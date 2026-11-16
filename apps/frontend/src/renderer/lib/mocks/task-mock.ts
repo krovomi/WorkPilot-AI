@@ -236,4 +236,7 @@ export const taskMock = {
 		success: false as const,
 		error: "Execution waves are not available in the browser preview",
 	}),
+	loadExecutionWaveRun: async () => ({ success: true as const, data: { run: null, ignored: false } }),
+	saveExecutionWaveRun: async () => ({ success: true as const }),
+	clearExecutionWaveRun: async () => ({ success: true as const }),
 };

@@ -148,3 +148,31 @@ export function scorePair(a: Footprint, b: Footprint): PairScore {
 	shared.sort((x, y) => x.localeCompare(y));
 	return { score, shared };
 }
+
+/**
+ * Fragile zones (`fragile-zones.ts`): normalized path -> the files the
+ * project's history changed together with it, often enough to count.
+ */
+export type CoChangeIndex = ReadonlyMap<string, ReadonlySet<string>>;
+
+/**
+ * Each coupled pair of files between two specs adds 1 to their score, at
+ * most this much: the history hints, shared files decide.
+ */
+export const MAX_FRAGILE_WEIGHT = 3;
+
+/**
+ * Coupled files between two specs, one on each side and neither shared
+ * (a shared file is already scored), as `x ↔ y` display pairs, sorted.
+ */
+export function fragileLinks(a: Footprint, b: Footprint, index: CoChangeIndex): string[] {
+	const links = new Set<string>();
+	for (const [x, shownX] of a) {
+		if (b.has(x)) continue;
+		for (const y of index.get(x) ?? []) {
+			if (a.has(y) || !b.has(y)) continue;
+			links.add(`${shownX} ↔ ${b.get(y) as string}`);
+		}
+	}
+	return [...links].sort((p, q) => p.localeCompare(q));
+}

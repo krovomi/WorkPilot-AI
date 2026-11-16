@@ -8,6 +8,8 @@ import type { IPCResult } from "../../../shared/types";
 import type {
 	ExecutionWavePlan,
 	ExecutionWavePlanRequest,
+	SavedWaveRunResult,
+	WaveRunState,
 } from "../../../shared/types/conflict-waves";
 import { invokeIpc } from "./ipc-utils";
 
@@ -15,11 +17,20 @@ export interface ConflictWavesAPI {
 	planExecutionWaves: (
 		request: ExecutionWavePlanRequest,
 	) => Promise<IPCResult<ExecutionWavePlan>>;
+	/** The run saved in the project, to resume after a restart. */
+	loadExecutionWaveRun: (projectId: string) => Promise<IPCResult<SavedWaveRunResult>>;
+	saveExecutionWaveRun: (state: WaveRunState) => Promise<IPCResult<void>>;
+	clearExecutionWaveRun: (projectId: string) => Promise<IPCResult<void>>;
 }
 
 export function createConflictWavesAPI(): ConflictWavesAPI {
 	return {
 		planExecutionWaves: (request) =>
 			invokeIpc(IPC_CHANNELS.CONFLICT_WAVES_PLAN, request),
+		loadExecutionWaveRun: (projectId) =>
+			invokeIpc(IPC_CHANNELS.CONFLICT_WAVES_RUN_LOAD, projectId),
+		saveExecutionWaveRun: (state) => invokeIpc(IPC_CHANNELS.CONFLICT_WAVES_RUN_SAVE, state),
+		clearExecutionWaveRun: (projectId) =>
+			invokeIpc(IPC_CHANNELS.CONFLICT_WAVES_RUN_CLEAR, projectId),
 	};
 }

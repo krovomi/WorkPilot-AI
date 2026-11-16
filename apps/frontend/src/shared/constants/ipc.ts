@@ -895,6 +895,10 @@ export const IPC_CHANNELS = {
 
 	// Execution waves across specs (Conflict Predictor, #358): plan by task id
 	CONFLICT_WAVES_PLAN: "conflictWaves:plan",
+	// The run, kept in <project>/.workpilot/ to survive a restart: by project id
+	CONFLICT_WAVES_RUN_LOAD: "conflictWaves:loadRun",
+	CONFLICT_WAVES_RUN_SAVE: "conflictWaves:saveRun",
+	CONFLICT_WAVES_RUN_CLEAR: "conflictWaves:clearRun",
 
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",

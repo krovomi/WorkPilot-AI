@@ -9,21 +9,15 @@
  */
 
 import type { Task, TaskStatus } from "../../shared/types";
-import type { WaveAdvanceWhen } from "../../shared/types/conflict-waves";
+import type { WaveAdvanceWhen, WaveRunState } from "../../shared/types/conflict-waves";
 import { indexTasksById, isBlocked } from "./kanban-dependencies";
 
-export interface WaveExecution {
-	projectId: string;
-	/** Task ids per wave, in merge order. */
-	waves: string[][];
-	/** 0-based index of the wave being run. */
-	current: number;
-	advanceWhen: WaveAdvanceWhen;
-	/** The project's max parallel tasks, from the plan the run started from. */
-	maxParallel: number;
+/**
+ * A run in memory: the state saved in the project after every step
+ * (`WaveRunState`, so it survives a restart) and whether it still runs.
+ */
+export interface WaveExecution extends WaveRunState {
 	status: "running" | "done" | "stopped";
-	/** Tasks this execution has already tried to start. */
-	started: string[];
 }
 
 export interface WaveStep {

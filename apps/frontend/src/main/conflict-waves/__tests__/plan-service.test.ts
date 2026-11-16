@@ -39,6 +39,9 @@ function makeDeps(tasks: Task[], settings: Partial<Project["settings"]> = { maxP
 		readWorktreeFiles: vi.fn(async (_path: string, specId: string) =>
 			specId === "002-running" ? ["src/cart.rs", "src/extra1.rs", "src/extra2.rs", "src/extra3.rs"] : null,
 		),
+		worktreeHead: vi.fn(async () => null),
+		testMerge: vi.fn(async () => null),
+		readCoChanges: vi.fn(async () => null),
 		now: () => new Date("2026-11-14T08:00:00Z"),
 	};
 }
@@ -65,6 +68,7 @@ describe("validateWavePlanRequest refuses hostile input", () => {
 		["an unknown policy", { projectId: PROJECT_ID, options: { unplannedPolicy: "yolo" } }],
 		["a huge drift threshold", { projectId: PROJECT_ID, options: { driftThreshold: 1e9 } }],
 		["options not an object", { projectId: PROJECT_ID, options: ["x"] }],
+		["a fragile zones option that is not a boolean", { projectId: PROJECT_ID, options: { fragileZones: "yes" } }],
 	])("refuses %s", (_name, raw) => {
 		expect(validateWavePlanRequest(raw).ok).toBe(false);
 	});
@@ -82,6 +86,7 @@ describe("validateWavePlanRequest refuses hostile input", () => {
 				tolerance: 0,
 				unplannedPolicy: "isolate",
 				driftThreshold: 3,
+				fragileZones: true,
 			},
 		});
 	});
@@ -89,12 +94,13 @@ describe("validateWavePlanRequest refuses hostile input", () => {
 	it("keeps explicit options in range", () => {
 		const result = validateWavePlanRequest({
 			projectId: PROJECT_ID,
-			options: { tolerance: 2, driftThreshold: 0, unplannedPolicy: "independent" },
+			options: { tolerance: 2, driftThreshold: 0, unplannedPolicy: "independent", fragileZones: false },
 		});
 		expect(result.ok && result.value).toMatchObject({
 			tolerance: 2,
 			driftThreshold: 0,
 			unplannedPolicy: "independent",
+			fragileZones: false,
 		});
 	});
 
@@ -192,5 +198,59 @@ describe("buildExecutionWavePlan", () => {
 	])("max parallel tasks %s gives waves of %d", (value, expected) => {
 		const project = { settings: { maxParallelTasks: value } } as unknown as Project;
 		expect(maxParallelOf(project)).toBe(expected);
+	});
+
+	it("test-merges only candidates with a worktree, by their spec id, and reports the checks", async () => {
+		const shared = [
+			makeTask("020-a", "backlog", ["src/cart.rs"], { specId: "020-a-spec" } as Partial<Task>),
+			makeTask("021-b", "backlog", ["src/cart.rs"]),
+			makeTask("022-c", "backlog", ["src/cart.rs"]),
+		];
+		const deps = makeDeps(shared, { maxParallelTasks: 5 });
+		deps.readWorktreeFiles = vi.fn(async (_p: string, specId: string) => (specId === "022-c" ? null : ["src/cart.rs"]));
+		deps.worktreeHead = vi.fn(async (_p: string, specId: string) => (specId === "020-a-spec" ? "a".repeat(40) : "b".repeat(40)));
+		deps.testMerge = vi.fn(async () => ({ verdict: "conflict" as const, files: ["src/cart.rs"] }));
+		const result = await buildExecutionWavePlan({ projectId: PROJECT_ID, options: { tolerance: 1 } }, deps);
+		if (!result.ok) throw new Error(result.error);
+		expect(deps.worktreeHead).toHaveBeenCalledWith("/projects/shop", "020-a-spec");
+		expect(deps.worktreeHead).toHaveBeenCalledWith("/projects/shop", "021-b");
+		expect(deps.worktreeHead).not.toHaveBeenCalledWith("/projects/shop", "022-c");
+		expect(result.value.mergeChecks).toEqual({ checked: 1, conflicts: 1, unchecked: 0, failed: 0 });
+		const waveOf = (id: string) => result.value.waves.findIndex((w) => w.taskIds.includes(id));
+		expect(waveOf("020-a")).not.toBe(waveOf("021-b"));
+	});
+
+	it("adds fragile zones from the project's history to the score, unless turned off", async () => {
+		const coupled = [
+			makeTask("030-api", "backlog", ["api/orders.proto"]),
+			makeTask("031-impl", "backlog", ["server/orders_impl.go"]),
+		];
+		const deps = makeDeps(coupled, { maxParallelTasks: 5 });
+		deps.readCoChanges = vi.fn(async () => ({
+			index: new Map([
+				["api/orders.proto", new Set(["server/orders_impl.go"])],
+				["server/orders_impl.go", new Set(["api/orders.proto"])],
+			]),
+			commits: 42,
+		}));
+		const on = await buildExecutionWavePlan({ projectId: PROJECT_ID }, deps);
+		if (!on.ok) throw new Error(on.error);
+		expect(deps.readCoChanges).toHaveBeenCalledWith("/projects/shop");
+		expect(on.value.fragileZones).toEqual({ enabled: true, commits: 42 });
+		expect(on.value.pairs[0]).toMatchObject({
+			score: 1,
+			sharedFiles: [],
+			fragileLinks: ["api/orders.proto ↔ server/orders_impl.go"],
+			blocking: true,
+		});
+		expect(on.value.waves).toHaveLength(2);
+
+		(deps.readCoChanges as ReturnType<typeof vi.fn>).mockClear();
+		const off = await buildExecutionWavePlan({ projectId: PROJECT_ID, options: { fragileZones: false } }, deps);
+		if (!off.ok) throw new Error(off.error);
+		expect(deps.readCoChanges).not.toHaveBeenCalled();
+		expect(off.value.fragileZones).toEqual({ enabled: false, commits: null });
+		expect(off.value.pairs).toEqual([]);
+		expect(off.value.waves).toHaveLength(1);
 	});
 });

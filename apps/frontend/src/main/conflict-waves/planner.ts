@@ -4,9 +4,13 @@
  * changes, the project's max parallel tasks) and stamps the result.
  *
  * 1. Footprint of each spec = files its plan declares ∪ files its worktree
- *    already changed (any language: the scorer weighs files by role).
+ *    already changed (any language: the scorer weighs files by role). With
+ *    `coChanges`, files the history changes together (one in each spec) add
+ *    to the pair's score: fragile zones.
  * 2. Conflict graph: an edge between two specs whose score is above the
- *    tolerance, or one of which has no known footprint (policy `isolate`).
+ *    tolerance, whose test merge conflicted (`mergeChecks`, run by the
+ *    service on pairs a previous pass put in one wave), or one of which has
+ *    no known footprint (policy `isolate`).
  * 3. Dependencies (`metadata.blockedBy`) are precedence constraints: a spec
  *    goes in a later wave than its blockers. A cycle cannot be planned
  *    without a human: its specs, and those waiting on them, are excluded.
@@ -25,12 +29,21 @@ import type {
 	UnplannedPolicy,
 	WaveDrift,
 	WaveExclusion,
+	WaveMergeVerdict,
 	WavePairRisk,
 	WavePlanTask,
 	WaveRunningConflict,
 } from "../../shared/types/conflict-waves";
 import type { TaskStatus } from "../../shared/types/task";
-import { buildFootprint, type Footprint, riskLevel, scorePair } from "./scorer";
+import {
+	buildFootprint,
+	type CoChangeIndex,
+	type Footprint,
+	fragileLinks,
+	MAX_FRAGILE_WEIGHT,
+	riskLevel,
+	scorePair,
+} from "./scorer";
 
 export interface PlannerTask {
 	id: string;
@@ -51,6 +64,16 @@ export interface PlannerOptions {
 	tolerance: number;
 	unplannedPolicy: UnplannedPolicy;
 	driftThreshold: number;
+	/** Test merges already run, by `pairKey`: a conflict is an edge. */
+	mergeChecks?: ReadonlyMap<string, MergeOutcome>;
+	/** Files the history changes together (fragile zones); absent when off. */
+	coChanges?: CoChangeIndex;
+}
+
+/** What a test merge of two worktrees said, and the files left in conflict. */
+export interface MergeOutcome {
+	verdict: WaveMergeVerdict;
+	files: readonly string[];
 }
 
 export interface PlannerResult {
@@ -66,7 +89,7 @@ export interface PlannerResult {
 	residualRisk: number;
 }
 
-const MAX_LISTED_FILES = 20;
+export const MAX_LISTED_FILES = 20;
 
 interface Node {
 	task: PlannerTask;
@@ -79,7 +102,8 @@ function toNode(task: PlannerTask): Node {
 	return { task, footprint, planned: footprint.size > 0 };
 }
 
-function pairKey(a: string, b: string): string {
+/** The same key for (a, b) and (b, a). */
+export function pairKey(a: string, b: string): string {
 	return a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
 }
 
@@ -156,6 +180,13 @@ export function planExecutionWaves(
 	const tolerance = Math.max(0, options.tolerance);
 	const isolateUnplanned = options.unplannedPolicy === "isolate";
 
+	/** Shared files by weight, plus the fragile links between the two, capped. */
+	const pairScore = (a: Footprint, b: Footprint) => {
+		const { score, shared } = scorePair(a, b);
+		const links = options.coChanges ? fragileLinks(a, b, options.coChanges) : [];
+		return { score: score + Math.min(links.length, MAX_FRAGILE_WEIGHT), shared, links };
+	};
+
 	const sorted = [...candidates].sort(compareBase);
 	const nodes = new Map(sorted.map((t) => [t.id, toNode(t)]));
 	const ids = sorted.map((t) => t.id);
@@ -170,12 +201,14 @@ export function planExecutionWaves(
 			const a = nodes.get(ids[i]) as Node;
 			const b = nodes.get(ids[j]) as Node;
 			const unknown = !a.planned || !b.planned;
-			const { score, shared } = scorePair(a.footprint, b.footprint);
-			const isBlocking = unknown ? isolateUnplanned : score > tolerance;
+			const { score, shared, links } = pairScore(a.footprint, b.footprint);
 			const key = pairKey(a.task.id, b.task.id);
+			const merge = options.mergeChecks?.get(key);
+			const conflicted = merge?.verdict === "conflict";
+			const isBlocking = unknown ? isolateUnplanned : score > tolerance || conflicted;
 			scores.set(key, score);
 			if (isBlocking) blocking.add(key);
-			if (score > 0 || (unknown && isolateUnplanned)) {
+			if (score > 0 || (unknown && isolateUnplanned) || conflicted) {
 				pairs.push({
 					a: a.task.id,
 					b: b.task.id,
@@ -184,6 +217,11 @@ export function planExecutionWaves(
 					sharedFiles: shared.slice(0, MAX_LISTED_FILES),
 					unknown,
 					blocking: isBlocking,
+					...(merge && {
+						mergeCheck: merge.verdict,
+						conflictFiles: merge.files.slice(0, MAX_LISTED_FILES),
+					}),
+					...(links.length > 0 ? { fragileLinks: links.slice(0, MAX_LISTED_FILES) } : {}),
 				});
 				// An unknown pair weighs one: enough to order, not to dominate.
 				const weight = score > 0 ? score : 1;
@@ -308,7 +346,7 @@ export function planExecutionWaves(
 	for (const id of plannable) {
 		const node = nodes.get(id) as Node;
 		for (const other of runningNodes) {
-			const { score } = scorePair(node.footprint, other.footprint);
+			const { score } = pairScore(node.footprint, other.footprint);
 			if (score > tolerance) {
 				runningConflicts.push({ taskId: id, runningTaskId: other.task.id, score });
 			}
