@@ -10,7 +10,9 @@ The relay is kept to the project's own repository, read from the project's
 ``repo_url`` on the server, never from the request:
 
 - a REST call is one of the calls the views make (``_ROUTES``) on
-  ``/repos/<owner>/<repo>``, or a read of ``/user`` (whose token this is);
+  ``/repos/<owner>/<repo>``, a read of ``/user`` (whose token this is), or
+  the count of the repository's open issues (``/search/issues``, its query
+  written here, the views' only search);
   the URL sent is rebuilt from the route's own words, the project's
   repository and numbers, never copied from the request, and the query
   string keeps only the views' keys, sent as parameters;
@@ -191,6 +193,26 @@ def match_route(
     return None
 
 
+def _open_issue_count(endpoint: str, repo: str) -> tuple[str, dict[str, str]] | None:
+    """The connection check's count of the open issues, a search GitHub
+    answers with ``total_count``: its query names the project's repository
+    and nothing else, and is written again from ``repo``."""
+    split = urlsplit(endpoint)
+    pairs = parse_qsl(split.query, keep_blank_values=True)
+    query = dict(pairs)
+    wanted = f"repo:{repo} is:issue is:open"
+    per_page = _number(query.get("per_page", ""))
+    if (
+        split.path != "/search/issues"
+        or split.fragment
+        or len(pairs) != 2
+        or query.get("q", "").lower() != wanted.lower()
+        or per_page is None
+    ):
+        return None
+    return "/search/issues", {"q": wanted, "per_page": per_page}
+
+
 def api_call(
     method: str, endpoint: str, repo: str
 ) -> tuple[str, dict[str, str], tuple[str, ...]] | None:
@@ -200,6 +222,9 @@ def api_call(
     The path is rebuilt from the route, the project's ``repo`` and numbers:
     it holds no text of ``endpoint``.
     """
+    if method == "GET" and endpoint.startswith("/search/"):
+        count = _open_issue_count(endpoint, repo)
+        return None if count is None else (*count, ())
     found = split_call(method, endpoint, _QUERY_KEYS)
     if found is None:
         return None
