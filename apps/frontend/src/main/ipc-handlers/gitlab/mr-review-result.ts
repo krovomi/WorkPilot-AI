@@ -2,7 +2,7 @@
  * A saved MR review, as the GitLab runner writes it
  * (`.workpilot/gitlab/mr/review_<iid>.json`), read for the view, and the
  * note a review is posted as on the merge request. A local project's review
- * is read from its folder (`mr-review-handlers.ts`), a server project's from
+ * is read from its folder (`mr-review-run.ts`), a server project's from
  * the server (`server-mr-review.ts`).
  */
 

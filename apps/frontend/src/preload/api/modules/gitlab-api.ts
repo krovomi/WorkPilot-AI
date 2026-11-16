@@ -95,7 +95,6 @@ export interface GitLabAPI {
 	) => Promise<IPCResult<GitLabMergeRequest>>;
 
 	// MR Review operations (AI-powered)
-	getGitLabMRDiff: (projectId: string, mrIid: number) => Promise<string | null>;
 	getGitLabMRReview: (
 		projectId: string,
 		mrIid: number,
@@ -380,9 +379,6 @@ export const createGitLabAPI = (): GitLabAPI => ({
 		),
 
 	// MR Review operations (AI-powered)
-	getGitLabMRDiff: (projectId: string, mrIid: number): Promise<string | null> =>
-		invokeIpc(IPC_CHANNELS.GITLAB_MR_GET_DIFF, projectId, mrIid),
-
 	getGitLabMRReview: (
 		projectId: string,
 		mrIid: number,
