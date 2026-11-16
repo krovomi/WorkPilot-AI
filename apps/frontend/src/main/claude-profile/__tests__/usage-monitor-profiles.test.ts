@@ -149,6 +149,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllGlobals();
+	vi.unstubAllEnvs();
 	vi.restoreAllMocks();
 	vi.useRealTimers();
 	if (savedDebug === undefined) delete process.env.DEBUG;
@@ -726,6 +727,9 @@ describe("the public controls", () => {
 describe("debug logging", () => {
 	it("prints the monitor's steps and the endpoint construction only with DEBUG=true", async () => {
 		process.env.DEBUG = "true";
+		// The lines are read as text: a terminal (or the pre-push hook's FORCE_COLOR)
+		// would otherwise colour each segment and split "[UsageMonitor] Initialized".
+		vi.stubEnv("NO_COLOR", "1");
 		const debugMonitor = newMonitor();
 		world.apiFile.profiles = [
 			{ id: "local", name: "Ollama", baseUrl: "http://localhost:11434", apiKey: "x" },
