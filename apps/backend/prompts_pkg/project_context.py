@@ -30,9 +30,17 @@ def load_project_index(project_dir: Path) -> dict:
 
     try:
         with open(index_file, encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
+            index = json.load(f)
+    except (OSError, ValueError):  # unreadable, not UTF-8, or not JSON
         return {}
+    return index if isinstance(index, dict) else {}
+
+
+def _names(value) -> set[str]:
+    """Lower-cased dependency names from a list, or from a name -> version map."""
+    if not isinstance(value, (list, tuple, dict)):
+        return set()
+    return {dep.lower() for dep in value if isinstance(dep, str)}
 
 
 def detect_project_capabilities(project_index: dict) -> dict:
@@ -76,7 +84,9 @@ def detect_project_capabilities(project_index: dict) -> dict:
         "has_database": False,
     }
 
-    services = project_index.get("services", {})
+    services = (
+        project_index.get("services", {}) if isinstance(project_index, dict) else {}
+    )
 
     # Handle both dict format (services by name) and list format
     if isinstance(services, dict):
@@ -90,14 +100,9 @@ def detect_project_capabilities(project_index: dict) -> dict:
         if not isinstance(service, dict):
             continue
 
-        # Collect all dependencies
-        deps = set()
-        for dep in service.get("dependencies", []):
-            if isinstance(dep, str):
-                deps.add(dep.lower())
-        for dep in service.get("dev_dependencies", []):
-            if isinstance(dep, str):
-                deps.add(dep.lower())
+        deps = _names(service.get("dependencies")) | _names(
+            service.get("dev_dependencies")
+        )
 
         # Get framework (normalize to lowercase)
         framework = str(service.get("framework", "")).lower()
@@ -164,6 +169,24 @@ def detect_project_capabilities(project_index: dict) -> dict:
     return capabilities
 
 
+_DEPENDENCY_FILES = (
+    "package.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "Gemfile",
+    "go.mod",
+    "Cargo.toml",
+    "composer.json",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "pubspec.yaml",
+    "Package.swift",
+    "mix.exs",
+)
+_NOT_A_SERVICE = ("node_modules", "__pycache__", "dist", "build")
+
+
 def should_refresh_project_index(project_dir: Path) -> bool:
     """
     Check if project_index.json needs refresh based on dependency file changes.
@@ -179,65 +202,32 @@ def should_refresh_project_index(project_dir: Path) -> bool:
     """
     index_file = project_dir / ".workpilot" / "project_index.json"
 
-    if not index_file.exists():
-        return True  # No index, must generate
-
     try:
         index_mtime = index_file.stat().st_mtime
     except OSError:
-        return True  # Can't stat file, regenerate
+        return True  # No index, or one we can't inspect: (re)generate
 
-    # Check all dependency files that could change frameworks
-    dep_files = [
-        project_dir / "package.json",
-        project_dir / "pyproject.toml",
-        project_dir / "requirements.txt",
-        project_dir / "Gemfile",
-        project_dir / "go.mod",
-        project_dir / "Cargo.toml",
-        project_dir / "composer.json",
-    ]
-
-    for dep_file in dep_files:
-        try:
-            dep_mtime = dep_file.stat().st_mtime
-            if dep_mtime > index_mtime:
-                return True  # Dependency file changed, refresh needed
-        except (OSError, FileNotFoundError):
-            continue  # Skip files we can't stat or don't exist
-
-    # Also check subdirectories for monorepos (first level only)
+    # The project's own dependency files, then each first-level service's
+    # (monorepos), whatever the language.
+    folders = [project_dir]
     try:
-        for subdir in project_dir.iterdir():
-            if not subdir.is_dir():
-                continue
-            # Skip hidden dirs and common non-service dirs
-            if subdir.name.startswith(".") or subdir.name in (
-                "node_modules",
-                "__pycache__",
-                "dist",
-                "build",
-                ".git",
-            ):
-                continue
-
-            subdir_pkg = subdir / "package.json"
-            try:
-                pkg_mtime = subdir_pkg.stat().st_mtime
-                if pkg_mtime > index_mtime:
-                    return True
-            except (OSError, FileNotFoundError):
-                continue
-
-            subdir_pyproject = subdir / "pyproject.toml"
-            try:
-                pyproject_mtime = subdir_pyproject.stat().st_mtime
-                if pyproject_mtime > index_mtime:
-                    return True
-            except (OSError, FileNotFoundError):
-                continue
+        folders += [
+            sub
+            for sub in project_dir.iterdir()
+            if sub.is_dir()
+            and not sub.name.startswith(".")
+            and sub.name not in _NOT_A_SERVICE
+        ]
     except OSError:
-        pass  # Can't iterate dir, use cached index
+        pass  # Can't list the folder: judge on the root files alone
+
+    for folder in folders:
+        for name in _DEPENDENCY_FILES:
+            try:
+                if (folder / name).stat().st_mtime > index_mtime:
+                    return True  # Dependency file changed, refresh needed
+            except OSError:
+                continue  # Missing or unreadable
 
     return False  # Cache is fresh
 
@@ -254,11 +244,9 @@ def get_mcp_tools_for_project(capabilities: dict) -> list[str]:
     """
     tools = []
 
-    # Desktop app validation
+    # Desktop app validation (Tauri has no MCP tool doc: none is wired)
     if capabilities.get("is_electron"):
         tools.append("mcp_tools/electron_validation.md")
-    if capabilities.get("is_tauri"):
-        tools.append("mcp_tools/tauri_validation.md")
 
     # Web browser automation (for non-Electron web apps)
     if capabilities.get("is_web_frontend") and not capabilities.get("is_electron"):

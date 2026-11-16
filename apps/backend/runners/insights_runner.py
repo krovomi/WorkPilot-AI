@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-Insights Runner - AI chat for codebase insights using Claude SDK
+Insights Runner - AI chat about a codebase, on the project's provider
 
-This script provides an AI-powered chat interface for asking questions
-about a codebase. It can also suggest tasks based on the conversation.
+The app asks a question (with the conversation so far); the runner answers on
+stdout, line by line, with the markers the app reads: ``__TOOL_START__`` and
+``__TOOL_END__`` around each tool, ``__EXPLANATION__`` in Learning Mode, and a
+``__TASK_SUGGESTION__`` the model writes itself. Every provider goes through
+``create_agent_client``. A chat that cannot be answered says why on stderr
+and exits with 1: the app shows that, never a made-up answer.
 """
 
 import argparse
@@ -18,25 +22,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Validate platform-specific dependencies BEFORE any imports that might
 # trigger a pywintypes import (the MCP library imports win32api; ACS-253)
 from cli.utils import import_dotenv
-from core.auth import ensure_claude_code_oauth_token, get_auth_token
 from core.dependency_validator import validate_platform_dependencies
-from foundation.debug import (
-    debug,
-    debug_detailed,
-    debug_error,
-    debug_section,
-    debug_success,
-)
+from foundation.debug import debug, debug_error, debug_section, debug_success
 from learning import ExplanationLevel, LearningMode, LearningModeConfig
 from phase_config import get_thinking_budget, resolve_model_id
-
-try:
-    # Availability only: the client itself comes from `create_simple_client`.
-    import claude_agent_sdk  # noqa: F401
-
-    SDK_AVAILABLE = True
-except ImportError:
-    SDK_AVAILABLE = False
 
 validate_platform_dependencies()
 
@@ -48,59 +37,57 @@ if env_file.exists():
     load_dotenv(env_file)
 
 
+def _read_json(path: Path) -> dict | None:
+    """A JSON object from a .workpilot file, or None if it is missing or unreadable."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def load_project_context(project_dir: str) -> str:
     """Load project context for the AI."""
     context_parts = []
+    workpilot = Path(project_dir) / ".workpilot"
 
-    # Load project index if available (from .workpilot - the installed instance)
-    index_path = Path(project_dir) / ".workpilot" / "project_index.json"
-    if index_path.exists():
-        try:
-            with open(index_path, encoding="utf-8") as f:
-                index = json.load(f)
-            # Summarize the index for context
-            summary = {
-                "project_root": index.get("project_root", ""),
-                "project_type": index.get("project_type", "unknown"),
-                "services": list(index.get("services", {}).keys()),
-                "infrastructure": index.get("infrastructure", {}),
-            }
-            context_parts.append(
-                f"## Project Structure\n```json\n{json.dumps(summary, indent=2)}\n```"
-            )
-        except Exception:
-            pass
+    # Project index (from .workpilot - the installed instance)
+    index = _read_json(workpilot / "project_index.json")
+    if index is not None:
+        services = index.get("services")
+        summary = {
+            "project_root": index.get("project_root", ""),
+            "project_type": index.get("project_type", "unknown"),
+            "services": list(services) if isinstance(services, dict) else [],
+            "infrastructure": index.get("infrastructure", {}),
+        }
+        context_parts.append(
+            f"## Project Structure\n```json\n{json.dumps(summary, indent=2)}\n```"
+        )
 
-    # Load roadmap if available
-    roadmap_path = Path(project_dir) / ".workpilot" / "roadmap" / "roadmap.json"
-    if roadmap_path.exists():
-        try:
-            with open(roadmap_path, encoding="utf-8") as f:
-                roadmap = json.load(f)
-            # Summarize roadmap
-            features = roadmap.get("features", [])
-            feature_summary = [
-                {"title": f.get("title", ""), "status": f.get("status", "")}
-                for f in features[:10]
-            ]
-            context_parts.append(
-                f"## Roadmap Features\n```json\n{json.dumps(feature_summary, indent=2)}\n```"
-            )
-        except Exception:
-            pass
+    roadmap = _read_json(workpilot / "roadmap" / "roadmap.json")
+    features = roadmap.get("features") if roadmap is not None else None
+    if isinstance(features, list):
+        feature_summary = [
+            {"title": f.get("title", ""), "status": f.get("status", "")}
+            for f in features[:10]
+            if isinstance(f, dict)
+        ]
+        context_parts.append(
+            f"## Roadmap Features\n```json\n{json.dumps(feature_summary, indent=2)}\n```"
+        )
 
-    # Load existing tasks
-    tasks_path = Path(project_dir) / ".workpilot" / "specs"
-    if tasks_path.exists():
-        try:
-            task_dirs = [d for d in tasks_path.iterdir() if d.is_dir()]
-            task_names = [d.name for d in task_dirs[:10]]
-            if task_names:
-                context_parts.append(
-                    "## Existing Tasks/Specs\n- " + "\n- ".join(task_names)
-                )
-        except Exception:
-            pass
+    # Existing tasks
+    try:
+        task_names = sorted(
+            d.name for d in (workpilot / "specs").iterdir() if d.is_dir()
+        )
+    except OSError:
+        task_names = []
+    if task_names:
+        context_parts.append(
+            "## Existing Tasks/Specs\n- " + "\n- ".join(task_names[:10])
+        )
 
     return (
         "\n\n".join(context_parts)
@@ -139,8 +126,10 @@ def _build_full_prompt(message: str, history: list) -> str:
     """Build the prompt from the latest message + prior conversation."""
     conversation_context = ""
     for msg in history[:-1]:  # Exclude the latest message
+        if not isinstance(msg, dict):
+            continue
         role = "User" if msg.get("role") == "user" else "Assistant"
-        conversation_context += f"\n{role}: {msg['content']}\n"
+        conversation_context += f"\n{role}: {msg.get('content', '')}\n"
     if conversation_context.strip():
         return f"""Previous conversation:
 {conversation_context}
@@ -149,167 +138,85 @@ Current question: {message}"""
     return message
 
 
-def _init_learning_mode(enabled: bool, explanation_level: str):
-    """Initialise Learning Mode (shared by both insights code paths)."""
+_LEVELS = {
+    "beginner": ExplanationLevel.BEGINNER,
+    "intermediate": ExplanationLevel.INTERMEDIATE,
+    "advanced": ExplanationLevel.ADVANCED,
+    "expert": ExplanationLevel.EXPERT,
+}
+
+
+def _init_learning_mode(enabled: bool, explanation_level: str) -> LearningMode | None:
+    """Learning Mode at the chosen level, or None when it is off."""
     if not enabled:
         return None
-    try:
-        level_map = {
-            "beginner": ExplanationLevel.BEGINNER,
-            "intermediate": ExplanationLevel.INTERMEDIATE,
-            "advanced": ExplanationLevel.ADVANCED,
-            "expert": ExplanationLevel.EXPERT,
-        }
-        config = LearningModeConfig(
-            enabled=True,
-            explanation_level=level_map.get(
-                explanation_level, ExplanationLevel.INTERMEDIATE
-            ),
+    level = _LEVELS.get(explanation_level, ExplanationLevel.INTERMEDIATE)
+    return LearningMode(LearningModeConfig(enabled=True, explanation_level=level))
+
+
+def _tool_input(inp: object) -> str:
+    """What a tool works on, as the app shows it beside the tool's name."""
+    if not isinstance(inp, dict):
+        return ""
+    if "pattern" in inp:
+        return f"pattern: {inp['pattern']}"
+    if "file_path" in inp:
+        # The whole path, so the app shows exactly which file is read.
+        fp = str(inp["file_path"])
+        return ("..." + fp[-1997:]) if len(fp) > 2000 else fp
+    if "path" in inp:
+        return str(inp["path"])
+    return ""
+
+
+def _explain(learning_mode: LearningMode, tool_name: str, tool_input: str) -> None:
+    """Learning Mode's explanation of a tool call, as an ``__EXPLANATION__`` line."""
+    explanation = learning_mode.explain_tool_use(
+        tool_name=tool_name,
+        tool_input={"input": tool_input} if tool_input else {},
+        reason="Exploring codebase to answer user question",
+        expected_outcome="Find relevant information",
+    )
+    if explanation:
+        explanation_json = json.dumps(
+            {
+                "category": explanation.category,
+                "title": explanation.title,
+                "explanation": explanation.explanation,
+                "difficulty": explanation.difficulty.value,
+            }
         )
-        return LearningMode(config)
-    except Exception as e:
-        debug_error("insights_runner", f"Failed to initialize Learning Mode: {e}")
-        return None
+        print(f"__EXPLANATION__:{explanation_json}", flush=True)
 
 
-async def run_with_agent_client(
-    project_dir: str,
-    message: str,
-    history: list,
-    model: str,
-    thinking_level: str,
-    learning_mode_enabled: bool,
-    explanation_level: str,
-    provider: str,
+def _record_usage(
+    client: object, spec_dir: Path, project_path: Path, model: str, provider: str
 ) -> None:
-    """Provider-agnostic insights chat (Copilot / OpenAI / Windsurf / …).
-
-    Routes through ``core.client.create_agent_client`` — which wires per-provider
-    tool execution (Read/Glob/Grep) — using the insights system prompt via the
-    ``system_prompt`` override. Streams text and tool markers exactly like the
-    Claude path. Raises on failure so the caller can fall back to the original
-    Claude SDK implementation in ``run_with_sdk``.
-    """
-    from core.agent_client import ContentBlockType
-    from core.client import create_agent_client
-
-    project_path = Path(project_dir).resolve()
-    system_prompt = build_system_prompt(project_dir)
-    learning_mode = _init_learning_mode(learning_mode_enabled, explanation_level)
-    full_prompt = _build_full_prompt(message, history)
-    max_thinking_tokens = get_thinking_budget(thinking_level)
-
-    synthetic_spec_dir = project_path / ".workpilot" / "insights"
-    try:
-        synthetic_spec_dir.mkdir(parents=True, exist_ok=True)
-    except Exception:
-        synthetic_spec_dir = project_path
-
-    debug(
-        "insights_runner",
-        "Using provider-agnostic client",
-        provider=provider,
-        model=model,
-    )
-
-    client = create_agent_client(
-        project_dir=project_path,
-        spec_dir=synthetic_spec_dir,
-        model=resolve_model_id(model),
-        agent_type="insights",
-        max_thinking_tokens=max_thinking_tokens,
-        provider=provider,
-        system_prompt=system_prompt,
-    )
-
-    response_text = ""
-    current_tool = None
-    async with client:
-        await client.query(full_prompt)
-        async for msg in client.receive_response():
-            for block in getattr(msg, "content", []) or []:
-                btype = getattr(block, "type", None)
-                if btype == ContentBlockType.TEXT and getattr(block, "text", None):
-                    print(block.text, flush=True)
-                    response_text += block.text
-                elif btype == ContentBlockType.TOOL_USE:
-                    tool_name = getattr(block, "tool_name", "") or ""
-                    inp = getattr(block, "tool_input", {}) or {}
-                    tool_input = ""
-                    if isinstance(inp, dict):
-                        if "pattern" in inp:
-                            tool_input = f"pattern: {inp['pattern']}"
-                        elif "file_path" in inp:
-                            fp = str(inp["file_path"])
-                            tool_input = ("..." + fp[-1997:]) if len(fp) > 2000 else fp
-                        elif "path" in inp:
-                            tool_input = str(inp["path"])
-                    current_tool = tool_name
-                    print(
-                        f"__TOOL_START__:{json.dumps({'name': tool_name, 'input': tool_input})}",
-                        flush=True,
-                    )
-                    if learning_mode:
-                        try:
-                            explanation = learning_mode.explain_tool_use(
-                                tool_name=tool_name,
-                                tool_input={"input": tool_input} if tool_input else {},
-                                reason="Exploring codebase to answer user question",
-                                expected_outcome="Find relevant information",
-                            )
-                            if explanation:
-                                # Correction : On pré-calcule le JSON pour éviter le saut de ligne interdit dans la f-string
-                                explanation_json = json.dumps(
-                                    {
-                                        "category": explanation.category,
-                                        "title": explanation.title,
-                                        "explanation": explanation.explanation,
-                                        "difficulty": explanation.difficulty.value,
-                                    }
-                                )
-                                print(
-                                    f"__EXPLANATION__:{explanation_json}",
-                                    flush=True,
-                                )
-                        except Exception as e:
-                            debug_error(
-                                "insights_runner",
-                                f"Learning Mode explanation error: {e}",
-                            )
-                elif btype == ContentBlockType.TOOL_RESULT and current_tool:
-                    print(
-                        f"__TOOL_END__:{json.dumps({'name': current_tool})}",
-                        flush=True,
-                    )
-                    current_tool = None
-
-    if response_text and not response_text.endswith("\n"):
-        print()
-
-    # Best-effort usage tracking (mirrors the Claude path).
+    """What the chat cost, in the same usage view as the builds (best effort)."""
     usage = getattr(client, "last_usage", None)
-    if isinstance(usage, dict):
-        try:
-            from core.usage_tracker import record_session_usage
+    if not isinstance(usage, dict):
+        return
+    try:
+        from core.usage_tracker import record_session_usage
 
-            record_session_usage(
-                spec_dir=synthetic_spec_dir,
-                project_dir=project_path,
-                phase="insights",
-                agent_type="insights",
-                model=resolve_model_id(model) or model,
-                provider=provider,
-                input_tokens=usage.get("input_tokens", 0),
-                output_tokens=usage.get("output_tokens", 0),
-                cost_usd=usage.get("cost_usd", 0.0),
-                cache_creation_input_tokens=usage.get("cache_creation_input_tokens", 0),
-                cache_read_input_tokens=usage.get("cache_read_input_tokens", 0),
-            )
-        except Exception as _ute:
-            debug_error("insights_runner", f"usage tracking skipped: {_ute}")
+        record_session_usage(
+            spec_dir=spec_dir,
+            project_dir=project_path,
+            phase="insights",
+            agent_type="insights",
+            model=resolve_model_id(model) or model,
+            provider=provider,
+            input_tokens=usage.get("input_tokens", 0),
+            output_tokens=usage.get("output_tokens", 0),
+            cost_usd=usage.get("cost_usd", 0.0),
+            cache_creation_input_tokens=usage.get("cache_creation_input_tokens", 0),
+            cache_read_input_tokens=usage.get("cache_read_input_tokens", 0),
+        )
+    except Exception as exc:  # usage is bookkeeping: the answer is already out
+        debug_error("insights_runner", f"usage tracking skipped: {exc}")
 
 
-async def run_with_sdk(
+async def run_chat(
     project_dir: str,
     message: str,
     history: list,
@@ -318,327 +225,83 @@ async def run_with_sdk(
     learning_mode_enabled: bool = False,
     explanation_level: str = "intermediate",
 ) -> None:
-    """Run the chat using Claude SDK with streaming.
+    """Answer one chat turn on the project's provider, streaming to stdout.
 
-    For non-Claude providers, delegates to the provider-agnostic
-    ``run_with_agent_client``; the Claude SDK implementation below stays as the
-    fallback (used for Claude, and if the provider-agnostic path fails).
+    Raises when the turn cannot be answered (no client, no sign-in, the
+    provider failing): the caller reports it. The chat never moves to another
+    provider than the one the project uses.
     """
-    try:
-        from core.client import peek_active_provider
+    from core.agent_client import ContentBlockType
+    from core.client import create_agent_client, peek_active_provider
 
-        # Peeked: a chat turn is not the session a "resume with X" was for.
-        active_provider = peek_active_provider(Path(project_dir).resolve())
-    except Exception:
-        active_provider = "claude"
-
-    if active_provider not in ("claude", "anthropic"):
-        try:
-            await run_with_agent_client(
-                project_dir,
-                message,
-                history,
-                model,
-                thinking_level,
-                learning_mode_enabled,
-                explanation_level,
-                active_provider,
-            )
-            return
-        except Exception as e:
-            print(
-                f"Provider-agnostic insights failed ({e}); "
-                "falling back to Claude SDK path",
-                file=sys.stderr,
-            )
-            # Fall through to the original Claude SDK implementation below.
-
-    if not SDK_AVAILABLE:
-        print("Claude SDK not available, falling back to simple mode", file=sys.stderr)
-        run_simple(project_dir, message, history)
-        return
-
-    if not get_auth_token():
-        print(
-            "No authentication token found, falling back to simple mode",
-            file=sys.stderr,
-        )
-        run_simple(project_dir, message, history)
-        return
-
-    # Ensure SDK can find the token
-    ensure_claude_code_oauth_token()
-
-    # Initialize Learning Mode if enabled
-    learning_mode = None
-    if learning_mode_enabled:
-        try:
-            level_map = {
-                "beginner": ExplanationLevel.BEGINNER,
-                "intermediate": ExplanationLevel.INTERMEDIATE,
-                "advanced": ExplanationLevel.ADVANCED,
-                "expert": ExplanationLevel.EXPERT,
-            }
-            config = LearningModeConfig(
-                enabled=True,
-                explanation_level=level_map.get(
-                    explanation_level, ExplanationLevel.INTERMEDIATE
-                ),
-            )
-            learning_mode = LearningMode(config)
-            debug("insights_runner", "Learning Mode enabled", level=explanation_level)
-        except Exception as e:
-            debug_error("insights_runner", f"Failed to initialize Learning Mode: {e}")
-
-    system_prompt = build_system_prompt(project_dir)
     project_path = Path(project_dir).resolve()
+    # Peeked: a chat turn is not the session a "resume with X" was for.
+    provider = peek_active_provider(project_path)
+    learning_mode = _init_learning_mode(learning_mode_enabled, explanation_level)
 
-    # Build conversation context from history
-    conversation_context = ""
-    for msg in history[:-1]:  # Exclude the latest message
-        role = "User" if msg.get("role") == "user" else "Assistant"
-        conversation_context += f"\n{role}: {msg['content']}\n"
+    # Usage is recorded against a spec folder; a chat has none of its own.
+    spec_dir = project_path / ".workpilot" / "insights"
+    try:
+        spec_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        spec_dir = project_path
 
-    # Build the full prompt with conversation history
-    full_prompt = message
-    if conversation_context.strip():
-        full_prompt = f"""Previous conversation:
-{conversation_context}
-
-Current question: {message}"""
-
-    # Convert thinking level to token budget
-    max_thinking_tokens = get_thinking_budget(thinking_level)
-
-    debug(
-        "insights_runner",
-        "Using model configuration",
-        model=model,
-        thinking_level=thinking_level,
-        max_thinking_tokens=max_thinking_tokens,
+    debug("insights_runner", "Answering", provider=provider, model=model)
+    client = create_agent_client(
+        project_dir=project_path,
+        spec_dir=spec_dir,
+        model=resolve_model_id(model),
+        agent_type="insights",
+        max_thinking_tokens=get_thinking_budget(thinking_level),
+        provider=provider,
+        system_prompt=build_system_prompt(project_dir),
+        # A chat answers by itself, with the read tools its type declares.
+        use_subagents=False,
     )
 
+    ends_with_newline = True
+    current_tool = None
+    async with client:
+        await client.query(_build_full_prompt(message, history))
+        async for msg in client.receive_response():
+            for block in getattr(msg, "content", None) or []:
+                btype = getattr(block, "type", None)
+                if btype == ContentBlockType.TEXT and getattr(block, "text", None):
+                    print(block.text, flush=True)
+                    ends_with_newline = block.text.endswith("\n")
+                elif btype == ContentBlockType.TOOL_USE:
+                    tool_name = getattr(block, "tool_name", "") or ""
+                    tool_input = _tool_input(getattr(block, "tool_input", None))
+                    current_tool = tool_name
+                    marker = json.dumps({"name": tool_name, "input": tool_input})
+                    print(f"__TOOL_START__:{marker}", flush=True)
+                    if learning_mode:
+                        _explain(learning_mode, tool_name, tool_input)
+                elif btype == ContentBlockType.TOOL_RESULT and current_tool:
+                    marker = json.dumps({"name": current_tool})
+                    print(f"__TOOL_END__:{marker}", flush=True)
+                    current_tool = None
+
+    if not ends_with_newline:
+        print()
+    _record_usage(client, spec_dir, project_path, model, provider)
+
+
+def _load_history(args: argparse.Namespace) -> list:
+    """The conversation so far, from --history-file or --history; [] if unreadable."""
     try:
-        from core.simple_client import create_simple_client
-
-        # The same `insights` declaration the other providers run under
-        # (`run_with_agent_client`). These options used to be built here, with
-        # nothing denied: the user's and the project's settings files decided
-        # what an insights chat could run. A `None` budget is the "none" level,
-        # which is also the type's default.
-        client = create_simple_client(
-            agent_type="insights",
-            model=resolve_model_id(model),  # Resolve via API Profile if configured
-            system_prompt=system_prompt,
-            cwd=project_path,
-            max_turns=30,  # Allow sufficient turns for codebase exploration
-            max_thinking_tokens=max_thinking_tokens,
-        )
-
-        # Use async context manager pattern
-        async with client:
-            # Send the query
-            await client.query(full_prompt)
-
-            # Stream the response
-            response_text = ""
-            current_tool = None
-            result_msg = None  # Captured for cost/usage tracking after the loop.
-
-            async for msg in client.receive_response():
-                msg_type = type(msg).__name__
-                debug_detailed("insights_runner", "Received message", msg_type=msg_type)
-
-                if msg_type == "ResultMessage":
-                    result_msg = msg
-                if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-                    for block in msg.content:
-                        block_type = type(block).__name__
-                        debug_detailed(
-                            "insights_runner", "Processing block", block_type=block_type
-                        )
-                        if block_type == "TextBlock" and hasattr(block, "text"):
-                            text = block.text
-                            debug_detailed(
-                                "insights_runner", "Text block", text_length=len(text)
-                            )
-                            # Print text with newline to ensure proper line separation for parsing
-                            print(text, flush=True)
-                            response_text += text
-                        elif block_type == "ToolUseBlock" and hasattr(block, "name"):
-                            # Emit tool start marker for UI feedback
-                            tool_name = block.name
-                            tool_input = ""
-
-                            # Extract a brief description of what the tool is doing
-                            if hasattr(block, "input") and block.input:
-                                inp = block.input
-                                if isinstance(inp, dict):
-                                    if "pattern" in inp:
-                                        tool_input = f"pattern: {inp['pattern']}"
-                                    elif "file_path" in inp:
-                                        # Show the full path so the UI reveals
-                                        # exactly which file is being touched.
-                                        fp = str(inp["file_path"])
-                                        if len(fp) > 2000:
-                                            fp = "..." + fp[-1997:]
-                                        tool_input = fp
-                                    elif "path" in inp:
-                                        tool_input = inp["path"]
-
-                            current_tool = tool_name
-                            print(
-                                f"__TOOL_START__:{json.dumps({'name': tool_name, 'input': tool_input})}",
-                                flush=True,
-                            )
-
-                            # Learning Mode: Explain tool usage
-                            if learning_mode:
-                                try:
-                                    explanation = learning_mode.explain_tool_use(
-                                        tool_name=tool_name,
-                                        tool_input={"input": tool_input}
-                                        if tool_input
-                                        else {},
-                                        reason="Exploring codebase to answer user question",
-                                        expected_outcome="Find relevant information",
-                                    )
-                                    if explanation:
-                                        # Extrayez le JSON dans une variable dédiée
-                                        explanation_json = json.dumps(
-                                            {
-                                                "category": explanation.category,
-                                                "title": explanation.title,
-                                                "explanation": explanation.explanation,
-                                                "difficulty": explanation.difficulty.value,
-                                            }
-                                        )
-                                        print(
-                                            f"__EXPLANATION__:{explanation_json}",
-                                            flush=True,
-                                        )
-
-                                except Exception as e:
-                                    debug_error(
-                                        "insights_runner",
-                                        f"Learning Mode explanation error: {e}",
-                                    )
-
-                elif msg_type == "ToolResult":
-                    # Tool finished executing
-                    if current_tool:
-                        print(
-                            f"__TOOL_END__:{json.dumps({'name': current_tool})}",
-                            flush=True,
-                        )
-                        current_tool = None
-
-            # Ensure we have a newline at the end
-            if response_text and not response_text.endswith("\n"):
-                print()
-
-            debug(
-                "insights_runner",
-                "Response complete",
-                response_length=len(response_text),
-            )
-
-            # Best-effort usage tracking — surfaces insights-mode cost in the
-            # same dashboard as the Kanban builds. Uses a synthetic spec_dir
-            # under <project>/.workpilot/insights/ because the chat panel has
-            # no real spec to point at.
-            if result_msg is not None:
-                try:
-                    from core.usage_tracker import record_session_usage
-
-                    _synthetic_spec_dir = project_path / ".workpilot" / "insights"
-                    _synthetic_spec_dir.mkdir(parents=True, exist_ok=True)
-                    _usage = getattr(result_msg, "usage", None) or {}
-                    _cost = getattr(result_msg, "total_cost_usd", None) or 0.0
-                    if isinstance(_usage, dict):
-                        record_session_usage(
-                            spec_dir=_synthetic_spec_dir,
-                            project_dir=project_path,
-                            phase="insights",
-                            agent_type="insights",
-                            model=resolve_model_id(model) or model,
-                            provider="anthropic",
-                            input_tokens=_usage.get("input_tokens", 0),
-                            output_tokens=_usage.get("output_tokens", 0),
-                            cost_usd=_cost,
-                            cache_creation_input_tokens=_usage.get(
-                                "cache_creation_input_tokens", 0
-                            ),
-                            cache_read_input_tokens=_usage.get(
-                                "cache_read_input_tokens", 0
-                            ),
-                        )
-                except Exception as _ute:
-                    debug_error("insights_runner", f"usage tracking skipped: {_ute}")
-
-    except Exception as e:
-        print(f"Error using Claude SDK: {e}", file=sys.stderr)
-        import traceback
-
-        traceback.print_exc(file=sys.stderr)
-        run_simple(project_dir, message, history)
-
-
-def run_simple(project_dir: str, message: str, history: list) -> None:
-    """Simple fallback mode without SDK - uses subprocess to call claude CLI."""
-    import subprocess
-
-    system_prompt = build_system_prompt(project_dir)
-
-    # Build conversation context
-    conversation_context = ""
-    for msg in history[:-1]:
-        role = "User" if msg.get("role") == "user" else "Assistant"
-        conversation_context += f"\n{role}: {msg['content']}\n"
-
-    # Create the full prompt
-    full_prompt = f"""{system_prompt}
-
-Previous conversation:
-{conversation_context}
-
-User: {message}
-Assistant:"""
-
-    try:
-        # Try to use claude CLI with --print for simple output
-        result = subprocess.run(
-            ["claude", "--print", "-p", full_prompt],
-            capture_output=True,
-            text=True,
-            cwd=project_dir,
-            timeout=120,
-        )
-
-        if result.returncode == 0:
-            print(result.stdout)
+        if args.history_file:
+            with open(args.history_file, encoding="utf-8") as f:
+                history = json.load(f)
         else:
-            # Fallback response if claude CLI fails
-            print(
-                f"I apologize, but I encountered an issue processing your request. "
-                f"Please ensure Claude CLI is properly configured.\n\n"
-                f"Your question was: {message}\n\n"
-                f"Based on the project context available, I can help you with:\n"
-                f"- Understanding the codebase structure\n"
-                f"- Suggesting improvements\n"
-                f"- Planning new features\n\n"
-                f"Please try again or check your Claude CLI configuration."
-            )
-
-    except subprocess.TimeoutExpired:
-        print("Request timed out. Please try a shorter query.")
-    except FileNotFoundError:
-        print("Claude CLI not found. Please ensure it is installed and in your PATH.")
-    except Exception as e:
-        print(f"Error: {e}")
+            history = json.loads(args.history)
+    except (ValueError, OSError) as e:
+        debug_error("insights_runner", f"Failed to load history: {e}")
+        return []
+    return history if isinstance(history, list) else []
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="Insights AI Chat Runner")
     parser.add_argument("--project-dir", required=True, help="Project directory path")
     parser.add_argument("--message", required=True, help="User message")
@@ -671,65 +334,37 @@ def main():
     args = parser.parse_args()
 
     debug_section("insights_runner", "Starting Insights Chat")
-
-    project_dir = args.project_dir
-    user_message = args.message
-    model = args.model
-    thinking_level = args.thinking_level
-    learning_mode_enabled = args.learning_mode
-    explanation_level = args.explanation_level
-
     debug(
         "insights_runner",
         "Arguments",
-        project_dir=project_dir,
-        message_length=len(user_message),
-        model=model,
-        thinking_level=thinking_level,
-        learning_mode=learning_mode_enabled,
-        explanation_level=explanation_level,
+        project_dir=args.project_dir,
+        message_length=len(args.message),
+        model=args.model,
+        thinking_level=args.thinking_level,
+        learning_mode=args.learning_mode,
+        explanation_level=args.explanation_level,
     )
-
-    # Load history from file if provided, otherwise parse inline JSON
     try:
-        if args.history_file:
-            debug(
-                "insights_runner", "Loading history from file", file=args.history_file
+        asyncio.run(
+            run_chat(
+                args.project_dir,
+                args.message,
+                _load_history(args),
+                args.model,
+                args.thinking_level,
+                args.learning_mode,
+                args.explanation_level,
             )
-            with open(args.history_file, encoding="utf-8") as f:
-                history = json.load(f)
-            debug_detailed(
-                "insights_runner",
-                "Loaded history from file",
-                history_length=len(history),
-            )
-        else:
-            history = json.loads(args.history)
-            debug_detailed(
-                "insights_runner", "Parsed inline history", history_length=len(history)
-            )
-    except (json.JSONDecodeError, FileNotFoundError, OSError) as e:
-        debug_error("insights_runner", f"Failed to load history: {e}")
-        history = []
-
-    # Run the async SDK function
-    debug("insights_runner", "Running SDK query")
-    asyncio.run(
-        run_with_sdk(
-            project_dir,
-            user_message,
-            history,
-            model,
-            thinking_level,
-            learning_mode_enabled,
-            explanation_level,
         )
-    )
+    except Exception as e:  # every failure ends as the one line the app shows
+        print(f"Insights could not answer: {e}", file=sys.stderr)
+        return 1
     debug_success("insights_runner", "Query completed")
+    return 0
 
 
 if __name__ == "__main__":
     from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()
-    main()
+    sys.exit(main())

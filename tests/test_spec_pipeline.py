@@ -8,144 +8,17 @@ Tests the spec/pipeline.py module functionality including:
 - Spec directory creation and naming
 - Orphaned pending folder cleanup
 - Specs directory path resolution
+
+The modules are the real ones: replacing them in `sys.modules` at import time
+leaked fakes into the files collected after this one.
 """
 
-import importlib
 import json
-import sys
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-
-# Add auto-claude directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
-
-# Store original modules for cleanup
-_original_modules = {}
-_mocked_module_names = [
-    # External SDKs
-    "claude_code_sdk",
-    "claude_code_sdk.types",
-    "claude_agent_sdk",
-    "claude_agent_sdk.types",
-    # Core infrastructure
-    "core",
-    "core.auth",
-    "core.client",
-    "core.simple_client",
-    "core.task_event",
-    "core.workspace",
-    "foundation.file_utils",
-    "core.plan_normalization",
-    "foundation.platform",
-    "client",
-    "init",
-    # Config & phases
-    "phase_config",
-    "foundation.phase_event",
-    # Logging & UI
-    "foundation.debug",
-    "ui",
-    "ui.capabilities",
-    "task_logger",
-    "integrations.linear.updater",
-    "core.progress",
-    # Prompts
-    "prompts_pkg",
-    "prompts_pkg.project_context",
-    # Security
-    "security",
-    "security.constants",
-    "security.tool_input_validator",
-    # Review system
-    "review",
-    "review.diff_analyzer",
-    "review.formatters",
-    "review.reviewer",
-    "review.state",
-    # Agents
-    "agents",
-    "agents.memory_manager",
-    "agents.tools_pkg",
-    # Analysis
-    "analysis",
-    "analysis.analyzers",
-    # Spec submodules (import chain from spec.pipeline)
-    "spec.complexity",
-    "spec.compaction",
-    "spec.context",
-    "spec.discovery",
-    "spec.requirements",
-    "spec.validator",
-    "spec.writer",
-    "spec.phases",
-    "spec.phases.executor",
-    "spec.phases.discovery_phases",
-    "spec.phases.requirements_phases",
-    "spec.phases.spec_phases",
-    "spec.phases.planning_phases",
-    "spec.phases.models",
-    "spec.phases.utils",
-    "spec.validate_pkg",
-    "spec.validate_pkg.spec_validator",
-    "spec.validate_pkg.validators",
-    # Validate spec (legacy)
-    "validate_spec",
-    # Integrations
-    "integrations",
-    "integrations.linear",
-    "integrations.linear.updater",
-]
-
-# `foundation.build_signals` and `foundation.pause_state` have no dependencies, and the
-# code under test imports them (`qa/loop.py`, `spec/pipeline/orchestrator.py`,
-# since the pause/halt signals of #151). They are not mocked: a MagicMock
-# `BuildPaused` cannot be caught, and a MagicMock `is_paused()` is truthy.
-# Import them for real *before* `core` is replaced below; once it is, Python
-# cannot resolve a submodule of it ("'core' is not a package"). Without this
-# the file only collected when an earlier test file had imported them.
-importlib.import_module("foundation.build_signals")
-importlib.import_module("foundation.pause_state")
-
-# `SpecOrchestrator` numbers spec folders through `core.workspace.models.
-# SpecNumberLock`, and the numbering tests below assert real numbers. A
-# MagicMock lock hands `create_spec_dir` a MagicMock number, which cannot be
-# formatted as `{n:03d}`. In a full run the real lock was used anyway, because
-# an earlier file had already imported `spec.pipeline`; run alone, the file
-# failed 24 tests. The module holds only dataclasses and enums, and
-# `tests/conftest.py` already keeps it real (`_MODULES_TO_PRESERVE`).
-importlib.import_module("core.workspace.models")
-
-for name in _mocked_module_names:
-    if name in sys.modules:
-        _original_modules[name] = sys.modules[name]
-
-# Mock all modules with MagicMock
-for name in _mocked_module_names:
-    sys.modules[name] = MagicMock()
-
-# Set specific return values needed by module-level code
-sys.modules["init"].init_workpilot_dir = MagicMock(
-    return_value=(Path("/tmp/.workpilot"), False)
-)
-
-# Now import the module under test
 from spec.pipeline import SpecOrchestrator, get_specs_dir
-
-
-# Cleanup fixture to restore original modules after all tests in this module
-@pytest.fixture(scope="module", autouse=True)
-def cleanup_mocked_modules():
-    """Restore original modules after all tests in this module complete."""
-    yield  # Run all tests first
-    # Cleanup: restore original modules or remove mocks
-    for name in _mocked_module_names:
-        if name in _original_modules:
-            sys.modules[name] = _original_modules[name]
-        elif name in sys.modules:
-            del sys.modules[name]
 
 
 class TestGetSpecsDir:

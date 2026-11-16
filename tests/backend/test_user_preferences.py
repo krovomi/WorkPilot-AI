@@ -186,3 +186,111 @@ def test_the_lists_match_the_desktop():
     palettes = (_ROOT / "apps/mobile/src/ui/palettes.ts").read_text(encoding="utf-8")
     for theme in COLOR_THEMES:
         assert re.search(rf"^\t{theme}: \{{$", palettes, re.M), theme
+
+
+_MENU = "/users/me/preferences/menu"
+_LAYOUT = {
+    "groupOrder": ["agents", "workspace"],
+    "itemOrder": {"agents": ["terminals", "kanban"]},
+    "itemGroups": {"kanban": "agents"},
+    "pinnedItems": ["insights", "github-prs"],
+    "pinnedGroups": ["planning"],
+    "hiddenItems": ["arena"],
+}
+
+
+class TestMenuLayout:
+    def test_nothing_saved_reads_null(self, people):
+        client, *_ = people
+        res = client.get(_MENU)
+        assert res.status_code == 200
+        assert res.json() == {"layout": None}
+
+    def test_a_layout_is_kept_and_replaced(self, people):
+        client, *_ = people
+        saved = client.put(_MENU, json=_LAYOUT)
+        assert saved.status_code == 200, saved.text
+        assert saved.json() == {"layout": _LAYOUT}
+        assert client.get(_MENU).json() == {"layout": _LAYOUT}
+        shipped = {
+            key: [] if isinstance(value, list) else {} for key, value in _LAYOUT.items()
+        }
+        client.put(_MENU, json=shipped)
+        assert client.get(_MENU).json() == {"layout": shipped}
+
+    def test_the_theme_and_the_menu_are_kept_apart(self, people):
+        client, *_ = people
+        client.put(_MENU, json=_LAYOUT)
+        assert client.get(_PATH).json() == {"theme": None, "colorTheme": None}
+        client.put(_PATH, json={"theme": "dark", "colorTheme": "ocean"})
+        assert client.get(_MENU).json() == {"layout": _LAYOUT}
+
+    def test_each_person_reads_and_writes_only_their_own(self, people):
+        client, sign_in, me, other = people
+        client.put(_MENU, json=_LAYOUT)
+        sign_in(other)
+        assert client.get(_MENU).json() == {"layout": None}
+        theirs = {**_LAYOUT, "groupOrder": ["planning"]}
+        client.put(_MENU, json=theirs)
+        sign_in(me)
+        assert client.get(_MENU).json() == {"layout": _LAYOUT}
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            {"groupOrder": ["Agents"]},
+            {"groupOrder": ["../etc"]},
+            {"groupOrder": ["-agents"]},
+            {"groupOrder": ["a" * 65]},
+            {"groupOrder": [f"g{i}" for i in range(65)]},
+            {"pinnedItems": [f"p{i}" for i in range(301)]},
+            {"itemOrder": {"agents": [f"p{i}" for i in range(301)]}},
+            {"itemOrder": {"Agents": ["kanban"]}},
+            {"itemGroups": {"kanban": "Agents"}},
+            {"itemGroups": {"kanban": 3}},
+            {"pinnedItems": "kanban"},
+            {"hiddenItems": [None]},
+            {"fontSize": 20},
+        ],
+    )
+    def test_anything_else_is_refused(self, people, change):
+        client, *_ = people
+        body = {**_LAYOUT, **change}
+        assert client.put(_MENU, json=body).status_code == 422
+        assert client.get(_MENU).json() == {"layout": None}
+
+    @pytest.mark.parametrize("missing", list(_LAYOUT))
+    def test_every_field_is_needed(self, people, missing):
+        client, *_ = people
+        body = {key: value for key, value in _LAYOUT.items() if key != missing}
+        assert client.put(_MENU, json=body).status_code == 422
+
+    def test_the_route_needs_a_signed_in_person(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from server.routers import preferences
+
+        app = FastAPI()
+        app.include_router(preferences.router)
+        with TestClient(app) as client:
+            assert client.get(_MENU).status_code == 401
+            assert client.put(_MENU, json=_LAYOUT).status_code == 401
+
+    def test_the_bounds_match_the_desktop(self):
+        """The desktop checks the same ids and sizes before it sends a layout."""
+        from server.services.preferences import (
+            MAX_MENU_ENTRIES,
+            MAX_MENU_GROUPS,
+            MenuLayout,
+        )
+
+        source = (_ROOT / "apps/frontend/src/shared/utils/menu-layout.ts").read_text(
+            encoding="utf-8"
+        )
+        assert "export const MENU_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;" in source
+        assert f"export const MAX_MENU_GROUPS = {MAX_MENU_GROUPS};" in source
+        assert f"export const MAX_MENU_ENTRIES = {MAX_MENU_ENTRIES};" in source
+        fields = {field.alias for field in MenuLayout.model_fields.values()}
+        assert fields == set(_LAYOUT)
+        for name in fields:
+            assert f"\t{name}:" in source, name

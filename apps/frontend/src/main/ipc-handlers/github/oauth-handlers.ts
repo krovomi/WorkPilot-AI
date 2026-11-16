@@ -3,13 +3,14 @@
  * Provides a simpler OAuth flow than manual PAT creation
  */
 
-import { execFile, execFileSync, execSync, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { BrowserWindow, ipcMain, shell } from "electron";
-import { IPC_CHANNELS } from "../../../shared/constants";
+import { BrowserWindow, ipcMain } from "electron";
+import { IPC_CHANNELS, MASKED_SECRET } from "../../../shared/constants";
 import type { IPCResult } from "../../../shared/types";
 import { getToolPath } from "../../cli-tool-manager";
 import { findExecutable, getAugmentedEnv } from "../../env-utils";
+import { openExternalUrl } from "../../open-external";
 
 const execFileAsync = promisify(execFile);
 
@@ -99,16 +100,59 @@ function debugLog(message: string, data?: unknown): void {
 	}
 }
 
-// Regex pattern to validate GitHub repository format (owner/repo)
-// Allows alphanumeric characters, hyphens, underscores, and periods
-const GITHUB_REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+// A GitHub account or organization: letters, digits, `-` and `_` (managed users).
+const GITHUB_OWNER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,38}$/;
+// A repository name: letters, digits, `_`, `.`, `-`, never an option nor `.` / `..`.
+const GITHUB_NAME_PATTERN = /^[A-Za-z0-9_.][A-Za-z0-9_.-]{0,99}$/;
+// GitHub's own limit for a repository description.
+const MAX_DESCRIPTION_LENGTH = 350;
 
-/**
- * Validate that a repository string matches the expected owner/repo format
- * Prevents command injection by rejecting strings with shell metacharacters
- */
-function isValidGitHubRepo(repo: string): boolean {
-	return GITHUB_REPO_PATTERN.test(repo);
+/** A repository name the renderer sent: a name, never a path segment or an option. */
+export function isValidGitHubRepoName(name: unknown): name is string {
+	return (
+		typeof name === "string" &&
+		GITHUB_NAME_PATTERN.test(name) &&
+		name !== "." &&
+		name !== ".."
+	);
+}
+
+/** An `owner/repo` the renderer sent (it becomes an API path and a remote URL). */
+export function isValidGitHubRepo(repo: unknown): repo is string {
+	if (typeof repo !== "string") return false;
+	const [owner, name, ...rest] = repo.split("/");
+	return (
+		rest.length === 0 &&
+		GITHUB_OWNER_PATTERN.test(owner) &&
+		isValidGitHubRepoName(name)
+	);
+}
+
+interface CreateRepoOptions {
+	description?: string;
+	isPrivate?: boolean;
+	projectPath: string;
+	owner?: string;
+}
+
+/** The options of a repository creation, checked field by field. */
+export function isValidCreateRepoOptions(
+	options: unknown,
+): options is CreateRepoOptions {
+	if (typeof options !== "object" || options === null) return false;
+	const { description, isPrivate, projectPath, owner } =
+		options as Record<string, unknown>;
+	return (
+		typeof projectPath === "string" &&
+		projectPath.length > 0 &&
+		(description === undefined ||
+			(typeof description === "string" &&
+				description.length <= MAX_DESCRIPTION_LENGTH)) &&
+		(isPrivate === undefined || typeof isPrivate === "boolean") &&
+		(owner === undefined ||
+			owner === "" ||
+			(typeof owner === "string" && GITHUB_OWNER_PATTERN.test(owner)))
+	);
 }
 
 // Regex patterns for parsing device code from gh CLI output
@@ -120,10 +164,7 @@ function isValidGitHubRepo(repo: string): boolean {
 const DEVICE_CODE_PATTERN =
 	/(?:one-time code|verification code|code):\s*([A-Z0-9]{4}[-\s][A-Z0-9]{4})/i;
 
-// GitHub device flow URL pattern
-const DEVICE_URL_PATTERN = /https:\/\/github\.com\/login\/device/i;
-
-// Default GitHub device flow URL
+// The GitHub device flow page (gh prints it; the main process opens this one)
 const GITHUB_DEVICE_URL = "https://github.com/login/device";
 
 /**
@@ -142,40 +183,6 @@ function parseDeviceCode(output: string): string | null {
 	return null;
 }
 
-/**
- * Parse device URL from gh CLI output
- * Returns the URL if found, or the default GitHub device URL
- */
-function parseDeviceUrl(output: string): string {
-	const match = output.match(DEVICE_URL_PATTERN);
-	if (match) {
-		debugLog("Found device URL in output:", match[0]);
-		return match[0];
-	}
-	// Default to standard GitHub device flow URL
-	return GITHUB_DEVICE_URL;
-}
-
-/**
- * Result of parsing device flow output from gh CLI
- */
-interface DeviceFlowInfo {
-	deviceCode: string | null;
-	authUrl: string;
-}
-
-/**
- * Parse both device code and URL from combined gh CLI output
- * Searches through both stdout and stderr as gh may output to either
- */
-function parseDeviceFlowOutput(stdout: string, stderr: string): DeviceFlowInfo {
-	const combinedOutput = `${stdout}\n${stderr}`;
-
-	return {
-		deviceCode: parseDeviceCode(combinedOutput),
-		authUrl: parseDeviceUrl(combinedOutput),
-	};
-}
 
 /**
  * Check if gh CLI is installed
@@ -311,7 +318,7 @@ interface GitHubAuthStartResult {
 /**
  * Start GitHub OAuth flow using gh CLI
  * This will extract the device code from gh CLI output and open the browser
- * using Electron's shell.openExternal (bypasses macOS child process restrictions)
+ * from the main process (bypasses macOS child process restrictions)
  *
  * Detects account changes and emits GITHUB_AUTH_CHANGED event when the authenticated
  * account differs from the previous one (or when going from unauthenticated to authenticated).
@@ -335,7 +342,7 @@ export function registerStartGhAuth(): void {
 					const args = ["auth", "login", "--web", "--scopes", "repo"];
 					debugLog("Spawning: gh", args);
 
-					const ghProcess = spawn("gh", args, {
+					const ghProcess = spawn(getToolPath("gh"), args, {
 						stdio: ["pipe", "pipe", "pipe"],
 						env: getAugmentedEnv(),
 					});
@@ -344,7 +351,6 @@ export function registerStartGhAuth(): void {
 					let errorOutput = "";
 					let deviceCodeExtracted = false;
 					let extractedDeviceCode: string | null = null;
-					let extractedAuthUrl: string = GITHUB_DEVICE_URL;
 					let browserOpenedSuccessfully = false;
 					let extractionInProgress = false;
 
@@ -354,24 +360,24 @@ export function registerStartGhAuth(): void {
 						if (deviceCodeExtracted || extractionInProgress) return;
 						extractionInProgress = true;
 
-						const deviceFlowInfo = parseDeviceFlowOutput(output, errorOutput);
+						// gh prints the code on stdout or stderr depending on its version
+						const deviceCode = parseDeviceCode(`${output}\n${errorOutput}`);
 
-						if (deviceFlowInfo.deviceCode) {
+						if (deviceCode) {
 							deviceCodeExtracted = true;
-							extractedDeviceCode = deviceFlowInfo.deviceCode;
-							extractedAuthUrl = deviceFlowInfo.authUrl;
+							extractedDeviceCode = deviceCode;
 
 							debugLog(
 								"Device code extracted successfully (code redacted for security)",
 							);
-							debugLog("Auth URL:", extractedAuthUrl);
+							debugLog("Auth URL:", GITHUB_DEVICE_URL);
 
-							// Open browser using Electron's shell.openExternal
-							// This bypasses macOS child process restrictions that block gh CLI's browser launch
+							// Open the browser from the main process: macOS child process
+							// restrictions block gh CLI's own browser launch
 							try {
-								await shell.openExternal(extractedAuthUrl);
+								await openExternalUrl(GITHUB_DEVICE_URL);
 								browserOpenedSuccessfully = true;
-								debugLog("Browser opened successfully via shell.openExternal");
+								debugLog("Browser opened successfully");
 							} catch (browserError) {
 								debugLog(
 									"Failed to open browser:",
@@ -387,7 +393,7 @@ export function registerStartGhAuth(): void {
 							// This is critical - the frontend needs to display the code while the gh process is still running
 							sendDeviceCodeToRenderer(
 								extractedDeviceCode,
-								extractedAuthUrl,
+								GITHUB_DEVICE_URL,
 								browserOpenedSuccessfully,
 							);
 
@@ -461,21 +467,17 @@ export function registerStartGhAuth(): void {
 										? "Successfully authenticated with GitHub"
 										: "Authentication successful. Browser could not be opened automatically.",
 									deviceCode: extractedDeviceCode || undefined,
-									authUrl: extractedAuthUrl,
+									authUrl: GITHUB_DEVICE_URL,
 									browserOpened: browserOpenedSuccessfully,
 									// Provide fallback URL when browser failed to open
 									fallbackUrl: !browserOpenedSuccessfully
-										? extractedAuthUrl
+										? GITHUB_DEVICE_URL
 										: undefined,
 								},
 							});
 						} else {
 							// Even if auth failed, return device code info if we extracted it
 							// This allows user to retry manually with the fallback URL
-							const fallbackUrlForManualAuth = extractedDeviceCode
-								? extractedAuthUrl
-								: GITHUB_DEVICE_URL;
-
 							resolve({
 								success: false,
 								error:
@@ -483,10 +485,10 @@ export function registerStartGhAuth(): void {
 								data: {
 									success: false,
 									deviceCode: extractedDeviceCode || undefined,
-									authUrl: extractedAuthUrl,
+									authUrl: GITHUB_DEVICE_URL,
 									browserOpened: browserOpenedSuccessfully,
 									// Always provide fallback URL on failure for manual recovery
-									fallbackUrl: fallbackUrlForManualAuth,
+									fallbackUrl: GITHUB_DEVICE_URL,
 									message:
 										"Authentication failed. Please visit the URL manually to complete authentication.",
 								},
@@ -556,10 +558,12 @@ export function registerGetGhToken(): void {
 					};
 				}
 
-				debugLog("Token retrieved successfully, length:", token.length);
+				// The renderer learns that gh holds a token, never its value (rule
+				// S6): saving the mask with the OAuth method stores gh's token
+				// from the main process (env-handlers, ENV_UPDATE).
 				return {
 					success: true,
-					data: { token },
+					data: { token: MASKED_SECRET },
 				};
 			} catch (error) {
 				debugLog(
@@ -639,8 +643,16 @@ export function registerListUserRepos(): void {
 				debugLog(
 					"Running: gh repo list --limit 100 --json nameWithOwner,description,isPrivate",
 				);
-				const output = execSync(
-					"gh repo list --limit 100 --json nameWithOwner,description,isPrivate",
+				const output = execFileSync(
+					getToolPath("gh"),
+					[
+						"repo",
+						"list",
+						"--limit",
+						"100",
+						"--json",
+						"nameWithOwner,description,isPrivate",
+					],
 					{
 						encoding: "utf-8",
 						stdio: "pipe",
@@ -777,7 +789,7 @@ export function registerGetGitHubBranches(): void {
 				const apiEndpoint = `repos/${repo}/branches`;
 				debugLog(`Running: gh api ${apiEndpoint} --paginate --jq '.[].name'`);
 				const output = execFileSync(
-					"gh",
+					getToolPath("gh"),
 					["api", apiEndpoint, "--paginate", "--jq", ".[].name"],
 					{
 						encoding: "utf-8",
@@ -819,23 +831,21 @@ export function registerCreateGitHubRepo(): void {
 		IPC_CHANNELS.GITHUB_CREATE_REPO,
 		async (
 			_event: Electron.IpcMainInvokeEvent,
-			repoName: string,
-			options: {
-				description?: string;
-				isPrivate?: boolean;
-				projectPath: string;
-				owner?: string;
-			},
+			repoName: unknown,
+			options: unknown,
 		): Promise<IPCResult<{ fullName: string; url: string }>> => {
 			debugLog("createGitHubRepo handler called", { repoName, options });
 
-			// Validate repo name - only alphanumeric, hyphens, underscores
-			if (!/^[A-Za-z0-9_.-]+$/.test(repoName)) {
+			// The renderer is not trusted (rule S6): a name, an owner, bounded text
+			if (!isValidGitHubRepoName(repoName)) {
 				return {
 					success: false,
 					error:
 						"Invalid repository name. Use only letters, numbers, hyphens, underscores, and periods.",
 				};
+			}
+			if (!isValidCreateRepoOptions(options)) {
+				return { success: false, error: "Invalid repository options" };
 			}
 
 			try {
@@ -880,7 +890,7 @@ export function registerCreateGitHubRepo(): void {
 				args.push("--push");
 
 				debugLog("Running: gh", args);
-				const output = execFileSync("gh", args, {
+				const output = execFileSync(getToolPath("gh"), args, {
 					encoding: "utf-8",
 					cwd: options.projectPath,
 					stdio: "pipe",
@@ -940,41 +950,23 @@ export function registerCreateGitHubRepo(): void {
 						);
 					}
 
-					// Configure the default branch tracking
-					try {
-						// Get the current branch
-						const _currentBranch = execFileSync(
-							getToolPath("git"),
-							["branch", "--show-current"],
-							{
-								cwd: options.projectPath,
-								encoding: "utf-8",
-								stdio: "pipe",
-							},
-						).trim();
-
-						// Set up branch tracking for main/master
-						const mainBranches = ["main", "master"];
-						for (const branch of mainBranches) {
-							try {
-								execFileSync(
-									getToolPath("git"),
-									["branch", `--set-upstream-to=origin/${branch}`, branch],
-									{
-										cwd: options.projectPath,
-										encoding: "utf-8",
-										stdio: "pipe",
-									},
-								);
-								debugLog("Set up tracking for branch:", branch);
-								break;
-							} catch {
-								// noop
-							}
+					// Track the default branch: main, else master (neither is fine)
+					for (const branch of ["main", "master"]) {
+						try {
+							execFileSync(
+								getToolPath("git"),
+								["branch", `--set-upstream-to=origin/${branch}`, branch],
+								{
+									cwd: options.projectPath,
+									encoding: "utf-8",
+									stdio: "pipe",
+								},
+							);
+							debugLog("Set up tracking for branch:", branch);
+							break;
+						} catch {
+							// This branch does not exist locally: try the next one
 						}
-					} catch (error) {
-						debugLog("Warning: Could not set up branch tracking:", error);
-						// Don't fail the operation, just log it
 					}
 
 					debugLog("Git remote configuration completed successfully");
@@ -1046,7 +1038,7 @@ export function registerAddGitRemote(): void {
 
 				// Add the remote
 				debugLog("Adding remote origin:", remoteUrl);
-				execFileSync("git", ["remote", "add", "origin", remoteUrl], {
+				execFileSync(getToolPath("git"), ["remote", "add", "origin", remoteUrl], {
 					cwd: projectPath,
 					encoding: "utf-8",
 					stdio: "pipe",
