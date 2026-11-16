@@ -29,3 +29,6 @@ section: 🐛 Corrections
 - **Corbeille de la mémoire** : une note oubliée dont le bloc `lifecycle` a été retouché à la main
   s'affiche et se restaure au lieu de faire échouer l'onglet, et des `variants` écrits comme un
   seul texte restent un nom de note.
+- **Cerveau partagé** : une note dont `agents`, `tasks`, `sources` ou `tags` est écrit comme une
+  seule valeur dans Obsidian (`agents: coder`) n'est plus réenregistrée lettre par lettre quand un
+  agent la complète.
