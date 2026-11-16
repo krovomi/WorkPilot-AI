@@ -21,6 +21,7 @@ _backend_dir = Path(__file__).parent.parent / "apps" / "backend"
 if str(_backend_dir) not in sys.path:
     sys.path.insert(0, str(_backend_dir))
 
+from agents.impact_analyzer import fallback_analysis
 from core.worktree import PullRequestResult, WorktreeInfo, WorktreeManager
 from foundation.git_provider import detect_git_provider
 
@@ -263,6 +264,10 @@ class TestGitHubCLIInvocation:
                 worktree_module.subprocess, "run", return_value=mock_subprocess_result
             ) as mock_run,
             patch.object(manager, "_extract_spec_summary", return_value="Test PR body"),
+            # The impact block calls a model: the arguments of `gh` are the test.
+            patch.object(
+                manager, "_run_impact_analysis", return_value=fallback_analysis()
+            ),
         ):
             result = manager.create_pull_request(
                 spec_name="001-test-spec",
@@ -333,6 +338,10 @@ class TestGitHubCLIInvocation:
                 worktree_module.subprocess, "run", return_value=mock_subprocess_result
             ) as mock_run,
             patch.object(manager, "_extract_spec_summary", return_value="Test PR body"),
+            # The impact block calls a model: the arguments of `gh` are the test.
+            patch.object(
+                manager, "_run_impact_analysis", return_value=fallback_analysis()
+            ),
         ):
             result = manager.create_pull_request(
                 spec_name="001-test-spec",
@@ -446,6 +455,10 @@ class TestGitHubErrorHandling:
                 return_value="https://github.com/user/repo/pull/123",
             ),
             patch.object(manager, "_extract_spec_summary", return_value="Test PR body"),
+            # The impact block calls a model: the arguments of `gh` are the test.
+            patch.object(
+                manager, "_run_impact_analysis", return_value=fallback_analysis()
+            ),
         ):
             result = manager.create_pull_request(
                 spec_name="001-test-spec",
