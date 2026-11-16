@@ -11,6 +11,7 @@ import {
 import { ensureOllamaReady } from "../services/ollama-portable";
 import { projectStore } from "../project-store";
 import { readSettingsFile } from "../settings-utils";
+import { swarmEnv } from "../../shared/utils/swarm-settings";
 import type { EnginePhase } from "../../shared/utils/task-engine";
 import { AgentEvents } from "./agent-events";
 import { AgentProcessManager } from "./agent-process";
@@ -568,12 +569,15 @@ export class AgentManager extends EventEmitter {
 		// Inject the Claude SDK resume session_id into the subprocess env.
 		// The Python side reads AUTO_CLAUDE_RESUME_SESSION_ID inside create_client()
 		// (apps/backend/core/client.py) and passes it to ClaudeAgentOptions(resume=...).
-		const spawnEnv = options.resumeSessionId
-			? {
-					...combinedEnv,
-					AUTO_CLAUDE_RESUME_SESSION_ID: options.resumeSessionId,
-				}
-			: combinedEnv;
+		// Swarm Mode, when the person turned it on: the build runs the subtasks
+		// its plan lets run side by side in parallel (agents/swarm/build_phase.py).
+		const spawnEnv = {
+			...combinedEnv,
+			...swarmEnv(readSettingsFile()?.swarm),
+			...(options.resumeSessionId && {
+				AUTO_CLAUDE_RESUME_SESSION_ID: options.resumeSessionId,
+			}),
+		};
 
 		// Auto-start the local Ollama server if that's the active provider.
 		await this.ensureLocalServerIfNeeded(undefined, providerPlan);

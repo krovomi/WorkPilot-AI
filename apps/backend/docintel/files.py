@@ -104,8 +104,10 @@ def threat(text: str, source: str) -> str:
         from injection_guard import InjectionScanner
 
         return InjectionScanner().scan(text, source=source).threat_level.value
-    except Exception:  # noqa: BLE001 - a scanner failure is not a verdict
-        return "safe"
+    except Exception:  # noqa: BLE001 - any failure of the scanner
+        # A scan that could not answer is no all-clear: the text is held back
+        # as if flagged, like a secret scan that could not run.
+        return "suspect"
 
 
 def clean(text: str) -> str:

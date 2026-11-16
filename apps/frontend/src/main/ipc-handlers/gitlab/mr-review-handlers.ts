@@ -1,1089 +1,264 @@
 /**
- * GitLab MR Review IPC handlers
+ * GitLab MR Review IPC handlers: the saved review, the AI review and its
+ * follow-up (`mr-review-run.ts`), posting it as a note, notes, merge,
+ * assignees, approval, and whether the MR moved on since its review.
  *
- * Handles AI-powered MR review:
- * 1. Get MR diff
- * 2. Run AI review with code analysis
- * 3. Post review comments (notes)
- * 4. Merge MR
- * 5. Assign users
- * 6. Approve MR
+ * Every channel registers on `mrIpcMain` (`mr-ipc-guard.ts`), which checks the
+ * renderer's arguments before the handler runs. A server project's review
+ * runs on the server (`server-mr-review.ts`).
  */
 
-import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import type { BrowserWindow } from "electron";
-import { ipcMain } from "electron";
-import { IPC_CHANNELS, MODEL_ID_MAP } from "../../../shared/constants";
+import { IPC_CHANNELS } from "../../../shared/constants";
 import type { Project } from "../../../shared/types";
-import type { AuthFailureInfo } from "../../../shared/types/terminal";
-import { createIPCCommunicators } from "../github/utils/ipc-communicator";
 import { createContextLogger } from "../github/utils/logger";
 import {
 	withForgeProjectOrNull,
 	withProjectOrNull,
 } from "../github/utils/project-middleware";
-import { getPageFeatureSettings } from "../../services/page-llm-config";
-import { getRunnerEnv } from "../github/utils/runner-env";
-import {
-	buildRunnerArgs,
-	findAppBackendPath,
-	getPythonPath,
-	runPythonSubprocess,
-} from "../github/utils/subprocess-runner";
-import type {
-	MRReviewProgress,
-	MRReviewResult,
-	NewCommitsCheck,
-} from "./types";
 import { serverProjectOf } from "../server-review-jobs";
-import { mrReviewFromJson, mrReviewNote } from "./mr-review-result";
+import { mrIpcMain } from "./mr-ipc-guard";
+import { mrReviewNote } from "./mr-review-result";
+import {
+	cancelLocalReview,
+	getGitLabMRSettings,
+	getReviewResult,
+	type ReviewKind,
+	runButtonReview,
+	updateSavedReview,
+} from "./mr-review-run";
 import {
 	cancelServerMRReview,
 	postServerMRReview,
 	serverMRReview,
 	startServerMRReview,
 } from "./server-mr-review";
+import type { GitLabConfig, MRReviewResult, NewCommitsCheck } from "./types";
 import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
 
-/**
- * The project's GitLab token and instance, from its settings (or glab), for
- * the review runner: the runner env carries no credential the main process
- * env happens to hold (github/utils/runner-env.ts).
- */
-async function gitlabRunnerEnv(
-	project: Project,
-): Promise<Record<string, string>> {
-	const config = await getGitLabConfig(project);
-	return config
-		? { GITLAB_TOKEN: config.token, GITLAB_INSTANCE_URL: config.instanceUrl }
-		: {};
-}
-
-/**
- * Get the GitLab runner path
- */
-function getGitLabRunnerPath(backendPath: string): string {
-	return path.join(backendPath, "runners", "gitlab", "runner.py");
-}
-
-// Debug logging
 const { debug: debugLog } = createContextLogger("GitLab MR");
 
-/**
- * Registry of running MR review processes
- * Key format: `${projectId}:${mrIid}`
- */
-const runningReviews = new Map<string, import("child_process").ChildProcess>();
-
 const REBASE_POLL_INTERVAL_MS = 1000;
-// Default rebase timeout (60 seconds). Can be overridden via GITLAB_REBASE_TIMEOUT_MS env var
-const REBASE_TIMEOUT_MS = parseInt(
-	process.env.GITLAB_REBASE_TIMEOUT_MS || "60000",
-	10,
-);
+const DEFAULT_REBASE_TIMEOUT_MS = 60_000;
 
-/**
- * Get the registry key for an MR review
- */
-/** An MR iid or a GitLab user id: a positive whole number. */
-function isIid(value: unknown): value is number {
-	return Number.isInteger(value) && (value as number) > 0;
+/** How long a merge waits for GitLab's rebase: `GITLAB_REBASE_TIMEOUT_MS`, else 60 s. */
+export function rebaseTimeoutMs(value = process.env.GITLAB_REBASE_TIMEOUT_MS): number {
+	const parsed = Number(value);
+	return value && Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REBASE_TIMEOUT_MS;
 }
 
-function getReviewKey(projectId: string, mrIid: number): string {
-	return `${projectId}:${mrIid}`;
+/** The API path of a merge request of the configured project. */
+function mrPath(config: GitLabConfig, mrIid: number, rest = ""): string {
+	return `/projects/${encodeProjectPath(config.project)}/merge_requests/${mrIid}${rest}`;
 }
 
-/**
- * Get the GitLab directory for a project
- */
-function getGitLabDir(project: Project): string {
-	return path.join(project.path, ".workpilot", "gitlab");
-}
-
-async function waitForRebaseCompletion(
-	token: string,
-	instanceUrl: string,
-	encodedProject: string,
-	mrIid: number,
-): Promise<void> {
-	const deadline = Date.now() + REBASE_TIMEOUT_MS;
-
+async function waitForRebaseCompletion(config: GitLabConfig, mrIid: number): Promise<void> {
+	const deadline = Date.now() + rebaseTimeoutMs();
 	while (Date.now() < deadline) {
-		const mrData = (await gitlabFetch(
-			token,
-			instanceUrl,
-			`/projects/${encodedProject}/merge_requests/${mrIid}`,
-		)) as { rebase_in_progress?: boolean };
-
-		if (!mrData.rebase_in_progress) {
-			return;
-		}
-
-		await new Promise((resolve) =>
-			setTimeout(resolve, REBASE_POLL_INTERVAL_MS),
-		);
+		const mr = (await gitlabFetch(config.token, config.instanceUrl, mrPath(config, mrIid))) as {
+			rebase_in_progress?: boolean;
+		};
+		if (!mr.rebase_in_progress) return;
+		await new Promise((resolve) => setTimeout(resolve, REBASE_POLL_INTERVAL_MS));
 	}
-
 	throw new Error("Rebase did not complete before timeout");
 }
 
 /**
- * Get saved MR review result
- */
-function getReviewResult(
-	project: Project,
-	mrIid: number,
-): MRReviewResult | null {
-	const reviewPath = path.join(
-		getGitLabDir(project),
-		"mr",
-		`review_${mrIid}.json`,
-	);
-
-	if (fs.existsSync(reviewPath)) {
-		try {
-			return mrReviewFromJson(fs.readFileSync(reviewPath, "utf-8"));
-		} catch {
-			return null;
-		}
-	}
-
-	return null;
-}
-
-/**
  * Whether the merge request moved on since its saved review: the head the
- * review read against the head the merge request has now.
+ * review read against the head the merge request has now, and how many of
+ * its commits (newest first) come after the reviewed one.
  */
 async function newCommitsSince(
 	project: Project,
 	review: MRReviewResult | null,
 	mrIid: number,
 ): Promise<NewCommitsCheck> {
-	const reviewedCommitSha = review?.reviewedCommitSha;
-	if (!reviewedCommitSha) {
-		debugLog("No reviewedCommitSha in review", { mrIid });
-		return { hasNewCommits: false };
-	}
-
+	const reviewedSha = review?.reviewedCommitSha;
+	if (!reviewedSha) return { hasNewCommits: false };
 	const config = await getGitLabConfig(project);
-	if (!config) {
-		return { hasNewCommits: false };
-	}
+	if (!config) return { hasNewCommits: false };
 
 	try {
-		const encodedProject = encodeProjectPath(config.project);
-		const mrData = (await gitlabFetch(
-			config.token,
-			config.instanceUrl,
-			`/projects/${encodedProject}/merge_requests/${mrIid}`,
-		)) as { sha: string; diff_refs: { head_sha: string } };
-
-		const currentHeadSha = mrData.sha || mrData.diff_refs?.head_sha;
-
-		if (reviewedCommitSha === currentHeadSha) {
-			return {
-				hasNewCommits: false,
-				currentSha: currentHeadSha,
-				reviewedSha: reviewedCommitSha,
-			};
+		const mr = (await gitlabFetch(config.token, config.instanceUrl, mrPath(config, mrIid))) as {
+			sha?: string;
+			diff_refs?: { head_sha?: string };
+		};
+		const currentSha = mr.sha || mr.diff_refs?.head_sha;
+		if (reviewedSha === currentSha) {
+			return { hasNewCommits: false, currentSha, reviewedSha };
 		}
-
-		// Get commits to count new ones
 		const commits = (await gitlabFetch(
 			config.token,
 			config.instanceUrl,
-			`/projects/${encodedProject}/merge_requests/${mrIid}/commits`,
+			mrPath(config, mrIid, "/commits?per_page=100"),
 		)) as Array<{ id: string }>;
-
-		// Find how many commits are after the reviewed one
-		let newCommitCount = 0;
-		for (const commit of commits) {
-			if (commit.id === reviewedCommitSha) break;
-			newCommitCount++;
-		}
-
-		return {
-			hasNewCommits: true,
-			currentSha: currentHeadSha,
-			reviewedSha: reviewedCommitSha,
-			newCommitCount: newCommitCount || 1,
-		};
+		const reviewedAt = commits.findIndex((commit) => commit.id === reviewedSha);
+		const newCommitCount = reviewedAt === -1 ? commits.length : reviewedAt;
+		return { hasNewCommits: true, currentSha, reviewedSha, newCommitCount: newCommitCount || 1 };
 	} catch (error) {
-		debugLog("Error checking new commits", {
-			mrIid,
-			error: error instanceof Error ? error.message : error,
-		});
+		debugLog("Error checking new commits", { mrIid, error: String(error) });
 		return { hasNewCommits: false };
 	}
 }
 
-/**
- * Get GitLab MR model and thinking settings from app settings
- */
-function getGitLabMRSettings(): { model: string; thinkingLevel: string } {
-	// Provider × LLM × effort : ce que la page a choisi, sinon les réglages.
-	// Une seule lecture, dans `services/page-llm-config`.
-	const { model: modelShort, thinkingLevel } = getPageFeatureSettings(
-		"gitlab-merge-requests",
-	);
-
-	// Convert model short name to full model ID
-	const model = MODEL_ID_MAP[modelShort] ?? modelShort;
-
-	debugLog("GitLab MR settings", { modelShort, model, thinkingLevel });
-
-	return { model, thinkingLevel };
-}
-
-/**
- * Validate GitLab module is properly set up: the runner lives in the app's
- * backend (`runners/gitlab/runner.py`), wherever the app runs from.
- */
-async function validateGitLabModule(): Promise<{
-	valid: boolean;
-	backendPath?: string;
-	error?: string;
-}> {
-	const backendPath = findAppBackendPath(
-		path.join("runners", "gitlab", "runner.py"),
-	);
-	if (!backendPath) {
-		return {
-			valid: false,
-			error:
-				"GitLab runners not found. Please ensure the backend is properly installed.",
-		};
-	}
-
-	return { valid: true, backendPath };
-}
-
-/**
- * Run the Python MR reviewer
- */
-async function runMRReview(
-	project: Project,
-	mrIid: number,
-	mainWindow: BrowserWindow,
-): Promise<MRReviewResult> {
-	const validation = await validateGitLabModule();
-
-	if (!validation.valid) {
-		throw new Error(validation.error);
-	}
-
-	// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-	const backendPath = validation.backendPath!;
-
-	const { sendProgress } = createIPCCommunicators<
-		MRReviewProgress,
-		MRReviewResult
-	>(
-		mainWindow,
-		{
-			progress: IPC_CHANNELS.GITLAB_MR_REVIEW_PROGRESS,
-			error: IPC_CHANNELS.GITLAB_MR_REVIEW_ERROR,
-			complete: IPC_CHANNELS.GITLAB_MR_REVIEW_COMPLETE,
-		},
-		project.id,
-	);
-
-	const { model, thinkingLevel } = getGitLabMRSettings();
-	const args = buildRunnerArgs(
-		getGitLabRunnerPath(backendPath),
-		project.path,
-		"review-mr",
-		[mrIid.toString()],
-		{ model, thinkingLevel },
-	);
-
-	debugLog("Spawning MR review process", { args, model, thinkingLevel });
-
-	// Get runner environment with PYTHONPATH for bundled packages (fixes #139)
-	const subprocessEnv = await getRunnerEnv(await gitlabRunnerEnv(project), {
-		jevWorkflow: "gitlab-review",
-		page: "gitlab-merge-requests",
-	});
-
-	const { process: childProcess, promise } =
-		runPythonSubprocess<MRReviewResult>({
-			pythonPath: getPythonPath(backendPath),
-			args,
-			cwd: backendPath,
-			env: subprocessEnv,
-			onProgress: (percent, message) => {
-				debugLog("Progress update", { percent, message });
-				sendProgress({
-					phase: "analyzing",
-					mrIid,
-					progress: percent,
-					message,
-				});
-			},
-			onStdout: (line) => debugLog("STDOUT:", line),
-			onStderr: (line) => debugLog("STDERR:", line),
-			onAuthFailure: (authFailureInfo: AuthFailureInfo) => {
-				debugLog("Auth failure detected in MR review", authFailureInfo);
-				mainWindow.webContents.send(
-					IPC_CHANNELS.CLAUDE_AUTH_FAILURE,
-					authFailureInfo,
-				);
-			},
-			onComplete: () => {
-				const reviewResult = getReviewResult(project, mrIid);
-				if (!reviewResult) {
-					throw new Error("Review completed but result not found");
-				}
-				debugLog("Review result loaded", {
-					findingsCount: reviewResult.findings.length,
-				});
-				return reviewResult;
-			},
-		});
-
-	// Register the running process
-	const reviewKey = getReviewKey(project.id, mrIid);
-	runningReviews.set(reviewKey, childProcess);
-	debugLog("Registered review process", { reviewKey, pid: childProcess.pid });
-
-	try {
-		const result = await promise;
-
-		if (!result.success) {
-			throw new Error(result.error ?? "Review failed");
+/** Runs `action` with the project's GitLab config; false without one, or when it throws. */
+async function withConfig(
+	projectId: string,
+	what: string,
+	action: (config: GitLabConfig, project: Project) => Promise<void>,
+): Promise<boolean> {
+	const done = await withForgeProjectOrNull(projectId, async (project) => {
+		const config = await getGitLabConfig(project);
+		if (!config) return false;
+		try {
+			await action(config, project);
+			return true;
+		} catch (error) {
+			debugLog(`Failed to ${what}`, { error: String(error) });
+			return false;
 		}
-
-		// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-		return result.data!;
-	} finally {
-		runningReviews.delete(reviewKey);
-		debugLog("Unregistered review process", { reviewKey });
-	}
+	});
+	return done ?? false;
 }
 
-/**
- * Register MR review handlers
- */
-export function registerMRReviewHandlers(
-	getMainWindow: () => BrowserWindow | null,
-): void {
-	debugLog("Registering MR review handlers");
+/** Register MR review handlers */
+export function registerMRReviewHandlers(getMainWindow: () => BrowserWindow | null): void {
+	/** The review button: on the server for a server project, else here. */
+	const buttonReview = async (projectId: string, mrIid: number, kind: ReviewKind) => {
+		const mainWindow = getMainWindow();
+		if (!mainWindow) return;
+		const remote = serverProjectOf(projectId);
+		if (remote) {
+			startServerMRReview(remote, mrIid, kind === "followup", mainWindow, getGitLabMRSettings());
+			return;
+		}
+		await withProjectOrNull(projectId, (project) =>
+			runButtonReview(project, mrIid, mainWindow, kind),
+		);
+	};
 
-	// Get MR diff (feature parity with GitHub PR diff)
-	ipcMain.handle(
-		IPC_CHANNELS.GITLAB_MR_GET_DIFF,
-		async (_, projectId: string, mrIid: number): Promise<string | null> => {
-			return withForgeProjectOrNull(projectId, async (project) => {
-				const config = await getGitLabConfig(project);
-				if (!config) return null;
-
-				try {
-					// Validate mrIid
-					if (!Number.isInteger(mrIid) || mrIid <= 0) {
-						throw new Error("Invalid MR IID");
-					}
-
-					const encodedProject = encodeProjectPath(config.project);
-					const diff = (await gitlabFetch(
-						config.token,
-						config.instanceUrl,
-						`/projects/${encodedProject}/merge_requests/${mrIid}/changes`,
-					)) as { changes: Array<{ diff: string }> };
-
-					// Combine all file diffs
-					return diff.changes.map((c) => c.diff).join("\n");
-				} catch (error) {
-					debugLog("Failed to get MR diff", {
-						mrIid,
-						error: error instanceof Error ? error.message : error,
-					});
-					return null;
-				}
-			});
-		},
-	);
-
-	// Get saved review
-	ipcMain.handle(
+	mrIpcMain.handle(
 		IPC_CHANNELS.GITLAB_MR_GET_REVIEW,
-		async (
-			_,
-			projectId: string,
-			mrIid: number,
-		): Promise<MRReviewResult | null> => {
+		async (_, projectId: string, mrIid: number): Promise<MRReviewResult | null> => {
 			const remote = serverProjectOf(projectId);
 			if (remote) return serverMRReview(remote, mrIid);
-			return withProjectOrNull(projectId, async (project) => {
-				return getReviewResult(project, mrIid);
-			});
+			return withProjectOrNull(projectId, async (project) => getReviewResult(project, mrIid));
 		},
 	);
 
-	// Run AI review
-	ipcMain.on(
-		IPC_CHANNELS.GITLAB_MR_REVIEW,
-		async (_, projectId: string, mrIid: number) => {
-			debugLog("runMRReview handler called", { projectId, mrIid });
-			const mainWindow = getMainWindow();
-			if (!mainWindow) {
-				debugLog("No main window available");
-				return;
-			}
-			// A server project's review runs on the server (`server-mr-review.ts`).
-			const remote = serverProjectOf(projectId);
-			if (remote) {
-				startServerMRReview(remote, mrIid, false, mainWindow, getGitLabMRSettings());
-				return;
-			}
-
-			try {
-				await withProjectOrNull(projectId, async (project) => {
-					const { sendProgress, sendComplete } = createIPCCommunicators<
-						MRReviewProgress,
-						MRReviewResult
-					>(
-						mainWindow,
-						{
-							progress: IPC_CHANNELS.GITLAB_MR_REVIEW_PROGRESS,
-							error: IPC_CHANNELS.GITLAB_MR_REVIEW_ERROR,
-							complete: IPC_CHANNELS.GITLAB_MR_REVIEW_COMPLETE,
-						},
-						projectId,
-					);
-
-					debugLog("Starting MR review", { mrIid });
-					sendProgress({
-						phase: "fetching",
-						mrIid,
-						progress: 5,
-						message: "Assigning you to MR...",
-					});
-
-					// Auto-assign current user to MR
-					const config = await getGitLabConfig(project);
-					if (config) {
-						try {
-							const encodedProject = encodeProjectPath(config.project);
-							// Get current user
-							const user = (await gitlabFetch(
-								config.token,
-								config.instanceUrl,
-								"/user",
-							)) as { id: number; username: string };
-							debugLog("Auto-assigning user to MR", {
-								mrIid,
-								username: user.username,
-							});
-
-							// Assign to MR
-							await gitlabFetch(
-								config.token,
-								config.instanceUrl,
-								`/projects/${encodedProject}/merge_requests/${mrIid}`,
-								{
-									method: "PUT",
-									body: JSON.stringify({ assignee_ids: [user.id] }),
-								},
-							);
-							debugLog("User assigned successfully", {
-								mrIid,
-								username: user.username,
-							});
-						} catch (assignError) {
-							debugLog("Failed to auto-assign user", {
-								mrIid,
-								error:
-									assignError instanceof Error
-										? assignError.message
-										: assignError,
-							});
-						}
-					}
-
-					sendProgress({
-						phase: "fetching",
-						mrIid,
-						progress: 10,
-						message: "Fetching MR data...",
-					});
-
-					const result = await runMRReview(project, mrIid, mainWindow);
-
-					debugLog("MR review completed", {
-						mrIid,
-						findingsCount: result.findings.length,
-					});
-					sendProgress({
-						phase: "complete",
-						mrIid,
-						progress: 100,
-						message: "Review complete!",
-					});
-
-					sendComplete(result);
-				});
-			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				debugLog("MR review failed", { mrIid, error: errorMessage });
-				const { sendError } = createIPCCommunicators<
-					MRReviewProgress,
-					MRReviewResult
-				>(
-					mainWindow,
-					{
-						progress: IPC_CHANNELS.GITLAB_MR_REVIEW_PROGRESS,
-						error: IPC_CHANNELS.GITLAB_MR_REVIEW_ERROR,
-						complete: IPC_CHANNELS.GITLAB_MR_REVIEW_COMPLETE,
-					},
-					projectId,
-				);
-				sendError({
-					mrIid,
-					error: `MR review failed for MR #${mrIid}: ${errorMessage}`,
-				});
-			}
-		},
+	mrIpcMain.on(IPC_CHANNELS.GITLAB_MR_REVIEW, (_, projectId: string, mrIid: number) =>
+		buttonReview(projectId, mrIid, "review"),
 	);
 
-	// Post review as note to MR
-	ipcMain.handle(
+	mrIpcMain.on(IPC_CHANNELS.GITLAB_MR_FOLLOWUP_REVIEW, (_, projectId: string, mrIid: number) =>
+		buttonReview(projectId, mrIid, "followup"),
+	);
+
+	// Post the saved review as a note, then mark what it posted.
+	mrIpcMain.handle(
 		IPC_CHANNELS.GITLAB_MR_POST_REVIEW,
-		async (
-			_,
-			projectId: string,
-			mrIid: number,
-			selectedFindingIds?: string[],
-		): Promise<boolean> => {
-			debugLog("postMRReview handler called", {
-				projectId,
-				mrIid,
-				selectedCount: selectedFindingIds?.length,
-			});
+		async (_, projectId: string, mrIid: number, selectedFindingIds?: string[]) => {
 			const remote = serverProjectOf(projectId);
 			if (remote) return postServerMRReview(remote, mrIid, selectedFindingIds);
-			const postResult = await withProjectOrNull(projectId, async (project) => {
-				const result = getReviewResult(project, mrIid);
-				if (!result) {
-					debugLog("No review result found", { mrIid });
-					return false;
-				}
-
-				const config = await getGitLabConfig(project);
-				if (!config) {
-					debugLog("No GitLab config found");
-					return false;
-				}
-
+			const posted = await withProjectOrNull(projectId, async (project) => {
+				const review = getReviewResult(project, mrIid);
+				const config = review && (await getGitLabConfig(project));
+				if (!review || !config) return false;
+				const { body, findings } = mrReviewNote(review, selectedFindingIds);
 				try {
-					const { body, findings } = mrReviewNote(result, selectedFindingIds);
-					debugLog("Posting findings", {
-						total: result.findings.length,
-						selected: findings.length,
+					await gitlabFetch(config.token, config.instanceUrl, mrPath(config, mrIid, "/notes"), {
+						method: "POST",
+						body: JSON.stringify({ body }),
 					});
-
-					const encodedProject = encodeProjectPath(config.project);
-
-					// Post as note (comment) to the MR
-					await gitlabFetch(
-						config.token,
-						config.instanceUrl,
-						`/projects/${encodedProject}/merge_requests/${mrIid}/notes`,
-						{
-							method: "POST",
-							body: JSON.stringify({ body }),
-						},
-					);
-
-					debugLog("Review note posted successfully", { mrIid });
-
-					// Update the stored review result with posted findings
-					// Use atomic write with temp file to prevent race conditions
-					const reviewPath = path.join(
-						getGitLabDir(project),
-						"mr",
-						`review_${mrIid}.json`,
-					);
-					const tempPath = `${reviewPath}.tmp.${randomUUID()}`;
-					try {
-						const data = JSON.parse(fs.readFileSync(reviewPath, "utf-8"));
-						data.has_posted_findings = true;
-						const newPostedIds = findings.map((f) => f.id);
-						const existingPostedIds = data.posted_finding_ids || [];
-						data.posted_finding_ids = [
-							...new Set([...existingPostedIds, ...newPostedIds]),
-						];
-						// Write to temp file first, then rename atomically
-						fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), "utf-8");
-						fs.renameSync(tempPath, reviewPath);
-						debugLog("Updated review result with posted findings", {
-							mrIid,
-							postedCount: newPostedIds.length,
-						});
-					} catch (error) {
-						// Clean up temp file if it exists
-						try {
-							fs.unlinkSync(tempPath);
-						} catch {
-							/* ignore cleanup errors */
-						}
-						debugLog("Failed to update review result file", {
-							error: error instanceof Error ? error.message : error,
-						});
-					}
-
-					return true;
 				} catch (error) {
-					debugLog("Failed to post review", {
-						mrIid,
-						error: error instanceof Error ? error.message : error,
-					});
+					debugLog("Failed to post review", { mrIid, error: String(error) });
 					return false;
 				}
+				updateSavedReview(project, mrIid, (data) => {
+					const before = Array.isArray(data.posted_finding_ids) ? data.posted_finding_ids : [];
+					data.has_posted_findings = true;
+					data.posted_finding_ids = [...new Set([...before, ...findings.map((f) => f.id)])];
+				});
+				return true;
 			});
-			return postResult ?? false;
+			return posted ?? false;
 		},
 	);
 
-	// Post note to MR
-	ipcMain.handle(
+	mrIpcMain.handle(
 		IPC_CHANNELS.GITLAB_MR_POST_NOTE,
-		async (
-			_,
-			projectId: string,
-			mrIid: number,
-			body: string,
-		): Promise<boolean> => {
-			debugLog("postMRNote handler called", { projectId, mrIid });
-			const postResult = await withForgeProjectOrNull(projectId, async (project) => {
-				const config = await getGitLabConfig(project);
-				if (!config || !isIid(mrIid)) return false;
-
-				try {
-					const encodedProject = encodeProjectPath(config.project);
-					await gitlabFetch(
-						config.token,
-						config.instanceUrl,
-						`/projects/${encodedProject}/merge_requests/${mrIid}/notes`,
-						{
-							method: "POST",
-							body: JSON.stringify({ body }),
-						},
-					);
-					debugLog("Note posted successfully", { mrIid });
-					return true;
-				} catch (error) {
-					debugLog("Failed to post note", {
-						mrIid,
-						error: error instanceof Error ? error.message : error,
-					});
-					return false;
-				}
-			});
-			return postResult ?? false;
-		},
+		async (_, projectId: string, mrIid: number, body: string): Promise<boolean> =>
+			withConfig(projectId, "post note", async (config) => {
+				await gitlabFetch(config.token, config.instanceUrl, mrPath(config, mrIid, "/notes"), {
+					method: "POST",
+					body: JSON.stringify({ body }),
+				});
+			}),
 	);
 
-	// Merge MR
-	ipcMain.handle(
+	// A squash merge squashes; a rebase merge rebases on GitLab first, then merges.
+	mrIpcMain.handle(
 		IPC_CHANNELS.GITLAB_MR_MERGE,
 		async (
 			_,
 			projectId: string,
 			mrIid: number,
 			mergeMethod: "merge" | "squash" | "rebase" = "squash",
-		): Promise<boolean> => {
-			debugLog("mergeMR handler called", { projectId, mrIid, mergeMethod });
-			const mergeResult = await withForgeProjectOrNull(
-				projectId,
-				async (project) => {
-					const config = await getGitLabConfig(project);
-					if (!config) return false;
-
-					try {
-						// Validate mrIid
-						if (!Number.isInteger(mrIid) || mrIid <= 0) {
-							throw new Error("Invalid MR IID");
-						}
-
-						const encodedProject = encodeProjectPath(config.project);
-
-						// Determine merge options based on method
-						const mergeOptions: Record<string, unknown> = {};
-						if (mergeMethod === "squash") {
-							mergeOptions.squash = true;
-						} else if (mergeMethod === "rebase") {
-							debugLog("Rebasing MR before merge", { mrIid });
-							await gitlabFetch(
-								config.token,
-								config.instanceUrl,
-								`/projects/${encodedProject}/merge_requests/${mrIid}/rebase`,
-								{ method: "PUT" },
-							);
-							await waitForRebaseCompletion(
-								config.token,
-								config.instanceUrl,
-								encodedProject,
-								mrIid,
-							);
-						}
-
-						debugLog("Merging MR", {
-							mrIid,
-							method: mergeMethod,
-							options: mergeOptions,
-						});
-
-						await gitlabFetch(
-							config.token,
-							config.instanceUrl,
-							`/projects/${encodedProject}/merge_requests/${mrIid}/merge`,
-							{
-								method: "PUT",
-								body: JSON.stringify(mergeOptions),
-							},
-						);
-
-						debugLog("MR merged successfully", { mrIid });
-						return true;
-					} catch (error) {
-						debugLog("Failed to merge MR", {
-							mrIid,
-							error: error instanceof Error ? error.message : error,
-						});
-						return false;
-					}
-				},
-			);
-			return mergeResult ?? false;
-		},
+		): Promise<boolean> =>
+			withConfig(projectId, "merge MR", async (config) => {
+				if (mergeMethod === "rebase") {
+					await gitlabFetch(config.token, config.instanceUrl, mrPath(config, mrIid, "/rebase"), {
+						method: "PUT",
+					});
+					await waitForRebaseCompletion(config, mrIid);
+				}
+				await gitlabFetch(config.token, config.instanceUrl, mrPath(config, mrIid, "/merge"), {
+					method: "PUT",
+					body: JSON.stringify(mergeMethod === "squash" ? { squash: true } : {}),
+				});
+			}),
 	);
 
-	// Assign users to MR
-	ipcMain.handle(
+	mrIpcMain.handle(
 		IPC_CHANNELS.GITLAB_MR_ASSIGN,
-		async (
-			_,
-			projectId: string,
-			mrIid: number,
-			userIds: number[],
-		): Promise<boolean> => {
-			debugLog("assignMR handler called", { projectId, mrIid, userIds });
-			const assignResult = await withForgeProjectOrNull(
-				projectId,
-				async (project) => {
-					const config = await getGitLabConfig(project);
-					if (
-						!config ||
-						!isIid(mrIid) ||
-						!Array.isArray(userIds) ||
-						!userIds.every(isIid)
-					) {
-						return false;
-					}
-
-					try {
-						const encodedProject = encodeProjectPath(config.project);
-						await gitlabFetch(
-							config.token,
-							config.instanceUrl,
-							`/projects/${encodedProject}/merge_requests/${mrIid}`,
-							{
-								method: "PUT",
-								body: JSON.stringify({ assignee_ids: userIds }),
-							},
-						);
-						debugLog("Users assigned successfully", { mrIid, userIds });
-						return true;
-					} catch (error) {
-						debugLog("Failed to assign users", {
-							mrIid,
-							userIds,
-							error: error instanceof Error ? error.message : error,
-						});
-						return false;
-					}
-				},
-			);
-			return assignResult ?? false;
-		},
+		async (_, projectId: string, mrIid: number, userIds: number[]): Promise<boolean> =>
+			withConfig(projectId, "assign users", async (config) => {
+				await gitlabFetch(config.token, config.instanceUrl, mrPath(config, mrIid), {
+					method: "PUT",
+					body: JSON.stringify({ assignee_ids: userIds }),
+				});
+			}),
 	);
 
-	// Approve MR
-	ipcMain.handle(
+	mrIpcMain.handle(
 		IPC_CHANNELS.GITLAB_MR_APPROVE,
-		async (_, projectId: string, mrIid: number): Promise<boolean> => {
-			debugLog("approveMR handler called", { projectId, mrIid });
-			const approveResult = await withForgeProjectOrNull(
-				projectId,
-				async (project) => {
-					const config = await getGitLabConfig(project);
-					if (!config || !isIid(mrIid)) return false;
-
-					try {
-						const encodedProject = encodeProjectPath(config.project);
-						await gitlabFetch(
-							config.token,
-							config.instanceUrl,
-							`/projects/${encodedProject}/merge_requests/${mrIid}/approve`,
-							{
-								method: "POST",
-							},
-						);
-						debugLog("MR approved successfully", { mrIid });
-						return true;
-					} catch (error) {
-						debugLog("Failed to approve MR", {
-							mrIid,
-							error: error instanceof Error ? error.message : error,
-						});
-						return false;
-					}
-				},
-			);
-			return approveResult ?? false;
-		},
+		async (_, projectId: string, mrIid: number): Promise<boolean> =>
+			withConfig(projectId, "approve MR", async (config) => {
+				await gitlabFetch(config.token, config.instanceUrl, mrPath(config, mrIid, "/approve"), {
+					method: "POST",
+				});
+			}),
 	);
 
-	// Cancel MR review
-	ipcMain.handle(
+	mrIpcMain.handle(
 		IPC_CHANNELS.GITLAB_MR_REVIEW_CANCEL,
-		async (_, projectId: string, mrIid: number): Promise<boolean> => {
-			debugLog("cancelMRReview handler called", { projectId, mrIid });
-			if (serverProjectOf(projectId)) return cancelServerMRReview(projectId, mrIid);
-			const reviewKey = getReviewKey(projectId, mrIid);
-			const childProcess = runningReviews.get(reviewKey);
-
-			if (!childProcess) {
-				debugLog("No running review found to cancel", { reviewKey });
-				return false;
-			}
-
-			try {
-				debugLog("Killing review process", {
-					reviewKey,
-					pid: childProcess.pid,
-				});
-				childProcess.kill("SIGTERM");
-
-				setTimeout(() => {
-					if (!childProcess.killed) {
-						debugLog("Force killing review process", {
-							reviewKey,
-							pid: childProcess.pid,
-						});
-						childProcess.kill("SIGKILL");
-					}
-				}, 1000);
-
-				runningReviews.delete(reviewKey);
-				debugLog("Review process cancelled", { reviewKey });
-				return true;
-			} catch (error) {
-				debugLog("Failed to cancel review", {
-					reviewKey,
-					error: error instanceof Error ? error.message : error,
-				});
-				return false;
-			}
-		},
+		async (_, projectId: string, mrIid: number): Promise<boolean> =>
+			serverProjectOf(projectId)
+				? cancelServerMRReview(projectId, mrIid)
+				: cancelLocalReview(projectId, mrIid),
 	);
 
-	// Check for new commits since last review
-	ipcMain.handle(
+	mrIpcMain.handle(
 		IPC_CHANNELS.GITLAB_MR_CHECK_NEW_COMMITS,
 		async (_, projectId: string, mrIid: number): Promise<NewCommitsCheck> => {
-			debugLog("checkNewCommits handler called", { projectId, mrIid });
-
 			const remote = serverProjectOf(projectId);
 			const result = remote
 				? await newCommitsSince(remote, await serverMRReview(remote, mrIid), mrIid)
 				: await withProjectOrNull(projectId, async (project) =>
 						newCommitsSince(project, getReviewResult(project, mrIid), mrIid),
 					);
-
 			return result ?? { hasNewCommits: false };
 		},
 	);
-
-	// Run follow-up review
-	ipcMain.on(
-		IPC_CHANNELS.GITLAB_MR_FOLLOWUP_REVIEW,
-		async (_, projectId: string, mrIid: number) => {
-			debugLog("followupReview handler called", { projectId, mrIid });
-			const mainWindow = getMainWindow();
-			if (!mainWindow) {
-				debugLog("No main window available");
-				return;
-			}
-			const remote = serverProjectOf(projectId);
-			if (remote) {
-				startServerMRReview(remote, mrIid, true, mainWindow, getGitLabMRSettings());
-				return;
-			}
-
-			try {
-				await withProjectOrNull(projectId, async (project) => {
-					const { sendProgress, sendError, sendComplete } =
-						createIPCCommunicators<MRReviewProgress, MRReviewResult>(
-							mainWindow,
-							{
-								progress: IPC_CHANNELS.GITLAB_MR_REVIEW_PROGRESS,
-								error: IPC_CHANNELS.GITLAB_MR_REVIEW_ERROR,
-								complete: IPC_CHANNELS.GITLAB_MR_REVIEW_COMPLETE,
-							},
-							projectId,
-						);
-
-					const validation = await validateGitLabModule();
-					if (!validation.valid) {
-						sendError({
-							mrIid,
-							error: validation.error || "GitLab module validation failed",
-						});
-						return;
-					}
-
-					// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-					const backendPath = validation.backendPath!;
-					const reviewKey = getReviewKey(projectId, mrIid);
-
-					if (runningReviews.has(reviewKey)) {
-						debugLog("Follow-up review already running", { reviewKey });
-						return;
-					}
-
-					debugLog("Starting follow-up review", { mrIid });
-					sendProgress({
-						phase: "fetching",
-						mrIid,
-						progress: 5,
-						message: "Starting follow-up review...",
-					});
-
-					const { model, thinkingLevel } = getGitLabMRSettings();
-					const args = buildRunnerArgs(
-						getGitLabRunnerPath(backendPath),
-						project.path,
-						"followup-review-mr",
-						[mrIid.toString()],
-						{ model, thinkingLevel },
-					);
-
-					debugLog("Spawning follow-up review process", {
-						args,
-						model,
-						thinkingLevel,
-					});
-
-					// Get runner environment with PYTHONPATH for bundled packages (fixes #139)
-					const followupSubprocessEnv = await getRunnerEnv(
-						await gitlabRunnerEnv(project),
-						{
-							jevWorkflow: "gitlab-review",
-							page: "gitlab-merge-requests",
-						},
-					);
-
-					const { process: childProcess, promise } =
-						runPythonSubprocess<MRReviewResult>({
-							pythonPath: getPythonPath(backendPath),
-							args,
-							cwd: backendPath,
-							env: followupSubprocessEnv,
-							onProgress: (percent, message) => {
-								debugLog("Progress update", { percent, message });
-								sendProgress({
-									phase: "analyzing",
-									mrIid,
-									progress: percent,
-									message,
-								});
-							},
-							onStdout: (line) => debugLog("STDOUT:", line),
-							onStderr: (line) => debugLog("STDERR:", line),
-							onAuthFailure: (authFailureInfo: AuthFailureInfo) => {
-								debugLog(
-									"Auth failure detected in follow-up MR review",
-									authFailureInfo,
-								);
-								mainWindow.webContents.send(
-									IPC_CHANNELS.CLAUDE_AUTH_FAILURE,
-									authFailureInfo,
-								);
-							},
-							onComplete: () => {
-								const reviewResult = getReviewResult(project, mrIid);
-								if (!reviewResult) {
-									throw new Error(
-										"Follow-up review completed but result not found",
-									);
-								}
-								debugLog("Follow-up review result loaded", {
-									findingsCount: reviewResult.findings.length,
-								});
-								return reviewResult;
-							},
-						});
-
-					runningReviews.set(reviewKey, childProcess);
-					debugLog("Registered follow-up review process", {
-						reviewKey,
-						pid: childProcess.pid,
-					});
-
-					try {
-						const result = await promise;
-
-						if (!result.success) {
-							throw new Error(result.error ?? "Follow-up review failed");
-						}
-
-						debugLog("Follow-up review completed", {
-							mrIid,
-							findingsCount: result.data?.findings.length,
-						});
-						sendProgress({
-							phase: "complete",
-							mrIid,
-							progress: 100,
-							message: "Follow-up review complete!",
-						});
-
-						// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-						sendComplete(result.data!);
-					} finally {
-						runningReviews.delete(reviewKey);
-						debugLog("Unregistered follow-up review process", { reviewKey });
-					}
-				});
-			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				debugLog("Follow-up review failed", { mrIid, error: errorMessage });
-				const { sendError } = createIPCCommunicators<
-					MRReviewProgress,
-					MRReviewResult
-				>(
-					mainWindow,
-					{
-						progress: IPC_CHANNELS.GITLAB_MR_REVIEW_PROGRESS,
-						error: IPC_CHANNELS.GITLAB_MR_REVIEW_ERROR,
-						complete: IPC_CHANNELS.GITLAB_MR_REVIEW_COMPLETE,
-					},
-					projectId,
-				);
-				sendError({
-					mrIid,
-					error: `Follow-up review failed for MR #${mrIid}: ${errorMessage}`,
-				});
-			}
-		},
-	);
-
-	debugLog("MR review handlers registered");
 }
