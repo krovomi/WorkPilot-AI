@@ -146,6 +146,11 @@ export function WorkspaceStatus({
 	// Drives the PR-first guided flow: the hero action is "Create PR" until a PR
 	// exists, then it flips to "Approve & close".
 	const hasExistingPr = Boolean(existingPrUrl);
+	// "1 file", "3 files": the count is shown on its own, next to the word.
+	const filesWord = (count: number) =>
+		count === 1
+			? t("taskReview:merge.status.file")
+			: t("taskReview:merge.status.files");
 	const actionsBusy = isMerging || isDiscarding || isCreatingPR || isCompleting;
 
 	// Merge progress state
@@ -415,7 +420,7 @@ export function WorkspaceStatus({
 						<span className="text-xs text-muted-foreground ml-2">
 							{t("taskReview:merge.status.aiWillResolve")} (
 							{hasPathMappedMerges
-								? `${pathMappedAIMergeCount} ${t("taskReview:merge.status.files")}`
+								? `${pathMappedAIMergeCount} ${filesWord(pathMappedAIMergeCount)}`
 								: t("taskReview:workspace.commitsCount", { count: commitsBehind })}
 							)
 						</span>
@@ -433,7 +438,7 @@ export function WorkspaceStatus({
 					</span>
 					<span className="text-xs text-muted-foreground ml-1">
 						{mergePreview?.summary?.totalFiles || 0}{" "}
-						{t("taskReview:merge.status.files")}
+						{filesWord(mergePreview?.summary?.totalFiles || 0)}
 					</span>
 				</>
 			);
@@ -494,7 +499,7 @@ export function WorkspaceStatus({
 						<span className="font-medium text-foreground">
 							{worktreeStatus.filesChanged || 0}
 						</span>{" "}
-						{t("taskReview:merge.status.files")}
+						{filesWord(worktreeStatus.filesChanged || 0)}
 					</span>
 					<span className="flex items-center gap-1.5 text-muted-foreground">
 						<GitCommit className="h-3.5 w-3.5" />
