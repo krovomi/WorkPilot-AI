@@ -11,16 +11,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from claude_agent_sdk import tool
 from foundation.file_utils import write_json_atomic
 from spec.validate_pkg.auto_fix import auto_fix_plan
-
-try:
-    from claude_agent_sdk import tool
-
-    SDK_TOOLS_AVAILABLE = True
-except ImportError:
-    SDK_TOOLS_AVAILABLE = False
-    tool = None
 
 
 def _update_subtask_in_plan(
@@ -71,9 +64,6 @@ def create_subtask_tools(spec_dir: Path, project_dir: Path) -> list:
     Returns:
         List of subtask tool functions
     """
-    if not SDK_TOOLS_AVAILABLE:
-        return []
-
     tools = []
 
     # -------------------------------------------------------------------------
