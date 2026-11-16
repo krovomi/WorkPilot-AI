@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { DeployWatch } from "../../shared/types/deploy-watch";
 
 export type CICDProvider = "github" | "gitlab" | "azure" | "jenkins" | "";
 export type PipelineRunStatus =
@@ -26,6 +27,13 @@ export interface CICDConfig {
 	jenkins_url: string;
 	jenkins_token: string;
 	jenkins_job: string;
+	/** The watch after a deployment (#366): what to read, how long. */
+	monitor_health_url: string;
+	monitor_prometheus_url: string;
+	monitor_prometheus_token: string;
+	monitor_window_minutes: string;
+	monitor_deploy_wait_minutes: string;
+	auto_rollback: boolean;
 }
 
 export interface PipelineRun {
@@ -42,6 +50,8 @@ export interface PipelineRun {
 	event?: "pr" | "merge";
 	task_id?: string;
 	spec_id?: string;
+	/** The watch after the deployment, when one was started. */
+	watch?: DeployWatch;
 }
 
 interface CICDTriggersState {
@@ -63,6 +73,9 @@ interface CICDTriggersState {
 			workflow?: string;
 		},
 	) => Promise<{ success: boolean; error?: string }>;
+	/** Rolls a watched run back; the person asked for it on the page. */
+	rollback: (projectDir: string, runId: string) => Promise<boolean>;
+	rollingBack: string | null;
 	clearError: () => void;
 }
 
@@ -72,6 +85,7 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set, get) => ({
 	isLoading: false,
 	isTriggering: false,
 	error: null,
+	rollingBack: null,
 
 	loadConfig: async (projectDir) => {
 		set({ isLoading: true, error: null });
@@ -157,6 +171,24 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set, get) => ({
 			return { success: false, error: msg };
 		} finally {
 			set({ isTriggering: false });
+		}
+	},
+
+	rollback: async (projectDir, runId) => {
+		set({ rollingBack: runId, error: null });
+		try {
+			const result = await globalThis.electronAPI.rollbackDeployment(projectDir, runId);
+			if (!result.success) {
+				set({ error: result.error ?? "Rollback failed" });
+				return false;
+			}
+			await get().loadRuns(projectDir);
+			return true;
+		} catch (err) {
+			set({ error: String(err) });
+			return false;
+		} finally {
+			set({ rollingBack: null });
 		}
 	},
 

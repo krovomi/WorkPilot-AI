@@ -308,7 +308,8 @@
 			"largest": "Plus grand"
 		},
 		"pullRequests": "Pull Requests",
-		"open": "ouvert",
+		"openCount_one": "{{count}} ouverte",
+		"openCount_other": "{{count}} ouvertes",
 		"selectPRToView": "Sélectionner une pull request pour voir les détails",
 		"loadingPRs": "Chargement des pull requests...",
 		"noOpenPRs": "Aucune pull request ouverte",
@@ -328,6 +329,17 @@
 		"reviewComplete": "Révision terminée",
 		"reviewStatus": "Statut de la révision",
 		"files": "fichiers",
+		"files_one": "fichier",
+		"files_other": "fichiers",
+		"fileStatus": {
+			"added": "ajouté",
+			"removed": "supprimé",
+			"modified": "modifié",
+			"renamed": "renommé",
+			"copied": "copié",
+			"changed": "changé",
+			"unchanged": "inchangé"
+		},
 		"filesChanged": "{{count}} fichiers modifiés",
 		"clickToViewFiles": "Cliquer pour voir les fichiers modifiés",
 		"loadingFiles": "Chargement des fichiers...",
@@ -370,13 +382,14 @@
 		},
 		"category": {
 			"security": "Sécurité",
-			"logic": "Logique",
 			"quality": "Qualité",
-			"performance": "Performance",
 			"style": "Style",
-			"documentation": "Documentation",
-			"testing": "Tests",
-			"other": "Autre"
+			"test": "Tests",
+			"docs": "Documentation",
+			"pattern": "Motif",
+			"performance": "Performance",
+			"verification_failed": "Non vérifié",
+			"redundancy": "Redondance"
 		},
 		"state": {
 			"open": "Ouvert",
@@ -385,6 +398,7 @@
 		},
 		"selectCriticalHigh": "Sélectionner Bloquant/Obligatoire ({{count}})",
 		"selectAll": "Tout sélectionner",
+		"selectSeverityGroup": "Sélectionner tous les résultats : {{severity}}",
 		"clear": "Effacer",
 		"noIssuesFound": "Aucun problème trouvé ! Le code semble bon.",
 		"allFindingsPosted": "Tous les résultats publiés sur GitHub",
@@ -476,8 +490,11 @@
 			"pastBugs": "Bugs passés dans cette zone",
 			"regressionRisks": "Risques de régression",
 			"gatheringTime": "Contexte collecté en {{ms}}ms",
-			"noContext": "Pas de contexte profond disponible",
-			"canImportFrom": "Peut importer depuis : {{imports}}"
+			"canImportFrom": "Peut importer depuis : {{imports}}",
+			"violationSeverity": {
+				"error": "Erreur",
+				"warning": "Avertissement"
+			}
 		},
 		"deepContextSections_one": "{{count}} section",
 		"deepContextSections_other": "{{count}} sections",
@@ -562,6 +579,10 @@
 		"dataUnavailableDescription": "Le point de terminaison de surveillance d'utilisation pour ce fournisseur n'est pas disponible ou n'est pas pris en charge.",
 		"dataUnavailableAnthropic": "Les données d'usage Anthropic ne sont pas disponibles. Vous pouvez vérifier votre consommation directement sur claude.ai/settings.",
 		"activeAccount": "Compte actif",
+		"planApiKey": "Clé API · à l'usage",
+		"planApiKeyHint": "Facturé à l'usage par une clé API : aucune fenêtre de forfait ne s'applique.",
+		"planSubscription": "Abonnement",
+		"planSubscriptionHint": "Forfait de ce compte, tel que le fournisseur l'indique.",
 		"usageAlert": "Alerte d'utilisation",
 		"accountExceedsThreshold": "L'utilisation du compte dépasse le seuil de 90%",
 		"authentication": "Authentification",
@@ -925,6 +946,8 @@
 		"daysAgo": "il y a {{count}} j",
 		"daysAgo_one": "il y a {{count}} j",
 		"daysAgo_other": "il y a {{count}} j",
+		"weeksAgo_one": "il y a {{count}} sem.",
+		"weeksAgo_other": "il y a {{count}} sem.",
 		"today": "Aujourd'hui",
 		"yesterday": "Hier"
 	},
@@ -1496,7 +1519,21 @@
 		"less": "Moins",
 		"more": "Plus",
 		"streaming": "Diffusion",
-		"running": "En cours"
+		"running": "En cours",
+		"phase": {
+			"context": "Collecte du contexte",
+			"analysis": "Analyse IA",
+			"synthesis": "Synthèse"
+		},
+		"activity": {
+			"read_one": "{{count}} fichier lu",
+			"read_other": "{{count}} fichiers lus",
+			"search_one": "{{count}} recherche",
+			"search_other": "{{count}} recherches",
+			"other_one": "{{count}} autre",
+			"other_other": "{{count}} autres"
+		},
+		"showDetail": "Afficher le détail"
 	},
 	"githubCopilot": {
 		"authTerminal": {

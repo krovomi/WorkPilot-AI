@@ -7,7 +7,6 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	importGitHubIssues,
 	loadGitHubIssues,
 	loadMoreGitHubIssues,
 	useIssuesStore,
@@ -16,7 +15,6 @@ import { checkGitHubConnection, useSyncStatusStore } from "../sync-status-store"
 
 const api = {
 	getGitHubIssues: vi.fn(),
-	importGitHubIssues: vi.fn(),
 	checkGitHubConnection: vi.fn(),
 };
 
@@ -105,29 +103,6 @@ describe("GitHub issue stores", () => {
 		useIssuesStore.setState({ hasMore: true, isLoadingMore: true });
 		await loadMoreGitHubIssues("p1");
 		expect(api.getGitHubIssues).not.toHaveBeenCalled();
-	});
-
-	it("imports issues, or says why it could not", async () => {
-		api.importGitHubIssues.mockResolvedValue({ success: true });
-		expect(await importGitHubIssues("p1", [1])).toBe(true);
-		expect(api.importGitHubIssues).toHaveBeenCalledWith("p1", [1]);
-
-		api.importGitHubIssues.mockResolvedValue({ success: false });
-		expect(await importGitHubIssues("p1", [1])).toBe(false);
-		expect(error()).toBe("Could not create tasks from the issues");
-
-		api.importGitHubIssues.mockResolvedValue({ success: false, error: "No board" });
-		await importGitHubIssues("p1", [1]);
-		expect(error()).toBe("No board");
-
-		api.importGitHubIssues.mockRejectedValue(new Error("IPC down"));
-		expect(await importGitHubIssues("p1", [1])).toBe(false);
-		expect(error()).toBe("IPC down");
-
-		api.importGitHubIssues.mockRejectedValue("dropped");
-		await importGitHubIssues("p1", [1]);
-		expect(error()).toBe("Unknown error");
-		expect(useIssuesStore.getState().isLoading).toBe(false);
 	});
 
 	it("forgets the last connection status when a check fails", async () => {

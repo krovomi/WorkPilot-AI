@@ -250,8 +250,12 @@ class TestPromptsCarryTheBlock:
                 if False:  # an empty answer: no message at all
                     yield None
 
+        # By the module the engine's lazy import will read, not by dotted
+        # string: an earlier file that drops `core.client` from `sys.modules`
+        # leaves the `core` package pointing at the old module.
+        client_module = importlib.import_module("core.client")
         monkeypatch.setattr(
-            "core.client.create_agent_client", lambda **_kwargs: _Client()
+            client_module, "create_agent_client", lambda **_kwargs: _Client()
         )
         engine = PRReviewEngine(tmp_path, tmp_path / ".workpilot" / "github", config)
 

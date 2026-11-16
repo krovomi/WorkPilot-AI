@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
 	checkGitHubConnection,
 	loadGitHubIssues,
@@ -21,23 +22,39 @@ export function useGitHubIssues(projectId: string | undefined) {
 		setFilterState,
 		getFilteredIssues,
 		getOpenIssuesCount,
-	} = useIssuesStore();
+	} = useIssuesStore(
+		useShallow((state) => ({
+			issues: state.issues,
+			isLoading: state.isLoading,
+			isLoadingMore: state.isLoadingMore,
+			error: state.error,
+			selectedIssueNumber: state.selectedIssueNumber,
+			filterState: state.filterState,
+			hasMore: state.hasMore,
+			selectIssue: state.selectIssue,
+			setFilterState: state.setFilterState,
+			getFilteredIssues: state.getFilteredIssues,
+			getOpenIssuesCount: state.getOpenIssuesCount,
+		})),
+	);
 
-	const syncStatus = useSyncStatusStore((s) => s.syncStatus);
+	const syncStatus = useSyncStatusStore((state) => state.syncStatus);
 	const connectionError = useSyncStatusStore((s) => s.connectionError);
 
-	// A search reads every issue, not one page: it has to see them all.
+	// Track if search is active (need to load all issues for search)
 	const [isSearchActive, setIsSearchActive] = useState(false);
 
-	// Always check connection when component mounts or projectId changes
-	// (in case settings changed).
+	// Check the connection (settings may have changed) and leave search mode
+	// whenever the project changes.
 	useEffect(() => {
-		if (projectId) checkGitHubConnection(projectId);
+		setIsSearchActive(false);
+		if (projectId) {
+			checkGitHubConnection(projectId);
+		}
 	}, [projectId]);
 
-	// The one place issues are loaded: on connection, and whenever the filter
-	// or the search mode changes. The search handlers only flip the mode, so a
-	// search loads once, not twice.
+	// The one place issues load: on connection, and whenever the filter or the
+	// search mode changes (a search needs every issue, not one page).
 	useEffect(() => {
 		if (projectId && syncStatus?.connected) {
 			loadGitHubIssues(projectId, filterState, isSearchActive);
@@ -67,7 +84,8 @@ export function useGitHubIssues(projectId: string | undefined) {
 		}
 	}, [projectId, filterState, isSearchActive]);
 
-	// Searching loads every issue; clearing goes back to pages.
+	// Searching loads every issue, clearing the search goes back to pages:
+	// the loading effect above does both when the mode changes.
 	const handleSearchStart = useCallback(() => setIsSearchActive(true), []);
 	const handleSearchClear = useCallback(() => setIsSearchActive(false), []);
 

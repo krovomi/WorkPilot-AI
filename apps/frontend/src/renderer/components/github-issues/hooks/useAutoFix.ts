@@ -15,9 +15,6 @@ export function useAutoFix(projectId: string | undefined) {
 	const projectIdRef = useRef(projectId);
 	projectIdRef.current = projectId;
 
-	// Ref for auto-fix interval
-	const autoFixIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
 	// Load the config and the queue on mount and when the project changes
 	useEffect(() => {
 		setConfig(null);
@@ -108,18 +105,13 @@ export function useAutoFix(projectId: string | undefined) {
 
 	// Auto-fix polling when enabled
 	useEffect(() => {
-		if (!projectId || !config?.enabled) {
-			if (autoFixIntervalRef.current) {
-				clearInterval(autoFixIntervalRef.current);
-				autoFixIntervalRef.current = null;
-			}
-			return;
-		}
+		// The previous run's cleanup has already cleared its interval.
+		if (!projectId || !config?.enabled) return;
 
 		// Poll for new issues every 5 minutes when auto-fix is enabled
 		const pollInterval = 5 * 60 * 1000; // 5 minutes
 
-		autoFixIntervalRef.current = setInterval(async () => {
+		const interval = setInterval(async () => {
 			try {
 				// Check for new issues (no labels required)
 				const newIssues =
@@ -135,12 +127,7 @@ export function useAutoFix(projectId: string | undefined) {
 			}
 		}, pollInterval);
 
-		return () => {
-			if (autoFixIntervalRef.current) {
-				clearInterval(autoFixIntervalRef.current);
-				autoFixIntervalRef.current = null;
-			}
-		};
+		return () => clearInterval(interval);
 	}, [projectId, config?.enabled]);
 
 	// Manually check for new issues (no labels required)
