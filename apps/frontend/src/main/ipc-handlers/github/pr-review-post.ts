@@ -33,6 +33,15 @@ function renderFinding(f: PRReviewFinding): string {
 	return text;
 }
 
+/** The id of the review GitHub made: a positive integer, or the post failed. */
+function reviewIdOf(response: { id?: unknown }): number {
+	const id = response?.id;
+	if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) {
+		throw new Error("GitHub did not return the review's id");
+	}
+	return id;
+}
+
 /**
  * Post `result` as a review of PR `prNumber`, with the findings selected
  * (all when none is given); the id of the review GitHub made and the
@@ -140,8 +149,8 @@ export async function postReviewToGitHub(
 					event,
 				}),
 			},
-		)) as { id: number };
-		reviewId = reviewResponse.id;
+		)) as { id?: unknown };
+		reviewId = reviewIdOf(reviewResponse);
 	} catch (error) {
 		// GitHub doesn't allow REQUEST_CHANGES or APPROVE on your own PR
 		// Fall back to COMMENT if that's the error
@@ -169,8 +178,8 @@ export async function postReviewToGitHub(
 						event: "COMMENT",
 					}),
 				},
-			)) as { id: number };
-			reviewId = fallbackResponse.id;
+			)) as { id?: unknown };
+			reviewId = reviewIdOf(fallbackResponse);
 		} else {
 			throw error;
 		}
