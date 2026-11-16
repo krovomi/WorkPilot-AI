@@ -124,18 +124,6 @@ class MergeStrategy(Enum):
     HUMAN_REQUIRED = "human_required"  # Cannot auto-merge, need human
 
 
-class MergeDecision(Enum):
-    """
-    Decision outcomes from the merge system.
-    """
-
-    AUTO_MERGED = "auto_merged"  # Python handled it, no AI
-    AI_MERGED = "ai_merged"  # AI resolved the conflict
-    NEEDS_HUMAN_REVIEW = "needs_human_review"  # Flagged for human
-    FAILED = "failed"  # Could not merge
-    DIRECT_COPY = "direct_copy"  # Use worktree version directly (no semantic merge)
-
-
 @dataclass
 class SemanticChange:
     """
@@ -514,68 +502,6 @@ class FileEvolution:
     def tasks_involved(self) -> list[str]:
         """Get list of task IDs that modified this file."""
         return [ts.task_id for ts in self.task_snapshots]
-
-
-@dataclass
-class MergeResult:
-    """
-    Result of a merge operation.
-
-    Contains the outcome, merged content, and detailed information
-    about how the merge was performed.
-
-    Attributes:
-        decision: The merge decision outcome
-        file_path: Path to the merged file
-        merged_content: The final merged content (if successful)
-        conflicts_resolved: List of conflicts that were resolved
-        conflicts_remaining: List of conflicts needing human review
-        ai_calls_made: Number of AI calls required
-        tokens_used: Approximate tokens used for AI calls
-        explanation: Human-readable explanation of what was done
-        error: Error message if merge failed
-    """
-
-    decision: MergeDecision
-    file_path: str
-    merged_content: str | None = None
-    conflicts_resolved: list[ConflictRegion] = field(default_factory=list)
-    conflicts_remaining: list[ConflictRegion] = field(default_factory=list)
-    ai_calls_made: int = 0
-    tokens_used: int = 0
-    explanation: str = ""
-    error: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        return {
-            "decision": self.decision.value,
-            "file_path": self.file_path,
-            "merged_content": self.merged_content,
-            "conflicts_resolved": [c.to_dict() for c in self.conflicts_resolved],
-            "conflicts_remaining": [c.to_dict() for c in self.conflicts_remaining],
-            "ai_calls_made": self.ai_calls_made,
-            "tokens_used": self.tokens_used,
-            "explanation": self.explanation,
-            "error": self.error,
-        }
-
-    @property
-    def success(self) -> bool:
-        """Check if merge was successful."""
-        return self.decision in {
-            MergeDecision.AUTO_MERGED,
-            MergeDecision.AI_MERGED,
-            MergeDecision.DIRECT_COPY,
-        }
-
-    @property
-    def needs_human_review(self) -> bool:
-        """Check if human review is needed."""
-        return (
-            len(self.conflicts_remaining) > 0
-            or self.decision == MergeDecision.NEEDS_HUMAN_REVIEW
-        )
 
 
 def compute_content_hash(content: str | None) -> str:

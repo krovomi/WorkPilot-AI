@@ -260,3 +260,100 @@ def test_the_runner_fixes_from_a_list_file(
     assert [a["fixId"] for a in payload["applied"]] == [
         "rename:src/cart.ts:6:qty:quantity"
     ]
+
+
+@pytest.fixture
+def drifted(repo: Path, tmp_path: Path, monkeypatch):
+    _branch(repo)
+    spec = tmp_path / "spec"
+    spec.mkdir()
+    (spec / "implementation_plan.json").write_text(
+        json.dumps(
+            {
+                "qa_signoff": {
+                    "status": "approved",
+                    "issues_found": [
+                        {"type": "doc_drift", "title": "old"},
+                        {"type": "critical", "title": "kept"},
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    scope = ChangeScope(
+        level="targeted", reason="t", files=("src/cart.ts",), base="develop"
+    )
+    monkeypatch.setenv(DOC_DRIFT_ENV, "strict")
+    return repo, spec, scope
+
+
+def test_a_strict_rejection_replaces_the_previous_drift_issues(drifted):
+    repo, spec, scope = drifted
+
+    issues, _ = doc_drift_gate(spec, repo, 2, scope)
+
+    signoff = json.loads(
+        (spec / "implementation_plan.json").read_text(encoding="utf-8")
+    )["qa_signoff"]
+    assert signoff["status"] == "rejected"
+    assert signoff["ready_for_qa_revalidation"] is False
+    titles = [i["title"] for i in signoff["issues_found"]]
+    assert "old" not in titles and "kept" in titles
+    assert len(signoff["issues_found"]) == 1 + len(issues)
+
+
+def test_the_drift_goes_to_the_task_log(drifted, monkeypatch):
+    repo, spec, scope = drifted
+    logged: list[str] = []
+
+    class Log:
+        def log(self, message, kind, phase):
+            logged.append(kind.value)
+
+    doc_drift_gate(spec, repo, 2, scope, task_logger=Log())
+    monkeypatch.setenv(DOC_DRIFT_ENV, "warn")
+    doc_drift_gate(spec, repo, 3, scope, task_logger=Log())
+
+    assert logged[0] == "error"
+
+
+def test_an_unknown_change_set_is_recorded_as_unchecked(drifted):
+    repo, spec, _ = drifted
+
+    assert doc_drift_gate(spec, repo, 1, None) is None
+    record = json.loads((spec / RECORD).read_text(encoding="utf-8"))
+    assert record == {"unchecked": "the change set is unknown"}
+
+
+def test_a_record_that_cannot_be_written_skips_the_detector(drifted):
+    repo, spec, scope = drifted
+    (spec / RECORD).mkdir()
+
+    assert doc_drift_gate(spec, repo, 1, scope) is None
+
+
+def test_an_unwritable_fix_request_does_not_lose_the_rejection(drifted):
+    repo, spec, scope = drifted
+    (spec / "QA_FIX_REQUEST.md").mkdir()
+
+    issues, verdict = doc_drift_gate(spec, repo, 1, scope)
+
+    assert issues and "rejected" in verdict
+
+
+def test_without_a_plan_the_rejection_still_stands(drifted):
+    repo, spec, scope = drifted
+    (spec / "implementation_plan.json").unlink()
+
+    assert doc_drift_gate(spec, repo, 1, scope) is not None
+
+
+def test_a_change_no_document_describes_says_nothing(drifted, capsys):
+    repo, spec, _ = drifted
+    scope = ChangeScope(
+        level="targeted", reason="t", files=("notes.txt",), base="develop"
+    )
+
+    assert doc_drift_gate(spec, repo, 1, scope) is None
+    assert "Documentation drift" not in capsys.readouterr().out

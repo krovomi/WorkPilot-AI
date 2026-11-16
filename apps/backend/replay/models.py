@@ -219,6 +219,36 @@ class Breakpoint:
 
 
 @dataclass
+class Bookmark:
+    """A marker a person leaves on a step, with a note (Markdown, shown as text)."""
+
+    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    step_index: int = 0
+    note: str = ""
+    author: str = ""
+    created_at: float = field(default_factory=time.time)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "step_index": self.step_index,
+            "note": self.note,
+            "author": self.author,
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Bookmark":
+        return cls(
+            id=data["id"],
+            step_index=data.get("step_index", 0),
+            note=data.get("note", ""),
+            author=data.get("author", ""),
+            created_at=data.get("created_at", 0.0),
+        )
+
+
+@dataclass
 class ReplaySession:
     """A complete recorded agent session for replay."""
 
@@ -245,6 +275,9 @@ class ReplaySession:
 
     # Breakpoints
     breakpoints: list[Breakpoint] = field(default_factory=list)
+
+    # Markers left by people on steps, kept with the session and its export
+    bookmarks: list[Bookmark] = field(default_factory=list)
 
     # Aggregate stats
     total_tokens: int = 0
@@ -320,6 +353,7 @@ class ReplaySession:
             "step_count": self.step_count,
             "steps": [s.to_dict() for s in self.steps],
             "breakpoints": [b.to_dict() for b in self.breakpoints],
+            "bookmarks": [b.to_dict() for b in self.bookmarks],
             "total_tokens": self.total_tokens,
             "total_cost_usd": self.total_cost_usd,
             "total_tool_calls": self.total_tool_calls,
@@ -380,6 +414,7 @@ class ReplaySession:
         session.breakpoints = [
             Breakpoint.from_dict(b) for b in data.get("breakpoints", [])
         ]
+        session.bookmarks = [Bookmark.from_dict(b) for b in data.get("bookmarks", [])]
         return session
 
 

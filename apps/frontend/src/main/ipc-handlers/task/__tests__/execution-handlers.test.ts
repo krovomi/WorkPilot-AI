@@ -359,8 +359,18 @@ describe("TASK_UPDATE_PLAN", () => {
 	it("writes the edited plan, or says it could not", async () => {
 		expect(await invoke(IPC_CHANNELS.TASK_UPDATE_PLAN, "t1", [])).toEqual({ success: false, error: "Task not found" });
 		setTask();
-		expect(await invoke(IPC_CHANNELS.TASK_UPDATE_PLAN, "t1", [{ name: "P" }])).toEqual({ success: true });
-		expect(state.updatePlan).toHaveBeenCalledWith(path.join(specDir, "implementation_plan.json"), [{ name: "P" }], "p1");
+		expect(await invoke(IPC_CHANNELS.TASK_UPDATE_PLAN, "t1", [{ name: "P" }])).toEqual({
+			success: false,
+			error: "Invalid plan edit",
+		});
+		expect(state.updatePlan).not.toHaveBeenCalled();
+		const phases = [{ name: "P", subtasks: [{ id: "a", title: "Do A", description: "Do A", status: "pending" }] }];
+		expect(await invoke(IPC_CHANNELS.TASK_UPDATE_PLAN, "t1", phases)).toEqual({ success: true });
+		expect(state.updatePlan).toHaveBeenCalledWith(
+			path.join(specDir, "implementation_plan.json"),
+			[{ id: "a", description: "Do A" }],
+			"p1",
+		);
 		state.updatePlan.mockResolvedValueOnce(null);
 		expect((await invoke(IPC_CHANNELS.TASK_UPDATE_PLAN, "t1", [])).error).toMatch(/^Failed to update plan/);
 	});
