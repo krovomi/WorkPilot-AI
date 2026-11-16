@@ -1,12 +1,1 @@
-"""
-Semantic analyzer package for code analysis.
-
-This package provides modular semantic analysis capabilities:
-- models.py: Data structures for extracted elements
-- comparison.py: Element comparison and change classification
-- regex_analyzer.py: Regex-based analysis for code changes
-"""
-
-from .models import ExtractedElement
-
-__all__ = ["ExtractedElement"]
+"""The regex reading of a file's changes, used by ``merge.semantic_analyzer``."""

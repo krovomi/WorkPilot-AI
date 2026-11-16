@@ -68,6 +68,12 @@ import {
 	ScanLine,
 	Section,
 } from "../charter";
+import {
+	ReplayBookmarks,
+	ReplayImportButton,
+	ReplayShareButton,
+	ReplayShareNotice,
+} from "./ReplaySharing";
 import { TimeTravelPanel } from "./TimeTravelPanel";
 import { formatAppDateTime } from "@/lib/date-format";
 
@@ -738,6 +744,10 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 							onClose={clearComparison}
 						/>
 					)}
+					<ReplayShareNotice />
+					<div className="flex justify-end">
+						<ReplayImportButton />
+					</div>
 					<SessionListView
 						sessions={sessions}
 						loading={sessionsLoading}
@@ -802,6 +812,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 					</span>
 					<span>{formatCost(activeSession.total_cost_usd)}</span>
 					<span>{formatDuration(activeSession.duration_seconds * 1000)}</span>
+					<ReplayShareButton sessionId={activeSession.session_id} />
 					<Button
 						variant="outline"
 						size="sm"
@@ -815,6 +826,8 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 					</Button>
 				</div>
 			</div>
+
+			<ReplayShareNotice />
 
 			{/* Playback controls */}
 			<div className="relative z-[1] flex items-center gap-3 border-b border-[var(--wp-border)] px-4 py-2 shrink-0">
@@ -1132,6 +1145,11 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										{t("replay:stepDetail.selectStep")}
 									</p>
 								)}
+								<ReplayBookmarks
+									session={activeSession}
+									currentStep={currentStep}
+									onGoTo={goToStep}
+								/>
 							</TabsContent>
 
 							{/* Diff view */}

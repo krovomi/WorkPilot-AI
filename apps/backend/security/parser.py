@@ -86,8 +86,6 @@ def _fallback_extract_commands(command_string: str) -> list[str]:
             match.group(1) or match.group(2) or match.group(3)
             for match in re.finditer(r'"([^"]*)"|\'([^\']*)\'|(\S+)', part)
         ]
-        if not tokens:
-            continue
 
         for cmd in _scan_tokens(tokens):
             # Remove Windows extensions
@@ -500,9 +498,6 @@ def extract_commands(command_string: str) -> list[str]:
                 return fallback_commands
             # If fallback also found nothing, return empty to trigger block
             return []
-
-        if not tokens:
-            continue
 
         commands.extend(_scan_tokens(tokens))
 
