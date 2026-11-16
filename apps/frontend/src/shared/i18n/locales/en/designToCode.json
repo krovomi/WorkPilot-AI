@@ -59,7 +59,10 @@
 			"projectReady_one": "ready · {{count}} file to write",
 			"projectReady_other": "ready · {{count}} files to write",
 			"projectWritten_one": "{{count}} file in review",
-			"projectWritten_other": "{{count}} files in review"
+			"projectWritten_other": "{{count}} files in review",
+			"codeLoop": "iteration {{iteration}}/{{max}}",
+			"codeLoopDone_one": "{{score}} % match · {{count}} iteration",
+			"codeLoopDone_other": "{{score}} % match · {{count}} iterations"
 		}
 	},
 	"steps": {
@@ -78,7 +81,8 @@
 		},
 		"code": {
 			"kicker": "Code",
-			"title": "Generate the components"
+			"title": "Generate the components",
+			"toggle": "Render, compare and correct the code"
 		},
 		"tests": {
 			"kicker": "Visual tests",
@@ -190,7 +194,8 @@
 		"visual_test_generation": "Visual tests",
 		"figma_sync": "Figma sync",
 		"complete": "Done",
-		"error": "Error"
+		"error": "Error",
+		"render_loop": "Render loop"
 	},
 	"errors": {
 		"missingInput": "Add an image or a Figma link."
@@ -233,5 +238,68 @@
 		"components": "Components found",
 		"palette": "Palette",
 		"files": "Generated files"
+	},
+	"loop": {
+		"title": "Render loop",
+		"kicker": "Render · compare · correct",
+		"status": {
+			"converged": "Converged: {{score}} % match",
+			"max_iterations": "Stopped at the iteration cap: {{score}} % match",
+			"budget": "Time budget spent: {{score}} % match",
+			"stalled": "No more progress: {{score}} % match",
+			"failed": "Stopped on an error: {{score}} % match",
+			"skipped": "The render loop did not run"
+		},
+		"reason": {
+			"no_model": "No model answered the generation: there is nothing real to correct.",
+			"no_files": "No file was generated.",
+			"unsupported_target": "The design cannot be compared pixel by pixel (SVG or unreadable image).",
+			"no_vision_route": "The provider {{provider}} has no vision route here. Choose Claude, OpenAI, Copilot, Gemini or a local Ollama vision model.",
+			"no_credentials": "The provider {{provider}} has no key or sign-in in this run.",
+			"model_without_vision": "{{model}} does not read images (model catalogue). Choose a vision model.",
+			"local_unavailable": "The local vision model {{model}} is not available: {{detail}}.",
+			"no_preview": "The model gave no static HTML mirror to render.",
+			"no_browser": "No headless browser could start here: install Playwright's Chromium.",
+			"no_playwright": "Playwright is not installed in the backend's environment.",
+			"load_failed": "The generated page did not load in the browser."
+		},
+		"mirror": "Rendered from a static HTML mirror of the generated files, kept in step with the code by the model; the components themselves are not rendered.",
+		"target": "Target",
+		"render": "Render",
+		"diff": "Diff map",
+		"iteration": "v{{index}}",
+		"generated": "generated",
+		"kept": "kept",
+		"score": "{{score}} %",
+		"iterationsLabel": "Iterations",
+		"issues": "Differences",
+		"noIssues": "No difference found.",
+		"issueStatus": {
+			"resolved": "resolved",
+			"open": "open",
+			"abandoned": "abandoned"
+		},
+		"issue": {
+			"color": "{{region}}: background {{render}} instead of {{target}}",
+			"offset": "{{region}}: content moved {{px}} px ({{axis}})",
+			"size": "{{region}}: {{axis}} off by {{px}} px",
+			"structure": "{{region}}: layout or shapes differ"
+		},
+		"edits_one": "{{count}} edit applied",
+		"edits_other": "{{count}} edits applied",
+		"noEdits": "no applicable edit",
+		"missingFonts": "Fonts missing on this machine, replaced in the render: {{fonts}}",
+		"masked": "Ignored zones (dynamic content): {{zones}}",
+		"live": "Iteration {{iteration}}/{{max}}: {{stage}}",
+		"stage": {
+			"render": "rendering",
+			"correct": "correcting"
+		},
+		"axis": {
+			"x": "horizontal",
+			"y": "vertical",
+			"width": "width",
+			"height": "height"
+		}
 	}
 }
