@@ -13,3 +13,5 @@ section: 🧪 Filets de test
   GitLab remplace l'analyse d'impact par un double, au lieu de lancer un vrai modèle quand un
   jeton se trouve dans l'environnement ; les tests des critères QA lisent l'état de build simulé
   même quand un autre fichier a importé `qa.criteria` avant eux.
+- **Journal de l'usage lu comme du texte** : le test des traces de débogage du moniteur d'usage
+  coupe les couleurs, que le hook de pre-push force et qui découpaient la ligne attendue.
