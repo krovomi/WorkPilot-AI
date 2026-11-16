@@ -10,6 +10,10 @@ import type {
 	UsageSnapshot,
 } from "../../shared/types";
 import { debugLog } from "../../shared/utils/debug-logger";
+import {
+	normalizeFailoverOrder,
+	sanitizeAutoSwitchUpdate,
+} from "../../shared/utils/failover-chain";
 import { createProfileDirectory } from "../claude-profile/profile-utils";
 import {
 	maskClaudeProfile,
@@ -478,9 +482,14 @@ export function registerTerminalHandlers(
 			_,
 			settings: Partial<import("../../shared/types").ClaudeAutoSwitchSettings>,
 		): Promise<IPCResult> => {
+			// The renderer is not trusted: only known switches and thresholds are kept.
+			const update = sanitizeAutoSwitchUpdate(settings);
+			if (!update) {
+				return { success: false, error: "Invalid auto-switch settings" };
+			}
 			try {
 				const profileManager = getClaudeProfileManager();
-				profileManager.updateAutoSwitchSettings(settings);
+				profileManager.updateAutoSwitchSettings(update);
 
 				// Restart usage monitor with new settings
 				const monitor = getUsageMonitor();
@@ -524,9 +533,13 @@ export function registerTerminalHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.ACCOUNT_PRIORITY_SET,
 		async (_, order: string[]): Promise<IPCResult> => {
+			const entries = normalizeFailoverOrder(order);
+			if (!entries) {
+				return { success: false, error: "Invalid account priority order" };
+			}
 			try {
 				const profileManager = getClaudeProfileManager();
-				profileManager.setAccountPriorityOrder(order);
+				profileManager.setAccountPriorityOrder(entries);
 				return { success: true };
 			} catch (error) {
 				return {
