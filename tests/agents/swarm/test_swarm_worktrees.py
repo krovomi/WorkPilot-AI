@@ -141,9 +141,10 @@ def events(out: str) -> list[dict]:
     ]
 
 
-def leftovers(project: Path) -> tuple[list[str], list[str]]:
+def leftovers(project: Path) -> tuple[list[Path], list[str]]:
+    # git writes the paths with "/" on Windows too: compare them as paths.
     worktrees = [
-        line
+        Path(line.removeprefix("worktree ")).resolve()
         for line in git(project, "worktree", "list", "--porcelain").splitlines()
         if line.startswith("worktree ")
     ]
@@ -179,7 +180,7 @@ def test_each_subtask_is_built_apart_and_each_wave_is_merged(
     # the other subtask of its wave; the second wave started from the first.
     api, db, ui = seen(shop, "api"), seen(shop, "db"), seen(shop, "ui")
     assert Path(api["cwd"]).name == "api" and Path(db["cwd"]).name == "db"
-    assert api["confined_to"] == api["cwd"]
+    assert Path(api["confined_to"]).resolve() == Path(api["cwd"]).resolve()
     assert "db.py" not in api["files"] and "api.py" not in db["files"]
     assert {"api.py", "db.py"} <= set(ui["files"])
     # The task's plan took what each worker recorded.
@@ -188,7 +189,7 @@ def test_each_subtask_is_built_apart_and_each_wave_is_merged(
         "db": ("completed", "built in db"),
         "ui": ("completed", "built in ui"),
     }
-    assert leftovers(project) == ([f"worktree {project}"], [])
+    assert leftovers(project) == ([project.resolve()], [])
     merged = [e for e in events(capsys.readouterr().out) if e["type"] == "wave_merged"]
     assert [(e["merged"], e["conflicted"]) for e in merged] == [
         (["api", "db"], []),
@@ -220,7 +221,7 @@ def test_a_merge_that_conflicts_leaves_the_subtask_to_the_task(
         "first": ("completed", "built in first"),
         "second": ("pending", None),
     }
-    assert leftovers(project) == ([f"worktree {project}"], [])
+    assert leftovers(project) == ([project.resolve()], [])
     [merged] = [
         e for e in events(capsys.readouterr().out) if e["type"] == "wave_merged"
     ]
@@ -239,7 +240,7 @@ def test_a_subtask_that_fails_is_not_merged_and_its_worktree_goes(
     assert status.nodes["bad"].error == "could not build bad"
     assert statuses(shop)["bad"] == ("pending", None)
     assert git(shop["project"], "ls-files").split()[-1] == "good.py"
-    assert leftovers(shop["project"]) == ([f"worktree {shop['project']}"], [])
+    assert leftovers(shop["project"]) == ([shop["project"].resolve()], [])
 
 
 def test_fail_fast_removes_the_worktrees_of_the_stopped_wave(
@@ -252,7 +253,7 @@ def test_fail_fast_removes_the_worktrees_of_the_stopped_wave(
 
     assert status.phase is SwarmPhase.FAILED
     assert not (shop["seen"] / "later.json").exists()
-    assert leftovers(shop["project"]) == ([f"worktree {shop['project']}"], [])
+    assert leftovers(shop["project"]) == ([shop["project"].resolve()], [])
 
 
 def test_a_commit_the_task_s_hooks_refuse_is_not_merged(
@@ -317,7 +318,7 @@ def test_a_worktree_a_stopped_run_left_is_replaced(shop: dict[str, Path]) -> Non
     assert (fresh.spec_dir / "implementation_plan.json").is_file()
     assert (fresh.path / ".gitignore").read_text(encoding="utf-8") == ".workpilot/\n"
     subtask_worktree.remove(shop["project"], fresh.path, fresh.branch)
-    assert leftovers(shop["project"]) == ([f"worktree {shop['project']}"], [])
+    assert leftovers(shop["project"]) == ([shop["project"].resolve()], [])
 
 
 def test_the_task_s_env_and_security_files_reach_the_worktree(
