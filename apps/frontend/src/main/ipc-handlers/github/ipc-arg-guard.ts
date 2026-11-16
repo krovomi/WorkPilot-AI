@@ -1,8 +1,11 @@
 /**
  * An `ipcMain` that checks a handler's arguments before the handler runs.
- * Each forge module (`pr-ipc-guard.ts`, `autofix-ipc-guard.ts`) gives its own
- * checks, one per channel, of the arguments after the project id. A refused
- * `invoke` rejects with the module's message; a refused `send` is dropped.
+ * Each forge module (`pr-ipc-guard.ts`, `autofix-ipc-guard.ts`,
+ * `gitlab/mr-ipc-guard.ts`) gives its own checks, one per channel, of the
+ * arguments after the project id; a module whose channels take no project id
+ * (`terminal/terminal-ipc-guard.ts`) has its checks read every argument. A
+ * refused `invoke` rejects with the module's message; a refused `send` is
+ * dropped.
  */
 
 import { ipcMain } from "electron";
@@ -22,23 +25,26 @@ export const isText = (value: unknown): value is string => typeof value === "str
 export const isNumberList = (value: unknown): value is number[] =>
 	Array.isArray(value) && value.length <= MAX_BATCH && value.every(isNumber);
 
-/** Whether the arguments a channel received (project id first) may reach its handler. */
-export function argsAllowed(checks: ArgChecks, channel: string, args: unknown[]): boolean {
+/**
+ * Whether the arguments a channel received may reach its handler; the check
+ * sees them after the first `skip` (the project id by default).
+ */
+export function argsAllowed(checks: ArgChecks, channel: string, args: unknown[], skip = 1): boolean {
 	const check = checks[channel];
-	return !check || check(args.slice(1));
+	return !check || check(args.slice(skip));
 }
 
-export function guardedIpcMain(checks: ArgChecks, refusal: string) {
+export function guardedIpcMain(checks: ArgChecks, refusal: string, skip = 1) {
 	return {
 		handle(channel: string, listener: HandleListener): void {
 			ipcMain.handle(channel, (event, ...args) => {
-				if (!argsAllowed(checks, channel, args)) throw new Error(refusal);
+				if (!argsAllowed(checks, channel, args, skip)) throw new Error(refusal);
 				return listener(event, ...args);
 			});
 		},
 		on(channel: string, listener: OnListener): void {
 			ipcMain.on(channel, (event, ...args) => {
-				if (argsAllowed(checks, channel, args)) listener(event, ...args);
+				if (argsAllowed(checks, channel, args, skip)) listener(event, ...args);
 			});
 		},
 	};

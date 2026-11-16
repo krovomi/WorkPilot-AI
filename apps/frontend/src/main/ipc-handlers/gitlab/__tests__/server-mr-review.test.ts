@@ -177,6 +177,13 @@ describe("a server project's MR AI review", () => {
 		expect(mocks.fetch).not.toHaveBeenCalled();
 	});
 
+	it("records nothing when GitLab refuses the note", async () => {
+		answered({ reviews: { "3": saved } });
+		answered({ status: 403, body: { message: "403 Forbidden" } });
+		expect(await postServerMRReview(project, 3)).toBe(false);
+		expect(mocks.authedFetch).toHaveBeenCalledTimes(2);
+	});
+
 	it("posts nothing without a saved review", async () => {
 		answered({ reviews: { "3": null } });
 		expect(await postServerMRReview(project, 3)).toBe(false);
