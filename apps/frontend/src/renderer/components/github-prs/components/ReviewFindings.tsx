@@ -34,7 +34,7 @@ import { SeverityGroupHeader } from "./SeverityGroupHeader";
 interface ReviewFindingsProps {
 	findings: PRReviewFinding[];
 	selectedIds: Set<string>;
-	postedIds?: Set<string>;
+	postedIds?: ReadonlySet<string>;
 	onSelectionChange: (selectedIds: Set<string>) => void;
 	/** With both, each finding offers Accept / Reject / Not applicable (#361). */
 	projectId?: string;
@@ -42,10 +42,13 @@ interface ReviewFindingsProps {
 	learnedSuppressions?: LearnedSuppression[];
 }
 
+/** One empty set: a new default on every render would redo the memos below. */
+const NONE_POSTED: ReadonlySet<string> = new Set();
+
 export function ReviewFindings({
 	findings,
 	selectedIds,
-	postedIds = new Set(),
+	postedIds = NONE_POSTED,
 	onSelectionChange,
 	projectId,
 	prNumber,
@@ -80,10 +83,7 @@ export function ReviewFindings({
 		};
 
 		for (const finding of unpostedFindings) {
-			const severity = finding.severity as SeverityGroup;
-			if (groups[severity]) {
-				groups[severity].push(finding);
-			}
+			groups[finding.severity].push(finding);
 		}
 
 		return groups;
@@ -220,10 +220,7 @@ export function ReviewFindings({
 								selectedCount={selectedInGroup}
 								expanded={isExpanded}
 								onToggle={() => toggleSection(severity)}
-								onSelectAll={(e) => {
-									e.stopPropagation();
-									toggleSeverityGroup(severity);
-								}}
+								onSelectAll={() => toggleSeverityGroup(severity)}
 							/>
 
 							{/* Group Content */}
