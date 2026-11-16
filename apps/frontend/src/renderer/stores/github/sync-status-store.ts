@@ -24,7 +24,9 @@ export const useSyncStatusStore = create<SyncStatusState>((set, get) => ({
 	// Actions
 	setSyncStatus: (syncStatus) => set({ syncStatus, connectionError: null }),
 
-	setConnectionError: (connectionError) => set({ connectionError }),
+	// A failed check forgets the last status: it may be another project's.
+	setConnectionError: (connectionError) =>
+		set({ syncStatus: null, connectionError }),
 
 	clearSyncStatus: () =>
 		set({
@@ -58,15 +60,12 @@ export async function checkGitHubConnection(
 			store.setSyncStatus(result.data);
 			return result.data;
 		} else {
-			store.setConnectionError(
-				result.error || "Failed to check GitHub connection",
-			);
+			// No reason given: the view says what to do in the app's language.
+			store.setConnectionError(result.error || null);
 			return null;
 		}
 	} catch (error) {
-		store.setConnectionError(
-			error instanceof Error ? error.message : "Unknown error",
-		);
+		store.setConnectionError(error instanceof Error ? error.message : null);
 		return null;
 	}
 }

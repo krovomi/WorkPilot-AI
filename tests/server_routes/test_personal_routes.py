@@ -161,6 +161,26 @@ class TestPreferences:
             "theme"
         ] is None
 
+    async def test_the_menu_follows_the_person_not_the_server(self, world):
+        path = "/users/me/preferences/menu"
+        assert await world.ok("contributor_a", "GET", path) == {"layout": None}
+        layout = {
+            "groupOrder": ["agents"],
+            "itemOrder": {"agents": ["terminals"]},
+            "itemGroups": {"kanban": "agents"},
+            "pinnedItems": ["insights"],
+            "pinnedGroups": [],
+            "hiddenItems": [],
+        }
+        saved = await world.ok("contributor_a", "PUT", path, json=layout)
+        assert saved == {"layout": layout}
+        assert await world.ok("contributor_a", "GET", path) == {"layout": layout}
+        assert await world.ok("viewer_a", "GET", path) == {"layout": None}
+        refused = await world.call(
+            "contributor_a", "PUT", path, json={**layout, "groupOrder": ["../x"]}
+        )
+        assert refused.status_code == 422
+
 
 async def make_token(
     world: World, who: str, headers: dict[str, str] | None = None, **body

@@ -11,6 +11,8 @@
  */
 
 import type {
+	CalibrationAdjustRequest,
+	CalibrationSummary,
 	SmartEstimationEvent,
 	SmartEstimationResult,
 } from "../../../shared/types/smart-estimation";
@@ -23,6 +25,14 @@ export interface SmartEstimationAPI {
 		taskDescription: string,
 	) => Promise<SmartEstimationResult>;
 	cancelSmartEstimation: () => Promise<boolean>;
+	/** Keep the person's own complexity score in the repository's calibration. */
+	adjustSmartEstimate: (
+		request: CalibrationAdjustRequest,
+	) => Promise<CalibrationSummary>;
+	/** Forget the repository's calibration (after a redesign). */
+	resetEstimationCalibration: (
+		projectId: string,
+	) => Promise<CalibrationSummary>;
 	onSmartEstimationEvent: (
 		callback: (event: SmartEstimationEvent) => void,
 	) => () => void;
@@ -37,6 +47,12 @@ export const createSmartEstimationAPI = (): SmartEstimationAPI => ({
 		invokeIpc(IPC_CHANNELS.RUN_SMART_ESTIMATION, { projectId, taskDescription }),
 
 	cancelSmartEstimation: () => invokeIpc(IPC_CHANNELS.CANCEL_SMART_ESTIMATION),
+
+	adjustSmartEstimate: (request) =>
+		invokeIpc(IPC_CHANNELS.SMART_ESTIMATION_ADJUST, request),
+
+	resetEstimationCalibration: (projectId) =>
+		invokeIpc(IPC_CHANNELS.SMART_ESTIMATION_RESET_CALIBRATION, { projectId }),
 
 	onSmartEstimationEvent: (callback) =>
 		createIpcListener<[SmartEstimationEvent]>(
