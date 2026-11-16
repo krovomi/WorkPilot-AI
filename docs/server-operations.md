@@ -40,7 +40,7 @@ depuis le dépôt, comme la CI le fait à chaque PR (job `server-image`).
 - Les identifiants du fournisseur de LLM des builds, par exemple `CLAUDE_CODE_OAUTH_TOKEN`.
 
 Le serveur sort vers : le fournisseur de LLM, les forges (git en SSH ou HTTPS, `api.github.com`,
-les instances GitLab), `login.microsoftonline.com` si Entra est réglé, `api.pwnedpasswords.com` si
+les instances GitLab), `login.microsoftonline.com` si Entra est réglé, l'émetteur OpenID Connect s'il est réglé, `api.pwnedpasswords.com` si
 la vérification HIBP est active, le serveur SMTP s'il est réglé.
 
 ## Premier démarrage
@@ -246,6 +246,8 @@ Le bloc `environment:` du compose l'emporte sur `.env.server` pour `WORKPILOT_SE
 | `WORKPILOT_ACCESS_TOKEN_TTL_MINUTES` | `15` | Durée d'un jeton d'accès. Les permissions sont relues en base à chaque requête, pas portées par le jeton. |
 | `WORKPILOT_REFRESH_TOKEN_TTL_DAYS` | `14` | Durée d'une session avant de se reconnecter. |
 | `WORKPILOT_ENTRA_TENANT_ID`, `WORKPILOT_ENTRA_CLIENT_ID` | — | Connexion Microsoft Entra, active quand les deux sont posées (ce ne sont pas des secrets). Enregistrement d'application de type « Mobile and desktop applications », URI de redirection `http://localhost`. Les comptes locaux marchent toujours. |
+| `WORKPILOT_OIDC_ISSUER`, `WORKPILOT_OIDC_CLIENT_ID` | — | Connexion par n'importe quel fournisseur OpenID Connect (Okta, Google, Keycloak, Auth0…), active quand les deux sont posées (ce ne sont pas des secrets). Le serveur lit `<issuer>/.well-known/openid-configuration` : le fournisseur doit être joignable du serveur. Client public (application native, PKCE, sans secret), URI de redirection `http://localhost`. `WORKPILOT_OIDC_NAME` nomme le bouton, `WORKPILOT_OIDC_SCOPES` (défaut `openid profile email`) les scopes ; le détail dans [CONFIGURATION.md](CONFIGURATION.md#sign-in-and-sessions). |
+| `WORKPILOT_SELF_APPROVAL` | `when-alone` | L'auteur d'une carte approuve-t-il sa propre spec : `allow`, `deny`, ou `when-alone` (seulement si personne d'autre sur le projet ne peut approuver). |
 | `WORKPILOT_INVITATION_TTL_HOURS` | `72` | Durée de validité d'un lien d'invitation. |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | `12` | Longueur minimale d'un mot de passe local ; ne fait que monter le plancher de 12. |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | Refuse un nouveau mot de passe connu de Have I Been Pwned (seuls cinq caractères de son empreinte SHA-1 sortent ; service injoignable, le mot de passe est accepté). |

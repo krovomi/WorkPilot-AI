@@ -32,6 +32,7 @@ async def test_the_login_methods_are_public(world):
         "entra_enabled": False,
         "entra_tenant_id": None,
         "entra_client_id": None,
+        "sso_enabled": False,
     }
 
 

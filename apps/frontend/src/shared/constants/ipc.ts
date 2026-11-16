@@ -1376,6 +1376,7 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_LIST_INVITES: "server-auth:list-invites",
 	SERVER_AUTH_LOGIN_ENTRA: "server-auth:login-entra",
 	SERVER_AUTH_LOGIN_LOCAL: "server-auth:login-local",
+	SERVER_AUTH_LOGIN_SSO: "server-auth:login-sso",
 	SERVER_AUTH_LOGOUT: "server-auth:logout",
 	SERVER_AUTH_LOOKUP_INVITE: "server-auth:lookup-invite",
 	SERVER_AUTH_RESTORE: "server-auth:restore",

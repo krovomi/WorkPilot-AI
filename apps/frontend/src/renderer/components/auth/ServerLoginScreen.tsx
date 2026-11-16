@@ -3,7 +3,8 @@
  *
  * Lets the user pick between local mode (historical single-user behavior)
  * and a shared WorkPilot server, then sign in with a local account or
- * Microsoft Entra ID (system browser + PKCE, handled by the main process).
+ * Microsoft Entra ID or the server's OpenID Connect provider (system browser
+ * + PKCE, handled by the main process).
  */
 import { Loader2, Monitor, Server } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -25,7 +26,7 @@ const LAST_SERVER_URL_KEY = "workpilot-last-server-url";
 
 export function ServerLoginScreen() {
 	const { t } = useTranslation();
-	const { serverUrl, loginLocal, loginEntra, switchToLocalMode } =
+	const { serverUrl, loginLocal, loginEntra, loginSso, switchToLocalMode } =
 		useServerSessionStore();
 
 	const [view, setView] = useState<"login" | "invite">("login");
@@ -36,8 +37,10 @@ export function ServerLoginScreen() {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
-	const [busy, setBusy] = useState<"local" | "entra" | null>(null);
+	const [busy, setBusy] = useState<"local" | "entra" | "sso" | null>(null);
 	const [entraEnabled, setEntraEnabled] = useState<boolean | null>(null);
+	// The provider's name when the server offers its OpenID Connect sign-in.
+	const [ssoName, setSsoName] = useState<string | null>(null);
 
 	// Probe the server's auth config whenever the URL settles, so the UI
 	// only offers the methods the server actually supports.
@@ -46,6 +49,9 @@ export function ServerLoginScreen() {
 		const handle = setTimeout(async () => {
 			const config = await window.electronAPI.serverAuth.getConfig(url.trim());
 			setEntraEnabled(config.ok ? config.data.entra_enabled : null);
+			setSsoName(
+				config.ok && config.data.sso_enabled ? config.data.sso_name || "SSO" : null,
+			);
 		}, 500);
 		return () => clearTimeout(handle);
 	}, [url]);
@@ -79,6 +85,21 @@ export function ServerLoginScreen() {
 			setBusy(null);
 		}
 	}, [url, loginEntra, rememberUrl]);
+
+	const handleSsoLogin = useCallback(async () => {
+		setError(null);
+		setBusy("sso");
+		try {
+			const trimmed = url.trim();
+			rememberUrl(trimmed);
+			const result = await loginSso(trimmed);
+			if (!result.ok) {
+				setError(result.error || t("serverLogin.failed", "Connexion impossible"));
+			}
+		} finally {
+			setBusy(null);
+		}
+	}, [url, loginSso, rememberUrl, t]);
 
 	if (view === "invite") {
 		return <AcceptInviteForm onBack={() => setView("login")} />;
@@ -124,6 +145,23 @@ export function ServerLoginScreen() {
 								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
 							) : null}
 							{t("serverLogin.entraButton", "Se connecter avec Microsoft")}
+						</Button>
+					)}
+
+					{ssoName && (
+						<Button
+							className="w-full"
+							variant="default"
+							disabled={!url.trim() || busy !== null}
+							onClick={handleSsoLogin}
+						>
+							{busy === "sso" ? (
+								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+							) : null}
+							{t("serverLogin.ssoButton", {
+								name: ssoName,
+								defaultValue: "Se connecter avec {{name}}",
+							})}
 						</Button>
 					)}
 

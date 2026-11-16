@@ -23,7 +23,7 @@ Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentif
 
 | Pièce | Où | Rôle |
 |---|---|---|
-| Identité | `server/auth/` | comptes locaux et Microsoft Entra, jetons d'accès courts, sessions de refresh révocables, invitations |
+| Identité | `server/auth/` | comptes locaux, Microsoft Entra et tout fournisseur OpenID Connect ([spec-approval-sso.md](spec-approval-sso.md)), jetons d'accès courts, sessions de refresh révocables, invitations |
 | Tenant et droits | `server/authz/` | l'organisation où agit la requête, les permissions de ses rôles, une permission sur chaque route (`mount_guarded`), le projet résolu depuis un `project_id` (`scope.py`) |
 | Groupes | `server/authz/groups.py`, `server/routers/admin/groups.py` | des personnes d'une organisation réunies pour recevoir ensemble un rôle d'organisation et un rôle sur des projets |
 | Projets | `server/routers/projects.py`, `services/repos.py` | un projet est un dépôt distant que le serveur clone sous `WORKPILOT_REPOS_ROOT/<id>` ; ses membres et leur rôle (`viewer`, `member`, `owner`) |

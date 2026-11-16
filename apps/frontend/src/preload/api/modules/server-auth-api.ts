@@ -51,6 +51,10 @@ export interface ServerAuthConfig {
 	entra_enabled: boolean;
 	entra_tenant_id: string | null;
 	entra_client_id: string | null;
+	/** Sign-in with the server's OpenID Connect provider (Okta, Google, Keycloak...). */
+	sso_enabled?: boolean;
+	/** The provider's name, for the button. */
+	sso_name?: string;
 }
 
 export type ServerAuthResult =
@@ -94,6 +98,7 @@ export interface ServerAuthAPI {
 		password: string,
 	) => Promise<ServerAuthResult>;
 	loginEntra: (serverUrl: string) => Promise<ServerAuthResult>;
+	loginSso: (serverUrl: string) => Promise<ServerAuthResult>;
 	lookupInvite: (
 		serverUrl: string,
 		token: string,
@@ -163,6 +168,8 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 		),
 	loginEntra: (serverUrl) =>
 		invokeIpc<ServerAuthResult>(IPC_CHANNELS.SERVER_AUTH_LOGIN_ENTRA, serverUrl),
+	loginSso: (serverUrl) =>
+		invokeIpc<ServerAuthResult>(IPC_CHANNELS.SERVER_AUTH_LOGIN_SSO, serverUrl),
 	lookupInvite: (serverUrl, token) =>
 		invokeIpc<DataResult<InviteLookup>>(
 			IPC_CHANNELS.SERVER_AUTH_LOOKUP_INVITE,

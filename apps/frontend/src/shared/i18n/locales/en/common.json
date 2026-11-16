@@ -1328,6 +1328,8 @@
 		"description": "Sign in to a shared server, or continue in local mode.",
 		"serverUrl": "Server URL",
 		"entraButton": "Sign in with Microsoft",
+		"ssoButton": "Sign in with {{name}}",
+		"failed": "Could not sign in",
 		"email": "Email",
 		"password": "Password",
 		"localAccountButton": "Sign in",
