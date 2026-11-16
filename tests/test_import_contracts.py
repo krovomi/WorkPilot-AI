@@ -123,6 +123,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The repo bench: git, files and test runners, read by Formula Lab and
     # the model router. A leaf, or the router's cycle reaches it.
     "bench": {"foundation"},
+    # Git snapshots of a task's worktree before each agent session, and the
+    # rollback (docs/architecture/agent-safety.md): git through foundation only.
+    "agent_snapshots": {"foundation"},
     # The security layer reads the project's stack (allowlist per stack), the
     # injection scanner, and rtk to see the command behind the proxy
     # (docs/architecture/rtk.md).

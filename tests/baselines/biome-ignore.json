@@ -174,7 +174,6 @@
   "apps/frontend/src/renderer/components/roadmap/PhaseCard.tsx": 4,
   "apps/frontend/src/renderer/components/settings/AccountPriorityList.tsx": 1,
   "apps/frontend/src/renderer/components/settings/AgentProfileSettings.tsx": 1,
-  "apps/frontend/src/renderer/components/settings/AnomalyDetectionSettings.tsx": 1,
   "apps/frontend/src/renderer/components/settings/ApiKeyConfigContent.tsx": 5,
   "apps/frontend/src/renderer/components/settings/CleanProviderCard.tsx": 1,
   "apps/frontend/src/renderer/components/settings/CleanProviderGrid.tsx": 2,

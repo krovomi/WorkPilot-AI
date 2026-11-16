@@ -302,6 +302,7 @@ Full reference: [docs/CLI-USAGE.md](docs/CLI-USAGE.md).
 1. **OS sandbox**: agent commands run under bubblewrap (Linux) or Seatbelt (macOS); Windows is not covered yet, and the card says when a task runs without a sandbox.
 2. **Filesystem restrictions**: operations stay inside the project directory.
 3. **Dynamic command allowlist**: only the commands of the detected stack are allowed.
+4. **Snapshots and trust score**: before each agent session the task's worktree is saved as a hidden git commit; each session starts with a trust score of 100 that anomalies lower, and below a threshold the task pauses, or the session stops and its snapshot is restored. Restricted mode and per-session limits are in Settings > Sandbox; restore a snapshot from the card.
 
 API keys and tokens are encrypted at rest with the OS keyring; Settings > Accounts shows how long ago each API key was saved and suggests renewing it after 90 days. Every release ships SHA256 checksums, a CycloneDX SBOM and a build provenance attestation per file.
 
