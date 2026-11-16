@@ -6,9 +6,14 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GitHubIssue } from "../../../shared/types";
-import { useInvestigationStore, useIssuesStore, useSyncStatusStore } from "../../stores/github";
+import {
+	setupGitHubInvestigationListeners,
+	useInvestigationStore,
+	useIssuesStore,
+	useSyncStatusStore,
+} from "../../stores/github";
 import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
 import { GitHubIssues } from "../GitHubIssues";
@@ -160,6 +165,10 @@ const detail = (title = "Crash on save") =>
 	screen.getByRole("heading", { level: 2, name: title }).closest("div.p-4") as HTMLElement;
 
 describe("GitHubIssues", () => {
+	// Investigation events are followed for the life of the window, not by the page.
+	let stopInvestigationListeners: () => void = () => undefined;
+	afterEach(() => stopInvestigationListeners());
+
 	beforeEach(() => {
 		listeners = {};
 		intersect = null;
@@ -177,6 +186,7 @@ describe("GitHubIssues", () => {
 		github.checkNewIssues.mockResolvedValue([]);
 		github.saveAutoFixConfig.mockResolvedValue(true);
 		Object.assign(globalThis.electronAPI, api, { github });
+		stopInvestigationListeners = setupGitHubInvestigationListeners();
 		useProjectStore.setState({
 			projects: [{ id: "p1", name: "app", path: "/work/app" }] as never,
 			selectedProjectId: "p1",

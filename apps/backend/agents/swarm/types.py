@@ -44,10 +44,7 @@ class SwarmConfig:
     max_parallel_agents: int = 4
     fail_fast: bool = False
     max_retries_per_subtask: int = 2
-    merge_after_each_wave: bool = True
     profile_distribution: str = "round_robin"  # round_robin | least_loaded | dedicated
-    enable_ai_merge: bool = True
-    dry_run: bool = False
     # Hard cap on a single subtask's subprocess. Without this, a wedged child
     # (network hang, infinite loop) blocks asyncio.gather and stalls the
     # entire swarm; cancel_all() only fires on explicit cancel. Default 30
@@ -59,10 +56,7 @@ class SwarmConfig:
             "max_parallel_agents": self.max_parallel_agents,
             "fail_fast": self.fail_fast,
             "max_retries_per_subtask": self.max_retries_per_subtask,
-            "merge_after_each_wave": self.merge_after_each_wave,
             "profile_distribution": self.profile_distribution,
-            "enable_ai_merge": self.enable_ai_merge,
-            "dry_run": self.dry_run,
             "subtask_timeout_seconds": self.subtask_timeout_seconds,
         }
 
