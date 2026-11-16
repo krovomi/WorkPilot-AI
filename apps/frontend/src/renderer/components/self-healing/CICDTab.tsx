@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Panel } from "../charter";
 import { useSelfHealingStore } from "@/stores/self-healing-store";
+import { BisectPanel } from "./BisectPanel";
 import { HealingTimeline } from "./HealingTimeline";
 import { IncidentCard } from "./IncidentCard";
 
@@ -66,6 +67,17 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 						/>
 						{t("selfHealing:autoCreatePR")}
 					</label>
+					<label className="flex items-center gap-2 text-sm text-muted-foreground">
+						<input
+							type="checkbox"
+							checked={cicdConfig.autoBisect !== false}
+							onChange={(e) =>
+								setCICDConfig(projectPath, { autoBisect: e.target.checked })
+							}
+							className="rounded"
+						/>
+						{t("selfHealing:autoBisect")}
+					</label>
 				</div>
 			</Panel>
 
@@ -106,7 +118,9 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 								onTriggerFix={(id) => triggerFix(projectPath, id)}
 								onDismiss={(id) => dismissIncident(projectPath, id)}
 								onRetry={(id) => retryIncident(projectPath, id)}
-							/>
+							>
+								<BisectPanel incident={incident} projectPath={projectPath} />
+							</IncidentCard>
 						))}
 					</div>
 				)}

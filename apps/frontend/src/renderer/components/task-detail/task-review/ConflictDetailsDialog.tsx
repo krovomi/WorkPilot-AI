@@ -96,7 +96,9 @@ export function ConflictDetailsDialog({
 													getSeverityVariant(conflict.severity),
 												)}
 											>
-												{conflict.severity}
+												{t(`taskReview:conflicts.severity.${conflict.severity}`, {
+													defaultValue: conflict.severity,
+												})}
 											</Badge>
 											{conflict.canAutoMerge && (
 												<Badge
