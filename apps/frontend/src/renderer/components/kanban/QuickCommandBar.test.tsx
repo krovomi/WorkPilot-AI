@@ -86,10 +86,6 @@ afterEach(() => {
 	api.restore();
 });
 
-// A toast is copied for a moment into a hidden live region that screen readers
-// read (Radix, aria-live): a text query by pattern would find both copies.
-const NOT_ANNOUNCED = { ignore: "script, style, [aria-live]" };
-
 describe("formatOutput", () => {
 	it("ne montre rien pour un résultat absent ou vide", () => {
 		expect(formatOutput(undefined)).toBe("");
@@ -237,7 +233,7 @@ describe("lancer une commande", () => {
 		renderBar();
 		await userEvent.type(input(), "/review{Enter}");
 		expect(
-			await screen.findByText(/2 files committed on workpilot\/qc/, NOT_ANNOUNCED),
+			await screen.findByText(/2 files committed on workpilot\/qc/),
 		).toBeInTheDocument();
 		await waitFor(() =>
 			expect(api.fn("getTasks")).toHaveBeenCalledWith(
@@ -257,7 +253,11 @@ describe("lancer une commande", () => {
 		expect(
 			await screen.findByText("/review · Slash command failed"),
 		).toBeInTheDocument();
-		expect(screen.getByText(/still in \/tmp\/wt/, NOT_ANNOUNCED)).toBeInTheDocument();
+		// The toast's description, not the live region that repeats it for about
+		// a second after the toast opens: a slow runner reads it in that window.
+		expect(
+			screen.getByText(/still in \/tmp\/wt/, { selector: "p" }),
+		).toBeInTheDocument();
 	});
 
 	it("une commande sans sortie ni note n'a pas de description", async () => {
@@ -303,7 +303,9 @@ describe("lancer une commande", () => {
 		await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 		await userEvent.type(input(), "/help{Enter}");
 		expect(await screen.findByText("Available commands")).toBeInTheDocument();
-		expect(screen.getByText(/\/review — Review the diff/, NOT_ANNOUNCED)).toBeInTheDocument();
+		// The toast shows the list in a <pre>; a moment later Radix also reads it to
+		// screen readers through a hidden live region, which a slow runner reaches.
+		expect(screen.getByText(/\/review — Review the diff/, { selector: "pre" })).toBeInTheDocument();
 		expect(api.fn("runQuickCommand")).not.toHaveBeenCalled();
 	});
 
