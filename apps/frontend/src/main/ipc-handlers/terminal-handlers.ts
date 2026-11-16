@@ -1,21 +1,30 @@
-import type { BrowserWindow, IpcMainInvokeEvent } from "electron";
-import { ipcMain } from "electron";
+/**
+ * The terminals of the app and the Claude profiles they run with: create,
+ * write to, resize and close a terminal, start Claude in it, name it, keep
+ * and restore its session by day; the profiles (never their token, rule S6),
+ * the active one, auto-switching and the order accounts are tried in; the
+ * usage the monitor reads. Every argument is checked by
+ * `terminal/terminal-ipc-guard.ts` before a handler runs.
+ */
+
+import { existsSync, mkdirSync } from "node:fs";
+import type { BrowserWindow } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type {
 	AllProfilesUsage,
+	ClaudeAutoSwitchSettings,
 	ClaudeProfile,
 	ClaudeProfileSettings,
 	IPCResult,
+	RetryWithProfileRequest,
 	TerminalCreateOptions,
+	TerminalRestoreResult,
+	TerminalSession,
+	TerminalWorktreeConfig,
 	UsageSnapshot,
 } from "../../shared/types";
-import { debugLog } from "../../shared/utils/debug-logger";
 import { createProfileDirectory } from "../claude-profile/profile-utils";
-import {
-	maskClaudeProfile,
-	maskClaudeProfileSettings,
-	unmaskClaudeProfile,
-} from "../claude-profile/renderer-view";
+import { maskClaudeProfile, maskClaudeProfileSettings, unmaskClaudeProfile } from "../claude-profile/renderer-view";
 import { migrateSession } from "../claude-profile/session-utils";
 import { getUsageMonitor } from "../claude-profile/usage-monitor";
 import { getClaudeProfileManager } from "../claude-profile-manager";
@@ -24,726 +33,134 @@ import { readSettingsFileAsync } from "../settings-utils";
 import type { TerminalManager } from "../terminal-manager";
 import { terminalNameGenerator } from "../terminal-name-generator";
 import { isValidConfigDir } from "../utils/config-path-validator";
+import { terminalIpcMain } from "./terminal/terminal-ipc-guard";
+
+/** `run`'s answer, or its error as a failed answer (`fallback` when it has no message). */
+async function answer<T>(fallback: string, run: () => IPCResult<T> | Promise<IPCResult<T>>): Promise<IPCResult<T>> {
+	try {
+		return await run();
+	} catch (error) {
+		return { success: false, error: error instanceof Error ? error.message : fallback };
+	}
+}
+
+const done = <T>(data?: T): IPCResult<T> => (data === undefined ? { success: true } : { success: true, data });
+const refused = (error: string): IPCResult<never> => ({ success: false, error });
 
 /**
- * Register all terminal-related IPC handlers
+ * The profile the settings send, ready to save: its stored token kept when
+ * the renderer sent back the mask, an id when new, and for a profile other
+ * than the default its own folder under the home folder, made if missing.
  */
-export function registerTerminalHandlers(
+async function profileToSave(received: ClaudeProfile): Promise<ClaudeProfile | string> {
+	const manager = getClaudeProfileManager();
+	const profile = unmaskClaudeProfile(received, received.id ? manager.getProfile(received.id) : undefined);
+	if (!profile.id) profile.id = manager.generateProfileId(profile.name);
+	if (profile.isDefault) return profile;
+	if (!profile.configDir) profile.configDir = await createProfileDirectory(profile.name);
+	if (!isValidConfigDir(profile.configDir)) {
+		return `Invalid config directory path: ${profile.configDir}. Config directories must be within the user's home directory.`;
+	}
+	if (!existsSync(profile.configDir)) mkdirSync(profile.configDir, { recursive: true });
+	return profile;
+}
+
+/**
+ * Makes `profileId` the active profile. When it changes, each terminal's
+ * Claude session moves to the new profile's folder and the renderer is told
+ * to recreate the terminals, whose environment cannot change in place.
+ */
+function setActiveProfile(
 	terminalManager: TerminalManager,
 	getMainWindow: () => BrowserWindow | null,
-): void {
-	// ============================================
-	// Terminal Operations
-	// ============================================
+	profileId: string,
+): IPCResult {
+	const manager = getClaudeProfileManager();
+	const previous = manager.getActiveProfile();
+	if (!manager.setActiveProfile(profileId)) return refused("Profile not found");
+	if (previous.id === profileId) return done();
 
-	ipcMain.handle(
-		IPC_CHANNELS.TERMINAL_CREATE,
-		async (_, options: TerminalCreateOptions): Promise<IPCResult> => {
-			try {
-				const result = await terminalManager.create(options);
-				return result;
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to create terminal (exception)",
-				};
-			}
-		},
+	const from = previous.configDir;
+	const to = manager.getProfile(profileId)?.configDir;
+	const terminals = terminalManager.getTerminalsForProfileChange().map((terminal) => ({
+		id: terminal.id,
+		sessionId: terminal.claudeSessionId,
+		sessionMigrated:
+			terminal.claudeSessionId && from && to
+				? migrateSession(from, to, terminal.cwd, terminal.claudeSessionId).success
+				: false,
+	}));
+
+	const window = getMainWindow();
+	if (window && !window.isDestroyed()) {
+		window.webContents.send(IPC_CHANNELS.TERMINAL_PROFILE_CHANGED, {
+			previousProfileId: previous.id,
+			newProfileId: profileId,
+			terminals,
+		});
+	}
+	return done();
+}
+
+function registerTerminalOperations(terminalManager: TerminalManager): void {
+	terminalIpcMain.handle(IPC_CHANNELS.TERMINAL_CREATE, (_, options: TerminalCreateOptions) =>
+		answer("Failed to create terminal (exception)", () => terminalManager.create(options)),
 	);
 
-	ipcMain.handle(
-		IPC_CHANNELS.TERMINAL_DESTROY,
-		async (_, id: string): Promise<IPCResult> => {
-			return terminalManager.destroy(id);
-		},
-	);
+	terminalIpcMain.handle(IPC_CHANNELS.TERMINAL_DESTROY, (_, id: string) => terminalManager.destroy(id));
 
-	ipcMain.on(IPC_CHANNELS.TERMINAL_INPUT, (_, id: string, data: string) => {
+	terminalIpcMain.on(IPC_CHANNELS.TERMINAL_INPUT, (_, id: string, data: string) => {
 		terminalManager.write(id, data);
 	});
 
-	ipcMain.handle(
-		IPC_CHANNELS.TERMINAL_RESIZE,
-		async (
-			_,
-			id: string,
-			cols: number,
-			rows: number,
-		): Promise<IPCResult<{ success: boolean }>> => {
-			const success = terminalManager.resize(id, cols, rows);
-			return { success, data: { success } };
-		},
+	terminalIpcMain.handle(IPC_CHANNELS.TERMINAL_RESIZE, (_, id: string, cols: number, rows: number) => {
+		const success = terminalManager.resize(id, cols, rows);
+		return { success, data: { success } };
+	});
+
+	terminalIpcMain.on(IPC_CHANNELS.TERMINAL_INVOKE_CLAUDE, (_, id: string, cwd?: string) => {
+		// YOLO mode (skip permissions) is read from the settings, never from the renderer
+		readSettingsFileAsync()
+			.then((settings) =>
+				terminalManager.invokeClaudeAsync(id, cwd, undefined, settings?.dangerouslySkipPermissions === true),
+			)
+			.catch((error) => console.warn("[terminal-handlers] Failed to invoke Claude:", error));
+	});
+
+	terminalIpcMain.handle(IPC_CHANNELS.TERMINAL_GENERATE_NAME, (_, command: string, cwd?: string) =>
+		answer<string>("Failed to generate terminal name", async () => {
+			const name = await terminalNameGenerator.generateName(command, cwd);
+			return name ? done(name) : refused("Failed to generate terminal name");
+		}),
 	);
 
-	ipcMain.on(
-		IPC_CHANNELS.TERMINAL_INVOKE_CLAUDE,
-		(_, id: string, cwd?: string) => {
-			// Wrap in async IIFE to allow async settings read without blocking
-			(async () => {
-				// Read settings asynchronously to check for YOLO mode (dangerously skip permissions)
-				const settings = await readSettingsFileAsync();
-				const dangerouslySkipPermissions =
-					settings?.dangerouslySkipPermissions === true;
+	terminalIpcMain.on(IPC_CHANNELS.TERMINAL_SET_TITLE, (_, id: string, title: string) => {
+		terminalManager.setTitle(id, title);
+	});
 
-				// Use async version to avoid blocking main process during CLI detection
-				await terminalManager.invokeClaudeAsync(
-					id,
-					cwd,
-					undefined,
-					dangerouslySkipPermissions,
-				);
-			})().catch((error) => {
-				console.warn("[terminal-handlers] Failed to invoke Claude:", error);
-			});
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.TERMINAL_GENERATE_NAME,
-		async (_, command: string, cwd?: string): Promise<IPCResult<string>> => {
-			try {
-				const name = await terminalNameGenerator.generateName(command, cwd);
-				if (name) {
-					return { success: true, data: name };
-				} else {
-					return { success: false, error: "Failed to generate terminal name" };
-				}
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to generate terminal name",
-				};
-			}
-		},
-	);
-
-	// Set terminal title (user renamed terminal in renderer)
-	ipcMain.on(
-		IPC_CHANNELS.TERMINAL_SET_TITLE,
-		(_, id: string, title: string) => {
-			terminalManager.setTitle(id, title);
-		},
-	);
-
-	// Set terminal worktree config (user changed worktree association in renderer)
-	ipcMain.on(
+	terminalIpcMain.on(
 		IPC_CHANNELS.TERMINAL_SET_WORKTREE_CONFIG,
-		(
-			_,
-			id: string,
-			config: import("../../shared/types").TerminalWorktreeConfig | undefined,
-		) => {
-			terminalManager.setWorktreeConfig(id, config);
+		(_, id: string, config: TerminalWorktreeConfig | undefined) => {
+			terminalManager.setWorktreeConfig(id, config ?? undefined);
 		},
 	);
 
-	// Claude profile management (multi-account support)
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILES_GET,
-		async (): Promise<IPCResult<ClaudeProfileSettings>> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				const settings = profileManager.getSettings();
-				// Which profiles have a token, never the token (S6)
-				return { success: true, data: maskClaudeProfileSettings(settings) };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to get Claude profiles",
-				};
-			}
-		},
+	terminalIpcMain.handle(IPC_CHANNELS.TERMINAL_CHECK_PTY_ALIVE, (_, terminalId: string) =>
+		answer("Failed to check terminal status", () => done({ alive: terminalManager.isTerminalAlive(terminalId) })),
+	);
+}
+
+function registerSessionHandlers(terminalManager: TerminalManager): void {
+	terminalIpcMain.handle(IPC_CHANNELS.TERMINAL_GET_SESSIONS, (_, projectPath: string) =>
+		answer<TerminalSession[]>("Failed to get terminal sessions", () =>
+			done(terminalManager.getSavedSessions(projectPath)),
+		),
 	);
 
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILE_SAVE,
-		async (
-			_,
-			received: ClaudeProfile,
-		): Promise<IPCResult<ClaudeProfile>> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				// The renderer sends back the mask it was handed: keep the stored token
-				const profile = unmaskClaudeProfile(
-					received,
-					received?.id ? profileManager.getProfile(received.id) : undefined,
-				);
-
-				// If this is a new profile without an ID, generate one
-				if (!profile.id) {
-					profile.id = profileManager.generateProfileId(profile.name);
-				}
-
-				// For non-default profiles, ensure configDir is ALWAYS set
-				// This is critical for the CLAUDE_CONFIG_DIR-based auth flow
-				// See: docs/LONG_LIVED_AUTH_PLAN.md for context
-				if (!profile.isDefault) {
-					if (!profile.configDir) {
-						// Auto-create a configDir in ~/.claude-profiles/{profile-name}/
-						console.warn(
-							"[CLAUDE_PROFILE_SAVE] Profile missing configDir, creating one:",
-							profile.name,
-						);
-						profile.configDir = await createProfileDirectory(profile.name);
-					}
-
-					// Security: Validate configDir path to prevent path traversal attacks
-					if (!isValidConfigDir(profile.configDir)) {
-						return {
-							success: false,
-							error: `Invalid config directory path: ${profile.configDir}. Config directories must be within the user's home directory.`,
-						};
-					}
-
-					// Ensure config directory exists
-					const { mkdirSync, existsSync } = await import("node:fs");
-					if (!existsSync(profile.configDir)) {
-						mkdirSync(profile.configDir, { recursive: true });
-					}
-				}
-
-				const savedProfile = profileManager.saveProfile(profile);
-				return { success: true, data: maskClaudeProfile(savedProfile) };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to save Claude profile",
-				};
-			}
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILE_DELETE,
-		async (_, profileId: string): Promise<IPCResult> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				const success = profileManager.deleteProfile(profileId);
-				if (!success) {
-					return {
-						success: false,
-						error: "Cannot delete default or last profile",
-					};
-				}
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to delete Claude profile",
-				};
-			}
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILE_RENAME,
-		async (_, profileId: string, newName: string): Promise<IPCResult> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				const success = profileManager.renameProfile(profileId, newName);
-				if (!success) {
-					return { success: false, error: "Profile not found or invalid name" };
-				}
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to rename Claude profile",
-				};
-			}
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILE_SET_ACTIVE,
-		async (_, profileId: string): Promise<IPCResult> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				const previousProfile = profileManager.getActiveProfile();
-				const previousProfileId = previousProfile.id;
-
-				const success = profileManager.setActiveProfile(profileId);
-
-				if (!success) {
-					return { success: false, error: "Profile not found" };
-				}
-
-				const newProfile = profileManager.getProfile(profileId);
-
-				// If the profile actually changed, restart Claude in active terminals
-				// This ensures existing Claude sessions use the new profile's OAuth token
-				const profileChanged = previousProfileId !== profileId;
-
-				if (profileChanged) {
-					// Get all terminal info for profile change
-					const terminals = terminalManager.getTerminalsForProfileChange();
-					debugLog(
-						"[terminal-handlers:CLAUDE_PROFILE_SET_ACTIVE] Terminals for profile change:",
-						terminals.length,
-					);
-
-					// Determine config directories for session migration
-					// All profiles now have their own configDir (no special case for default)
-					const sourceConfigDir = previousProfile.configDir;
-					const targetConfigDir = newProfile?.configDir;
-
-					// Build terminal refresh info for frontend
-					const terminalsNeedingRefresh: Array<{
-						id: string;
-						sessionId?: string;
-						sessionMigrated?: boolean;
-					}> = [];
-
-					// Process each terminal
-					for (const terminal of terminals) {
-						debugLog(
-							"[terminal-handlers:CLAUDE_PROFILE_SET_ACTIVE] Processing terminal:",
-							{
-								id: terminal.id,
-								isClaudeMode: terminal.isClaudeMode,
-								claudeSessionId: terminal.claudeSessionId,
-								cwd: terminal.cwd,
-							},
-						);
-
-						let sessionMigrated = false;
-
-						// If terminal has an active Claude session, migrate it to new profile
-						if (
-							terminal.claudeSessionId &&
-							sourceConfigDir &&
-							targetConfigDir
-						) {
-							debugLog(
-								"[terminal-handlers:CLAUDE_PROFILE_SET_ACTIVE] Migrating session:",
-								{
-									sessionId: terminal.claudeSessionId,
-									from: sourceConfigDir,
-									to: targetConfigDir,
-								},
-							);
-
-							const migrationResult = migrateSession(
-								sourceConfigDir,
-								targetConfigDir,
-								terminal.cwd,
-								terminal.claudeSessionId,
-							);
-
-							sessionMigrated = migrationResult.success;
-							debugLog(
-								"[terminal-handlers:CLAUDE_PROFILE_SET_ACTIVE] Session migration result:",
-								migrationResult,
-							);
-						}
-
-						// All terminals need refresh (PTY env vars can't be updated)
-						terminalsNeedingRefresh.push({
-							id: terminal.id,
-							sessionId: terminal.claudeSessionId,
-							sessionMigrated,
-						});
-					}
-
-					debugLog(
-						"[terminal-handlers:CLAUDE_PROFILE_SET_ACTIVE] Terminals needing refresh:",
-						terminalsNeedingRefresh,
-					);
-
-					// Notify frontend that terminals need to be refreshed
-					// Frontend will destroy and recreate terminals with new profile env vars
-					const mainWindow = getMainWindow();
-					if (mainWindow && !mainWindow.isDestroyed()) {
-						mainWindow.webContents.send(IPC_CHANNELS.TERMINAL_PROFILE_CHANGED, {
-							previousProfileId,
-							newProfileId: profileId,
-							terminals: terminalsNeedingRefresh,
-						});
-						debugLog(
-							"[terminal-handlers:CLAUDE_PROFILE_SET_ACTIVE] Sent TERMINAL_PROFILE_CHANGED event to frontend",
-						);
-					}
-				}
-
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to set active Claude profile",
-				};
-			}
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILE_SWITCH,
-		async (_, terminalId: string, profileId: string): Promise<IPCResult> => {
-			try {
-				const result = await terminalManager.switchClaudeProfile(
-					terminalId,
-					profileId,
-				);
-				return result;
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to switch Claude profile",
-				};
-			}
-		},
-	);
-
-	// Set OAuth token for a profile (used when capturing from terminal or manual input)
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILE_SET_TOKEN,
-		async (
-			_,
-			profileId: string,
-			token: string,
-			email?: string,
-		): Promise<IPCResult> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				const success = profileManager.setProfileToken(profileId, token, email);
-				if (!success) {
-					return { success: false, error: "Profile not found" };
-				}
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to set OAuth token",
-				};
-			}
-		},
-	);
-
-	// Get auto-switch settings
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILE_AUTO_SWITCH_SETTINGS,
-		async (): Promise<
-			IPCResult<import("../../shared/types").ClaudeAutoSwitchSettings>
-		> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				const settings = profileManager.getAutoSwitchSettings();
-				return { success: true, data: settings };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to get auto-switch settings",
-				};
-			}
-		},
-	);
-
-	// Update auto-switch settings
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILE_UPDATE_AUTO_SWITCH,
-		async (
-			_,
-			settings: Partial<import("../../shared/types").ClaudeAutoSwitchSettings>,
-		): Promise<IPCResult> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				profileManager.updateAutoSwitchSettings(settings);
-
-				// Restart usage monitor with new settings
-				const monitor = getUsageMonitor();
-				monitor.stop();
-				monitor.start();
-
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to update auto-switch settings",
-				};
-			}
-		},
-	);
-
-	// Get account priority order
-	ipcMain.handle(
-		IPC_CHANNELS.ACCOUNT_PRIORITY_GET,
-		async (): Promise<IPCResult<string[]>> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				const order = profileManager.getAccountPriorityOrder();
-				return { success: true, data: order };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to get account priority order",
-				};
-			}
-		},
-	);
-
-	// Set account priority order
-	ipcMain.handle(
-		IPC_CHANNELS.ACCOUNT_PRIORITY_SET,
-		async (_, order: string[]): Promise<IPCResult> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				profileManager.setAccountPriorityOrder(order);
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to set account priority order",
-				};
-			}
-		},
-	);
-
-	// Fetch usage by sending /usage command to terminal
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILE_FETCH_USAGE,
-		async (_, terminalId: string): Promise<IPCResult> => {
-			try {
-				// Send /usage command to the terminal
-				terminalManager.write(terminalId, "/usage\r");
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error ? error.message : "Failed to fetch usage",
-				};
-			}
-		},
-	);
-
-	// Get best available profile
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_PROFILE_GET_BEST_PROFILE,
-		async (
-			_,
-			excludeProfileId?: string,
-		): Promise<IPCResult<ClaudeProfile | null>> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-				const bestProfile =
-					profileManager.getBestAvailableProfile(excludeProfileId);
-				return { success: true, data: maskClaudeProfile(bestProfile) };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to get best profile",
-				};
-			}
-		},
-	);
-
-	// Retry rate-limited operation with a different profile
-	ipcMain.handle(
-		IPC_CHANNELS.CLAUDE_RETRY_WITH_PROFILE,
-		async (
-			_,
-			request: import("../../shared/types").RetryWithProfileRequest,
-		): Promise<IPCResult> => {
-			try {
-				const profileManager = getClaudeProfileManager();
-
-				// Set the new active profile
-				profileManager.setActiveProfile(request.profileId);
-
-				// Get the project
-				const project = projectStore.getProject(request.projectId);
-				if (!project) {
-					return { success: false, error: "Project not found" };
-				}
-
-				// Retry based on the source
-				switch (request.source) {
-					case "changelog":
-						// The changelog UI will handle retrying by re-submitting the form
-						// We just need to confirm the profile switch was successful
-						return { success: true };
-
-					case "task":
-						// For tasks, we would need to restart the task
-						// This is complex and would need task state restoration
-						return {
-							success: true,
-							data: { message: "Please restart the task manually" },
-						};
-
-					case "roadmap":
-						// For roadmap, the UI can trigger a refresh
-						return { success: true };
-
-					case "ideation":
-						// For ideation, the UI can trigger a refresh
-						return { success: true };
-
-					default:
-						return { success: true };
-				}
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to retry with profile",
-				};
-			}
-		},
-	);
-
-	// ============================================
-	// Usage Monitoring (Proactive Account Switching)
-	// ============================================
-
-	// Request current usage snapshot
-	// Returns fresh data directly AND emits it as an event so both
-	// the IPC response and event listeners receive updated usage.
-	ipcMain.handle(
-		IPC_CHANNELS.USAGE_REQUEST,
-		async (
-			_event: IpcMainInvokeEvent,
-			providerName?: string,
-		): Promise<
-			IPCResult<import("../../shared/types").UsageSnapshot | null>
-		> => {
-			try {
-				const monitor = getUsageMonitor();
-
-				let usage: UsageSnapshot | null;
-
-				if (providerName) {
-					// Only reset caches when the provider actually changed (not on every
-					// 30s poll or initial mount for the same provider).  This ensures
-					// fresh data after a real provider switch while keeping caches intact
-					// for normal polling.
-					monitor.onProviderRequestIfChanged(providerName);
-					// Use getUsageForProvider for specific provider requests
-					usage = await monitor.getUsageForProvider(providerName);
-				} else {
-					// Use getCurrentUsage for general requests (backward compatibility)
-					usage = monitor.getCurrentUsage();
-				}
-
-				// Also emit the fresh usage so event-based listeners stay in sync
-				if (usage) {
-					monitor.emit("usage-updated", usage);
-				}
-
-				return { success: true, data: usage };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to get current usage",
-				};
-			}
-		},
-	);
-
-	// Request all profiles usage immediately (for startup/refresh)
-	// Optional forceRefresh parameter bypasses cache to get fresh data
-	ipcMain.handle(
-		IPC_CHANNELS.ALL_PROFILES_USAGE_REQUEST,
-		async (
-			_event: IpcMainInvokeEvent,
-			forceRefresh: boolean = false,
-		): Promise<IPCResult<AllProfilesUsage | null>> => {
-			try {
-				const monitor = getUsageMonitor();
-				const allProfilesUsage =
-					await monitor.getAllProfilesUsage(forceRefresh);
-				return { success: true, data: allProfilesUsage };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to get all profiles usage",
-				};
-			}
-		},
-	);
-
-	// Terminal session management (persistence/restore)
-	ipcMain.handle(
-		IPC_CHANNELS.TERMINAL_GET_SESSIONS,
-		async (
-			_,
-			projectPath: string,
-		): Promise<IPCResult<import("../../shared/types").TerminalSession[]>> => {
-			try {
-				const sessions = terminalManager.getSavedSessions(projectPath);
-				return { success: true, data: sessions };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to get terminal sessions",
-				};
-			}
-		},
-	);
-
-	ipcMain.handle(
+	terminalIpcMain.handle(
 		IPC_CHANNELS.TERMINAL_RESTORE_SESSION,
-		async (
-			_,
-			session: import("../../shared/types").TerminalSession,
-			cols?: number,
-			rows?: number,
-		): Promise<
-			IPCResult<import("../../shared/types").TerminalRestoreResult>
-		> => {
-			try {
+		(_, session: TerminalSession, cols?: number, rows?: number) =>
+			answer<TerminalRestoreResult>("Failed to restore terminal session", async () => {
 				const result = await terminalManager.restore(session, cols, rows);
 				return {
 					success: result.success,
@@ -754,201 +171,183 @@ export function registerTerminalHandlers(
 						error: result.error,
 					},
 				};
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to restore terminal session",
-				};
-			}
-		},
+			}),
 	);
 
-	ipcMain.handle(
-		IPC_CHANNELS.TERMINAL_CLEAR_SESSIONS,
-		async (_, projectPath: string): Promise<IPCResult> => {
-			try {
-				terminalManager.clearSavedSessions(projectPath);
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to clear terminal sessions",
-				};
-			}
-		},
+	terminalIpcMain.on(IPC_CHANNELS.TERMINAL_ACTIVATE_DEFERRED_RESUME, (_, id: string) => {
+		terminalManager
+			.activateDeferredResume(id)
+			.catch((error) => console.warn("[terminal-handlers] Failed to activate deferred resume:", error));
+	});
+
+	terminalIpcMain.handle(IPC_CHANNELS.TERMINAL_GET_SESSION_DATES, (_, projectPath?: string) =>
+		answer("Failed to get session dates", () => done(terminalManager.getAvailableSessionDates(projectPath))),
 	);
 
-	ipcMain.on(
-		IPC_CHANNELS.TERMINAL_RESUME_CLAUDE,
-		(_, id: string, sessionId?: string) => {
-			// Use async version to avoid blocking main process during CLI detection
-			terminalManager.resumeClaudeAsync(id, sessionId).catch((error) => {
-				console.warn("[terminal-handlers] Failed to resume Claude:", error);
-			});
-		},
+	terminalIpcMain.handle(IPC_CHANNELS.TERMINAL_GET_SESSIONS_FOR_DATE, (_, date: string, projectPath: string) =>
+		answer("Failed to get sessions for date", () => done(terminalManager.getSessionsForDate(date, projectPath))),
 	);
 
-	// Activate deferred Claude resume when terminal becomes active
-	// This is triggered by the renderer when a terminal with pendingClaudeResume becomes the active tab
-	ipcMain.on(
-		IPC_CHANNELS.TERMINAL_ACTIVATE_DEFERRED_RESUME,
-		(_, id: string) => {
-			terminalManager.activateDeferredResume(id).catch((error) => {
-				console.warn(
-					"[terminal-handlers] Failed to activate deferred resume:",
-					error,
-				);
-			});
-		},
-	);
-
-	// Get available session dates for a project
-	ipcMain.handle(
-		IPC_CHANNELS.TERMINAL_GET_SESSION_DATES,
-		async (_, projectPath?: string) => {
-			try {
-				const dates = terminalManager.getAvailableSessionDates(projectPath);
-				return { success: true, data: dates };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to get session dates",
-				};
-			}
-		},
-	);
-
-	// Get sessions for a specific date and project
-	ipcMain.handle(
-		IPC_CHANNELS.TERMINAL_GET_SESSIONS_FOR_DATE,
-		async (_, date: string, projectPath: string) => {
-			try {
-				const sessions = terminalManager.getSessionsForDate(date, projectPath);
-				return { success: true, data: sessions };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to get sessions for date",
-				};
-			}
-		},
-	);
-
-	// Restore all sessions from a specific date
-	ipcMain.handle(
+	terminalIpcMain.handle(
 		IPC_CHANNELS.TERMINAL_RESTORE_FROM_DATE,
-		async (
-			_,
-			date: string,
-			projectPath: string,
-			cols?: number,
-			rows?: number,
-		) => {
-			try {
-				const result = await terminalManager.restoreSessionsFromDate(
-					date,
-					projectPath,
-					cols || 80,
-					rows || 24,
-				);
-				return { success: true, data: result };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to restore sessions from date",
-				};
-			}
-		},
+		(_, date: string, projectPath: string, cols = 80, rows = 24) =>
+			answer("Failed to restore sessions from date", async () =>
+				done(await terminalManager.restoreSessionsFromDate(date, projectPath, cols, rows)),
+			),
 	);
 
-	// Check if a terminal's PTY process is alive
-	ipcMain.handle(
-		IPC_CHANNELS.TERMINAL_CHECK_PTY_ALIVE,
-		async (_, terminalId: string): Promise<IPCResult<{ alive: boolean }>> => {
-			try {
-				const alive = terminalManager.isTerminalAlive(terminalId);
-				return { success: true, data: { alive } };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to check terminal status",
-				};
-			}
-		},
-	);
-
-	// Update terminal display orders after drag-drop reorder
-	ipcMain.handle(
+	terminalIpcMain.handle(
 		IPC_CHANNELS.TERMINAL_UPDATE_DISPLAY_ORDERS,
-		async (
-			_,
-			projectPath: string,
-			orders: Array<{ terminalId: string; displayOrder: number }>,
-		): Promise<IPCResult> => {
-			try {
+		(_, projectPath: string, orders: Array<{ terminalId: string; displayOrder: number }>) =>
+			answer("Failed to update display orders", () => {
 				terminalManager.updateDisplayOrders(projectPath, orders);
-				return { success: true };
-			} catch (error) {
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to update display orders",
-				};
+				return done();
+			}),
+	);
+}
+
+function registerProfileHandlers(terminalManager: TerminalManager, getMainWindow: () => BrowserWindow | null): void {
+	terminalIpcMain.handle(IPC_CHANNELS.CLAUDE_PROFILES_GET, () =>
+		answer<ClaudeProfileSettings>("Failed to get Claude profiles", () =>
+			// Which profiles have a token, never the token (S6)
+			done(maskClaudeProfileSettings(getClaudeProfileManager().getSettings())),
+		),
+	);
+
+	terminalIpcMain.handle(IPC_CHANNELS.CLAUDE_PROFILE_SAVE, (_, received: ClaudeProfile) =>
+		answer<ClaudeProfile>("Failed to save Claude profile", async () => {
+			const profile = await profileToSave(received);
+			if (typeof profile === "string") return refused(profile);
+			return done(maskClaudeProfile(getClaudeProfileManager().saveProfile(profile)));
+		}),
+	);
+
+	terminalIpcMain.handle(IPC_CHANNELS.CLAUDE_PROFILE_DELETE, (_, profileId: string) =>
+		answer("Failed to delete Claude profile", () =>
+			getClaudeProfileManager().deleteProfile(profileId) ? done() : refused("Cannot delete default or last profile"),
+		),
+	);
+
+	terminalIpcMain.handle(IPC_CHANNELS.CLAUDE_PROFILE_RENAME, (_, profileId: string, newName: string) =>
+		answer("Failed to rename Claude profile", () =>
+			getClaudeProfileManager().renameProfile(profileId, newName)
+				? done()
+				: refused("Profile not found or invalid name"),
+		),
+	);
+
+	terminalIpcMain.handle(IPC_CHANNELS.CLAUDE_PROFILE_SET_ACTIVE, (_, profileId: string) =>
+		answer("Failed to set active Claude profile", () => setActiveProfile(terminalManager, getMainWindow, profileId)),
+	);
+
+	terminalIpcMain.handle(IPC_CHANNELS.CLAUDE_PROFILE_SWITCH, (_, terminalId: string, profileId: string) =>
+		answer("Failed to switch Claude profile", () => terminalManager.switchClaudeProfile(terminalId, profileId)),
+	);
+
+	// A token captured from a terminal or typed in the settings
+	terminalIpcMain.handle(
+		IPC_CHANNELS.CLAUDE_PROFILE_SET_TOKEN,
+		(_, profileId: string, token: string, email?: string) =>
+			answer("Failed to set OAuth token", () =>
+				getClaudeProfileManager().setProfileToken(profileId, token, email) ? done() : refused("Profile not found"),
+			),
+	);
+
+	terminalIpcMain.handle(IPC_CHANNELS.CLAUDE_PROFILE_AUTO_SWITCH_SETTINGS, () =>
+		answer<ClaudeAutoSwitchSettings>("Failed to get auto-switch settings", () =>
+			done(getClaudeProfileManager().getAutoSwitchSettings()),
+		),
+	);
+
+	terminalIpcMain.handle(
+		IPC_CHANNELS.CLAUDE_PROFILE_UPDATE_AUTO_SWITCH,
+		(_, settings: Partial<ClaudeAutoSwitchSettings>) =>
+			answer("Failed to update auto-switch settings", () => {
+				getClaudeProfileManager().updateAutoSwitchSettings(settings);
+				// The monitor reads the settings when it starts
+				const monitor = getUsageMonitor();
+				monitor.stop();
+				monitor.start();
+				return done();
+			}),
+	);
+
+	terminalIpcMain.handle(IPC_CHANNELS.ACCOUNT_PRIORITY_GET, () =>
+		answer<string[]>("Failed to get account priority order", () =>
+			done(getClaudeProfileManager().getAccountPriorityOrder()),
+		),
+	);
+
+	terminalIpcMain.handle(IPC_CHANNELS.ACCOUNT_PRIORITY_SET, (_, order: string[]) =>
+		answer("Failed to set account priority order", () => {
+			getClaudeProfileManager().setAccountPriorityOrder(order);
+			return done();
+		}),
+	);
+
+	// After a rate limit, the operation of a project runs again under another
+	// profile: the view that started it re-submits it once the profile is active.
+	terminalIpcMain.handle(IPC_CHANNELS.CLAUDE_RETRY_WITH_PROFILE, (_, request: RetryWithProfileRequest) =>
+		answer("Failed to retry with profile", () => {
+			if (!projectStore.getProject(request.projectId)) return refused("Project not found");
+			if (!getClaudeProfileManager().setActiveProfile(request.profileId)) return refused("Profile not found");
+			return done();
+		}),
+	);
+}
+
+function registerUsageHandlers(): void {
+	// Fresh usage, also emitted so the views that listen stay in step
+	terminalIpcMain.handle(IPC_CHANNELS.USAGE_REQUEST, (_, providerName?: string) =>
+		answer<UsageSnapshot | null>("Failed to get current usage", async () => {
+			const monitor = getUsageMonitor();
+			let usage: UsageSnapshot | null;
+			if (providerName) {
+				// Caches reset only when the provider really changed, not on every poll
+				monitor.onProviderRequestIfChanged(providerName);
+				usage = await monitor.getUsageForProvider(providerName);
+			} else {
+				usage = monitor.getCurrentUsage();
 			}
-		},
+			if (usage) monitor.emit("usage-updated", usage);
+			return done(usage) as IPCResult<UsageSnapshot | null>;
+		}),
+	);
+
+	terminalIpcMain.handle(IPC_CHANNELS.ALL_PROFILES_USAGE_REQUEST, (_, forceRefresh = false) =>
+		answer<AllProfilesUsage | null>("Failed to get all profiles usage", async () => ({
+			success: true,
+			data: await getUsageMonitor().getAllProfilesUsage(forceRefresh),
+		})),
 	);
 }
 
 /**
- * Initialize usage monitor event forwarding to renderer process
- * Call this after mainWindow is created
+ * Register all terminal-related IPC handlers
  */
-export function initializeUsageMonitorForwarding(
-	mainWindow: BrowserWindow,
+export function registerTerminalHandlers(
+	terminalManager: TerminalManager,
+	getMainWindow: () => BrowserWindow | null,
 ): void {
-	const monitor = getUsageMonitor();
+	registerTerminalOperations(terminalManager);
+	registerSessionHandlers(terminalManager);
+	registerProfileHandlers(terminalManager, getMainWindow);
+	registerUsageHandlers();
+}
 
-	// Forward usage updates to renderer
+/**
+ * Forwards the usage monitor's events to the renderer; called once the main
+ * window exists.
+ */
+export function initializeUsageMonitorForwarding(mainWindow: BrowserWindow): void {
+	const monitor = getUsageMonitor();
 	monitor.on("usage-updated", (usage: UsageSnapshot) => {
 		mainWindow.webContents.send(IPC_CHANNELS.USAGE_UPDATED, usage);
 	});
-
-	// Forward all profiles usage updates to renderer (for multi-profile display)
-	monitor.on(
-		"all-profiles-usage-updated",
-		(allProfilesUsage: AllProfilesUsage) => {
-			mainWindow.webContents.send(
-				IPC_CHANNELS.ALL_PROFILES_USAGE_UPDATED,
-				allProfilesUsage,
-			);
-		},
-	);
-
-	// Forward proactive swap notifications to renderer
+	monitor.on("all-profiles-usage-updated", (allProfilesUsage: AllProfilesUsage) => {
+		mainWindow.webContents.send(IPC_CHANNELS.ALL_PROFILES_USAGE_UPDATED, allProfilesUsage);
+	});
 	monitor.on("show-swap-notification", (notification: unknown) => {
-		mainWindow.webContents.send(
-			IPC_CHANNELS.PROACTIVE_SWAP_NOTIFICATION,
-			notification,
-		);
+		mainWindow.webContents.send(IPC_CHANNELS.PROACTIVE_SWAP_NOTIFICATION, notification);
 	});
 }

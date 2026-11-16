@@ -169,8 +169,6 @@ export const IPC_CHANNELS = {
 	// Terminal session management
 	TERMINAL_GET_SESSIONS: "terminal:getSessions",
 	TERMINAL_RESTORE_SESSION: "terminal:restoreSession",
-	TERMINAL_CLEAR_SESSIONS: "terminal:clearSessions",
-	TERMINAL_RESUME_CLAUDE: "terminal:resumeClaude",
 	TERMINAL_ACTIVATE_DEFERRED_RESUME: "terminal:activateDeferredResume", // Trigger deferred Claude resume when terminal becomes active
 	TERMINAL_GET_SESSION_DATES: "terminal:getSessionDates",
 	TERMINAL_GET_SESSIONS_FOR_DATE: "terminal:getSessionsForDate",
@@ -210,8 +208,6 @@ export const IPC_CHANNELS = {
 	CLAUDE_PROFILE_VERIFY_AUTH: "claude:profileVerifyAuth", // Check if profile has been authenticated
 	CLAUDE_PROFILE_AUTO_SWITCH_SETTINGS: "claude:autoSwitchSettings",
 	CLAUDE_PROFILE_UPDATE_AUTO_SWITCH: "claude:updateAutoSwitch",
-	CLAUDE_PROFILE_FETCH_USAGE: "claude:fetchUsage",
-	CLAUDE_PROFILE_GET_BEST_PROFILE: "claude:getBestProfile",
 
 	// Account priority order (unified OAuth + API profile ordering)
 	ACCOUNT_PRIORITY_GET: "account:priorityGet",

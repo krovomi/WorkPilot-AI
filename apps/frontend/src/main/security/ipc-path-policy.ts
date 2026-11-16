@@ -111,7 +111,6 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"task:worktreeOpenInTerminal": [0],
 	"task:worktreeReadFile": [0],
 	"task:worktreeWriteFile": [0],
-	"terminal:clearSessions": [0],
 	"terminal:getSessionDates": [0],
 	"terminal:getSessions": [0],
 	"terminal:getSessionsForDate": [1],
