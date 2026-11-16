@@ -253,11 +253,7 @@ class PRReviewEngine:
         if advice := context_advice(context):
             full_prompt += "\n\n" + advice
 
-        project_root = (
-            self.project_dir.parent.parent
-            if self.project_dir.name == "backend"
-            else self.project_dir
-        )
+        project_root = self.project_dir
 
         # What earlier reviews on this project established. Without it the
         # reviewer re-raises findings the team already decided about, which is
@@ -528,11 +524,7 @@ class PRReviewEngine:
         pr_context = self._build_review_context(context)
         full_prompt = prompt + "\n\n---\n\n" + pr_context
 
-        project_root = (
-            self.project_dir.parent.parent
-            if self.project_dir.name == "backend"
-            else self.project_dir
-        )
+        project_root = self.project_dir
 
         # Resolve model shorthand (e.g., "sonnet") to full model ID for API compatibility
         model = resolve_model_id(self.config.model or "sonnet")
@@ -588,11 +580,7 @@ class PRReviewEngine:
             prompt + "\n\n---\n\n" + ai_comments_context + "\n\n---\n\n" + pr_context
         )
 
-        project_root = (
-            self.project_dir.parent.parent
-            if self.project_dir.name == "backend"
-            else self.project_dir
-        )
+        project_root = self.project_dir
 
         # Resolve model shorthand (e.g., "sonnet") to full model ID for API compatibility
         model = resolve_model_id(self.config.model or "sonnet")

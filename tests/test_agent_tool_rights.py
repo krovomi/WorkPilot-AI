@@ -33,13 +33,39 @@ from agents.tools_pkg import (  # noqa: E402
 from agents.tools_pkg.permissions import GUARDED_TOOLS  # noqa: E402
 
 WRITE_FAMILY = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+WEB_TOOLS = {"WebFetch", "WebSearch"}
+
+#: The agent types the GitHub, GitLab and Azure DevOps runners pass to the
+#: client factory for a pull request, merge request or issue.
+FORGE_READER_TYPES = [
+    "pr_reviewer",
+    "pr_orchestrator_parallel",
+    "pr_followup_parallel",
+    "pr_followup_reviewer",
+    "pr_finding_validator",
+    "issue_triage",
+    "batch_analysis",
+    "batch_validation",
+]
 
 
 class TestTheDeclarationIsTheRight:
     def test_a_reviewer_may_neither_write_nor_run(self):
         denied = set(undeclared_builtin_tools("pr_reviewer"))
         assert WRITE_FAMILY | {"Bash"} <= denied
-        assert not denied & {"WebFetch", "WebSearch"}, "it declares the web"
+
+    @pytest.mark.parametrize("agent_type", FORGE_READER_TYPES)
+    def test_forge_reviewers_work_offline_from_the_repository_content(self, agent_type):
+        """The types the forge runners open on a pull request, merge request or
+        issue read the project and the change; they declare no web tool."""
+        config = AGENT_CONFIGS[agent_type]
+        assert not set(config["tools"]) & WEB_TOOLS
+        assert WEB_TOOLS <= set(undeclared_builtin_tools(agent_type))
+        assert not set(config["tools"]) & (WRITE_FAMILY | {"Bash"})
+
+    def test_the_review_types_keep_the_docs_server(self):
+        for agent_type in ("pr_reviewer", "pr_orchestrator_parallel"):
+            assert "context7" in AGENT_CONFIGS[agent_type]["mcp_servers"]
 
     def test_the_coder_is_denied_nothing(self):
         assert undeclared_builtin_tools("coder") == []

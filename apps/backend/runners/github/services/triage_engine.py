@@ -87,7 +87,7 @@ class TriageEngine:
             project_dir=self.project_dir,
             spec_dir=self.github_dir,
             model=model,
-            agent_type="qa_reviewer",
+            agent_type="issue_triage",
         )
 
         try:
