@@ -1,8 +1,7 @@
 // React
 
 // Types
-import type { GitStatus, Project } from "@shared/types";
-import { providerFromRemoteUrl } from "@shared/utils/git-remote-provider";
+import type { GitStatus } from "@shared/types";
 // Drag and drop (dnd-kit)
 import {
 	type CollisionDetection,
@@ -56,15 +55,12 @@ import {
 import { saveSettings, useSettingsStore } from "@/stores/settings-store";
 import { useSetupHubStore } from "@/stores/setup-hub-store";
 // Modals & Components
-import { AddProjectModal } from "./AddProjectModal";
-import { AzureDevOpsSetupModal } from "./AzureDevOpsSetupModal";
 import { AppEmulatorDialog } from "./app-emulator/AppEmulatorDialog";
 import { ArenaDialog } from "./arena/ArenaDialog";
 import { CodePlaygroundDialog } from "./code-playground/CodePlaygroundDialog";
 import { ConflictPredictorDialog } from "./conflict-predictor/ConflictPredictorDialog";
 import { ContextAwareSnippetsDialog } from "./context-aware-snippets/ContextAwareSnippetsDialog";
 import { DependencySentinelDialog } from "./dependency-sentinel/DependencySentinelDialog";
-import { GitHubSetupModal } from "./GitHubSetupModal";
 import { GitSetupModal } from "./GitSetupModal";
 import { LearningLoopDialog } from "./learning-loop/LearningLoopDialog";
 import { NaturalLanguageGitDialog } from "./natural-language-git/NaturalLanguageGitDialog";
@@ -101,7 +97,9 @@ import {
 import { serverForge, useServerNavGates } from "./sidebar/server-gates";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
 import { MenuModeCard } from "./sidebar/MenuModeCard";
+import { SidebarResizeHandle } from "./sidebar/SidebarResizeHandle";
 import { type RailSpace, SidebarRail } from "./sidebar/SidebarRail";
+import { useSidebarResize } from "./sidebar/use-sidebar-resize";
 import { HiddenList, HideSuggestion } from "./sidebar/HiddenPages";
 import { LaboPanel } from "./sidebar/LaboPanel";
 import {
@@ -234,6 +232,9 @@ export { navItemLabelKey } from "./sidebar/nav-model";
  * The star of the rail is small: the pointer over it wins, then the nearest
  * sortable row, so a page dragged onto the star pins it.
  */
+/** The panel beside the rail, sized by the handle on its right edge. */
+const SIDEBAR_PANEL_ID = "sidebar-panel";
+
 const pointerFirst: CollisionDetection = (args) => {
 	const within = pointerWithin(args);
 	return within.length > 0 ? within : closestCenter(args);
@@ -269,11 +270,9 @@ export function Sidebar({
 		[activities, selectedProjectId],
 	);
 
-	const [showAddProjectModal, setShowAddProjectModal] = useState(false);
 	const [showGitSetupModal, setShowGitSetupModal] = useState(false);
 	const gitSetupSkippedForProjectRef = useRef<string | null>(null);
 	const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
-	const [_pendingProject, setPendingProject] = useState<Project | null>(null);
 	const {
 		prefs: sidebarPrefs,
 		toggleItemPin,
@@ -302,74 +301,17 @@ export function Sidebar({
 	const shortcutBufferRef = useRef<string>("");
 	const shortcutBufferTimeRef = useRef<number>(0);
 
-	const [showGitHubSetup, setShowGitHubSetup] = useState(false);
-	const [gitHubSetupProject, setGitHubSetupProject] = useState<Project | null>(
-		null,
-	);
-	const [showAzureDevOpsSetup, setShowAzureDevOpsSetup] = useState(false);
-	const [azureDevOpsSetupProject, setAzureDevOpsSetupProject] =
-		useState<Project | null>(null);
-
 	const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
 	// Sidebar collapsed state from settings
 	const isCollapsed = settings.sidebarCollapsed ?? false;
 
-	// Sidebar resizable width
-	// The whole menu, rail and panel; folded, only the rail stays.
-	const SIDEBAR_MIN_WIDTH = 240;
-	const SIDEBAR_MAX_WIDTH = 480;
-	const SIDEBAR_DEFAULT_WIDTH = 296;
-	const SIDEBAR_RAIL_WIDTH = 52; // w-13 of the rail
-
-	const sidebarWidth = settings.sidebarWidth ?? SIDEBAR_DEFAULT_WIDTH;
-	const [isResizing, setIsResizing] = useState(false);
-	const [resizeWidth, setResizeWidth] = useState(sidebarWidth);
-	const resizingRef = useRef(false);
-
-	// Sync resizeWidth when settings change externally
-	useEffect(() => {
-		if (!resizingRef.current) {
-			setResizeWidth(settings.sidebarWidth ?? SIDEBAR_DEFAULT_WIDTH);
-		}
-	}, [settings.sidebarWidth]);
-
-	const handleResizeStart = useCallback(
-		(e: React.MouseEvent) => {
-			e.preventDefault();
-			resizingRef.current = true;
-			setIsResizing(true);
-			const startX = e.clientX;
-			const startWidth = resizeWidth;
-
-			const handleMouseMove = (moveEvent: MouseEvent) => {
-				const newWidth = Math.min(
-					SIDEBAR_MAX_WIDTH,
-					Math.max(
-						SIDEBAR_MIN_WIDTH,
-						startWidth + (moveEvent.clientX - startX),
-					),
-				);
-				setResizeWidth(newWidth);
-			};
-
-			const handleMouseUp = () => {
-				resizingRef.current = false;
-				setIsResizing(false);
-				document.removeEventListener("mousemove", handleMouseMove);
-				document.removeEventListener("mouseup", handleMouseUp);
-				// Persist final width
-				setResizeWidth((prev) => {
-					saveSettings({ sidebarWidth: prev });
-					return prev;
-				});
-			};
-
-			document.addEventListener("mousemove", handleMouseMove);
-			document.addEventListener("mouseup", handleMouseUp);
-		},
-		[resizeWidth],
-	);
+	// Width of the menu: dragged or moved with the keyboard on its right edge.
+	const resize = useSidebarResize({
+		storedWidth: settings.sidebarWidth,
+		isCollapsed,
+		onCommit: saveSettings,
+	});
 
 	const toggleSidebar = () => {
 		saveSettings({ sidebarCollapsed: !isCollapsed });
@@ -425,7 +367,7 @@ export function Sidebar({
 
 		// Apply custom per-group item order, without the experimental views
 		// when the user hid them
-		const gates = { serverProject, hideExperimental: sidebarPrefs.hideExperimental === true };
+		const gates = { serverProject, forge, hideExperimental: sidebarPrefs.hideExperimental === true };
 		return orderedGroups
 			.map((group) => {
 				const actualItemIds = group.items.map((i) => i.id);
@@ -445,6 +387,7 @@ export function Sidebar({
 		gitlabEnabled,
 		canAdminister,
 		serverProject,
+		forge,
 		sidebarPrefs.groupOrder,
 		sidebarPrefs.itemOrder,
 		mergeOrder,
@@ -493,8 +436,8 @@ export function Sidebar({
 
 	// The tabs a hub's entry leads to, under the same gates as the entries
 	const hubGates = useMemo<HubTabGates>(
-		() => ({ serverProject, hideExperimental: sidebarPrefs.hideExperimental === true }),
-		[serverProject, sidebarPrefs.hideExperimental],
+		() => ({ serverProject, forge, hideExperimental: sidebarPrefs.hideExperimental === true }),
+		[serverProject, forge, sidebarPrefs.hideExperimental],
 	);
 
 	// Get all visible items for keyboard shortcuts; a hub's tabs keep theirs
@@ -596,15 +539,9 @@ export function Sidebar({
 				e.preventDefault();
 				shortcutBufferRef.current = key;
 				shortcutBufferTimeRef.current = now;
-				return;
 			}
-
-			// Legacy single-char shortcut support (none remain, but kept defensively)
-			const matchedItem = visibleNavItems.find((item) => item.shortcut === key);
-			if (matchedItem) {
-				e.preventDefault();
-				onViewChange?.(matchedItem.id);
-			}
+			// Every shortcut has two letters (Sidebar.test.tsx checks it): a
+			// letter that starts none does nothing.
 		};
 
 		globalThis.addEventListener("keydown", handleKeyDown);
@@ -643,63 +580,6 @@ export function Sidebar({
 		checkGit();
 	}, [selectedProject]);
 
-	const inferProviderFromRemote = (
-		provider: "github" | "azure_devops" | "unknown",
-		remoteUrl?: string,
-	) => {
-		if (provider !== "unknown" || !remoteUrl) return provider;
-		return providerFromRemoteUrl(remoteUrl);
-	};
-
-	const handleProjectAdded = async (project: Project, needsInit: boolean) => {
-		if (needsInit) {
-			setPendingProject(project);
-			return;
-		}
-
-		try {
-			const envResult = await globalThis.electronAPI.getProjectEnv(project.id);
-			const envConfig = envResult.success ? envResult.data : null;
-			const hasProvider = !!(
-				envConfig?.githubEnabled || envConfig?.azureDevOpsEnabled
-			);
-			if (!hasProvider) {
-				const detectionResult = await globalThis.electronAPI.detectRepoProvider(
-					project.path,
-				);
-				const rawProvider = detectionResult.success
-					? (detectionResult.data?.provider ?? "unknown")
-					: "unknown";
-				const provider = inferProviderFromRemote(
-					rawProvider,
-					detectionResult.data?.remoteUrl,
-				);
-
-				setShowGitHubSetup(false);
-				setGitHubSetupProject(null);
-				setShowAzureDevOpsSetup(false);
-				setAzureDevOpsSetupProject(null);
-
-				if (provider === "github") {
-					setGitHubSetupProject(project);
-					setShowGitHubSetup(true);
-					return;
-				}
-
-				if (provider === "azure_devops") {
-					setAzureDevOpsSetupProject(project);
-					setShowAzureDevOpsSetup(true);
-					return;
-				}
-			}
-		} catch {
-			setShowGitHubSetup(false);
-			setGitHubSetupProject(null);
-			setShowAzureDevOpsSetup(false);
-			setAzureDevOpsSetupProject(null);
-		}
-	};
-
 	const handleGitInitialized = async () => {
 		// Refresh git status after initialization
 		if (selectedProject) {
@@ -714,52 +594,6 @@ export function Sidebar({
 				console.error("Failed to refresh git status:", error);
 			}
 		}
-	};
-
-	const handleGitHubSetupComplete = async (settings: {
-		githubToken: string;
-		githubRepo: string;
-		mainBranch: string;
-		githubAuthMethod?: "oauth" | "pat";
-	}) => {
-		if (!gitHubSetupProject) return;
-
-		try {
-			await globalThis.electronAPI.updateProjectEnv(gitHubSetupProject.id, {
-				githubEnabled: true,
-				githubToken: settings.githubToken,
-				githubRepo: settings.githubRepo,
-				githubAuthMethod: settings.githubAuthMethod,
-				azureDevOpsEnabled: false,
-			});
-
-			await globalThis.electronAPI.updateProjectSettings(
-				gitHubSetupProject.id,
-				{
-					mainBranch: settings.mainBranch,
-				},
-			);
-		} catch (error) {
-			console.error("Failed to save GitHub settings:", error);
-		}
-
-		setShowGitHubSetup(false);
-		setGitHubSetupProject(null);
-	};
-
-	const handleGitHubSetupSkip = () => {
-		setShowGitHubSetup(false);
-		setGitHubSetupProject(null);
-	};
-
-	const handleAzureDevOpsSetupComplete = async () => {
-		setShowAzureDevOpsSetup(false);
-		setAzureDevOpsSetupProject(null);
-	};
-
-	const handleAzureDevOpsSetupSkip = () => {
-		setShowAzureDevOpsSetup(false);
-		setAzureDevOpsSetupProject(null);
 	};
 
 	const handleNavClick = (view: SidebarView) => openNavView(view, onViewChange);
@@ -927,6 +761,7 @@ export function Sidebar({
 					disabled={!selectedProjectId && item.id !== "administration"}
 					aria-keyshortcuts={item.shortcut}
 					aria-current={isActive ? "page" : undefined}
+					data-nav-item={item.id}
 					className={cn(
 						// pl-5 leaves room for the drag grip shown on hover
 						"flex w-full min-w-0 items-center gap-3 rounded-md py-1.5 pr-3 pl-5 text-sm transition-colors",
@@ -1198,7 +1033,7 @@ export function Sidebar({
 
 	const railFooter = (
 		<>
-			{isCollapsed &&
+			{resize.folded &&
 				railIconButton(t("actions.newTask"), () => {
 					if (selectedProjectId && selectedProject?.autoBuildPath) onNewTaskClick();
 				}, <Plus className="h-4 w-4" />)}
@@ -1215,9 +1050,9 @@ export function Sidebar({
 			)}
 			{railIconButton(t("tooltips.settings"), onSettingsClick, <Settings className="h-4 w-4" />)}
 			{railIconButton(
-				isCollapsed ? t("actions.expandSidebar") : t("actions.collapseSidebar"),
+				resize.folded ? t("actions.expandSidebar") : t("actions.collapseSidebar"),
 				toggleSidebar,
-				isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />,
+				resize.folded ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />,
 			)}
 		</>
 	);
@@ -1234,22 +1069,26 @@ export function Sidebar({
 				<div
 					className={cn(
 						"relative flex h-full bg-sidebar border-r border-border",
-						!isResizing && "transition-[width] duration-300",
+						!resize.isResizing && "transition-[width] duration-300",
 					)}
-					style={{ width: isCollapsed ? SIDEBAR_RAIL_WIDTH : resizeWidth }}
+					style={{ width: resize.width }}
 				>
 					<SidebarRail
 						mine={mineSpace}
 						groups={railGroups.map(spaceOf)}
 						extras={laboItems.length > 0 ? [laboSpace] : []}
 						activeSpace={space}
-						isCollapsed={isCollapsed}
+						isCollapsed={resize.folded}
 						onSelect={selectSpace}
 						footer={railFooter}
 					/>
 
-					{!isCollapsed && (
-						<div className="flex min-w-0 flex-1 flex-col" data-testid="sidebar-panel">
+					{!resize.folded && (
+						<div
+							id={SIDEBAR_PANEL_ID}
+							className="flex min-w-0 flex-1 flex-col"
+							data-testid="sidebar-panel"
+						>
 							{/* Header with drag area - extra top padding for macOS traffic lights */}
 							<div className="electron-drag flex h-14 shrink-0 items-end px-4 pb-1.5">
 								<h2 className="electron-no-drag truncate text-base font-semibold text-foreground">
@@ -1355,19 +1194,15 @@ export function Sidebar({
 						</div>
 					)}
 
-					{/* Resize handle */}
-					{!isCollapsed && (
-						// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
-						// biome-ignore lint/a11y/noNoninteractiveElementInteractions: resize handle — mouse drag interaction
-						<div
-							onMouseDown={handleResizeStart}
-							className={cn(
-								"absolute top-0 right-0 w-1 h-full cursor-col-resize z-50 transition-colors",
-								"hover:bg-primary/40",
-								isResizing && "bg-primary/60",
-							)}
-						/>
-					)}
+					<SidebarResizeHandle
+						controls={SIDEBAR_PANEL_ID}
+						width={resize.width}
+						maxWidth={resize.maxWidth}
+						folded={resize.folded}
+						isResizing={resize.isResizing}
+						isDragging={resize.isDragging}
+						{...resize.handlers}
+					/>
 				</div>
 				<DragOverlay dropAnimation={null}>
 					{activeDragId ? (
@@ -1377,35 +1212,6 @@ export function Sidebar({
 					) : null}
 				</DragOverlay>
 			</DndContext>
-
-			{/* Add Project Modal */}
-			<AddProjectModal
-				open={showAddProjectModal}
-				onOpenChange={setShowAddProjectModal}
-				onProjectAdded={handleProjectAdded}
-			/>
-
-			{/* Azure DevOps Setup Modal - configure Azure DevOps */}
-			{azureDevOpsSetupProject && (
-				<AzureDevOpsSetupModal
-					open={showAzureDevOpsSetup}
-					onOpenChange={setShowAzureDevOpsSetup}
-					project={azureDevOpsSetupProject}
-					onComplete={handleAzureDevOpsSetupComplete}
-					onSkip={handleAzureDevOpsSetupSkip}
-				/>
-			)}
-
-			{/* GitHub Setup Modal - configure GitHub */}
-			{gitHubSetupProject && !showAzureDevOpsSetup && (
-				<GitHubSetupModal
-					open={showGitHubSetup}
-					onOpenChange={setShowGitHubSetup}
-					project={gitHubSetupProject}
-					onComplete={handleGitHubSetupComplete}
-					onSkip={handleGitHubSetupSkip}
-				/>
-			)}
 
 			{/* Git Setup Modal */}
 			<GitSetupModal

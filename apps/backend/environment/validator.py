@@ -150,16 +150,18 @@ class EnvironmentValidator:
                         status[name] = running
                 return status
 
-            # Parse JSON output
+            # Parse JSON output: one object per line (Compose 2.21+) or one
+            # array for every service (earlier 2.x).
             status = {}
             for line in proc.stdout.strip().splitlines():
                 try:
                     data = json.loads(line)
-                    name = data.get("Service", data.get("Name", ""))
-                    state = data.get("State", "").lower()
-                    status[name] = state == "running"
                 except json.JSONDecodeError:
                     continue
+                for entry in data if isinstance(data, list) else [data]:
+                    name = entry.get("Service", entry.get("Name", ""))
+                    state = entry.get("State", "").lower()
+                    status[name] = state == "running"
             return status
 
         except (subprocess.TimeoutExpired, FileNotFoundError):

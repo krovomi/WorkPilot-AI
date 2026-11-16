@@ -5,7 +5,12 @@ Allows recording of streaming sessions for later replay, perfect for learning,
 debugging, and sharing development sessions.
 """
 
+import asyncio
 import json
+import logging
+import os
+import re
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,6 +18,11 @@ from pathlib import Path
 from typing import Any
 
 from .streaming_manager import EventType, StreamingEvent
+
+logger = logging.getLogger(__name__)
+
+#: What a session id keeps in a recording's file name (Windows refuses `:`).
+_UNSAFE_NAME = re.compile(r"[^A-Za-z0-9._-]")
 
 
 @dataclass
@@ -73,7 +83,6 @@ class SessionRecorder:
     - Automatic recording of all streaming events
     - Save/load recordings to disk
     - Replay sessions at different speeds
-    - Export to video format (future enhancement)
     """
 
     def __init__(self, recordings_dir: Path | None = None):
@@ -125,13 +134,10 @@ class SessionRecorder:
         Ctrl+C during save corrupted the file and silently broke the
         listing UI for every recording in the directory.
         """
-        import os
-        import tempfile
-
         timestamp = datetime.fromtimestamp(recording.start_time).strftime(
             "%Y%m%d_%H%M%S"
         )
-        filename = f"{timestamp}_{recording.session_id}.json"
+        filename = f"{timestamp}_{_UNSAFE_NAME.sub('_', recording.session_id)}.json"
         filepath = self._recordings_dir / filename
 
         fd, tmp_path = tempfile.mkstemp(
@@ -178,19 +184,14 @@ class SessionRecorder:
                         "metadata": data.get("metadata", {}),
                     }
                 )
-            except Exception as e:
-                print(f"Failed to load recording {filepath}: {e}")
+            except (OSError, ValueError, KeyError, TypeError) as e:
+                logger.warning(
+                    "Skipping unreadable recording %s: %s",
+                    filepath.name,
+                    type(e).__name__,
+                )
 
         return sorted(recordings, key=lambda x: x["start_time"], reverse=True)
-
-    def delete_recording(self, filepath: Path) -> bool:
-        """Delete a recording."""
-        try:
-            filepath.unlink()
-            return True
-        except Exception as e:
-            print(f"Failed to delete recording {filepath}: {e}")
-            return False
 
     async def replay_session(
         self,
@@ -201,62 +202,19 @@ class SessionRecorder:
         """
         Replay a recorded session.
 
+        Each event waits for the time that separated it from the one before,
+        divided by ``speed``.
+
         Args:
             recording: The recording to replay
             speed: Playback speed (1.0 = real-time, 2.0 = 2x speed, etc.)
             callback: Optional callback function to call for each event
         """
-        import asyncio
-
-        if not recording.events:
-            return
-
-        start_time = recording.events[0].timestamp
-
+        if speed <= 0:
+            raise ValueError("speed must be positive")
+        previous = recording.events[0].timestamp if recording.events else 0.0
         for event in recording.events:
-            # Calculate delay to maintain timing
-            relative_time = event.timestamp - start_time
-            await asyncio.sleep(relative_time / speed)
-
+            await asyncio.sleep(max(0.0, event.timestamp - previous) / speed)
+            previous = event.timestamp
             if callback:
                 await callback(event)
-
-    def get_session_stats(self, recording: SessionRecording) -> dict[str, Any]:
-        """Get statistics about a recorded session."""
-        event_types = {}
-        file_changes = 0
-        commands_run = 0
-
-        for event in recording.events:
-            event_types[event.event_type.value] = (
-                event_types.get(event.event_type.value, 0) + 1
-            )
-
-            if event.event_type in [
-                EventType.FILE_CREATE,
-                EventType.FILE_UPDATE,
-                EventType.FILE_DELETE,
-            ]:
-                file_changes += 1
-            elif event.event_type == EventType.COMMAND_RUN:
-                commands_run += 1
-
-        return {
-            "duration": recording.duration(),
-            "event_count": len(recording.events),
-            "event_types": event_types,
-            "file_changes": file_changes,
-            "commands_run": commands_run,
-        }
-
-
-# Global instance
-_session_recorder: SessionRecorder | None = None
-
-
-def get_session_recorder() -> SessionRecorder:
-    """Get or create the global session recorder instance."""
-    global _session_recorder
-    if _session_recorder is None:
-        _session_recorder = SessionRecorder()
-    return _session_recorder

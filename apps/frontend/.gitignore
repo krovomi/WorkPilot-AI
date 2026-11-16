@@ -60,3 +60,7 @@ bun.lockb
 # Test files in root
 test-*.js
 test-*.cjs
+
+# The backend's virtualenv, linked beside the E2E fake agent (e2e/local-project.ts).
+# Named here as well as at the root: Biome reads this folder's ignore file.
+e2e/fake-backend/.venv

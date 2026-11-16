@@ -17,7 +17,7 @@ from spec.phases.spec_phases import learning_context_for
 LESSONS = "## Learned from previous builds\n- Use the repository's Result<T> type"
 
 
-def _lessons(_project_dir, agent_type, task_context=None):
+def _lessons(_project_dir, agent_type, task_context=None, **_kw):
     return f"{LESSONS} ({agent_type})"
 
 

@@ -9,8 +9,7 @@ Provides comprehensive security features for the WorkPilot AI framework:
 3. Secret Detection - Automatic detection of hardcoded credentials
 4. Compliance Analysis - GDPR, SOC2, HIPAA, PCI-DSS compliance checking
 5. Security Reports - Multiple formats (JSON, HTML, Markdown, SARIF)
-6. Git Integration - Automatic scanning via Git hooks
-7. CI/CD Integration - Security gates for deployment pipelines
+6. CI/CD Integration - Security gates for deployment pipelines
 
 Feature 8: Security-First Features
 -----------------------------------
@@ -18,7 +17,7 @@ Feature 8: Security-First Features
 Security scanning is a core safety feature that cannot be disabled.
 
 This module implements the complete Feature 8 roadmap:
-- Automatic vulnerability scanning on every commit
+- Vulnerability scanning in the QA loop and via `python -m security.security_orchestrator`
 - Detection of secrets/credentials in code
 - Compliance analysis (GDPR, SOC2, HIPAA, PCI-DSS, ISO 27001, CCPA)
 - Automatic generation of security reports
@@ -43,7 +42,6 @@ Main classes:
 - VulnerabilityScanner: Multi-tool vulnerability scanner
 - ComplianceAnalyzer: Compliance framework analyzer
 - SecurityReportGenerator: Multi-format report generator
-- GitHookManager: Git hooks for automatic scanning
 
 Quick Start:
     from security import SecurityOrchestrator
@@ -66,7 +64,6 @@ from project import (
     needs_validation,
 )
 
-from . import auto_integration  # noqa: F401
 from .compliance_analyzer import (
     ComplianceAnalyzer,
     ComplianceFramework,
@@ -74,14 +71,12 @@ from .compliance_analyzer import (
     ComplianceSeverity,
     ComplianceViolation,
 )
-from .git_hooks import GitHookManager
 from .guardrails import (
     GuardrailAction,
     GuardrailDecision,
     GuardrailRule,
     evaluate_rules,
     guardrails_hook,
-    load_guardrails,
 )
 from .hooks import bash_security_hook, validate_command
 from .parser import (
@@ -93,22 +88,13 @@ from .profile import (
     get_security_profile,
     reset_profile_cache,
 )
-from .secure_subprocess import (
-    SubprocessResult,
-    SubprocessSecurityError,
-    check_tool_available,
-    run_secure,
-)
 from .security_orchestrator import (
     SecurityOrchestrator,
     SecurityScanConfig,
     SecurityScanResult,
 )
 from .security_report_generator import SecurityReportGenerator
-from .tool_input_validator import (
-    get_safe_tool_input,
-    validate_tool_input,
-)
+from .tool_input_validator import get_safe_tool_input
 from .validator import (
     VALIDATORS,
     validate_bash_command,
@@ -165,7 +151,6 @@ __all__ = [
     "ComplianceReport",
     "ComplianceSeverity",
     "SecurityReportGenerator",
-    "GitHookManager",
     # Validators
     "VALIDATORS",
     "validate_pkill_command",
@@ -194,13 +179,7 @@ __all__ = [
     "needs_validation",
     "BASE_COMMANDS",
     # Tool input validation
-    "validate_tool_input",
     "get_safe_tool_input",
-    # Secure subprocess
-    "run_secure",
-    "SubprocessResult",
-    "SubprocessSecurityError",
-    "check_tool_available",
     # Prompt Injection Guard — re-exported from `injection_guard`, which is
     # the one implementation. See the import block below.
     "InjectionScanner",
@@ -209,7 +188,6 @@ __all__ = [
     "ScanFinding",
     # Guardrails
     "guardrails_hook",
-    "load_guardrails",
     "evaluate_rules",
     "GuardrailRule",
     "GuardrailAction",

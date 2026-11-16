@@ -51,5 +51,62 @@
 	"kickers": {
 		"setup": "Réglages",
 		"history": "Historique"
+	},
+	"monitor": {
+		"heading": "Surveillance après déploiement",
+		"description": "Après un pipeline lancé depuis WorkPilot, le health check et les métriques Prometheus sont comparés à leur niveau d'avant, pendant une fenêtre d'observation.",
+		"monitor_health_url": "URL du health check",
+		"monitor_prometheus_url": "URL de Prometheus",
+		"monitor_prometheus_token": "Jeton Prometheus (facultatif)",
+		"monitor_window_minutes": "Fenêtre d'observation (minutes)",
+		"monitor_deploy_wait_minutes": "Attente du déploiement (minutes)",
+		"auto_rollback": "Rollback automatique sur un verdict critique",
+		"autoRollbackHint": "Désactivé : le rollback est proposé ici. Activé : GitHub Actions et Azure Pipelines reviennent à la dernière exécution réussie, sauf si le changement contient une migration de base de données.",
+		"fileHint": "Métriques et seuils : .workpilot/deploy-monitors.yaml (requête PromQL, type error_rate, latency, throughput ou custom, warning et critical en pourcentage)."
+	},
+	"watch": {
+		"notConfigured": "Non surveillé : aucun health check ni aucune métrique configurés.",
+		"verdict": {
+			"ok": "Sain",
+			"warning": "Dégradé",
+			"critical": "Critique",
+			"unknown": "Non mesuré"
+		},
+		"phase": {
+			"baseline": "mesure de référence",
+			"waiting": "attente du déploiement",
+			"watching": "surveillance",
+			"done": "fenêtre terminée",
+			"interrupted": "interrompue (l'app a été fermée)"
+		},
+		"samples_one": "{{count}} mesure",
+		"samples_other": "{{count}} mesures",
+		"healthOk": "health check OK",
+		"healthFailed": "health check en échec",
+		"metric": "{{name}} : {{baseline}} → {{current}} ({{change}} %, {{level}})",
+		"problems": "Réglages ignorés : {{problems}}",
+		"migrations": "Migrations de base de données entre la bonne version et celle-ci : {{files}}. Un rollback ne restaure que le code ; traitez ces migrations à la main.",
+		"rollback": {
+			"proposed": "Rollback proposé.",
+			"started": "Rollback lancé : la dernière exécution réussie tourne à nouveau.",
+			"failed": "Le rollback n'a pas pu démarrer.",
+			"blocked_migrations": "Rollback automatique bloqué par une migration de base de données.",
+			"manual": "Rollback à faire à la main."
+		},
+		"byPerson": "(demandé depuis l'app)",
+		"plan": {
+			"manual": "Ce fournisseur ne peut pas relancer un ancien pipeline sur son commit : relancez le dernier bon depuis sa page.",
+			"no_previous_success": "Aucune exécution réussie antérieure vers laquelle revenir.",
+			"not_configured": "Les réglages du fournisseur sont incomplets pour un rollback.",
+			"unreachable": "Le fournisseur n'a pas répondu pour préparer le rollback.",
+			"unsupported": "Le rollback n'est pas pris en charge pour ce fournisseur.",
+			"offline": "Mode hors-ligne strict : aucun fournisseur n'est appelé, rollback à la main."
+		},
+		"openTarget": "Ouvrir la dernière bonne exécution ({{run}})",
+		"revertHint": "La branche contient toujours le commit fautif : revertez-le avant le prochain déploiement.",
+		"rollbackButton": "Revenir en arrière",
+		"confirm": "Relancer le dernier déploiement réussi ?",
+		"confirmButton": "Confirmer le rollback",
+		"cancel": "Annuler"
 	}
 }

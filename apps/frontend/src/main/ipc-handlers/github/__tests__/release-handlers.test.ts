@@ -121,6 +121,44 @@ describe("GITHUB_CREATE_RELEASE", () => {
 		expect(mockExecFileSync).not.toHaveBeenCalled();
 	});
 
+	it("answers an unknown project, a missing gh and a gh that is not signed in", async () => {
+		expect(await createRelease("nope", "1.2.0", "notes")).toEqual({ success: false, error: "Project not found" });
+
+		mockExecFileSync.mockImplementationOnce(() => {
+			throw new Error("not found");
+		});
+		expect((await createRelease("p1", "1.2.0", "notes")).error).toMatch(/^GitHub CLI \(gh\) not found/);
+
+		mockExecFileSync.mockReturnValueOnce("/usr/bin/gh").mockImplementationOnce(() => {
+			throw new Error("not logged in");
+		});
+		expect((await createRelease("p1", "1.2.0", "notes")).error).toMatch(/^Not authenticated with GitHub/);
+		expect(mockExecFileSync.mock.calls.at(-1)?.[1]).toEqual(["auth", "status"]);
+	});
+
+	it("tags a bare version with v, and builds the URL when gh prints none", async () => {
+		mockExecFileSync.mockReturnValue("");
+
+		const result = await createRelease("p1", "v3.0.0", "notes", { prerelease: true });
+
+		expect(result).toEqual({ success: true, data: { url: "https://github.com/releases/tag/v3.0.0" } });
+		expect(mockExecFileSync.mock.calls.at(-1)?.[1]).toContain("--prerelease");
+	});
+
+	it.each([
+		[Object.assign(new Error("Command failed"), { stderr: "tag v1.2.0 exists" }), "tag v1.2.0 exists"],
+		[Object.assign(new Error("Command failed"), { stderr: "" }), "Command failed"],
+		[new Error("spawn EACCES"), "spawn EACCES"],
+		["odd", "Failed to create release"],
+	])("reports what gh said when the release fails: %s", async (thrown, message) => {
+		mockExecFileSync.mockImplementation((_file: string, args: string[]) => {
+			if (args[0] === "release") throw thrown;
+			return "";
+		});
+
+		expect(await createRelease("p1", "1.2.0", "notes")).toEqual({ success: false, error: message });
+	});
+
 	it("refuses notes that are not a string", async () => {
 		const result = await createRelease("p1", "1.2.0", { toString: "x" });
 

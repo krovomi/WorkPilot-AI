@@ -134,8 +134,6 @@ export function TaskCreationWizard({
 	const [isLoadingBranches, setIsLoadingBranches] = useState(false);
 	const [baseBranch, setBaseBranch] = useState<string>(PROJECT_DEFAULT_BRANCH);
 	const [projectDefaultBranch, setProjectDefaultBranch] = useState<string>("");
-	// Worktree isolation - default to true for safety
-	const [useWorktree, setUseWorktree] = useState(true);
 
 	// Get project path from project store
 	const projects = useProjectStore((state) => state.projects);
@@ -348,7 +346,6 @@ export function TaskCreationWizard({
 				setAcceptanceCriteria(ensureAtLeastOne([]));
 				setExtraNote("");
 				setBaseBranch(PROJECT_DEFAULT_BRANCH);
-				setUseWorktree(true);
 				setIsDraftRestored(false);
 				setShowClassification(false);
 				setShowFileExplorer(false);
@@ -694,8 +691,6 @@ export function TaskCreationWizard({
 			} else if (baseBranch) {
 				metadata.baseBranch = baseBranch;
 			}
-			// Pass worktree preference - false means use --direct mode
-			if (!useWorktree) metadata.useWorktree = false;
 			// Set useLocalBranch when user explicitly selects a local branch
 			// This preserves gitignored files (.env, configs) by not switching to origin
 			if (isSelectedBranchLocal) metadata.useLocalBranch = true;
@@ -765,7 +760,6 @@ export function TaskCreationWizard({
 		setAcceptanceCriteria(ensureAtLeastOne([]));
 		setExtraNote("");
 		setBaseBranch(PROJECT_DEFAULT_BRANCH);
-		setUseWorktree(true);
 		setError(null);
 		setShowClassification(false);
 		setShowFileExplorer(false);

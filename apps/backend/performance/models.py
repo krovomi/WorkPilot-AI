@@ -98,6 +98,7 @@ class BenchmarkResult:
             "memory_mb": self.memory_mb,
             "cpu_percent": self.cpu_percent,
             "timestamp": self.timestamp,
+            "metadata": self.metadata,
         }
 
 

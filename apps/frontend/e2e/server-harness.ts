@@ -1,15 +1,16 @@
 /**
  * The pieces every `*.server-e2e.ts` spec shares: a real WorkPilot server
  * started by `tests/server_e2e/app_world.py`, seeded with two organizations
- * (Alice, its administrator, and Bob in the first, with the project "Team
- * Board"; Carol in the second), and the app's own screens to sign in and
- * open the project's board.
+ * (Alice, its administrator, and Bob in the first, with the projects "Team
+ * Board", "Team Site" on a fake GitHub and "Team Docs" on a fake GitLab;
+ * Carol in the second), and the app's own screens to sign in and open a
+ * project's board.
  *
  * Needs the backend's Python (`apps/backend/.venv`, or
  * `WORKPILOT_E2E_PYTHON`), Linux and port 8765 free.
  */
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -27,7 +28,23 @@ export type Who = "alice" | "bob" | "carol";
 export interface World {
 	serverUrl: string;
 	project: string;
+	/** The team's project on GitHub, and the one on GitLab (`fake_forge.py`). */
+	githubProject: string;
+	gitlabProject: string;
+	/** Where the fake forges say what they were asked (`forgeCalls`). */
+	forgeUrl: string;
 	people: Record<Who, Account>;
+}
+
+/** A call the fake GitHub or GitLab received through the server's relay. */
+export interface ForgeCall {
+	host: string;
+	method: string;
+	path: string;
+	query: string;
+	/** The SHA-256 prefix of the token it carried (`tokenTag`), "" for none. */
+	token: string;
+	body: unknown;
 }
 
 export interface Server {
@@ -69,7 +86,7 @@ export async function startServer(): Promise<Server> {
 		lines.once("line", resolve);
 		void exited.then((code) => reject(new Error(`server exited (${code})`)));
 	});
-	let answer: { serverUrl: string; project: string; emails: Record<Who, string> };
+	let answer: Omit<World, "people"> & { emails: Record<Who, string> };
 	try {
 		answer = JSON.parse(
 			await Promise.race([
@@ -90,9 +107,24 @@ export async function startServer(): Promise<Server> {
 	const world: World = {
 		serverUrl: answer.serverUrl,
 		project: answer.project,
+		githubProject: answer.githubProject,
+		gitlabProject: answer.gitlabProject,
+		forgeUrl: answer.forgeUrl,
 		people: { alice: account("alice"), bob: account("bob"), carol: account("carol") },
 	};
 	return { world, stop };
+}
+
+/** What the fake forges were asked so far, oldest first. */
+export async function forgeCalls(world: World): Promise<ForgeCall[]> {
+	const answer = await fetch(`${world.forgeUrl}/calls`);
+	if (!answer.ok) throw new Error(`fake forge: ${answer.status}`);
+	return (await answer.json()) as ForgeCall[];
+}
+
+/** What a fake forge keeps of a token (`fake_forge.token_tag`). */
+export function tokenTag(token: string): string {
+	return createHash("sha256").update(token, "utf8").digest("hex").slice(0, 16);
 }
 
 /** Sign in from the app's first screen, as a person of the world. */
@@ -110,20 +142,40 @@ export async function signIn(page: Page, world: World, who: Account): Promise<vo
 	);
 }
 
-/** The project's board, opened from the welcome screen unless the app
- * already opened it (it does when the person has a single project). */
+/**
+ * A project's board: from the welcome screen, from its tab, or, when the
+ * app opened another project first (it opens a tab for the first one only),
+ * from the team's projects listed by the "Add project" dialog.
+ */
 export async function openBoard(page: Page, project: string): Promise<void> {
 	const tab = page.getByText(project, { exact: true }).first();
 	const fromWelcome = page.getByRole("button", { name: `Open project ${project}` });
+	// Another project's tab, shown with the button that adds or opens one.
+	const tabBar = page.getByText(/Shared board/).or(page.getByRole("button", { name: "Add project" }));
 	// On the welcome screen both match (the name is inside the button).
-	await expect(tab.or(fromWelcome).first()).toBeVisible({ timeout: 15_000 });
-	if (await fromWelcome.isVisible()) await fromWelcome.click();
+	await expect(tab.or(fromWelcome).or(tabBar).first()).toBeVisible({
+		timeout: 15_000,
+	});
+	// The app may still be opening the project's tab itself.
+	await tab
+		.or(fromWelcome)
+		.first()
+		.waitFor({ timeout: 5_000 })
+		.catch(() => undefined);
+	if (await fromWelcome.isVisible()) {
+		await fromWelcome.click();
+	} else if (await tab.isVisible()) {
+		await tab.click();
+	} else {
+		await page.getByRole("button", { name: "Add project" }).click();
+		await page.getByRole("button", { name: `Open ${project}`, exact: true }).click();
+	}
+	await expect(tab).toBeVisible({ timeout: 15_000 });
 	await expect(page.getByText(/Shared board/).first()).toBeVisible({
 		timeout: 15_000,
 	});
 	await expect(page.getByRole("button", { name: /^New Task$/ })).toBeEnabled();
 }
-
 
 /**
  * Open a view from the sidebar: its space in the rail (unless already open),
