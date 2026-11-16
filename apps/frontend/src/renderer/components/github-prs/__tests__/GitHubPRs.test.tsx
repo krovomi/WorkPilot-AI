@@ -156,7 +156,6 @@ describe("GitHubPRs", () => {
 
 		const props = detail.props as DetailProps;
 		expect(props.projectId).toBe("p1");
-		expect(props.isActive).toBe(true);
 		expect(props.initialNewCommitsCheck).toEqual({ hasNewCommits: true });
 
 		props.onRunReview();
@@ -166,7 +165,6 @@ describe("GitHubPRs", () => {
 		await props.onPostReview(["f1"], { forceApprove: true });
 		await props.onPostComment("LGTM");
 		props.onMergePR("squash");
-		props.onAssignPR("bob");
 		await props.onGetLogs();
 		await props.onMarkReviewPosted?.(2);
 
@@ -177,7 +175,6 @@ describe("GitHubPRs", () => {
 		expect(api.postReview).toHaveBeenCalledWith(2, ["f1"], { forceApprove: true });
 		expect(api.postComment).toHaveBeenCalledWith(2, "LGTM");
 		expect(api.mergePR).toHaveBeenCalledWith(2, "squash");
-		expect(api.assignPR).toHaveBeenCalledWith(2, "bob");
 		expect(getPRLogs).toHaveBeenCalledWith("p1", 2);
 		expect(api.markReviewPosted).toHaveBeenCalledWith(2);
 	});

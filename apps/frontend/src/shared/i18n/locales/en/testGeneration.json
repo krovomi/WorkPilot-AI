@@ -99,7 +99,9 @@
 	"filePicker": {
 		"selectFile": "Browse and select a source file...",
 		"filter": "Filter files...",
-		"empty": "No files found"
+		"empty": "No files found",
+		"clear": "Clear the selected file",
+		"clearFilter": "Clear the filter"
 	},
 	"errors": {
 		"noFile": "Please select a file to analyze",

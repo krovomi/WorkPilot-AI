@@ -24,7 +24,7 @@ import {
 	generateImageId,
 	isValidImageMimeType,
 	resolveFilename,
-} from "../ImageUpload";
+} from "../../lib/image-attachments";
 
 /** Data structure for file reference drops from FileTreeItem */
 export interface FileReferenceData {

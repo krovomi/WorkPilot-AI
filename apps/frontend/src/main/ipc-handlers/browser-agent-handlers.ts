@@ -10,13 +10,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
-import { parsePythonCommand } from "../python-detector";
-import { resolveInProject } from "../security/renderer-path";
 import {
-	getConfiguredPythonPath,
-	pythonEnvManager,
-} from "../python-env-manager";
+	isArtifactName,
+	readRunnerUrl,
+} from "../../shared/utils/browser-agent-inputs";
+import { parsePythonCommand } from "../python-detector";
+import { getConfiguredPythonPath } from "../python-env-manager";
+import { resolveInProject } from "../security/renderer-path";
+import { pythonStaticRunnerEnv } from "../utils/python-runner-env";
 
+const URL_REFUSED = "Only an http or https URL can be opened";
+const NAME_REFUSED =
+	"A name may only contain letters, digits, '.', '_' and '-', and not start with '-'";
 
 /**
  * Register all browser agent IPC handlers.
@@ -45,14 +50,15 @@ export function registerBrowserAgentHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.BROWSER_AGENT_CAPTURE_SCREENSHOT,
-		async (_, projectPath: string, name: string, url: string) => {
+		async (_, projectPath: string, name: unknown, url: unknown) => {
+			const pageUrl = readRunnerUrl(url);
+			if (!pageUrl) return { success: false, error: URL_REFUSED };
+			if (!isArtifactName(name)) return { success: false, error: NAME_REFUSED };
 			try {
 				const result = await runBrowserAgentCommand(projectPath, [
 					"screenshot",
-					"--url",
-					url,
-					"--name",
-					name,
+					`--url=${pageUrl}`,
+					`--name=${name}`,
 				]);
 				const data = JSON.parse(result);
 
@@ -90,14 +96,14 @@ export function registerBrowserAgentHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.BROWSER_AGENT_NAVIGATE,
-		async (_, projectPath: string, url: string) => {
+		async (_, projectPath: string, url: unknown) => {
+			const pageUrl = readRunnerUrl(url);
+			if (!pageUrl) return { success: false, error: URL_REFUSED };
 			try {
 				const result = await runBrowserAgentCommand(projectPath, [
 					"screenshot",
-					"--url",
-					url,
-					"--name",
-					"navigation_preview",
+					`--url=${pageUrl}`,
+					"--name=navigation_preview",
 				]);
 				return JSON.parse(result);
 			} catch (error) {
@@ -110,9 +116,10 @@ export function registerBrowserAgentHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.BROWSER_AGENT_SET_BASELINE,
-		async (_, projectPath: string, name: string, screenshotPath?: string) => {
+		async (_, projectPath: string, name: unknown, screenshotPath?: string) => {
+			if (!isArtifactName(name)) return { success: false, error: NAME_REFUSED };
 			try {
-				const args = ["baseline", "set", "--name", name];
+				const args = ["baseline", "set", `--name=${name}`];
 				if (screenshotPath) {
 					// The runner copies this file into the baselines: it must be
 					// a screenshot in the project, not any file the renderer names.
@@ -123,7 +130,7 @@ export function registerBrowserAgentHandlers(): void {
 							error: "Screenshot not found in a known project",
 						};
 					}
-					args.push("--screenshot", screenshot);
+					args.push(`--screenshot=${screenshot}`);
 				}
 				const result = await runBrowserAgentCommand(projectPath, args);
 				return JSON.parse(result);
@@ -150,13 +157,13 @@ export function registerBrowserAgentHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.BROWSER_AGENT_DELETE_BASELINE,
-		async (_, projectPath: string, name: string) => {
+		async (_, projectPath: string, name: unknown) => {
+			if (!isArtifactName(name)) return { success: false, error: NAME_REFUSED };
 			try {
 				const result = await runBrowserAgentCommand(projectPath, [
 					"baseline",
 					"delete",
-					"--name",
-					name,
+					`--name=${name}`,
 				]);
 				return JSON.parse(result);
 			} catch (error) {
@@ -169,12 +176,15 @@ export function registerBrowserAgentHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.BROWSER_AGENT_COMPARE,
-		async (_, projectPath: string, name: string, url?: string) => {
+		async (_, projectPath: string, name: unknown, url?: unknown) => {
+			if (!isArtifactName(name)) return { success: false, error: NAME_REFUSED };
+			const args = ["compare", `--name=${name}`];
+			if (url) {
+				const pageUrl = readRunnerUrl(url);
+				if (!pageUrl) return { success: false, error: URL_REFUSED };
+				args.push(`--url=${pageUrl}`);
+			}
 			try {
-				const args = ["compare", "--name", name];
-				if (url) {
-					args.push("--url", url);
-				}
 				const result = await runBrowserAgentCommand(projectPath, args);
 				return JSON.parse(result);
 			} catch (error) {
@@ -227,12 +237,21 @@ function runBrowserAgentCommand(
 	timeout = 120000,
 ): Promise<string> {
 	return new Promise((resolve, reject) => {
-		const runnerPath = path.join(
+		// The project folder was matched to a registered project before the
+		// handler ran (DIRECTORY_ARGS); an absent one is not a folder to run in.
+		if (typeof projectPath !== "string" || !projectPath) {
+			reject(new Error("A project folder is required"));
+			return;
+		}
+		const backendPath = path.join(
 			import.meta.dirname,
 			"..",
 			"..",
 			"..",
 			"backend",
+		);
+		const runnerPath = path.join(
+			backendPath,
 			"runners",
 			"browser_agent_runner.py",
 		);
@@ -241,17 +260,18 @@ function runBrowserAgentCommand(
 		// "python" that would resolve to whatever is first on the runtime PATH.
 		const pythonPath = getConfiguredPythonPath();
 		const [cmd, pythonBaseArgs] = parsePythonCommand(pythonPath);
-		// getPythonEnv() already sets PYTHONIOENCODING=utf-8 + PYTHONPATH so the
-		// venv's site-packages resolve and emoji don't crash on a cp1252 pipe.
-		const env = pythonEnvManager.getPythonEnv();
+		// Built, not inherited: the runner and the project's E2E tests it runs
+		// call no model, so they get no credential. It keeps the managed
+		// Python's PYTHONPATH (the venv's site-packages resolve) and sets
+		// PYTHONIOENCODING=utf-8 so emoji don't crash on a cp1252 pipe.
+		const env = pythonStaticRunnerEnv(backendPath);
 
 		const proc = spawn(
 			cmd,
 			[
 				...pythonBaseArgs,
 				runnerPath,
-				"--project",
-				projectPath,
+				`--project=${projectPath}`,
 				"--json",
 				...args,
 			],

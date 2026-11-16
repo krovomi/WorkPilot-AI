@@ -61,6 +61,7 @@ import {
 	maskSettingsSecrets,
 	unmaskSettingsUpdate,
 } from "../settings-secrets";
+import { pushMenuLayoutIfChanged } from "../server-menu-layout";
 import { pushThemeIfChanged } from "../server-ui-preferences";
 import {
 	isSecretSettingsKey,
@@ -763,8 +764,10 @@ export function registerSettingsHandlers(
 					secretFieldValues(newSettings, isSecretSettingsKey),
 				);
 				const credentialsSetAt = writeSettingsFile(newSettings);
-				// Server mode: the theme follows the person to their other devices.
+				// Server mode: the theme and the menu as arranged follow the
+				// person to their other devices.
 				pushThemeIfChanged(settings, newSettings);
+				pushMenuLayoutIfChanged(settings, currentSettings, newSettings);
 
 				// Apply Python path if changed
 				if (settings.pythonPath || settings.autoBuildPath) {
