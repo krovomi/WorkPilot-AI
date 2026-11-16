@@ -427,11 +427,6 @@ export const IPC_CHANNELS = {
 	GITLAB_GET_TOKEN: "gitlab:getToken",
 	GITLAB_GET_USER: "gitlab:getUser",
 	GITLAB_LIST_USER_PROJECTS: "gitlab:listUserProjects",
-	GITLAB_DETECT_PROJECT: "gitlab:detectProject",
-	GITLAB_GET_BRANCHES: "gitlab:getBranches",
-	GITLAB_CREATE_PROJECT: "gitlab:createProject",
-	GITLAB_ADD_REMOTE: "gitlab:addRemote",
-	GITLAB_LIST_GROUPS: "gitlab:listGroups",
 
 	// GitLab events (main -> renderer)
 	GITLAB_INVESTIGATION_PROGRESS: "gitlab:investigationProgress",

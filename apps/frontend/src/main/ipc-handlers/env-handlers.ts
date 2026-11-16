@@ -27,6 +27,7 @@ import {
 } from "../project-env-file";
 import { ensureProjectEnvIgnored } from "../project-initializer";
 import { withGhCliToken } from "./github/oauth-token";
+import { withGlabCliToken } from "./gitlab/oauth-token";
 import { projectStore } from "../project-store";
 import {
 	envTemplateKeys,
@@ -1169,9 +1170,12 @@ ${otherLines.join("\n")}
 
 				// Generate new content
 				// A secret sent back as the mask ENV_GET showed keeps its stored value;
-				// the mask of a gh sign-in stands for the token gh holds now.
+				// the mask of a gh or glab sign-in stands for the token it holds now.
 				const newContent = generateEnvContent(
-					await withGhCliToken(config, unmaskProjectEnvUpdate(config)),
+					await withGlabCliToken(
+						config,
+						await withGhCliToken(config, unmaskProjectEnvUpdate(config)),
+					),
 					existingContent,
 				);
 
