@@ -352,6 +352,25 @@ def test_the_process_without_an_image_says_so(tmp_path: Path) -> None:
     assert _line(done.stdout, ERROR).startswith("No image data provided")
 
 
+def test_strict_offline_makes_no_figma_export(
+    runner, model, figma, tmp_path, monkeypatch, capsys
+) -> None:
+    from services.design_to_code_providers import STRICT_OFFLINE_REFUSAL
+
+    policy = tmp_path / ".workpilot" / "offline-mode.json"
+    policy.parent.mkdir(parents=True)
+    policy.write_text(json.dumps({"airgapStrict": True}), encoding="utf-8")
+
+    code = _main(
+        runner, monkeypatch, "--project-dir", str(tmp_path), "--figma-url", FIGMA_URL
+    )
+
+    assert code == 1
+    assert _line(capsys.readouterr().out, ERROR) == STRICT_OFFLINE_REFUSAL
+    assert figma["sent"] == []
+    assert model["vision"] == []
+
+
 def test_the_render_loop_refines_the_files_and_reports_each_iteration(
     runner, model, tmp_path, monkeypatch, capsys
 ) -> None:
