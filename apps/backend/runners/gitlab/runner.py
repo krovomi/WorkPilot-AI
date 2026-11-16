@@ -37,16 +37,12 @@ from cli.utils import import_dotenv
 
 load_dotenv = import_dotenv()
 
-env_file = Path(__file__).parent.parent.parent / ".env"
-if env_file.exists():
-    load_dotenv(env_file)
-
-# Add gitlab runner directory to path for direct imports
-sys.path.insert(0, str(Path(__file__).parent))
+# The backend's .env, when there is one (a missing file loads nothing)
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 from core.io_utils import safe_print
-from models import GitLabRunnerConfig
-from orchestrator import GitLabOrchestrator, ProgressCallback
+from runners.gitlab.models import GitLabRunnerConfig
+from runners.gitlab.orchestrator import GitLabOrchestrator, ProgressCallback
 
 
 def print_progress(callback: ProgressCallback) -> None:
@@ -58,38 +54,48 @@ def print_progress(callback: ProgressCallback) -> None:
     safe_print(f"{prefix}[{callback.progress:3d}%] {callback.message}")
 
 
+def _token_from_glab() -> str:
+    """The token glab is signed in with, or "" when glab is missing or signed out."""
+    import subprocess
+
+    from core.glab_executable import get_glab_executable
+
+    glab = get_glab_executable()
+    if not glab:
+        return ""
+    try:
+        result = subprocess.run(
+            [glab, "auth", "status", "-t"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if result.returncode != 0:
+        return ""
+    # glab prints its status report on stderr; older versions used stdout
+    for line in f"{result.stdout}\n{result.stderr}".split("\n"):
+        if "Token:" in line:
+            return line.split("Token:")[-1].strip()
+    return ""
+
+
 def get_config(args) -> GitLabRunnerConfig:
     """Build config from CLI args and environment."""
     token = args.token or os.environ.get("GITLAB_TOKEN", "")
-    instance_url = args.instance or os.environ.get(
-        "GITLAB_INSTANCE_URL", "https://gitlab.com"
-    )
 
-    # Project detection priority:
-    # 1. Explicit --project flag (highest priority)
-    # 2. Auto-detect from .workpilot/gitlab/config.json (primary for multi-project setups)
-    # 3. GITLAB_PROJECT env var (fallback only)
-    project = args.project  # Only use explicit CLI flag initially
+    # Priority, for the project and the instance alike:
+    # 1. Explicit --project / --instance flag (highest priority)
+    # 2. The project's .workpilot/gitlab/config.json (primary for multi-project setups)
+    # 3. GITLAB_PROJECT / GITLAB_INSTANCE_URL env vars (fallback only)
+    project = args.project
+    instance_url = args.instance
 
     if not token:
-        # Try to get from glab CLI
-        import subprocess
-
-        try:
-            result = subprocess.run(
-                ["glab", "auth", "status", "-t"],
-                capture_output=True,
-                text=True,
-            )
-        except FileNotFoundError:
-            result = None
-
-        if result and result.returncode == 0:
-            # Parse token from output
-            for line in result.stdout.split("\n"):
-                if "Token:" in line:
-                    token = line.split("Token:")[-1].strip()
-                    break
+        token = _token_from_glab()
 
     # Auto-detect from project config (takes priority over env var)
     if not project:
@@ -98,16 +104,18 @@ def get_config(args) -> GitLabRunnerConfig:
             try:
                 with open(config_path, encoding="utf-8") as f:
                     data = json.load(f)
-                    project = data.get("project", "")
-                    instance_url = data.get("instance_url", instance_url)
-                    if not token:
-                        token = data.get("token", "")
-            except Exception as exc:
+                project = data.get("project", "")
+                instance_url = instance_url or data.get("instance_url")
+                if not token:
+                    token = data.get("token", "")
+            except (OSError, ValueError, AttributeError) as exc:
                 print(f"Warning: Failed to read GitLab config: {exc}", file=sys.stderr)
 
-    # Fall back to environment variable only if auto-detection failed
+    # Fall back to environment variables only if auto-detection failed
     if not project:
         project = os.environ.get("GITLAB_PROJECT", "")
+    if not instance_url:
+        instance_url = os.environ.get("GITLAB_INSTANCE_URL") or "https://gitlab.com"
 
     if not token:
         print(
@@ -273,8 +281,8 @@ def main():
     parser.add_argument(
         "--instance",
         type=str,
-        default="https://gitlab.com",
-        help="GitLab instance URL (default: https://gitlab.com)",
+        default=None,
+        help="GitLab instance URL (default: the project's config, GITLAB_INSTANCE_URL, then https://gitlab.com)",
     )
     parser.add_argument(
         "--model",
@@ -315,10 +323,7 @@ def main():
         "followup-review-mr": cmd_followup_review_mr,
     }
 
-    handler = commands.get(args.command)
-    if not handler:
-        print(f"Unknown command: {args.command}")
-        sys.exit(1)
+    handler = commands[args.command]
 
     try:
         exit_code = asyncio.run(handler(args))
