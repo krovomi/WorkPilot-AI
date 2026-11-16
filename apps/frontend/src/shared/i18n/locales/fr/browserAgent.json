@@ -4,7 +4,8 @@
 	"tabs": {
 		"browser": "Navigateur",
 		"visualRegression": "Régression visuelle",
-		"testRunner": "Tests E2E"
+		"testRunner": "Tests E2E",
+		"recorder": "Enregistreur"
 	},
 	"stats": {
 		"totalTests": "Tests",
@@ -73,5 +74,44 @@
 		"compareFailed": "Échec de la comparaison visuelle",
 		"testsFailed": "Échec de l’exécution des tests",
 		"noProject": "Sélectionnez un projet pour utiliser l’agent navigateur."
+	},
+	"recorder": {
+		"title": "Enregistrer un test",
+		"description": "Ouvrez une page dans une fenêtre de navigateur, faites ce que le test doit faire, puis exportez les étapes en test Playwright ou Cypress. Alt+clic sur un élément pour vérifier son texte visible.",
+		"urlLabel": "Adresse de départ de l'enregistrement",
+		"start": "Enregistrer",
+		"stop": "Arrêter",
+		"starting": "Ouverture de la fenêtre du navigateur…",
+		"recording": "Enregistrement : agissez dans la fenêtre du navigateur",
+		"stopping": "Fermeture de la fenêtre du navigateur…",
+		"truncated": "L'enregistrement a atteint sa limite de 300 étapes ; les actions suivantes n'ont pas été enregistrées.",
+		"stepsTitle": "Étapes",
+		"noSteps": "Aucune étape pour l'instant. Lancez un enregistrement et agissez dans la fenêtre du navigateur.",
+		"removeStep": "Retirer cette étape",
+		"secretValue": "secret, lu dans {{name}}",
+		"kinds": {
+			"navigate": "Ouvrir",
+			"click": "Cliquer",
+			"fill": "Saisir",
+			"select": "Choisir",
+			"press": "Appuyer",
+			"assert_text": "Vérifier le texte"
+		},
+		"exportTitle": "Exporter",
+		"nameLabel": "Nom du test",
+		"namePlaceholder": "parcours enregistré",
+		"formatLabel": "Format du test",
+		"formats": {
+			"playwright-ts": "Playwright (TypeScript)",
+			"playwright-python": "Playwright (Python)",
+			"cypress": "Cypress"
+		},
+		"preview": "Aperçu",
+		"review": "Proposer sur une carte de revue",
+		"file": "Enregistrer dans un fichier…",
+		"reviewHint": "Une carte de revue met le test sur sa propre branche, jamais dans le dossier du projet ; un fichier s'enregistre hors du projet.",
+		"savedTo": "Enregistré dans {{path}}",
+		"envVars": "Définissez ces variables d'environnement avant de lancer le test : {{names}}",
+		"skipped": "{{count}} étape(s) sans sélecteur exprimable par ce framework, laissée(s) en commentaire."
 	}
 }

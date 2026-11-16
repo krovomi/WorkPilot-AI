@@ -55,14 +55,16 @@ function MiniPixelChar({
 	useEffect(() => {
 		let frame = 0;
 
+		const ctx = canvasRef.current?.getContext("2d");
+		// No 2D context: the name under the character still says who it is.
+		if (!ctx) return;
+		const { width, height } = ctx.canvas;
+
 		const draw = () => {
-			const canvas = canvasRef.current;
-			const ctx = canvas?.getContext("2d");
-			if (!canvas || !ctx) return;
 			ctx.imageSmoothingEnabled = false;
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.clearRect(0, 0, width, height);
 			const sprite = getCharacterSprite(characterIndex, "down", frame);
-			ctx.drawImage(sprite, 0, 0, canvas.width, canvas.height);
+			ctx.drawImage(sprite, 0, 0, width, height);
 		};
 
 		draw();
@@ -155,7 +157,7 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 					className="flex gap-3 px-4 pb-3 overflow-x-auto"
 					style={{ scrollbarWidth: "none" }}
 				>
-					{agents.map((agent) => (
+					{agents.map((agent, place) => (
 						<button
 							key={agent.id}
 							type="button"
@@ -166,9 +168,11 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 								// the nearest positioned ancestor is a Tailwind class anyone
 								// could remove from a parent, and the bubble would then be
 								// anchored against the viewport.
+								// The button is rendered inside the strip, so the strip is
+								// mounted whenever it can be clicked.
+								const strip = stripRef.current as HTMLDivElement;
 								const rect = e.currentTarget.getBoundingClientRect();
-								const parentRect = stripRef.current?.getBoundingClientRect();
-								if (!parentRect) return;
+								const parentRect = strip.getBoundingClientRect();
 								onAgentClick(
 									agent.id,
 									rect.left - parentRect.left + rect.width / 2,
@@ -180,7 +184,8 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 							<div
 								style={{
 									animation: "waitBob 2.5s ease-in-out infinite",
-									animationDelay: `${(agent.waitingIndex ?? 0) * 0.4}s`,
+									// Staggered by place in the queue, so the bench does not bob in step.
+									animationDelay: `${place * 0.4}s`,
 								}}
 							>
 								<MiniPixelChar characterIndex={agent.characterIndex} />
@@ -241,7 +246,6 @@ export function PixelOffice({
 	onNavigateToKanban,
 }: PixelOfficeProps) {
 	const { t } = useTranslation(["pixelOffice", "common", "navigation"]);
-	const containerRef = useRef<HTMLDivElement>(null);
 	const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 	const [bubblePos, setBubblePos] = useState<{ x: number; y: number } | null>(
 		null,
@@ -310,9 +314,9 @@ export function PixelOffice({
 
 	// ── Container resize ────────────────────────────────────────
 
-	useEffect(() => {
-		const el = containerRef.current;
-		if (!el) return;
+	// A ref callback with a cleanup (React 19) observes the element it is given,
+	// instead of an effect reading a ref that may not be attached yet.
+	const observeContainer = useCallback((el: HTMLDivElement) => {
 		const ro = new ResizeObserver((entries) => {
 			for (const entry of entries) {
 				const { width, height } = entry.contentRect;
@@ -347,70 +351,34 @@ export function PixelOffice({
 	}, [selectAgent]);
 
 	// ── Terminal agent actions ───────────────────────────────────
+	// The bubble only exists for a selected agent, and only a terminal's panel
+	// offers these, so each receives that terminal's id.
 
-	const handleGoToTerminal = useCallback(() => {
-		const agent = agents.find((a) => a.id === selectedAgentId);
-		if (agent?.type !== "terminal" || !selectedAgentId) return;
-		jumpToTerminal(selectedAgentId);
+	const handleGoToTerminal = (terminalId: string) => {
+		jumpToTerminal(terminalId);
 		onNavigateToTerminals?.();
 		closeBubble();
-	}, [
-		agents,
-		selectedAgentId,
-		jumpToTerminal,
-		onNavigateToTerminals,
-		closeBubble,
-	]);
+	};
 
-	const handleKill = useCallback(async () => {
-		if (!selectedAgentId) return;
+	const handleKill = async (terminalId: string) => {
 		closeBubble();
-		await globalThis.electronAPI.destroyTerminal(selectedAgentId);
-		removeTerminal(selectedAgentId);
-	}, [selectedAgentId, removeTerminal, closeBubble]);
-
-	const handleInterrupt = useCallback(() => {
-		if (!selectedAgentId) return;
-		globalThis.electronAPI.sendTerminalInput(selectedAgentId, "\x03");
-	}, [selectedAgentId]);
-
-	const handleResumeClaude = useCallback(() => {
-		if (!selectedAgentId) return;
-		globalThis.electronAPI.invokeClaudeInTerminal(selectedAgentId);
-	}, [selectedAgentId]);
-
-	const handleSendCommand = useCallback(
-		(cmd: string) => {
-			if (!selectedAgentId) return;
-			globalThis.electronAPI.sendTerminalInput(selectedAgentId, `${cmd}\n`);
-		},
-		[selectedAgentId],
-	);
+		await globalThis.electronAPI.destroyTerminal(terminalId);
+		removeTerminal(terminalId);
+	};
 
 	// ── Task agent actions ───────────────────────────────────────
 
-	const handleGoToTask = useCallback(() => {
-		const agent = agents.find((a) => a.id === selectedAgentId);
-		if (!agent?.taskId) return;
-		selectTask(agent.taskId);
-		jumpToTask(agent.taskId); // triggers scroll + spotlight in TaskCard
+	const handleGoToTask = (taskId: string) => {
+		selectTask(taskId);
+		jumpToTask(taskId); // triggers scroll + spotlight in TaskCard
 		onNavigateToKanban?.();
 		closeBubble();
-	}, [
-		agents,
-		selectedAgentId,
-		selectTask,
-		jumpToTask,
-		onNavigateToKanban,
-		closeBubble,
-	]);
+	};
 
-	const handleStopTask = useCallback(() => {
-		const agent = agents.find((a) => a.id === selectedAgentId);
-		if (!agent?.taskId) return;
-		globalThis.electronAPI.stopTask(agent.taskId);
+	const handleStopTask = (taskId: string) => {
+		globalThis.electronAPI.stopTask(taskId);
 		closeBubble();
-	}, [agents, selectedAgentId, closeBubble]);
+	};
 
 	// ── Pending agent click (from WaitingQueue strip) ────────────
 
@@ -552,7 +520,7 @@ export function PixelOffice({
 	}, [agents]);
 
 	return (
-		<div ref={containerRef} className="wp-scope flex flex-col h-full overflow-hidden">
+		<div ref={observeContainer} className="wp-scope flex flex-col h-full overflow-hidden">
 			{/* Toolbar */}
 			<div className="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-dashed border-[var(--wp-border)] bg-background/80 backdrop-blur-sm shrink-0">
 				<div className="flex min-w-0 items-center gap-3">
@@ -672,7 +640,10 @@ export function PixelOffice({
 			</div>
 
 			{/* Canvas area */}
-			<div className="flex-1 bg-[#1A1A2E] overflow-hidden relative">
+			<div
+				className="flex-1 bg-[#1A1A2E] overflow-hidden relative"
+				title={t("pixelOffice:toolbar.shortcuts")}
+			>
 				{agents.length === 0 ? (
 					<div className="flex flex-col items-center justify-center h-full text-center gap-4 px-8">
 						<Building2 className="h-16 w-16 text-white/25" aria-hidden />
@@ -733,12 +704,24 @@ export function PixelOffice({
 								anchorX={bubblePos.x}
 								anchorY={bubblePos.y}
 								onClose={closeBubble}
-								onGoToTerminal={handleGoToTerminal}
+								onGoToTerminal={() => handleGoToTerminal(selectedAgent.id)}
 								onGoToTask={handleGoToTask}
-								onKill={handleKill}
-								onInterrupt={handleInterrupt}
-								onResumeClaude={handleResumeClaude}
-								onSendCommand={handleSendCommand}
+								onKill={() => handleKill(selectedAgent.id)}
+								onInterrupt={() =>
+									globalThis.electronAPI.sendTerminalInput(
+										selectedAgent.id,
+										"\x03",
+									)
+								}
+								onResumeClaude={() =>
+									globalThis.electronAPI.invokeClaudeInTerminal(selectedAgent.id)
+								}
+								onSendCommand={(cmd) =>
+									globalThis.electronAPI.sendTerminalInput(
+										selectedAgent.id,
+										`${cmd}\n`,
+									)
+								}
 								onStopTask={handleStopTask}
 							/>
 						)}

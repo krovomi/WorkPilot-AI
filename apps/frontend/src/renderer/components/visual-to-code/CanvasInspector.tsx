@@ -49,7 +49,6 @@ export function CanvasInspector({
 	onDeleteEdge,
 }: CanvasInspectorProps) {
 	const { t } = useTranslation("visualProgramming");
-	if (!node && !edge) return null;
 
 	const header = (title: string, onDelete: () => void, deleteLabel: string) => (
 		<div className="flex items-center justify-between">

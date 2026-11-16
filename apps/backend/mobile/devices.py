@@ -236,15 +236,16 @@ def _ios_simulators() -> list[MobileDevice]:
         return []
     try:
         payload = json.loads(output)
-    except (json.JSONDecodeError, ValueError):
+    except ValueError:  # JSONDecodeError is one
         return []
 
+    runtimes = payload.get("devices") if isinstance(payload, dict) else None
     devices: list[MobileDevice] = []
-    for runtime, entries in (payload.get("devices") or {}).items():
+    for runtime, entries in (runtimes if isinstance(runtimes, dict) else {}).items():
         # "com.apple.CoreSimulator.SimRuntime.iOS-18-2" -> "iOS 18.2"
         label = runtime.rsplit(".", 1)[-1].replace("-", " ", 1).replace("-", ".")
-        for entry in entries or []:
-            if not entry.get("isAvailable", True):
+        for entry in entries if isinstance(entries, list) else []:
+            if not isinstance(entry, dict) or not entry.get("isAvailable", True):
                 continue
             devices.append(
                 MobileDevice(
