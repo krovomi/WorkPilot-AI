@@ -64,7 +64,8 @@ export function callAzureDevOpsPython(
 		proc.on("close", (code) => {
 			let answer: { data?: unknown; error?: string } | undefined;
 			try {
-				answer = JSON.parse(stdout.trim().split("\n").pop() ?? "");
+				const text = stdout.trim();
+				answer = JSON.parse(text.slice(text.lastIndexOf("\n") + 1));
 			} catch {
 				answer = undefined;
 			}
