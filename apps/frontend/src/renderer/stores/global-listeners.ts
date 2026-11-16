@@ -27,11 +27,15 @@ import { setupLiveCompanionListeners } from "./live-companion-store";
 import { setupContextUsageListeners } from "./context-usage-store";
 import { setupTaskPermissionListeners } from "./task-permission-store";
 import { setupDocDriftListeners } from "./doc-drift-store";
+import { setupExecutionWavesListeners } from "./execution-waves-store";
 import { setupFlakyTestsListeners } from "./flaky-tests-store";
+import { setupMRReviewListeners } from "./gitlab/mr-review-store";
 import { setupGitSurgeonListeners } from "./git-surgeon-store";
 import { setupIdeationListeners } from "./ideation-store";
 import { setupInjectionGuardListeners } from "./injection-guard-store";
 import { setupInsightsListeners } from "./insights-store";
+import { setupGitHubInvestigationListeners } from "./github";
+import { setupGitLabInvestigationListeners } from "./gitlab-store";
 import { setupLearningLoopListeners } from "./learning-loop-store";
 import { setupMobileListeners } from "./mobile-store";
 import { setupNaturalLanguageGitListeners } from "./natural-language-git-store";
@@ -51,6 +55,7 @@ import { setupReleaseCoordinatorListeners } from "./release-coordinator-store";
 import { setupSandboxListeners } from "./sandbox-store";
 import { setupTaskSandboxListeners } from "./task-sandbox-store";
 import { setupSecureStorageListeners } from "./secure-storage-store";
+import { setupSelfHealingListeners } from "./self-healing-store";
 import { setupServerViewListeners } from "./server-live-views";
 import { setupSmartEstimationListeners } from "./smart-estimation-store";
 import { setupVisualToCodeListeners } from "./visual-to-code-store";
@@ -104,11 +109,18 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// Import Design: each step of a run reaches the page as it happens.
 	["DesignToCode", setupDesignToCodeListeners],
 	["DocDrift", setupDocDriftListeners],
+	// Not an IPC listener: "Execute in optimal order" starts the next wave
+	// when the task list changes, whichever page is open.
+	["ExecutionWaves", setupExecutionWavesListeners],
 	["FlakyTests", setupFlakyTestsListeners],
+	// A GitLab MR review finishing while the merge-request page is closed.
+	["GitLabMRReview", setupMRReviewListeners],
 	["GitSurgeon", setupGitSurgeonListeners],
 	["Ideation", setupIdeationListeners],
 	["InjectionGuard", setupInjectionGuardListeners],
 	["Insights", setupInsightsListeners],
+	["GitHubInvestigation", setupGitHubInvestigationListeners],
+	["GitLabInvestigation", setupGitLabInvestigationListeners],
 	["LearningLoop", setupLearningLoopListeners],
 	["Mobile", setupMobileListeners],
 	// A multi-repo run goes on in the main process with the dialog closed.
@@ -131,6 +143,7 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// Not a page's feature: the sidebar's warning that stored API keys are
 	// not protected by the OS keyring.
 	["SecureStorage", setupSecureStorageListeners],
+	["SelfHealing", setupSelfHealingListeners],
 	// A shared view of a server project read again when a teammate changes it.
 	["ServerViews", setupServerViewListeners],
 	["SmartEstimation", setupSmartEstimationListeners],

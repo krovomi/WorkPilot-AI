@@ -16,7 +16,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 | `core/simple_client.py` | — | client sans hooks, refusé aux types qui écrivent ou exécutent |
 | `core/agent_clients/` | ~6 800 | un module par provider (`claude`, `copilot`, `openai`, `google`, `compatible`, `local`, `windsurf`, les CLI `opencode_cli`, `antigravity_cli`, `pi_cli` sur `cli_subprocess`, `acp` le client Agent Client Protocol commun à tous les agents ACP et `acp_permissions` qui pose leurs questions sur la carte, `pi_guard/` le garde-fou chargé dans pi…) ; `core/agent_client.py` les réexporte |
 | `core/worktree.py` + `worktree_pr.py` + `worktree_common.py` | ~3 450 | worktrees par spec ; la création de PR/MR est le mixin `WorktreePRMixin` |
-| `agents/session.py` | ~2 500 | boucle de session : streaming, reprise, erreurs, rate limits ; l'affichage d'un appel d'outil (fil d'activité, vue streaming) vit dans `agents/tool_display.py` |
+| `agents/session.py` | ~2 500 | boucle de session : streaming, reprise, erreurs, rate limits ; l'affichage d'un appel d'outil (fil d'activité, vue streaming) vit dans `agents/tool_display.py` et `agents/tool_results.py`, le coupe-circuit des appels répétés dans `agents/tool_breaker.py` ([justification](../../docs/architecture/agent-kill-switch.md)) |
 | `agents/coder.py` | ~2 950 | l'agent d'implémentation : `run_autonomous_agent` (la boucle, ~1 150 lignes), les prompts de planification et de sous-tâche (`_planning_prompt`, `_coding_prompt`), l'issue d'une session (`_on_session_error` et un `_on_*` par type d'erreur, `_RetryState`), le plan invalide, le bilan de fin |
 | `cli/build_commands.py` | ~1 300 | enchaîne les phases d'un build : planning → coding → QA |
 | `qa/loop.py` | ~1 600 | boucle de validation QA : `run_qa_validation_loop` et une fonction par session, gate et verdict |
@@ -33,7 +33,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 `offline_policy/` (avec `local_model_catalog.py`), `app_detection.py` (détecteur de l'aperçu),
 `project/ui_stack.py` et `project/test_stack.py` (les piles UI et de test, venues de `uiux` et de
 `test_generation`). `agent_runtime/` est le port par lequel une unité que `core` importe lance
-une session sans importer `core` ni `agents` (merge, intégrations, analyse, architecture,
+une session sans importer `core` ni `agents` (intégrations, analyse, architecture,
 génération de tests ;
 [justification](../../docs/architecture/agent-runtime.md)) ; `core/agent_runtime.py` l'installe.
 `tests/test_import_contracts.py` tient ces frontières.
@@ -79,6 +79,7 @@ génération de tests ;
 | `foundation/api_safety.py` | chemins acceptés par l'API locale |
 | `offline_policy/` | hors-ligne strict (`airgapStrict`) |
 | `os_sandbox/` | bac à sable de l'OS autour des commandes d'agent : bubblewrap, Seatbelt, proxy filtrant ([conception](../../docs/architecture/os-sandbox.md)) |
+| `agent_snapshots/`, `agents/safety_watch.py`, `runners/snapshot_runner.py` | instantanés git du worktree d'une tâche avant chaque session et retour arrière ; score de confiance et limites du sandbox sur le flux des appels ([conception](../../docs/architecture/agent-safety.md)) |
 | `foundation/landlock.py`, `server/services/run_isolation.py`, `runners/confined_run.py` | mode serveur : chaque run confiné par Landlock à son clone, au home de son projet et à son dossier temporaire ([conception](../../docs/architecture/server-mode.md#ce-quun-run-voit-sur-le-disque)) |
 | `foundation/log_redaction.py` | filtre de redaction des logs |
 
@@ -88,9 +89,10 @@ génération de tests ;
 |---|---|
 | `brain/` | le cerveau partagé : vault Obsidian, `graph.json`, sync git, serveur MCP `workpilot-brain` |
 | `brain/project_memory.py` | **la seule mémoire** des builds (pièges, conventions, sessions) |
+| `brain/lifecycle/` | le cycle de vie de cette mémoire : journal dans le vault (`journal.py`), corbeille, restauration et épingles (`store.py`), contradictions après une synchronisation (`contradictions.py`, `arbitration.py`), avis d'un modèle demandé par une personne (`advisor.py`) ; [justification](../../docs/architecture/memory-lifecycle.md) |
 | `mem_search/` | lecture de la mémoire par paliers (index → timeline → détail) |
 | `cross_review/` | verdict de la revue croisée : lecture, enregistrement, `blocking_verdict` qui retient la PR d'un code avec lequel le second fournisseur est en désaccord ; feuille sur `foundation`. La phase `cross-review` elle-même (choix du moteur, session) est `workflows/cross_review_phase.py` |
-| `learning_loop/` | patterns des builds, phase `observe` (`skills/_proposed/`), replay A/B ; `review_lessons.py` : règles candidates des revues, adoptées par une personne |
+| `learning_loop/` | patterns des builds, phase `observe` (`skills/_proposed/`), replay A/B ; `review_lessons.py` : règles candidates des revues, adoptées par une personne ; `applied.py` : leçons reçues par les prompts d'une tâche et désactivées pour elle ; `kind_checkpoints.py` : points de contrôle du type de tâche selon l'historique QA |
 | `agent_coach/` | conseils tirés des runs ; profil de style personnel par langage (`profile_builder.py`), donné au codeur et au fixer en phrases fixes (`profile_injector.py`) ; [justification](../../docs/architecture/agent-coach.md) |
 | `hermes/` | hermes-agent : doctor, persona `SOUL.md`, cycle d'apprentissage |
 | `core/merge_event.py` | un merge publié une fois ; mémoire, apprentissage et `uiux` s'y abonnent |
@@ -115,6 +117,7 @@ génération de tests ;
 | `mcp_tasks/` | MCP 2026-07-28 pour les serveurs de WorkPilot : `ToolServer` (deux ères), `TaskStore` (extension Tasks) ; feuille. Côté client : `core/mcp_extensions.py` ([conception](../../docs/architecture/mcp-2026.md)) |
 | `board_mcp/` | serveur MCP `workpilot-board` : le Kanban d'un projet pour un agent en terminal (lister, lire, créer au backlog, attendre une colonne) ; ni lancement, ni approbation, ni merge ; runner `runners/board_mcp.py` ([conception](../../docs/architecture/board-mcp.md)) |
 | `pr_followup/` | la PR d'une tâche suivie jusqu'au merge : `policy.decide` (pure), gardes du diff de correctif, GitHub par `gh`, `run_round` ; runner `runners/pr_followup_runner.py` ([justification](../../docs/architecture/pr-followup.md)) |
+| `deploy_watch/` | après un pipeline lancé par les déclencheurs CI/CD : health check et métriques Prometheus comparés à leur référence (`evaluate.py`, sans modèle), rollback vers la dernière exécution réussie (GitHub, Azure ; GitLab et Jenkins guidés), bloqué par une migration (`migrations.py`, toutes les piles) ; runner `runners/deploy_watch_runner.py` ([conception](../../docs/architecture/deploy-watch.md)) |
 | `best_of_n/` | best-of-N : variantes d'une tâche (une par moteur), classement chiffré, adoption de la variante choisie ([best-of-n.md](../../docs/architecture/best-of-n.md)) |
 | `goal/` | mode objectif : une commande et son code de sortie disent « fini » ; chemins protégés, plafond de dépense ([goal-mode.md](../../docs/architecture/goal-mode.md)) |
 | `architecture_visualizer/` | carte archify du projet et delta par tâche |

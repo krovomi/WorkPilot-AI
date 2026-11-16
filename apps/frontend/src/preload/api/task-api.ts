@@ -9,6 +9,7 @@ import type {
 	ImageAttachment,
 	ImplementationPlan,
 	IPCResult,
+	StopAllResult,
 	MergeProgress,
 	PRDetailsResult,
 	PrFollowupStartOptions,
@@ -22,6 +23,9 @@ import type {
 	TaskContextEvent,
 	TaskGoal,
 	TaskGoalState,
+	TaskSnapshot,
+	TaskSnapshotRestore,
+	AppliedLessonsState,
 	TaskLogStreamChunk,
 	TaskLogs,
 	TaskMetadata,
@@ -64,6 +68,8 @@ export interface TaskAPI {
 	) => Promise<TaskUpdateResult>;
 	startTask: (taskId: string, options?: TaskStartOptions) => void;
 	stopTask: (taskId: string) => void;
+	/** "Stop all agents": every running task paused, every other agent process stopped. */
+	stopAllAgents: () => Promise<IPCResult<StopAllResult>>;
 	submitReview: (
 		taskId: string,
 		approved: boolean,
@@ -128,6 +134,13 @@ export interface TaskAPI {
 		taskId: string,
 		policy: Partial<ContextPolicy>,
 	) => Promise<IPCResult<{ contextPolicy: ContextPolicy }>>;
+	/** The git snapshots of the task's worktree, newest first. */
+	listTaskSnapshots: (taskId: string) => Promise<IPCResult<TaskSnapshot[]>>;
+	/** Put the task's worktree back on a snapshot (a snapshot of the state replaced is taken first). */
+	restoreTaskSnapshot: (
+		taskId: string,
+		snapshotId: string,
+	) => Promise<IPCResult<TaskSnapshotRestore>>;
 	/** The task's goal (goal mode): the command whose exit code says "done". */
 	getTaskGoal: (taskId: string) => Promise<IPCResult<TaskGoalState>>;
 	/** Write the goal in every spec dir copy, or remove it with null. */
@@ -135,6 +148,14 @@ export interface TaskAPI {
 		taskId: string,
 		goal: TaskGoal | null,
 	) => Promise<IPCResult<TaskGoalState>>;
+	/** The lessons the task's prompts carried, and the ones turned off for it. */
+	getAppliedLessons: (taskId: string) => Promise<IPCResult<AppliedLessonsState>>;
+	/** Turn one lesson off for this task (or back on); every spec dir copy. */
+	setLessonDisabled: (
+		taskId: string,
+		lessonId: string,
+		disabled: boolean,
+	) => Promise<IPCResult<AppliedLessonsState>>;
 	/** CONTEXT_USAGE / CONTEXT_ACTION_APPLIED events of running tasks. */
 	onTaskContextUsage: (
 		callback: (
@@ -478,6 +499,9 @@ export const createTaskAPI = (): TaskAPI => ({
 	stopTask: (taskId: string): void =>
 		ipcRenderer.send(IPC_CHANNELS.TASK_STOP, taskId),
 
+	stopAllAgents: (): Promise<IPCResult<StopAllResult>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.AGENTS_STOP_ALL),
+
 	submitReview: (
 		taskId: string,
 		approved: boolean,
@@ -589,6 +613,15 @@ export const createTaskAPI = (): TaskAPI => ({
 	): Promise<IPCResult<{ contextPolicy: ContextPolicy }>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_CONTEXT_POLICY_UPDATE, taskId, policy),
 
+	listTaskSnapshots: (taskId: string): Promise<IPCResult<TaskSnapshot[]>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_SNAPSHOTS_LIST, taskId),
+
+	restoreTaskSnapshot: (
+		taskId: string,
+		snapshotId: string,
+	): Promise<IPCResult<TaskSnapshotRestore>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_SNAPSHOT_RESTORE, taskId, snapshotId),
+
 	getTaskGoal: (taskId: string): Promise<IPCResult<TaskGoalState>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_GOAL_GET, taskId),
 
@@ -597,6 +630,16 @@ export const createTaskAPI = (): TaskAPI => ({
 		goal: TaskGoal | null,
 	): Promise<IPCResult<TaskGoalState>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_GOAL_SET, taskId, goal),
+
+	getAppliedLessons: (taskId: string): Promise<IPCResult<AppliedLessonsState>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_LESSONS_GET, taskId),
+
+	setLessonDisabled: (
+		taskId: string,
+		lessonId: string,
+		disabled: boolean,
+	): Promise<IPCResult<AppliedLessonsState>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_LESSONS_SET_DISABLED, taskId, lessonId, disabled),
 
 	onTaskContextUsage: (
 		callback: (

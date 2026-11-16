@@ -456,6 +456,10 @@ class BrowserSession:
         if self._mcp is not None:
             return await self._call("navigate_page", {"type": "url", "url": url})
         page = self._page
+        # Like chrome-devtools-mcp, the console and the requests are the
+        # current page's: what the last page printed is not this one's error.
+        self._console.clear()
+        self._network.clear()
         try:
             response = await page.goto(url, wait_until="load", timeout=60_000)
         except Exception as exc:  # noqa: BLE001

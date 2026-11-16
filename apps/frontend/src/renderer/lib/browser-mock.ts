@@ -14,8 +14,10 @@ import {
 	contextMock,
 	insightsMock,
 	integrationMock,
+	memoryLifecycleMock,
 	phase35Mock,
 	projectMock,
+	selfHealingMock,
 	settingsMock,
 	taskMock,
 	terminalMock,
@@ -61,6 +63,9 @@ const browserMockAPI: Partial<ElectronAPI> = {
 
 	// Settings
 	...settingsMock,
+
+	// Self-healing (the desktop app scans, groups and bisects)
+	...selfHealingMock,
 
 	// Roadmap Operations
 	getRoadmap: async () => ({
@@ -136,6 +141,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 
 	// Context Operations
 	...contextMock,
+	...memoryLifecycleMock,
 
 	// Environment Configuration & Integration Operations
 	...integrationMock,
@@ -300,6 +306,14 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		mergePR: async () => true,
 		assignPR: async () => true,
 		markReviewPosted: async () => true,
+		setReviewFindingFeedback: async () => ({
+			success: true as const,
+			feedback: {},
+		}),
+		getReviewFindingFeedback: async () => ({
+			success: true as const,
+			feedback: {},
+		}),
 		getPRReview: async () => null,
 		getPRReviewsBatch: async () => ({}),
 		deletePRReview: async () => true,

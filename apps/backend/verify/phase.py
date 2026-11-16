@@ -71,20 +71,23 @@ def make_agent_runner(
 
 
 def _context(project_dir: Path, spec_dir: Path) -> str:
-    """The binding rules a skill phase receives, for the verifier too."""
-    parts = []
-    try:
-        from workflows.runner import _constitution, _docintel, _mobile
+    """The binding rules a skill phase receives, for the verifier too.
 
+    Each section is never fatal on its own (`workflows.runner` swallows what
+    a section cannot read), so nothing here hides a renamed helper: the
+    verifier once ran without any rule for as long as nobody looked.
+    """
+    from workflows.runner import _constitution, _docintel, _platform
+
+    parts = [
+        section
         for section in (
             _constitution(project_dir),
-            _mobile(project_dir),
+            _platform(project_dir, spec_dir, "verify"),
             _docintel(project_dir, spec_dir),
-        ):
-            if section:
-                parts.append(section)
-    except Exception:  # noqa: BLE001
-        pass
+        )
+        if section
+    ]
     return "\n\n---\n\n".join(parts)
 
 

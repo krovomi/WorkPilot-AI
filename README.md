@@ -157,6 +157,7 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 <td valign="top">
 
 **Import Design**: a mockup, screenshot or Figma export becomes components of the project's stack, in six visible steps.
+The code is then rendered, compared with the mockup and corrected until it matches, with each iteration's score and the remaining differences shown ([render loop](docs/architecture/design-render-loop.md)).
 
 ![Import Design: the six steps from an image to the project's components](.github/assets/showcase/import-design.png)
 
@@ -201,11 +202,15 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - **Guardrails as code**: a versioned policy, in layers, that agents cannot get around, enforced in task worktrees too; every tool result is scanned for prompt injection before the agent reads it.
 
 **Agents and orchestration**
+- **Execution waves** (Mission Control): the specs waiting in the backlog are grouped into waves that share no file, from their plans and worktrees, then run wave after wave in merge order with the project's parallelism; no model is called.
 - **Mission Control** to run several agents on one goal, **agent terminals**, **Arena** and **Bounty Board** to compare engines, **Repo bench** to measure them on your own past tasks.
+- **Agent Replay** shares a recorded session: a `.wpreplay` bundle a teammate imports, or one HTML page anyone opens without WorkPilot, with secrets and local folders masked and, on request, the reasoning, the token counts or the file contents left out; bookmarks with a note mark the steps that matter.
 - Specialised agents: test generator, flaky test detective (with the cause and a fix card), refactorer, docs and drift, accessibility (WCAG 2.2 score and fixes), i18n, API contract watcher, compliance evidence, notebooks (cell dependencies, fresh-kernel runs), migration, self-healing on CI failures, technical debt tracker; their fixes go on a review branch, never straight into your folder.
+- **Self-healing that looks further than the last commit**: risk trends per file from scan to scan (a hot list of fast-rising files, directories that degrade together), production errors from several monitoring tools grouped into one incident per bug with its suspect commits, and a bisect of a CI failure in a temporary worktree that names the first bad commit to the fixer.
 - **Release Train** deploys your services itself, in dependency order, with health and smoke checks and a click per production service; the **Git history surgeon** cleans up a branch's commits onto a new branch, same code.
 - **Personal coach**: learns your coding style per language from your git history and lint config, and gives your clear preferences to the coder and the QA fixer.
 - **Shared memory**: one Obsidian vault and graph every agent reads and writes, across sessions and providers; the learning loop analyses each build with a model of whichever provider is selected, and its lessons reach the spec, the plan, the code and QA; provider-agnostic **skills** packs.
+- **Lessons applied, per task**: the task panel lists the adopted rules, learned patterns and kind checkpoints (bug fix, refactoring, upgrade…) each prompt of the task carried, and any one can be turned off for that task alone; a kind's checkpoints reach its spec only when this repository's QA history shows specs of that kind coming back.
 
 **Understand and plan**
 - **Insights**, **Ideation**, **Roadmap**, architecture visualizer, code review rules and code smells for every major stack, risk classifier.
@@ -213,7 +218,8 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 
 **Integrations**
 - GitHub, GitLab, Azure DevOps, Jira and Linear: import issues, investigate them, review pull requests.
-- **Automations** turn an event (an issue labelled, CI red, a time of day, a production incident from Sentry) into a draft card; **CI/CD Triggers** start your pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) when an agent opens a task's PR or the PR is merged.
+- **AI PR review that learns**: accept, reject or mark each finding not applicable, with a reason; a kind of remark your project keeps rejecting is downgraded, then no longer raised, on every provider; security and critical findings never are ([review feedback](docs/architecture/review-feedback.md)).
+- **Automations** turn an event (an issue labelled, CI red, a time of day, a production incident from Sentry) into a draft card; **CI/CD Triggers** start your pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) when an agent opens a task's PR or the PR is merged, then **watch the deployment** (health check and Prometheus metrics against their level before it) and offer, or start, a **rollback** to the last run that succeeded.
 - MCP marketplace and custom MCP servers with pinned tool descriptions; the **workpilot-board** MCP server gives Claude Code, Codex, Gemini CLI, Copilot, Cursor and others your Kanban.
 - Notifications on Slack, Teams, Discord, Google Chat, webhooks, ntfy and Telegram.
 
@@ -223,6 +229,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 
 **Cost and monitoring**
 - Cost budgets enforced while tasks run: a project budget per period and a limit per task, checked before every agent session on every provider; the task pauses at its limit, can step down to a lighter model of the same provider, and a task that spends without progress is paused too.
+- Circuit breaker and kill switch: an agent that repeats the same tool call with the same result is paused on every provider, and "Stop all agents" (sidebar button, Ctrl+Shift+.) pauses every running task, each resumed from its card.
 - Analytics dashboard, cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler with a monthly budget and an ESG export, OpenTelemetry GenAI traces for every provider.
 
 **Look and feel**
@@ -297,6 +304,7 @@ Full reference: [docs/CLI-USAGE.md](docs/CLI-USAGE.md).
 1. **OS sandbox**: agent commands run under bubblewrap (Linux) or Seatbelt (macOS); Windows is not covered yet, and the card says when a task runs without a sandbox.
 2. **Filesystem restrictions**: operations stay inside the project directory.
 3. **Dynamic command allowlist**: only the commands of the detected stack are allowed.
+4. **Snapshots and trust score**: before each agent session the task's worktree is saved as a hidden git commit; each session starts with a trust score of 100 that anomalies lower, and below a threshold the task pauses, or the session stops and its snapshot is restored. Restricted mode and per-session limits are in Settings > Sandbox; restore a snapshot from the card.
 
 API keys and tokens are encrypted at rest with the OS keyring; Settings > Accounts shows how long ago each API key was saved and suggests renewing it after 90 days. Every release ships SHA256 checksums, a CycloneDX SBOM and a build provenance attestation per file.
 

@@ -12,8 +12,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import (
     CurrentUser,
+    effective_project_role,
     get_current_user,
-    get_project_role,
     require_project_role,
 )
 from server.authz.principal import Principal, get_principal
@@ -207,7 +207,7 @@ async def get_project(
         # exists, which is itself a cross-tenant leak.
         raise HTTPException(status_code=404, detail="Project not found")
     item = ProjectPublic.model_validate(project)
-    item.my_role = await get_project_role(db, user, project_id)
+    item.my_role = effective_project_role(request)
     return item
 
 

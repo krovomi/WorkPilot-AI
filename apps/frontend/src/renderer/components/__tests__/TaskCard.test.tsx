@@ -1,0 +1,930 @@
+/**
+ * TaskCard — the Kanban card. Rendered with the real stores; only the IPC
+ * bridge is a stand-in, so each test asserts what the person sees and which
+ * main-process call a click makes.
+ */
+
+import {
+	act,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
+import {
+	installRendererApi,
+	type RendererApi,
+} from "../../../__tests__/helpers/renderer-api";
+import {
+	JSON_ERROR_PREFIX,
+	JSON_ERROR_TITLE_SUFFIX,
+} from "../../../shared/constants";
+import type { Task, TaskStatus } from "../../../shared/types";
+import i18n from "../../../shared/i18n";
+import { consumePendingTaskDetailTab } from "../../lib/task-detail-nav";
+import { useKanbanBlockerStore } from "../../stores/kanban-blocker-store";
+import { useKanbanConflictStore } from "../../stores/kanban-conflict-store";
+import { useProjectStore } from "../../stores/project-store";
+import { useSmartEstimationStore } from "../../stores/smart-estimation-store";
+import { recordTaskActivity, useTaskStore } from "../../stores/task-store";
+import { TaskCard } from "../TaskCard";
+import { TooltipProvider } from "../ui/tooltip";
+
+function makeTask(overrides: Partial<Task> = {}): Task {
+	return {
+		id: "task-1",
+		specId: "001-card",
+		projectId: "project-1",
+		title: "Add login page",
+		description: "Build the **login** form",
+		status: "backlog" as TaskStatus,
+		subtasks: [],
+		logs: [],
+		createdAt: new Date("2026-11-01T10:00:00Z"),
+		updatedAt: new Date("2026-11-01T10:00:00Z"),
+		...overrides,
+	} as Task;
+}
+
+type CardProps = Parameters<typeof TaskCard>[0];
+
+function renderCard(props: Partial<CardProps> & { task: Task }) {
+	const onClick = props.onClick ?? vi.fn();
+	const utils = render(
+		<TooltipProvider>
+			<TaskCard onClick={onClick} {...props} />
+		</TooltipProvider>,
+	);
+	return { ...utils, onClick };
+}
+
+/** A card that follows the task store, as the Kanban column does. */
+function StoreCard({ id, ...rest }: Omit<CardProps, "task"> & { id: string }) {
+	const task = useTaskStore((s) => s.tasks.find((t) => t.id === id));
+	if (!task) return null;
+	return <TaskCard task={task} {...rest} />;
+}
+
+let api: RendererApi;
+
+beforeAll(() => {
+	// jsdom has no IntersectionObserver; the progress bar only uses it to
+	// pause its animation off screen.
+	vi.stubGlobal(
+		"IntersectionObserver",
+		class {
+			observe = vi.fn();
+			disconnect = vi.fn();
+			unobserve = vi.fn();
+		},
+	);
+});
+
+beforeEach(() => {
+	api = installRendererApi();
+	useTaskStore.setState({ tasks: [], pipelineStatuses: {}, jumpToTaskId: null });
+	useProjectStore.setState({
+		projects: [
+			{
+				id: "project-1",
+				name: "Demo",
+				path: "/work/demo",
+				autoBuildPath: "",
+				settings: {},
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			} as never,
+		],
+	});
+	useKanbanConflictStore.setState({ conflicts: {} });
+	useKanbanBlockerStore.setState({ blockers: {} });
+});
+
+afterEach(() => {
+	vi.useRealTimers();
+	api.restore();
+});
+
+describe("TaskCard — content", () => {
+	it("shows the title, a plain-text description and the pending badge", () => {
+		renderCard({ task: makeTask() });
+		expect(
+			screen.getByRole("heading", { name: "Add login page" }),
+		).toBeInTheDocument();
+		expect(screen.getByText("Build the login form")).toBeInTheDocument();
+	});
+
+	it("strips HTML from imported titles", () => {
+		renderCard({
+			task: makeTask({ title: "<div><b>Imported</b> story</div>" }),
+		});
+		expect(
+			screen.getByRole("heading", { name: "Imported story" }),
+		).toBeInTheDocument();
+	});
+
+	it("translates the JSON error markers of a broken plan", () => {
+		renderCard({
+			task: makeTask({
+				title: `Broken${JSON_ERROR_TITLE_SUFFIX}`,
+				description: `${JSON_ERROR_PREFIX}Unexpected token`,
+				status: "human_review",
+				reviewReason: "errors",
+			}),
+		});
+		expect(
+			screen.getByRole("heading", { name: "Broken (JSON Error)" }),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(/JSON Parse Error: Unexpected token/),
+		).toBeInTheDocument();
+		expect(screen.getByText("Has Errors")).toBeInTheDocument();
+	});
+
+	it("names the category and priority in the app language", async () => {
+		await i18n.changeLanguage("fr");
+		try {
+			renderCard({
+				task: makeTask({
+					metadata: { category: "testing", priority: "high" } as never,
+				}),
+			});
+			expect(screen.getByText("Tests")).toBeInTheDocument();
+			expect(screen.getByText("Haute")).toBeInTheDocument();
+		} finally {
+			await i18n.changeLanguage("en");
+		}
+	});
+
+	it("shows the metadata badges the card carries", () => {
+		renderCard({
+			task: makeTask({
+				status: "queue",
+				metadata: {
+					category: "bug_fix",
+					impact: "critical",
+					complexity: "complex",
+					priority: "urgent",
+					securitySeverity: "high",
+					tddMode: true,
+					archivedAt: "2026-11-02T00:00:00Z",
+					mobileTargets: ["android"],
+				} as never,
+				verification: { status: "pass", score: 92 } as never,
+				crossReview: {
+					verdict: "disagree",
+					provider: "openai",
+					model: "gpt",
+					summary: "Missing test",
+				} as never,
+			}),
+		});
+		expect(screen.getByText("TDD")).toBeInTheDocument();
+		expect(screen.getByText("Archived")).toBeInTheDocument();
+		expect(screen.getByText("Verified · 92")).toBeInTheDocument();
+		expect(screen.getByText("Cross review: disagrees")).toHaveAttribute(
+			"title",
+			"openai / gpt — Missing test",
+		);
+		expect(screen.getByText("High severity")).toBeInTheDocument();
+		expect(screen.getByText("Android")).toBeInTheDocument();
+	});
+
+	it("shows a failed verification even on a card without metadata", () => {
+		renderCard({
+			task: makeTask({
+				verification: { status: "fail", reason: "Blank page" } as never,
+			}),
+		});
+		expect(screen.getByText("Verify failed")).toHaveAttribute(
+			"title",
+			"Blank page",
+		);
+	});
+
+	it("opens the tracker work item from its badge", () => {
+		renderCard({
+			task: makeTask({
+				metadata: {
+					azureDevOpsIdentifier: "4242",
+					azureDevOpsUrl: "https://dev.azure.com/org/_workitems/4242",
+				} as never,
+			}),
+		});
+		const badge = screen.getByTitle("Open in Azure DevOps");
+		expect(within(badge).getByText("#4242")).toBeInTheDocument();
+		fireEvent.click(badge);
+		expect(api.fn("openExternal")).toHaveBeenCalledWith(
+			"https://dev.azure.com/org/_workitems/4242",
+		);
+	});
+
+	it("shows a Jira key without a link when the issue has no URL", () => {
+		renderCard({
+			task: makeTask({ metadata: { jiraIdentifier: "PROJ-7" } as never }),
+		});
+		fireEvent.click(screen.getByText("PROJ-7"));
+		expect(api.fn("openExternal")).not.toHaveBeenCalled();
+	});
+
+	it("explains a plan conflict in its tooltip", async () => {
+		const user = userEvent.setup();
+		useKanbanConflictStore.setState({
+			conflicts: { "task-1": { files: 3, titles: ["Other task"] } as never },
+		});
+		renderCard({ task: makeTask() });
+		await user.hover(screen.getByText("Conflict 1"));
+		expect(
+			(await screen.findAllByText("Conflicts with: Other task")).length,
+		).toBeGreaterThan(0);
+		expect(screen.getAllByText("3 file(s) in common").length).toBeGreaterThan(0);
+	});
+
+	it("explains the prerequisites that hold a queued card back", async () => {
+		const user = userEvent.setup();
+		useKanbanBlockerStore.setState({
+			blockers: {
+				"task-1": {
+					pending: [{ id: "b1", title: "Set up DB" }],
+					missing: ["gone"],
+					resolvedCount: 2,
+				} as never,
+			},
+		});
+		renderCard({ task: makeTask({ status: "queue" }) });
+		await user.hover(screen.getByText("1 blocker"));
+		expect(
+			(
+				await screen.findAllByText(
+					"The queue will not start it until these prerequisites are done.",
+				)
+			).length,
+		).toBeGreaterThan(0);
+		expect(screen.getAllByText("• Set up DB").length).toBeGreaterThan(0);
+		expect(
+			screen.getAllByText("2 prerequisites already done.").length,
+		).toBeGreaterThan(0);
+		expect(
+			screen.getAllByText(/1 prerequisite not found/).length,
+		).toBeGreaterThan(0);
+	});
+
+	it("shows deleted prerequisites even on a card without metadata", async () => {
+		const user = userEvent.setup();
+		useKanbanBlockerStore.setState({
+			blockers: {
+				"task-1": { pending: [], missing: ["gone"], resolvedCount: 0 } as never,
+			},
+		});
+		renderCard({ task: makeTask({ status: "backlog" }) });
+		await user.hover(screen.getByText("Blockers"));
+		expect(
+			(await screen.findAllByText(/1 prerequisite not found/)).length,
+		).toBeGreaterThan(0);
+	});
+
+	it("shows no blocker badge when nothing is pending or missing", () => {
+		useKanbanBlockerStore.setState({
+			blockers: {
+				"task-1": { pending: [], missing: [], resolvedCount: 3 } as never,
+			},
+		});
+		renderCard({ task: makeTask({ status: "backlog" }) });
+		expect(screen.queryByText("Blockers")).toBeNull();
+	});
+
+	it("describes blockers as context outside the queue", async () => {
+		const user = userEvent.setup();
+		useKanbanBlockerStore.setState({
+			blockers: {
+				"task-1": { pending: [{ id: "b1", title: "Set up DB" }], missing: [], resolvedCount: 0 } as never,
+			},
+		});
+		renderCard({ task: makeTask({ status: "backlog" }) });
+		await user.hover(screen.getByText("1 blocker"));
+		expect(
+			(
+				await screen.findAllByText(
+					"This task declares prerequisites that are not finished.",
+				)
+			).length,
+		).toBeGreaterThan(0);
+	});
+
+	it("explains the complexity estimate in its tooltip", async () => {
+		const user = userEvent.setup();
+		renderCard({
+			task: makeTask({
+				metadata: {
+					smartEstimate: {
+						complexityScore: 7,
+						confidenceLevel: 0.84,
+						qaIterations: 1.2,
+						riskFactors: ["auth", "migration"],
+					},
+				} as never,
+			}),
+		});
+		await user.hover(screen.getByText("Complexity 7"));
+		expect(
+			(await screen.findAllByText("Confidence: 84%")).length,
+		).toBeGreaterThan(0);
+		expect(
+			screen.getAllByText("2 QA passes expected.").length,
+		).toBeGreaterThan(0);
+		expect(screen.getAllByText("• migration").length).toBeGreaterThan(0);
+	});
+
+	it("shows the live pipeline and relaunches the fix loop on a red build", async () => {
+		let release: () => void = () => undefined;
+		api = installRendererApi({
+			fixRedBuild: vi.fn(
+				() => new Promise<void>((resolve) => (release = resolve)),
+			),
+		});
+		useTaskStore.setState({
+			pipelineStatuses: {
+				"task-1": {
+					taskId: "task-1",
+					state: "failed",
+					buildNumber: "20261114.3",
+					definitionName: "CI",
+					webUrl: "https://ci/build/3",
+				} as never,
+			},
+		});
+		renderCard({ task: makeTask() });
+
+		fireEvent.click(screen.getByText(/Pipeline 20261114\.3/));
+		expect(api.fn("openExternal")).toHaveBeenCalledWith("https://ci/build/3");
+
+		const repair = screen.getByRole("button", { name: /Repair build/ });
+		fireEvent.click(repair);
+		expect(api.fn("fixRedBuild")).toHaveBeenCalledWith("task-1");
+		await waitFor(() => expect(repair).toBeDisabled());
+		await act(async () => release());
+		await waitFor(() => expect(repair).toBeEnabled());
+	});
+
+	it.each([
+		["succeeded"],
+		["partiallySucceeded"],
+		["canceled"],
+		["running"],
+	])("shows a %s pipeline without a repair button", (state) => {
+		useTaskStore.setState({
+			pipelineStatuses: {
+				"task-1": { taskId: "task-1", state, definitionName: "Nightly" } as never,
+			},
+		});
+		renderCard({ task: makeTask() });
+		fireEvent.click(screen.getByText(/Pipeline Nightly/));
+		expect(api.fn("openExternal")).not.toHaveBeenCalled();
+		expect(
+			screen.queryByRole("button", { name: /Repair build/ }),
+		).not.toBeInTheDocument();
+	});
+});
+
+describe("TaskCard — status badges", () => {
+	it.each([
+		["build_failed", "Red build"],
+		["pr_created", "Open PR"],
+		["done", "Complete"],
+		["queue", "Pending"],
+	] as const)("labels a %s card %s", (status, label) => {
+		renderCard({ task: makeTask({ status, metadata: {} as never }) });
+		expect(screen.getByText(label)).toBeInTheDocument();
+	});
+
+	it.each([
+		["completed", "Completed"],
+		["qa_rejected", "QA Issues"],
+		["qa_unverified", "QA not verified"],
+		["plan_review", "Approve Plan"],
+		["stopped", "Stopped"],
+	] as const)("explains a %s human review", (reviewReason, label) => {
+		renderCard({
+			task: makeTask({
+				status: "human_review",
+				reviewReason,
+				subtasks: [{ id: "s1", title: "s", description: "", status: "completed" } as never],
+			}),
+		});
+		expect(screen.getByText("Needs Review")).toBeInTheDocument();
+		expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+	});
+
+	it("reads Completed once the run reached its complete phase", () => {
+		renderCard({
+			task: makeTask({
+				status: "human_review",
+				reviewReason: "qa_rejected",
+				executionProgress: { phase: "complete" } as never,
+				subtasks: [{ id: "s1", title: "s", description: "", status: "completed" } as never],
+			}),
+		});
+		expect(screen.getByText("Completed")).toBeInTheDocument();
+		expect(screen.queryByText("QA Issues")).not.toBeInTheDocument();
+	});
+
+	it("shows the running phase instead of the status while the agent codes", () => {
+		renderCard({
+			task: makeTask({
+				status: "in_progress",
+				executionProgress: { phase: "coding", phaseProgress: 40 } as never,
+			}),
+		});
+		expect(screen.queryByText("Running")).not.toBeInTheDocument();
+		expect(screen.getByText("Coding")).toBeInTheDocument();
+	});
+});
+
+describe("TaskCard — actions", () => {
+	it("opens the task on click and on Enter", () => {
+		const { onClick } = renderCard({ task: makeTask() });
+		fireEvent.click(screen.getByRole("option"));
+		fireEvent.keyDown(screen.getByRole("option"), { key: "Enter" });
+		fireEvent.keyDown(screen.getByRole("option"), { key: " " });
+		fireEvent.keyDown(screen.getByRole("option"), { key: "a" });
+		expect(onClick).toHaveBeenCalledTimes(3);
+	});
+
+	it("starts a backlog task without opening it", () => {
+		const { onClick } = renderCard({ task: makeTask() });
+		fireEvent.click(screen.getByRole("button", { name: /Start/ }));
+		expect(api.fn("startTask")).toHaveBeenCalledWith("task-1", undefined);
+		expect(onClick).not.toHaveBeenCalled();
+	});
+
+	it("stops, pauses and watches a running task", async () => {
+		renderCard({
+			task: makeTask({ status: "in_progress" }),
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+		expect(api.fn("stopTask")).toHaveBeenCalledWith("task-1");
+
+		fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+		await waitFor(() =>
+			expect(api.fn("invoke")).toHaveBeenCalledWith(
+				"TASK_PAUSE",
+				"task-1",
+				undefined,
+			),
+		);
+	});
+
+	it("resumes a paused task from the card and from its menu", async () => {
+		const user = userEvent.setup();
+		renderCard({
+			task: makeTask({
+				status: "in_progress",
+				metadata: { paused: { enabled: true } } as never,
+			}),
+		});
+		await user.click(screen.getByRole("button", { name: "Resume" }));
+		await waitFor(() =>
+			expect(api.fn("invoke")).toHaveBeenCalledWith("TASK_RESUME", "task-1"),
+		);
+
+		await user.click(screen.getByRole("button", { name: "Task actions" }));
+		await user.click(await screen.findByRole("menuitem", { name: "Resume" }));
+		expect(api.fn("invoke")).toHaveBeenCalledTimes(2);
+	});
+
+	it("turns Pause into Resume once the task is paused (store update)", async () => {
+		const task = makeTask({ status: "in_progress" });
+		useTaskStore.setState({ tasks: [task] });
+		render(
+			<TooltipProvider>
+				<StoreCard id="task-1" onClick={vi.fn()} />
+			</TooltipProvider>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+		expect(
+			await screen.findByRole("button", { name: "Resume" }),
+		).toBeInTheDocument();
+	});
+
+	it("pauses and stops the AI review from the card", async () => {
+		renderCard({ task: makeTask({ status: "ai_review" }) });
+		fireEvent.click(screen.getByRole("button", { name: /Stop/ }));
+		expect(api.fn("stopTask")).toHaveBeenCalledWith("task-1");
+		fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+		await waitFor(() => expect(api.fn("invoke")).toHaveBeenCalled());
+	});
+
+	it("previews the app of a task under review", () => {
+		const onPreviewApp = vi.fn();
+		const { onClick } = renderCard({
+			task: makeTask({
+				status: "human_review",
+				reviewReason: "completed",
+				subtasks: [{ id: "s1", title: "s", description: "", status: "completed" } as never],
+			}),
+			onPreviewApp,
+		});
+		fireEvent.click(screen.getByTitle("Preview application"));
+		expect(onPreviewApp).toHaveBeenCalled();
+		expect(onClick).not.toHaveBeenCalled();
+	});
+
+	it("previews and archives a done task, and reloads the board", async () => {
+		const onPreviewApp = vi.fn();
+		renderCard({ task: makeTask({ status: "done" }), onPreviewApp });
+		fireEvent.click(screen.getByTitle("Preview application"));
+		expect(onPreviewApp).toHaveBeenCalled();
+		fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+		await waitFor(() =>
+			expect(api.fn("archiveTasks")).toHaveBeenCalledWith(
+				"project-1",
+				["task-1"],
+				undefined,
+			),
+		);
+		await waitFor(() => expect(api.fn("getTasks")).toHaveBeenCalled());
+	});
+
+	it("logs an archive the main process refused", async () => {
+		const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+		api = installRendererApi({
+			archiveTasks: vi.fn(async () => ({ success: false, error: "locked" })),
+		});
+		renderCard({ task: makeTask({ status: "done" }) });
+		fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+		await waitFor(() =>
+			expect(error).toHaveBeenCalledWith(
+				"[TaskCard] Failed to archive task:",
+				"task-1",
+				"locked",
+			),
+		);
+		error.mockRestore();
+	});
+
+	it("opens the PR, its files and archives a task whose PR is open", async () => {
+		const onViewPRFiles = vi.fn();
+		const onPreviewApp = vi.fn();
+		renderCard({
+			task: makeTask({
+				status: "pr_created",
+				metadata: { prUrl: "https://github.com/o/r/pull/9" } as never,
+			}),
+			onViewPRFiles,
+			onPreviewApp,
+		});
+		fireEvent.click(screen.getByTitle("Open pull request in browser"));
+		expect(api.fn("openExternal")).toHaveBeenCalledWith(
+			"https://github.com/o/r/pull/9",
+		);
+		fireEvent.click(screen.getByRole("button", { name: "View modified files" }));
+		expect(onViewPRFiles).toHaveBeenCalledWith(
+			"https://github.com/o/r/pull/9",
+			"task-1",
+		);
+		fireEvent.click(screen.getByTitle("Preview application"));
+		expect(onPreviewApp).toHaveBeenCalled();
+		fireEvent.click(screen.getByTitle("Archive task"));
+		await waitFor(() => expect(api.fn("archiveTasks")).toHaveBeenCalled());
+	});
+
+	it("does not offer to archive an archived done task", () => {
+		renderCard({
+			task: makeTask({
+				status: "done",
+				metadata: { prUrl: "https://x/pull/1", archivedAt: "2026-11-02" } as never,
+			}),
+		});
+		expect(screen.queryByTitle("Archive task")).not.toBeInTheDocument();
+	});
+
+	it("resumes a human-review task that crashed before coding", () => {
+		renderCard({ task: makeTask({ status: "human_review" }) });
+		expect(screen.getByText("Needs Resume")).toBeInTheDocument();
+		expect(screen.getByText("Incomplete")).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+		expect(api.fn("startTask")).toHaveBeenCalledWith("task-1", undefined);
+	});
+
+	it("brings an abandoned task back from its banner", async () => {
+		const { onClick } = renderCard({
+			task: makeTask({ metadata: { abandoned: true } as never }),
+		});
+		expect(screen.getByText("Abandoned")).toBeInTheDocument();
+		fireEvent.click(screen.getByTitle("Resume"));
+		await waitFor(() =>
+			expect(api.fn("updateTask")).toHaveBeenCalledWith(
+				"task-1",
+				expect.objectContaining({ metadata: expect.any(Object) }),
+			),
+		);
+		expect(onClick).not.toHaveBeenCalled();
+	});
+
+	it("deletes from the corner button without opening the task", () => {
+		const onDelete = vi.fn();
+		const { onClick } = renderCard({ task: makeTask(), onDelete });
+		fireEvent.click(screen.getByTitle("Delete"));
+		expect(onDelete).toHaveBeenCalled();
+		expect(onClick).not.toHaveBeenCalled();
+	});
+
+	it("ignores clicks and presses in the delete corner of the card", () => {
+		const onDelete = vi.fn();
+		const { onClick } = renderCard({ task: makeTask(), onDelete });
+		const card = screen.getByRole("option");
+		card.getBoundingClientRect = () =>
+			({ left: 0, top: 0, width: 200, height: 100 }) as DOMRect;
+		const press = new MouseEvent("mousedown", {
+			bubbles: true,
+			cancelable: true,
+			clientX: 190,
+			clientY: 10,
+		});
+		card.dispatchEvent(press);
+		expect(press.defaultPrevented).toBe(true);
+		fireEvent.click(card, { clientX: 190, clientY: 10 });
+		expect(onClick).not.toHaveBeenCalled();
+		fireEvent.mouseDown(card, { clientX: 20, clientY: 80 });
+		fireEvent.click(card, { clientX: 20, clientY: 80 });
+		expect(onClick).toHaveBeenCalledTimes(1);
+	});
+
+	it("selects the card from its checkbox without opening it", () => {
+		const onToggleSelect = vi.fn();
+		const { onClick } = renderCard({
+			task: makeTask(),
+			isSelectable: true,
+			isSelected: false,
+			onToggleSelect,
+		});
+		fireEvent.click(
+			screen.getByRole("checkbox", { name: "Select task: Add login page" }),
+		);
+		expect(onToggleSelect).toHaveBeenCalled();
+		expect(onClick).not.toHaveBeenCalled();
+		expect(screen.getByRole("option")).toHaveAttribute("aria-selected", "false");
+	});
+
+	it("opens the plan tab from the progress indicator", () => {
+		const { onClick } = renderCard({
+			task: makeTask({
+				status: "in_progress",
+				executionProgress: { phase: "coding" } as never,
+				subtasks: [
+					{ id: "s1", title: "one", description: "", status: "completed" },
+					{ id: "s2", title: "two", description: "", status: "pending" },
+				] as never,
+			}),
+		});
+		fireEvent.click(screen.getByTitle("View implementation plan"));
+		expect(onClick).toHaveBeenCalledTimes(1);
+		expect(consumePendingTaskDetailTab()).toBe("subtasks");
+	});
+});
+
+describe("TaskCard — options menu", () => {
+	it("estimates, duplicates, syncs and moves the task", async () => {
+		const user = userEvent.setup();
+		const onDuplicate = vi.fn();
+		const onStatusChange = vi.fn();
+		useSmartEstimationStore.getState().reset();
+		renderCard({
+			task: makeTask(),
+			onDuplicate,
+			onStatusChange,
+		});
+
+		const openMenu = async () =>
+			user.click(screen.getByRole("button", { name: "Task actions" }));
+
+		await openMenu();
+		await user.click(
+			await screen.findByRole("menuitem", { name: "Estimate complexity" }),
+		);
+		expect(useSmartEstimationStore.getState()).toMatchObject({
+			isOpen: true,
+			initialTaskDescription: "Build the **login** form",
+			sourceTaskId: "task-1",
+		});
+
+		await openMenu();
+		await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
+		expect(onDuplicate).toHaveBeenCalled();
+
+		await openMenu();
+		await user.click(await screen.findByRole("menuitem", { name: "Queue" }));
+		expect(onStatusChange).toHaveBeenCalledWith("queue");
+
+		await openMenu();
+		await user.click(
+			await screen.findByRole("menuitem", { name: "Sync from branch" }),
+		);
+		expect(await screen.findByRole("dialog")).toBeInTheDocument();
+	});
+
+	it("pauses a running task from its menu", async () => {
+		const user = userEvent.setup();
+		renderCard({ task: makeTask({ status: "in_progress" }) });
+		await user.click(screen.getByRole("button", { name: "Task actions" }));
+		await user.click(await screen.findByRole("menuitem", { name: "Pause" }));
+		await waitFor(() =>
+			expect(api.fn("invoke")).toHaveBeenCalledWith(
+				"TASK_PAUSE",
+				"task-1",
+				undefined,
+			),
+		);
+	});
+
+	it("has no menu when there is nothing to offer", () => {
+		renderCard({ task: makeTask({ status: "done" }) });
+		expect(
+			screen.queryByRole("button", { name: "Task actions" }),
+		).not.toBeInTheDocument();
+	});
+});
+
+describe("TaskCard — stuck detection and spotlight", () => {
+	it("flags a running task whose process died, then recovers it", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		api = installRendererApi({
+			checkTaskRunning: vi.fn(async () => ({ success: true, data: false })),
+			recoverStuckTask: vi.fn(async () => ({
+				success: true,
+				data: { message: "ok", autoRestarted: true },
+			})),
+		});
+		renderCard({ task: makeTask({ id: "task-stuck", status: "in_progress" }) });
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(61_000);
+		});
+		expect(await screen.findByText("Stuck")).toBeInTheDocument();
+		expect(screen.getByText("Needs Recovery")).toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole("button", { name: /Recover/ }));
+		expect(api.fn("recoverStuckTask")).toHaveBeenCalledWith("task-stuck", {
+			autoRestart: true,
+		});
+		await waitFor(() =>
+			expect(screen.queryByText("Stuck")).not.toBeInTheDocument(),
+		);
+	});
+
+	it("keeps a running task with recent activity out of the stuck state", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		renderCard({ task: makeTask({ id: "task-alive", status: "in_progress" }) });
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(59_000);
+			recordTaskActivity("task-alive");
+			await vi.advanceTimersByTimeAsync(2_000);
+		});
+		expect(api.fn("checkTaskRunning")).not.toHaveBeenCalled();
+		expect(screen.queryByText("Stuck")).not.toBeInTheDocument();
+	});
+
+	it("scrolls to and lights up the card the office jumped to", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const scroll = vi.fn();
+		HTMLElement.prototype.scrollIntoView = scroll;
+		useTaskStore.setState({ jumpToTaskId: "task-1" });
+		renderCard({ task: makeTask() });
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(150);
+		});
+		expect(scroll).toHaveBeenCalled();
+		expect(screen.getByRole("option").className).toContain("task-spotlight");
+		expect(useTaskStore.getState().jumpToTaskId).toBeNull();
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(2300);
+		});
+		expect(screen.getByRole("option").className).not.toContain(
+			"task-spotlight",
+		);
+	});
+});
+
+describe("TaskCard — re-render rules", () => {
+	it("skips a render when only unrelated fields change, renders on the ones it shows", () => {
+		const onClick = vi.fn();
+		const base = makeTask({
+			status: "queue",
+			metadata: { model: "opus" } as never,
+			subtasks: [{ id: "s1", title: "a", description: "", status: "pending" }] as never,
+		});
+		const { rerender } = render(
+			<TooltipProvider>
+				<TaskCard task={base} onClick={onClick} />
+			</TooltipProvider>,
+		);
+		const again = (task: Task, extra: Partial<CardProps> = {}) =>
+			rerender(
+				<TooltipProvider>
+					<TaskCard task={task} onClick={onClick} {...extra} />
+				</TooltipProvider>,
+			);
+
+		// The parent re-renders with the very same props.
+		const heading = screen.getByRole("heading", { name: "Add login page" });
+		again(base);
+		expect(screen.getByRole("heading", { name: "Add login page" })).toBe(heading);
+
+		// A new object with the same visible fields: the card keeps its DOM.
+		again({ ...base, logs: ["noise"] });
+		expect(screen.getByRole("heading", { name: "Add login page" })).toBeInTheDocument();
+
+		// A visible field changes: the card follows.
+		again({ ...base, logs: ["noise"], title: "Renamed" });
+		expect(screen.getByRole("heading", { name: "Renamed" })).toBeInTheDocument();
+
+		// A subtask finishing changes the progress shown.
+		again({
+			...base,
+			title: "Renamed",
+			subtasks: [{ id: "s1", title: "a", description: "", status: "completed" }] as never,
+		});
+		expect(screen.getByText(/1\/1/)).toBeInTheDocument();
+
+		// Becoming selectable shows the checkbox.
+		again({ ...base, title: "Renamed" }, { isSelectable: true, isSelected: true });
+		expect(screen.getByRole("checkbox")).toBeChecked();
+	});
+
+	it("drops the stuck watch once the task stops running", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const task = makeTask({ id: "task-stop", status: "in_progress" });
+		const { rerender } = renderCard({ task });
+		rerender(
+			<TooltipProvider>
+				<TaskCard task={{ ...task, status: "backlog" }} onClick={vi.fn()} />
+			</TooltipProvider>,
+		);
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(61_000);
+		});
+		expect(api.fn("checkTaskRunning")).not.toHaveBeenCalled();
+	});
+
+	it("is not stuck when activity arrives while the process check is in flight", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		api = installRendererApi({
+			checkTaskRunning: vi.fn(async () => {
+				recordTaskActivity("task-race");
+				return { success: true, data: false };
+			}),
+		});
+		renderCard({ task: makeTask({ id: "task-race", status: "in_progress" }) });
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(61_000);
+		});
+		expect(api.fn("checkTaskRunning")).toHaveBeenCalledWith("task-race");
+		expect(screen.queryByText("Stuck")).not.toBeInTheDocument();
+	});
+
+	it("keeps the task closed while its sync dialog is open", async () => {
+		const user = userEvent.setup();
+		const { onClick } = renderCard({ task: makeTask(), onDuplicate: vi.fn() });
+		await user.click(screen.getByRole("button", { name: "Task actions" }));
+		await user.click(
+			await screen.findByRole("menuitem", { name: "Sync from branch" }),
+		);
+		await screen.findByRole("dialog");
+		fireEvent.click(
+			screen.getByRole("option", { name: "Add login page", hidden: true }),
+		);
+		expect(onClick).not.toHaveBeenCalled();
+	});
+
+	it("shows no description paragraph and no reason badge it cannot name", () => {
+		renderCard({
+			task: makeTask({
+				description: "",
+				metadata: {} as never,
+				status: "human_review",
+				reviewReason: "unknown_reason" as never,
+				subtasks: [{ id: "s1", title: "s", description: "", status: "completed" } as never],
+			}),
+		});
+		expect(screen.getByText("Needs Review")).toBeInTheDocument();
+		expect(screen.queryByText("Build the login form")).not.toBeInTheDocument();
+	});
+
+	it("previews the app during the AI review", () => {
+		const onPreviewApp = vi.fn();
+		renderCard({ task: makeTask({ status: "ai_review" }), onPreviewApp });
+		fireEvent.click(screen.getByTitle("Preview application"));
+		expect(onPreviewApp).toHaveBeenCalled();
+	});
+});

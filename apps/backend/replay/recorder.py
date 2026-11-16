@@ -21,6 +21,7 @@ from .models import (
     ReplayStep,
     ReplayStepType,
 )
+from .storage import record_file, require_record_file
 
 logger = logging.getLogger(__name__)
 
@@ -465,7 +466,7 @@ class ReplayRecorder:
 
     def save_session(self, session: ReplaySession) -> Path:
         """Save a replay session to disk."""
-        filepath = self._storage_dir / f"{session.session_id}.json"
+        filepath = require_record_file(self._storage_dir, session.session_id)
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(session.to_dict(), f, indent=2, ensure_ascii=False)
         logger.info(f"Replay session saved: {filepath}")
@@ -473,8 +474,8 @@ class ReplayRecorder:
 
     def load_session(self, session_id: str) -> ReplaySession | None:
         """Load a replay session from disk."""
-        filepath = self._storage_dir / f"{session_id}.json"
-        if not filepath.exists():
+        filepath = record_file(self._storage_dir, session_id)
+        if filepath is None or not filepath.exists():
             return None
 
         try:
@@ -498,10 +499,14 @@ class ReplayRecorder:
                 logger.warning(f"Failed to load {filepath}: {e}")
         return sorted(sessions, key=lambda x: x["start_time"], reverse=True)
 
+    def is_recording(self, session_id: str) -> bool:
+        """Whether ``session_id`` is still being recorded (not yet saved for good)."""
+        return session_id in self._active_sessions
+
     def delete_session(self, session_id: str) -> bool:
         """Delete a saved replay session."""
-        filepath = self._storage_dir / f"{session_id}.json"
-        if filepath.exists():
+        filepath = record_file(self._storage_dir, session_id)
+        if filepath is not None and filepath.exists():
             filepath.unlink()
             return True
         return False

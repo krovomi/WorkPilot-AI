@@ -9,6 +9,7 @@ import/export relationships and build a structural dependency graph.
 from __future__ import annotations
 
 import ast
+import posixpath
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -74,12 +75,11 @@ class DependencyGraphBuilder:
             rel_path = str(source_file.relative_to(self.project_dir)).replace("\\", "/")
             ext = source_file.suffix.lower()
 
+            # _iter_source_files yields only these two families.
             if ext in _PYTHON_EXTS:
                 node = self._parse_python(source_file, rel_path)
-            elif ext in _JS_TS_EXTS:
-                node = self._parse_js_ts(source_file, rel_path)
             else:
-                continue
+                node = self._parse_js_ts(source_file, rel_path)
 
             graph.add_node(node)
             files_indexed += 1
@@ -97,8 +97,12 @@ class DependencyGraphBuilder:
         for path in self.project_dir.rglob("*"):
             if not path.is_file():
                 continue
-            # Skip ignored directories (check all path parts)
-            if any(part in _SKIP_DIRS for part in path.parts):
+            # Skip ignored directories inside the project. The project's own
+            # location does not count: a checkout under ~/build/ or ~/env/
+            # used to index nothing.
+            if any(
+                part in _SKIP_DIRS for part in path.relative_to(self.project_dir).parts
+            ):
                 continue
             if path.suffix.lower() in _PYTHON_EXTS | _JS_TS_EXTS:
                 yield path
@@ -121,6 +125,16 @@ class DependencyGraphBuilder:
                         node.imports.append(resolved)
 
             elif isinstance(stmt, ast.ImportFrom):
+                # `from pkg import mod` and `from . import mod` import the
+                # submodule `mod`, not only the package: try each name as a
+                # submodule first, then the module itself.
+                prefix = f"{stmt.module}." if stmt.module else ""
+                for alias in stmt.names:
+                    resolved = self._resolve_python_import(
+                        prefix + alias.name, rel_path, level=stmt.level
+                    )
+                    if resolved:
+                        node.imports.append(resolved)
                 if stmt.module:
                     resolved = self._resolve_python_import(
                         stmt.module, rel_path, level=stmt.level
@@ -149,7 +163,7 @@ class DependencyGraphBuilder:
         if level > 0:
             # Relative import
             base_parts = from_file.split("/")[:-(level)]
-            module_parts = module.split(".") if module else []
+            module_parts = module.split(".")
             candidate_parts = base_parts + module_parts
         else:
             candidate_parts = module.split(".")
@@ -157,8 +171,8 @@ class DependencyGraphBuilder:
         # Try as a module file or package __init__
         for suffix in (".py", "/__init__.py"):
             candidate = "/".join(candidate_parts) + suffix
-            if (self.project_dir / candidate).exists():
-                return candidate.replace("/__init__.py", "/__init__.py")
+            if (self.project_dir / candidate).is_file():
+                return candidate
 
         return None
 
@@ -229,17 +243,15 @@ class DependencyGraphBuilder:
         else:
             joined = raw
 
-        # Resolve ".." and "." segments
-        try:
-            resolved_base = str(Path(joined).as_posix())
-        except Exception:
-            return None
+        # Resolve ".." and "." segments: node keys are normalised paths, so
+        # "src/./a" or "src/b/../a" must become "src/a" to meet its node.
+        resolved_base = posixpath.normpath(joined)
+        if resolved_base == ".." or resolved_base.startswith("../"):
+            return None  # Outside the project
 
         for ext in self._JS_EXTENSIONS_TRY:
             candidate = resolved_base + ext
-            # Normalize to forward slashes
-            candidate = candidate.lstrip("/")
-            if (self.project_dir / candidate).exists():
+            if (self.project_dir / candidate).is_file():
                 return candidate
 
         return None

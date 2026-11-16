@@ -3,117 +3,22 @@
 Tests for Spec Pipeline Phase Execution
 ========================================
 
-Tests the PhaseExecutor class in auto-claude/spec/phases.py covering:
+Tests the PhaseExecutor class in spec/phases covering:
 - PhaseResult dataclass
 - All phase methods (discovery, requirements, context, etc.)
 - Retry logic and error handling
 - File existence checks and caching
+
+The modules are the real ones: replacing them in `sys.modules` at import time
+leaked fakes into the files collected after this one.
 """
 
 import json
-import sys
 from pathlib import Path
-from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-
-# Add backend path to sys.path
-backend_path = Path(__file__).parent.parent / "apps" / "backend"
-sys.path.insert(0, str(backend_path))
-
-# Store original modules before mocking (for cleanup)
-_original_modules = {}
-_mocked_module_names = [
-    # External SDKs
-    "claude_code_sdk",
-    "claude_code_sdk.types",
-    "claude_agent_sdk",
-    "claude_agent_sdk.types",
-    # Core infrastructure
-    "core",
-    "core.auth",
-    "core.client",
-    "core.simple_client",
-    "core.task_event",
-    "core.workspace",
-    "core.workspace.models",
-    "foundation.file_utils",
-    "core.plan_normalization",
-    "foundation.platform",
-    "client",
-    # Config & phases
-    "phase_config",
-    "foundation.phase_event",
-    # Logging & UI
-    "foundation.debug",
-    "ui",
-    "ui.capabilities",
-    "task_logger",
-    "integrations.linear.updater",
-    "core.progress",
-    # Prompts
-    "prompts_pkg",
-    "prompts_pkg.project_context",
-    # Security
-    "security",
-    "security.constants",
-    "security.tool_input_validator",
-    # Review system
-    "review",
-    "review.diff_analyzer",
-    "review.formatters",
-    "review.reviewer",
-    "review.state",
-    # Agents
-    "agents",
-    "agents.memory_manager",
-    "agents.tools_pkg",
-    # Analysis
-    "analysis",
-    "analysis.analyzers",
-    # Spec submodules (transitive)
-    "spec.complexity",
-    "spec.compaction",
-    "spec.validate_pkg",
-    "spec.validate_pkg.spec_validator",
-    "spec.validate_pkg.validators",
-    # Validate spec (legacy)
-    "validate_spec",
-    # Integrations
-    "integrations",
-    "integrations.linear",
-    "integrations.linear.updater",
-]
-
-for name in _mocked_module_names:
-    if name in sys.modules:
-        _original_modules[name] = sys.modules[name]
-
-# Mock ALL external dependencies before ANY imports from the spec module
-# The import chain is: spec.phases -> spec.__init__ -> spec.pipeline -> client -> claude_agent_sdk
-for name in _mocked_module_names:
-    sys.modules[name] = MagicMock()
-
-# Set up specific mock attributes
-mock_validate_spec = sys.modules["validate_spec"]
-mock_validate_spec.auto_fix_plan = MagicMock(return_value=False)
-
-# Now import the phases module directly (bypasses __init__.py issues)
-from apps.backend.spec.phases import MAX_RETRIES, PhaseExecutor, PhaseResult
-
-
-# Cleanup fixture to restore original modules after all tests in this module
-@pytest.fixture(scope="module", autouse=True)
-def cleanup_mocked_modules():
-    """Restore original modules after all tests in this module complete."""
-    yield  # Run all tests first
-    # Cleanup: restore original modules or remove mocks
-    for name in _mocked_module_names:
-        if name in _original_modules:
-            sys.modules[name] = _original_modules[name]
-        elif name in sys.modules:
-            del sys.modules[name]
+from spec.phases import MAX_RETRIES, PhaseExecutor, PhaseResult
 
 
 class TestPhaseResult:
@@ -252,7 +157,8 @@ class TestPhaseDiscovery:
             "spec.discovery.run_discovery_script", return_value=(True, "Created")
         ):
             with patch(
-                "spec.discovery.get_project_index_stats", return_value={"file_count": 3}
+                "spec.discovery.get_project_index_stats",
+                return_value={"services": ["api"], "project_type": "single"},
             ):
                 result = await executor.phase_discovery()
 
@@ -283,7 +189,7 @@ class TestPhaseDiscovery:
 
         # Always fail
         with patch(
-            "apps.backend.spec.phases.discovery_phases.discovery.run_discovery_script",
+            "spec.phases.discovery_phases.discovery.run_discovery_script",
             return_value=(False, "Script failed"),
         ):
             result = await executor.phase_discovery()
@@ -460,7 +366,7 @@ class TestPhaseContext:
         assert result.retries == 0
 
     @pytest.mark.asyncio
-    async def test_context_discovery_success(
+    async def test_context_is_written_from_the_task_alone(
         self,
         temp_dir: Path,
         spec_dir: Path,
@@ -469,59 +375,30 @@ class TestPhaseContext:
         mock_ui_module,
         mock_spec_validator,
     ):
-        """Context phase calls discovery script and succeeds."""
+        """The context file comes from the task; nothing in the project is run."""
+        scripts = temp_dir / ".workpilot"
+        scripts.mkdir(exist_ok=True)
+        marker = temp_dir / "ran.txt"
+        (scripts / "context.py").write_text(
+            f"open({str(marker)!r}, 'w').write('ran')\n", encoding="utf-8"
+        )
         executor = PhaseExecutor(
             project_dir=temp_dir,
             spec_dir=spec_dir,
-            task_description="Test task",
+            task_description="Fix the login button in app/login.tsx",
             spec_validator=mock_spec_validator(),
             run_agent_fn=mock_run_agent_fn(),
             task_logger=mock_task_logger,
             ui_module=mock_ui_module,
         )
 
-        with patch(
-            "spec.context.run_context_discovery", return_value=(True, "Success")
-        ):
-            with patch(
-                "spec.context.get_context_stats", return_value={"files_to_modify": 5}
-            ):
-                result = await executor.phase_context()
+        result = await executor.phase_context()
 
         assert result.success is True
-
-    @pytest.mark.asyncio
-    async def test_context_creates_minimal_on_failure(
-        self,
-        temp_dir: Path,
-        spec_dir: Path,
-        mock_run_agent_fn,
-        mock_task_logger,
-        mock_ui_module,
-        mock_spec_validator,
-    ):
-        """Context phase creates minimal context when script fails."""
-        executor = PhaseExecutor(
-            project_dir=temp_dir,
-            spec_dir=spec_dir,
-            task_description="Test task",
-            spec_validator=mock_spec_validator(),
-            run_agent_fn=mock_run_agent_fn(),
-            task_logger=mock_task_logger,
-            ui_module=mock_ui_module,
-        )
-
-        with patch(
-            "apps.backend.spec.context.run_context_discovery",
-            return_value=(False, "Failed"),
-        ):
-            with patch(
-                "apps.backend.spec.context.create_minimal_context"
-            ) as mock_minimal:
-                result = await executor.phase_context()
-
-        mock_minimal.assert_called_once()
-        assert result.success is True  # Creates minimal context as fallback
+        assert result.errors == []
+        context = json.loads((spec_dir / "context.json").read_text(encoding="utf-8"))
+        assert context["task_description"] == "Fix the login button in app/login.tsx"
+        assert not marker.exists()
 
 
 class TestPhaseQuickSpec:
@@ -947,6 +824,49 @@ class TestPhasePlanning:
         assert result.phase == "planning"
         assert result.retries == 0
 
+    @pytest.mark.asyncio
+    async def test_planning_goes_to_the_planner_agent(
+        self,
+        temp_dir: Path,
+        spec_dir: Path,
+        mock_task_logger,
+        mock_ui_module,
+        mock_spec_validator,
+    ):
+        """The plan comes from the planner agent; nothing in the project is run."""
+        scripts = temp_dir / ".workpilot"
+        scripts.mkdir(exist_ok=True)
+        marker = temp_dir / "ran.txt"
+        (scripts / "planner.py").write_text(
+            f"open({str(marker)!r}, 'w').write('ran')\n", encoding="utf-8"
+        )
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+        prompts = []
+
+        async def planner(prompt_file, *args, **kwargs):
+            prompts.append(prompt_file)
+            (spec_dir / "implementation_plan.json").write_text(
+                json.dumps({"phases": [{"phase": 1, "subtasks": [{"id": "1"}]}]}),
+                encoding="utf-8",
+            )
+            return True, "done"
+
+        executor = PhaseExecutor(
+            project_dir=temp_dir,
+            spec_dir=spec_dir,
+            task_description="Test task",
+            spec_validator=mock_spec_validator(plan_valid=True),
+            run_agent_fn=planner,
+            task_logger=mock_task_logger,
+            ui_module=mock_ui_module,
+        )
+
+        result = await executor.phase_planning()
+
+        assert result.success is True
+        assert prompts == ["planner.md"]
+        assert not marker.exists()
+
 
 class TestPhaseValidation:
     """Tests for phase_validation method."""
@@ -1012,35 +932,6 @@ class TestPhaseValidation:
 
         assert result.success is False
         assert result.retries == MAX_RETRIES
-
-
-class TestRunScript:
-    """Tests for _run_script helper method."""
-
-    def test_run_script_not_found(
-        self,
-        temp_dir: Path,
-        spec_dir: Path,
-        mock_run_agent_fn,
-        mock_task_logger,
-        mock_ui_module,
-        mock_spec_validator,
-    ):
-        """_run_script returns False when script not found."""
-        executor = PhaseExecutor(
-            project_dir=temp_dir,
-            spec_dir=spec_dir,
-            task_description="Test task",
-            spec_validator=mock_spec_validator(),
-            run_agent_fn=mock_run_agent_fn(),
-            task_logger=mock_task_logger,
-            ui_module=mock_ui_module,
-        )
-
-        success, output = executor._run_script("nonexistent.py", [])
-
-        assert success is False
-        assert "not found" in output.lower()
 
 
 class TestMaxRetriesConstant:
@@ -1127,7 +1018,7 @@ class TestPhaseWorkflow:
         ):
             with patch(
                 "spec.discovery.get_project_index_stats",
-                return_value={"file_count": 10},
+                return_value={"services": [], "project_type": "single"},
             ):
                 await executor.phase_discovery()
 
@@ -1336,7 +1227,7 @@ class TestPlaceholdersAreSaid:
 
 class TestPhaseNotes:
     def test_a_successful_phase_owes_its_warnings_and_its_errors(self):
-        from apps.backend.spec.phases import phase_notes
+        from spec.phases import phase_notes
 
         result = PhaseResult(
             "research", True, [], ["Attempt 1: failed"], 1, warnings=["placeholder"]
@@ -1347,7 +1238,7 @@ class TestPhaseNotes:
         ]
 
     def test_a_clean_phase_owes_nothing(self):
-        from apps.backend.spec.phases import phase_notes
+        from spec.phases import phase_notes
 
         assert phase_notes("research", PhaseResult("research", True, [], [], 0)) == []
 

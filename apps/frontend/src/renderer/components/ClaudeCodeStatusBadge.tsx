@@ -51,8 +51,6 @@ interface ClaudeCodeStatusBadgeProps {
 // biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
 type StatusType = "loading" | "installed" | "outdated" | "not-found" | "error";
 
-// Check interval for version updates
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 // Delay before re-checking version after install/update
 const VERSION_RECHECK_DELAY_MS = 5000;
 
@@ -112,24 +110,6 @@ export function ClaudeCodeStatusBadge({
 	const versionInfo = claude.versionInfo;
 	const lastChecked = claude.lastChecked;
 
-	// Check Claude Code version
-	const checkVersion = useCallback(async () => {
-		try {
-			if (!globalThis.electronAPI?.checkClaudeCodeVersion) {
-				return;
-			}
-
-			const result = await globalThis.electronAPI.checkClaudeCodeVersion();
-
-			if (result.success && result.data) {
-				// Version checking is handled by the context
-				// No need to set local state since we use context data
-			}
-		} catch (err) {
-			console.error("Failed to check Claude Code version:", err);
-		}
-	}, []);
-
 	// Fetch available versions
 	const fetchVersions = useCallback(async () => {
 		if (!globalThis.electronAPI?.getClaudeCodeVersions) {
@@ -177,18 +157,6 @@ export function ClaudeCodeStatusBadge({
 			setIsLoadingInstallations(false);
 		}
 	}, []);
-
-	// Initial check and periodic re-check
-	useEffect(() => {
-		checkVersion();
-
-		// Set up periodic check
-		const interval = setInterval(() => {
-			checkVersion();
-		}, CHECK_INTERVAL_MS);
-
-		return () => clearInterval(interval);
-	}, [checkVersion]);
 
 	// Fetch versions when popover opens and Claude is installed
 	useEffect(() => {
@@ -361,7 +329,7 @@ export function ClaudeCodeStatusBadge({
 
 		try {
 			if (!globalThis.electronAPI?.setClaudeCodeActivePath) {
-				setInstallError("Path switching not available");
+				setInstallError(t("navigation:cliStatus.pathSwitchUnavailable"));
 				return;
 			}
 
@@ -376,12 +344,12 @@ export function ClaudeCodeStatusBadge({
 					fetchInstallations();
 				}, VERSION_RECHECK_DELAY_MS);
 			} else {
-				setInstallError(result.error || "Failed to switch CLI path");
+				setInstallError(result.error || t("navigation:cliStatus.pathSwitchFailed"));
 			}
 		} catch (err) {
 			console.error("Failed to switch Claude CLI path:", err);
 			setInstallError(
-				err instanceof Error ? err.message : "Failed to switch CLI path",
+				err instanceof Error ? err.message : t("navigation:cliStatus.pathSwitchFailed"),
 			);
 		} finally {
 			setIsInstalling(false);

@@ -18,14 +18,13 @@
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { AUTO_BUILD_PATHS, getSpecsDir } from "../../../shared/constants";
 import type { Project, Task, TaskStatus } from "../../../shared/types";
 import type { TaskEventPayload } from "../../agent/task-event-schema";
-import { getIsolatedGitEnv } from "../../utils/git-isolation";
 import { projectStore } from "../../project-store";
 import type { VisualProofRun } from "../../../shared/types";
+import { applyPlanEdit, type SubtaskEdit } from "./plan-edit";
 
 // In-memory locks for plan file operations
 // Key: plan file path, Value: Promise chain for serializing operations
@@ -480,39 +479,30 @@ export async function createPlanIfNotExists(
 			plan.xstateState = xstateState;
 		}
 
-		// Ensure directory exists - use try/catch pattern
-		const planDir = path.dirname(planPath);
-		try {
-			mkdirSync(planDir, { recursive: true });
-		} catch (err) {
-			// Directory might already exist or be created concurrently - that's fine
-			if ((err as NodeJS.ErrnoException).code !== "EEXIST") {
-				throw err;
-			}
-		}
+		// A recursive mkdir is quiet when the folder exists, even if another
+		// call created it a moment ago; anything else in the way throws.
+		mkdirSync(path.dirname(planPath), { recursive: true });
 
 		writeFileSync(planPath, JSON.stringify(plan, null, 2), "utf-8");
 	});
 }
 
 /**
- * Update plan phases and subtasks.
- * This allows adding, modifying, or removing pending subtasks from the implementation plan.
+ * Apply the Subtasks tab's edits to the plan: reword, trim or remove pending
+ * subtasks and add new ones, keeping the phases and every other subtask as
+ * they are (see `plan-edit.ts`).
  *
  * @param planPath - Path to the implementation_plan.json file
- * @param phases - The updated phases array with potentially modified subtasks
+ * @param edits - The pending-subtask edits, from `parsePlanEdit`
  * @param projectId - Optional project ID to invalidate cache
  * @returns The updated plan, or null if the file doesn't exist
  */
 export async function updatePlanSubtasks(
 	planPath: string,
-	phases: Array<Record<string, unknown>>,
+	edits: SubtaskEdit[],
 	projectId?: string,
 ): Promise<Record<string, unknown> | null> {
-	return updatePlanFile(planPath, (plan) => {
-		plan.phases = phases;
-		return plan;
-	}).then((updatedPlan) => {
+	return updatePlanFile(planPath, (plan) => applyPlanEdit(plan, edits)).then((updatedPlan) => {
 		// Invalidate cache after successful update
 		if (updatedPlan && projectId) {
 			projectStore.invalidateTasksCache(projectId);
@@ -600,59 +590,6 @@ export function updateTaskMetadataField(
 	} catch (err) {
 		console.warn(`[plan-file-utils] Could not update ${field} at ${metadataPath}:`, err);
 		return false;
-	}
-}
-
-/**
- * Get modified files from a git worktree compared to the main branch.
- * Detects files changed, added, or deleted.
- *
- * @param worktreePath - Path to the git worktree
- * @param mainBranch - The main branch to compare against (default: "main")
- * @returns Array of modified file paths
- */
-export function getModifiedFilesFromWorktree(
-	worktreePath: string,
-	mainBranch: string = "main",
-): string[] {
-	try {
-		// Get diff between main branch and current branch
-		// Shows files that are: modified (M), added (A), or deleted (D)
-		// execFileSync (no shell): `mainBranch` is caller-supplied and a branch
-		// name may legally contain characters the shell would interpret.
-		const output = execFileSync(
-			"git",
-			["diff", "--name-status", `${mainBranch}...HEAD`],
-			{
-				cwd: worktreePath,
-				encoding: "utf-8",
-				stdio: ["pipe", "pipe", "pipe"],
-				env: getIsolatedGitEnv(),
-			},
-		);
-
-		if (!output.trim()) {
-			return [];
-		}
-
-		// Parse the diff output
-		// Format: STATUS\tFILEPATH
-		const files = output
-			.trim()
-			.split("\n")
-			.map((line) => {
-				const parts = line.split("\t");
-				return parts[1] || "";
-			})
-			.filter((file) => file.length > 0);
-
-		return files;
-	} catch (error) {
-		console.warn(
-			`[plan-file-utils] Could not get modified files from ${worktreePath}:`,
-			error,
-		);
-		return [];
 	}
 }
 

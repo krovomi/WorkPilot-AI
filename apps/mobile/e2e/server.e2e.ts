@@ -3,8 +3,9 @@
  *
  * `tests/server_e2e/app_world.py` starts the server as `deploy/` does (API,
  * streaming server, migrations, a fake agent) and seeds two organizations:
- * Alice (administrator) and Bob in the first, with the project "Team Board";
- * Carol in the second. The app's screens are served from its web bundle
+ * Alice (administrator) and Bob in the first, with the project "Team Board",
+ * "Team Site" on a fake GitHub and "Team Docs" on a fake GitLab
+ * (`fake_forge.py`); Carol in the second. The app's screens are served from its web bundle
  * (`dist/`, `expo export --platform web`) on localhost:3000, an origin the
  * server's CORS allows, and driven at a phone's size.
  *
@@ -13,7 +14,12 @@
  * starts it (the fake agent writes the spec), and a teammate sees the card;
  * a person of another organization never sees the project; a refused password
  * says so; a theme chosen in Settings is kept on the person's account and
- * applies on another device. The browser cannot set headers on a WebSocket, so on the web the
+ * applies on another device; the team's pull requests, issues and merge
+ * requests read and commented through the server with each person's own
+ * token, which the fake forge saw and the page never shows; a card's spec
+ * approved from the phone, built (the fake agent checks the approval as a
+ * build does and commits in the card's workspace), reviewed with its changes
+ * and sent back to a build that runs. The browser cannot set headers on a WebSocket, so on the web the
  * board follows by its periodic read; the header handshake is the native
  * app's (unit-tested in `src/__tests__`).
  *
@@ -21,7 +27,7 @@
  * Linux and port 8765 free. `pnpm run test:e2e:server` after `pnpm run export:web`.
  */
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -39,6 +45,11 @@ type Who = "alice" | "bob" | "carol";
 interface World {
 	serverUrl: string;
 	project: string;
+	/** The team's projects on the fake GitHub and GitLab (`fake_forge.py`). */
+	githubProject: string;
+	gitlabProject: string;
+	/** Where the fake forges say what they were asked (`GET /calls`). */
+	forgeUrl: string;
 	emails: Record<Who, string>;
 	passwords: Record<Who, string>;
 	stop: () => Promise<void>;
@@ -68,7 +79,7 @@ async function startServer(): Promise<World> {
 		createInterface({ input: child.stdout }).once("line", resolve);
 		void exited.then((code) => reject(new Error(`server exited (${code})`)));
 	});
-	const answer = JSON.parse(line) as { serverUrl: string; project: string; emails: Record<Who, string> };
+	const answer = JSON.parse(line) as Omit<World, "passwords" | "stop">;
 	return { ...answer, passwords, stop };
 }
 
@@ -147,6 +158,38 @@ function signedInPage(who: Who): Page {
 }
 
 const signedIn = new Map<Who, Page>();
+
+/** Bob's GitHub token, saved on the server by a scenario and used by a later one. */
+const bobGitHub = `ghp_${randomBytes(12).toString("hex")}`;
+
+interface ForgeCall {
+	host: string;
+	method: string;
+	path: string;
+	token: string;
+	body: unknown;
+}
+
+/** What the fake forges were asked so far, oldest first. */
+async function forgeCalls(): Promise<ForgeCall[]> {
+	const answer = await fetch(`${world.forgeUrl}/calls`);
+	return (await answer.json()) as ForgeCall[];
+}
+
+/** What a fake forge keeps of a token (`fake_forge.token_tag`). */
+function tokenTag(token: string): string {
+	return createHash("sha256").update(token, "utf8").digest("hex").slice(0, 16);
+}
+
+/** Back to the list of projects, from wherever a scenario left the page. */
+async function home(page: Page, project: string): Promise<void> {
+	const button = page.getByRole("button", { name: project });
+	for (let i = 0; i < 6 && !(await button.isVisible()); i++) {
+		await page.goBack();
+		await page.waitForTimeout(300);
+	}
+	await expect(button).toBeVisible({ timeout: 30_000 });
+}
 
 let world: World;
 let app: http.Server;
@@ -288,7 +331,7 @@ test("the project's context, and a personal token kept on the server", async () 
 	await bob.getByText("Settings", { exact: true }).click();
 	await bob.getByRole("button", { name: "Manage my tokens" }).click();
 	await bob.getByRole("button", { name: "Add" }).first().click({ timeout: 30_000 });
-	const token = `ghp_${randomBytes(12).toString("hex")}`;
+	const token = bobGitHub;
 	await bob.getByLabel("GitHub token").fill(token);
 	await bob.getByRole("button", { name: "Save" }).click();
 	await expect(bob.getByText("Saved")).toBeVisible({ timeout: 30_000 });
@@ -367,4 +410,110 @@ test("the theme chosen on the phone follows the person to another device", async
 	}
 	await expect(projects).toBeVisible({ timeout: 30_000 });
 	await expect.poll(() => paints(elsewhere, "rgb(8, 47, 73)"), { timeout: 30_000 }).toBe(true);
+});
+
+test("Bob reads the team's GitHub from the phone, and comments with his own token", async () => {
+	// Bob saved his GitHub token on the server in an earlier scenario.
+	const bob = signedInPage("bob");
+	await home(bob, world.githubProject);
+	await bob.getByRole("button", { name: world.githubProject }).click();
+	await bob.getByRole("link", { name: "GitHub" }).click({ timeout: 30_000 });
+
+	// Pull requests first, with the files of the one opened.
+	await bob.getByText("#12 Add a welcome banner").click({ timeout: 30_000 });
+	await expect(bob.getByText("app.py").first()).toBeVisible({ timeout: 30_000 });
+	await shot(bob, "16-pull");
+	await bob.goBack();
+
+	await bob.getByRole("tab", { name: "Issues" }).click();
+	await bob.getByText("#7 The onboarding guide is missing").click({ timeout: 30_000 });
+	await expect(bob.getByText("New teammates have nothing to read on their first day.")).toBeVisible({
+		timeout: 30_000,
+	});
+	await expect(bob.getByText("A short page in docs/ would already help.")).toBeVisible();
+	const comment = `On it from the phone ${randomBytes(3).toString("hex")}`;
+	await bob.getByLabel("Your comment").fill(comment);
+	await bob.getByRole("button", { name: "Comment", exact: true }).click();
+	await expect
+		.poll(async () => (await forgeCalls()).some((c) => c.method === "POST" && JSON.stringify(c.body).includes(comment)))
+		.toBe(true);
+	await shot(bob, "17-issue");
+
+	const calls = (await forgeCalls()).filter((c) => c.host === "api.github.com");
+	const posted = calls.find((c) => c.method === "POST" && JSON.stringify(c.body).includes(comment));
+	expect(posted?.path).toBe("/repos/e2e-team/team-site/issues/7/comments");
+	// Every call carried Bob's own token, and the page never shows it.
+	expect(new Set(calls.map((c) => c.token))).toEqual(new Set([tokenTag(bobGitHub)]));
+	expect(await bob.content()).not.toContain(bobGitHub);
+});
+
+test("Alice adds her GitLab token and reads the team's merge requests", async () => {
+	const alice = signedInPage("alice");
+	await home(alice, world.gitlabProject);
+	await alice.getByText("Settings", { exact: true }).click();
+	await alice.getByRole("button", { name: "Manage my tokens" }).click();
+	const token = `glpat-${randomBytes(12).toString("hex")}`;
+	const field = alice.getByLabel("GitLab token");
+	if (!(await field.isVisible())) {
+		await alice.getByRole("button", { name: "Add" }).nth(1).click({ timeout: 30_000 });
+	}
+	await field.fill(token);
+	await alice.getByRole("button", { name: "Save" }).click();
+	await expect(alice.getByText("Saved")).toBeVisible({ timeout: 30_000 });
+
+	await home(alice, world.gitlabProject);
+	await alice.getByRole("button", { name: world.gitlabProject }).click();
+	await alice.getByRole("link", { name: "GitLab" }).click({ timeout: 30_000 });
+	await expect(alice.getByRole("tab", { name: "Merge requests" })).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText("#5 Document the deploy steps")).toBeVisible({ timeout: 30_000 });
+	await alice.getByRole("tab", { name: "Issues" }).click();
+	await expect(alice.getByText("#3 Write the release checklist")).toBeVisible({ timeout: 30_000 });
+	await shot(alice, "18-gitlab");
+
+	const calls = (await forgeCalls()).filter((c) => c.host === "gitlab.e2e.test");
+	expect(calls.map((c) => c.path)).toContain("/api/v4/projects/e2e-team%2Fteam-docs/merge_requests");
+	expect(new Set(calls.map((c) => c.token))).toEqual(new Set([tokenTag(token)]));
+});
+
+test("Alice approves a card's spec from the phone, builds it, and sends it back", async () => {
+	// Two runs of the fake agent, each released at once, and a second build.
+	test.setTimeout(300_000);
+	const alice = signedInPage("alice");
+	await home(alice, world.project);
+	await alice.getByRole("button", { name: world.project }).click();
+	await alice.getByRole("button", { name: "New card" }).click();
+	await alice.getByLabel("Title").fill("Greet the team by name");
+	await alice.getByLabel("Description").fill("hello() takes the team's name.");
+	// The review before coding stays on: the spec waits for an approval.
+	await alice.getByRole("button", { name: "Create" }).click();
+	await expect(alice.getByRole("heading", { name: "Greet the team by name" })).toBeVisible({ timeout: 30_000 });
+
+	// The spec phase runs on the server; the fake agent writes the spec.
+	await alice.getByRole("button", { name: "Start" }).click();
+	const approve = alice.getByRole("button", { name: "Approve the spec" });
+	await expect(approve).toBeVisible({ timeout: 90_000 });
+	await expect(alice.getByText("Spec written by the fake agent")).toBeVisible();
+	await approve.click();
+	await expect(alice.getByText("Approved by alice")).toBeVisible({ timeout: 30_000 });
+	await shot(alice, "19-approved");
+
+	// The build checks that approval, then the card waits for the team's
+	// review, its changes read from its workspace on the server. The build
+	// moved the plan on: the card still counts as approved.
+	await alice.getByRole("button", { name: "Start" }).click();
+	const requestChanges = alice.getByRole("button", { name: "Request changes" });
+	await expect(requestChanges).toBeVisible({ timeout: 90_000 });
+	await expect(alice.getByRole("button", { name: "Merge" })).toBeVisible();
+	await expect(alice.getByText("BUILD_NOTES.md").first()).toBeVisible({ timeout: 30_000 });
+	await shot(alice, "20-review");
+
+	// Sent back with what to change: the build it starts is not stopped for
+	// a new approval, and the card comes back to review.
+	await requestChanges.click();
+	await alice.getByPlaceholder("What should the agents change?").fill("Say good morning before noon.");
+	await alice.getByRole("button", { name: "Send", exact: true, disabled: false }).click();
+	await expect(alice.getByText(/^(Queued|Running)$/).first()).toBeVisible({ timeout: 60_000 });
+	await expect(requestChanges).toBeVisible({ timeout: 90_000 });
+	await expect(alice.getByText(/Failed/)).toHaveCount(0);
+	await shot(alice, "21-sent-back");
 });

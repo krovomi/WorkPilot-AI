@@ -50,6 +50,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # registries and its record; git through foundation. The QA gate that
     # calls it, and offline_policy, live in qa. A leaf.
     "dependency_guard": {"foundation"},
+    # The watch after a deployment (docs/architecture/deploy-watch.md): git and
+    # atomic writes through foundation, the strict offline policy. A leaf the
+    # deploy watch runner calls.
+    "deploy_watch": {"foundation", "offline_policy"},
     # The API contract watcher (docs/architecture/api-contract-watcher.md):
     # git through foundation; the consumer registry is read in the main
     # checkout (security.guardrail_policy.main_project). Its QA gate is in qa,
@@ -105,6 +109,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The board as an MCP server: the spec numbering lock and the MCP layer,
     # nothing that runs an agent (docs/architecture/board-mcp.md).
     "board_mcp": {"core", "mcp_tasks"},
+    # Import Design's render loop (docs/architecture/design-render-loop.md):
+    # the model catalogue (does this model read images?), nothing else. Its
+    # model call and its browser binary are handed in by the runner's glue
+    # (services), so it stays out of the agents' cycle. A leaf.
+    "design_to_code": {"models_registry"},
     # The changelog's prompts, git history and done cards, shared by its
     # runner and the server's routes: the board, git and the untrusted-content
     # fence, nothing that runs an agent (its model call is the runner's,
@@ -123,6 +132,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The repo bench: git, files and test runners, read by Formula Lab and
     # the model router. A leaf, or the router's cycle reaches it.
     "bench": {"foundation"},
+    # Git snapshots of a task's worktree before each agent session, and the
+    # rollback (docs/architecture/agent-safety.md): git through foundation only.
+    "agent_snapshots": {"foundation"},
     # The security layer reads the project's stack (allowlist per stack), the
     # injection scanner, and rtk to see the command behind the proxy
     # (docs/architecture/rtk.md).
@@ -175,9 +187,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The agent runtime as a port (docs/architecture/agent-runtime.md): core
     # installs it, the units below reach a session through it. A leaf.
     "agent_runtime": set(),
+    # The merge preview reads git and asks no model; the AI merge of a file
+    # lives in core.workspace.
+    "merge": {"foundation"},
     # Taken out of the agents' cycle by the port (plan of 29 October, A1):
     # each starts its session through agent_runtime, never core or agents.
-    "merge": {"agent_runtime", "foundation"},
     "integrations": {
         "agent_runtime",
         "foundation",
@@ -185,7 +199,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "phase_config",
         "server",
     },
-    "analysis": {"agent_runtime", "foundation", "project", "security"},
+    "analysis": {"agent_runtime", "foundation"},
     # The subagent registry, out of agents (it never imported it): read by
     # core, the skills emitter and the learning loop.
     "subagents": {"mobile", "project", "skills_registry"},
@@ -213,7 +227,17 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The shared brain and what sits on it: with docintel, a cycle of five of
     # their own below the agents' one; none of them imports core, agents or a
     # phase.
-    "brain": {"docintel", "foundation", "learning_loop", "skills_registry"},
+    # agent_runtime (a leaf) and security (clean_untrusted): the model's
+    # opinion on a queued memory conflict, asked by a person
+    # (brain/lifecycle/advisor.py); neither reaches back to brain.
+    "brain": {
+        "agent_runtime",
+        "docintel",
+        "foundation",
+        "learning_loop",
+        "security",
+        "skills_registry",
+    },
     # The model analysis (F178) asks the agent_runtime port, never core.
     "learning_loop": {
         "agent_runtime",
