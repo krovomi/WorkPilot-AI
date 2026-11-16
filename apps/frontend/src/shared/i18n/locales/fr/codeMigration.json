@@ -45,7 +45,10 @@
 		"target": "Cible",
 		"log": "Journal de l’analyse",
 		"readyHint": "Le planificateur connaît cette migration. Créez la tâche Kanban pour l’appliquer : les agents suivent le plan et lancent les vérifications du projet.",
-		"unsupportedHint": "Le planificateur à règles ne connaît pas cette paire. La tâche Kanban l’applique quand même : les agents la planifient pour la pile du projet et lancent ses vérifications."
+		"unsupportedHint": "Le planificateur à règles ne connaît pas cette paire. La tâche Kanban l’applique quand même : les agents la planifient pour la pile du projet et lancent ses vérifications.",
+		"risk": "Risque",
+		"plan_one": "Migration planifiée, {{count}} étape",
+		"plan_other": "Migration planifiée, {{count}} étapes"
 	},
 	"empty": {
 		"title": "Décrivez une migration",
@@ -59,12 +62,19 @@
 		"ready": "Plan connu",
 		"unsupported": "Plan libre"
 	},
+	"risk": {
+		"low": "Faible",
+		"medium": "Moyen",
+		"high": "Élevé",
+		"critical": "Critique"
+	},
 	"task": {
 		"title": "Migration : {{description}}",
 		"scope": "Migrer tout le projet, pile par pile, sans changer son comportement.",
 		"acceptance": "Terminé quand le projet compile et que ses tests existants passent sur chaque pile concernée.",
 		"source": "Pile détectée par l’analyse : {{source}}.",
-		"created": "Tâche « {{title}} » créée dans le backlog du Kanban."
+		"created": "Tâche « {{title}} » créée dans le backlog du Kanban.",
+		"plan": "Plan issu de l’analyse (phases et étapes) :"
 	},
 	"errors": {
 		"noProject": "Sélectionnez un projet pour l’analyser ou le migrer."
