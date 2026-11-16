@@ -5,6 +5,13 @@
 // Module-level EUR rate cache (shared across all consumers)
 let _eurRate = 0.92;
 let _eurRateFetchedAt = 0;
+/** The request in flight: pages that open together share one. */
+let _inFlight: Promise<number> | null = null;
+
+/** The last known EUR rate, before any request answers. */
+export function knownEurRate(): number {
+	return _eurRate;
+}
 
 /**
  * Fetch the current EUR/USD exchange rate from open.er-api.com.
@@ -13,6 +20,13 @@ let _eurRateFetchedAt = 0;
 export async function getEurRate(): Promise<number> {
 	const STALE_MS = 24 * 60 * 60 * 1000; // 24 h
 	if (Date.now() - _eurRateFetchedAt < STALE_MS) return _eurRate;
+	_inFlight ??= fetchEurRate().finally(() => {
+		_inFlight = null;
+	});
+	return _inFlight;
+}
+
+async function fetchEurRate(): Promise<number> {
 	try {
 		const res = await fetch("https://open.er-api.com/v6/latest/USD");
 		if (res.ok) {
