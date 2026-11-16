@@ -215,6 +215,8 @@ export class DesignToCodeService {
 		if (figmaUrl) args.push("--figma-url", figmaUrl);
 		if (req.generateTests === false) args.push("--no-tests");
 		if (req.useDesignTokens === false) args.push("--no-tokens");
+		// Strictly a boolean: the loop renders and calls a vision model again.
+		if (req.renderLoop === true) args.push("--render-loop");
 		const instructions = shortText(req.customInstructions);
 		if (instructions) args.push("--instructions", instructions);
 
