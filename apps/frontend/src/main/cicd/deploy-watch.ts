@@ -15,7 +15,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
+	DeployIncident,
 	DeployMetricCheck,
+	DeployRevertPr,
+	DeployRevertStatus,
 	DeployRollbackPlan,
 	DeployRollbackState,
 	DeployWatch,
@@ -28,6 +31,7 @@ export const RUN_ID = /^[0-9]{1,20}$/;
 const MAX_STATE_BYTES = 2 * 1024 * 1024;
 const MAX_TEXT = 300;
 const MAX_LIST = 50;
+const MAX_EXPLANATION = 1200;
 
 const LEVELS: readonly DeployWatchLevel[] = ["ok", "warning", "critical", "unknown"];
 const PHASES: readonly DeployWatchPhase[] = ["baseline", "waiting", "watching", "done"];
@@ -37,6 +41,18 @@ const ROLLBACKS: readonly DeployRollbackState[] = [
 	"failed",
 	"blocked_migrations",
 	"manual",
+];
+
+const REVERTS: readonly DeployRevertStatus[] = [
+	"opened",
+	"exists",
+	"failed",
+	"conflict",
+	"no_commit",
+	"unknown_commit",
+	"not_on_branch",
+	"offline",
+	"unavailable",
 ];
 
 /** The CI/CD settings name something to watch after a deployment. */
@@ -92,6 +108,45 @@ function plan(raw: unknown): DeployRollbackPlan | undefined {
 	};
 }
 
+function https(value: unknown): string {
+	const url = text(value, 500);
+	return url.startsWith("https://") && !/\s/.test(url) ? url : "";
+}
+
+function count(value: unknown): number {
+	return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function revertPr(raw: unknown): DeployRevertPr | undefined {
+	const r = record(raw);
+	if (!REVERTS.includes(r.status as DeployRevertStatus)) return undefined;
+	return { status: r.status as DeployRevertStatus, url: https(r.url), sha: text(r.sha, 40) };
+}
+
+function incident(raw: unknown): DeployIncident | undefined {
+	if (!raw || typeof raw !== "object") return undefined;
+	const i = record(raw);
+	const summary = record(i.summary);
+	const health = record(summary.health);
+	return {
+		criticalSamples: count(summary.critical_samples),
+		warningSamples: count(summary.warning_samples),
+		healthChecks: count(health.checks),
+		healthFailed: count(health.failed),
+		metrics: (Array.isArray(summary.metrics) ? summary.metrics : []).slice(0, MAX_LIST).map((entry) => {
+			const m = record(entry);
+			return {
+				name: text(m.name, 60),
+				baseline: num(m.baseline),
+				worst: num(m.worst),
+				worstChangePct: num(m.worst_change_pct),
+				level: oneOf(m.level, LEVELS, "unknown"),
+			};
+		}),
+		explanation: text(i.explanation, MAX_EXPLANATION),
+	};
+}
+
 /** The state the runner wrote, typed and bounded. */
 export function parseDeployWatch(raw: unknown, live: boolean): DeployWatch | undefined {
 	const s = record(raw);
@@ -124,6 +179,68 @@ export function parseDeployWatch(raw: unknown, live: boolean): DeployWatch | und
 			? { rollback: s.rollback as DeployRollbackState }
 			: {}),
 		rollbackByPerson: s.rollback_by === "person",
+		...(revertPr(s.revert_pr) ? { revertPr: revertPr(s.revert_pr) } : {}),
+		...(incident(s.incident) ? { incident: incident(s.incident) } : {}),
+	};
+}
+
+const ALERT_WORDS = {
+	en: {
+		critical: (project: string) => `Deployment critical: ${project}`,
+		warning: (project: string) => `Deployment degraded: ${project}`,
+		criticalBody: (run: string) => `Run ${run}: two critical samples in a row after the deployment.`,
+		warningBody: (run: string) => `Run ${run}: the metrics got worse during the watch window.`,
+		rollback: {
+			proposed: "A rollback is proposed on the CI/CD page.",
+			started: "The rollback started.",
+			failed: "The rollback could not start.",
+			blocked_migrations: "Automatic rollback blocked by a database migration.",
+			manual: "Roll back by hand.",
+		} satisfies Record<DeployRollbackState, string>,
+		revertOpened: (url: string) => `Revert PR: ${url}`,
+		revertMissed: "The revert PR could not be opened.",
+	},
+	fr: {
+		critical: (project: string) => `Déploiement critique : ${project}`,
+		warning: (project: string) => `Déploiement dégradé : ${project}`,
+		criticalBody: (run: string) => `Exécution ${run} : deux mesures critiques d'affilée après le déploiement.`,
+		warningBody: (run: string) => `Exécution ${run} : les métriques se sont dégradées pendant la fenêtre de surveillance.`,
+		rollback: {
+			proposed: "Un rollback est proposé sur la page CI/CD.",
+			started: "Le rollback a démarré.",
+			failed: "Le rollback n'a pas pu démarrer.",
+			blocked_migrations: "Rollback automatique bloqué par une migration de base de données.",
+			manual: "Rollback à faire à la main.",
+		} satisfies Record<DeployRollbackState, string>,
+		revertOpened: (url: string) => `PR de revert : ${url}`,
+		revertMissed: "La PR de revert n'a pas pu être ouverte.",
+	},
+};
+
+/**
+ * The notification of a watch that ended on a warning or critical verdict,
+ * in the app's language; null for any other watch. Facts of the state only:
+ * no model text goes to a notification channel.
+ */
+export function deployAlertText(
+	language: string,
+	project: string,
+	watch: DeployWatch | undefined,
+): { title: string; body: string } | null {
+	if (watch?.phase !== "done") return null;
+	if (watch.verdict !== "warning" && watch.verdict !== "critical") return null;
+	const words = language === "fr" ? ALERT_WORDS.fr : ALERT_WORDS.en;
+	const critical = watch.verdict === "critical";
+	const lines = [critical ? words.criticalBody(watch.runId) : words.warningBody(watch.runId)];
+	if (watch.rollback) lines.push(words.rollback[watch.rollback]);
+	if (watch.revertPr) {
+		const opened = watch.revertPr.status === "opened" || watch.revertPr.status === "exists";
+		if (opened && watch.revertPr.url) lines.push(words.revertOpened(watch.revertPr.url));
+		else if (!opened) lines.push(words.revertMissed);
+	}
+	return {
+		title: critical ? words.critical(project) : words.warning(project),
+		body: lines.join(" "),
 	};
 }
 

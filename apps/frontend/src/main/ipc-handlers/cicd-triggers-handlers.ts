@@ -32,23 +32,30 @@ import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { envWithoutCredentials } from "../utils/child-env";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { getAppLanguage } from "../app-language";
+import { notificationService } from "../notification-service";
 import {
 	DEPLOY_WATCH_RUNNER,
 	LiveDeployWatches,
 	RUN_ID,
+	deployAlertText,
 	readDeployWatch,
 	watchConfigured,
 } from "../cicd/deploy-watch";
 
 
-function getRunnerPath(runner = "cicd_triggers_runner.py"): string {
+function getBackendPath(): string {
 	// Bundled resources once packaged, `apps/backend` in dev (app path is
 	// `apps/frontend`). Walking up from `import.meta.dirname` (`out/main`)
 	// left the repository and the runner was never found.
-	const backendPath = app.isPackaged
+	return app.isPackaged
 		? path.resolve(process.resourcesPath, "backend")
 		: path.resolve(app.getAppPath(), "..", "backend");
-	return path.join(backendPath, "runners", runner);
+}
+
+function getRunnerPath(runner = "cicd_triggers_runner.py"): string {
+	return path.join(getBackendPath(), "runners", runner);
 }
 
 /**
@@ -171,6 +178,7 @@ async function runRunner(
 	project: Project,
 	args: string[],
 	runner?: string,
+	runnerEnv?: Record<string, string>,
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
 	const pythonPath = getConfiguredPythonPath();
 	const [cmd, pythonBaseArgs] = parsePythonCommand(pythonPath);
@@ -179,7 +187,7 @@ async function runRunner(
 	return new Promise((resolve) => {
 		// Only the CI/CD settings, decrypted: the project's files are never
 		// spread whole into the child's environment.
-		const env = envWithoutCredentials(process.env, readCicdConfig(project));
+		const env = runnerEnv ?? envWithoutCredentials(process.env, readCicdConfig(project));
 
 		const proc = spawn(cmd, cmdArgs, { env, cwd: project.path });
 		const stdout: string[] = [];
@@ -259,13 +267,22 @@ function startDeployWatch(project: Project, runId: string): void {
 		return;
 	}
 	if (!watchConfigured(config)) return;
-	liveWatches.start(project.path, runId, () =>
-		runRunner(
+	liveWatches.start(project.path, runId, async () => {
+		// The environment of a Python runner (the user's provider and its key,
+		// for the incident report) plus the CI/CD settings: no more than any
+		// view runner gets (docs/rules/security.md, S4).
+		const env = await pythonRunnerEnv(getBackendPath(), { extra: config });
+		await runRunner(
 			project,
 			["--action", "watch", "--project", project.path, "--run-id", runId],
 			DEPLOY_WATCH_RUNNER,
-		),
-	);
+			env,
+		);
+		// A warning or critical verdict reaches the person on the app's
+		// notification channels (desktop, ntfy, Telegram).
+		const alert = deployAlertText(getAppLanguage(), project.name, readDeployWatch(project.path, runId, true));
+		if (alert) notificationService.announce(project.id, alert);
+	});
 }
 
 /**
