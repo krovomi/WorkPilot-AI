@@ -24,3 +24,6 @@ section: 🐛 Corrections
 - **Exigences tirées des pièces jointes** : un `drafts.json` retouché à la main (une proposition
   sans tous ses champs, un identifiant accepté d'une autre forme) n'empêche plus la carte de
   charger ni la décision d'aboutir ; l'entrée incomplète est ignorée.
+- **QA visuelle** : un `visual_qa.json` retouché à la main (une liste remplacée par un nombre
+  ou un texte, une lecture qui n'en est pas une) ne fait plus échouer chaque revue suivante ni
+  le rapport ; ce qui ne se lit pas est ignoré.
