@@ -255,6 +255,9 @@ export interface SidebarPrefs {
 	pinnedGroups: string[];
 	groupOrder: string[];
 	itemOrder: Record<string, string[]>;
+	// Pages the user moved to another space: page id → group id
+	// (renderer/components/sidebar/menu-layout.ts). Unset = shipped place.
+	itemGroups?: Record<string, string>;
 	expandedGroups: string[];
 	favoritesExpanded: boolean;
 	// Hides the views EXPERIMENTAL_VIEWS lists (renderer/components/sidebar).

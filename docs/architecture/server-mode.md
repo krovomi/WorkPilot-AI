@@ -94,6 +94,15 @@ Toute autre valeur, un champ en trop ou manquant est refusé (422). L'app de bur
 connexion et l'écrit quand le thème change (`main/server-ui-preferences.ts`), le téléphone de
 même ([mobile-app.md](mobile-app.md#les-thèmes)).
 
+**Le menu qu'elle a arrangé la suit de même** (table `user_menu_layouts`, révision `0015`).
+`GET /users/me/preferences/menu` rend `{"layout": …}` (`null` tant qu'elle n'en a enregistré
+aucun) : l'ordre des espaces et de leurs pages, les pages déplacées vers un autre espace, les
+épingles et les pages masquées, sous les noms des réglages du bureau. `PUT` le remplace. Seuls
+des identifiants du menu (minuscules, chiffres, tirets, 64 caractères au plus) dans des listes
+bornées passent (`MenuLayout`, `server/services/preferences.py`), le reste est refusé (422).
+Le bureau le lit à la connexion, où il remplace le sien, donne le sien à un serveur qui n'en a
+pas, et l'envoie quand la personne réarrange le menu (`main/server-menu-layout.ts`).
+
 ## Ce qu'un run voit sur le disque
 
 Tous les runs de toutes les organisations tournent sous le même utilisateur de l'OS, à côté des
