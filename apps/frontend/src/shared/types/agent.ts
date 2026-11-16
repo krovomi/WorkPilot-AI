@@ -37,6 +37,19 @@ export interface ClaudeUsageData {
  * Real-time usage snapshot for proactive monitoring
  * Returned from API or CLI usage check
  */
+/**
+ * How the account shown in the usage panel is billed.
+ *
+ * `subscription`: a plan with usage windows (Claude, ChatGPT, Copilot,
+ * Windsurf, Cursor…); `api`: an API key billed per use. `name` is the plan as
+ * the provider reports it ("Claude Max 20x", "ChatGPT Plus"), absent when the
+ * provider does not say: the UI then names the billing mode only.
+ */
+export interface UsagePlan {
+	billing: "subscription" | "api";
+	name?: string;
+}
+
 export interface UsageSnapshot {
 	/** Session usage percentage (0-100) - represents 5-hour window for most providers */
 	sessionPercent: number;
@@ -91,6 +104,9 @@ export interface UsageSnapshot {
 	/** Provider name this snapshot belongs to (e.g., 'anthropic', 'openai', 'ollama', 'ollama_local') */
 	providerName?: string;
 
+	/** Plan of the account shown, added by `main/claude-profile/usage-plan.ts` */
+	plan?: UsagePlan;
+
 	/**
 	 * True when nothing was measured for this provider: the percentages are
 	 * placeholders, and the UI must say "not measured" rather than show 0%.
@@ -133,6 +149,8 @@ export interface UsageSnapshot {
 		// --- scope: personal-quotas (Premium Requests / quotas utilisateur) ---
 		/** Plan Copilot ("business", "enterprise", "individual", ...) */
 		plan?: string;
+		/** `access_type_sku` de GitHub : distingue Copilot Pro+ de Pro */
+		sku?: string;
 		/** Nom d'organisation (si Copilot Business/Enterprise) */
 		organization?: string;
 		/** Premium requests consommées sur le cycle de facturation */
@@ -282,6 +300,8 @@ export interface ProfileUsageSummary {
 	fetchError?: string;
 	/** True if profile has invalid refresh token and needs re-authentication */
 	needsReauthentication?: boolean;
+	/** Plan of this account, when its credentials say which */
+	plan?: UsagePlan;
 }
 
 /**

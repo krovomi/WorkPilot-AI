@@ -138,3 +138,107 @@ def test_a_mixed_change_keeps_the_coverage_gate():
     )
     assert not windev_only(scope)
     assert windev_only(ChangeScope("full", "t", files=("X.wdw.binary",), base="a"))
+
+
+def _invent_a_control(repo: Path) -> None:
+    window = repo / "FEN_Clients.wdw"
+    window.write_text(
+        window.read_text(encoding="utf-8").replace(
+            "  -\n    name : SAI_Nom\n",
+            "  -\n    name : SAI_Prenom\n"
+            "    identifier : 0x24f4cd010a15ffff\n"
+            "    internal_properties : InventedByAModel\n"
+            "  -\n    name : SAI_Nom\n",
+        ),
+        encoding="utf-8",
+    )
+
+
+class TestTheReads:
+    def test_a_missing_git_leaves_the_file_unchecked(self, task, monkeypatch):
+        import qa.windev_gate as gate
+
+        repo, _ = task
+        monkeypatch.setattr(gate, "get_git_executable", lambda: str(repo / "no-git"))
+
+        assert gate._git_blob(repo, "HEAD", "COL_Clients.wdg") == (False, None)
+
+    def test_a_file_too_large_is_not_read(self, task, monkeypatch):
+        import qa.windev_gate as gate
+
+        repo, _ = task
+        monkeypatch.setattr(gate, "_MAX_BYTES", 8)
+
+        assert gate._git_blob(repo, "HEAD", "COL_Clients.wdg") == (False, None)
+        assert gate._disk(repo.resolve(), "COL_Clients.wdg") == (False, None)
+
+    def test_a_link_out_of_the_worktree_is_not_read(self, task, tmp_path):
+        import qa.windev_gate as gate
+
+        repo, _ = task
+        outside = tmp_path / "outside.wdw"
+        outside.write_text(WINDOW, encoding="utf-8")
+        try:
+            (repo / "FEN_Lien.wdw").symlink_to(outside)
+        except OSError:
+            pytest.skip("this system cannot create a symbolic link")
+
+        assert gate._disk(repo.resolve(), "FEN_Lien.wdw") == (False, None)
+
+    def test_a_deleted_file_is_absent_and_an_unreadable_one_unchecked(
+        self, task, monkeypatch
+    ):
+        import qa.windev_gate as gate
+
+        repo, _ = task
+        root = repo.resolve()
+        assert gate._disk(root, "FEN_Absente.wdw") == (True, None)
+
+        def denied(self):
+            raise PermissionError("denied")
+
+        monkeypatch.setattr(Path, "read_bytes", denied)
+        assert gate._disk(root, "COL_Clients.wdg") == (False, None)
+
+
+class TestTheRejection:
+    def test_without_a_plan_it_still_stands(self, task):
+        repo, spec = task
+        (spec / "implementation_plan.json").unlink()
+        _invent_a_control(repo)
+
+        _, gate = _run(repo, spec)
+
+        assert gate is not None and (spec / "QA_FIX_REQUEST.md").exists()
+
+    def test_an_unwritable_fix_request_does_not_lose_it(self, task):
+        repo, spec = task
+        (spec / "QA_FIX_REQUEST.md").mkdir()
+        _invent_a_control(repo)
+
+        _, gate = _run(repo, spec)
+
+        assert gate is not None and "rejected" in gate[1]
+
+    def test_a_record_that_cannot_be_written_skips_the_check(self, task):
+        repo, spec = task
+        (spec / RECORD).mkdir()
+        _invent_a_control(repo)
+
+        assert _run(repo, spec)[1] is None
+
+    def test_the_problems_go_to_the_task_log(self, task):
+        repo, spec = task
+        logged: list[tuple[str, str]] = []
+
+        class Log:
+            def log(self, message, kind, phase):
+                logged.append((message, kind.value))
+
+        _invent_a_control(repo)
+        windev_gate(spec, repo, 1, change_scope(repo, "main"), task_logger=Log())
+        unreadable = ChangeScope("full", "t", files=("COL_Clients.wdg",), base="0" * 40)
+        windev_gate(spec, repo, 2, unreadable, task_logger=Log())
+
+        assert [kind for _, kind in logged] == ["error", "warning"]
+        assert "could not be read" in logged[1][0]

@@ -208,6 +208,9 @@ class TestTheQaFixerCarriesTheTasksLessons:
         class _Client:
             prompt = ""
 
+            def provider_name(self) -> str:
+                return "test"
+
             async def query(self, prompt: str) -> None:
                 _Client.prompt = prompt
                 raise _Stop  # the prompt is all this test needs
