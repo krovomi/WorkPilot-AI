@@ -58,6 +58,8 @@ export interface PixelOfficeSettings {
 	showGrid: boolean;
 	soundEnabled: boolean;
 	autoAssignSeats: boolean;
+	/** Calm mode: the characters and the queue hold still (TV mode's switch). */
+	calmMode: boolean;
 }
 
 /**
@@ -391,6 +393,7 @@ const DEFAULT_SETTINGS: PixelOfficeSettings = {
 	showGrid: false,
 	soundEnabled: false,
 	autoAssignSeats: true,
+	calmMode: false,
 };
 
 export const usePixelOfficeStore = create<PixelOfficeState>()(

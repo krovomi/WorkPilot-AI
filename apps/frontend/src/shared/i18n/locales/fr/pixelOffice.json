@@ -107,5 +107,55 @@
 	"pending": {
 		"description": "Cette tâche est en file d'attente et n'a pas encore démarré. Rends-toi dans le Kanban pour la lancer, la prioriser ou modifier sa spécification.",
 		"hint": "En attente d'un agent disponible"
+	},
+	"achievements": {
+		"title": "Succès",
+		"open": "Voir les succès du projet",
+		"count": "{{earned}}/{{total}}",
+		"unlocked": "Succès débloqué",
+		"dismiss": "Fermer",
+		"locked": "Pas encore obtenu",
+		"earnedOn": "Obtenu le {{date}}",
+		"items": {
+			"first-ship": {
+				"name": "Première livraison",
+				"description": "Une tâche est terminée ou devenue une pull request."
+			},
+			"ten-ships-week": {
+				"name": "Belle semaine",
+				"description": "Dix tâches livrées en sept jours."
+			},
+			"qa-first-try": {
+				"name": "Du premier coup",
+				"description": "Une tâche a passé la QA à sa première revue."
+			},
+			"qa-first-try-five": {
+				"name": "Main sûre",
+				"description": "Cinq tâches ont passé la QA à leur première revue."
+			},
+			"incident-resolved": {
+				"name": "Retour au vert",
+				"description": "Un incident Self-Healing a été résolu."
+			},
+			"incident-fixed-by-agent": {
+				"name": "Réparé tout seul",
+				"description": "Un agent a ouvert la pull request qui a résolu un incident."
+			},
+			"second-opinion": {
+				"name": "Deuxième avis",
+				"description": "Un second moteur a relu une tâche et l'a approuvée."
+			}
+		}
+	},
+	"kiosk": {
+		"enter": "Mode TV",
+		"exit": "Quitter le mode TV",
+		"calmOn": "Mode calme",
+		"calmOff": "Animations",
+		"calmLocked": "Votre système demande moins d'animations : le bureau reste immobile.",
+		"active": "Actifs",
+		"waiting": "Vous attendent",
+		"shippedToday": "Livrées aujourd'hui",
+		"achievements": "Succès"
 	}
 }

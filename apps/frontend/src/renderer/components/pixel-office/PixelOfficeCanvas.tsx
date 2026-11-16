@@ -458,6 +458,8 @@ interface PixelOfficeCanvasProps {
 	readonly height: number;
 	/** Translated caption drawn on a desk nobody sits at. */
 	readonly emptyDeskLabel: string;
+	/** Calm: the scene is still drawn, but nothing bobs, glows or blinks. */
+	readonly calm?: boolean;
 	readonly onAgentClick?: (
 		agentId: string,
 		screenX: number,
@@ -469,6 +471,7 @@ export function PixelOfficeCanvas({
 	width,
 	height,
 	emptyDeskLabel,
+	calm = false,
 	onAgentClick,
 }: PixelOfficeCanvasProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -508,6 +511,8 @@ export function PixelOfficeCanvas({
 	sizeRef.current = { width, height };
 	const emptyLabelRef = useRef(emptyDeskLabel);
 	emptyLabelRef.current = emptyDeskLabel;
+	const calmRef = useRef(calm);
+	calmRef.current = calm;
 
 	// ── Render loop ────────────────────────────────────────
 
@@ -527,7 +532,8 @@ export function PixelOfficeCanvas({
 		const delta = timestamp - lastTimeRef.current;
 		if (delta < 1000 / TARGET_FPS) return;
 		lastTimeRef.current = timestamp;
-		frameRef.current++;
+		// Every animation reads the frame counter: holding it still is calm mode.
+		if (!calmRef.current) frameRef.current++;
 
 		const z = zoomRef.current;
 		const agents = seatedRef.current;
