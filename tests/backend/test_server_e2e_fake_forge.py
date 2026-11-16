@@ -111,11 +111,14 @@ def test_a_clone_of_the_github_url_reads_the_local_repository(
             **stack.server_env("sqlite://", tmp_path / "repos"),
             **forge.env(f"{served}/origin.git"),
         }
-        subprocess.run(
+        cloned = subprocess.run(
             ["git", "clone", "-q", GITHUB_CLONE_URL, str(tmp_path / "clone")],
             env=env,
-            check=True,
             capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=60,
         )
+    assert cloned.returncode == 0, cloned.stderr
     assert (tmp_path / "clone" / "app.py").is_file()
