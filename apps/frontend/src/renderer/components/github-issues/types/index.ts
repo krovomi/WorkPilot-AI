@@ -64,8 +64,6 @@ export interface IssueListHeaderProps {
 	readonly onRefresh: () => void;
 	// Auto-fix toggle (reactive - for new issues)
 	readonly autoFixEnabled?: boolean;
-	readonly autoFixRunning?: boolean;
-	readonly autoFixProcessing?: number; // Number of issues being processed
 	readonly onAutoFixToggle?: (enabled: boolean) => void;
 	// Analyze & Group (proactive - for existing issues)
 	readonly onAnalyzeAndGroup?: () => void;

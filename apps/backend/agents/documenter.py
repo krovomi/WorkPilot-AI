@@ -292,10 +292,7 @@ class DocAnalyzer:
                 args = [a.arg for a in child.args.args if a.arg not in ("self", "cls")]
                 return_type = None
                 if child.returns:
-                    try:
-                        return_type = ast.unparse(child.returns)
-                    except Exception:
-                        pass
+                    return_type = ast.unparse(child.returns)
 
                 if docstring:
                     # Check if partial (has docstring but missing args docs)
@@ -351,7 +348,7 @@ class DocAnalyzer:
                             info.classes.append(sym.name)
                         elif sym.symbol_type == "function":
                             info.functions.append(sym.name)
-                except Exception:
+                except OSError:  # the file went away while the folder was read
                     pass
 
                 # Extract imports for dependencies (Python's are read exactly)
@@ -371,8 +368,8 @@ class DocAnalyzer:
                             dep = node.module.split(".")[0]
                             if dep not in info.dependencies:
                                 info.dependencies.append(dep)
-                except Exception:
-                    pass
+                except (OSError, SyntaxError, ValueError):
+                    pass  # not UTF-8, or not Python a parser reads
 
             elif os.path.isdir(full_path) and not entry.startswith("."):
                 init_file = os.path.join(full_path, "__init__.py")
@@ -389,8 +386,8 @@ class DocAnalyzer:
                 docstring = ast.get_docstring(tree)
                 if docstring:
                     info.description = docstring.split("\n")[0]
-            except Exception:
-                pass
+            except (OSError, SyntaxError, ValueError):
+                pass  # no description from an unreadable __init__.py
 
         return info
 
@@ -532,8 +529,6 @@ class DocGenerator:
         name = symbol.name.split(".")[-1]
         # Convert snake_case to words
         words = name.replace("_", " ").strip()
-        if words.startswith("  "):
-            words = words.lstrip()
         if not words:
             # Empty name: leave the slot blank rather than emitting a TODO
             # that would leak into the final docstring.
