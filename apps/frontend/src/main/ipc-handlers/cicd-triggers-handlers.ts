@@ -8,6 +8,10 @@
  *   cicdTriggers:trigger        — Manually trigger a pipeline for a PR
  *   cicdTriggers:getRunStatus   — Get status of a specific pipeline run
  *   cicdTriggers:cancelRun      — Cancel a running pipeline
+ *   cicdTriggers:rollback       — Roll a watched deployment back (#366)
+ *
+ * A triggered run is then watched when the settings name a health check or
+ * Prometheus (`main/cicd/deploy-watch.ts`, `apps/backend/deploy_watch/`).
  *
  * Supported providers: GitHub Actions, GitLab CI, Azure DevOps Pipelines, Jenkins
  */
@@ -28,16 +32,23 @@ import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { envWithoutCredentials } from "../utils/child-env";
+import {
+	DEPLOY_WATCH_RUNNER,
+	LiveDeployWatches,
+	RUN_ID,
+	readDeployWatch,
+	watchConfigured,
+} from "../cicd/deploy-watch";
 
 
-function getRunnerPath(): string {
+function getRunnerPath(runner = "cicd_triggers_runner.py"): string {
 	// Bundled resources once packaged, `apps/backend` in dev (app path is
 	// `apps/frontend`). Walking up from `import.meta.dirname` (`out/main`)
 	// left the repository and the runner was never found.
 	const backendPath = app.isPackaged
 		? path.resolve(process.resourcesPath, "backend")
 		: path.resolve(app.getAppPath(), "..", "backend");
-	return path.join(backendPath, "runners", "cicd_triggers_runner.py");
+	return path.join(backendPath, "runners", runner);
 }
 
 /**
@@ -75,6 +86,13 @@ export const CICD_CONFIG_KEYS: Readonly<Record<string, string>> = {
 	jenkins_url: "CICD_JENKINS_URL",
 	jenkins_token: "CICD_JENKINS_TOKEN",
 	jenkins_job: "CICD_JENKINS_JOB",
+	// The watch after a deployment (#366).
+	monitor_health_url: "CICD_MONITOR_HEALTH_URL",
+	monitor_prometheus_url: "CICD_MONITOR_PROMETHEUS_URL",
+	monitor_prometheus_token: "CICD_MONITOR_PROMETHEUS_TOKEN",
+	monitor_window_minutes: "CICD_MONITOR_WINDOW_MINUTES",
+	monitor_deploy_wait_minutes: "CICD_MONITOR_DEPLOY_WAIT_MINUTES",
+	auto_rollback: "CICD_AUTO_ROLLBACK",
 };
 
 /** What getConfig shows for a token that is set; sent back, it means "unchanged". */
@@ -152,10 +170,11 @@ async function writeCicdConfig(
 async function runRunner(
 	project: Project,
 	args: string[],
+	runner?: string,
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
 	const pythonPath = getConfiguredPythonPath();
 	const [cmd, pythonBaseArgs] = parsePythonCommand(pythonPath);
-	const cmdArgs = [...pythonBaseArgs, getRunnerPath(), ...args];
+	const cmdArgs = [...pythonBaseArgs, getRunnerPath(runner), ...args];
 
 	return new Promise((resolve) => {
 		// Only the CI/CD settings, decrypted: the project's files are never
@@ -229,6 +248,26 @@ interface RunOrigin {
 
 type RunnerResult = Awaited<ReturnType<typeof runRunner>>;
 
+const liveWatches = new LiveDeployWatches();
+
+/** Starts the watch of a triggered run when the settings name something to watch. */
+function startDeployWatch(project: Project, runId: string): void {
+	let config: Record<string, string>;
+	try {
+		config = readCicdConfig(project);
+	} catch {
+		return;
+	}
+	if (!watchConfigured(config)) return;
+	liveWatches.start(project.path, runId, () =>
+		runRunner(
+			project,
+			["--action", "watch", "--project", project.path, "--run-id", runId],
+			DEPLOY_WATCH_RUNNER,
+		),
+	);
+}
+
 /**
  * Triggers the configured pipeline and records the run in
  * `.workpilot/cicd_runs.json`: pending first, then triggered or failed.
@@ -274,6 +313,7 @@ async function triggerPipeline(
 		(runs[idx] as Record<string, unknown>).run_data = result.data;
 		fs.writeFileSync(getRunsLogPath(project.path), JSON.stringify(runs, null, 2), "utf-8");
 	}
+	if (result.success) startDeployWatch(project, run.id);
 	return { id: run.id, triggeredAt: run.triggered_at, result };
 }
 
@@ -350,6 +390,14 @@ export async function autoTriggerForTask(
 	}
 }
 
+/** A run of the log with its deployment watch, when it has one. */
+function withWatch(projectPath: string, run: object): object {
+	const id = (run as { id?: unknown }).id;
+	if (typeof id !== "string") return run;
+	const watch = readDeployWatch(projectPath, id, liveWatches.isLive(projectPath, id));
+	return watch ? { ...run, watch } : run;
+}
+
 export function registerCICDTriggersHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.CICD_TRIGGERS_GET_CONFIG, (_event, projectDir: unknown) => {
 		const project = findKnownProject(projectDir);
@@ -380,6 +428,13 @@ export function registerCICDTriggersHandlers(): void {
 					jenkins_url: cfg.CICD_JENKINS_URL ?? "",
 					jenkins_token: cfg.CICD_JENKINS_TOKEN ? "***" : "",
 					jenkins_job: cfg.CICD_JENKINS_JOB ?? "",
+					// Watch after a deployment
+					monitor_health_url: cfg.CICD_MONITOR_HEALTH_URL ?? "",
+					monitor_prometheus_url: cfg.CICD_MONITOR_PROMETHEUS_URL ?? "",
+					monitor_prometheus_token: cfg.CICD_MONITOR_PROMETHEUS_TOKEN ? "***" : "",
+					monitor_window_minutes: cfg.CICD_MONITOR_WINDOW_MINUTES ?? "",
+					monitor_deploy_wait_minutes: cfg.CICD_MONITOR_DEPLOY_WAIT_MINUTES ?? "",
+					auto_rollback: cfg.CICD_AUTO_ROLLBACK === "true",
 				},
 			};
 		} catch (err) {
@@ -410,7 +465,9 @@ export function registerCICDTriggersHandlers(): void {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
 			try {
-				const runs = loadRuns(project.path).slice(0, limit);
+				const runs = loadRuns(project.path)
+					.slice(0, limit)
+					.map((run) => withWatch(project.path, run));
 				return { success: true, data: runs };
 			} catch (err) {
 				return { success: false, error: String(err) };
@@ -459,6 +516,27 @@ export function registerCICDTriggersHandlers(): void {
 				project.path,
 				"--output-json",
 			]);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.CICD_TRIGGERS_ROLLBACK,
+		async (_event, projectDir: unknown, runId: unknown) => {
+			const project = findKnownProject(projectDir);
+			if (!project) return UNKNOWN_PROJECT;
+			if (typeof runId !== "string" || !RUN_ID.test(runId)) {
+				return { success: false, error: "Invalid run id" };
+			}
+			if (liveWatches.isLive(project.path, runId)) {
+				return { success: false, error: "watch-running" };
+			}
+			const result = await runRunner(
+				project,
+				["--action", "rollback", "--project", project.path, "--run-id", runId],
+				DEPLOY_WATCH_RUNNER,
+			);
+			if (!result.success) return { success: false, error: result.error };
+			return { success: true, data: readDeployWatch(project.path, runId, false) };
 		},
 	);
 }

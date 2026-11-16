@@ -256,3 +256,84 @@ def test_the_state_file_is_json_with_the_issue_fields(repo, spec_dir):
     state = json.loads((spec_dir / recheck.STATE_FILE).read_text("utf-8"))
     assert state["iteration"] == 1
     assert [i["title"] for i in state["issues"]] == ["add subtracts"]
+
+
+class TestEdges:
+    def test_a_fresh_repository_without_an_index_is_snapshotted(self, tmp_path):
+        root = tmp_path / "fresh"
+        root.mkdir()
+        _git(root, "init", "-q", "-b", "main")
+        (root / "a.txt").write_text("a\n", encoding="utf-8")
+
+        assert recheck.snapshot_tree(root)
+
+    def test_a_worktree_index_given_as_an_absolute_path_is_used(self, repo, tmp_path):
+        worktree = tmp_path / "wt"
+        _git(repo, "worktree", "add", "-q", "-b", "task", str(worktree))
+
+        assert recheck.snapshot_tree(worktree) == recheck.snapshot_tree(repo)
+
+    def test_an_index_that_cannot_be_copied_means_no_snapshot(self, repo, monkeypatch):
+        def denied(*args, **kwargs):
+            raise PermissionError("locked")
+
+        monkeypatch.setattr(recheck.shutil, "copy2", denied)
+
+        assert recheck.snapshot_tree(repo) is None
+
+    def test_a_file_git_cannot_add_means_no_snapshot(self, repo):
+        (repo / "sub").mkdir()
+        _git(repo / "sub", "init", "-q")  # an embedded repository with no commit
+
+        assert recheck.snapshot_tree(repo) is None
+
+    def test_a_state_that_cannot_be_written_means_a_complete_review(
+        self, repo, spec_dir
+    ):
+        (spec_dir / recheck.STATE_FILE).mkdir()
+
+        assert recheck.record_rejection(spec_dir, repo, 1, ISSUES) is False
+
+    @pytest.mark.parametrize(
+        "state",
+        [
+            {"iteration": 1, "tree": 7, "issues": ISSUES},
+            {"iteration": 1, "tree": "abc", "issues": []},
+            ["not", "an", "object"],
+        ],
+    )
+    def test_a_malformed_state_means_a_complete_review(self, repo, spec_dir, state):
+        (spec_dir / recheck.STATE_FILE).write_text(json.dumps(state), encoding="utf-8")
+
+        assert recheck.recheck_section(spec_dir, repo, 2) == ""
+
+    def test_a_snapshot_git_no_longer_knows_means_a_complete_review(
+        self, repo, spec_dir
+    ):
+        state = {"iteration": 1, "tree": "0" * 40, "issues": ISSUES}
+        (spec_dir / recheck.STATE_FILE).write_text(json.dumps(state), encoding="utf-8")
+
+        assert recheck.recheck_section(spec_dir, repo, 2) == ""
+
+    def test_without_git_now_the_review_is_complete(self, repo, spec_dir, monkeypatch):
+        assert recheck.record_rejection(spec_dir, repo, 1, ISSUES)
+        monkeypatch.setattr(recheck, "snapshot_tree", lambda project_dir: None)
+
+        assert recheck.recheck_section(spec_dir, repo, 2) == ""
+
+    def test_more_issues_than_the_section_shows_are_counted(self, repo, spec_dir):
+        many = [{"title": f"issue {n}"} for n in range(recheck.MAX_ISSUES + 3)]
+        assert recheck.record_rejection(spec_dir, repo, 1, many)
+
+        section = recheck.recheck_section(spec_dir, repo, 2)
+
+        assert "... and 3 more (see qa_report.md)." in section
+
+
+def test_a_changed_file_without_a_test_is_named(repo, spec_dir):
+    assert recheck.record_rejection(spec_dir, repo, 1, ISSUES)
+    (repo / "src" / "orphan.py").write_text("X = 1\n", encoding="utf-8")
+
+    section = recheck.recheck_section(spec_dir, repo, 2)
+
+    assert "Without a mapped test: `src/orphan.py`" in section

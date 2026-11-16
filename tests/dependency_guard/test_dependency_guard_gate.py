@@ -181,3 +181,62 @@ def test_the_workflows_that_add_code_declare_it(kind):
     workflow = load_workflow(REPO_ROOT / "workflows" / kind / "workflow.yaml")
     gates = ",".join(p.hard_gate for p in workflow.phases if p.hard_gate)
     assert DEPS_EXIST in gates.split(",")
+
+
+def test_without_a_plan_the_rejection_still_stands(task):
+    repo, spec, scope = task
+    (spec / "implementation_plan.json").unlink()
+
+    gate = dependency_gate(
+        spec, repo, 1, scope, fetch=fetch_404_for("react-quantum-state")
+    )
+
+    assert gate is not None and (spec / "QA_FIX_REQUEST.md").exists()
+
+
+def test_an_unwritable_fix_request_does_not_lose_the_rejection(task):
+    repo, spec, scope = task
+    (spec / "QA_FIX_REQUEST.md").mkdir()
+
+    gate = dependency_gate(
+        spec, repo, 1, scope, fetch=fetch_404_for("react-quantum-state")
+    )
+
+    assert gate is not None and gate[0][0]["type"] == "missing_dependency"
+
+
+def test_a_record_that_cannot_be_written_skips_the_guard(task):
+    from dependency_guard.guard import RECORD_FILE
+
+    repo, spec, scope = task
+    (spec / RECORD_FILE).mkdir()
+
+    assert (
+        dependency_gate(
+            spec, repo, 1, scope, fetch=fetch_404_for("react-quantum-state")
+        )
+        is None
+    )
+
+
+def test_the_findings_go_to_the_task_log(task):
+    repo, spec, scope = task
+    logged: list[tuple[str, str]] = []
+
+    class Log:
+        def log(self, message, kind, phase):
+            logged.append((message, kind.value))
+
+    dependency_gate(
+        spec,
+        repo,
+        1,
+        scope,
+        fetch=fetch_404_for("react-quantum-state"),
+        task_logger=Log(),
+    )
+    dependency_gate(spec, repo, 1, None, task_logger=Log())
+
+    assert [kind for _, kind in logged] == ["error", "warning"]
+    assert "✗ react-quantum-state (npm)" in logged[0][0]
+    assert "nothing checked" in logged[1][0]
