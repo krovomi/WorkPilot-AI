@@ -96,8 +96,7 @@ class Significance:
         }
 
 
-def _normalise(path: str) -> str:
-    return path.replace("\\", "/").lstrip("./")
+_normalise = ir_module.normalise_path
 
 
 def is_structural(path: str) -> bool:
@@ -120,11 +119,11 @@ def _components_touching(baseline: dict[str, Any], changed: set[str]) -> list[st
     `apps/backend/agents` would never match any of its own files.
     """
     matched: list[str] = []
-    for component in baseline.get("components", []):
-        if not isinstance(component, dict) or not component.get("id"):
+    for component in ir_module.components(baseline):
+        if not component.get("id"):
             continue
-        for source in component.get("sources", []) or []:
-            if not isinstance(source, dict) or not source.get("path"):
+        for source in ir_module.sources(component):
+            if not source.get("path"):
                 continue
             cited = _normalise(str(source["path"]))
             if any(c == cited or c.startswith(f"{cited}/") for c in changed):
