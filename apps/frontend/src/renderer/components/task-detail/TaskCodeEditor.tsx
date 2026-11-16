@@ -10,7 +10,6 @@ import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Subtask } from "../../../shared/types";
 import { Button } from "../ui/button";
-import { CodeEditor } from "../ui/code-editor";
 import { ScrollArea } from "../ui/scroll-area";
 import {
 	Tooltip,
@@ -23,12 +22,12 @@ interface FileNode {
 	path: string;
 	isFolder: boolean;
 	children: FileNode[];
-	content?: string;
 }
 
 interface TaskCodeEditorProps {
 	readonly subtask: Subtask;
-	readonly onUpdate?: (subtask: Subtask) => Promise<void>;
+	/** Saves the subtask; resolves false when the save was refused. */
+	readonly onUpdate?: (subtask: Subtask) => Promise<boolean>;
 }
 
 function buildFileTree(files: string[]): FileNode[] {
@@ -86,12 +85,10 @@ function buildFileTree(files: string[]): FileNode[] {
 function FileTreeNode({
 	node,
 	depth,
-	onFileClick,
 	onDelete,
 }: {
 	readonly node: FileNode;
 	readonly depth: number;
-	readonly onFileClick?: (path: string) => void;
 	readonly onDelete?: (path: string) => void;
 }) {
 	const { t } = useTranslation(["tasks"]);
@@ -127,7 +124,6 @@ function FileTreeNode({
 							key={child.path}
 							node={child}
 							depth={depth + 1}
-							onFileClick={onFileClick}
 							onDelete={onDelete}
 						/>
 					))}
@@ -140,94 +136,57 @@ function FileTreeNode({
 			className="flex items-center justify-between p-1.5 rounded-lg hover:bg-secondary/50 transition-colors select-none group"
 			style={{ paddingLeft: depth * 16 + 8 }}
 		>
-			{/* The row carries a delete button, so the label — not the row — is the
-			    control: nesting one button inside another is invalid. */}
-			<button
-				type="button"
-				className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer text-left"
-				onClick={() => onFileClick?.(node.path)}
-			>
+			<span className="flex items-center gap-1.5 min-w-0 flex-1" title={node.path}>
 				<File className="h-4 w-4 shrink-0 text-blue-400" />
 				<span className="text-sm truncate">{node.name}</span>
-			</button>
+			</span>
 			<Tooltip>
 				<TooltipTrigger asChild>
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-						onClick={(e) => {
-							e.stopPropagation();
-							onDelete?.(node.path);
-						}}
+						aria-label={t("tasks:codeEditor.removeFile", { name: node.path })}
+						className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+						onClick={() => onDelete?.(node.path)}
 					>
 						<Trash2 className="h-3.5 w-3.5 text-destructive" />
 					</Button>
 				</TooltipTrigger>
-				<TooltipContent>{t("tasks:codeEditor.deleteFile")}</TooltipContent>
+				<TooltipContent>{t("tasks:codeEditor.removeFile", { name: node.path })}</TooltipContent>
 			</Tooltip>
 		</div>
 	);
 }
 
+/**
+ * The files a pending subtask is planned to touch, as a tree: a file that the
+ * subtask should leave alone is removed from its plan. Nothing on disk changes;
+ * the agent reads the trimmed list when it codes the subtask.
+ */
 export function TaskCodeEditor({
 	subtask,
 	onUpdate,
 }: TaskCodeEditorProps) {
-	const { t } = useTranslation(["tasks"]);
-	const [selectedFile, setSelectedFile] = useState<string | null>(null);
-	const [editedFiles, setEditedFiles] = useState<Map<string, string>>(
-		new Map(),
-	);
-	const [deletedFiles, setDeletedFiles] = useState<Set<string>>(new Set());
-	const [hasChanges, setHasChanges] = useState(false);
+	const { t } = useTranslation(["tasks", "taskReview", "common"]);
+	const [removedFiles, setRemovedFiles] = useState<Set<string>>(new Set());
 	const [isSaving, setIsSaving] = useState(false);
 
-	const fileTree = buildFileTree(
-		subtask.files.filter((f) => !deletedFiles.has(f)),
-	);
+	const keptFiles = subtask.files.filter((f) => !removedFiles.has(f));
+	const fileTree = buildFileTree(keptFiles);
 
-	const handleFileDelete = useCallback((path: string) => {
-		setDeletedFiles((prev) => {
-			const next = new Set(prev);
-			next.add(path);
-			return next;
-		});
-		setEditedFiles((prev) => {
-			const next = new Map(prev);
-			next.delete(path);
-			return next;
-		});
-		setSelectedFile(null);
-		setHasChanges(true);
+	const handleFileRemove = useCallback((path: string) => {
+		setRemovedFiles((prev) => new Set(prev).add(path));
 	}, []);
-
-	const handleContentChange = useCallback((content: string) => {
-		if (selectedFile) {
-			setEditedFiles((prev) => {
-				const next = new Map(prev);
-				next.set(selectedFile, content);
-				return next;
-			});
-			setHasChanges(true);
-		}
-	}, [selectedFile]);
 
 	const handleSave = async () => {
 		if (!onUpdate) return;
 
 		setIsSaving(true);
 		try {
-			const updatedSubtask: Subtask = {
-				...subtask,
-				files: subtask.files.filter((f) => !deletedFiles.has(f)),
-			};
-
-			await onUpdate(updatedSubtask);
-			setEditedFiles(new Map());
-			setDeletedFiles(new Set());
-			setHasChanges(false);
-			setSelectedFile(null);
+			// A refused save keeps the selection, so it can be tried again.
+			if (await onUpdate({ ...subtask, files: keptFiles })) {
+				setRemovedFiles(new Set());
+			}
 		} catch (error) {
 			console.error("Failed to save changes:", error);
 		} finally {
@@ -235,107 +194,55 @@ export function TaskCodeEditor({
 		}
 	};
 
-	const currentFileContent = selectedFile
-		? editedFiles.get(selectedFile) || ""
-		: "";
-
 	return (
-		<div className="flex gap-4 h-full">
-			{/* File tree sidebar */}
-			<div className="w-64 border-r border-border">
-				<ScrollArea className="h-full">
-					<div className="p-2 space-y-1">
-						{fileTree.length === 0 ? (
-							<p className="text-xs text-muted-foreground p-2">
-								{t("taskReview:taskPanel.noFilesInSubtask")}
-							</p>
-						) : (
-							fileTree.map((node) => (
-								<FileTreeNode
-									key={node.path}
-									node={node}
-									depth={0}
-									onFileClick={setSelectedFile}
-									onDelete={handleFileDelete}
-								/>
-							))
-						)}
-					</div>
-				</ScrollArea>
-			</div>
-
-			{/* Editor panel */}
-			<div className="flex-1 flex flex-col">
-				{selectedFile ? (
-					<>
-						<div className="p-3 border-b border-border bg-muted/50">
-							<div className="flex items-center justify-between">
-								<div className="flex items-center gap-2">
-									<File className="h-4 w-4 text-blue-400" />
-									<span className="text-sm font-mono">{selectedFile}</span>
-								</div>
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={() => setSelectedFile(null)}
-									className="h-6"
-								>
-									{t("common:buttons.close")}
-								</Button>
-							</div>
-						</div>
-						<div className="flex-1 flex flex-col min-h-0">
-							<CodeEditor
-								value={currentFileContent}
-								onChange={handleContentChange}
-								filename={selectedFile}
-								placeholder={t("tasks:codeEditor.contentPlaceholder")}
-								className="flex-1 min-h-0 rounded-none border-0"
-							/>
-						</div>
-					</>
-				) : (
-					<div className="flex-1 flex items-center justify-center text-muted-foreground">
-						<p>{t("tasks:codeEditor.selectFile")}</p>
-					</div>
-				)}
-
-				{/* Footer with save button */}
-				{hasChanges && (
-					<div className="p-3 border-t border-border bg-muted/30 flex items-center justify-between">
-						<p className="text-xs text-muted-foreground">
-							{deletedFiles.size > 0 &&
-								t("taskReview:taskPanel.filesDeleted", { count: deletedFiles.size })}
-							{deletedFiles.size > 0 && editedFiles.size > 0 && " • "}
-							{editedFiles.size > 0 &&
-								t("taskReview:taskPanel.filesModified", { count: editedFiles.size })}
+		<div className="flex h-full flex-col">
+			<p className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
+				{t("tasks:codeEditor.hint")}
+			</p>
+			<ScrollArea className="flex-1">
+				<div className="p-2 space-y-1">
+					{fileTree.length === 0 ? (
+						<p className="text-xs text-muted-foreground p-2">
+							{t("taskReview:taskPanel.noFilesInSubtask")}
 						</p>
-						<div className="flex gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => {
-									setEditedFiles(new Map());
-									setDeletedFiles(new Set());
-									setHasChanges(false);
-									setSelectedFile(null);
-								}}
-								disabled={isSaving}
-							>
-								{t("common:buttons.cancel")}
-							</Button>
-							<Button
-								variant="default"
-								size="sm"
-								onClick={handleSave}
-								disabled={isSaving}
-							>
-								{isSaving ? t("common:buttons.saving") : t("taskReview:taskPanel.saveChanges")}
-							</Button>
-						</div>
+					) : (
+						fileTree.map((node) => (
+							<FileTreeNode
+								key={node.path}
+								node={node}
+								depth={0}
+								onDelete={handleFileRemove}
+							/>
+						))
+					)}
+				</div>
+			</ScrollArea>
+
+			{removedFiles.size > 0 && (
+				<div className="p-3 border-t border-border bg-muted/30 flex items-center justify-between">
+					<p className="text-xs text-muted-foreground">
+						{t("tasks:codeEditor.filesRemoved", { count: removedFiles.size })}
+					</p>
+					<div className="flex gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setRemovedFiles(new Set())}
+							disabled={isSaving}
+						>
+							{t("common:buttons.cancel")}
+						</Button>
+						<Button
+							variant="default"
+							size="sm"
+							onClick={handleSave}
+							disabled={isSaving}
+						>
+							{isSaving ? t("common:buttons.saving") : t("taskReview:taskPanel.saveChanges")}
+						</Button>
 					</div>
-				)}
-			</div>
+				</div>
+			)}
 		</div>
 	);
 }

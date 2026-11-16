@@ -102,9 +102,9 @@ def test_validation_tools_use_spec_directory_and_preserve_project_boundary(tmp_p
         )
         assert (spec_dir / "spec.md").read_text(encoding="utf-8") == "## Overview"
         assert not (tmp_path / "spec.md").exists()
-        import sys
+        from tests.allowlisted_python import allowlisted_python
 
-        command = f'"{sys.executable}" -c "import os; print(os.getcwd())"'
+        command = f'"{allowlisted_python()}" -c "import os; print(os.getcwd())"'
         assert str(spec_dir) in await executor.execute(
             "run_command", {"command": command}
         )
