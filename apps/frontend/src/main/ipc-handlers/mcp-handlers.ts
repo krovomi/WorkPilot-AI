@@ -15,6 +15,12 @@ import type {
 } from "../../shared/types/project";
 import { appLog } from "../app-logger";
 import { isDangerousEnvVar } from "../claude-code-settings/env-sanitizer";
+import {
+	parseCustomMcpServers,
+	unmaskCustomMcpServers,
+} from "../custom-mcp-secrets";
+import { readProjectEnv } from "../project-env-file";
+import { projectStore } from "../project-store";
 import { isWindows } from "../platform";
 import { envWithoutCredentials } from "../utils/child-env";
 
@@ -638,11 +644,34 @@ async function testCommandConnection(
 /**
  * Register MCP IPC handlers.
  */
+/**
+ * `server` from the renderer with each masked header or environment value
+ * replaced by the one stored for that server in the project's `.env`; a mask
+ * without one (no project, another URL or command) is left out. Null when
+ * `server` is not a server.
+ */
+export function withStoredSecrets(
+	server: unknown,
+	projectId: unknown,
+): CustomMcpServer | null {
+	if (typeof server !== "object" || server === null || Array.isArray(server)) {
+		return null;
+	}
+	const project =
+		typeof projectId === "string" ? projectStore.getProject(projectId) : undefined;
+	const stored = project
+		? parseCustomMcpServers(readProjectEnv(project).CUSTOM_MCP_SERVERS)
+		: [];
+	return unmaskCustomMcpServers([server as CustomMcpServer], stored)[0];
+}
+
 export function registerMcpHandlers(): void {
 	// Quick health check
 	ipcMain.handle(
 		IPC_CHANNELS.MCP_CHECK_HEALTH,
-		async (_event, server: CustomMcpServer) => {
+		async (_event, sent: unknown, projectId?: unknown) => {
+			const server = withStoredSecrets(sent, projectId);
+			if (!server) return { success: false, error: "Invalid server" };
 			try {
 				const result = await checkMcpHealth(server);
 				return { success: true, data: result };
@@ -659,7 +688,9 @@ export function registerMcpHandlers(): void {
 	// Full connection test
 	ipcMain.handle(
 		IPC_CHANNELS.MCP_TEST_CONNECTION,
-		async (_event, server: CustomMcpServer) => {
+		async (_event, sent: unknown, projectId?: unknown) => {
+			const server = withStoredSecrets(sent, projectId);
+			if (!server) return { success: false, error: "Invalid server" };
 			try {
 				const result = await testMcpConnection(server);
 				return { success: true, data: result };

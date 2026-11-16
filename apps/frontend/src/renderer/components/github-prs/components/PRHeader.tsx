@@ -32,7 +32,6 @@ function getFileStatusStyle(status: string) {
 		case "added":
 			return "bg-success/15 text-success border-success/30";
 		case "removed":
-		case "deleted":
 			return "bg-destructive/15 text-destructive border-destructive/30";
 		case "modified":
 		case "changed":
@@ -51,7 +50,7 @@ function getFileStatusStyle(status: string) {
 export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
 	const { t } = useTranslation("common");
 	const [showFiles, setShowFiles] = useState(false);
-	const hasFiles = pr.files && pr.files.length > 0;
+	const hasFiles = pr.files.length > 0;
 
 	const filesList = hasFiles ? (
 		<div className="divide-y divide-border/40 max-h-[300px] overflow-y-auto">
@@ -74,7 +73,9 @@ export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
 							getFileStatusStyle(file.status),
 						)}
 					>
-						{file.status}
+						{t(`prReview.fileStatus.${file.status.toLowerCase()}`, {
+							defaultValue: file.status,
+						})}
 					</Badge>
 					<div className="flex items-center gap-1.5 text-xs font-mono shrink-0">
 						<span className="text-success flex items-center gap-0.5">
@@ -119,7 +120,9 @@ export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
 								: "",
 						)}
 					>
-						{t(`prReview.state.${pr.state.toLowerCase()}`)}
+						{t(`prReview.state.${pr.state.toLowerCase()}`, {
+							defaultValue: pr.state,
+						})}
 					</Badge>
 					<span className="text-muted-foreground text-sm font-mono">
 						#{pr.number}
@@ -131,7 +134,12 @@ export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
 					asChild
 					className="h-8 w-8 text-muted-foreground hover:text-foreground"
 				>
-					<a href={pr.htmlUrl} target="_blank" rel="noopener noreferrer">
+					<a
+						href={pr.htmlUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						aria-label={t("accessibility.openOnGitHubAriaLabel")}
+					>
 						<ExternalLink className="h-4 w-4" />
 					</a>
 				</Button>
@@ -179,7 +187,9 @@ export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
 						<span className="font-medium text-foreground">
 							{pr.changedFiles}
 						</span>
-						<span className="text-xs">{t("prReview.files")}</span>
+						<span className="text-xs">
+							{t("prReview.files", { count: pr.changedFiles })}
+						</span>
 						{hasFiles &&
 							(showFiles ? (
 								<ChevronUp className="h-3 w-3 ml-1" />
