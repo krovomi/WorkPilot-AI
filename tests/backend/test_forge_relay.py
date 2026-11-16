@@ -126,6 +126,10 @@ async def _db():
     return get_session_factory()()
 
 
+#: The connection check's search, encoded as the app sends it.
+_OPEN_ISSUES = "repo%3Aacme%2Fshop%20is%3Aissue%20is%3Aopen"
+
+
 def test_the_repository_is_read_from_the_project_url():
     from shared_features.forge import github_repo
 
@@ -159,6 +163,19 @@ def test_only_the_views_calls_on_the_project_s_repository_are_made():
             {"status": "action_required"},
         ),
         ("GET", "/user", "/user", {}),
+        (
+            "GET",
+            f"/search/issues?q={_OPEN_ISSUES}&per_page=1",
+            "/search/issues",
+            {"q": "repo:acme/shop is:issue is:open", "per_page": "1"},
+        ),
+        # The query is written again with the repository as the server knows it.
+        (
+            "GET",
+            "/search/issues?per_page=01&q=repo%3AACME%2FShop+is%3Aissue+is%3Aopen",
+            "/search/issues",
+            {"q": "repo:acme/shop is:issue is:open", "per_page": "1"},
+        ),
         ("POST", "/repos/acme/shop/issues/3/comments", None, {}),
         ("PUT", "/repos/acme/shop/pulls/3/merge", None, {}),
         ("PUT", "/repos/acme/shop/pulls/3/update-branch", None, {}),
@@ -194,8 +211,40 @@ def test_only_the_views_calls_on_the_project_s_repository_are_made():
         ("POST", "/user"),
         ("POST", "/repos/acme/shop/issues"),
         ("DELETE", "/repos/acme/shop"),
+        # The one search of the views, on the project's repository only.
+        ("GET", "/search/issues?q=repo%3Aacme%2Fother+is%3Aissue+is%3Aopen&per_page=1"),
+        ("GET", f"/search/issues?q={_OPEN_ISSUES}+repo%3Aacme%2Fother&per_page=1"),
+        ("GET", "/search/issues?q=repo%3Aacme%2Fshop+is%3Apr+is%3Aopen&per_page=1"),
+        ("GET", f"/search/code?q={_OPEN_ISSUES}&per_page=1"),
+        ("GET", f"/search/issues?q={_OPEN_ISSUES}&per_page=1#x"),
+        ("GET", f"/search/issues?q={_OPEN_ISSUES}"),
+        ("GET", f"/search/issues?q={_OPEN_ISSUES}&per_page=1&page=2"),
+        ("GET", f"/search/issues?q={_OPEN_ISSUES}&q={_OPEN_ISSUES}"),
+        ("GET", f"/search/issues?q={_OPEN_ISSUES}&per_page=x"),
+        ("POST", f"/search/issues?q={_OPEN_ISSUES}&per_page=1"),
     ):
         assert api_call(method, refused, "acme/shop") is None, refused
+
+
+@pytest.mark.asyncio
+async def test_the_open_issue_count_is_searched_with_the_caller_s_token(server):
+    from shared_features.forge import RestCall, github_read
+
+    async with await _db() as db:
+        answer = await github_read(
+            RestCall(endpoint=f"/search/issues?q={_OPEN_ISSUES}&per_page=1"),
+            _request("u-ada", "vcs.read"),
+            _scope(server, "viewer"),
+            db,
+        )
+    assert answer["status"] == 200
+    (sent,) = server["sent"]
+    assert sent.url.path == "/search/issues"
+    assert dict(sent.url.params) == {
+        "q": "repo:acme/shop is:issue is:open",
+        "per_page": "1",
+    }
+    assert sent.headers["Authorization"] == f"Bearer {_ADA_TOKEN}"
 
 
 @pytest.mark.asyncio
