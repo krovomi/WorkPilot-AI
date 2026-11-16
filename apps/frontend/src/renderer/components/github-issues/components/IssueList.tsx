@@ -37,9 +37,12 @@ export function IssueList({
 		[hasMore, isLoadingMore, isLoading, onLoadMore],
 	);
 
+	// The trigger is rendered with the first issue: the observer is set up
+	// then, even when nothing else changed in that render.
+	const hasTrigger = issues.length > 0;
 	useEffect(() => {
 		const trigger = loadMoreTriggerRef.current;
-		if (!trigger || !onLoadMore) return;
+		if (!hasTrigger || !trigger || !onLoadMore) return;
 
 		// Find the Radix ScrollArea viewport via DOM query to avoid setState-in-ref loops
 		const scrollViewport = trigger.closest(
@@ -58,7 +61,7 @@ export function IssueList({
 		return () => {
 			observer.disconnect();
 		};
-	}, [handleIntersection, onLoadMore]);
+	}, [handleIntersection, onLoadMore, hasTrigger]);
 
 	// Only show blocking error view when no issues are loaded
 	// Load-more errors are shown inline near the load-more trigger
@@ -82,7 +85,7 @@ export function IssueList({
 	}
 
 	if (issues.length === 0) {
-		return <EmptyState message="No issues found" />;
+		return <EmptyState message={t("common:githubIssues.noIssues")} />;
 	}
 
 	return (
@@ -115,16 +118,16 @@ export function IssueList({
 							<div className="flex items-center gap-2 text-muted-foreground">
 								<Loader2 className="h-4 w-4 animate-spin" />
 								<span className="text-sm">
-									{t("issues.loadingMore", "Loading more...")}
+									{t("issues.loadingMore")}
 								</span>
 							</div>
 						) : hasMore ? (
 							<span className="text-xs text-muted-foreground opacity-50">
-								{t("issues.scrollForMore", "Scroll for more")}
+								{t("issues.scrollForMore")}
 							</span>
 						) : issues.length > 0 ? (
 							<span className="text-xs text-muted-foreground opacity-50">
-								{t("issues.allLoaded", "All issues loaded")}
+								{t("issues.allLoaded")}
 							</span>
 						) : null}
 					</div>

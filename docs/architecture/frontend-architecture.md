@@ -126,6 +126,7 @@ id changes.
 | the command palette lists a hub's tabs, matched by their own name or the hub's | "replay" finds Agent Replay, not a hub whose name says nothing about it |
 | `HubTabList` follows the WAI-ARIA tabs pattern: one tab in the tab order, arrows, Home and End move, Enter or Space opens; activation is manual | a tab is a whole page: moving the focus does not load one |
 | `HubMain` has the same tree with or without a hub | entering a hub does not remount what the main area keeps alive (the terminals) |
+| `HubMain` wraps the view on screen in one `ErrorBoundary` whose `resetKey` is the active view | a page that throws shows an error card in the main area instead of blanking the window; choosing another page clears it without remounting the views kept alive (a caught error does replace them until then) |
 
 Formula Lab stays outside the costs hub: it chooses the engine of one card
 and needs that card, so it opens from the card. Change Preview (`sandbox`),
@@ -170,6 +171,16 @@ Lot 3 tidies what the spaces list.
 | the Toolbox's families are four more hubs (`sidebar/hubs.ts`): Quality and security, Accessibility and i18n, API, Automation; its sub-group headers are gone, and with them `NavItem.subGroup` | 20 entries became 9. A hub keeps each page's id and shortcut, so links, pins and the palette are unchanged; a dialog tool (dependency sentinel, app emulator) is a tab that offers to open it (`HubLauncher`) |
 | while a page is in beta (`EXPERIMENTAL_VIEWS`) its entry leaves its group for the Labo, the flask at the foot of the rail, with a count; the Labo lists every beta page, a hub's beta tab included, one card each with what it does (`navigation:labo.about.*`, `LaboPanel`) | stable pages are no longer mixed with trials. The move is computed (`railGroupsOf`, `laboItemsOf`), not written in `nav-model.ts`: a page out of beta is back at its place with no other change. Hiding the beta views hides the Labo |
 | a space's entries not opened for 30 days are offered for hiding (`unusedEntries`), never hidden by the app; nothing is offered before the usage count (`view-usage-store`, local) is 30 days old, nor a pinned entry; « Plus tard » puts the offer off for 30 days | the user decides what goes, from what they actually use. A hidden page stays in Ctrl K, in « Mon menu » if pinned, and under « Pages masquées » in its space to show it again; resetting the layout shows everything |
+
+Each person arranges their own menu (« Personnaliser le menu »).
+
+| Decision | Why |
+|---|---|
+| the rules live in `sidebar/menu-layout.ts`, pure: `applyMenuLayout` moves each page to the space chosen (`sidebarPrefs.itemGroups`, page id → group id), then orders the spaces (`groupOrder`) and the pages of each (`itemOrder`); an id the code no longer ships is dropped, a new one keeps its shipped place after the user's | adding or removing a page needs no settings migration; a page moved back to its shipped space forgets the move instead of storing it |
+| one `DndContext` routes every drop (`sidebar/use-menu-dnd.ts`): page onto page reorders its space, page onto a space of the rail moves it there (the icon lights up), page or space onto the star pins it, pin onto pin (`pin:<id>`) reorders « Mon menu », space onto space reorders the rail | the drag is the quick way and reads like what it does; a page of a pinned group follows its group and has no grip |
+| « Personnaliser le menu » (`sidebar/MenuCustomizer.tsx`) keeps the grips shown and adds, on each row, up, down and « Déplacer vers… » (every other space), and for the space shown its place in the rail; « Rétablir l'ordre d'origine » clears the three order fields only | nothing needs a pointer. Up and down move among the pages on screen, so a hidden page or one in the Labo keeps its place between them. The full « Réinitialiser la disposition » still clears pins, hidden pages and the menu mode |
+| a grip taken from the keyboard (Space or Enter, arrows, Space to drop, Escape to cancel) is announced in the app's language (`navigation:customize.announce.*`) | dnd-kit's own announcements are English only |
+| in server mode the layout (orders, moves, pins, hidden pages; not the space open) follows the person: read at connection, sent when it changes (`main/server-menu-layout.ts`, `GET/PUT /users/me/preferences/menu`), checked by `shared/utils/menu-layout.ts` both ways and by the server | two people on one server each keep their own menu, and one person finds theirs on every desktop |
 
 ## Agent Management (`src/main/agent/`)
 

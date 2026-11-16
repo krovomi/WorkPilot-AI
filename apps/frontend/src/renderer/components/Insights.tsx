@@ -20,9 +20,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
 	TASK_CATEGORY_COLORS,
-	TASK_CATEGORY_LABELS,
 	TASK_COMPLEXITY_COLORS,
-	TASK_COMPLEXITY_LABELS,
 } from "../../shared/constants";
 import type {
 	InsightsChatMessage,
@@ -139,6 +137,7 @@ export function Insights({ projectId }: InsightsProps) {
 	const [inputValue, setInputValue] = useState("");
 	const [creatingTask, setCreatingTask] = useState<string | null>(null);
 	const [taskCreated, setTaskCreated] = useState<Set<string>>(new Set());
+	const [taskFailed, setTaskFailed] = useState<string | null>(null);
 	const [showSidebar, setShowSidebar] = useState(true);
 	const [isUserAtBottom, setIsUserAtBottom] = useState(true);
 
@@ -175,26 +174,21 @@ export function Insights({ projectId }: InsightsProps) {
 	// A server project's conversations show a teammate's change at once.
 	useServerViewLive(projectId, "insights");
 
-	// Smart auto-scroll: only scroll if user is already at bottom
-	// This allows users to scroll up to read previous messages without being
-	// yanked back down during streaming responses
+	// Smart auto-scroll: follow a new message and the streamed answer, only
+	// while the user is at the bottom, so reading an earlier message is not
+	// yanked back down during a response.
+	const messageCount = session?.messages?.length ?? 0;
 	useEffect(() => {
-		if (isUserAtBottom) {
-			const viewport = scrollAreaRef.current?.querySelector(
-				"[data-radix-scroll-area-viewport]",
-			) as HTMLElement | null;
-			if (viewport) viewport.scrollTop = viewport.scrollHeight;
-		}
-	}, [isUserAtBottom]);
+		if (!isUserAtBottom || (messageCount === 0 && !streamingContent)) return;
+		const viewport = scrollAreaRef.current?.querySelector(
+			"[data-radix-scroll-area-viewport]",
+		) as HTMLElement | null;
+		if (viewport) viewport.scrollTop = viewport.scrollHeight;
+	}, [isUserAtBottom, messageCount, streamingContent]);
 
 	// Focus textarea on mount
 	useEffect(() => {
 		textareaRef.current?.focus();
-	}, []);
-
-	// Reset taskCreated when switching sessions
-	useEffect(() => {
-		setTaskCreated(new Set());
 	}, []);
 
 	const handleSend = () => {
@@ -237,23 +231,26 @@ export function Insights({ projectId }: InsightsProps) {
 		return await renameSession(projectId, sessionId, newTitle);
 	};
 
-	const handleCreateTask = async (message: InsightsChatMessage) => {
-		if (!message.suggestedTask) return;
-
+	/** Only offered for a message that suggests a task. */
+	const handleCreateTask = async (
+		message: InsightsChatMessage,
+		suggested: NonNullable<InsightsChatMessage["suggestedTask"]>,
+	) => {
 		setCreatingTask(message.id);
+		setTaskFailed(null);
 		try {
 			const task = await createTaskFromSuggestion(
 				projectId,
-				message.suggestedTask.title,
-				message.suggestedTask.description,
-				message.suggestedTask.metadata,
+				suggested.title,
+				suggested.description,
+				suggested.metadata,
 			);
-
-			if (task) {
-				setTaskCreated((prev) => new Set(prev).add(message.id));
-				// Reload tasks to show the new task in the kanban
-				loadTasks(projectId);
-			}
+			if (!task) throw new Error("no task");
+			setTaskCreated((prev) => new Set(prev).add(message.id));
+			// Reload tasks to show the new task in the kanban
+			loadTasks(projectId);
+		} catch {
+			setTaskFailed(message.id);
 		} finally {
 			setCreatingTask(null);
 		}
@@ -367,9 +364,12 @@ export function Insights({ projectId }: InsightsProps) {
 										key={message.id}
 										message={message}
 										markdownComponents={markdownComponents}
-										onCreateTask={() => handleCreateTask(message)}
+										onCreateTask={(suggested) =>
+											handleCreateTask(message, suggested)
+										}
 										isCreatingTask={creatingTask === message.id}
 										taskCreated={taskCreated.has(message.id)}
+										taskFailed={taskFailed === message.id}
 									/>
 								))}
 
@@ -464,9 +464,12 @@ export function Insights({ projectId }: InsightsProps) {
 interface MessageBubbleProps {
 	readonly message: InsightsChatMessage;
 	readonly markdownComponents: Components;
-	readonly onCreateTask: () => void;
+	readonly onCreateTask: (
+		suggested: NonNullable<InsightsChatMessage["suggestedTask"]>,
+	) => void;
 	readonly isCreatingTask: boolean;
 	readonly taskCreated: boolean;
+	readonly taskFailed: boolean;
 }
 
 function MessageBubble({
@@ -475,9 +478,11 @@ function MessageBubble({
 	onCreateTask,
 	isCreatingTask,
 	taskCreated,
+	taskFailed,
 }: MessageBubbleProps) {
-	const { t } = useTranslation(["common", "insights"]);
+	const { t } = useTranslation(["common", "insights", "tasks"]);
 	const isUser = message.role === "user";
+	const suggested = message.suggestedTask;
 
 	const buttonContent = (() => {
 		if (isCreatingTask) {
@@ -539,7 +544,7 @@ function MessageBubble({
 				)}
 
 				{/* Task suggestion card */}
-				{message.suggestedTask && (
+				{suggested && (
 					<Card className="mt-3 border-primary/20 bg-primary/5">
 						<CardContent className="p-4">
 							<div className="mb-2 flex items-center gap-2">
@@ -549,52 +554,59 @@ function MessageBubble({
 								</span>
 							</div>
 							<h4 className="mb-2 font-medium text-foreground">
-								{message.suggestedTask.title}
+								{suggested.title}
 							</h4>
 							<p className="mb-3 text-sm text-muted-foreground">
-								{message.suggestedTask.description}
+								{suggested.description}
 							</p>
-							{message.suggestedTask.metadata && (
+							{suggested.metadata && (
 								<div className="mb-3 flex flex-wrap gap-2">
-									{message.suggestedTask.metadata.category && (
+									{suggested.metadata.category && (
 										<Badge
 											variant="outline"
 											className={cn(
 												"text-xs",
 												TASK_CATEGORY_COLORS[
-													message.suggestedTask.metadata.category
+													suggested.metadata.category
 												],
 											)}
 										>
-											{TASK_CATEGORY_LABELS[
-												message.suggestedTask.metadata.category
-											] || message.suggestedTask.metadata.category}
+											{t(
+												`tasks:form.classification.values.category.${suggested.metadata.category}`,
+												{ defaultValue: suggested.metadata.category },
+											)}
 										</Badge>
 									)}
-									{message.suggestedTask.metadata.complexity && (
+									{suggested.metadata.complexity && (
 										<Badge
 											variant="outline"
 											className={cn(
 												"text-xs",
 												TASK_COMPLEXITY_COLORS[
-													message.suggestedTask.metadata.complexity
+													suggested.metadata.complexity
 												],
 											)}
 										>
-											{TASK_COMPLEXITY_LABELS[
-												message.suggestedTask.metadata.complexity
-											] || message.suggestedTask.metadata.complexity}
+											{t(
+												`tasks:form.classification.values.complexity.${suggested.metadata.complexity}`,
+												{ defaultValue: suggested.metadata.complexity },
+											)}
 										</Badge>
 									)}
 								</div>
 							)}
 							<Button
 								size="sm"
-								onClick={onCreateTask}
+								onClick={() => onCreateTask(suggested)}
 								disabled={isCreatingTask || taskCreated}
 							>
 								{buttonContent}
 							</Button>
+							{taskFailed && (
+								<p role="alert" className="mt-2 text-xs text-destructive">
+									{t("insights:tasks.createFailed")}
+								</p>
+							)}
 						</CardContent>
 					</Card>
 				)}
@@ -615,8 +627,6 @@ interface ToolUsageHistoryProps {
 function ToolUsageHistory({ tools }: ToolUsageHistoryProps) {
 	const { t } = useTranslation(["common", "insights"]);
 	const [expanded, setExpanded] = useState(false);
-
-	if (tools.length === 0) return null;
 
 	// Group tools by name for summary
 	const toolCounts = tools.reduce(
@@ -690,7 +700,8 @@ function ToolUsageHistory({ tools }: ToolUsageHistoryProps) {
 						const Icon = getToolIcon(tool.name);
 						return (
 							<div
-								key={tool.name}
+								// The same tool is often used several times in a row.
+								key={`${tool.name}:${tool.input ?? ""}:${String(tool.timestamp)}`}
 								className="flex items-center gap-2 text-xs"
 							>
 								<Icon

@@ -134,5 +134,65 @@
 			"message_too_long": "A message is too long.",
 			"queue_unwritable": "The task's folder could not be written."
 		}
+	},
+	"devices": {
+		"iphone-15": "iPhone 15",
+		"iphone-15-pro-max": "iPhone 15 Pro Max",
+		"pixel-8": "Pixel 8",
+		"pixel-9": "Pixel 9",
+		"galaxy-z-fold-5": "Galaxy Z Fold 5 (folded)",
+		"ipad-mini": "iPad Mini",
+		"ipad-pro": "iPad Pro",
+		"desktop-1080p": "Full HD desktop",
+		"desktop-4k": "4K desktop (150 % scaling)",
+		"tv-1080p": "Smart TV 16:9"
+	},
+	"matrix": {
+		"toggle": "Device matrix",
+		"intro": "Each checked device renders {{path}} from the emulator's server, one after the other, then the page is read for responsive bugs.",
+		"introRoot": "The page shown is not on the emulator's server: the matrix renders the server root.",
+		"category": {
+			"phone": "Phones",
+			"tablet": "Tablets",
+			"desktop": "Desktops",
+			"tv": "TV"
+		},
+		"dimensions": "{{width}} × {{height}} @{{dpr}}x",
+		"capture_one": "Capture {{count}} device",
+		"capture_other": "Capture {{count}} devices",
+		"stop": "Stop after this device",
+		"selectAll": "All",
+		"selectNone": "None",
+		"clear": "Clear the captures",
+		"empty": "Check devices, then capture: each one appears here side by side.",
+		"pending": "Waiting…",
+		"capturing": "Rendering on this device…",
+		"imageAlt": "The page rendered on {{device}}",
+		"keep": "Keep for the visual review",
+		"errors": {
+			"invalid-request": "The request was refused.",
+			"unknown-device": "This device is not in the catalogue.",
+			"not-running": "The emulator's server is not running: start it, then capture again.",
+			"invalid-path": "This address is not a page of the emulator's server.",
+			"busy": "Another capture is in progress: wait for it to finish.",
+			"load-failed": "The page did not load on this device in time.",
+			"capture-failed": "The page could not be captured on this device."
+		},
+		"report": {
+			"unavailable": "The page could not be read for responsive bugs.",
+			"clean": "No responsive bug detected.",
+			"pageOverflow": "The page is {{px}} px wider than the screen: it scrolls sideways.",
+			"truncated": "Partial reading: the first {{count}} elements only."
+		},
+		"issues": {
+			"horizontalOverflow_one": "{{count}} element goes past the edge of the screen",
+			"horizontalOverflow_other": "{{count}} elements go past the edge of the screen",
+			"overflowingMedia_one": "{{count}} image or media is wider than the screen",
+			"overflowingMedia_other": "{{count}} images or media are wider than the screen",
+			"smallTouchTarget_one": "{{count}} touch target smaller than 44 × 44 px",
+			"smallTouchTarget_other": "{{count}} touch targets smaller than 44 × 44 px",
+			"smallText_one": "{{count}} text smaller than 12 px",
+			"smallText_other": "{{count}} texts smaller than 12 px"
+		}
 	}
 }

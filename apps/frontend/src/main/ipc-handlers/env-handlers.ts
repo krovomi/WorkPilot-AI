@@ -32,6 +32,8 @@ import {
 	writeProjectEnvFile,
 } from "../project-env-file";
 import { ensureProjectEnvIgnored } from "../project-initializer";
+import { withGhCliToken } from "./github/oauth-token";
+import { withGlabCliToken } from "./gitlab/oauth-token";
 import { projectStore } from "../project-store";
 import {
 	envTemplateKeys,
@@ -1183,14 +1185,21 @@ ${otherLines.join("\n")}
 				}
 
 				// Generate new content
-				// A secret sent back as the mask ENV_GET showed keeps its stored value.
+				// A secret sent back as the mask ENV_GET showed keeps its stored value;
+				// the mask of a gh or glab sign-in stands for the token it holds now.
 				const newContent = generateEnvContent(
-					unmaskProjectEnvUpdate(
+					await withGlabCliToken(
 						config,
-						parseCustomMcpServers(
-							existingContent
-								? parseEnvFile(existingContent).CUSTOM_MCP_SERVERS
-								: undefined,
+						await withGhCliToken(
+							config,
+							unmaskProjectEnvUpdate(
+								config,
+								parseCustomMcpServers(
+									existingContent
+										? parseEnvFile(existingContent).CUSTOM_MCP_SERVERS
+										: undefined,
+								),
+							),
 						),
 					),
 					existingContent,

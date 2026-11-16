@@ -8,6 +8,22 @@ import { type OpenApiSpec } from "../../stores/api-explorer-store";
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
+/** The keys of an OpenAPI path item that are operations; the others
+ * (`parameters`, `summary`, `servers`…) describe the path itself. */
+export const HTTP_METHODS = [
+	"get",
+	"post",
+	"put",
+	"delete",
+	"patch",
+	"head",
+	"options",
+] as const;
+
+export function isHttpMethod(key: string): boolean {
+	return (HTTP_METHODS as readonly string[]).includes(key);
+}
+
 export const HTTP_METHOD_COLORS: Record<string, string> = {
 	GET: "text-blue-400 bg-blue-400/10 border-blue-400/30",
 	POST: "text-success bg-success/10 border-success/30",

@@ -46,43 +46,18 @@ if sys.version_info < (3, 12):  # noqa: UP036
     )
 
 import asyncio
-import io
 import json
 import os
 import subprocess
 from pathlib import Path
 
-# Configure safe encoding on Windows BEFORE any imports that might print
-# This handles both TTY and piped output (e.g., from Electron)
-if sys.platform == "win32":
-    for _stream_name in ("stdout", "stderr"):
-        _stream = getattr(sys, _stream_name)
-        # Method 1: Try reconfigure (works for TTY)
-        if hasattr(_stream, "reconfigure"):
-            try:
-                _stream.reconfigure(encoding="utf-8", errors="replace")
-                continue
-            except (AttributeError, io.UnsupportedOperation, OSError):
-                pass
-        # Method 2: Wrap with TextIOWrapper for piped output
-        try:
-            if hasattr(_stream, "buffer"):
-                _new_stream = io.TextIOWrapper(
-                    _stream.buffer,
-                    encoding="utf-8",
-                    errors="replace",
-                    line_buffering=True,
-                )
-                setattr(sys, _stream_name, _new_stream)
-        except (AttributeError, io.UnsupportedOperation, OSError):
-            pass
-    # Clean up temporary variables
-    del _stream_name, _stream
-    if "_new_stream" in dir():
-        del _new_stream
-
-# Add auto-claude to path (parent of runners/)
+# Add the backend to the path (parent of runners/)
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# UTF-8 on Windows BEFORE any import that might print, piped (Electron) or not.
+from ui.capabilities import configure_safe_encoding
+
+configure_safe_encoding()
 
 # Validate platform-specific dependencies BEFORE any imports that might
 # trigger a pywintypes import (the MCP library imports win32api; ACS-253)
@@ -114,6 +89,41 @@ from phase_config import resolve_model_id
 from review import ReviewState
 from spec import SpecOrchestrator
 from ui import Icons, highlight, muted, print_section, print_status
+
+
+def _continue_command(orchestrator: SpecOrchestrator) -> str:
+    """The command that picks this spec up again, as it can be pasted."""
+    return subprocess.list2cmdline(
+        [
+            "python",
+            str(Path(__file__).resolve()),
+            "--project-dir",
+            str(orchestrator.project_dir),
+            "--continue",
+            orchestrator.spec_dir.name,
+        ]
+    )
+
+
+def _project_root(project_dir: Path) -> Path:
+    """The project a spec is for, from the folder the runner was started in.
+
+    Started inside WorkPilot's own backend (``cd apps/backend``), the project
+    is the repository around it; elsewhere it is the nearest folder with a
+    ``.workpilot`` of its own, or the folder itself.
+    """
+    if (project_dir / "run.py").is_file() and (
+        project_dir / "core" / "client.py"
+    ).exists():
+        for parent in project_dir.parents:
+            if (parent / ".git").exists():
+                return parent
+    if (project_dir / ".workpilot").exists():
+        return project_dir
+    for parent in project_dir.parents:
+        if (parent / ".workpilot").exists():
+            return parent
+    return project_dir
 
 
 def main():
@@ -244,10 +254,14 @@ Examples:
     # Handle task from file if provided
     task_description = args.task
     if args.task_file:
-        if not args.task_file.exists():
+        try:
+            task_description = args.task_file.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
             print(f"Error: Task file not found: {args.task_file}")
             sys.exit(1)
-        task_description = args.task_file.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"Error: Task file cannot be read: {args.task_file} ({e})")
+            sys.exit(1)
         if not task_description:
             print(f"Error: Task file is empty: {args.task_file}")
             sys.exit(1)
@@ -262,28 +276,7 @@ Examples:
         # Sanitize null bytes which could cause issues
         task_description = task_description.replace("\x00", "")
 
-    # Find project root (look for auto-claude folder)
-    project_dir = args.project_dir
-
-    # Auto-detect if running from within workpilot/apps/backend/ source directory.
-    # This must be specific: check for run.py FILE (not dir) AND core/client.py to confirm
-    # we're in the actual backend source tree, not just a project named "workpilot".
-    run_py_path = project_dir / "run.py"
-    if (
-        project_dir.name in ("auto-claude", "workpilot", "WorkPilot-AI")
-        and run_py_path.exists()
-        and run_py_path.is_file()
-        and (project_dir / "core" / "client.py").exists()
-    ):
-        # Running from within workpilot/apps/backend/ source directory, go up 1 level
-        project_dir = project_dir.parent
-    elif not (project_dir / ".workpilot").exists():
-        # No .workpilot folder found - try to find project root
-        # First check for .workpilot (installed instance)
-        for parent in project_dir.parents:
-            if (parent / ".workpilot").exists():
-                project_dir = parent
-                break
+    project_dir = _project_root(args.project_dir)
 
     # Propagate --provider to SELECTED_LLM_PROVIDER environment variable so that
     # _get_active_provider() picks it up throughout the entire spec creation pipeline
@@ -292,17 +285,14 @@ Examples:
     # Anthropic is propagated too, as "claude": the task named it, and leaving
     # the variable alone would let the app's default provider — inherited from
     # Electron — run a spec the task asked Claude to write.
-    if args.provider:
-        import os as _os
-
-        _os.environ["SELECTED_LLM_PROVIDER"] = (
-            "claude"
-            if args.provider.lower() in ("anthropic", "claude")
-            else args.provider
-        )
+    provider = args.provider
+    if provider and provider.lower() in ("anthropic", "claude"):
+        provider = "claude"
+    if provider:
+        os.environ["SELECTED_LLM_PROVIDER"] = provider
         debug(
             "spec_runner",
-            f"Injected SELECTED_LLM_PROVIDER={args.provider} into environment from --provider arg",
+            f"Injected SELECTED_LLM_PROVIDER={provider} into environment from --provider arg",
         )
 
     # Resolve the model the way every other phase does — provider-aware.
@@ -322,13 +312,13 @@ Examples:
     # four phases finally agree on what "this provider's model" is.
     from phase_config import _resolve_provider_model
 
-    if args.provider and args.provider not in ("anthropic", "claude"):
-        resolved_model = _resolve_provider_model(args.model, args.provider)
+    if provider and provider != "claude":
+        resolved_model = _resolve_provider_model(args.model, provider)
         if resolved_model != args.model:
             debug(
                 "spec_runner",
                 f"Model '{args.model}' is not valid for provider "
-                f"'{args.provider}' — using the provider's model instead",
+                f"'{provider}' — using the provider's model instead",
                 resolved_model=resolved_model,
             )
     else:
@@ -389,18 +379,10 @@ Examples:
                 print()
                 print_status("Build cannot start: spec not approved.", "error")
                 print()
-                print(f"  {muted('To approve the spec, run:')}")
                 print(
-                    f"  {highlight(f'python auto-claude/review.py --spec-dir {orchestrator.spec_dir}')}"
+                    f"  {muted('Approve it in the app (the task’s review), or here:')}"
                 )
-                print()
-                print(
-                    f"  {muted('Or re-run spec_runner with --auto-approve to skip review:')}"
-                )
-                example_cmd = (
-                    'python auto-claude/spec_runner.py --task "..." --auto-approve'
-                )
-                print(f"  {highlight(example_cmd)}")
+                print(f"  {highlight(_continue_command(orchestrator))}")
                 sys.exit(1)
 
             debug_success("spec_runner", "Spec approved - starting build")
@@ -513,16 +495,12 @@ Examples:
         # crash and moves the card out of its column, which is exactly what a
         # pause has to avoid. The pause flag stays on disk for the resume.
         print("\n\n⏸  Spec creation paused — resume from the Kanban, or:")
-        print(
-            f"   python auto-claude/spec_runner.py --continue {orchestrator.spec_dir.name}"
-        )
+        print(f"   {_continue_command(orchestrator)}")
         sys.exit(0)
     except KeyboardInterrupt:
         debug_error("spec_runner", "Spec creation interrupted by user")
         print("\n\nSpec creation interrupted.")
-        print(
-            f"To continue: python auto-claude/spec_runner.py --continue {orchestrator.spec_dir.name}"
-        )
+        print(f"To continue: {_continue_command(orchestrator)}")
         sys.exit(1)
     except Exception as e:
         # Capture unexpected errors to Sentry
