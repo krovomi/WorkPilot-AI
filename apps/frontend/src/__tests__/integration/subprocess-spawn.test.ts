@@ -74,6 +74,19 @@ try {
 const [EXPECTED_PYTHON_COMMAND, EXPECTED_PYTHON_BASE_ARGS] =
 	parsePythonCommand(DETECTED_PYTHON_CMD);
 
+// The saved app settings, read for real unless a test sets what they hold.
+const savedSettings = vi.hoisted(() => ({
+	value: undefined as Record<string, unknown> | undefined,
+}));
+vi.mock("../../main/settings-utils", async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import("../../main/settings-utils")>();
+	return {
+		...actual,
+		readSettingsFile: () => savedSettings.value ?? actual.readSettingsFile(),
+	};
+});
+
 // Mock child_process spawn
 const mockStdout = new EventEmitter();
 const mockStderr = new EventEmitter();
@@ -442,6 +455,65 @@ describe("Subprocess Spawn Integration", () => {
 				expect.any(Object),
 			);
 		}, 30000); // Increase timeout for Windows CI (dynamic imports are slow)
+	});
+
+	describe("AgentManager · swarm mode", () => {
+		afterEach(() => {
+			savedSettings.value = undefined;
+		});
+
+		async function buildEnv(): Promise<Record<string, string>> {
+			const { spawn } = await import("node:child_process");
+			const { AgentManager } = await import("../../main/agent");
+			const manager = new AgentManager();
+			manager.configure(undefined, AUTO_CLAUDE_SOURCE);
+			const promise = manager.startTaskExecution(
+				"task-1",
+				TEST_PROJECT_PATH,
+				"spec-001",
+			);
+			await new Promise((resolve) => setImmediate(resolve));
+			mockProcess.emit("exit", 0);
+			await promise;
+			const call = vi.mocked(spawn).mock.calls.at(-1);
+			if (!call) throw new Error("the build was not spawned");
+			return (call[2] as { env: Record<string, string> }).env;
+		}
+
+		it("sends the saved swarm setting to the task's build", async () => {
+			savedSettings.value = {
+				swarm: {
+					enabled: true,
+					maxParallelAgents: 3,
+					failFast: true,
+					maxRetriesPerSubtask: 1,
+				},
+			};
+
+			const env = await buildEnv();
+
+			expect(env).toMatchObject({
+				WORKPILOT_SWARM_MAX_PARALLEL: "3",
+				WORKPILOT_SWARM_MAX_RETRIES: "1",
+				WORKPILOT_SWARM_FAIL_FAST: "1",
+			});
+		}, 30000);
+
+		it("sends nothing when the swarm is off", async () => {
+			savedSettings.value = {
+				swarm: {
+					enabled: false,
+					maxParallelAgents: 3,
+					failFast: true,
+					maxRetriesPerSubtask: 1,
+				},
+			};
+
+			const env = await buildEnv();
+
+			expect(env.WORKPILOT_SWARM_MAX_PARALLEL).toBeUndefined();
+			expect(env.WORKPILOT_SWARM_FAIL_FAST).toBeUndefined();
+		}, 30000);
 	});
 
 	// -----------------------------------------------------------------

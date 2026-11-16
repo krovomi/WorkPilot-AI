@@ -286,6 +286,8 @@ export type OpenAIAuthMode = "api-key" | "codex-cli";
 
 export interface AppSettings {
 	jev?: import("./jev").JevSettings;
+	/** Swarm Mode: parallel subtasks in a task's build (off when absent). */
+	swarm?: import("./swarm").SwarmSettings;
 	theme: "light" | "dark" | "system";
 	colorTheme?: ColorTheme;
 	defaultModel: string;

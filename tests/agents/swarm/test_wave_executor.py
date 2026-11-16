@@ -107,12 +107,14 @@ async def test_a_wave_runs_every_subtask_and_reports_each(
     assert events[0]["parallelism"] == 4
     assert kinds.count("subtask_started") == 3
     assert kinds.count("subtask_completed") == 3
-    # Only the phase markers of a subtask are forwarded, not its plain output.
+    # Only the phase markers of a subtask are forwarded, not its plain output,
+    # and without the marker: the app would take them for the task's own.
     [forwarded] = [e for e in events if e["type"] == "subtask_log"]
     assert forwarded == {
         "type": "subtask_log",
         "subtask_id": "s1",
-        "line": '__EXEC_PHASE__:{"phase": "coding"}',
+        "kind": "phase",
+        "data": '{"phase": "coding"}',
     }
     assert events[-1] == {
         "type": "wave_completed",
@@ -155,7 +157,9 @@ async def test_long_lines_and_a_last_line_without_its_end_are_read_whole(
     [forwarded] = [
         e for e in _events(capsys.readouterr().out) if e["type"] == "subtask_log"
     ]
-    assert len(forwarded["line"]) == len(lines[0])
+    assert forwarded["kind"] == "task"
+    assert forwarded["data"] == '{"diff": "' + "d" * 100_000 + '"}'
+    assert "__TASK_EVENT__" not in forwarded["data"]
 
 
 @pytest.mark.asyncio

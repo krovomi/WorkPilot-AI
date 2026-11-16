@@ -1,5 +1,6 @@
 import { debugLog } from "../../shared/utils/debug-logger";
 import { parseJevSettings } from "../../shared/utils/jev-settings";
+import { parseSwarmSettings } from "../../shared/utils/swarm-settings";
 import { execFileSync, spawn } from "node:child_process";
 import {
 	existsSync,
@@ -741,6 +742,8 @@ export function registerSettingsHandlers(
 				const newSettings = { ...currentSettings, ...settings };
 				if (settings.jev !== undefined)
 					newSettings.jev = parseJevSettings(settings.jev);
+				if (settings.swarm !== undefined)
+					newSettings.swarm = parseSwarmSettings(settings.swarm);
 
 				// Sync defaultModel when agent profile changes (#414)
 				if (settings.selectedAgentProfile) {
