@@ -13,6 +13,8 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+from foundation.platform import find_executable, is_macos, is_windows
+
 __all__ = ["android_sdk_root", "find_tool", "clear_cache"]
 
 # Where the SDK lands when nobody said. Android Studio's defaults, per OS.
@@ -27,15 +29,17 @@ _SDK_BIN_DIRS = ("platform-tools", "emulator", "cmdline-tools/latest/bin", "tool
 
 
 def _current_os() -> str:
-    try:
-        from foundation.platform import get_current_os
+    """The key of `_SDK_DEFAULTS` for this machine.
 
-        return str(get_current_os())
-    except Exception:  # noqa: BLE001 - detection must never be fatal
-        import platform as _platform
-
-        system = _platform.system().lower()
-        return {"darwin": "macos", "windows": "windows"}.get(system, "linux")
+    Not `str(get_current_os())`: that is the enum's name (``"OS.LINUX"``), which
+    matched no key, so the SDK's default install folders were never searched
+    and an SDK installed by Android Studio without ``ANDROID_HOME`` went unseen.
+    """
+    if is_windows():
+        return "windows"
+    if is_macos():
+        return "macos"
+    return "linux"
 
 
 @lru_cache(maxsize=1)
@@ -65,17 +69,12 @@ def find_tool(name: str) -> str:
     if root:
         sdk_paths = [str(Path(root) / sub) for sub in _SDK_BIN_DIRS]
 
-    try:
-        from foundation.platform import find_executable
+    found = find_executable(name, sdk_paths or None)
+    if found:
+        return found
 
-        found = find_executable(name, sdk_paths or None)
-        if found:
-            return found
-    except Exception:  # noqa: BLE001 - fall through to the manual search
-        pass
-
-    # `find_executable` unavailable (or it declined): look under the SDK
-    # ourselves, since that is the case it does not cover.
+    # `find_executable` declined: look under the SDK ourselves, with the
+    # suffixes a Windows SDK ships its tools under.
     suffixes = (".exe", ".bat", ".cmd", "") if _current_os() == "windows" else ("",)
     for directory in sdk_paths:
         for suffix in suffixes:

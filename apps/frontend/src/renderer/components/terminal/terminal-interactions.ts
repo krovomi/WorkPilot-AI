@@ -32,11 +32,15 @@ import {
 export async function copyTextToClipboard(text: string): Promise<boolean> {
 	if (!text) return false;
 
-	try {
-		await navigator.clipboard?.writeText(text);
-		return true;
-	} catch (error) {
-		console.warn("[terminal] clipboard.writeText failed, falling back", error);
+	// Without the API (an insecure context) there is nothing to await: the
+	// fallback is the only way to copy, not a success to report.
+	if (navigator.clipboard) {
+		try {
+			await navigator.clipboard.writeText(text);
+			return true;
+		} catch (error) {
+			console.warn("[terminal] clipboard.writeText failed, falling back", error);
+		}
 	}
 
 	try {
