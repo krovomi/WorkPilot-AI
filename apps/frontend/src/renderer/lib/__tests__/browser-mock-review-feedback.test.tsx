@@ -20,5 +20,16 @@ describe("browser mock: review feedback", () => {
 			success: true,
 			feedback: {},
 		});
+		await expect(github.getReviewFeedbackStats("p")).resolves.toEqual({
+			success: true,
+			stats: { threshold: 3, categories: [], rules: [] },
+		});
+		await expect(
+			github.resetReviewFeedbackRule("p", "0123456789abcdef"),
+		).resolves.toEqual({ success: false, error: "not_found" });
+		await expect(github.writeReviewConventions("p")).resolves.toEqual({
+			success: false,
+			error: "write_failed",
+		});
 	});
 });
