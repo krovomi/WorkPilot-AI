@@ -122,6 +122,28 @@ def test_a_pair_the_planner_knows_gets_a_real_plan(tmp_path: Path) -> None:
     assert "python" in result["plan"]["source"].lower()
     assert result["summary"]["plan_status"] == "ready"
     assert "Migration start warning" not in done.stdout
+    # The page shows the plan and hands it to the Kanban task.
+    phases = result["plan"]["phases"]
+    assert [phase["name"] for phase in phases][0] == "Analysis"
+    assert all(phase["steps"] for phase in phases)
+    assert result["plan"]["total_steps"] == sum(len(p["steps"]) for p in phases)
+    assert result["plan"]["risk_level"] in {"low", "medium"}
+
+
+def test_a_react_app_moved_to_typescript_gets_the_typescript_plan(project) -> None:
+    done = _process(
+        "--project-dir",
+        str(project),
+        "--migration-description",
+        "Convert JavaScript files to TypeScript",
+        "--dry-run",
+    )
+
+    assert done.returncode == 0, done.stdout + done.stderr
+    result = _result(done.stdout)
+    assert result["summary"]["plan_status"] == "ready"
+    names = [phase["name"] for phase in result["plan"]["phases"]]
+    assert "JavaScript to TypeScript" in names
 
 
 @pytest.fixture
@@ -187,6 +209,7 @@ def test_a_pair_the_planner_does_not_know_is_unsupported_not_failed(
     assert result["plan"]["migration_id"] == "fallback"
     assert result["plan"]["note"] == "no rule for javascript -> cobol"
     assert result["summary"]["plan_status"] == "unsupported"
+    assert "phases" not in result["plan"]  # no rule-based plan to show
     assert "Migration start warning" in capsys.readouterr().out
 
 
@@ -196,7 +219,19 @@ def test_a_pair_the_planner_does_not_know_is_unsupported_not_failed(
         ("Port the service to Go", None, "go"),
         ("Use Google fonts", None, None),
         ("Upgrade to Python 3.11", "python3.12", "python"),
-        ("Move to ASP.NET in C#", "dotnet", "csharp"),
+        # The longer name at the same place: ASP.NET, not .NET.
+        ("Move to ASP.NET in C#", "aspnetcore", "csharp"),
+        ("Upgrade to .NET 10", "dotnet", None),
+        # The target is the stack named last.
+        ("Migrate from React to Vue 3", "vue", None),
+        ("Migrate React Class Components to Hooks", "react-hooks", None),
+        ("Convert the Java classes to Kotlin", None, "kotlin"),
+        ("Convert JavaScript files to TypeScript", "typescript", "typescript"),
+        ("Move to Python 3.12", "python3.12", "python"),
+        ("Move from MySQL to Postgres", "postgresql", None),
+        # Brackets give a detail; they name the target only when nothing else does.
+        ("Upgrade Spring Boot 2 to 3 (javax to jakarta)", "spring-boot", None),
+        ("Upgrade the app (to Vue 3)", "vue", None),
     ],
 )
 def test_the_target_is_read_from_the_description(

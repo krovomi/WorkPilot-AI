@@ -47,6 +47,17 @@ const EXAMPLES = [
 
 const RUNNING = new Set(["analyzing", "planning", "executing", "validating"]);
 
+/** The plan as lines of the Kanban task's description, under its heading. */
+function planLines(phases: { name: string; steps: string[] }[], heading: string): string[] {
+	if (phases.length === 0) return [];
+	return [
+		heading,
+		...phases.map((phase, i) =>
+			phase.steps.length ? `${i + 1}. ${phase.name}: ${phase.steps.join("; ")}` : `${i + 1}. ${phase.name}`,
+		),
+	];
+}
+
 /** Migrations of framework, version or language, analysed here and made by a Kanban task. */
 export function CodeMigrationDashboard(): React.ReactElement {
 	const { t } = useTranslation(["codeMigration", "navigation"]);
@@ -59,6 +70,7 @@ export function CodeMigrationDashboard(): React.ReactElement {
 	const isRunning = RUNNING.has(phase);
 	const description = migrationDescription.trim();
 	const ready = result?.summary.plan_status === "ready";
+	const phases = ready ? (result?.plan.phases ?? []) : [];
 
 	async function handleCreateTask() {
 		if (!activeProject || !description) return;
@@ -72,6 +84,10 @@ export function CodeMigrationDashboard(): React.ReactElement {
 			t("codeMigration:task.scope"),
 			t("codeMigration:task.acceptance"),
 			result?.plan.source ? t("codeMigration:task.source", { source: result.plan.source }) : "",
+			// Only the plan of this description, not of one analysed before it.
+			...(result?.migration_description.trim() === description
+				? planLines(phases, t("codeMigration:task.plan"))
+				: []),
 		]
 			.filter(Boolean)
 			.join("\n");
@@ -154,7 +170,33 @@ export function CodeMigrationDashboard(): React.ReactElement {
 										})}
 										tone={ready ? "green" : "amber"}
 									/>
+									{ready && result.plan.risk_level && (
+										<Stat
+											label={t("codeMigration:results.risk")}
+											value={t(`codeMigration:risk.${result.plan.risk_level}`, {
+												defaultValue: result.plan.risk_level,
+											})}
+											tone={result.plan.risk_level === "low" ? "green" : "amber"}
+										/>
+									)}
 								</Stats>
+								{phases.length > 0 && (
+									<Panel>
+										<p className="wp-meta mb-2">
+											{t("codeMigration:results.plan", { count: result.plan.total_steps ?? 0 })}
+										</p>
+										<ol className="list-decimal space-y-1 pl-5 text-sm" data-testid="code-migration-plan">
+											{phases.map((phase) => (
+												<li key={phase.name}>
+													<span className="font-medium">{phase.name}</span>
+													{phase.steps.length > 0 && (
+														<span className="wp-meta"> · {phase.steps.join(" · ")}</span>
+													)}
+												</li>
+											))}
+										</ol>
+									</Panel>
+								)}
 								<Notice tone={ready ? "blue" : "amber"} icon={KanbanSquare}>
 									{t(ready ? "codeMigration:results.readyHint" : "codeMigration:results.unsupportedHint")}
 								</Notice>
