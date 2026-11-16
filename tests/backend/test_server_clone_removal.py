@@ -111,11 +111,29 @@ def test_a_clone_that_resists_is_logged_and_the_rest_still_goes(
     # The project's rows are gone already: the clone is reported, not raised,
     # and its home is still deleted.
     assert clone.exists() and not home.exists()
-    assert f"Could not delete {clone}" in caplog.text
-    assert f"Deleted {home}" in caplog.text
+    # Paths are read from their end: the log redaction can mask the start of
+    # a temporary path (on Windows the user's folder, as `HOMEPATH`).
+    [warning] = _logged(caplog, "WARNING")
+    assert warning.startswith("Could not delete ")
+    assert f"{_tail(clone)}: " in warning
+    [info] = _logged(caplog, "INFO")
+    assert info.startswith("Deleted ") and info.endswith(_tail(home))
 
     # A home that is not there any more is nothing to do.
     caplog.clear()
     with caplog.at_level("INFO", logger=repos.logger.name):
         repos.delete_clone("p-1")
-    assert f"{home}" not in caplog.text
+    assert _logged(caplog, "INFO") == []
+
+
+def _tail(path: Path) -> str:
+    """The end of a temporary path, which the log redaction leaves alone."""
+    return os.path.join(path.parent.name, path.name)
+
+
+def _logged(caplog, level: str) -> list[str]:
+    return [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == repos.logger.name and record.levelname == level
+    ]
