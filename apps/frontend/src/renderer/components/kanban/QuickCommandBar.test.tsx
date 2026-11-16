@@ -253,7 +253,11 @@ describe("lancer une commande", () => {
 		expect(
 			await screen.findByText("/review · Slash command failed"),
 		).toBeInTheDocument();
-		expect(screen.getByText(/still in \/tmp\/wt/)).toBeInTheDocument();
+		// The toast's description, not the live region that repeats it for about
+		// a second after the toast opens: a slow runner reads it in that window.
+		expect(
+			screen.getByText(/still in \/tmp\/wt/, { selector: "p" }),
+		).toBeInTheDocument();
 	});
 
 	it("une commande sans sortie ni note n'a pas de description", async () => {
