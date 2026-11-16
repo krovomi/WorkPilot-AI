@@ -18,7 +18,7 @@ import {
 	Users,
 	XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { GitLabNewCommitsCheck } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
@@ -32,6 +32,11 @@ import type {
 	GitLabMRReviewProgress,
 	GitLabMRReviewResult,
 } from "../hooks/useGitLabMRs";
+import {
+	getMRDetailStatus,
+	isReadyToMerge,
+	type MRDetailStatus,
+} from "../utils/mr-detail-status";
 import { ReviewFindings } from "./ReviewFindings";
 import { formatAppDate } from "@/lib/date-format";
 
@@ -46,9 +51,7 @@ interface MRDetailProps {
 	onCheckNewCommits: () => Promise<GitLabNewCommitsCheck>;
 	onCancelReview: () => void;
 	onPostReview: (selectedFindingIds?: string[]) => Promise<boolean>;
-	onPostNote: (body: string) => Promise<boolean>;
 	onMergeMR: (mergeMethod?: "merge" | "squash" | "rebase") => Promise<boolean>;
-	onAssignMR: (userIds: number[]) => Promise<boolean>;
 	onApproveMR: () => Promise<boolean>;
 }
 
@@ -62,31 +65,93 @@ function formatDate(dateString: string): string {
 	});
 }
 
-function getStatusColor(status: GitLabMRReviewResult["overallStatus"]): string {
-	switch (status) {
-		case "approve":
-			return "bg-success/20 text-success border-success/50";
-		case "request_changes":
-			return "bg-destructive/20 text-destructive border-destructive/50";
-		default:
-			return "bg-muted";
-	}
+/** The badge of the review's verdict. */
+const VERDICT_LOOK: Record<
+	GitLabMRReviewResult["overallStatus"],
+	{ className: string; label: string }
+> = {
+	approve: {
+		className: "bg-success/20 text-success border-success/50",
+		label: "gitlab:mrReview.overallStatus.approve",
+	},
+	request_changes: {
+		className: "bg-destructive/20 text-destructive border-destructive/50",
+		label: "gitlab:mrReview.overallStatus.requestChanges",
+	},
+	comment: { className: "bg-muted", label: "gitlab:mrReview.overallStatus.comment" },
+};
+
+const MR_STATE_COLOR: Record<GitLabMergeRequest["state"], string> = {
+	opened: "bg-success/20 text-success border-success/50",
+	merged: "bg-purple-500/20 text-purple-500 border-purple-500/50",
+	closed: "bg-destructive/20 text-destructive border-destructive/50",
+	locked: "bg-muted",
+};
+
+/** The banner's look for each status. */
+const STATUS_LOOK: Record<
+	MRDetailStatus,
+	{ Icon: typeof Sparkles; color: string }
+> = {
+	not_reviewed: {
+		Icon: Sparkles,
+		color: "bg-muted text-muted-foreground border-muted",
+	},
+	ready_for_followup: { Icon: RefreshCw, color: "bg-info/20 text-info border-info/50" },
+	ready_to_merge: {
+		Icon: CheckCheck,
+		color: "bg-success/20 text-success border-success/50",
+	},
+	followup_issues_remain: {
+		Icon: AlertTriangle,
+		color: "bg-warning/20 text-warning border-warning/50",
+	},
+	waiting_for_changes: {
+		Icon: AlertTriangle,
+		color: "bg-warning/20 text-warning border-warning/50",
+	},
+	needs_attention: {
+		Icon: AlertCircle,
+		color: "bg-destructive/20 text-destructive border-destructive/50",
+	},
+	reviewed_pending_post: {
+		Icon: MessageSquare,
+		color: "bg-primary/20 text-primary border-primary/50",
+	},
+};
+
+/** What a follow-up review did with the previous findings. */
+const FOLLOWUP_BADGES = [
+	{
+		field: "resolvedFindings",
+		label: "gitlab:mrReview.resolvedCount",
+		Icon: CheckCircle,
+		className: "bg-success/20 text-success border-success/50",
+	},
+	{
+		field: "unresolvedFindings",
+		label: "gitlab:mrReview.stillOpenCount",
+		Icon: AlertCircle,
+		className: "bg-warning/20 text-warning border-warning/50",
+	},
+	{
+		field: "newFindingsSinceLastReview",
+		label: "gitlab:mrReview.newIssueCount",
+		Icon: XCircle,
+		className: "bg-destructive/20 text-destructive border-destructive/50",
+	},
+] as const;
+
+/**
+ * One page per MR: opening another MR starts a fresh page, so findings
+ * posted or selected on one MR, and its new-commit check, never show on the
+ * next.
+ */
+export function MRDetail(props: MRDetailProps) {
+	return <MRDetailPage key={props.mr.iid} {...props} />;
 }
 
-function getMRStateColor(state: string): string {
-	switch (state) {
-		case "opened":
-			return "bg-success/20 text-success border-success/50";
-		case "merged":
-			return "bg-purple-500/20 text-purple-500 border-purple-500/50";
-		case "closed":
-			return "bg-destructive/20 text-destructive border-destructive/50";
-		default:
-			return "bg-muted";
-	}
-}
-
-export function MRDetail({
+function MRDetailPage({
 	projectId,
 	mr,
 	reviewResult,
@@ -97,8 +162,6 @@ export function MRDetail({
 	onCheckNewCommits,
 	onCancelReview,
 	onPostReview,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
-	onPostNote,
 	onMergeMR,
 	onApproveMR,
 }: MRDetailProps) {
@@ -146,14 +209,10 @@ export function MRDetail({
 			reviewResult.reviewedCommitSha &&
 			hasPostedFindings
 		) {
-			try {
-				const result = await onCheckNewCommits();
-				setNewCommitsCheck(result);
-			} finally {
-				// No additional state to clean up
-			}
+			// A check that fails says nothing new; it used to be an unhandled
+			// rejection.
+			setNewCommitsCheck(await onCheckNewCommits().catch(() => null));
 		} else {
-			// Clear any existing new commits check if we haven't posted yet
 			setNewCommitsCheck(null);
 		}
 	}, [reviewResult, onCheckNewCommits, hasPostedFindings]);
@@ -173,185 +232,16 @@ export function MRDetail({
 	// Count selected findings by type for the button label
 	const selectedCount = selectedFindingIds.size;
 
-	// Check if MR is ready to merge based on review
-	const isReadyToMerge = useMemo(() => {
-		if (!reviewResult?.success) return false;
-		// Check if the summary contains "READY TO MERGE"
-		return (
-			reviewResult.summary?.includes("READY TO MERGE") ||
-			reviewResult.overallStatus === "approve"
-		);
-	}, [reviewResult]);
-
-	// Compute the overall MR review status for visual display
-	type MRStatus =
-		| "not_reviewed"
-		| "reviewed_pending_post"
-		| "waiting_for_changes"
-		| "ready_to_merge"
-		| "needs_attention"
-		| "ready_for_followup"
-		| "followup_issues_remain";
-	const mrStatus: {
-		status: MRStatus;
-		label: string;
-		description: string;
-		icon: React.ReactNode;
-		color: string;
-	} = useMemo(() => {
-		if (!reviewResult?.success) {
-			return {
-				status: "not_reviewed",
-				label: "Not Reviewed",
-				description: "Run an AI review to analyze this MR",
-				icon: <Sparkles className="h-5 w-5" />,
-				color: "bg-muted text-muted-foreground border-muted",
-			};
-		}
-
-		const totalPosted =
-			postedFindingIds.size + (reviewResult.postedFindingIds?.length ?? 0);
-		const hasPosted = totalPosted > 0 || reviewResult.hasPostedFindings;
-		const hasBlockers = reviewResult.findings.some(
-			(f) => f.severity === "critical" || f.severity === "high",
-		);
-		const unpostedFindings = reviewResult.findings.filter(
-			(f) =>
-				!postedFindingIds.has(f.id) &&
-				!reviewResult.postedFindingIds?.includes(f.id),
-		);
-		const hasUnpostedBlockers = unpostedFindings.some(
-			(f) => f.severity === "critical" || f.severity === "high",
-		);
-		const hasNewCommits = newCommitsCheck?.hasNewCommits ?? false;
-		const newCommitCount = newCommitsCheck?.newCommitCount ?? 0;
-
-		// Follow-up review specific statuses
-		if (reviewResult.isFollowupReview) {
-			const resolvedCount = reviewResult.resolvedFindings?.length ?? 0;
-			const unresolvedCount = reviewResult.unresolvedFindings?.length ?? 0;
-			const newIssuesCount =
-				reviewResult.newFindingsSinceLastReview?.length ?? 0;
-
-			// Check if any remaining issues are blockers (HIGH/CRITICAL)
-			const hasBlockingIssuesRemaining = reviewResult.findings.some(
-				(f) => f.severity === "critical" || f.severity === "high",
-			);
-
-			// Check if ready for another follow-up (new commits after this follow-up)
-			if (hasNewCommits) {
-				return {
-					status: "ready_for_followup",
-					label: "Ready for Follow-up",
-					description: `${newCommitCount} new commit${newCommitCount !== 1 ? "s" : ""} since follow-up. Run another follow-up review.`,
-					icon: <RefreshCw className="h-5 w-5" />,
-					color: "bg-info/20 text-info border-info/50",
-				};
-			}
-
-			// All issues resolved - ready to merge
-			if (unresolvedCount === 0 && newIssuesCount === 0) {
-				return {
-					status: "ready_to_merge",
-					label: "Ready to Merge",
-					description: `All ${resolvedCount} issue${resolvedCount !== 1 ? "s" : ""} resolved. This MR can be merged.`,
-					icon: <CheckCheck className="h-5 w-5" />,
-					color: "bg-success/20 text-success border-success/50",
-				};
-			}
-
-			// No blocking issues (only MEDIUM/LOW) - can merge with suggestions
-			if (!hasBlockingIssuesRemaining) {
-				const suggestionsCount = unresolvedCount + newIssuesCount;
-				return {
-					status: "ready_to_merge",
-					label: "Ready to Merge",
-					description: `${resolvedCount} resolved. ${suggestionsCount} non-blocking suggestion${suggestionsCount !== 1 ? "s" : ""} remain.`,
-					icon: <CheckCheck className="h-5 w-5" />,
-					color: "bg-success/20 text-success border-success/50",
-				};
-			}
-
-			// Blocking issues still remain after follow-up
-			return {
-				status: "followup_issues_remain",
-				label: "Blocking Issues",
-				description: `${resolvedCount} resolved, ${unresolvedCount} blocking issue${unresolvedCount !== 1 ? "s" : ""} still open.`,
-				icon: <AlertTriangle className="h-5 w-5" />,
-				color: "bg-warning/20 text-warning border-warning/50",
-			};
-		}
-
-		// Initial review statuses (non-follow-up)
-
-		// Priority 1: Ready for follow-up review (posted findings + new commits)
-		if (hasPosted && hasNewCommits) {
-			return {
-				status: "ready_for_followup",
-				label: "Ready for Follow-up",
-				description: `${newCommitCount} new commit${newCommitCount !== 1 ? "s" : ""} since review. Run follow-up to check if issues are resolved.`,
-				icon: <RefreshCw className="h-5 w-5" />,
-				color: "bg-info/20 text-info border-info/50",
-			};
-		}
-
-		// Priority 2: Ready to merge (no blockers)
-		if (isReadyToMerge && hasPosted) {
-			return {
-				status: "ready_to_merge",
-				label: "Ready to Merge",
-				description: "No blocking issues found. This MR can be merged.",
-				icon: <CheckCheck className="h-5 w-5" />,
-				color: "bg-success/20 text-success border-success/50",
-			};
-		}
-
-		// Priority 3: Waiting for changes (posted but has blockers, no new commits yet)
-		if (hasPosted && hasBlockers) {
-			return {
-				status: "waiting_for_changes",
-				label: "Waiting for Changes",
-				description: `${totalPosted} finding${totalPosted !== 1 ? "s" : ""} posted. Waiting for contributor to address issues.`,
-				icon: <AlertTriangle className="h-5 w-5" />,
-				color: "bg-warning/20 text-warning border-warning/50",
-			};
-		}
-
-		// Priority 4: Ready to merge (posted, no blockers)
-		if (hasPosted && !hasBlockers) {
-			return {
-				status: "ready_to_merge",
-				label: "Ready to Merge",
-				description: `${totalPosted} finding${totalPosted !== 1 ? "s" : ""} posted. No blocking issues remain.`,
-				icon: <CheckCheck className="h-5 w-5" />,
-				color: "bg-success/20 text-success border-success/50",
-			};
-		}
-
-		// Priority 5: Needs attention (unposted blockers)
-		if (hasUnpostedBlockers) {
-			return {
-				status: "needs_attention",
-				label: "Needs Attention",
-				description: `${unpostedFindings.length} finding${unpostedFindings.length !== 1 ? "s" : ""} need to be posted to GitLab.`,
-				icon: <AlertCircle className="h-5 w-5" />,
-				color: "bg-destructive/20 text-destructive border-destructive/50",
-			};
-		}
-
-		// Default: Review complete, pending post
-		return {
-			status: "reviewed_pending_post",
-			label: "Review Complete",
-			description: `${reviewResult.findings.length} finding${reviewResult.findings.length !== 1 ? "s" : ""} found. Select and post to GitLab.`,
-			icon: <MessageSquare className="h-5 w-5" />,
-			color: "bg-primary/20 text-primary border-primary/50",
-		};
-	}, [reviewResult, postedFindingIds, isReadyToMerge, newCommitsCheck]);
+	const readyToMerge = isReadyToMerge(reviewResult);
+	const mrStatus = getMRDetailStatus({
+		result: reviewResult,
+		postedIds: postedFindingIds,
+		newCommitsCheck,
+	});
+	const { Icon: StatusIcon, color: statusColor } = STATUS_LOOK[mrStatus.status];
 
 	const handlePostReview = async () => {
 		const idsToPost = Array.from(selectedFindingIds);
-		if (idsToPost.length === 0) return;
 
 		setIsPostingFindings(true);
 		try {
@@ -361,11 +251,10 @@ export function MRDetail({
 				setPostedFindingIds((prev) => new Set([...prev, ...idsToPost]));
 				// Clear selection
 				setSelectedFindingIds(new Set());
-				// Show success message
+				// Show success message. The new-commit check follows on its own:
+				// posting changes hasPostedFindings, which re-runs the effect. A
+				// delayed call here kept the old closure and wiped its answer.
 				setPostSuccess({ count: idsToPost.length, timestamp: Date.now() });
-				// After posting, check for new commits (follow-up review now available)
-				// Use a small delay to allow the backend to save the posted state
-				setTimeout(() => checkForNewCommits(), 500);
 			}
 		} finally {
 			setIsPostingFindings(false);
@@ -373,8 +262,6 @@ export function MRDetail({
 	};
 
 	const handleApprove = async () => {
-		if (!reviewResult) return;
-
 		setIsApproving(true);
 		try {
 			await onApproveMR();
@@ -405,8 +292,8 @@ export function MRDetail({
 					<div className="space-y-2">
 						<div className="flex items-start justify-between gap-4">
 							<div className="flex items-center gap-2">
-								<Badge variant="outline" className={getMRStateColor(mr.state)}>
-									{mr.state.charAt(0).toUpperCase() + mr.state.slice(1)}
+								<Badge variant="outline" className={MR_STATE_COLOR[mr.state]}>
+									{t(`gitlab:mergeRequests.states.${mr.state}`)}
 								</Badge>
 								<span className="text-sm text-muted-foreground">!{mr.iid}</span>
 							</div>
@@ -453,7 +340,9 @@ export function MRDetail({
 						<div className="flex items-center gap-4">
 							<Badge variant="outline" className="flex items-center gap-1">
 								<FileDiff className="h-3 w-3" />
-								{mr.mergeStatus}
+								{t(`gitlab:mrReview.mergeStatus.${mr.mergeStatus}`, {
+									defaultValue: mr.mergeStatus,
+								})}
 							</Badge>
 						</div>
 					)}
@@ -465,14 +354,13 @@ export function MRDetail({
 							{newCommitsCheck?.hasNewCommits && !isReviewing ? (
 								<Button
 									onClick={onRunFollowupReview}
-									disabled={isReviewing}
 									className="flex-1"
 									variant="secondary"
 								>
 									<RefreshCw className="h-4 w-4 mr-2" />
 									{t("gitlab:mrReview.followupWithCommits", {
-									count: newCommitsCheck.newCommitCount,
-								})}
+										count: newCommitsCheck.newCommitCount ?? 0,
+									})}
 								</Button>
 							) : (
 								<Button
@@ -528,63 +416,66 @@ export function MRDetail({
 						</div>
 
 						{/* Approval and Merge buttons */}
-						{reviewResult?.success &&
-							isReadyToMerge &&
-							mr.state === "opened" && (
-								<div className="flex items-center gap-2">
-									<Button
-										onClick={handleApprove}
-										disabled={isApproving}
-										variant="default"
-										className="flex-1 bg-success hover:bg-success/90"
-									>
-										{isApproving ? (
-											<>
-												<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-												{t("gitlab:mrReview.approving")}
-											</>
-										) : (
-											<>
-												<CheckCircle className="h-4 w-4 mr-2" />
-												{t("gitlab:mrReview.approve")}
-											</>
-										)}
-									</Button>
-									<Button
-										onClick={handleMerge}
-										disabled={isMerging}
-										variant="outline"
-										className="flex-1"
-									>
-										{isMerging ? (
-											<>
-												<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-												{t("gitlab:mrReview.merging")}
-											</>
-										) : (
-											<>
-												<GitMerge className="h-4 w-4 mr-2" />
-												{t("gitlab:mrReview.merge")}
-											</>
-										)}
-									</Button>
-								</div>
-							)}
+						{readyToMerge && mr.state === "opened" && (
+							<div className="flex items-center gap-2">
+								<Button
+									onClick={handleApprove}
+									disabled={isApproving}
+									variant="default"
+									className="flex-1 bg-success hover:bg-success/90"
+								>
+									{isApproving ? (
+										<>
+											<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+											{t("gitlab:mrReview.approving")}
+										</>
+									) : (
+										<>
+											<CheckCircle className="h-4 w-4 mr-2" />
+											{t("gitlab:mrReview.approve")}
+										</>
+									)}
+								</Button>
+								<Button
+									onClick={handleMerge}
+									disabled={isMerging}
+									variant="outline"
+									className="flex-1"
+								>
+									{isMerging ? (
+										<>
+											<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+											{t("gitlab:mrReview.merging")}
+										</>
+									) : (
+										<>
+											<GitMerge className="h-4 w-4 mr-2" />
+											{t("gitlab:mrReview.merge")}
+										</>
+									)}
+								</Button>
+							</div>
+						)}
 					</div>
 
 					{/* MR Review Status Banner */}
 					<Card
-						className={`border-2 ${mrStatus.color} ${mrStatus.status === "ready_for_followup" ? "animate-pulse-subtle" : ""}`}
+						className={`border-2 ${statusColor} ${mrStatus.status === "ready_for_followup" ? "animate-pulse-subtle" : ""}`}
 					>
 						<CardContent className="py-3">
 							<div className="flex items-center gap-3">
-								<div className={`p-2 rounded-full ${mrStatus.color}`}>
-									{mrStatus.icon}
+								<div className={`p-2 rounded-full ${statusColor}`}>
+									<StatusIcon className="h-5 w-5" />
 								</div>
 								<div className="flex-1 min-w-0">
-									<div className="font-medium">{mrStatus.label}</div>
+									<div className="font-medium">
+										{t(`gitlab:mrReview.status.${mrStatus.status}`)}
+									</div>
 									<div className="text-sm text-muted-foreground truncate">
-										{mrStatus.description}
+										{t(
+											`gitlab:mrReview.status.${mrStatus.detail.key}`,
+											mrStatus.detail.values ?? {},
+										)}
 									</div>
 								</div>
 								{mrStatus.status === "ready_for_followup" && (
@@ -606,18 +497,6 @@ export function MRDetail({
 										)}
 									</Button>
 								)}
-								{mrStatus.status === "waiting_for_changes" &&
-									newCommitsCheck?.hasNewCommits && (
-										<Badge
-											variant="outline"
-											className="bg-primary/20 text-primary border-primary/50 shrink-0"
-										>
-											<RefreshCw className="h-3 w-3 mr-1" />
-											{t("gitlab:mrReview.newCommitsBadge", {
-									count: newCommitsCheck.newCommitCount,
-								})}
-										</Badge>
-									)}
 							</div>
 						</CardContent>
 					</Card>
@@ -656,12 +535,9 @@ export function MRDetail({
 									</span>
 									<Badge
 										variant="outline"
-										className={getStatusColor(reviewResult.overallStatus)}
+										className={VERDICT_LOOK[reviewResult.overallStatus].className}
 									>
-										{reviewResult.overallStatus === "approve" && t("gitlab:mrReview.overallStatus.approve")}
-										{reviewResult.overallStatus === "request_changes" &&
-											t("gitlab:mrReview.overallStatus.requestChanges")}
-										{reviewResult.overallStatus === "comment" && t("gitlab:mrReview.overallStatus.comment")}
+										{t(VERDICT_LOOK[reviewResult.overallStatus].label)}
 									</Badge>
 								</CardTitle>
 							</CardHeader>
@@ -669,40 +545,17 @@ export function MRDetail({
 								{/* Follow-up Review Resolution Status */}
 								{reviewResult.isFollowupReview && (
 									<div className="flex flex-wrap gap-2 pb-2 border-b border-border">
-										{(reviewResult.resolvedFindings?.length ?? 0) > 0 && (
-											<Badge
-												variant="outline"
-												className="bg-success/20 text-success border-success/50"
-											>
-												<CheckCircle className="h-3 w-3 mr-1" />
-												{t("gitlab:mrReview.resolvedCount", {
-											count: reviewResult.resolvedFindings?.length,
+										{FOLLOWUP_BADGES.map(({ field, label, Icon, className }) => {
+											const count = reviewResult[field]?.length ?? 0;
+											return (
+												count > 0 && (
+													<Badge key={field} variant="outline" className={className}>
+														<Icon className="h-3 w-3 mr-1" />
+														{t(label, { count })}
+													</Badge>
+												)
+											);
 										})}
-											</Badge>
-										)}
-										{(reviewResult.unresolvedFindings?.length ?? 0) > 0 && (
-											<Badge
-												variant="outline"
-												className="bg-warning/20 text-warning border-warning/50"
-											>
-												<AlertCircle className="h-3 w-3 mr-1" />
-												{t("gitlab:mrReview.stillOpenCount", {
-											count: reviewResult.unresolvedFindings?.length,
-										})}
-											</Badge>
-										)}
-										{(reviewResult.newFindingsSinceLastReview?.length ?? 0) >
-											0 && (
-											<Badge
-												variant="outline"
-												className="bg-destructive/20 text-destructive border-destructive/50"
-											>
-												<XCircle className="h-3 w-3 mr-1" />
-												{t("gitlab:mrReview.newIssueCount", {
-												count: reviewResult.newFindingsSinceLastReview?.length,
-											})}
-											</Badge>
-										)}
 									</div>
 								)}
 
@@ -721,14 +574,14 @@ export function MRDetail({
 								{reviewResult.reviewedAt && (
 									<p className="text-xs text-muted-foreground">
 										{t("gitlab:mrReview.reviewedAt", {
-								date: formatDate(reviewResult.reviewedAt),
-							})}
+											date: formatDate(reviewResult.reviewedAt),
+										})}
 										{reviewResult.reviewedCommitSha && (
 											<>
 												{" "}
 												{t("gitlab:mrReview.atCommit", {
-										sha: reviewResult.reviewedCommitSha.substring(0, 7),
-									})}
+													sha: reviewResult.reviewedCommitSha.substring(0, 7),
+												})}
 											</>
 										)}
 									</p>

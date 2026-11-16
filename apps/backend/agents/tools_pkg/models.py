@@ -656,8 +656,6 @@ def _map_mcp_server_name(
     Returns:
         Internal server identifier or None if not recognized
     """
-    if not name:
-        return None
     mappings = {
         "brain": "brain",
         "workpilot-brain": "brain",
@@ -785,16 +783,12 @@ def get_required_mcp_servers(
     # preflight said this task touches the interface. A backend task declares
     # no server and pays for no tool definition. Before the overrides, so
     # AGENT_MCP_<agent>_REMOVE=uiux works.
+    # ``active_for`` turns any failure of its own into "not offered".
     if config.get("tools") and "uiux" not in servers:
-        try:
-            from uiux.integration import active_for as uiux_active
+        from uiux.integration import active_for as uiux_active
 
-            if uiux_active(spec_dir):
-                servers.append("uiux")
-        except Exception as exc:  # noqa: BLE001 - optional design data never blocks an agent
-            import logging
-
-            logging.getLogger(__name__).debug("ui-ux-pro-max not offered: %s", exc)
+        if uiux_active(spec_dir):
+            servers.append("uiux")
 
     # Filter chrome-devtools if not enabled (default: disabled)
     if "chrome-devtools" in servers:

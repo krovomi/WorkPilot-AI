@@ -270,6 +270,10 @@ export interface GitHubAPI {
 	 * the component read the rest anyway.
 	 */
 	startGitHubAuth: () => Promise<IPCResult<GitHubAuthStartResult>>;
+	/**
+	 * Whether gh holds a token: `token` is MASKED_SECRET, never the value.
+	 * Saving it with `githubAuthMethod: "oauth"` stores gh's token (main).
+	 */
 	getGitHubToken: () => Promise<IPCResult<{ token: string }>>;
 	getGitHubUser: () => Promise<IPCResult<{ username: string; name?: string }>>;
 	listGitHubUserRepos: () => Promise<
