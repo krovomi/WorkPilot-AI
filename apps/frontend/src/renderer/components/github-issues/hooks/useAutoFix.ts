@@ -1,50 +1,39 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
 	AutoFixConfig,
 	AutoFixQueueItem,
-	BatchProgress,
-	IssueBatch,
 } from "../../../../preload/api/modules/github-api";
 
 /**
- * Hook for managing auto-fix state with batching support
+ * Hook for the auto-fix of single issues: its settings, its queue, and the
+ * polling for new issues while it is on.
  */
 export function useAutoFix(projectId: string | undefined) {
 	const [config, setConfig] = useState<AutoFixConfig | null>(null);
 	const [queue, setQueue] = useState<AutoFixQueueItem[]>([]);
-	const [batches, setBatches] = useState<IssueBatch[]>([]);
-	const [isLoading, setIsLoading] = useState(false);
-	const [isBatchRunning, setIsBatchRunning] = useState(false);
-	const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(
-		null,
-	);
+	// The project shown now: an answer for the previous one is dropped.
+	const projectIdRef = useRef(projectId);
+	projectIdRef.current = projectId;
 
-	// Load config, queue, and batches
-	const loadData = useCallback(async () => {
+	// Load the config and the queue on mount and when the project changes
+	useEffect(() => {
+		setConfig(null);
+		setQueue([]);
 		if (!projectId) return;
 
-		setIsLoading(true);
-		try {
-			const [configResult, queueResult, batchesResult] = await Promise.all([
-				window.electronAPI.github.getAutoFixConfig(projectId),
-				window.electronAPI.github.getAutoFixQueue(projectId),
-				window.electronAPI.github.getBatches(projectId),
-			]);
-
-			setConfig(configResult);
-			setQueue(queueResult);
-			setBatches(batchesResult);
-		} catch (error) {
-			console.error("Failed to load auto-fix data:", error);
-		} finally {
-			setIsLoading(false);
-		}
+		Promise.all([
+			window.electronAPI.github.getAutoFixConfig(projectId),
+			window.electronAPI.github.getAutoFixQueue(projectId),
+		])
+			.then(([configResult, queueResult]) => {
+				if (projectIdRef.current !== projectId) return;
+				setConfig(configResult);
+				setQueue(queueResult);
+			})
+			.catch((error) => {
+				console.error("Failed to load auto-fix data:", error);
+			});
 	}, [projectId]);
-
-	// Load on mount and when projectId changes
-	useEffect(() => {
-		loadData();
-	}, [loadData]);
 
 	// Listen for completion events to refresh queue
 	useEffect(() => {
@@ -53,53 +42,19 @@ export function useAutoFix(projectId: string | undefined) {
 		const cleanupComplete = window.electronAPI.github.onAutoFixComplete(
 			(eventProjectId: string) => {
 				if (eventProjectId === projectId) {
-					window.electronAPI.github.getAutoFixQueue(projectId).then(setQueue);
+					window.electronAPI.github
+						.getAutoFixQueue(projectId)
+						.then((next) => {
+							if (projectIdRef.current === projectId) setQueue(next);
+						})
+						.catch((error) => {
+							console.error("Failed to refresh the auto-fix queue:", error);
+						});
 				}
 			},
 		);
 
 		return cleanupComplete;
-	}, [projectId]);
-
-	// Listen for batch events
-	useEffect(() => {
-		if (!projectId) return;
-
-		const cleanupProgress = window.electronAPI.github.onBatchProgress(
-			(eventProjectId: string, progress: BatchProgress) => {
-				if (eventProjectId === projectId) {
-					setBatchProgress(progress);
-					if (progress.phase === "complete") {
-						setIsBatchRunning(false);
-					}
-				}
-			},
-		);
-
-		const cleanupComplete = window.electronAPI.github.onBatchComplete(
-			(eventProjectId: string, newBatches: IssueBatch[]) => {
-				if (eventProjectId === projectId) {
-					setBatches(newBatches);
-					setIsBatchRunning(false);
-					setBatchProgress(null);
-				}
-			},
-		);
-
-		const cleanupError = window.electronAPI.github.onBatchError(
-			(eventProjectId: string, _error: { error: string }) => {
-				if (eventProjectId === projectId) {
-					setIsBatchRunning(false);
-					setBatchProgress(null);
-				}
-			},
-		);
-
-		return () => {
-			cleanupProgress();
-			cleanupComplete();
-			cleanupError();
-		};
 	}, [projectId]);
 
 	// Get queue item for a specific issue
@@ -128,24 +83,6 @@ export function useAutoFix(projectId: string | undefined) {
 				console.error("Failed to save auto-fix config:", error);
 				return false;
 			}
-		},
-		[projectId],
-	);
-
-	// Start batch auto-fix for all open issues or specific issues
-	const startBatchAutoFix = useCallback(
-		(issueNumbers?: number[]) => {
-			if (!projectId) return;
-
-			setIsBatchRunning(true);
-			setBatchProgress({
-				phase: "analyzing",
-				progress: 0,
-				message: "Starting batch analysis...",
-				totalIssues: issueNumbers?.length ?? 0,
-				batchCount: 0,
-			});
-			window.electronAPI.github.batchAutoFix(projectId, issueNumbers);
 		},
 		[projectId],
 	);
@@ -211,28 +148,12 @@ export function useAutoFix(projectId: string | undefined) {
 		}
 	}, [projectId, config?.enabled]);
 
-	// Count active batches being processed
-	const activeBatchCount = batches.filter(
-		(b) =>
-			b.status === "analyzing" ||
-			b.status === "creating_spec" ||
-			b.status === "building" ||
-			b.status === "qa_review",
-	).length;
-
 	return {
 		config,
 		queue,
-		batches,
-		isLoading,
-		isBatchRunning,
-		batchProgress,
-		activeBatchCount,
 		getQueueItem,
 		saveConfig,
 		toggleAutoFix,
-		startBatchAutoFix,
 		checkForNewIssues,
-		refresh: loadData,
 	};
 }

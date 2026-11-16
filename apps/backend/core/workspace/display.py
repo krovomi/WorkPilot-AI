@@ -19,7 +19,6 @@ from ui import (
 def show_build_summary(manager: WorktreeManager, spec_name: str) -> None:
     """Show a summary of what was built."""
     summary = manager.get_change_summary(spec_name)
-    manager.get_changed_files(spec_name)
 
     total = summary["new_files"] + summary["modified_files"] + summary["deleted_files"]
 
@@ -106,19 +105,18 @@ def print_merge_success(
             "",
         ]
 
-        if stats:
+        # The counts every merge path reports (`core/workspace.py`).
+        merged = (stats or {}).get("files_merged", 0)
+        resolved = (stats or {}).get("conflicts_resolved", 0)
+        with_ai = (stats or {}).get("ai_assisted", 0)
+        if merged or resolved:
             lines.append("What changed:")
-            if stats.get("files_added", 0) > 0:
+            if merged:
+                lines.append(f"  + {merged} file{'s' if merged != 1 else ''} merged")
+            if resolved:
                 lines.append(
-                    f"  + {stats['files_added']} file{'s' if stats['files_added'] != 1 else ''} added"
-                )
-            if stats.get("files_modified", 0) > 0:
-                lines.append(
-                    f"  ~ {stats['files_modified']} file{'s' if stats['files_modified'] != 1 else ''} modified"
-                )
-            if stats.get("files_deleted", 0) > 0:
-                lines.append(
-                    f"  - {stats['files_deleted']} file{'s' if stats['files_deleted'] != 1 else ''} deleted"
+                    f"  ~ {resolved} conflict{'s' if resolved != 1 else ''} resolved"
+                    + (f" ({with_ai} with AI)" if with_ai else "")
                 )
             lines.append("")
 
