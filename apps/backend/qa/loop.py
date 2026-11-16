@@ -756,7 +756,13 @@ async def _run_security_scan(
     """
     print("\n🔐 Running security scan...")
     try:
-        sec_passed, _, sec_issues = await run_qa_security_scan(project_dir, spec_dir)
+        from security_reach import evidence_for
+
+        # Ranked by reach and production use (#364): the report and the fixer
+        # see the exposed findings first; what blocks does not change.
+        sec_passed, _, sec_issues = await run_qa_security_scan(
+            project_dir, spec_dir, evidence=evidence_for
+        )
         # Feed the Consensus Arbiter: persist the security scanner's findings as
         # security-domain opinions so the arbiter has real data to reconcile
         # against the QA reviewer's verdict. Overwrites each run (latest state).
