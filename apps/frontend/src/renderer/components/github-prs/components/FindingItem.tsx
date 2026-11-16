@@ -28,22 +28,6 @@ interface FindingItemProps {
 	};
 }
 
-// Helper to translate category names
-function getCategoryTranslationKey(category: string): string {
-	// Map category values to translation keys
-	const categoryMap: Record<string, string> = {
-		security: "prReview.category.security",
-		logic: "prReview.category.logic",
-		quality: "prReview.category.quality",
-		performance: "prReview.category.performance",
-		style: "prReview.category.style",
-		documentation: "prReview.category.documentation",
-		testing: "prReview.category.testing",
-		other: "prReview.category.other",
-	};
-	return categoryMap[category.toLowerCase()] || category;
-}
-
 export function FindingItem({
 	finding,
 	selected,
@@ -54,9 +38,10 @@ export function FindingItem({
 	const { t } = useTranslation("common");
 	const CategoryIcon = getCategoryIcon(finding.category);
 
-	// Get translated category name (falls back to original if translation not found)
-	const categoryKey = getCategoryTranslationKey(finding.category);
-	const categoryLabel = t(categoryKey, { defaultValue: finding.category });
+	// A category the app does not know yet keeps the reviewer's word.
+	const categoryLabel = t(`prReview.category.${finding.category}`, {
+		defaultValue: finding.category,
+	});
 
 	return (
 		<div
@@ -75,6 +60,7 @@ export function FindingItem({
 						id={finding.id}
 						checked={selected}
 						onCheckedChange={onToggle}
+						aria-label={finding.title}
 						className="mt-0.5"
 					/>
 				)}

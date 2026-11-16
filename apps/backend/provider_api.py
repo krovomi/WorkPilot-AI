@@ -1535,7 +1535,7 @@ async def get_provider_usage(provider: str):
                     "fetched_at": usage_data.get("fetched_at"),
                     "copilotUsageDetails": {
                         "scope": "personal-quotas",
-                        "plan": usage_data.get("plan"),
+                        **{key: usage_data.get(key) for key in ("plan", "sku")},
                         "organization": usage_data.get("organization"),
                         "premiumRequestsUsed": premium.get("used", 0),
                         "premiumRequestsEntitlement": premium.get("entitlement", 0),

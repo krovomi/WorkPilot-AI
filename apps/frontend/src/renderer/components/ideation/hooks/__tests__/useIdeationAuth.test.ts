@@ -294,6 +294,23 @@ describe("useIdeationAuth", () => {
 			expect(result.current.hasToken).toBe(false);
 		});
 
+		it("should return hasToken false when the profiles cannot be read", async () => {
+			mockCheckSourceToken.mockResolvedValue({
+				success: true,
+				data: { hasToken: false },
+			});
+			mockGetApiProfiles.mockRejectedValue(new Error("ipc closed"));
+			useSettingsStore.setState({ profiles: [], activeProfileId: null });
+
+			const { result } = renderHook(() => useIdeationAuth());
+
+			await waitFor(() => {
+				expect(result.current.isLoading).toBe(false);
+			});
+
+			expect(result.current.hasToken).toBe(false);
+		});
+
 		it("should return hasToken false when activeProfileId is empty string", async () => {
 			mockCheckSourceToken.mockResolvedValue({
 				success: true,
