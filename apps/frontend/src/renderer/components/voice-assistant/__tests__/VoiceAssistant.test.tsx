@@ -74,7 +74,7 @@ describe("VoiceAssistant", () => {
 		});
 		vi.mocked(captureDictation).mockImplementation(async (callback) => {
 			chunk = callback;
-			return stop;
+			return Object.assign(stop, { flush: vi.fn() });
 		});
 	});
 

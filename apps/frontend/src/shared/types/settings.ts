@@ -370,6 +370,9 @@ export interface AppSettings {
 	// is in the background (registered with the OS; off by default).
 	voiceAssistantShortcut?: string;
 	voiceAssistantSystemWide?: boolean;
+	// How far above the room's noise the assistant's microphone counts speech
+	// (`voice-assistant/voice-activity.ts`; "medium" when absent).
+	voiceAssistantSensitivity?: "low" | "medium" | "high";
 	// Developer tools preferences
 	preferredIDE?: SupportedIDE;
 	customIDEPath?: string; // For 'custom' IDE

@@ -75,4 +75,36 @@ describe("microphone capture", () => {
 		expect(track.stop).toHaveBeenCalledOnce();
 		expect(close).toHaveBeenCalledOnce();
 	});
+	it("sends the audio so far on flush and keeps listening", async () => {
+		const chunk = vi.fn();
+		const stop = await captureDictation(chunk, vi.fn(), vi.fn());
+		const frame = { inputBuffer: { getChannelData: () => new Float32Array([0.5]) } };
+		processor.onaudioprocess?.(frame);
+		stop.flush();
+		expect(chunk).toHaveBeenCalledOnce();
+		processor.onaudioprocess?.(frame);
+		stop();
+		expect(chunk).toHaveBeenCalledTimes(2);
+		stop.flush();
+		expect(chunk).toHaveBeenCalledTimes(2);
+	});
+	it("asks the caller's detector which frames are voice, and never sends the room alone", async () => {
+		const chunk = vi.fn();
+		const level = vi.fn();
+		const isVoice = vi.fn((rms: number) => rms > 0.4);
+		const stop = await captureDictation(chunk, level, vi.fn(), isVoice);
+		processor.onaudioprocess?.({
+			inputBuffer: { getChannelData: () => new Float32Array([0.2, -0.2]) },
+		});
+		expect(level).toHaveBeenLastCalledWith(1, false);
+		stop.flush();
+		expect(chunk).not.toHaveBeenCalled();
+		processor.onaudioprocess?.({
+			inputBuffer: { getChannelData: () => new Float32Array([0.5, -0.5]) },
+		});
+		expect(level).toHaveBeenLastCalledWith(1, true);
+		stop();
+		expect(chunk).toHaveBeenCalledOnce();
+		expect(isVoice).toHaveBeenCalledWith(0.5);
+	});
 });

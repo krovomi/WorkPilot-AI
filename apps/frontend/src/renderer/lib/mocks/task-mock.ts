@@ -70,6 +70,11 @@ export const taskMock = {
 		data: { pausedTasks: [], stoppedProcesses: 0, failedTasks: [] },
 	}),
 
+	stopAgentsAfterStep: async () => ({
+		success: true,
+		data: { stoppingTasks: [], failedTasks: [] },
+	}),
+
 	submitReview: async () => ({ success: true }),
 
 	// Task archive operations

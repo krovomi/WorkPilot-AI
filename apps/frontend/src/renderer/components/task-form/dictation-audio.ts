@@ -1,11 +1,22 @@
+/** The fixed level the task form's dictation treats as voice. */
+export const DEFAULT_VOICE_RMS = 0.008;
+const fixedThreshold = (rms: number) => rms > DEFAULT_VOICE_RMS;
+
+/** Stops the capture (`discard` drops audio not sent yet); `flush` sends it now and goes on. */
+export type DictationStop = ((discard?: boolean) => void) & { flush: () => void };
+
 /** Capture mono PCM in memory, cutting on pauses so words usually stay together.
  * ScriptProcessor is used for Electron compatibility; output is always silence.
+ * `isVoice` tells speech from the room for each frame's RMS (the voice
+ * assistant passes its calibrated detector, `voice-activity.ts`); a chunk with
+ * no voiced frame is never sent.
  */
 export async function captureDictation(
 	onChunk: (wav: ArrayBuffer) => void,
-	onLevel: (level: number) => void,
+	onLevel: (level: number, voiced: boolean) => void,
 	onEnded: () => void,
-) {
+	isVoice: (rms: number) => boolean = fixedThreshold,
+): Promise<DictationStop> {
 	const stream = await navigator.mediaDevices.getUserMedia({
 		audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
 		video: false,
@@ -75,10 +86,11 @@ export async function captureDictation(
 		const rms = Math.sqrt(
 			data.reduce((sum, value) => sum + value * value, 0) / data.length,
 		);
-		onLevel(Math.min(1, rms * 8));
+		const voice = isVoice(rms);
+		onLevel(Math.min(1, rms * 8), voice);
 		parts.push(data);
 		samples += data.length;
-		if (rms > 0.008) {
+		if (voice) {
 			voiced = true;
 			quiet = 0;
 		} else quiet += data.length;
@@ -91,7 +103,7 @@ export async function captureDictation(
 	stream
 		.getAudioTracks()
 		.forEach((track) => track.addEventListener("ended", onEnded));
-	return (discard = false) => {
+	const stop = (discard = false) => {
 		if (stopped) return;
 		stopped = true;
 		processor.onaudioprocess = null;
@@ -107,4 +119,9 @@ export async function captureDictation(
 			/* Browser already closed the context. */
 		});
 	};
+	return Object.assign(stop, {
+		flush: () => {
+			if (!stopped) flush();
+		},
+	});
 }
