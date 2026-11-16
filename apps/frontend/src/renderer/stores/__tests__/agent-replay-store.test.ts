@@ -3,12 +3,13 @@
  * and says the backend did not answer only when nothing answered.
  */
 
+import i18n from "i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAgentReplayStore } from "../agent-replay-store";
 
-vi.mock("i18next", () => ({
-	default: { t: (key: string) => key },
-}));
+// The message is compared with what i18next gives for the key, not with the
+// key itself: a module mock of i18next did not always reach the store when
+// the setup file had loaded the real one first (full-suite runs).
 
 const api = {
 	listReplaySessions: vi.fn(),
@@ -44,7 +45,9 @@ describe("agent replay store", () => {
 
 		await useAgentReplayStore.getState().fetchSessions();
 
-		expect(useAgentReplayStore.getState().error).toBe("replay:errors.backendUnreachable");
+		expect(useAgentReplayStore.getState().error).toBe(
+			i18n.t("replay:errors.backendUnreachable"),
+		);
 	});
 
 	it("shows the backend's own error otherwise", async () => {

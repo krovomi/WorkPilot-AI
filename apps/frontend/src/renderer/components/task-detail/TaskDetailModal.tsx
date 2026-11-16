@@ -314,8 +314,10 @@ function useTaskDetailHandlers(
 	// Pré-requis « Provider × LLM × Effort » : on propose (une seule fois par
 	// ouverture) de choisir une formule avant de lancer une tâche importée ou
 	// dupliquée non encore configurée. Skippable via « Démarrer avec les défauts ».
+	// The panel is not remounted when it moves to the next task: the gate
+	// remembers which task it was offered for, so each task gets it once.
 	const [showFormulaGate, setShowFormulaGate] = useState(false);
-	const formulaGatePromptedRef = useRef(false);
+	const formulaGatePromptedRef = useRef<string | null>(null);
 
 	// Lancement effectif (signale au passage un éventuel changement de provider).
 	const startNow = () => {
@@ -349,9 +351,8 @@ function useTaskDetailHandlers(
 			const isValid = await state.reloadPlanForIncompleteTask();
 			if (!isValid) {
 				toast({
-					title: "Cannot Resume Task",
-					description:
-						"Failed to load implementation plan. Please try again or check the task files.",
+					title: t("tasks:modal.notifications.cannotResumeTitle"),
+					description: t("tasks:modal.notifications.cannotResumeDescription"),
 					variant: "destructive",
 					duration: 5000,
 				});
@@ -362,8 +363,8 @@ function useTaskDetailHandlers(
 		// Tâche importée/dupliquée non configurée → proposer le choix de la formule
 		// une seule fois avant de lancer (l'utilisateur peut quand même démarrer
 		// avec les défauts depuis le dialog).
-		if (!formulaGatePromptedRef.current && needsExecutionFormula(task)) {
-			formulaGatePromptedRef.current = true;
+		if (formulaGatePromptedRef.current !== task.id && needsExecutionFormula(task)) {
+			formulaGatePromptedRef.current = task.id;
 			setShowFormulaGate(true);
 			return;
 		}
@@ -427,7 +428,7 @@ function useTaskDetailHandlers(
 			state.setShowDeleteDialog(false);
 			onOpenChange(false);
 		} else {
-			state.setDeleteError(result.error || "Failed to delete task");
+			state.setDeleteError(result.error || t("tasks:modal.errors.failedToDelete"));
 		}
 		state.setIsDeleting(false);
 	};
@@ -473,6 +474,7 @@ function useTaskDetailHandlers(
 				duration: 5000,
 			});
 		}
+		return success;
 	};
 
 	const handleToggleTdd = async () => {
@@ -700,7 +702,7 @@ function TaskDetailModalContent({
 				if (state.stageOnly && result.data.staged) {
 					state.setWorkspaceError(null);
 					state.setStagedSuccess(
-						result.data.message || "Changes staged in main project",
+						result.data.message || t("taskReview:workspace.stagedDescription"),
 					);
 					state.setStagedProjectPath(result.data.projectPath);
 					state.setSuggestedCommitMessage(result.data.suggestedCommitMessage);
@@ -709,12 +711,16 @@ function TaskDetailModalContent({
 				}
 			} else {
 				state.setWorkspaceError(
-					result.data?.message || result.error || "Failed to merge changes",
+					result.data?.message ||
+						result.error ||
+						t("tasks:modal.errors.failedToMerge"),
 				);
 			}
 		} catch (error) {
 			state.setWorkspaceError(
-				error instanceof Error ? error.message : "Unknown error during merge",
+				error instanceof Error
+					? error.message
+					: t("tasks:modal.errors.failedToMerge"),
 			);
 		} finally {
 			state.setIsMerging(false);
@@ -730,7 +736,9 @@ function TaskDetailModalContent({
 			onOpenChange(false);
 		} else {
 			state.setWorkspaceError(
-				result.data?.message || result.error || "Failed to discard changes",
+				result.data?.message ||
+					result.error ||
+					t("tasks:modal.errors.failedToDiscard"),
 			);
 		}
 		state.setIsDiscarding(false);
@@ -1123,6 +1131,7 @@ function TaskDetailModalContent({
 													variant="ghost"
 													size="icon"
 													className="hover:bg-primary/10 hover:text-primary transition-colors"
+													aria-label={t("tasks:modal.actions.syncFromBranch")}
 													onClick={() => state.setShowSyncDialog(true)}
 												>
 													<GitMerge className="h-4 w-4" />
@@ -1139,6 +1148,7 @@ function TaskDetailModalContent({
 												variant="ghost"
 												size="icon"
 												className="hover:bg-primary/10 hover:text-primary transition-colors"
+												aria-label={t("tasks:actions.duplicate")}
 												onClick={() => state.setIsDuplicateDialogOpen(true)}
 											>
 												<Copy className="h-4 w-4" />
@@ -1152,6 +1162,7 @@ function TaskDetailModalContent({
 										variant="ghost"
 										size="icon"
 										className="hover:bg-primary/10 hover:text-primary transition-colors"
+										aria-label={t("tasks:modal.actions.edit")}
 										onClick={() => state.setIsEditDialogOpen(true)}
 										disabled={state.isRunning && !state.isStuck}
 									>
@@ -1180,7 +1191,9 @@ function TaskDetailModalContent({
 											className="hover:bg-muted transition-colors"
 										>
 											<X className="h-5 w-5" />
-											<span className="sr-only">Close</span>
+											<span className="sr-only">
+												{t("tasks:modal.actions.close")}
+											</span>
 										</Button>
 									</DialogPrimitive.Close>
 								</div>

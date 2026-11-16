@@ -336,7 +336,8 @@ def test_logs_and_stop(web):
     assert _run(web, "verify_logs", target="nothing") == "Error: no target"
     log = web.base / "logs" / "web.log"
     log.parent.mkdir(parents=True)
-    log.write_text("ready\nTypeError: x is undefined\n", encoding="utf-8")
+    # Bytes, as the app wrote them: write_text would put \r\n on Windows.
+    log.write_bytes(b"ready\nTypeError: x is undefined\n")
     data = json.loads(_run(web, "verify_logs"))
     assert data["target"] == "web"
     assert data["errors"][0]["kind"] == "exception"
