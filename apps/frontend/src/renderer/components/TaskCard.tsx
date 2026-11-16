@@ -50,9 +50,7 @@ import {
 	JSON_ERROR_TITLE_SUFFIX,
 	TASK_CATEGORY_COLORS,
 	TASK_COMPLEXITY_COLORS,
-	TASK_COMPLEXITY_LABELS,
 	TASK_IMPACT_COLORS,
-	TASK_IMPACT_LABELS,
 	TASK_PRIORITY_COLORS,
 	TASK_STATUS_LABELS,
 } from "../../shared/constants";
@@ -694,7 +692,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 							TASK_IMPACT_COLORS[task.metadata.impact],
 						)}
 					>
-						{TASK_IMPACT_LABELS[task.metadata.impact]}
+						{t(`tasks:form.classification.values.impact.${task.metadata.impact}`, {
+							defaultValue: task.metadata.impact,
+						})}
 					</Badge>
 				)}
 
@@ -707,7 +707,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 						TASK_COMPLEXITY_COLORS[task.metadata.complexity],
 					)}
 				>
-					{TASK_COMPLEXITY_LABELS[task.metadata.complexity]}
+					{t(`tasks:form.classification.values.complexity.${task.metadata.complexity}`, {
+							defaultValue: task.metadata.complexity,
+						})}
 				</Badge>
 			)}
 
@@ -735,7 +737,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 						TASK_IMPACT_COLORS[task.metadata.securitySeverity],
 					)}
 				>
-					{task.metadata.securitySeverity} {t("metadata.severity")}
+					{t(`metadata.securitySeverity.${task.metadata.securitySeverity}`)}
 				</Badge>
 			)}
 		</div>
