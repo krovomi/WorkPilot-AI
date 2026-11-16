@@ -422,7 +422,10 @@ MONOREPO = {
 }
 
 
-def test_inferred_rules_only_warn(tmp_path, capsys):
+def test_inferred_rules_only_warn(tmp_path, capsys, runtime):
+    # Inferred rules turn the AI review on: it gets a reviewer that finds
+    # nothing, so the warning below can only come from the import rules.
+    runtime(StandInRuntime({"ai_violations": []}))
     repo, spec_dir = _project(tmp_path, rules=None)
     (repo / "apps" / "api").mkdir(parents=True)
     (repo / "apps" / "web").mkdir(parents=True)
@@ -438,7 +441,9 @@ def test_inferred_rules_only_warn(tmp_path, capsys):
 
     assert passed is True
     assert report["violations"] == []
-    assert report["warnings"], "a cross-service import is a warning when inferred"
+    assert [w["type"] for w in report["warnings"]] == ["bounded_context"], (
+        "a cross-service import is a warning when inferred"
+    )
     assert "\u26a0" in capsys.readouterr().out
 
 
