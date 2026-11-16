@@ -23,6 +23,12 @@ import { getAugmentedEnv } from "../env-utils";
 import { isWindows, killProcessGracefully } from "../platform";
 import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
+import {
+	chainHasOtherProvider,
+	FAILOVER_REQUEST_EVENT,
+	type FailoverReason,
+	taskPhaseProvider,
+} from "../provider-failover/task-phase-provider";
 import { agentSafetyEnv } from "./agent-safety-env";
 import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
@@ -47,6 +53,7 @@ import { PERMISSION_CHANNEL_ENV } from "../task-permissions";
 import { parseTaskEvent } from "./task-event-parser";
 import type { ExecutionProgressData, ProcessType } from "./types";
 import { autoSplitEnv } from "../../shared/utils/task-split";
+import { isClaudeProvider } from "../../shared/utils/task-engine";
 
 /**
  * Détermine si l'arrêt du processus backend doit être signalé comme un échec.
@@ -382,6 +389,7 @@ export class AgentProcessManager {
 			appLog.info("[AgentProcess] Auto-switch disabled - showing manual modal");
 			return false;
 		}
+		if (this.requestProviderFailover(taskId, "rate_limit", false)) return true;
 
 		const currentProfileId = rateLimitDetection.profileId;
 		let bestProfile = profileManager.getBestAvailableProfile(currentProfileId);
@@ -397,6 +405,8 @@ export class AgentProcessManager {
 		);
 
 		if (!bestProfile) {
+			// No other Claude account: the chain may still name another provider.
+			if (this.requestProviderFailover(taskId, "rate_limit", true)) return true;
 			// Single account case: let backend handle with intelligent pause
 			// Don't show manual modal - backend will pause intelligently and resume when ready
 			appLog.info(
@@ -458,6 +468,27 @@ export class AgentProcessManager {
 			taskId,
 		);
 		this.emitter.emit("auto-swap-restart-task", taskId, bestProfile.id);
+		return true;
+	}
+
+	/**
+	 * Hand the task to the cross-provider failover (main/provider-failover):
+	 * always when its phase runs off Claude, and for a Claude task only when
+	 * `noClaudeAccountLeft` and the chain names another provider.
+	 */
+	private requestProviderFailover(
+		taskId: string,
+		reason: FailoverReason,
+		noClaudeAccountLeft: boolean,
+	): boolean {
+		const provider = taskPhaseProvider(taskId);
+		if (!provider) return false;
+		const offClaude = !isClaudeProvider(provider);
+		if (!offClaude && !(noClaudeAccountLeft && chainHasOtherProvider())) {
+			return false;
+		}
+		appLog.info(`[AgentProcess] Provider failover requested for ${taskId} (${provider})`);
+		this.emitter.emit(FAILOVER_REQUEST_EVENT, taskId, reason);
 		return true;
 	}
 
@@ -538,6 +569,7 @@ export class AgentProcessManager {
 			);
 			return false;
 		}
+		if (this.requestProviderFailover(taskId, "auth_failure", false)) return true;
 
 		const currentProfileId = authFailureDetection.profileId;
 		const bestProfile =
@@ -556,6 +588,7 @@ export class AgentProcessManager {
 
 		// Verify the best profile is actually authenticated
 		if (!bestProfile?.isAuthenticated) {
+			if (this.requestProviderFailover(taskId, "auth_failure", true)) return true;
 			appLog.info(
 				"[AgentProcess] No authenticated alternative profile - falling back to UI",
 			);

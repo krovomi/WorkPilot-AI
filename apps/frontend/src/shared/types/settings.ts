@@ -394,7 +394,8 @@ export interface AppSettings {
 	// User sidebar customization: pinned favorites, group/item ordering, expanded state
 	sidebarPrefs?: SidebarPrefs;
 	providerPriorityOrder?: import("../../renderer/components/settings/multiconnector/types").LLMProvider[];
-	// Providers explicitly disabled from auto-switching by user toggle
+	// Failover chain entries (or providers) the person took out of the chain;
+	// read by main/provider-failover.
 	disabledAutoSwitchProviders?: string[];
 	// Configuration pour providers custom/enterprise
 	customProviderUrl?: string;
@@ -405,24 +406,8 @@ export interface AppSettings {
 	 */
 	credentialsSetAt?: import("../utils/secret-age").SecretDates;
 	customProviderModels?: import("../constants/models").ProviderModel[];
-	// Auto-switching settings
-	autoSwitchEnabled?: boolean;
-	proactiveEnabled?: boolean;
-	sessionThreshold?: number;
-	rateLimitEnabled?: boolean;
-	authFailureEnabled?: boolean;
-	routingStrategy?:
-		| "best_performance"
-		| "cheapest"
-		| "lowest_latency"
-		| "round_robin";
 	// Active view persistence (restore last view on app reload)
 	activeView?: import("../../renderer/components/Sidebar").SidebarView;
-	// Provider grid UI preferences
-	providerViewMode?: "grid" | "list";
-	providerFilterStatus?: "all" | "configured" | "unconfigured" | "errors";
-	providerSortBy?: "name" | "category" | "status" | "usage";
-	providerSearchQuery?: string;
 	// Context Mesh — Cross-Project Intelligence
 	contextMeshEnabled?: boolean;
 	// Live Development Companion — Real-time pair programming

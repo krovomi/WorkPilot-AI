@@ -25,6 +25,20 @@ sys.path.insert(0, str(backend_path))
 from migration.orchestrator import MigrationOrchestrator
 
 
+def _last_named(text: str, names: dict[str, str]) -> str | None:
+    """The value of the name that ends last in `text`, as a whole word.
+
+    "go" must not match "google", nor "rust" "trust", nor "java" "javascript".
+    """
+    best: tuple[int, int, str] | None = None
+    for name, value in names.items():
+        for match in re.finditer(rf"(?<![\w]){re.escape(name)}(?![\w#])", text):
+            rank = (match.end(), len(name), value)
+            if best is None or rank[:2] > best[:2]:
+                best = rank
+    return best[2] if best else None
+
+
 class CodeMigrationRunner:
     """Runner for the Code Migration Agent feature."""
 
@@ -82,6 +96,7 @@ class CodeMigrationRunner:
                 "source": source,
                 "target": f"{target_framework or 'modern'} / {target_language or 'auto'}",
                 "description": self.migration_description,
+                **self._plan_outline(context.plan),
             }
         except Exception as e:
             print(f"⚠️  Migration start warning: {e}")
@@ -117,6 +132,22 @@ class CodeMigrationRunner:
         }
         return result
 
+    @staticmethod
+    def _plan_outline(plan) -> dict:
+        """What the page shows of the plan and hands to the Kanban task.
+
+        The phases and their step titles, the step count and the risk; no
+        duration, which the page does not estimate.
+        """
+        return {
+            "risk_level": plan.risk_level.value,
+            "total_steps": plan.total_steps,
+            "phases": [
+                {"name": phase.name, "steps": [step.title for step in phase.steps]}
+                for phase in plan.phases
+            ],
+        }
+
     def _describe_source_stack(self) -> str:
         """The project's languages and frameworks, for every stack.
 
@@ -137,6 +168,8 @@ class CodeMigrationRunner:
         framework = None
         language = None
 
+        # The names the planner's pairs use (`migration.config`) where one
+        # exists, so that "React to Vue" is planned rather than unsupported.
         framework_keywords = {
             "hooks": "react-hooks",
             "react hooks": "react-hooks",
@@ -144,7 +177,12 @@ class CodeMigrationRunner:
             "python 3.1": "python3.12",
             "python 3.11": "python3.12",
             "python 3.10": "python3.12",
-            "vue 3": "vue3",
+            "python 3.12": "python3.12",
+            "python 3.13": "python3.12",
+            "react": "react",
+            "vue": "vue",
+            "vue 3": "vue",
+            "svelte": "svelte",
             "angular": "angular",
             "next.js": "nextjs",
             "tailwind": "tailwindcss",
@@ -159,6 +197,15 @@ class CodeMigrationRunner:
             "swiftui": "swiftui",
             "jetpack compose": "jetpack-compose",
             "fastapi": "fastapi",
+            "fastify": "fastify",
+            "postgresql": "postgresql",
+            "postgres": "postgresql",
+            "mongodb": "mongodb",
+            "graphql": "graphql",
+            "pytest": "pytest",
+            "poetry": "poetry",
+            "pnpm": "pnpm",
+            "yarn": "yarn",
             "vite": "vite",
             "vitest": "vitest",
         }
@@ -179,15 +226,17 @@ class CodeMigrationRunner:
             "dart": "dart",
         }
 
-        for keyword, target in framework_keywords.items():
-            if keyword in desc:
-                framework = target
-                break
-        for keyword, lang in language_keywords.items():
-            # Whole words: "go" must not match "google", nor "rust" "trust".
-            if re.search(rf"(?<![\w]){re.escape(keyword)}(?![\w#])", desc):
-                language = lang
-                break
+        # The target is the last stack named ("from React to Vue" is Vue);
+        # at the same place the longer name wins ("ASP.NET" over ".NET").
+        # A detail in brackets does not name it: "Spring Boot 2 to 3 (javax to
+        # jakarta)" targets Spring Boot, unless only the brackets name a stack.
+        main = re.sub(r"\([^)]*\)", " ", desc)
+        framework = _last_named(main, framework_keywords) or _last_named(
+            desc, framework_keywords
+        )
+        language = _last_named(main, language_keywords) or _last_named(
+            desc, language_keywords
+        )
 
         return framework, language
 
