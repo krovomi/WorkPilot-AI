@@ -15,3 +15,8 @@ section: 🐛 Corrections
 - **Maquettes Figma** : une réponse de l'API dont les enfants d'un calque ne sont pas une liste
   n'interrompt plus l'import, et un `.figma.json` écrit à la main dont les libellés sont un texte
   au lieu d'une liste ne se lit plus lettre par lettre.
+- **Captures HTTP → tests** : une collection Postman ou un fichier OpenAPI retouchés à la main
+  (une liste remplacée par un texte ou un nombre) ne font plus échouer la lecture ; une ligne
+  `curl` ne prend plus la valeur d'une option (`-o fichier`, `-u`, `-b`, `-A`…) pour l'URL, et
+  `-u` / `-b` se lisent comme les en-têtes `Authorization` / `Cookie` qu'ils deviennent, donc
+  masqués.
