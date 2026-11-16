@@ -1,16 +1,12 @@
-import {
-	AlertTriangle,
-	Cpu,
-	GitMerge,
-	Info,
-	Layers,
-	RotateCcw,
-	Sparkles,
-	Zap,
-} from "lucide-react";
+import { AlertTriangle, Cpu, Info, RotateCcw, Zap } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { useSwarmStore } from "../../stores/swarm-store";
+import {
+	DEFAULT_SWARM_SETTINGS,
+	type SwarmSettings,
+} from "../../../shared/types/swarm";
+import { saveSettings, useSettingsStore } from "../../stores/settings-store";
 import { Notice } from "../charter";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
@@ -19,12 +15,23 @@ import { SettingsSection } from "./SettingsSection";
 /**
  * Swarm Mode settings panel.
  *
- * Master toggle + sub-options for configuring parallel multi-agent execution.
- * Works with any LLM configured in the user's active profile.
+ * The setting is saved with the app's settings and sent to every task's
+ * build: when it is on, the build runs the subtasks its plan lets run side
+ * by side in parallel, each in its own worktree, and merges them wave after
+ * wave. Works with any LLM configured in the user's active profile.
  */
 export function SwarmModeSettings() {
 	const { t } = useTranslation(["swarm", "common"]);
-	const { isEnabled, setEnabled, config, setConfig } = useSwarmStore();
+	const saved = useSettingsStore((s) => s.settings.swarm);
+	const config = { ...DEFAULT_SWARM_SETTINGS, ...saved };
+	const isEnabled = config.enabled;
+	const [saveFailed, setSaveFailed] = useState(false);
+	const setConfig = (partial: Partial<SwarmSettings>) => {
+		void saveSettings({ swarm: { ...config, ...partial } }).then((ok) =>
+			setSaveFailed(!ok),
+		);
+	};
+	const setEnabled = (enabled: boolean) => setConfig({ enabled });
 
 	return (
 		<SettingsSection title={t("swarm:title")} description={t("swarm:subtitle")}>
@@ -51,6 +58,12 @@ export function SwarmModeSettings() {
 					</div>
 					<Switch checked={isEnabled} onCheckedChange={setEnabled} />
 				</div>
+
+				{saveFailed && (
+					<Notice tone="red" icon={AlertTriangle}>
+						{t("swarm:saveFailed")}
+					</Notice>
+				)}
 
 				{/* ── Info Banner ────────────────────────────────── */}
 				{isEnabled && (
@@ -95,40 +108,6 @@ export function SwarmModeSettings() {
 							<p className="text-xs text-muted-foreground">
 								{t("swarm:config.maxParallelDesc")}
 							</p>
-						</div>
-
-						{/* Merge Strategy */}
-						<div className="flex items-center justify-between">
-							<div>
-								<Label className="text-sm font-medium flex items-center gap-2">
-									<GitMerge className="h-3.5 w-3.5 text-primary" />
-									{t("swarm:config.mergeAfterWave")}
-								</Label>
-								<p className="text-xs text-muted-foreground mt-0.5">
-									{t("swarm:config.mergeAfterWaveDesc")}
-								</p>
-							</div>
-							<Switch
-								checked={config.mergeAfterEachWave}
-								onCheckedChange={(v) => setConfig({ mergeAfterEachWave: v })}
-							/>
-						</div>
-
-						{/* AI-Assisted Merge */}
-						<div className="flex items-center justify-between">
-							<div>
-								<Label className="text-sm font-medium flex items-center gap-2">
-									<Sparkles className="h-3.5 w-3.5 text-primary" />
-									{t("swarm:config.aiMerge")}
-								</Label>
-								<p className="text-xs text-muted-foreground mt-0.5">
-									{t("swarm:config.aiMergeDesc")}
-								</p>
-							</div>
-							<Switch
-								checked={config.enableAiMerge}
-								onCheckedChange={(v) => setConfig({ enableAiMerge: v })}
-							/>
 						</div>
 
 						{/* Fail Fast */}
@@ -182,22 +161,6 @@ export function SwarmModeSettings() {
 							</div>
 						</div>
 
-						{/* Dry Run */}
-						<div className="flex items-center justify-between">
-							<div>
-								<Label className="text-sm font-medium flex items-center gap-2">
-									<Layers className="h-3.5 w-3.5 text-primary" />
-									{t("swarm:config.dryRun")}
-								</Label>
-								<p className="text-xs text-muted-foreground mt-0.5">
-									{t("swarm:config.dryRunDesc")}
-								</p>
-							</div>
-							<Switch
-								checked={config.dryRun}
-								onCheckedChange={(v) => setConfig({ dryRun: v })}
-							/>
-						</div>
 					</div>
 				)}
 			</div>

@@ -36,6 +36,7 @@ import json
 import logging
 import re
 import subprocess
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -109,7 +110,19 @@ _MANIFESTS = {
     "pom.xml": "maven",
     "build.gradle": "maven",
     "build.gradle.kts": "maven",
+    "Directory.Packages.props": "nuget",
+    "packages.config": "nuget",
 }
+#: .NET project files, whose name is the project's: matched by suffix.
+_NUGET_PROJECT_SUFFIXES = (".csproj", ".fsproj", ".vbproj")
+
+
+def _manifest_ecosystem(name: str) -> str:
+    """The ecosystem a manifest file name declares, or "" when it is none."""
+    if name in _MANIFESTS:
+        return _MANIFESTS[name]
+    return "nuget" if name.endswith(_NUGET_PROJECT_SUFFIXES) else ""
+
 
 _SOURCE_SUFFIXES = frozenset(
     {
@@ -129,6 +142,8 @@ _SOURCE_SUFFIXES = frozenset(
         ".java",
         ".kt",
         ".cs",
+        ".fs",
+        ".vb",
         ".dart",
         ".scala",
         ".swift",
@@ -285,11 +300,11 @@ def read_manifests(project_dir: Path) -> dict[str, Dependency]:
     """
     found: dict[str, Dependency] = {}
     for manifest in _find_manifests(project_dir):
-        ecosystem = _MANIFESTS.get(manifest.name, "")
+        ecosystem = _manifest_ecosystem(manifest.name)
         try:
             for dependency in _parse_manifest(manifest, ecosystem, project_dir):
                 found.setdefault(dependency.name, dependency)
-        except Exception as exc:  # noqa: BLE001 - a broken manifest is not fatal
+        except (OSError, ValueError) as exc:  # a broken manifest is not fatal
             logger.debug("libdocs: could not read %s: %s", manifest, exc)
     return found
 
@@ -305,7 +320,7 @@ def _find_manifests(project_dir: Path) -> list[Path]:
         except OSError:
             return
         for entry in entries:
-            if entry.is_file() and entry.name in _MANIFESTS:
+            if entry.is_file() and _manifest_ecosystem(entry.name):
                 manifests.append(entry)
                 if len(manifests) >= _MAX_MANIFESTS:
                     return
@@ -322,10 +337,9 @@ def _find_manifests(project_dir: Path) -> list[Path]:
 
 def _parse_manifest(path: Path, ecosystem: str, project_dir: Path) -> list[Dependency]:
     text = path.read_text(encoding="utf-8", errors="replace")
-    try:
-        label = str(path.relative_to(project_dir))
-    except ValueError:
-        label = path.name
+    # Always below the project (`_find_manifests`); POSIX on every OS, since
+    # the fallback ranks manifests by their depth in "/".
+    label = path.relative_to(project_dir).as_posix()
 
     def make(name: str, version: str = "") -> Dependency:
         return Dependency(
@@ -334,13 +348,13 @@ def _parse_manifest(path: Path, ecosystem: str, project_dir: Path) -> list[Depen
 
     name = path.name
     if name == "package.json":
-        payload = json.loads(text or "{}")
-        out = []
-        for section in ("dependencies", "devDependencies", "peerDependencies"):
-            block = payload.get(section)
-            if isinstance(block, dict):
-                out.extend(make(k, v) for k, v in block.items() if k)
-        return out
+        return [
+            make(k, v)
+            for k, v in _json_sections(
+                text, ("dependencies", "devDependencies", "peerDependencies")
+            )
+            if k
+        ]
     if name == "pyproject.toml":
         return [make(n, v) for n, v in _parse_pyproject(text)]
     if name in ("requirements.txt", "requirements-dev.txt", "Pipfile"):
@@ -350,22 +364,24 @@ def _parse_manifest(path: Path, ecosystem: str, project_dir: Path) -> list[Depen
     if name in ("Cargo.toml", "pubspec.yaml"):
         return [make(n, v) for n, v in _parse_simple_table(text, name)]
     if name == "composer.json":
-        payload = json.loads(text or "{}")
-        out = []
-        for section in ("require", "require-dev"):
-            block = payload.get(section)
-            if isinstance(block, dict):
-                out.extend(make(k, v) for k, v in block.items() if "/" in k)
-        return out
+        return [
+            make(k, v)
+            for k, v in _json_sections(text, ("require", "require-dev"))
+            if "/" in k
+        ]
     if name == "Gemfile":
         return [
             make(match.group(1))
             for match in re.finditer(r"""^\s*gem\s+['"]([^'"]+)['"]""", text, re.M)
         ]
     if name == "pom.xml":
+        # Only what a <dependency> block names: the project's own artifactId,
+        # its parent's and its plugins' are not libraries the code calls.
         return [
-            make(match.group(1))
-            for match in re.finditer(r"<artifactId>([^<]+)</artifactId>", text)
+            make(artifact.group(1), version.group(1) if version else "")
+            for block in re.finditer(r"<dependency>(.*?)</dependency>", text, re.S)
+            if (artifact := re.search(r"<artifactId>([^<]+)</artifactId>", block[1]))
+            for version in [re.search(r"<version>([^<]+)</version>", block[1])]
         ]
     if name.startswith("build.gradle"):
         return [
@@ -374,7 +390,46 @@ def _parse_manifest(path: Path, ecosystem: str, project_dir: Path) -> list[Depen
                 r"""['"]([\w.-]+):([\w.-]+)(?::([\w.-]+))?['"]""", text
             )
         ]
-    return []
+    # What is left is .NET: a project file, central versions, packages.config.
+    return [make(n, v) for n, v in _parse_nuget(text)]
+
+
+def _json_sections(text: str, sections: tuple[str, ...]) -> list[tuple[str, str]]:
+    """(name, version) of each entry of these objects of a JSON manifest."""
+    payload = json.loads(text or "{}")
+    if not isinstance(payload, dict):
+        return []
+    out: list[tuple[str, str]] = []
+    for section in sections:
+        block = payload.get(section)
+        if isinstance(block, dict):
+            out.extend((str(k), str(v)) for k, v in block.items())
+    return out
+
+
+_NUGET_TAG = re.compile(r"<(?:PackageReference|PackageVersion|package)\b([^>]*)>", re.I)
+_XML_ATTRIBUTE = re.compile(r"""([\w.-]+)\s*=\s*["']([^"']*)["']""")
+
+
+def _parse_nuget(text: str) -> list[tuple[str, str]]:
+    """`<PackageReference Include=…>` of a project, `<PackageVersion>` of
+    central package management, `<package id=…>` of a packages.config."""
+    out: list[tuple[str, str]] = []
+    for tag in _NUGET_TAG.finditer(text):
+        attributes = {k.lower(): v for k, v in _XML_ATTRIBUTE.findall(tag.group(1))}
+        name = attributes.get("include") or attributes.get("id") or ""
+        if name.strip():
+            out.append((name, attributes.get("version", "")))
+    return out
+
+
+def _requirement_list(value) -> list[tuple[str, str]]:
+    """Parsed requirement strings of a TOML array (anything else holds none)."""
+    if not isinstance(value, list):
+        return []
+    return [
+        p for raw in value if isinstance(raw, str) if (p := _split_requirement(raw))
+    ]
 
 
 def _parse_pyproject(text: str) -> list[tuple[str, str]]:
@@ -386,18 +441,14 @@ def _parse_pyproject(text: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     project = payload.get("project")
     if isinstance(project, dict):
-        for raw in project.get("dependencies") or []:
-            parsed = _split_requirement(str(raw))
-            if parsed:
-                out.append(parsed)
+        out += _requirement_list(project.get("dependencies"))
         optional = project.get("optional-dependencies")
         if isinstance(optional, dict):
             for group in optional.values():
-                for raw in group or []:
-                    parsed = _split_requirement(str(raw))
-                    if parsed:
-                        out.append(parsed)
-    poetry = ((payload.get("tool") or {}).get("poetry") or {}).get("dependencies")
+                out += _requirement_list(group)
+    tool = payload.get("tool")
+    poetry = tool.get("poetry") if isinstance(tool, dict) else None
+    poetry = poetry.get("dependencies") if isinstance(poetry, dict) else None
     if isinstance(poetry, dict):
         for name, spec in poetry.items():
             if name.lower() == "python":
@@ -409,15 +460,8 @@ def _parse_pyproject(text: str) -> list[tuple[str, str]]:
 
 def _load_toml(text: str) -> dict:
     try:
-        import tomllib
-    except ImportError:  # pragma: no cover - Python < 3.11
-        try:
-            import tomli as tomllib  # type: ignore[no-redef]
-        except ImportError:
-            return {}
-    try:
         return tomllib.loads(text)
-    except Exception:  # noqa: BLE001 - malformed TOML falls back to the regex
+    except ValueError:  # malformed TOML (TOMLDecodeError) falls back to the regex
         return {}
 
 
@@ -583,6 +627,9 @@ def _patterns_for(name: str, ecosystem: str) -> list[str]:
         patterns.add(name)
     elif ecosystem == "maven":
         patterns.add(name)
+    elif ecosystem == "nuget":
+        # C# `using`, F# `open`, VB `Imports`: the namespace the package ships.
+        patterns |= {f"using {name}", f"open {name}", f"Imports {name}"}
     else:
         short = name.split("/")[-1]
         patterns |= {f'"{short}"', f"'{short}'"}
@@ -732,10 +779,8 @@ def detect_needs(
     counts = usage_counts(project_dir, candidates) if candidates else {}
 
     needs: list[LibraryNeed] = []
-    for name in sorted(named):
-        dependency = deps.get(name)
-        if dependency is None:
-            continue
+    for name in sorted(named):  # `named` only holds declared names
+        dependency = deps[name]
         usages = counts.get(name, 0)
         if usages >= THIN_USAGE:
             continue

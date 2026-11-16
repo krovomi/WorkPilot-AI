@@ -401,20 +401,15 @@ export const IPC_CHANNELS = {
 	GITHUB_INVESTIGATION_ERROR: "github:investigationError",
 
 	// GitLab integration
-	GITLAB_GET_PROJECTS: "gitlab:getProjects",
 	GITLAB_GET_ISSUES: "gitlab:getIssues",
-	GITLAB_GET_ISSUE: "gitlab:getIssue",
 	GITLAB_GET_ISSUE_NOTES: "gitlab:getIssueNotes",
 	GITLAB_CHECK_CONNECTION: "gitlab:checkConnection",
 	GITLAB_INVESTIGATE_ISSUE: "gitlab:investigateIssue",
 	GITLAB_IMPORT_ISSUES: "gitlab:importIssues",
-	GITLAB_CREATE_RELEASE: "gitlab:createRelease",
 
 	// GitLab Merge Requests (equivalent to GitHub PRs)
 	GITLAB_GET_MERGE_REQUESTS: "gitlab:getMergeRequests",
-	GITLAB_GET_MERGE_REQUEST: "gitlab:getMergeRequest",
 	GITLAB_CREATE_MERGE_REQUEST: "gitlab:createMergeRequest",
-	GITLAB_UPDATE_MERGE_REQUEST: "gitlab:updateMergeRequest",
 
 	// GitLab OAuth (glab CLI authentication)
 	GITLAB_CHECK_CLI: "gitlab:checkCli",
@@ -431,7 +426,6 @@ export const IPC_CHANNELS = {
 	GITLAB_INVESTIGATION_ERROR: "gitlab:investigationError",
 
 	// GitLab MR Review operations
-	GITLAB_MR_GET_DIFF: "gitlab:mr:getDiff",
 	GITLAB_MR_REVIEW: "gitlab:mr:review",
 	GITLAB_MR_REVIEW_CANCEL: "gitlab:mr:reviewCancel",
 	GITLAB_MR_GET_REVIEW: "gitlab:mr:getReview",
@@ -447,41 +441,6 @@ export const IPC_CHANNELS = {
 	GITLAB_MR_REVIEW_PROGRESS: "gitlab:mr:reviewProgress",
 	GITLAB_MR_REVIEW_COMPLETE: "gitlab:mr:reviewComplete",
 	GITLAB_MR_REVIEW_ERROR: "gitlab:mr:reviewError",
-
-	// GitLab Auto-Fix operations
-	GITLAB_AUTOFIX_START: "gitlab:autofix:start",
-	GITLAB_AUTOFIX_GET_QUEUE: "gitlab:autofix:getQueue",
-	GITLAB_AUTOFIX_CHECK_LABELS: "gitlab:autofix:checkLabels",
-	GITLAB_AUTOFIX_CHECK_NEW: "gitlab:autofix:checkNew",
-	GITLAB_AUTOFIX_GET_CONFIG: "gitlab:autofix:getConfig",
-	GITLAB_AUTOFIX_SAVE_CONFIG: "gitlab:autofix:saveConfig",
-	GITLAB_AUTOFIX_GET_BATCHES: "gitlab:autofix:getBatches",
-
-	// GitLab Auto-Fix events (main -> renderer)
-	GITLAB_AUTOFIX_PROGRESS: "gitlab:autofix:progress",
-	GITLAB_AUTOFIX_COMPLETE: "gitlab:autofix:complete",
-	GITLAB_AUTOFIX_ERROR: "gitlab:autofix:error",
-
-	// GitLab Issue Analysis Preview (proactive batch workflow)
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW: "gitlab:autofix:analyzePreview",
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW_PROGRESS:
-		"gitlab:autofix:analyzePreviewProgress",
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW_COMPLETE:
-		"gitlab:autofix:analyzePreviewComplete",
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW_ERROR: "gitlab:autofix:analyzePreviewError",
-	GITLAB_AUTOFIX_APPROVE_BATCHES: "gitlab:autofix:approveBatches",
-
-	// GitLab Issue Triage operations
-	GITLAB_TRIAGE_RUN: "gitlab:triage:run",
-	GITLAB_TRIAGE_GET_RESULTS: "gitlab:triage:getResults",
-	GITLAB_TRIAGE_APPLY_LABELS: "gitlab:triage:applyLabels",
-	GITLAB_TRIAGE_GET_CONFIG: "gitlab:triage:getConfig",
-	GITLAB_TRIAGE_SAVE_CONFIG: "gitlab:triage:saveConfig",
-
-	// GitLab Issue Triage events (main -> renderer)
-	GITLAB_TRIAGE_PROGRESS: "gitlab:triage:progress",
-	GITLAB_TRIAGE_COMPLETE: "gitlab:triage:complete",
-	GITLAB_TRIAGE_ERROR: "gitlab:triage:error",
 
 	// GitHub Auto-Fix operations
 	GITHUB_AUTOFIX_START: "github:autofix:start",
@@ -815,6 +774,10 @@ export const IPC_CHANNELS = {
 	BROWSER_AGENT_COMPARE: "browserAgent:compare",
 	BROWSER_AGENT_DELETE_BASELINE: "browserAgent:deleteBaseline",
 	BROWSER_AGENT_RUN_TESTS: "browserAgent:runTests",
+	BROWSER_AGENT_RECORD_START: "browserAgent:recordStart", // A session in a browser window the person drives (#387)
+	BROWSER_AGENT_RECORD_STOP: "browserAgent:recordStop",
+	BROWSER_AGENT_RECORD_EXPORT: "browserAgent:recordExport", // Steps → Playwright / Cypress test: preview, review card or file
+	BROWSER_AGENT_RECORD_EVENT: "browserAgent:recordEvent", // main → renderer: step, started, stopped, error
 
 	// Architecture Visualizer
 	ARCHITECTURE_VISUALIZER_GENERATE: "architectureVisualizer:generate",

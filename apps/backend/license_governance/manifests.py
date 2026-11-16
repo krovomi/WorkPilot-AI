@@ -160,20 +160,27 @@ def _composer_license(value: object) -> str | None:
     return None
 
 
-def parse_composer_lock(path: Path) -> list[DependencyRecord]:
-    """``composer.lock`` records every package's licence: no lookup needed."""
+def _json_object(path: Path) -> dict:
     try:
         data = json.loads(_read(path) or "{}")
     except json.JSONDecodeError:
-        return []
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def parse_composer_lock(path: Path) -> list[DependencyRecord]:
+    """``composer.lock`` records every package's licence: no lookup needed."""
+    data = _json_object(path)
     deps: list[DependencyRecord] = []
     for is_direct, key in ((True, "packages"), (False, "packages-dev")):
-        for pkg in data.get(key) or []:
-            if not isinstance(pkg, dict) or not pkg.get("name"):
+        packages = data.get(key)
+        for pkg in packages if isinstance(packages, list) else []:
+            name = pkg.get("name") if isinstance(pkg, dict) else None
+            if not isinstance(name, str) or not name:
                 continue
             deps.append(
                 DependencyRecord(
-                    name=pkg["name"],
+                    name=name,
                     version=str(pkg.get("version") or ""),
                     ecosystem="composer",
                     declared_license=_composer_license(pkg.get("license")),
@@ -187,13 +194,11 @@ def parse_composer_json(path: Path) -> list[DependencyRecord]:
     """``composer.json`` when no lock file sits beside it."""
     if (path.parent / "composer.lock").exists():
         return []
-    try:
-        data = json.loads(_read(path) or "{}")
-    except json.JSONDecodeError:
-        return []
+    data = _json_object(path)
     deps: list[DependencyRecord] = []
     for is_direct, key in ((True, "require"), (False, "require-dev")):
-        for name, version in (data.get(key) or {}).items():
+        section = data.get(key)
+        for name, version in (section if isinstance(section, dict) else {}).items():
             # `php` and `ext-*` are platform requirements, not packages.
             if name == "php" or name.startswith(("ext-", "lib-")) or "/" not in name:
                 continue
