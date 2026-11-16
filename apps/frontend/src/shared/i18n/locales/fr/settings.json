@@ -1501,7 +1501,9 @@
 		"pending": "Invitations en attente",
 		"none": "Aucune invitation en attente.",
 		"expires": "expire le",
-		"revoke": "Révoquer"
+		"revoke": "Révoquer",
+		"copyLink": "Copier le lien",
+		"copyFailed": "Le lien n'a pas pu être copié"
 	},
 	"jiraImport": {
 		"cancel": "Annuler",
