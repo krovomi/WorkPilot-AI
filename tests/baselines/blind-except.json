@@ -338,7 +338,7 @@
   "apps/backend/server/services/events.py": {"blind": 1, "silent": 0},
   "apps/backend/server/services/run_manager.py": {"blind": 3, "silent": 0},
   "apps/backend/services/conflict_predictor_service.py": {"blind": 1, "silent": 1},
-  "apps/backend/services/design_to_code_service.py": {"blind": 8, "silent": 1},
+  "apps/backend/services/design_to_code_service.py": {"blind": 7, "silent": 1},
   "apps/backend/services/hooks/hook_service.py": {"blind": 9, "silent": 2},
   "apps/backend/services/hooks/scheduler.py": {"blind": 5, "silent": 1},
   "apps/backend/services/notifications/channels.py": {"blind": 2, "silent": 0},

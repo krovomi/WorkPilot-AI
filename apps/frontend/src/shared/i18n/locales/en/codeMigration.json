@@ -45,7 +45,10 @@
 		"target": "Target",
 		"log": "Analysis log",
 		"readyHint": "The planner knows this migration. Create the Kanban task to apply it: the agents follow the plan and run the project checks.",
-		"unsupportedHint": "The rule-based planner does not know this pair. The Kanban task still applies it: the agents plan it for the project stack and run its checks."
+		"unsupportedHint": "The rule-based planner does not know this pair. The Kanban task still applies it: the agents plan it for the project stack and run its checks.",
+		"risk": "Risk",
+		"plan_one": "Planned migration, {{count}} step",
+		"plan_other": "Planned migration, {{count}} steps"
 	},
 	"empty": {
 		"title": "Describe a migration",
@@ -59,12 +62,19 @@
 		"ready": "Known plan",
 		"unsupported": "Free plan"
 	},
+	"risk": {
+		"low": "Low",
+		"medium": "Medium",
+		"high": "High",
+		"critical": "Critical"
+	},
 	"task": {
 		"title": "Migration: {{description}}",
 		"scope": "Migrate the whole project, stack by stack, without changing behaviour.",
 		"acceptance": "Done when the project builds and its existing tests pass on every affected stack.",
 		"source": "Stack detected by the analysis: {{source}}.",
-		"created": "Task « {{title}} » created in the Kanban backlog."
+		"created": "Task « {{title}} » created in the Kanban backlog.",
+		"plan": "Plan from the analysis (phases and steps):"
 	},
 	"errors": {
 		"noProject": "Select a project to analyse or migrate it."
