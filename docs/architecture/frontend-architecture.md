@@ -185,6 +185,7 @@ Multi-profile credential management for switching between Claude accounts:
 - **`credential-utils.ts`** — OS credential storage (Keychain/Windows Credential Manager)
 - **`token-refresh.ts`** — OAuth token lifecycle and automatic refresh
 - **`usage-monitor.ts`** — API usage tracking and rate limiting per profile
+- **`usage-plan.ts`** — the plan of the account each usage snapshot shows (Claude Max 20x, ChatGPT Plus, Copilot Pro+, an API key billed per use…), added on the way to the renderer by `terminal-handlers.ts`; local sources only, a plan the provider does not name stays unnamed. Names are built by `shared/utils/plan-names.ts`
 - **`profile-scorer.ts`** — Scores profiles by usage and availability
 
 ## Terminal System (`src/main/terminal/`)
