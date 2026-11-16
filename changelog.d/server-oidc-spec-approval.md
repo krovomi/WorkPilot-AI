@@ -9,4 +9,4 @@ section: ✨ Nouveautés
   fournisseur l'a vérifiée.
 - **Mode serveur : une spec est approuvée par une autre personne que l'auteur de la carte** quand
   quelqu'un d'autre sur le projet peut approuver. `WORKPILOT_SELF_APPROVAL` règle ce choix
-  (`when-alone` par défaut, `deny`, `allow`).
+  (`when-alone` par défaut, `deny`, ou `allow`, qui garde le comportement d'avant).

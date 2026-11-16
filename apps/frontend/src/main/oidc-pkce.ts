@@ -13,6 +13,7 @@
 
 import * as crypto from "node:crypto";
 import * as http from "node:http";
+import type { AddressInfo } from "node:net";
 import { openExternalUrl } from "./open-external";
 
 export const LOOPBACK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -129,7 +130,8 @@ function awaitCode(
 		);
 
 		server.on("request", (req, res) => {
-			const url = new URL(req.url || "/", "http://localhost");
+			// A request on an http.Server always has its path.
+			const url = new URL(String(req.url), "http://localhost");
 			if (url.pathname !== "/callback") {
 				res.writeHead(404).end();
 				return;
@@ -137,12 +139,14 @@ function awaitCode(
 			res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
 			res.end(DONE_PAGE);
 			const code = url.searchParams.get("code");
+			const refusal = url.searchParams.get("error");
 			if (url.searchParams.get("state") !== state) {
 				finish(new Error("The sign-in answer does not match this attempt"));
-			} else if (url.searchParams.get("error")) {
+			} else if (refusal) {
 				// The provider's own words stay out: only its error code, bounded.
-				const reason = (url.searchParams.get("error") ?? "").slice(0, 60);
-				finish(new Error(`The identity provider refused: ${reason}`));
+				finish(
+					new Error(`The identity provider refused: ${refusal.slice(0, 60)}`),
+				);
 			} else if (!code) {
 				finish(new Error("The identity provider returned no code"));
 			} else {
@@ -151,8 +155,8 @@ function awaitCode(
 		});
 
 		server.listen(0, "127.0.0.1", () => {
-			const address = server.address();
-			const port = typeof address === "object" && address ? address.port : 0;
+			// Listening on a TCP host, the address is never a pipe name.
+			const { port } = server.address() as AddressInfo;
 			redirectUri = `http://localhost:${port}/callback`;
 			const authorize = new URL(provider.authorizationEndpoint);
 			const query = {
