@@ -15,3 +15,5 @@ section: 🧪 Filets de test
   même quand un autre fichier a importé `qa.criteria` avant eux.
 - **Journal de l'usage lu comme du texte** : le test des traces de débogage du moniteur d'usage
   coupe les couleurs, que le hook de pre-push force et qui découpaient la ligne attendue.
+- **Barre de commandes rapides** : le test de `/help` lit la liste dans la notification visible,
+  et non dans la copie que l'annonce pour lecteur d'écran ajoute un instant plus tard.
