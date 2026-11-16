@@ -15,6 +15,13 @@ beforeEach(() => {
 	useCICDTriggersStore.setState({ error: null, rollingBack: null, runs: [] });
 });
 
+// The dashboard is on the project before anything is rolled back.
+beforeEach(async () => {
+	await useCICDTriggersStore.getState().loadRuns("/p");
+	useCICDTriggersStore.setState({ runs: [] });
+	invoke.mockClear();
+});
+
 describe("rollback", () => {
 	it("rolls back, then reads the runs again", async () => {
 		rollbackDeployment.mockResolvedValue({ success: true });

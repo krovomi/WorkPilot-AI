@@ -79,7 +79,42 @@ interface CICDTriggersState {
 	clearError: () => void;
 }
 
-export const useCICDTriggersStore = create<CICDTriggersState>((set, get) => ({
+/**
+ * The project the dashboard is on. Config and runs read for a project left
+ * behind are dropped: the dashboard would show, and then save, another
+ * project's settings.
+ */
+let shownProject: string | null = null;
+const isShown = (projectDir: string) => projectDir === shownProject;
+
+/** The dashboard opened on a project: the last project's data is not its. */
+function show(projectDir: string): void {
+	if (!isShown(projectDir)) {
+		useCICDTriggersStore.setState({ config: null, runs: [] });
+	}
+	shownProject = projectDir;
+}
+
+/** Read the runs again for the project on screen, after a change. */
+async function readRuns(projectDir: string, limit = 50): Promise<void> {
+	try {
+		const result = await globalThis.electronAPI.invoke(
+			"cicdTriggers:listRuns",
+			projectDir,
+			limit,
+		);
+		if (!isShown(projectDir)) return;
+		if (result.success) {
+			useCICDTriggersStore.setState({ runs: result.data as PipelineRun[] });
+		} else {
+			useCICDTriggersStore.setState({ error: result.error ?? "Failed to load runs" });
+		}
+	} catch (err) {
+		if (isShown(projectDir)) useCICDTriggersStore.setState({ error: String(err) });
+	}
+}
+
+export const useCICDTriggersStore = create<CICDTriggersState>((set) => ({
 	config: null,
 	runs: [],
 	isLoading: false,
@@ -88,21 +123,23 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set, get) => ({
 	rollingBack: null,
 
 	loadConfig: async (projectDir) => {
+		show(projectDir);
 		set({ isLoading: true, error: null });
 		try {
 			const result = await globalThis.electronAPI.invoke(
 				"cicdTriggers:getConfig",
 				projectDir,
 			);
+			if (!isShown(projectDir)) return;
 			if (result.success) {
 				set({ config: result.data as CICDConfig });
 			} else {
 				set({ error: result.error ?? "Failed to load CI/CD config" });
 			}
 		} catch (err) {
-			set({ error: String(err) });
+			if (isShown(projectDir)) set({ error: String(err) });
 		} finally {
-			set({ isLoading: false });
+			if (isShown(projectDir)) set({ isLoading: false });
 		}
 	},
 
@@ -112,11 +149,18 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set, get) => ({
 			for (const [key, value] of Object.entries(config)) {
 				flat[key] = String(value);
 			}
-			await globalThis.electronAPI.invoke(
+			const result = await globalThis.electronAPI.invoke(
 				"cicdTriggers:setConfig",
 				projectDir,
 				flat,
 			);
+			// Refused by the main process: nothing was written, so the page
+			// must not show the new values as saved.
+			if (!result?.success) {
+				set({ error: result?.error ?? "Failed to save CI/CD config" });
+				return;
+			}
+			if (!isShown(projectDir)) return;
 			set((state) => ({
 				config: state.config
 					? { ...state.config, ...config }
@@ -128,20 +172,8 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set, get) => ({
 	},
 
 	loadRuns: async (projectDir, limit = 50) => {
-		try {
-			const result = await globalThis.electronAPI.invoke(
-				"cicdTriggers:listRuns",
-				projectDir,
-				limit,
-			);
-			if (result.success) {
-				set({ runs: result.data as PipelineRun[] });
-			} else {
-				set({ error: result.error ?? "Failed to load runs" });
-			}
-		} catch (err) {
-			set({ error: String(err) });
-		}
+		show(projectDir);
+		await readRuns(projectDir, limit);
 	},
 
 	triggerPipeline: async (projectDir, params) => {
@@ -159,7 +191,7 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set, get) => ({
 			);
 			if (result.success) {
 				// Refresh runs list
-				await get().loadRuns(projectDir);
+				await readRuns(projectDir);
 				return { success: true };
 			}
 			const err = result.error ?? "Trigger failed";
@@ -182,7 +214,7 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set, get) => ({
 				set({ error: result.error ?? "Rollback failed" });
 				return false;
 			}
-			await get().loadRuns(projectDir);
+			await readRuns(projectDir);
 			return true;
 		} catch (err) {
 			set({ error: String(err) });

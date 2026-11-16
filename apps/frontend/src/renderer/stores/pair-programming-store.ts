@@ -9,6 +9,7 @@
  * - Conflict warnings
  */
 
+import i18n from "i18next";
 import { create } from "zustand";
 import {
 	type GeneratedReview,
@@ -77,7 +78,6 @@ interface PairProgrammingState {
 	addMessage: (message: PairMessage) => void;
 	appendStreamContent: (content: string) => void;
 	finalizeAiMessage: () => void;
-	clearStreamContent: () => void;
 	addAiAction: (action: AiAction) => void;
 	addConflict: (filePath: string, message: string) => void;
 	setReview: (review: unknown) => void;
@@ -87,6 +87,14 @@ interface PairProgrammingState {
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
+
+/** What the app says itself, in the app's language; the main process's own
+ * messages are shown as they come. */
+const say = (key: string): string => i18n.t(`pairProgramming:statusMessages.${key}`);
+
+/** Ids are React keys: two messages of the same millisecond need two ids. */
+let lastId = 0;
+const nextId = (prefix: string): string => `${prefix}_${Date.now()}_${++lastId}`;
 
 export const usePairProgrammingStore = create<PairProgrammingState>(
 	(set, get) => ({
@@ -127,14 +135,12 @@ export const usePairProgrammingStore = create<PairProgrammingState>(
 		appendStreamContent: (content) =>
 			set((state) => ({ streamingContent: state.streamingContent + content })),
 
-		clearStreamContent: () => set({ streamingContent: "" }),
-
 		finalizeAiMessage: () =>
 			set((state) => {
 				const content = state.streamingContent.trim();
 				if (!content) return { streamingContent: "" };
 				const aiMsg: PairMessage = {
-					id: `msg_${Date.now()}`,
+					id: nextId("msg"),
 					role: "ai",
 					content,
 					timestamp: new Date().toISOString(),
@@ -153,7 +159,7 @@ export const usePairProgrammingStore = create<PairProgrammingState>(
 				conflicts: [
 					...state.conflicts,
 					{
-						id: `conflict_${Date.now()}`,
+						id: nextId("conflict"),
 						filePath,
 						message,
 						timestamp: new Date().toISOString(),
@@ -187,14 +193,17 @@ export async function startPairSession(
 ): Promise<void> {
 	const store = usePairProgrammingStore.getState();
 	store.reset();
-	store.setStatus("planning", "Starting pair programming session...");
+	store.setStatus("planning", say("starting"));
 
 	const result = await globalThis.electronAPI.startPairSession(params);
 	if (result.success && result.data) {
 		store.setSession(result.data);
-		store.setStatus("planning", "Analyzing project and planning AI scope...");
+		store.setStatus("planning", say("planning"));
 	} else {
-		store.setStatus("error", result.error || "Failed to start session");
+		store.setStatus(
+			"error",
+			result.error || i18n.t("pairProgramming:errors.startFailed"),
+		);
 	}
 }
 
@@ -203,7 +212,7 @@ export async function stopPairSession(
 	sessionId: string,
 ): Promise<void> {
 	await globalThis.electronAPI.stopPairSession(projectId, sessionId);
-	usePairProgrammingStore.getState().setStatus("completed", "Session stopped.");
+	usePairProgrammingStore.getState().setStatus("completed", say("stopped"));
 }
 
 export function sendPairMessage(
@@ -215,7 +224,7 @@ export function sendPairMessage(
 
 	// Optimistically add user message to UI
 	const userMsg: PairMessage = {
-		id: `msg_${Date.now()}`,
+		id: nextId("msg"),
 		role: "user",
 		content: message,
 		timestamp: new Date().toISOString(),
@@ -227,13 +236,29 @@ export function sendPairMessage(
 	globalThis.electronAPI.sendPairMessage(projectId, sessionId, message);
 }
 
+/**
+ * Show the session of the project on screen. The store holds one project's
+ * session at a time, so a project switch would otherwise keep showing the
+ * last project's session, and its Stop button would stop it under the wrong
+ * project. The main process keeps each project's chat and AI log, so they
+ * come back with the session.
+ */
 export async function loadPairSession(projectId: string): Promise<void> {
 	const result = await globalThis.electronAPI.getPairSession(projectId);
-	if (result.success && result.data) {
-		const store = usePairProgrammingStore.getState();
-		store.setSession(result.data);
-		store.setStatus(result.data.status as PairStatus);
-	}
+	// Another project was chosen while this was out.
+	if (projectId !== useProjectStore.getState().selectedProjectId) return;
+	const session = result.success ? (result.data ?? null) : null;
+	const store = usePairProgrammingStore.getState();
+	// Already the session on screen: the listeners keep it up to date.
+	if ((store.session?.id ?? null) === (session?.id ?? null)) return;
+	store.reset();
+	if (!session) return;
+	usePairProgrammingStore.setState({
+		session,
+		messages: session.messages,
+		aiActions: session.aiActions,
+	});
+	store.setStatus(session.status);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +287,7 @@ export function setupPairProgrammingListeners(): () => void {
 						// Finalize any ongoing stream first
 						store().finalizeAiMessage();
 						store().addMessage({
-							id: `q_${Date.now()}`,
+							id: nextId("q"),
 							role: "ai",
 							content: chunk.content,
 							timestamp: new Date().toISOString(),
@@ -272,11 +297,11 @@ export function setupPairProgrammingListeners(): () => void {
 					break;
 				case "done":
 					store().finalizeAiMessage();
-					store().setStatus("completed", chunk.summary || "Session completed.");
+					store().setStatus("completed", chunk.summary || say("completed"));
 					break;
 				case "error":
 					store().finalizeAiMessage();
-					store().setStatus("error", chunk.message || "An error occurred.");
+					store().setStatus("error", chunk.message || say("failed"));
 					break;
 			}
 		},

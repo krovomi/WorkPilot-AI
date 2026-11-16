@@ -61,8 +61,14 @@ export const useAgentDebuggerStore = create<AgentDebuggerState>((set, get) => ({
 	detach: async () => {
 		const { sessionId } = get();
 		if (!sessionId) return;
-		await window.electronAPI.detachDebugger(sessionId);
-		set({ sessionId: null, breakpoints: [], frames: [] });
+		try {
+			await window.electronAPI.detachDebugger(sessionId);
+		} catch (e) {
+			// Still attached on the runner's side: say so, and keep showing it.
+			set({ error: (e as Error).message });
+			return;
+		}
+		set({ sessionId: null, breakpoints: [], frames: [], error: null });
 		await get().listSessions();
 	},
 
@@ -75,33 +81,50 @@ export const useAgentDebuggerStore = create<AgentDebuggerState>((set, get) => ({
 		// rejections.
 		try {
 			const state = await window.electronAPI.getDebugState(sessionId);
+			// Detached, or attached elsewhere, while the poll was out.
+			if (get().sessionId !== sessionId) return;
 			set({
 				breakpoints: Array.isArray(state?.breakpoints) ? state.breakpoints : [],
 				frames: Array.isArray(state?.frames) ? state.frames : [],
 			});
 		} catch (e) {
-			set({ error: (e as Error).message });
+			if (get().sessionId === sessionId) set({ error: (e as Error).message });
 		}
 	},
 
-	addBreakpoint: async (bp) => {
-		const { sessionId } = get();
-		if (!sessionId) return;
-		await window.electronAPI.setBreakpoint(sessionId, bp);
-		await get().refresh();
-	},
+	addBreakpoint: (bp) =>
+		change(get, set, (sessionId) =>
+			window.electronAPI.setBreakpoint(sessionId, bp),
+		),
 
-	removeBreakpoint: async (id) => {
-		const { sessionId } = get();
-		if (!sessionId) return;
-		await window.electronAPI.removeBreakpoint(sessionId, id);
-		await get().refresh();
-	},
+	removeBreakpoint: (id) =>
+		change(get, set, (sessionId) =>
+			window.electronAPI.removeBreakpoint(sessionId, id),
+		),
 
-	resume: async (frameId, action, options) => {
-		const { sessionId } = get();
-		if (!sessionId) return;
-		await window.electronAPI.resumeFrame(sessionId, frameId, action, options);
-		await get().refresh();
-	},
+	resume: (frameId, action, options) =>
+		change(get, set, (sessionId) =>
+			window.electronAPI.resumeFrame(sessionId, frameId, action, options),
+		),
 }));
+
+/**
+ * Send one change to the attached session, then read its state again. A
+ * refusal is shown on the panel, where a person pressed the button, instead
+ * of becoming an unhandled rejection nobody sees.
+ */
+async function change(
+	get: () => AgentDebuggerState,
+	set: (partial: Partial<AgentDebuggerState>) => void,
+	call: (sessionId: string) => Promise<unknown>,
+): Promise<void> {
+	const { sessionId } = get();
+	if (!sessionId) return;
+	try {
+		await call(sessionId);
+	} catch (e) {
+		set({ error: (e as Error).message });
+		return;
+	}
+	await get().refresh();
+}
