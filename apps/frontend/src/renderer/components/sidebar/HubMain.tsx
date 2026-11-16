@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useProjectStore } from "@/stores/project-store";
+import { ErrorBoundary } from "../ui/error-boundary";
 import type { SidebarView } from "../Sidebar";
 import { BetaBanner } from "./ExperimentalMarker";
 import { EXPERIMENTAL_VIEWS } from "./experimental-views";
@@ -35,9 +36,13 @@ interface HubMainProps {
  *
  * The tree has the same shape with or without a hub, so entering one never
  * remounts what the main area keeps alive across views (the terminals).
+ *
+ * A page that throws while rendering shows an error card in the main area
+ * instead of blanking the whole window: the menu stays usable, and choosing
+ * another page (or "Try again") clears it.
  */
 export function HubMain({ activeView, onSelectView, children }: HubMainProps) {
-	const { t } = useTranslation(["navigation"]);
+	const { t } = useTranslation(["navigation", "errors"]);
 	const project = useProjectStore((s) =>
 		s.projects.find((p) => p.id === s.selectedProjectId),
 	);
@@ -85,7 +90,9 @@ export function HubMain({ activeView, onSelectView, children }: HubMainProps) {
 				className={showTabs ? "min-h-0 flex-1 overflow-auto" : "min-h-0 flex-1 overflow-hidden"}
 			>
 				{dialogTab && <HubLauncher tab={dialogTab} />}
-				{children}
+				<ErrorBoundary resetKey={activeView} description={t("errors:boundary.pageDescription")}>
+					{children}
+				</ErrorBoundary>
 			</div>
 		</main>
 	);

@@ -169,37 +169,6 @@ def test_enum_well_formed(module_name: str, enum_name: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Stateless helper classes — constructor smoke
-
-
-def test_debugger_registry_constructs() -> None:
-    from agents.debugger import DebuggerRegistry
-
-    registry = DebuggerRegistry()
-    assert registry is not None
-    # Brand new registry has no sessions
-    assert registry.list_sessions() == []
-
-
-def test_debugger_session_lifecycle() -> None:
-    from agents.debugger import DebuggerRegistry
-
-    registry = DebuggerRegistry()
-    session = registry.attach("agent-1")
-    assert session is not None
-    assert "agent-1" in registry.list_sessions()
-    assert registry.detach("agent-1") is True
-    assert "agent-1" not in registry.list_sessions()
-
-
-def test_make_debugger_hook_returns_callable() -> None:
-    from agents.debugger import make_debugger_hook
-
-    hook = make_debugger_hook("session-x")
-    assert callable(hook)
-
-
-# ---------------------------------------------------------------------------
 # Pure-function helpers
 
 

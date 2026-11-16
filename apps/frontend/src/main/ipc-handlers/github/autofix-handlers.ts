@@ -982,12 +982,12 @@ export function registerAutoFixHandlers(
 				// Provide user-friendly error messages
 				let userMessage = "Failed to analyze issues";
 				if (error instanceof Error) {
-					if (error.message.includes("JSON")) {
-						userMessage =
-							"Analysis completed, but there was an error processing the results. Please try again.";
-					} else if (error.message.includes("No JSON found")) {
+					if (error.message.includes("No JSON found")) {
 						userMessage =
 							"No analysis results returned. Please check your GitHub connection and try again.";
+					} else if (error.message.includes("JSON")) {
+						userMessage =
+							"Analysis completed, but there was an error processing the results. Please try again.";
 					} else {
 						userMessage = error.message;
 					}
@@ -1015,11 +1015,9 @@ export function registerAutoFixHandlers(
 				batchCount: approvedBatches.length,
 			});
 			const result = await withProjectOrNull(projectId, async (project) => {
+				const tempFile = path.join(getGitHubDir(project), "temp_approved_batches.json");
 				try {
-					const tempFile = path.join(
-						getGitHubDir(project),
-						"temp_approved_batches.json",
-					);
+					fs.mkdirSync(getGitHubDir(project), { recursive: true });
 
 					// Convert camelCase to snake_case for Python
 					const pythonBatches = approvedBatches.map((b) => ({
@@ -1053,21 +1051,19 @@ export function registerAutoFixHandlers(
 
 					// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 					const backendPath = validation.backendPath!;
-					const { execFileSync } = await import("node:child_process");
-					// Use execFileSync with arguments array to prevent command injection
-					execFileSync(
-						getPythonPath(backendPath),
-						[
-							getRunnerPath(backendPath),
-							"--project",
-							project.path,
-							"approve-batches",
-							tempFile,
-						],
-						{ cwd: backendPath, encoding: "utf-8" },
-					);
-
-					fs.unlinkSync(tempFile);
+					// Like every other auto-fix command: the runner's environment
+					// (provider, GitHub token), off the main thread.
+					const { promise } = runPythonSubprocess({
+						pythonPath: getPythonPath(backendPath),
+						args: buildRunnerArgs(getRunnerPath(backendPath), project.path, "approve-batches", [tempFile]),
+						cwd: backendPath,
+						env: await getRunnerEnv(),
+						onAuthFailure: createAuthFailureCallback(getMainWindow(), "approve batches"),
+					});
+					const run = await promise;
+					if (!run.success) {
+						throw new Error(run.error ?? "Failed to approve batches");
+					}
 
 					const batches = getBatches(project);
 					debugLog("Batches approved and created", { count: batches.length });
@@ -1084,6 +1080,8 @@ export function registerAutoFixHandlers(
 								? error.message
 								: "Failed to approve batches",
 					};
+				} finally {
+					fs.rmSync(tempFile, { force: true });
 				}
 			});
 			return result ?? { success: false, error: "Project not found" };

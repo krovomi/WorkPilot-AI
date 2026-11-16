@@ -77,6 +77,8 @@ export const useDocumentationStore = create<DocumentationState>((set, get) => ({
 				if (get().projectPath === projectPath) set({ readme, draftsView: "readme" });
 			}
 		} catch (err) {
+			// A run of the project left behind is not this project's error.
+			if (get().projectPath !== projectPath) return;
 			const message = err instanceof Error ? err.message : String(err);
 			// "Error invoking remote method 'x': Error: reason" -> "reason"
 			set({ error: message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") });
@@ -94,3 +96,15 @@ export const useDocumentationStore = create<DocumentationState>((set, get) => ({
 	selectSymbol: (selectedSymbol) => set({ selectedSymbol }),
 	setDraftsView: (draftsView) => set({ draftsView }),
 }));
+
+/**
+ * The runner's progress lines, for the life of the window (registered by
+ * global-listeners): a run goes on with the tab closed, and the tab shows
+ * where it is when it comes back. A line after the run has ended is dropped.
+ */
+export function setupDocumentationListeners(): (() => void) | undefined {
+	return globalThis.electronAPI?.onDocumentationProgress?.((status) => {
+		const store = useDocumentationStore.getState();
+		if (store.running) store.setStatus(status);
+	});
+}
