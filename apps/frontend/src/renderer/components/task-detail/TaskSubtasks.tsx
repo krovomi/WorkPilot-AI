@@ -110,11 +110,12 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 	}
 
 	const handleCodeEditorUpdate = async (updatedSubtask: Subtask) => {
-		if (!onUpdatePlan) return;
+		if (!onUpdatePlan) return false;
 		const saved = await onUpdatePlan(
 			asPhases(task.subtasks.map((s) => (s.id === updatedSubtask.id ? updatedSubtask : s))),
 		);
 		if (saved) setSelectedSubtaskForCodeEdit(null);
+		return saved;
 	};
 
 	async function handleSaveChanges() {
