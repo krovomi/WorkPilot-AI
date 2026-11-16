@@ -2,16 +2,11 @@
  * SeverityGroupHeader - Collapsible header for a severity group with selection checkbox
  */
 
-import {
-	CheckSquare,
-	ChevronDown,
-	ChevronRight,
-	MinusSquare,
-	Square,
-} from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../../lib/utils";
 import { Badge } from "../../ui/badge";
+import { Checkbox } from "../../ui/checkbox";
 import type { SeverityGroup } from "../constants/severity-config";
 import { SEVERITY_CONFIG } from "../constants/severity-config";
 
@@ -21,7 +16,7 @@ interface SeverityGroupHeaderProps {
 	selectedCount: number;
 	expanded: boolean;
 	onToggle: () => void;
-	onSelectAll: (e: React.MouseEvent) => void;
+	onSelectAll: () => void;
 }
 
 export function SeverityGroupHeader({
@@ -38,43 +33,44 @@ export function SeverityGroupHeader({
 	const isFullySelected = selectedCount === count && count > 0;
 	const isPartiallySelected = selectedCount > 0 && selectedCount < count;
 
-	return (
-		<button
-			type="button"
-			onClick={onToggle}
-			className="w-full flex items-center justify-between p-3 hover:bg-black/5 dark:hover:bg-white/5 rounded-t-lg transition-colors"
-		>
-			<div className="flex items-center gap-3">
-				{/* Group Checkbox */}
-				{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: clickable checkbox proxy */}
-				{/* biome-ignore lint/a11y/noStaticElementInteractions: clickable checkbox proxy */}
-				{/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard handled by outer button */}
-				<div onClick={onSelectAll} className="cursor-pointer">
-					{isFullySelected ? (
-						<CheckSquare className={cn("h-4 w-4", config.color)} />
-					) : isPartiallySelected ? (
-						<MinusSquare className={cn("h-4 w-4", config.color)} />
-					) : (
-						<Square className="h-4 w-4 text-muted-foreground" />
-					)}
-				</div>
+	const label = t(config.labelKey);
+	let checked: boolean | "indeterminate" = false;
+	if (isFullySelected) checked = true;
+	else if (isPartiallySelected) checked = "indeterminate";
 
-				<Icon className={cn("h-4 w-4", config.color)} />
-				<span className={cn("font-medium text-sm", config.color)}>
-					{t(config.labelKey)}
-				</span>
-				<Badge variant="secondary" className="text-xs">
-					{count}
-				</Badge>
-				<span className="text-xs text-muted-foreground hidden sm:inline">
-					{t(config.descriptionKey)}
-				</span>
-			</div>
-			{expanded ? (
-				<ChevronDown className="h-4 w-4 text-muted-foreground" />
-			) : (
-				<ChevronRight className="h-4 w-4 text-muted-foreground" />
-			)}
-		</button>
+	// Two controls side by side: a checkbox inside the toggle button could
+	// not be reached from the keyboard.
+	return (
+		<div className="flex items-center gap-3 pl-3 rounded-t-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+			<Checkbox
+				checked={checked}
+				onCheckedChange={onSelectAll}
+				aria-label={t("prReview.selectSeverityGroup", { severity: label })}
+			/>
+			<button
+				type="button"
+				onClick={onToggle}
+				aria-expanded={expanded}
+				className="flex-1 flex items-center justify-between py-3 pr-3"
+			>
+				<div className="flex items-center gap-3">
+					<Icon className={cn("h-4 w-4", config.color)} />
+					<span className={cn("font-medium text-sm", config.color)}>
+						{label}
+					</span>
+					<Badge variant="secondary" className="text-xs">
+						{count}
+					</Badge>
+					<span className="text-xs text-muted-foreground hidden sm:inline">
+						{t(config.descriptionKey)}
+					</span>
+				</div>
+				{expanded ? (
+					<ChevronDown className="h-4 w-4 text-muted-foreground" />
+				) : (
+					<ChevronRight className="h-4 w-4 text-muted-foreground" />
+				)}
+			</button>
+		</div>
 	);
 }

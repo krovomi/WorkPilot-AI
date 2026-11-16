@@ -18,6 +18,22 @@ export type ReviewStatus =
 	| "followup_issues_remain"
 	| "reviewing";
 
+/** The dot and label of a review that is running, and of each status. */
+const REVIEWING_LOOK = {
+	dot: "bg-blue-500 animate-pulse",
+	labelKey: "prReview.aiReviewInProgress",
+};
+const STATUS_LOOK: Record<ReviewStatus, { dot: string; labelKey: string }> = {
+	reviewing: REVIEWING_LOOK,
+	not_reviewed: { dot: "bg-muted-foreground", labelKey: "prReview.reviewStatus" },
+	ready_to_merge: { dot: "bg-success", labelKey: "prReview.readyToMerge" },
+	waiting_for_changes: { dot: "bg-warning", labelKey: "prReview.waitingForChanges" },
+	reviewed_pending_post: { dot: "bg-primary", labelKey: "prReview.reviewComplete" },
+	ready_for_followup: { dot: "bg-info", labelKey: "prReview.readyForFollowup" },
+	needs_attention: { dot: "bg-destructive", labelKey: "prReview.needsAttention" },
+	followup_issues_remain: { dot: "bg-warning", labelKey: "prReview.blockingIssues" },
+};
+
 export interface ReviewStatusTreeProps {
 	status: ReviewStatus;
 	isReviewing: boolean;
@@ -269,52 +285,9 @@ export function ReviewStatusTree({
 		}
 	}
 
-	// Status dot color - explicitly handle all statuses
-	const getStatusDotColor = (): string => {
-		if (isReviewing) return "bg-blue-500 animate-pulse";
-		switch (status) {
-			case "ready_to_merge":
-				return "bg-success";
-			case "waiting_for_changes":
-				return "bg-warning";
-			case "reviewed_pending_post":
-				return "bg-primary";
-			case "ready_for_followup":
-				return "bg-info";
-			case "needs_attention":
-				return "bg-destructive";
-			case "followup_issues_remain":
-				return "bg-warning";
-			default:
-				return "bg-muted-foreground";
-		}
-	};
-	const statusDotColor = cn(
-		"h-2.5 w-2.5 shrink-0 rounded-full",
-		getStatusDotColor(),
-	);
-
-	// Status label - explicitly handle all statuses
-	const getStatusLabel = (): string => {
-		if (isReviewing) return t("prReview.aiReviewInProgress");
-		switch (status) {
-			case "ready_to_merge":
-				return t("prReview.readyToMerge");
-			case "waiting_for_changes":
-				return t("prReview.waitingForChanges");
-			case "reviewed_pending_post":
-				return t("prReview.reviewComplete");
-			case "ready_for_followup":
-				return t("prReview.readyForFollowup");
-			case "needs_attention":
-				return t("prReview.needsAttention");
-			case "followup_issues_remain":
-				return t("prReview.blockingIssues");
-			default:
-				return t("prReview.reviewStatus");
-		}
-	};
-	const statusLabel = getStatusLabel();
+	const look = isReviewing ? REVIEWING_LOOK : STATUS_LOOK[status];
+	const statusDotColor = cn("h-2.5 w-2.5 shrink-0 rounded-full", look.dot);
+	const statusLabel = t(look.labelKey);
 
 	return (
 		<CollapsibleCard

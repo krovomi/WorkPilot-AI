@@ -327,3 +327,77 @@ class TestCiWorkflow:
         text = github_actions(["x$(id)/openapi.yaml", "a`b`.proto"], "dev$(id)")
         assert "$(id)" not in text and "`" not in text
         assert "branches: [develop]" in text
+
+
+class TestQaGateEdges:
+    def test_the_changes_go_to_the_task_log(self, repo, spec, monkeypatch):
+        logged: list[tuple] = []
+
+        class Log:
+            def log(self, message, kind, phase):
+                logged.append((message, kind.value))
+
+        _break_orders(repo)
+        api_contract_gate(spec, repo, 1, _scope(repo), task_logger=Log())
+        monkeypatch.setenv(API_CONTRACT_ENV, "strict")
+        api_contract_gate(spec, repo, 1, _scope(repo), task_logger=Log())
+
+        assert [kind for _, kind in logged] == ["error", "error"]
+        assert "✗ services/orders/api/openapi.yaml" in logged[0][0]
+
+    def test_an_acknowledged_change_is_logged_as_a_warning(self, repo, spec):
+        logged: list[str] = []
+
+        class Log:
+            def log(self, message, kind, phase):
+                logged.append(kind.value)
+
+        _write(
+            repo,
+            "services/orders/api/openapi.yaml",
+            ORDERS.replace(
+                '  /orders:\n    post: {operationId: createOrder, responses: {"201": {description: ok}}}\n',
+                "  /orders:\n    x-breaking-acknowledged: true\n",
+            ),
+        )
+        api_contract_gate(spec, repo, 1, _scope(repo), task_logger=Log())
+
+        assert logged == ["warning"]
+
+    def test_an_unknown_base_is_recorded_not_raised(self, repo, spec):
+        scope = ChangeScope("full", "test", files=(), base="not-a-revision")
+
+        assert api_contract_gate(spec, repo, 1, scope) is None
+        assert load_record(spec) is not None
+
+    def test_a_record_that_cannot_be_written_skips_the_watcher(
+        self, repo, spec, monkeypatch, capsys
+    ):
+        from api_watcher.compare import RECORD
+
+        monkeypatch.setenv(API_CONTRACT_ENV, "strict")
+        (spec / RECORD).mkdir()
+        _break_orders(repo)
+
+        assert api_contract_gate(spec, repo, 1, _scope(repo)) is None
+        assert "API contract watcher" not in capsys.readouterr().out
+
+    def test_without_a_plan_the_rejection_still_stands(self, repo, spec, monkeypatch):
+        monkeypatch.setenv(API_CONTRACT_ENV, "strict")
+        (spec / "implementation_plan.json").unlink()
+        _break_orders(repo)
+
+        issues, _ = api_contract_gate(spec, repo, 1, _scope(repo))
+
+        assert issues and (spec / "QA_FIX_REQUEST.md").exists()
+
+    def test_an_unwritable_fix_request_does_not_lose_the_rejection(
+        self, repo, spec, monkeypatch
+    ):
+        monkeypatch.setenv(API_CONTRACT_ENV, "strict")
+        (spec / "QA_FIX_REQUEST.md").mkdir()
+        _break_orders(repo)
+
+        issues, verdict = api_contract_gate(spec, repo, 1, _scope(repo))
+
+        assert issues and "rejected" in verdict
