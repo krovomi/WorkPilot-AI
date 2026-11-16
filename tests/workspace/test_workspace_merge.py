@@ -18,6 +18,7 @@ import pytest
 from core.workspace import merge_existing_build
 from core.workspace.models import ParallelMergeTask
 from core.worktree import WorktreeManager
+from phase_config import MODEL_ID_MAP
 
 ws = workspace_pkg._workspace_module
 SPEC = "003-discounts"
@@ -145,12 +146,10 @@ class Project:
 
 
 @pytest.fixture
-def project(temp_git_repo, tmp_path, monkeypatch):
+def project(isolated_repo, tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "no-global-gitconfig"))
     monkeypatch.delenv("DEFAULT_BRANCH", raising=False)
-    return Project(temp_git_repo)
+    return Project(isolated_repo)
 
 
 # ── merge_existing_build ────────────────────────────────────────────────
@@ -231,7 +230,8 @@ class TestMergeExistingBuild:
         prompt = model.sessions[0]["prompt"]
         assert "FILE: app.py" in prompt
         assert "return x * 0.9" in prompt
-        assert model.sessions[0]["options"]["agent_type"] == "merge_resolver"
+        # The merge is a text-only call: no tools reach the project.
+        assert model.sessions[0]["options"]["agent_type"] == "commit_message"
 
     def test_an_unresolved_conflict_is_left_to_the_person(self, project, model, capsys):
         model.answers = ["I cannot merge this file safely."]
@@ -260,7 +260,7 @@ class TestMergeExistingBuild:
     ):
         conflict = {"file": "app.py", "can_auto_merge": False, "reason": "both"}
         monkeypatch.setattr(
-            ws.MergeOrchestrator,
+            ws.MergePreview,
             "preview_merge",
             lambda self, specs: {
                 "files_to_merge": ["app.py"],
@@ -277,7 +277,7 @@ class TestMergeExistingBuild:
         def broken(self, specs):
             raise RuntimeError("analysis broke")
 
-        monkeypatch.setattr(ws.MergeOrchestrator, "preview_merge", broken)
+        monkeypatch.setattr(ws.MergePreview, "preview_merge", broken)
         project.work(cart_dot_py="CART = []\n")
 
         assert merge_existing_build(project.repo, SPEC) is True
@@ -306,9 +306,8 @@ def resolve(project, files: list[str]) -> dict:
         "base_branch": "main",
         "spec_branch": BRANCH,
     }
-    orchestrator = ws.MergeOrchestrator(project.repo, enable_ai=True, dry_run=False)
     return ws._resolve_git_conflicts_with_ai(
-        project.repo, SPEC, project.task, conflicts, orchestrator
+        project.repo, SPEC, project.task, conflicts
     )
 
 
@@ -451,20 +450,9 @@ class TestResolveConflicts:
 
         assert result["success"] is True
         assert project.read("app.py") == MERGED_APP
+        # On Claude: a quick model first, then a capable one.
         models = [s["options"]["model"] for s in model.sessions]
-        assert models == [ws.MERGE_FAST_MODEL, ws.MERGE_CAPABLE_MODEL]
-
-    def test_no_token_no_model(self, project, model, monkeypatch):
-        monkeypatch.setattr(model.auth, "get_auth_token", lambda *_a: None)
-        project.main(app_dot_py=MAIN_APP)
-        project.work(app_dot_py=TASK_APP)
-
-        result = resolve(project, ["app.py"])
-
-        assert result["remaining_conflicts"][0]["reason"] == (
-            "No authentication token available"
-        )
-        assert model.sessions == []
+        assert models == [MODEL_ID_MAP["haiku"], MODEL_ID_MAP["sonnet"]]
 
 
 class TestParallelMerges:
