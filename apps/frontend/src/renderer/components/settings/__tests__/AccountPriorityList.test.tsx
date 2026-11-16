@@ -1,21 +1,19 @@
 /**
- * AccountPriorityList — every account in the order auto-switching uses them:
- * the one in use, the next one (wrapping round), the usage of each Claude
- * account, the warnings, and the new order when an account is dropped elsewhere.
+ * AccountPriorityList — the failover chain: every connected account in the
+ * order a stopped task moves through them, with its rank, its kind and its
+ * usage; a switch takes one out without losing its place.
  */
 
 import type { DragEndEvent } from "@dnd-kit/core";
-import { act, cleanup, render as rtlRender, screen, within } from "@testing-library/react";
-import type { ComponentProps, ReactElement } from "react";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TooltipProvider } from "../../ui/tooltip";
-import { AccountPriorityList, type UnifiedAccount } from "../AccountPriorityList";
+import i18n from "../../../../shared/i18n";
+import { AccountPriorityList } from "../AccountPriorityList";
+import type { FailoverAccount } from "../failover-accounts";
 
-// The app wraps every screen in one tooltip provider.
-const render = (ui: ReactElement) => rtlRender(ui, { wrapper: TooltipProvider });
-
-// The drop itself needs a real pointer and layout; the list is given the event
-// dnd-kit sends when an account is dropped on another.
+// The drop needs a real pointer and layout; the list gets the event dnd-kit sends.
 const dnd = vi.hoisted(() => ({ onDragEnd: undefined as undefined | ((event: DragEndEvent) => void) }));
 vi.mock("@dnd-kit/core", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@dnd-kit/core")>();
@@ -28,25 +26,32 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
 	};
 });
 
-function account(id: string, extra: Partial<UnifiedAccount> = {}): UnifiedAccount {
-	return {
-		id,
-		name: id,
-		type: "oauth",
-		displayName: `Account ${id}`,
-		identifier: `${id}@example.com`,
-		isActive: false,
-		isNext: false,
-		isAvailable: true,
-		hasUnlimitedUsage: false,
-		...extra,
-	};
+const t = (key: string, options?: Record<string, unknown>) => i18n.t(`settings:${key}`, options);
+
+const ACCOUNTS: FailoverAccount[] = [
+	{ id: "oauth-me", kind: "oauth", provider: "anthropic", label: "Me", detail: "me@example.com", isActive: true, sessionPercent: 41.6 },
+	{ id: "api-proxy", kind: "api", provider: "openai", label: "Proxy", isActive: false },
+	{ id: "provider-copilot", kind: "provider", provider: "copilot", label: "GitHub Copilot", detail: "@octo", isActive: false },
+];
+
+function renderList(excluded: string[] = [], disabled = false) {
+	const onReorder = vi.fn();
+	const onInclude = vi.fn();
+	render(
+		<AccountPriorityList
+			accounts={ACCOUNTS}
+			excluded={(account) => excluded.includes(account.id)}
+			providerLabel={(provider) => provider.toUpperCase()}
+			disabled={disabled}
+			onReorder={onReorder}
+			onInclude={onInclude}
+		/>,
+	);
+	return { onReorder, onInclude };
 }
 
 const drop = (active: string, over: string | null) =>
 	act(() => dnd.onDragEnd?.({ active: { id: active }, over: over === null ? null : { id: over } } as DragEndEvent));
-
-const rows = () => screen.getAllByRole("button", { name: /^Move / }).map((handle) => handle.parentElement as HTMLElement);
 
 afterEach(() => {
 	cleanup();
@@ -54,113 +59,37 @@ afterEach(() => {
 });
 
 describe("AccountPriorityList", () => {
-	it("says when there is no account", () => {
-		render(<AccountPriorityList accounts={[]} onReorder={vi.fn()} />);
-		expect(screen.getByText("No accounts configured. Add accounts above to set priority.")).toBeInTheDocument();
+	it("ranks the accounts in the chain and marks the one taken out", () => {
+		renderList(["api-proxy"]);
+		const rows = screen.getAllByRole("listitem");
+		expect(rows.map((row) => row.querySelector(".wp-mono")?.textContent)).toEqual(["1", "–", "2"]);
+		expect(rows[0]).toHaveTextContent(t("aiAccounts.failover.kind.oauth"));
+		expect(rows[0]).toHaveTextContent(t("aiAccounts.failover.active"));
+		expect(rows[0]).toHaveTextContent(`me@example.com · ${t("aiAccounts.card.usage", { session: 42 })}`);
+		expect(rows[1]).toHaveTextContent(t("aiAccounts.failover.kind.api"));
+		expect(rows[2]).toHaveTextContent("@octo");
 	});
 
-	it("numbers the accounts, marks the one in use and the next one, and shows each one's usage", () => {
-		render(
-			<AccountPriorityList
-				accounts={[
-					account("a", { sessionPercent: 20, weeklyPercent: 10 }),
-					account("b", { isActive: true, sessionPercent: 75.4, weeklyPercent: 40 }),
-					account("c", { isAvailable: false }),
-					account("api", { type: "api", displayName: "Proxy", identifier: "https://proxy.example" }),
-				]}
-				onReorder={vi.fn()}
-			/>,
-		);
-		const [a, b, c, api] = rows();
-		expect(within(a).getByText("1")).toBeInTheDocument();
-		expect(within(b).getByText("In Use")).toBeInTheDocument();
-		expect(within(b).getByText("75%")).toBeInTheDocument();
-		expect(within(b).getByText("40%")).toBeInTheDocument();
-		expect(within(b).getByText("Moderate")).toBeInTheDocument();
-		expect(within(a).getByText("Healthy")).toBeInTheDocument();
-		// The next one after the one in use is the API endpoint, skipping the signed-out account.
-		expect(within(api).getByText("Next")).toBeInTheDocument();
-		expect(within(api).getByText("Pay-per-use")).toBeInTheDocument();
-		expect(within(api).getByText("https://proxy.example")).toBeInTheDocument();
-		expect(within(c).getByText("Not authenticated")).toBeInTheDocument();
-		expect(within(c).queryByText(/%$/)).toBeNull();
-		expect(within(a).queryByText("Next")).toBeNull();
+	it("puts an account back in the chain or takes it out", async () => {
+		const { onInclude } = renderList(["api-proxy"]);
+		await userEvent.click(screen.getByRole("switch", { name: t("aiAccounts.failover.include", { name: "Proxy" }) }));
+		await userEvent.click(screen.getByRole("switch", { name: t("aiAccounts.failover.include", { name: "Me" }) }));
+		expect(onInclude.mock.calls).toEqual([
+			["api-proxy", true],
+			["oauth-me", false],
+		]);
 	});
 
-	it("wraps round for the next account, and takes the first available one when none is in use", () => {
-		const { rerender } = render(
-			<AccountPriorityList accounts={[account("a"), account("b", { isActive: true })]} onReorder={vi.fn()} />,
-		);
-		expect(within(rows()[0]).getByText("Next")).toBeInTheDocument();
-		rerender(<AccountPriorityList accounts={[account("a", { isAvailable: false }), account("b")]} onReorder={vi.fn()} />);
-		expect(within(rows()[1]).getByText("Next")).toBeInTheDocument();
-		rerender(<AccountPriorityList accounts={[account("a", { isActive: true }), account("b", { isAvailable: false })]} onReorder={vi.fn()} />);
-		expect(screen.queryByText("Next")).toBeNull();
+	it("gives the new order when an account is dropped on another", () => {
+		const { onReorder } = renderList();
+		drop("provider-copilot", "oauth-me");
+		drop("oauth-me", "oauth-me");
+		drop("oauth-me", null);
+		expect(onReorder.mock.calls).toEqual([[["provider-copilot", "oauth-me", "api-proxy"]]]);
 	});
 
-	it("names the usage level of each account", () => {
-		render(
-			<AccountPriorityList
-				accounts={[
-					account("high", { sessionPercent: 92, weeklyPercent: 10 }),
-					account("near", { sessionPercent: 10, weeklyPercent: 96 }),
-					account("limited", { sessionPercent: 0, isRateLimited: true }),
-				]}
-				onReorder={vi.fn()}
-			/>,
-		);
-		const [high, near, limited] = rows();
-		expect(within(high).getByText("High usage")).toBeInTheDocument();
-		expect(within(near).getByText("Near limit")).toBeInTheDocument();
-		expect(within(limited).getByText("Rate limited")).toBeInTheDocument();
-		// A weekly figure not known yet shows as none.
-		expect(within(limited).getAllByText("0%")).toHaveLength(2);
-	});
-
-	it("warns about Claude accounts with the very same usage, and about one to sign in again", () => {
-		render(
-			<AccountPriorityList
-				accounts={[
-					account("a", { sessionPercent: 30, weeklyPercent: 50 }),
-					account("b", { sessionPercent: 30, weeklyPercent: 50, needsReauthentication: true }),
-					// Unused accounts all read 0 %: not a duplicate.
-					account("c", { sessionPercent: 0, weeklyPercent: 0 }),
-					account("d", { sessionPercent: 0, weeklyPercent: 0 }),
-					account("e", { sessionPercent: 30 }),
-				]}
-				onReorder={vi.fn()}
-			/>,
-		);
-		const [a, b, c, d, e] = rows();
-		expect(within(a).getByText("Duplicate usage detected")).toBeInTheDocument();
-		expect(within(b).getByText("Duplicate usage detected")).toBeInTheDocument();
-		expect(within(b).getByText("Needs re-auth")).toBeInTheDocument();
-		for (const row of [c, d, e]) expect(within(row).queryByText("Duplicate usage detected")).toBeNull();
-	});
-
-	it("checks for the same usage only with two Claude accounts signed in", () => {
-		render(
-			<AccountPriorityList
-				accounts={[account("a", { sessionPercent: 30, weeklyPercent: 50 }), account("b", { isAvailable: false, sessionPercent: 30, weeklyPercent: 50 })]}
-				onReorder={vi.fn()}
-			/>,
-		);
-		expect(screen.queryByText("Duplicate usage detected")).toBeNull();
-	});
-
-	it("moves an account dropped on another and sends the new order, and follows a new list", () => {
-		const onReorder = vi.fn();
-		const { rerender } = render(<AccountPriorityList accounts={[account("a"), account("b"), account("c")]} onReorder={onReorder} />);
-		drop("c", "a");
-		expect(onReorder).toHaveBeenCalledWith(["c", "a", "b"]);
-		expect(rows().map((row) => within(row).getByText(/^Account /).textContent)).toEqual(["Account c", "Account a", "Account b"]);
-
-		// Dropped on itself or outside the list: nothing changes.
-		drop("c", "c");
-		drop("c", null);
-		expect(onReorder).toHaveBeenCalledTimes(1);
-
-		rerender(<AccountPriorityList accounts={[account("b"), account("a")]} onReorder={onReorder} isLoading />);
-		expect(rows().map((row) => within(row).getByText(/^Account /).textContent)).toEqual(["Account b", "Account a"]);
+	it("locks the list when disabled", () => {
+		renderList([], true);
+		for (const handle of screen.getAllByRole("button", { name: /^Move / })) expect(handle).toBeDisabled();
 	});
 });
