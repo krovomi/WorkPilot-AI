@@ -321,6 +321,7 @@ export interface ProjectEnvConfig {
 	gitlabToken?: string;
 	gitlabProject?: string; // Format: group/project or numeric ID
 	gitlabAutoSync?: boolean; // Auto-sync issues on project load
+	gitlabAuthMethod?: "oauth" | "pat"; // How the token was obtained
 
 	// Azure DevOps Integration
 	azureDevOpsEnabled: boolean;
