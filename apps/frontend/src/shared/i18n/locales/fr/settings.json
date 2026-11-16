@@ -1997,7 +1997,13 @@
 			"remoteSaveFailed": "Impossible d'enregistrer le remote.",
 			"mainBranchPlaceholder": "main",
 			"mainBranchDetect": "Auto-détecter",
-			"mainBranchHint": "Branche de base des worktrees de tâches. Enregistrée avec cette fenêtre."
+			"mainBranchHint": "Branche de base des worktrees de tâches. Enregistrée avec cette fenêtre.",
+			"copyPathAria": "Copier le chemin du dépôt",
+			"copyRemoteAria": "Copier l'URL du dépôt distant",
+			"copyWorkpilotAria": "Copier le chemin du dossier WorkPilot",
+			"repathFailed": "Impossible de changer de dossier.",
+			"openTerminalFailed": "Impossible d'ouvrir un terminal.",
+			"mainBranchDetectFailed": "Aucune branche principale trouvée : saisissez-la."
 		}
 	},
 	"projectSettings": {
@@ -2741,7 +2747,10 @@
 		"copyThenOpen": "Copiez ce code puis ouvrez le lien ci-dessous pour vous authentifier.",
 		"accountConnected": "Votre compte GitHub est connecté",
 		"timedOut": "Délai d'authentification dépassé",
-		"failed": "Échec de l'authentification"
+		"failed": "Échec de l'authentification",
+		"timedOutDescription": "La fenêtre de connexion est restée ouverte trop longtemps. Réessayez.",
+		"tokenFailed": "Impossible de lire la connexion de la CLI GitHub",
+		"cliCheckFailed": "Impossible de vérifier la CLI GitHub"
 	},
 	"apiKeyConfig": {
 		"apiUrl": "URL de l'API",
@@ -2886,7 +2895,8 @@
 		"awaiting": "Cette recette lance des commandes sur votre machine. Elle ne s'exécute qu'une fois approuvée telle qu'elle est maintenant.",
 		"approve": "Approuver",
 		"saveHint": "Enregistrez-la en .workpilot/worktree.toml pour la modifier (fichiers à copier, ports, nettoyage).",
-		"saveDetected": "Enregistrer en worktree.toml"
+		"saveDetected": "Enregistrer en worktree.toml",
+		"failed": "Impossible de lire ou d'enregistrer la recette du worktree."
 	},
 	"kicker": "WorkPilot · Configuration",
 	"headerDescription": "Paramètres de l’application et du projet, rangés par thème.",

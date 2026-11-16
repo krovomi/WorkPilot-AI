@@ -53,9 +53,13 @@ export function BrickEditorDialog({
 	const updateBrick = useCustomBricksStore((s) => s.updateBrick);
 	const removeBrick = useCustomBricksStore((s) => s.removeBrick);
 	const [draft, setDraft] = useState<BrickInput>(EMPTY);
+	const [saveFailed, setSaveFailed] = useState(false);
 
 	useEffect(() => {
-		if (open) setDraft(brick ? { ...brick } : EMPTY);
+		if (open) {
+			setDraft(brick ? { ...brick } : EMPTY);
+			setSaveFailed(false);
+		}
 	}, [open, brick]);
 
 	const set = <K extends keyof BrickInput>(key: K, value: BrickInput[K]) =>
@@ -64,15 +68,17 @@ export function BrickEditorDialog({
 	const canSave = draft.name.trim().length > 0;
 	const look = resolveLook({ type: "custom", ...draft });
 
+	// The button is disabled until there is a name, so a save always has one.
 	const save = () => {
-		if (!canSave) return;
 		const ok = brick ? updateBrick(brick.id, draft) : addBrick(draft) !== null;
+		// A brick deleted meanwhile (from another window's palette) cannot be
+		// updated; saying so beats a button that silently does nothing.
 		if (ok) onOpenChange(false);
+		else setSaveFailed(true);
 	};
 
-	const remove = () => {
-		if (!brick) return;
-		removeBrick(brick.id);
+	const remove = (target: CustomBrick) => {
+		removeBrick(target.id);
 		onOpenChange(false);
 	};
 
@@ -147,7 +153,7 @@ export function BrickEditorDialog({
 					</span>
 					<ColorSwatches
 						value={draft.accent}
-						onChange={(accent) => set("accent", accent ?? DEFAULT_BRICK_ACCENT)}
+						onChange={(accent) => set("accent", accent)}
 						label={t("brickColor", "Couleur")}
 					/>
 				</div>
@@ -213,11 +219,20 @@ export function BrickEditorDialog({
 					/>
 				</div>
 
+				{saveFailed ? (
+					<p role="alert" className="mt-3 text-xs text-destructive">
+						{t(
+							"brickSaveFailed",
+							"La brique n'a pas pu être enregistrée : elle a peut-être été supprimée entre-temps.",
+						)}
+					</p>
+				) : null}
+
 				<DialogFooter className="mt-4">
 					{brick ? (
 						<Button
 							variant="ghost"
-							onClick={remove}
+							onClick={() => remove(brick)}
 							className="mr-auto gap-1.5 text-destructive hover:text-destructive"
 						>
 							<Trash2 className="h-3.5 w-3.5" />

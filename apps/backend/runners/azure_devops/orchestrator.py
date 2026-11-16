@@ -13,47 +13,20 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-try:
-    from ..github.services.deep_context_provider import (
-        DeepContextProvider,
-        store_review_learnings,
-    )
-    from .azdo_client import AzDOClient
-    from .models import (
-        AzDOPRContext,
-        AzureDevOpsRunnerConfig,
-        MergeVerdict,
-        PRReviewResult,
-    )
-    from .services import PRReviewEngine
-except ImportError:
-    from azdo_client import AzDOClient
-    from models import (
-        AzDOPRContext,
-        AzureDevOpsRunnerConfig,
-        MergeVerdict,
-        PRReviewResult,
-    )
-    from services import PRReviewEngine
+from core.io_utils import safe_print
 
-    try:
-        from services.deep_context_provider import (
-            DeepContextProvider,
-            store_review_learnings,
-        )
-    except ImportError:
-        DeepContextProvider = None
-        store_review_learnings = None
-
-# Import safe_print
-try:
-    from core.io_utils import safe_print
-except ImportError:
-    import sys
-    from pathlib import Path as PathLib
-
-    sys.path.insert(0, str(PathLib(__file__).parent.parent.parent))
-    from core.io_utils import safe_print
+from ..github.services.deep_context_provider import (
+    DeepContextProvider,
+    store_review_learnings,
+)
+from .azdo_client import AzDOClient
+from .models import (
+    AzDOPRContext,
+    AzureDevOpsRunnerConfig,
+    MergeVerdict,
+    PRReviewResult,
+)
+from .services import PRReviewEngine
 
 
 @dataclass
@@ -109,11 +82,7 @@ class AzureDevOpsOrchestrator:
         )
 
         # Initialize deep context provider (shared with GitHub/GitLab)
-        self.deep_context_provider = (
-            DeepContextProvider(project_dir=self.project_dir)
-            if DeepContextProvider
-            else None
-        )
+        self.deep_context_provider = DeepContextProvider(project_dir=self.project_dir)
 
         # Initialize review engine
         self.review_engine = PRReviewEngine(
@@ -205,29 +174,24 @@ class AzureDevOpsOrchestrator:
             )
 
             # Gather deep codebase context (non-blocking)
-            if self.deep_context_provider:
-                try:
-                    changed_paths = [
-                        f.get("path", "")
-                        for f in context.changed_files
-                        if f.get("path")
-                    ]
-                    deep_ctx = await self.deep_context_provider.gather_deep_context(
-                        pr_title=context.title,
-                        pr_description=context.description or "",
-                        changed_file_paths=changed_paths,
-                        timeout=20.0,
-                    )
-                    context.deep_context = deep_ctx.to_dict()
-                    safe_print(
-                        f"[AzDO] Deep context: patterns={len(deep_ctx.project_patterns)}, "
-                        f"insights={len(deep_ctx.historical_insights)}, "
-                        f"arch_violations={len(deep_ctx.architecture_violations)}"
-                    )
-                except Exception as e:
-                    safe_print(
-                        f"[AzDO] Deep context gathering failed (non-blocking): {e}"
-                    )
+            changed_paths = [
+                f.get("path", "") for f in context.changed_files if f.get("path")
+            ]
+            try:
+                deep_ctx = await self.deep_context_provider.gather_deep_context(
+                    pr_title=context.title,
+                    pr_description=context.description or "",
+                    changed_file_paths=changed_paths,
+                    timeout=20.0,
+                )
+                context.deep_context = deep_ctx.to_dict()
+                safe_print(
+                    f"[AzDO] Deep context: patterns={len(deep_ctx.project_patterns)}, "
+                    f"insights={len(deep_ctx.historical_insights)}, "
+                    f"arch_violations={len(deep_ctx.architecture_violations)}"
+                )
+            except Exception as e:
+                safe_print(f"[AzDO] Deep context gathering failed (non-blocking): {e}")
 
             self._report_progress("analyzing", 30, "Running AI review...", pr_id=pr_id)
 
@@ -241,9 +205,7 @@ class AzureDevOpsOrchestrator:
             safe_print(f"[AzDO] Review complete: {len(findings)} findings")
 
             # Map verdict to overall_status
-            if verdict == MergeVerdict.BLOCKED:
-                overall_status = "request_changes"
-            elif verdict == MergeVerdict.NEEDS_REVISION:
+            if verdict in (MergeVerdict.BLOCKED, MergeVerdict.NEEDS_REVISION):
                 overall_status = "request_changes"
             elif verdict == MergeVerdict.MERGE_WITH_CHANGES:
                 overall_status = "comment"
@@ -277,25 +239,16 @@ class AzureDevOpsOrchestrator:
             # Save result
             result.save(self.azdo_dir)
 
-            # Store review learnings in the shared brain (non-blocking)
-            if store_review_learnings and findings:
-                try:
-                    changed_paths = [
-                        f.get("path", "")
-                        for f in context.changed_files
-                        if f.get("path")
-                    ]
-                    await store_review_learnings(
-                        project_dir=self.project_dir,
-                        pr_number=pr_id,
-                        findings=[f.to_dict() for f in findings],
-                        pr_title=context.title,
-                        changed_files=changed_paths,
-                    )
-                except Exception as e:
-                    safe_print(
-                        f"[AzDO] Failed to store review learnings (non-blocking): {e}"
-                    )
+            # Store review learnings in the shared brain (non-blocking: the
+            # provider reports its own failures)
+            if findings:
+                await store_review_learnings(
+                    project_dir=self.project_dir,
+                    pr_number=pr_id,
+                    findings=[f.to_dict() for f in findings],
+                    pr_title=context.title,
+                    changed_files=changed_paths,
+                )
 
             self._report_progress("complete", 100, "Review complete!", pr_id=pr_id)
 
