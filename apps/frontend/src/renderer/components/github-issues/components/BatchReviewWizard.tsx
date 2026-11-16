@@ -94,27 +94,32 @@ export function BatchReviewWizard({
 			setStep("analyzing");
 		} else if (analysisResult) {
 			setStep("review");
-			// Select all validated batches by default
-			const validatedIds = new Set(
-				analysisResult.proposedBatches
-					.filter((b) => b.validated)
-					.map((_, idx) => idx),
-			);
-			setSelectedBatchIds(validatedIds);
-			// If no batches, auto-select all single issues
-			if (
-				analysisResult.proposedBatches.length === 0 &&
-				analysisResult.singleIssues.length > 0
-			) {
-				const singleIssueNumbers = new Set(
-					analysisResult.singleIssues.map((issue) => issue.issueNumber),
-				);
-				setSelectedSingleIssueNumbers(singleIssueNumbers);
-			}
 		} else if (analysisError) {
 			setStep("intro");
 		}
 	}, [isAnalyzing, analysisResult, analysisError]);
+
+	// A new result selects its validated batches, or every single issue when
+	// it has no batch; a later error leaves the person's selection alone.
+	useEffect(() => {
+		if (!analysisResult) return;
+		// Indexes in the whole list, as the cards and the approval read them.
+		setSelectedBatchIds(
+			new Set(
+				analysisResult.proposedBatches.flatMap((b, idx) =>
+					b.validated ? [idx] : [],
+				),
+			),
+		);
+		if (
+			analysisResult.proposedBatches.length === 0 &&
+			analysisResult.singleIssues.length > 0
+		) {
+			setSelectedSingleIssueNumbers(
+				new Set(analysisResult.singleIssues.map((issue) => issue.issueNumber)),
+			);
+		}
+	}, [analysisResult]);
 
 	// Update step when approving
 	useEffect(() => {
@@ -207,8 +212,13 @@ export function BatchReviewWizard({
 		// Combine batches and single issues
 		const allBatches = [...selectedBatches, ...selectedSingleIssueBatches];
 
-		await onApproveBatches(allBatches);
-		setStep("done");
+		try {
+			await onApproveBatches(allBatches);
+			setStep("done");
+		} catch {
+			// The error is shown above the selection, which is kept.
+			setStep("review");
+		}
 	}, [
 		analysisResult,
 		selectedBatchIds,
@@ -272,6 +282,13 @@ export function BatchReviewWizard({
 
 		return (
 			<div className="flex flex-col h-[60vh]">
+				{analysisError && (
+					<div className="flex items-center gap-2 p-3 mb-4 rounded-lg bg-destructive/10 text-destructive">
+						<AlertTriangle className="h-4 w-4" />
+						<span className="text-sm">{analysisError}</span>
+					</div>
+				)}
+
 				{/* Stats Bar */}
 				<div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mb-4">
 					<div className="flex items-center gap-4 text-sm">
@@ -322,37 +339,28 @@ export function BatchReviewWizard({
 							</h4>
 							<div className="grid grid-cols-2 gap-2">
 								{singleIssues.slice(0, 10).map((issue) => (
-									<>
-										{/* biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional */}
-										{/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled elsewhere */}
-										{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: selectable issue row */}
-										<div
-											key={issue.issueNumber}
-											onClick={() =>
+									<label
+										key={issue.issueNumber}
+										htmlFor={`batch-single-issue-${issue.issueNumber}`}
+										className={`p-2 rounded border text-sm truncate cursor-pointer transition-colors ${
+											selectedSingleIssueNumbers.has(issue.issueNumber)
+												? "border-primary bg-primary/5"
+												: "border-border hover:bg-accent"
+										}`}
+									>
+										<Checkbox
+											id={`batch-single-issue-${issue.issueNumber}`}
+											checked={selectedSingleIssueNumbers.has(issue.issueNumber)}
+											className="inline-block mr-2"
+											onCheckedChange={() =>
 												toggleSingleIssueSelection(issue.issueNumber)
 											}
-											className={`p-2 rounded border text-sm truncate cursor-pointer transition-colors ${
-												selectedSingleIssueNumbers.has(issue.issueNumber)
-													? "border-primary bg-primary/5"
-													: "border-border hover:bg-accent"
-											}`}
-										>
-											<Checkbox
-												checked={selectedSingleIssueNumbers.has(
-													issue.issueNumber,
-												)}
-												className="inline-block mr-2"
-												onClick={(e) => e.stopPropagation()}
-												onCheckedChange={() =>
-													toggleSingleIssueSelection(issue.issueNumber)
-												}
-											/>
-											<span className="text-muted-foreground">
-												#{issue.issueNumber}
-											</span>{" "}
-											{issue.title}
-										</div>
-									</>
+										/>
+										<span className="text-muted-foreground">
+											#{issue.issueNumber}
+										</span>{" "}
+										{issue.title}
+									</label>
 								))}
 								{singleIssues.length > 10 && (
 									<div className="p-2 text-sm text-muted-foreground">
@@ -508,7 +516,14 @@ function BatchCard({
 			}`}
 		>
 			<div className="flex items-center gap-3 p-3">
-				<Checkbox checked={isSelected} onCheckedChange={onToggleSelect} />
+				<Checkbox
+					checked={isSelected}
+					onCheckedChange={onToggleSelect}
+					aria-label={
+						batch.theme ||
+						t("common:githubIssues.batch.defaultName", { number: index + 1 })
+					}
+				/>
 
 				<Collapsible
 					className="flex-1"

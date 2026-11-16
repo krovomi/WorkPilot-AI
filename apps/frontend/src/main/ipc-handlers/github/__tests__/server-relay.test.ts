@@ -205,12 +205,18 @@ describe("a server project's GitHub", () => {
 
 	it("keeps gh for a project of this computer", async () => {
 		const local = { id: "l-1", path: "/work/shop" } as unknown as Project;
-		mocks.execFileSync.mockReturnValue("diff");
+		mocks.execFile.mockImplementation(
+			(_command: string, _args: string[], _options: unknown, callback: (e: null, out: string) => void) => {
+				callback(null, "diff");
+				return { stdin: { end: () => undefined } };
+			},
+		);
 		expect(await prDiff(local, 7)).toBe("diff");
-		expect(mocks.execFileSync).toHaveBeenCalledWith(
-			"gh",
+		expect(mocks.execFile).toHaveBeenCalledWith(
+			expect.stringMatching(/gh(\.exe)?$/),
 			["pr", "diff", "7"],
 			expect.objectContaining({ cwd: "/work/shop" }),
+			expect.any(Function),
 		);
 		expect(mocks.authedFetch).not.toHaveBeenCalled();
 	});
