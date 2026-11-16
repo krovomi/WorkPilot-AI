@@ -16,15 +16,7 @@ import sys
 from pathlib import Path
 
 import pytest
-
-# Add tests directory to path for helper imports
-sys.path.insert(0, str(Path(__file__).parent))
-
-from qa_report_helpers import cleanup_qa_report_mocks, setup_qa_report_mocks
-
-setup_qa_report_mocks()
-
-from qa.coverage_gate import (  # noqa: E402
+from qa.coverage_gate import (
     build_coverage_issues,
     evaluate_coverage,
     get_min_coverage,
@@ -35,13 +27,6 @@ from qa.coverage_gate import (  # noqa: E402
     run_coverage_gate,
     write_coverage_fix_request,
 )
-
-
-@pytest.fixture(scope="module", autouse=True)
-def cleanup_mocked_modules():
-    """Restore original modules after all tests in this module complete."""
-    yield
-    cleanup_qa_report_mocks()
 
 
 @pytest.fixture(autouse=True)
@@ -259,3 +244,51 @@ def test_mark_signoff_rejected_is_idempotent(tmp_path):
     ]
     # No duplicate accumulation across repeated calls.
     assert len(gaps) == 1
+
+
+# =============================================================================
+# edges
+# =============================================================================
+
+
+@pytest.mark.parametrize("value", ["a/10", "1/b"])
+def test_parse_coverage_value_bad_fraction(value):
+    assert parse_coverage_value(value) is None
+
+
+def test_a_missing_signoff_has_no_coverage(tmp_path):
+    from qa.coverage_gate import _extract_coverage_section
+
+    assert _extract_coverage_section(None) == {}
+
+
+def test_a_passing_report_lists_no_failure_and_no_warning():
+    report = evaluate_coverage({"unit": 100, "integration": 100, "e2e": 100}, 100)
+
+    text = render_coverage_fix_request(report)
+
+    assert "## À corriger" not in text and "## Avertissements" not in text
+    assert "## Après correctifs" in text
+
+
+def test_an_unwritable_fix_request_says_so(tmp_path):
+    report = evaluate_coverage({"unit": 10}, 100)
+
+    assert write_coverage_fix_request(tmp_path / "missing", report) is False
+
+
+def test_without_a_plan_nothing_is_marked(tmp_path):
+    assert mark_signoff_rejected(tmp_path, evaluate_coverage({}, 100)) is False
+
+
+def test_a_signoff_that_is_not_an_object_is_replaced(tmp_path):
+    (tmp_path / "implementation_plan.json").write_text(
+        json.dumps({"qa_signoff": "approved"}), encoding="utf-8"
+    )
+
+    assert mark_signoff_rejected(tmp_path, evaluate_coverage({"unit": 1}, 100))
+
+    plan = json.loads(
+        (tmp_path / "implementation_plan.json").read_text(encoding="utf-8")
+    )
+    assert plan["qa_signoff"]["status"] == "rejected"

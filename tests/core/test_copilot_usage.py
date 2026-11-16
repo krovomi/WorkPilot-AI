@@ -113,6 +113,7 @@ class TestPersonalQuotas:
                     {
                         "login": "dana",
                         "copilot_plan": "business",
+                        "access_type_sku": "copilot_for_business_seat_quota",
                         "organization_list": [{"login": "acme"}],
                         "quota_reset_date": "2026-12-01",
                         "quota_snapshots": {
@@ -137,6 +138,8 @@ class TestPersonalQuotas:
         assert answer["usage"]["organization"] == "acme"
         details = answer["copilotUsageDetails"]
         assert details["plan"] == "business"
+        # The sku tells Copilot Pro+ apart from Pro in the usage panel.
+        assert details["sku"] == "copilot_for_business_seat_quota"
         assert details["premiumRequestsUsed"] == 180
         assert details["premiumRequestsRemaining"] == 120
         assert details["premiumRequestsPercentUsed"] == 60.0

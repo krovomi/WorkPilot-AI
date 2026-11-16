@@ -15,11 +15,17 @@ Persists incidents and operations to JSON for dashboard display.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
 from typing import Any
 
+from ..cicd import bisect as cicd_bisect
+from ..cicd import flow as cicd_flow
+from ..cicd import green as cicd_green
+from ..cicd import triggers as cicd_triggers
+from ..production import grouping
 from .cicd_mode import CICDMode
 from .mcp_connector import MCPSourceConfig
 from .models import (
@@ -57,6 +63,28 @@ NEEDS_A_PERSON = (
 _CLAIMED_HEALED = (HealingStatus.PR_CREATED, HealingStatus.QA_RUNNING)
 
 
+GROUPED_STEP = "Grouping with an open incident"
+
+
+def _grouped_operation(group: Incident, incident: Incident) -> HealingOperation:
+    """What the caller gets back for a report folded into an open incident.
+
+    Not kept in the operations list: no healing ran for it.
+    """
+    operation = HealingOperation(incident=group)
+    step = operation.add_step(GROUPED_STEP)
+    reports = group.source_data.get("group", {}).get("report_count", 1)
+    sources = ", ".join(group.source_data.get("group", {}).get("sources", []))
+    operation.complete_step(
+        step,
+        "completed",
+        f"same fingerprint as incident {group.id} ({incident.source.value}); "
+        f"{reports} report(s) from {sources}: one fix covers them",
+    )
+    operation.finalize(success=False)
+    return operation
+
+
 def _reopen_claimed_heal(incident: Incident) -> None:
     """Undo what the placeholder pipeline claimed on an incident stored before F48.
 
@@ -90,6 +118,7 @@ class IncidentResponderOrchestrator:
         max_files: int = 100,
         auto_fix: bool = True,
         auto_create_pr: bool = True,
+        auto_bisect: bool = True,
     ):
         self.project_dir = Path(project_dir)
         self.data_dir = (
@@ -99,6 +128,8 @@ class IncidentResponderOrchestrator:
         )
         self.auto_fix = auto_fix
         self.auto_create_pr = auto_create_pr
+        self.auto_bisect = auto_bisect
+        self.bisect_budget = cicd_bisect.BisectBudget()
 
         # Initialize modes
         self.cicd = CICDMode(project_dir)
@@ -130,11 +161,13 @@ class IncidentResponderOrchestrator:
         failing_tests: list[str] | None = None,
         ci_log_url: str | None = None,
         pipeline_id: str | None = None,
+        good_sha: str | None = None,
     ) -> HealingOperation:
         """Handle a CI/CD test failure end-to-end.
 
-        Creates an incident, starts a healing operation, and if auto_fix
-        is enabled, proceeds through the full healing pipeline.
+        Creates an incident, reads the bisect triggers, bisects when one fires
+        and a green commit is known (#375), starts a healing operation, and if
+        auto_fix is enabled, proceeds through the full healing pipeline.
         """
         incident = await self.cicd.on_test_failure(
             commit_sha=commit_sha,
@@ -146,6 +179,20 @@ class IncidentResponderOrchestrator:
         )
 
         self._incidents.append(incident)
+        good = good_sha if cicd_triggers.is_commit_sha(good_sha) else None
+        good = good or cicd_green.last_green(self.project_dir, branch) or None
+        if good:
+            incident.source_data["last_green"] = good
+        triggers = cicd_triggers.evaluate_triggers(
+            self.project_dir,
+            commit_sha,
+            incident.source_data.get("failing_tests") or [],
+            good,
+        )
+        incident.source_data["bisect_triggers"] = triggers.to_dict()
+        if self.auto_bisect and triggers.fired and good:
+            await self._bisect(incident, good)
+
         operation = self._create_operation(incident)
 
         if self.auto_fix:
@@ -153,6 +200,56 @@ class IncidentResponderOrchestrator:
 
         self._save_state()
         return operation
+
+    async def bisect_incident(
+        self,
+        incident_id: str,
+        good_sha: str | None = None,
+        on_step: cicd_bisect.StepCallback | None = None,
+    ) -> cicd_bisect.BisectResult | None:
+        """Bisect a CI/CD incident on demand; ``None`` when it is not one."""
+        incident = self._find_incident(incident_id)
+        if incident is None or incident.mode != IncidentMode.CICD:
+            return None
+        good = good_sha if cicd_triggers.is_commit_sha(good_sha) else None
+        good = (
+            good
+            or incident.source_data.get("last_green")
+            or cicd_green.last_green(
+                self.project_dir, str(incident.source_data.get("branch") or "")
+            )
+        )
+        if not good:
+            result = cicd_bisect.BisectResult(
+                "unavailable",
+                bad=str(incident.source_data.get("commit_sha") or ""),
+                reason="no green commit is known for this branch",
+            )
+            incident.source_data["bisect"] = result.to_dict()
+            self._save_state()
+            return result
+        incident.source_data["last_green"] = good
+        result = await self._bisect(incident, good, on_step)
+        self._save_state()
+        return result
+
+    async def _bisect(
+        self,
+        incident: Incident,
+        good: str,
+        on_step: cicd_bisect.StepCallback | None = None,
+    ) -> cicd_bisect.BisectResult:
+        result = await asyncio.to_thread(
+            cicd_bisect.run_bisect,
+            self.project_dir,
+            good,
+            str(incident.source_data.get("commit_sha") or ""),
+            incident.source_data.get("failing_tests") or [],
+            budget=self.bisect_budget,
+            on_step=on_step,
+        )
+        cicd_flow.apply_bisect(incident, result, self.cicd._get_commit_diff)
+        return result
 
     # ── Production Mode ─────────────────────────────────────────
 
@@ -164,14 +261,35 @@ class IncidentResponderOrchestrator:
         """Handle a production incident end-to-end."""
         incident = await self.production.on_incident(source, error_data)
 
-        self._incidents.append(incident)
+        group = self._file_production_incident(incident)
+        if group is not None:
+            # The same fingerprint as an open incident: one bug, one fix
+            # attempt. The report is counted on the group, nothing else runs.
+            self._save_state()
+            return _grouped_operation(group, incident)
+
         operation = self._create_operation(incident)
 
         if self.auto_fix:
             await self._run_healing_pipeline(operation, incident)
 
+        grouping.apply_priority_inheritance(self._incidents)
         self._save_state()
         return operation
+
+    def _file_production_incident(self, incident: Incident) -> Incident | None:
+        """Fold ``incident`` into the open incident of its fingerprint, or keep it.
+
+        Returns the group it joined, ``None`` when it opens a group of its own.
+        """
+        fingerprint = str(incident.source_data.get("fingerprint") or "")
+        group = grouping.find_open_group(self._incidents, fingerprint)
+        if group is None:
+            self._incidents.append(incident)
+            return None
+        grouping.absorb(group, incident)
+        grouping.apply_priority_inheritance(self._incidents)
+        return group
 
     async def connect_production_source(self, config: MCPSourceConfig) -> bool:
         """Connect to a production monitoring source."""
@@ -184,9 +302,10 @@ class IncidentResponderOrchestrator:
     async def poll_production_incidents(self) -> list[Incident]:
         """Poll all connected production sources for new incidents."""
         incidents = await self.production.poll_incidents()
-        self._incidents.extend(incidents)
+        opened = [i for i in incidents if self._file_production_incident(i) is None]
+        grouping.apply_priority_inheritance(self._incidents)
         self._save_state()
-        return incidents
+        return opened
 
     # ── Proactive Mode ──────────────────────────────────────────
 
@@ -267,6 +386,8 @@ class IncidentResponderOrchestrator:
             "stats": self.get_stats().to_dict(),
             "productionStatus": self.production.get_status(),
             "proactiveSummary": self.proactive.get_summary(),
+            "riskTrends": self.proactive.trend_report(),
+            "incidentClusters": grouping.root_cause_clusters(self._incidents),
         }
 
     def get_incidents(self, mode: IncidentMode | None = None) -> list[Incident]:
