@@ -1120,6 +1120,8 @@ export const IPC_CHANNELS = {
 	APP_EMULATOR_CONFIG: "app-emulator:config",
 	APP_EMULATOR_DETECT: "app-emulator:detect",
 	APP_EMULATOR_ERROR: "app-emulator:error",
+	// Device matrix: the grid of the main's last captures, saved where the person chooses (#383)
+	APP_EMULATOR_EXPORT_DEVICE_GRID: "app-emulator:export-device-grid",
 	APP_EMULATOR_OUTPUT: "app-emulator:output",
 	APP_EMULATOR_READY: "app-emulator:ready",
 	APP_EMULATOR_START: "app-emulator:start",
