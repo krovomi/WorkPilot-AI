@@ -1,8 +1,9 @@
 /**
  * An `ipcMain` that checks a handler's arguments before the handler runs.
- * Each forge module (`pr-ipc-guard.ts`, `autofix-ipc-guard.ts`) gives its own
- * checks, one per channel, of the arguments after the project id. A refused
- * `invoke` rejects with the module's message; a refused `send` is dropped.
+ * Each forge module (`pr-ipc-guard.ts`, `autofix-ipc-guard.ts`,
+ * `gitlab/mr-ipc-guard.ts`) gives its own checks, one per channel, of the
+ * arguments after the project id. A refused `invoke` rejects with the
+ * module's message; a refused `send` is dropped.
  */
 
 import { ipcMain } from "electron";
