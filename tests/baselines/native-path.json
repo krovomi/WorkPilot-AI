@@ -6,7 +6,6 @@
   "apps/backend/core/runtimes/tool_executor.py": 1,
   "apps/backend/core/workspace/workspace_setup.py": 1,
   "apps/backend/i18n_scaler/editor.py": 1,
-  "apps/backend/libdocs/detect.py": 1,
   "apps/backend/onboarding_agent/onboarding_engine.py": 1,
   "apps/backend/qa/loop.py": 1,
   "apps/backend/runners/api_watcher_runner.py": 1,
