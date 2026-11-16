@@ -436,7 +436,6 @@ export const IPC_CHANNELS = {
 	GITLAB_INVESTIGATION_ERROR: "gitlab:investigationError",
 
 	// GitLab MR Review operations
-	GITLAB_MR_GET_DIFF: "gitlab:mr:getDiff",
 	GITLAB_MR_REVIEW: "gitlab:mr:review",
 	GITLAB_MR_REVIEW_CANCEL: "gitlab:mr:reviewCancel",
 	GITLAB_MR_GET_REVIEW: "gitlab:mr:getReview",
@@ -820,6 +819,10 @@ export const IPC_CHANNELS = {
 	BROWSER_AGENT_COMPARE: "browserAgent:compare",
 	BROWSER_AGENT_DELETE_BASELINE: "browserAgent:deleteBaseline",
 	BROWSER_AGENT_RUN_TESTS: "browserAgent:runTests",
+	BROWSER_AGENT_RECORD_START: "browserAgent:recordStart", // A session in a browser window the person drives (#387)
+	BROWSER_AGENT_RECORD_STOP: "browserAgent:recordStop",
+	BROWSER_AGENT_RECORD_EXPORT: "browserAgent:recordExport", // Steps → Playwright / Cypress test: preview, review card or file
+	BROWSER_AGENT_RECORD_EVENT: "browserAgent:recordEvent", // main → renderer: step, started, stopped, error
 
 	// Architecture Visualizer
 	ARCHITECTURE_VISUALIZER_GENERATE: "architectureVisualizer:generate",
