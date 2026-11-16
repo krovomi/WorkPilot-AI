@@ -35,6 +35,8 @@ import { setupGitSurgeonListeners } from "./git-surgeon-store";
 import { setupIdeationListeners } from "./ideation-store";
 import { setupInjectionGuardListeners } from "./injection-guard-store";
 import { setupInsightsListeners } from "./insights-store";
+import { setupGitHubInvestigationListeners } from "./github";
+import { setupGitLabInvestigationListeners } from "./gitlab-store";
 import { setupLearningLoopListeners } from "./learning-loop-store";
 import { setupMobileListeners } from "./mobile-store";
 import { setupNaturalLanguageGitListeners } from "./natural-language-git-store";
@@ -54,6 +56,7 @@ import { setupReleaseCoordinatorListeners } from "./release-coordinator-store";
 import { setupSandboxListeners } from "./sandbox-store";
 import { setupTaskSandboxListeners } from "./task-sandbox-store";
 import { setupSecureStorageListeners } from "./secure-storage-store";
+import { setupSelfHealingListeners } from "./self-healing-store";
 import { setupServerViewListeners } from "./server-live-views";
 import { setupSmartEstimationListeners } from "./smart-estimation-store";
 import { setupVisualToCodeListeners } from "./visual-to-code-store";
@@ -119,6 +122,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["Ideation", setupIdeationListeners],
 	["InjectionGuard", setupInjectionGuardListeners],
 	["Insights", setupInsightsListeners],
+	["GitHubInvestigation", setupGitHubInvestigationListeners],
+	["GitLabInvestigation", setupGitLabInvestigationListeners],
 	["LearningLoop", setupLearningLoopListeners],
 	["Mobile", setupMobileListeners],
 	// A multi-repo run goes on in the main process with the dialog closed.
@@ -141,6 +146,7 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// Not a page's feature: the sidebar's warning that stored API keys are
 	// not protected by the OS keyring.
 	["SecureStorage", setupSecureStorageListeners],
+	["SelfHealing", setupSelfHealingListeners],
 	// A shared view of a server project read again when a teammate changes it.
 	["ServerViews", setupServerViewListeners],
 	["SmartEstimation", setupSmartEstimationListeners],

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../ui/badge";
+import { withUniqueKeys } from "../utils/unique-keys";
 import { CollapsibleCard } from "./CollapsibleCard";
 
 interface DeepContextData {
@@ -62,6 +63,8 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 		(hasPatterns || hasConventions ? 1 : 0) +
 		(hasRelatedCode ? 1 : 0) +
 		(hasInsights || hasPastBugs || hasRegressionRisks ? 1 : 0);
+	// Context was gathered but held nothing worth a card.
+	if (sectionCount === 0) return null;
 
 	return (
 		<CollapsibleCard
@@ -137,9 +140,12 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 							{t("prReview.deepContext.violations")}
 						</h4>
 						<div className="space-y-1.5">
-							{deepContext.architectureViolations.map((v) => (
+							{withUniqueKeys(
+								deepContext.architectureViolations,
+								(v) => `${v.file}:${v.type}`,
+							).map(({ key, item: v }) => (
 								<div
-									key={v.file}
+									key={key}
 									className="text-xs p-2 rounded bg-warning/5 border border-warning/20"
 								>
 									<div className="flex items-center gap-2">
@@ -147,7 +153,9 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 											variant="outline"
 											className="text-3xs px-1.5 py-0"
 										>
-											{v.severity}
+											{t(`prReview.deepContext.violationSeverity.${v.severity}`, {
+												defaultValue: v.severity,
+											})}
 										</Badge>
 										<code className="text-muted-foreground">{v.file}</code>
 									</div>
@@ -192,8 +200,11 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 									{t("prReview.deepContext.conventions")}:
 								</p>
 								<ul className="text-xs text-muted-foreground space-y-0.5 pl-3">
-									{deepContext.projectConventions.slice(0, 8).map((conv) => (
-										<li key={conv} className="list-disc">
+									{withUniqueKeys(
+										deepContext.projectConventions.slice(0, 8),
+										(conv) => conv,
+									).map(({ key, item: conv }) => (
+										<li key={key} className="list-disc">
 											{conv}
 										</li>
 									))}
@@ -211,8 +222,11 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 							{t("prReview.deepContext.relatedCode")}
 						</h4>
 						<div className="space-y-1">
-							{deepContext.relatedCode.slice(0, 8).map((item) => (
-								<div key={item.path} className="text-xs flex items-start gap-2">
+							{withUniqueKeys(
+								deepContext.relatedCode.slice(0, 8),
+								(related) => related.path,
+							).map(({ key, item }) => (
+								<div key={key} className="text-xs flex items-start gap-2">
 									<code className="text-indigo-500/80 shrink-0 min-w-0 truncate max-w-[200px]">
 										{item.path}
 									</code>
@@ -233,7 +247,10 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 
 						{hasInsights && (
 							<ul className="text-xs text-muted-foreground space-y-0.5 pl-3">
-								{deepContext.historicalInsights.slice(0, 5).map((hint) => {
+								{withUniqueKeys(
+									deepContext.historicalInsights.slice(0, 5),
+									(hint) => JSON.stringify(hint),
+								).map(({ key, item: hint }) => {
 									let displayValue: string;
 									if (typeof hint.fact === "string") {
 										displayValue = hint.fact;
@@ -243,7 +260,7 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 										displayValue = JSON.stringify(hint);
 									}
 									return (
-										<li key={JSON.stringify(hint)} className="list-disc">
+										<li key={key} className="list-disc">
 											{displayValue}
 										</li>
 									);
@@ -257,7 +274,10 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 									{t("prReview.deepContext.pastBugs")}:
 								</p>
 								<ul className="text-xs text-muted-foreground space-y-0.5 pl-3">
-									{deepContext.pastBugsInArea.slice(0, 5).map((bug) => {
+									{withUniqueKeys(
+										deepContext.pastBugsInArea.slice(0, 5),
+										(bug) => JSON.stringify(bug),
+									).map(({ key, item: bug }) => {
 										let displayValue: string;
 										if (typeof bug.description === "string") {
 											displayValue = bug.description;
@@ -267,7 +287,7 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 											displayValue = JSON.stringify(bug);
 										}
 										return (
-											<li key={JSON.stringify(bug)} className="list-disc">
+											<li key={key} className="list-disc">
 												{displayValue}
 											</li>
 										);
@@ -283,8 +303,11 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 									{t("prReview.deepContext.regressionRisks")}:
 								</p>
 								<ul className="text-xs text-muted-foreground space-y-0.5 pl-3">
-									{deepContext.regressionRisks.slice(0, 5).map((risk) => (
-										<li key={risk} className="list-disc text-destructive/80">
+									{withUniqueKeys(
+										deepContext.regressionRisks.slice(0, 5),
+										(risk) => risk,
+									).map(({ key, item: risk }) => (
+										<li key={key} className="list-disc text-destructive/80">
 											{risk}
 										</li>
 									))}

@@ -1097,7 +1097,10 @@ export function AgentTools() {
 
 			let health: McpHealthCheckResult | undefined;
 			try {
-				const result = await globalThis.electronAPI.checkMcpHealth(server);
+				const result = await globalThis.electronAPI.checkMcpHealth(
+					server,
+					selectedProjectId ?? undefined,
+				);
 				health = result.success ? result.data : undefined;
 			} catch (error) {
 				console.warn(`Health check failed for MCP server ${server.id}:`, error);
@@ -1112,7 +1115,7 @@ export function AgentTools() {
 				},
 			}));
 		}
-	}, [customServers, t]);
+	}, [customServers, selectedProjectId, t]);
 
 	// Check health when custom servers change
 	useEffect(() => {
@@ -1126,7 +1129,10 @@ export function AgentTools() {
 
 			let test: McpTestConnectionResult | undefined;
 			try {
-				const result = await globalThis.electronAPI.testMcpConnection(server);
+				const result = await globalThis.electronAPI.testMcpConnection(
+					server,
+					selectedProjectId ?? undefined,
+				);
 				test = result.success ? result.data : undefined;
 			} catch (error) {
 				console.warn(
@@ -1150,7 +1156,7 @@ export function AgentTools() {
 				return next;
 			});
 		},
-		[t],
+		[selectedProjectId, t],
 	);
 
 	// Resolve agent settings using the centralized utility

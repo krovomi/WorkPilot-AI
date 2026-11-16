@@ -23,6 +23,7 @@ import { getAugmentedEnv } from "../env-utils";
 import { isWindows, killProcessGracefully } from "../platform";
 import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
+import { agentSafetyEnv } from "./agent-safety-env";
 import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
 import {
@@ -934,6 +935,7 @@ export class AgentProcessManager {
 						...apiProfileEnv, // Include active API profile config (highest priority for ANTHROPIC_* vars)
 						...providerSpecificEnv, // Include provider credentials (WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
 						...PERMISSION_CHANNEL_ENV, // An ACP agent's questions go to the card; answers come back on stdin
+						...agentSafetyEnv(), // Settings, Sandbox and Anomaly detection (agents/safety_watch.py)
 					},
 					processType === "task-execution" ? "feature-build" : undefined,
 				),
