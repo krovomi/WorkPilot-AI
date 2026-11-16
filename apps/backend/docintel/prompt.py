@@ -19,6 +19,7 @@ from .api_tests import api_tests_section
 from .conformance import conformance_section
 from .diagnostics import render_diagnosis
 from .erd import erd_section
+from .files import threat
 from .models import AdrRecord, ExtractedDocument
 from .preflight import load_result
 from .sequence import sequence_section
@@ -304,9 +305,24 @@ def rules_section(spec_dir: Path) -> str:
     return section.rstrip()
 
 
+def _plain(text: str, limit: int) -> str:
+    """Repository text on one line: no control character, no Markdown marker."""
+    line = " ".join(re.sub(r"[`*\x00-\x1f]", " ", text or "").split())
+    return line if len(line) <= limit else line[: limit - 1].rstrip() + "…"
+
+
 def _adr_line(record: AdrRecord) -> str:
-    decision = f": {record.decision}" if record.decision else ""
-    return f"- **{record.id}** — {record.title} (`{record.path}`){decision}"
+    where = f"`{_code_path(record.path)}`"
+    title, decision = _plain(record.title, 160), _plain(record.decision, 600)
+    if threat(f"{title}\n{decision}", source=f"repository:{record.path}") != "safe":
+        # A record is a file of the target repository: one the scan flags is
+        # named, never quoted, and the reader opens it to judge.
+        return (
+            f"- **{_plain(record.id, 40)}** ({where}): text not shown, flagged by "
+            "the injection scan; open the file"
+        )
+    decision = f": {decision}" if decision else ""
+    return f"- **{_plain(record.id, 40)}** — {title} ({where}){decision}"
 
 
 def adr_section(project_dir: Path) -> str:
@@ -318,7 +334,7 @@ def adr_section(project_dir: Path) -> str:
     if not binding and not proposed:
         return ""
 
-    directory = str(Path(records[0].path).parent.as_posix())
+    directory = _code_path(str(Path(records[0].path).parent.as_posix()))
     lines = [_ADR_HEADER.format(directory=directory)]
     if binding:
         lines.append("Accepted:")

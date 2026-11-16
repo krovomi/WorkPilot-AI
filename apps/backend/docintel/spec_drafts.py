@@ -578,8 +578,10 @@ def _edited(text: object) -> str:
         from .redact import redact_text
 
         line, _ = redact_text(line)
-    except Exception:  # noqa: BLE001 - the person's own text, already on screen
-        pass
+    except Exception:  # noqa: BLE001 - any failure of the secret scan
+        # An edit the scan could not read is not written: the proposal, masked
+        # when the attachment was read, stands instead.
+        return ""
     return line
 
 

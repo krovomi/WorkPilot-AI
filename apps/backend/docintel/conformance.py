@@ -41,6 +41,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from .diagrams import _xml, parse_diagram
+from .files import threat
 from .models import DiagramModel
 
 #: Where a repository keeps architecture diagrams.
@@ -594,17 +595,35 @@ def conformance_section(project_dir: Path) -> str:
         return ""
 
     lines = ["## Architecture diagram vs. module references", "", _SECTION_INTRO]
+    withheld: set[str] = set()
     for check in checked:
         lines.append("")
-        lines.append(f"`{check.diagram}` — layers:")
+        said = "\n".join(
+            [*check.layers, *(m for ms in check.layers.values() for m in ms)]
+        )
+        if threat(said, source=f"repository:{check.diagram}") != "safe":
+            # The labels are the target repository's text: a diagram the scan
+            # flags is named, never quoted, and its findings are left out.
+            withheld.add(check.diagram)
+            lines.append(
+                f"`{_span(check.diagram)}` — not shown: its labels were flagged by "
+                "the injection scan; open the diagram."
+            )
+            continue
+        lines.append(f"`{_span(check.diagram)}` — layers:")
         for layer, members in check.layers.items():
-            shown = ", ".join(members[:6]) + (" …" if len(members) > 6 else "")
-            lines.append(f"- {layer}: {shown}")
+            shown = ", ".join(_label(m) for m in members[:6]) + (
+                " …" if len(members) > 6 else ""
+            )
+            lines.append(f"- {_label(layer)}: {shown}")
         if check.allowed:
-            arrows = ", ".join(f"{a} -> {b}" for a, b in check.allowed[:20])
+            arrows = ", ".join(
+                f"{_label(a)} -> {_label(b)}" for a, b in check.allowed[:20]
+            )
             lines.append(f"Allowed: {arrows}")
 
-    findings = report.findings[:MAX_FINDINGS]
+    kept = [f for f in report.findings if f.diagram not in withheld]
+    findings = kept[:MAX_FINDINGS]
     if findings:
         lines.append("")
         lines.append(
@@ -614,9 +633,21 @@ def conformance_section(project_dir: Path) -> str:
         for f in findings:
             verb = "points backwards" if f.kind == "inverted" else "is not drawn"
             lines.append(
-                f"- `{f.source_project}` ({f.source_layer}) -> `{f.target_project}` "
-                f"({f.target_layer}) {verb} — `{f.file}`"
+                f"- `{_span(f.source_project)}` ({_label(f.source_layer)}) -> "
+                f"`{_span(f.target_project)}` ({_label(f.target_layer)}) {verb} — "
+                f"`{_span(f.file)}`"
             )
-        if len(report.findings) > MAX_FINDINGS:
-            lines.append(f"- … {len(report.findings) - MAX_FINDINGS} more")
+        if len(kept) > MAX_FINDINGS:
+            lines.append(f"- … {len(kept) - MAX_FINDINGS} more")
     return "\n".join(lines)
+
+
+def _span(text: str) -> str:
+    """A name for a Markdown code span: a backtick or a line break would end it."""
+    return re.sub(r"[`\r\n\x00-\x1f]", "_", text)
+
+
+def _label(text: str, limit: int = 80) -> str:
+    """A diagram label on one line, outside any span."""
+    line = " ".join(re.sub(r"[`\x00-\x1f]", " ", text).split())
+    return line if len(line) <= limit else line[: limit - 1].rstrip() + "…"
