@@ -154,15 +154,9 @@ export function useProjectSettings(
 
 	// GitHub state
 	const [showGitHubToken, setShowGitHubToken] = useState(false);
-	const [gitHubConnectionStatus, setGitHubConnectionStatus] =
-		useState<GitHubSyncStatus | null>(null);
-	const [isCheckingGitHub, setIsCheckingGitHub] = useState(false);
 
 	// GitLab state
 	const [showGitLabToken, setShowGitLabToken] = useState(false);
-	const [gitLabConnectionStatus, setGitLabConnectionStatus] =
-		useState<GitLabSyncStatus | null>(null);
-	const [isCheckingGitLab, setIsCheckingGitLab] = useState(false);
 
 	// Claude auth state
 	const [isCheckingClaudeAuth, setIsCheckingClaudeAuth] = useState(false);
@@ -172,17 +166,11 @@ export function useProjectSettings(
 
 	// Linear import state
 	const [showLinearImportModal, setShowLinearImportModal] = useState(false);
-	const [linearConnectionStatus, setLinearConnectionStatus] =
-		useState<LinearSyncStatus | null>(null);
-	const [isCheckingLinear, setIsCheckingLinear] = useState(false);
 
 	// Azure DevOps state
 	const [showAzureDevOpsToken, setShowAzureDevOpsToken] = useState(false);
 	const [showAzureDevOpsImportModal, setShowAzureDevOpsImportModal] =
 		useState(false);
-	const [azureDevOpsConnectionStatus, setAzureDevOpsConnectionStatus] =
-		useState<AzureDevOpsSyncStatus | null>(null);
-	const [isCheckingAzureDevOps, setIsCheckingAzureDevOps] = useState(false);
 
 	// Reset settings when project changes
 	useEffect(() => {
@@ -191,10 +179,12 @@ export function useProjectSettings(
 
 	// Check version when dialog opens
 	useEffect(() => {
+		let stale = false;
 		const checkVersion = async () => {
 			if (open && project.autoBuildPath) {
 				setIsCheckingVersion(true);
 				const result = await checkProjectVersion(project.id);
+				if (stale) return;
 				if (result.success && result.data) {
 					setVersionInfo(result.data);
 				} else {
@@ -203,17 +193,29 @@ export function useProjectSettings(
 				setIsCheckingVersion(false);
 			}
 		};
-		checkVersion();
+		void checkVersion();
+		return () => {
+			stale = true;
+		};
 	}, [open, project.id, project.autoBuildPath]);
 
 	// Load environment config when dialog opens
 	useEffect(() => {
+		// Another project, or the dialog closed, while this was out: the
+		// answer is not the configuration on screen.
+		let stale = false;
+		// The last project's configuration is not this one's, even while it loads.
+		if (committedEnvConfigRef.current?.projectId !== project.id) {
+			committedEnvConfigRef.current = null;
+			setEnvConfig(null);
+		}
 		const loadEnvConfig = async () => {
 			if (open && project.autoBuildPath) {
 				setIsLoadingEnv(true);
 				setEnvError(null);
 				try {
 					const result = await window.electronAPI.getProjectEnv(project.id);
+					if (stale) return;
 					if (result.success && result.data) {
 						setEnvConfig(result.data);
 						committedEnvConfigRef.current = {
@@ -226,22 +228,29 @@ export function useProjectSettings(
 						setEnvError(result.error || "Failed to load environment config");
 					}
 				} catch (err) {
-					setEnvError(err instanceof Error ? err.message : "Unknown error");
+					if (!stale) {
+						setEnvError(err instanceof Error ? err.message : "Unknown error");
+					}
 				} finally {
-					setIsLoadingEnv(false);
+					if (!stale) setIsLoadingEnv(false);
 				}
 			}
 		};
-		loadEnvConfig();
+		void loadEnvConfig();
+		return () => {
+			stale = true;
+		};
 	}, [open, project.id, project.autoBuildPath]);
 
 	// Check Claude authentication status
 	useEffect(() => {
+		let stale = false;
 		const checkAuth = async () => {
 			if (open && project.autoBuildPath) {
 				setIsCheckingClaudeAuth(true);
 				try {
 					const result = await window.electronAPI.checkClaudeAuth(project.id);
+					if (stale) return;
 					if (result.success && result.data) {
 						setClaudeAuthStatus(
 							result.data.authenticated ? "authenticated" : "not_authenticated",
@@ -250,178 +259,59 @@ export function useProjectSettings(
 						setClaudeAuthStatus("error");
 					}
 				} catch {
-					setClaudeAuthStatus("error");
+					if (!stale) setClaudeAuthStatus("error");
 				} finally {
-					setIsCheckingClaudeAuth(false);
+					if (!stale) setIsCheckingClaudeAuth(false);
 				}
 			}
 		};
-		checkAuth();
+		void checkAuth();
+		return () => {
+			stale = true;
+		};
 	}, [open, project.id, project.autoBuildPath]);
 
-	// Check Linear connection when API key changes
-	useEffect(() => {
-		const checkLinearConnection = async () => {
-			if (!envConfig?.linearEnabled || !envConfig.linearApiKey) {
-				setLinearConnectionStatus(null);
-				return;
-			}
+	// Each connection is checked while its settings are complete, again when
+	// they change, and forgotten when they are not: a disabled integration
+	// kept showing the last "connected" badge.
+	const [linearConnectionStatus, isCheckingLinear] = useConnectionCheck(
+		Boolean(envConfig?.linearEnabled && envConfig.linearApiKey),
+		[project.id, envConfig?.linearApiKey],
+		async (projectId) => {
+			const result = await window.electronAPI.checkLinearConnection(projectId);
+			return result.success ? result.data : undefined;
+		},
+	);
 
-			setIsCheckingLinear(true);
-			try {
-				const result = await window.electronAPI.checkLinearConnection(
-					project.id,
-				);
-				if (result.success && result.data) {
-					setLinearConnectionStatus(result.data);
-				}
-			} catch {
-				setLinearConnectionStatus({
-					connected: false,
-					error: "Failed to check connection",
-				});
-			} finally {
-				setIsCheckingLinear(false);
-			}
-		};
-
-		if (envConfig?.linearEnabled && envConfig.linearApiKey) {
-			checkLinearConnection();
-		}
-	}, [envConfig?.linearEnabled, envConfig?.linearApiKey, project.id]);
-
-	// Check Azure DevOps connection when credentials change
-	useEffect(() => {
-		const checkAzureDevOpsConnection = async () => {
-			if (
-				!envConfig?.azureDevOpsEnabled ||
-				!envConfig.azureDevOpsPat ||
-				!envConfig.azureDevOpsOrgUrl
-			) {
-				setAzureDevOpsConnectionStatus(null);
-				return;
-			}
-
-			setIsCheckingAzureDevOps(true);
-			try {
-				const result = await window.electronAPI.checkAzureDevOpsConnection(
-					project.id,
-				);
-				if (result.success && result.data) {
-					setAzureDevOpsConnectionStatus(result.data);
-				}
-			} catch {
-				setAzureDevOpsConnectionStatus({
-					connected: false,
-					error: "Failed to check connection",
-				});
-			} finally {
-				setIsCheckingAzureDevOps(false);
-			}
-		};
-
-		if (
+	const [azureDevOpsConnectionStatus, isCheckingAzureDevOps] = useConnectionCheck(
+		Boolean(
 			envConfig?.azureDevOpsEnabled &&
-			envConfig.azureDevOpsPat &&
-			envConfig.azureDevOpsOrgUrl
-		) {
-			checkAzureDevOpsConnection();
-		}
-	}, [
-		envConfig?.azureDevOpsEnabled,
-		envConfig?.azureDevOpsPat,
-		envConfig?.azureDevOpsOrgUrl,
-		project.id,
-	]);
+				envConfig.azureDevOpsPat &&
+				envConfig.azureDevOpsOrgUrl,
+		),
+		[project.id, envConfig?.azureDevOpsPat, envConfig?.azureDevOpsOrgUrl],
+		async (projectId) => {
+			const result = await window.electronAPI.checkAzureDevOpsConnection(projectId);
+			return result.success ? result.data : undefined;
+		},
+	);
 
-	// Check GitHub connection when token/repo changes
-	// Also updates the global GitHub store so other components (like GitHub Issues) see the change
-	useEffect(() => {
-		const checkGitHubConnection = async () => {
-			if (
-				!envConfig?.githubEnabled ||
-				!envConfig.githubToken ||
-				!envConfig.githubRepo
-			) {
-				setGitHubConnectionStatus(null);
-				return;
-			}
+	// The global store action makes the call AND updates the global store, so
+	// the GitHub Issues page sees the new status too.
+	const [gitHubConnectionStatus, isCheckingGitHub] = useConnectionCheck(
+		Boolean(envConfig?.githubEnabled && envConfig.githubToken && envConfig.githubRepo),
+		[project.id, envConfig?.githubToken, envConfig?.githubRepo],
+		(projectId) => checkGitHubConnectionGlobal(projectId),
+	);
 
-			setIsCheckingGitHub(true);
-			try {
-				// Use the global store action - it makes the API call AND updates the global store
-				// This ensures the GitHub Issues page sees the updated status
-				const status = await checkGitHubConnectionGlobal(project.id);
-				if (status) {
-					setGitHubConnectionStatus(status);
-				}
-			} catch {
-				setGitHubConnectionStatus({
-					connected: false,
-					error: "Failed to check connection",
-				});
-			} finally {
-				setIsCheckingGitHub(false);
-			}
-		};
-
-		if (
-			envConfig?.githubEnabled &&
-			envConfig.githubToken &&
-			envConfig.githubRepo
-		) {
-			checkGitHubConnection();
-		}
-	}, [
-		envConfig?.githubEnabled,
-		envConfig?.githubToken,
-		envConfig?.githubRepo,
-		project.id,
-	]);
-
-	// Check GitLab connection when token/project changes
-	useEffect(() => {
-		const checkGitLabConnection = async () => {
-			if (
-				!envConfig?.gitlabEnabled ||
-				!envConfig.gitlabToken ||
-				!envConfig.gitlabProject
-			) {
-				setGitLabConnectionStatus(null);
-				return;
-			}
-
-			setIsCheckingGitLab(true);
-			try {
-				const status = await window.electronAPI.checkGitLabConnection(
-					project.id,
-				);
-				if (status.success && status.data) {
-					setGitLabConnectionStatus(status.data);
-				}
-			} catch {
-				setGitLabConnectionStatus({
-					connected: false,
-					error: "Failed to check connection",
-				});
-			} finally {
-				setIsCheckingGitLab(false);
-			}
-		};
-
-		if (
-			envConfig?.gitlabEnabled &&
-			envConfig.gitlabToken &&
-			envConfig.gitlabProject
-		) {
-			checkGitLabConnection();
-		}
-	}, [
-		envConfig?.gitlabEnabled,
-		envConfig?.gitlabToken,
-		envConfig?.gitlabProject,
-		project.id,
-	]);
+	const [gitLabConnectionStatus, isCheckingGitLab] = useConnectionCheck(
+		Boolean(envConfig?.gitlabEnabled && envConfig.gitlabToken && envConfig.gitlabProject),
+		[project.id, envConfig?.gitlabToken, envConfig?.gitlabProject],
+		async (projectId) => {
+			const result = await window.electronAPI.checkGitLabConnection(projectId);
+			return result.success ? result.data : undefined;
+		},
+	);
 
 	const toggleSection = (section: string) => {
 		setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -544,7 +434,8 @@ export function useProjectSettings(
 				return;
 			}
 
-			if (envConfig) {
+			// Only a configuration read for this project is written to it.
+			if (envConfig && committedEnvConfigRef.current?.projectId === project.id) {
 				const envResult = await window.electronAPI.updateProjectEnv(
 					project.id,
 					envConfig,
@@ -567,34 +458,19 @@ export function useProjectSettings(
 		// Use the committed ref as base to handle concurrent calls correctly
 		// This ensures rapid updates don't lose changes due to stale state reads
 		const loaded = committedEnvConfigRef.current;
-		if (loaded && loaded.projectId !== project.id) {
-			// The dialog moved to another project while this field was losing
-			// focus. Saving would write the previous project's whole
-			// configuration here; the reload that is already running is what
-			// provides a base for this project.
+		if (!loaded || loaded.projectId !== project.id) {
+			// Nothing was read for this project yet, or the dialog moved to
+			// another project while this field was losing focus. Saving would
+			// write a partial configuration, or the previous project's, here;
+			// the load that is already running provides this project's base.
 			console.warn(
-				"[useProjectSettings] the loaded configuration belongs to another project — skipping save.",
-			);
-			return;
-		}
-		const baseConfig = loaded?.config || envConfig;
-		if (!baseConfig) {
-			console.warn(
-				"[useProjectSettings] updateEnvConfig called but baseConfig is null — skipping save. Updates:",
+				"[useProjectSettings] no configuration loaded for this project — skipping save. Updates:",
 				updates,
 			);
 			return;
 		}
 
-		const newConfig = { ...baseConfig, ...updates };
-
-		// Debug: log Azure DevOps-specific updates
-		const azureKeys = Object.keys(updates).filter((k) =>
-			k.startsWith("azureDevOps"),
-		);
-		if (azureKeys.length > 0) {
-			// noop
-		}
+		const newConfig = { ...loaded.config, ...updates };
 
 		// OPTIMISTIC UPDATES: Update local state IMMEDIATELY for responsive UI
 		// This ensures the user sees their changes reflected instantly
@@ -622,9 +498,6 @@ export function useProjectSettings(
 				// Note: We don't rollback the optimistic update because another concurrent call may have
 				// already updated it. The error is shown to the user who can retry.
 				return;
-			}
-			if (azureKeys.length > 0) {
-				// noop
 			}
 		} catch (err) {
 			console.error("[useProjectSettings] Error auto-saving env config:", err);
@@ -690,4 +563,53 @@ export function useProjectSettings(
 		handleClaudeSetup,
 		handleSave,
 	};
+}
+
+/**
+ * A connection's status, checked while `ready` and again whenever the project
+ * or the settings it depends on change; nothing while not ready. An answer for
+ * settings that changed in the meantime (another project, another token) is
+ * dropped.
+ */
+function useConnectionCheck<T extends { connected: boolean; error?: string }>(
+	ready: boolean,
+	inputs: readonly [projectId: string, ...settings: Array<string | undefined>],
+	check: (projectId: string) => Promise<T | null | undefined>,
+): [T | null, boolean] {
+	const [status, setStatus] = useState<T | null>(null);
+	const [checking, setChecking] = useState(false);
+	const checkRef = useRef(check);
+	checkRef.current = check;
+	const key = JSON.stringify(inputs);
+
+	useEffect(() => {
+		setStatus(null);
+		if (!ready) {
+			setChecking(false);
+			return;
+		}
+		let stale = false;
+		setChecking(true);
+		// The project the inputs name, read from the same text the effect
+		// depends on: a new array each render, the same text.
+		const [projectId] = JSON.parse(key) as [string];
+		checkRef
+			.current(projectId)
+			.then((result) => {
+				if (!stale && result) setStatus(result);
+			})
+			.catch(() => {
+				if (!stale) {
+					setStatus({ connected: false, error: "Failed to check connection" } as T);
+				}
+			})
+			.finally(() => {
+				if (!stale) setChecking(false);
+			});
+		return () => {
+			stale = true;
+		};
+	}, [ready, key]);
+
+	return [status, checking];
 }
