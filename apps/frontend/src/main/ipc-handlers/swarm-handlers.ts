@@ -173,8 +173,6 @@ export function registerSwarmHandlers(
 				];
 
 				if (config.failFast) args.push("--fail-fast");
-				if (!config.mergeAfterEachWave) args.push("--no-merge");
-				if (config.dryRun) args.push("--dry-run");
 
 				const proc = spawn(pythonPath, args, {
 					env: await pythonRunnerEnv(sourcePath),

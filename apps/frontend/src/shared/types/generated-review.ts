@@ -21,6 +21,7 @@ export const GENERATED_REVIEW_SOURCES = [
 	"accessibility",
 	"doc-drift",
 	"notebook-agent",
+	"browser-recorder",
 ] as const;
 
 export type GeneratedReviewSource = (typeof GENERATED_REVIEW_SOURCES)[number];

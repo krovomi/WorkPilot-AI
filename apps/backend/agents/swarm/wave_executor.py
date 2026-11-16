@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
+from security.constants import PROJECT_DIR_ENV_VAR
+
 from .types import SubtaskNode, SubtaskState, SwarmConfig, Wave
 
 logger = logging.getLogger(__name__)
@@ -77,6 +79,31 @@ async def _read_lines(stream: asyncio.StreamReader):
             yield line
     if pending:
         yield pending
+
+
+# A subtask's phase and task events, as its process prints them.
+_MARKERS = {"__EXEC_PHASE__:": "phase", "__TASK_EVENT__:": "task"}
+
+
+def _forward_marker(subtask_id: str, line: str) -> None:
+    """Pass a subtask's phase or task event on as a swarm event.
+
+    The marker is left out: the app reads ``__TASK_EVENT__:`` anywhere in a
+    line of the build's output, and a subtask's own events (its
+    ``ALL_SUBTASKS_DONE``, its failure) are not the task's.
+    """
+    for marker, kind in _MARKERS.items():
+        at = line.find(marker)
+        if at >= 0:
+            emit_swarm_event(
+                "subtask_log",
+                {
+                    "subtask_id": subtask_id,
+                    "kind": kind,
+                    "data": line[at + len(marker) :],
+                },
+            )
+            return
 
 
 class WaveExecutor:
@@ -277,10 +304,13 @@ class WaveExecutor:
         Spawn a Python subprocess to execute the subtask.
 
         The subprocess runs `run.py --spec {spec_id} --subtask {subtask_id}`
-        which scopes the coder agent to a single subtask within the spec.
+        (``cli/subtask_command.py``), which keeps the coder on that one
+        subtask, in the subtask's own worktree when the orchestrator gave it
+        one.
         """
         spec_name = self.spec_dir.name
         subtask_id = node.id
+        workdir = node.worktree_path or self.project_dir
 
         # Build command
         run_script = Path(self.source_path) / "run.py"
@@ -289,6 +319,8 @@ class WaveExecutor:
             str(run_script),
             "--spec",
             spec_name,
+            "--project-dir",
+            str(workdir),
             "--subtask",
             subtask_id,
         ]
@@ -298,6 +330,9 @@ class WaveExecutor:
         env["SWARM_MODE"] = "1"
         env["SWARM_SUBTASK_ID"] = subtask_id
         env["SWARM_WAVE_INDEX"] = str(node.wave_index)
+        # The worker's command and write checks are confined to its worktree,
+        # not to the task's that the parent process holds.
+        env[PROJECT_DIR_ENV_VAR] = str(workdir)
         env["PYTHONPATH"] = self.source_path
 
         start = time.time()
@@ -306,7 +341,7 @@ class WaveExecutor:
                 *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(self.project_dir),
+                cwd=str(workdir),
                 env=env,
             )
             self._running_processes[subtask_id] = process
@@ -336,15 +371,7 @@ class WaveExecutor:
                     line = line_bytes.decode("utf-8", errors="replace").rstrip()
                     if on_log:
                         on_log(subtask_id, line)
-                    # Forward phase events with subtask prefix
-                    if "__EXEC_PHASE__:" in line or "__TASK_EVENT__:" in line:
-                        emit_swarm_event(
-                            "subtask_log",
-                            {
-                                "subtask_id": subtask_id,
-                                "line": line,
-                            },
-                        )
+                    _forward_marker(subtask_id, line)
                 await process.wait()
 
             # The timeout bounds the whole run, output included: a wedged
@@ -371,8 +398,10 @@ class WaveExecutor:
             success = process.returncode == 0
             error = None
             if not success:
+                # The end of stderr: a traceback ends with its exception, and
+                # the interpreter's own warnings come first.
                 error = (
-                    stderr_output[:500]
+                    stderr_output[-500:]
                     if stderr_output
                     else f"Exit code {process.returncode}"
                 )

@@ -1,9 +1,11 @@
 """A swarm run, from the plan to its last wave.
 
 The plan is a real ``implementation_plan.json``; each subtask is a real
-process of the backend stand-in from ``conftest.py``; the wave merge is the
-real merge system. What the orchestrator reports is read from its status and
-from the ``__SWARM_EVENT__`` lines the app parses.
+process of the backend stand-in from ``conftest.py``. The project here is not
+a git checkout, so the subtasks run in it and nothing is merged (the
+worktrees and the merge: ``test_swarm_worktrees.py``). What the orchestrator
+reports is read from its status and from the ``__SWARM_EVENT__`` lines the
+app parses.
 """
 
 from __future__ import annotations
@@ -15,8 +17,8 @@ from pathlib import Path
 
 import pytest
 from agents.swarm.orchestrator import SwarmOrchestrator
-from agents.swarm.types import SubtaskNode, SubtaskState, SwarmConfig, SwarmPhase, Wave
-from agents.swarm.wave_executor import SWARM_EVENT_PREFIX, SubtaskResult, WaveResult
+from agents.swarm.types import SubtaskState, SwarmConfig, SwarmPhase
+from agents.swarm.wave_executor import SWARM_EVENT_PREFIX
 
 
 def _events(out: str) -> list[dict]:
@@ -90,7 +92,8 @@ def test_two_waves_run_and_a_failed_subtask_is_retried(
         SubtaskState.COMPLETED,
         SubtaskState.COMPLETED,
     ]
-    assert status.waves[0].merge_success is True
+    # Outside a git checkout there is nothing to merge.
+    assert [w.merge_success for w in status.waves] == [None, None]
     assert (_attempts(world, "db"), _attempts(world, "api")) == (2, 1)
     assert status.nodes["db"].state is SubtaskState.COMPLETED
     assert status.is_complete and status.progress_percent == 100
@@ -107,7 +110,7 @@ def test_two_waves_run_and_a_failed_subtask_is_retried(
         "max_retries": 2,
     } in events
     assert "swarm_skipped" not in kinds
-    assert kinds.index("final_merge_started") < kinds.index("final_merge_complete")
+    assert "wave_merged" not in kinds
     assert events[-1]["type"] == "swarm_complete"
     assert (events[-1]["completed"], events[-1]["failed"]) == (3, 0)
 
@@ -160,10 +163,9 @@ def test_a_plan_with_no_parallelism_still_runs_in_order(
     )
     _steps(world, first=["ok"], second=["ok"])
 
-    status = asyncio.run(_swarm(world, merge_after_each_wave=False).run())
+    status = asyncio.run(_swarm(world).run())
 
     assert status.phase is SwarmPhase.COMPLETE
-    assert [w.merge_success for w in status.waves] == [None, None]
     events = _events(capsys.readouterr().out)
     [skipped] = [e for e in events if e["type"] == "swarm_skipped"]
     assert skipped["reason"] == "no_parallelism"
@@ -215,77 +217,3 @@ def test_cancelling_the_swarm_marks_it_failed(
     assert swarm.status.phase is SwarmPhase.FAILED
     assert swarm.status.error == "Cancelled by user"
     assert [e["type"] for e in _events(capsys.readouterr().out)] == ["swarm_cancelled"]
-
-
-# -- the merge between waves ---------------------------------------------------
-
-
-def _node(subtask_id: str, worktree: Path | None) -> SubtaskNode:
-    return SubtaskNode(
-        id=subtask_id,
-        phase_name="p",
-        description=f"do {subtask_id}",
-        wave_index=0,
-        worktree_path=worktree,
-    )
-
-
-def _done(*ids: str, failed: tuple[str, ...] = ()) -> WaveResult:
-    return WaveResult(
-        wave_index=0,
-        results=[SubtaskResult(i, True) for i in ids]
-        + [SubtaskResult(i, False) for i in failed],
-    )
-
-
-def test_a_wave_with_nothing_to_merge_counts_as_merged(world: dict[str, Path]) -> None:
-    swarm = _swarm(world)
-    nothing_done = Wave(index=0, subtask_ids=["a"])
-    no_worktree = Wave(index=0, subtask_ids=["b"])
-
-    asyncio.run(swarm._merge_wave(nothing_done, _done(failed=("a",)), {}))
-    asyncio.run(
-        swarm._merge_wave(no_worktree, _done("b", "ghost"), {"b": _node("b", None)})
-    )
-
-    assert nothing_done.merge_success is True
-    assert no_worktree.merge_success is True
-
-
-def test_the_finished_subtasks_of_a_wave_are_merged(
-    world: dict[str, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    worktree = tmp_path / "worktree-a"
-    worktree.mkdir()
-    swarm = _swarm(world, enable_ai_merge=False, dry_run=True)
-    wave = Wave(index=0, subtask_ids=["a"])
-
-    asyncio.run(swarm._merge_wave(wave, _done("a"), {"a": _node("a", worktree)}))
-
-    assert wave.merge_success is True
-    [merged] = [
-        e for e in _events(capsys.readouterr().out) if e["type"] == "wave_merged"
-    ]
-    assert merged["success"] is True
-    assert merged["stats"]["files_failed"] == 0
-
-
-def test_a_merge_that_breaks_is_reported_and_the_swarm_goes_on(
-    world: dict[str, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    worktree = tmp_path / "worktree-a"
-    worktree.mkdir()
-    swarm = _swarm(world, enable_ai_merge=False, dry_run=True)
-    # The merge keeps its data under <project>/.workpilot: a file there
-    # makes it fail.
-    (world["project"] / ".workpilot").rename(world["project"] / "specs-moved")
-    (world["project"] / ".workpilot").write_text("", encoding="utf-8")
-    wave = Wave(index=0, subtask_ids=["a"])
-
-    asyncio.run(swarm._merge_wave(wave, _done("a"), {"a": _node("a", worktree)}))
-
-    assert wave.merge_success is False
-    [failed] = [
-        e for e in _events(capsys.readouterr().out) if e["type"] == "wave_merge_failed"
-    ]
-    assert failed["wave_index"] == 0 and failed["error"]
