@@ -9,3 +9,6 @@ section: 🐛 Corrections
   comme un texte) ne fait plus échouer la liste des pièces jointes d'une tâche.
 - **Schémas Excalidraw** : une scène dont les liaisons de flèches ou la liste d'éléments ont une
   autre forme se lit sans erreur ; seules les flèches reliées des deux côtés sont tracées.
+- **Tableau blanc → draw.io** : deux boîtes que le modèle de vision donne sous le même identifiant
+  ne produisent plus un fichier `.drawio` aux cellules en double (la première l'emporte), et des
+  listes d'une autre forme dans sa réponse se lisent comme « rien de dessiné ».
