@@ -79,3 +79,43 @@ def test_a_link_is_removed_not_followed(tmp_path: Path):
 
 def test_a_missing_folder_is_nothing_to_do(tmp_path: Path):
     remove_tree(tmp_path / "never-there")
+
+
+def test_a_clone_that_resists_is_logged_and_the_rest_still_goes(
+    tmp_path: Path, monkeypatch, caplog
+):
+    from types import SimpleNamespace
+
+    import server.services.run_isolation as run_isolation
+
+    clone = _checkout(tmp_path / "clone")
+    home = tmp_path / "home"
+    (home / "cache").mkdir(parents=True)
+    monkeypatch.setattr(
+        repos, "get_settings", lambda: SimpleNamespace(repos_root=tmp_path)
+    )
+    monkeypatch.setattr(repos, "project_clone_path", lambda _id: clone)
+    monkeypatch.setattr(run_isolation, "project_home", lambda _root, _id: home)
+    real_remove = repos.remove_tree
+
+    def resist_the_clone(path: Path) -> None:
+        if path == clone:
+            raise PermissionError(13, "Access is denied", str(path))
+        real_remove(path)
+
+    monkeypatch.setattr(repos, "remove_tree", resist_the_clone)
+
+    with caplog.at_level("INFO", logger=repos.logger.name):
+        repos.delete_clone("p-1")
+
+    # The project's rows are gone already: the clone is reported, not raised,
+    # and its home is still deleted.
+    assert clone.exists() and not home.exists()
+    assert f"Could not delete {clone}" in caplog.text
+    assert f"Deleted {home}" in caplog.text
+
+    # A home that is not there any more is nothing to do.
+    caplog.clear()
+    with caplog.at_level("INFO", logger=repos.logger.name):
+        repos.delete_clone("p-1")
+    assert f"{home}" not in caplog.text
