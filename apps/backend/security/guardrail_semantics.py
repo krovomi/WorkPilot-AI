@@ -304,10 +304,6 @@ _MANIFESTS: list[tuple[re.Pattern[str], object]] = [
 ]
 
 
-def is_manifest(path: str) -> bool:
-    return any(pattern.search(path.replace("\\", "/")) for pattern, _ in _MANIFESTS)
-
-
 def dependencies(path: str, text: str) -> set[str] | None:
     """The dependencies a manifest declares, or ``None`` if ``path`` is no manifest."""
     norm = path.replace("\\", "/")
