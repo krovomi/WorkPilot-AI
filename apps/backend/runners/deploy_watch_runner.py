@@ -8,6 +8,11 @@ Usage:
 The run id names a record of `.workpilot/cicd_runs.json`; the endpoints and
 tokens come from the environment the app builds from the project's CI/CD
 settings. Prints the watch state as JSON.
+
+A critical verdict may open a revert PR (`core.deploy_revert`, the forge the
+project pushes to) and every bad verdict asks the project's model for a short
+explanation: importing `core` installs the agent runtime the incident report
+asks (`agent_runtime`).
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ from pathlib import Path
 
 
 def main(argv: list[str] | None = None) -> int:
+    from core.deploy_revert import open_revert_pr
     from deploy_watch.watch import WatchError, run_rollback, run_watch
 
     parser = argparse.ArgumentParser(description="Deployment watch runner")
@@ -35,7 +41,9 @@ def main(argv: list[str] | None = None) -> int:
     env = dict(os.environ)
     try:
         if args.action == "watch":
-            state = run_watch(project, args.run_id, env)
+            state = run_watch(
+                project, args.run_id, env, revert_opener=open_revert_pr(project)
+            )
         else:
             state = run_rollback(project, args.run_id, env)
     except WatchError as error:
