@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type {
 	NewCommitsCheck,
 	PRData,
@@ -101,20 +102,18 @@ export function useGitHubPRs(
 	const fetchGenerationRef = useRef(0);
 
 	// Get PR review state from the global store
-	const _prReviews = usePRReviewStore((state) => state.prReviews);
 	const getPRReviewState = usePRReviewStore((state) => state.getPRReviewState);
-	const getActivePRReviews = usePRReviewStore(
-		(state) => state.getActivePRReviews,
-	);
 	const setNewCommitsCheckAction = usePRReviewStore(
 		(state) => state.setNewCommitsCheck,
 	);
 
-	// Get review state for the selected PR from the store
-	const selectedPRReviewState = useMemo(() => {
-		if (!projectId || selectedPRNumber === null) return null;
-		return getPRReviewState(projectId, selectedPRNumber);
-	}, [projectId, selectedPRNumber, getPRReviewState]);
+	// Selected from the store, not memoised over its getters: the getters never
+	// change, so a memo over them froze the review panel on its first value.
+	const selectedPRReviewState = usePRReviewStore((state) =>
+		projectId && selectedPRNumber !== null
+			? state.getPRReviewState(projectId, selectedPRNumber)
+			: null,
+	);
 
 	// Derive values from store state - all from the same source to ensure consistency
 	const reviewResult = selectedPRReviewState?.result ?? null;
@@ -124,10 +123,13 @@ export function useGitHubPRs(
 	const startedAt = selectedPRReviewState?.startedAt ?? null;
 
 	// Get list of PR numbers currently being reviewed
-	const activePRReviews = useMemo(() => {
-		if (!projectId) return [];
-		return getActivePRReviews(projectId).map((review) => review.prNumber);
-	}, [projectId, getActivePRReviews]);
+	const activePRReviews = usePRReviewStore(
+		useShallow((state) =>
+			projectId
+				? state.getActivePRReviews(projectId).map((review) => review.prNumber)
+				: [],
+		),
+	);
 
 	// Helper to get review state for any PR
 	const getReviewStateForPR = useCallback(

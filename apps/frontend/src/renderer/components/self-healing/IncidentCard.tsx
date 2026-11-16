@@ -1,4 +1,5 @@
 import type { Incident } from "@shared/types/self-healing";
+import type React from "react";
 import {
 	AlertTriangle,
 	CheckCircle2,
@@ -21,6 +22,8 @@ interface IncidentCardProps {
 	readonly onTriggerFix?: (id: string) => void;
 	readonly onDismiss?: (id: string) => void;
 	readonly onRetry?: (id: string) => void;
+	/** What a mode adds under the incident: its group, its bisect. */
+	readonly children?: React.ReactNode;
 }
 
 const SEVERITY_TONE: Record<string, Tone> = {
@@ -43,7 +46,7 @@ const STATUS_ICON: Record<string, LucideIcon> = {
 };
 
 /** One incident: severity rail, what broke, the files it touches, its actions. */
-export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry }: IncidentCardProps) {
+export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry, children }: IncidentCardProps) {
 	const { t } = useTranslation(["selfHealing", "common"]);
 	const isActionable = ["pending", "failed", "escalated"].includes(incident.status);
 	const tone = SEVERITY_TONE[incident.severity] ?? "muted";
@@ -113,6 +116,7 @@ export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry }: Inc
 					</div>
 				)}
 			</div>
+			{children}
 			<div className="wp-meta mt-2">{formatAppDateTime(incident.created_at)}</div>
 		</Panel>
 	);

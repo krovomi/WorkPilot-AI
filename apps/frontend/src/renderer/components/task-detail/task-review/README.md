@@ -36,17 +36,6 @@ The most complex component handling the active workspace display including:
 - `isLoadingPreview`: Loading state for merge preview
 - Various callback handlers
 
-#### `MergePreviewSummary.tsx` (109 lines)
-Displays merge conflict preview information:
-- Conflict count and severity
-- Git conflicts with AI resolution indicator
-- Auto-mergeable vs manual review statistics
-- Branch divergence information
-
-**Props:**
-- `mergePreview`: Object containing conflicts, summary, and git conflict info
-- `onShowConflictDialog`: Callback to open conflict details dialog
-
 ### Dialog Components
 
 #### `ConflictDetailsDialog.tsx` (123 lines)
@@ -107,8 +96,7 @@ TaskReview (main entry point)
 ├── StagedSuccessMessage
 ├── LoadingMessage
 ├── WorkspaceStatus
-│   ├── MergePreviewSummary
-│   └── (action buttons)
+│   └── (merge status, action buttons)
 ├── StagedInProjectMessage
 ├── NoWorkspaceMessage
 ├── QAFeedbackSection
@@ -167,7 +155,7 @@ The modular structure enables focused unit tests:
 
 ```tsx
 // Test individual components
-describe('MergePreviewSummary', () => {
+describe('WorkspaceStatus', () => {
   it('shows success state when no conflicts', () => {
     // Test logic
   });
