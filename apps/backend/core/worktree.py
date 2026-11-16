@@ -185,9 +185,11 @@ class WorktreeManager(WorktreePRMixin):
         files_to_unstage = set()
 
         # 1. Check which staged files are gitignored
-        # git check-ignore returns the files that ARE ignored
+        # git check-ignore returns the files that ARE ignored. ``--no-index``:
+        # these files are staged, and without it check-ignore never reports a
+        # file that is in the index, so none of them would ever be unstaged.
         result = run_git(
-            ["check-ignore", "--stdin"],
+            ["check-ignore", "--no-index", "--stdin"],
             cwd=self.project_dir,
             input_data="\n".join(staged_files),
         )
@@ -308,25 +310,16 @@ class WorktreeManager(WorktreePRMixin):
 
         # Handle detached HEAD state: rev-parse --abbrev-ref returns literal "HEAD"
         # when the worktree is in detached HEAD (e.g. after rebase, merge conflict, etc.)
-        # First try to resolve the branch from git's worktree registry, then fall back
-        # to the expected branch name derived from the spec name.
+        # git's worktree registry says "detached" too, so the branch is the one the
+        # spec name gives.
         if actual_branch == "HEAD":
-            registered_branch = self._get_worktree_registered_branch(worktree_path)
-            if registered_branch:
-                debug_warning(
-                    "worktree",
-                    f"Worktree '{spec_name}' is in detached HEAD state. "
-                    f"Resolved branch from git worktree registry: {registered_branch}",
-                )
-                actual_branch = registered_branch
-            else:
-                expected_branch = self.get_branch_name(spec_name)
-                debug_warning(
-                    "worktree",
-                    f"Worktree '{spec_name}' is in detached HEAD state. "
-                    f"Using expected branch name: {expected_branch}",
-                )
-                actual_branch = expected_branch
+            expected_branch = self.get_branch_name(spec_name)
+            debug_warning(
+                "worktree",
+                f"Worktree '{spec_name}' is in detached HEAD state. "
+                f"Using expected branch name: {expected_branch}",
+            )
+            actual_branch = expected_branch
 
         # Get statistics
         stats = self._get_worktree_stats(spec_name)
@@ -339,50 +332,6 @@ class WorktreeManager(WorktreePRMixin):
             is_active=True,
             **stats,
         )
-
-    def _get_worktree_registered_branch(self, worktree_path: Path) -> str | None:
-        """
-        Get the branch name for a worktree from git's worktree registry.
-
-        Uses `git worktree list --porcelain` to find the branch associated with
-        a worktree path. This works even when the worktree is in detached HEAD state,
-        as git tracks the original branch association in its registry.
-
-        Args:
-            worktree_path: The path to the worktree directory.
-
-        Returns:
-            The branch name (without refs/heads/ prefix) if found, None otherwise.
-        """
-        result = self._run_git(["worktree", "list", "--porcelain"])
-        if result.returncode != 0:
-            return None
-
-        resolved_path = worktree_path.resolve()
-
-        # Parse porcelain output: entries are separated by blank lines,
-        # each entry has "worktree <path>", "HEAD <sha>", "branch refs/heads/<name>"
-        # (or "detached" instead of "branch" if truly detached in registry too)
-        current_path = None
-        for line in result.stdout.split("\n"):
-            if line.startswith("worktree "):
-                current_path = Path(line.split(" ", 1)[1])
-            elif line.startswith("branch refs/heads/") and current_path is not None:
-                try:
-                    if current_path.exists() and resolved_path.exists():
-                        if os.path.samefile(resolved_path, current_path):
-                            return line[len("branch refs/heads/") :]
-                except OSError:
-                    pass
-                # Fallback to normalized case comparison
-                if os.path.normcase(str(resolved_path)) == os.path.normcase(
-                    str(current_path)
-                ):
-                    return line[len("branch refs/heads/") :]
-            elif line == "":
-                current_path = None
-
-        return None
 
     def _check_branch_namespace_conflict(self) -> str | None:
         """
@@ -613,9 +562,18 @@ class WorktreeManager(WorktreePRMixin):
                     ["worktree", "remove", "--force", str(worktree_path)]
                 )
                 if remove_result.returncode != 0:
-                    raise WorktreeError(
-                        f"Failed to remove corrupted worktree: {remove_result.stderr}"
-                    )
+                    # git refuses to remove a worktree whose `.git` file it
+                    # cannot validate: delete the directory, then let prune
+                    # drop the registration of a worktree that is gone.
+                    shutil.rmtree(worktree_path, ignore_errors=True)
+                    self._run_git(["worktree", "prune"])
+                    if worktree_path.exists() or self._worktree_is_registered(
+                        worktree_path
+                    ):
+                        raise WorktreeError(
+                            "Failed to remove corrupted worktree: "
+                            f"{remove_result.stderr}"
+                        )
 
         # Step 4: Handle stale worktree directory (exists but not registered with git)
         if worktree_path.exists() and not self._worktree_is_registered(worktree_path):
@@ -1234,20 +1192,6 @@ class WorktreeManager(WorktreePRMixin):
 
         return worktrees
 
-    def list_all_spec_branches(self) -> list[str]:
-        """List all workpilot branches (even if worktree removed)."""
-        result = self._run_git(["branch", "--list", "workpilot/*"])
-        if result.returncode != 0:
-            return []
-
-        branches = []
-        for line in result.stdout.strip().split("\n"):
-            branch = line.strip().lstrip("* ")
-            if branch:
-                branches.append(branch)
-
-        return branches
-
     def get_changed_files(self, spec_name: str) -> list[tuple[str, str]]:
         """Get list of changed files in a spec's worktree."""
         worktree_path = self.get_worktree_path(spec_name)
@@ -1286,29 +1230,6 @@ class WorktreeManager(WorktreePRMixin):
         """Remove all worktrees and their branches."""
         for worktree in self.list_all_worktrees():
             self.remove_worktree(worktree.spec_name, delete_branch=True)
-
-    def cleanup_stale_worktrees(self) -> None:
-        """Remove worktrees that aren't registered with git."""
-        if not self.worktrees_dir.exists():
-            return
-
-        # Get list of registered worktrees
-        result = self._run_git(["worktree", "list", "--porcelain"])
-        registered_paths = set()
-        for line in result.stdout.split("\n"):
-            if line.startswith("worktree "):
-                registered_paths.add(Path(line.split(" ", 1)[1]))
-
-        # Remove unregistered directories
-        for item in self.worktrees_dir.iterdir():
-            if item.is_dir() and item not in registered_paths:
-                print(f"Removing stale worktree directory: {item.name}")
-                from core.workspace.recipe_run import teardown_worktree
-
-                teardown_worktree(self.project_dir, item, item.name)
-                shutil.rmtree(item, ignore_errors=True)
-
-        self._run_git(["worktree", "prune"])
 
     def get_test_commands(self, spec_name: str) -> list[str]:
         """Detect likely test/run commands for the project."""
