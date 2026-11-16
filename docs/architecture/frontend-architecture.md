@@ -161,6 +161,7 @@ one space.
 | while nothing is pinned and no choice was made, « Mon menu » asks once: « Essentiel » pins `ESSENTIAL_VIEWS` (10 stable pages) and hides the beta views, « Complet » keeps everything (`sidebarPrefs.menuMode`); resetting the layout asks again | a short menu by default would hide pages people use; asking in the menu, not in the wizard, lets them answer once they see it |
 | the rail and the panel share one `DndContext`: a group dragged on the rail reorders the spaces, a page or a group dropped on the star is pinned; collision tries the pointer first (`pointerFirst`) | the star is small, the nearest centre alone picked a row of the panel. The old drop zone never pinned: its id `__fav_drop__` has no kind, so the drag-end handler decoded it to nothing and stopped |
 | the stored `sidebarWidth` is the whole menu, rail included (default 296 px, minimum 240) | a width saved before the rail still gives a usable panel |
+| the menu's right edge is a focusable separator (`sidebar/SidebarResizeHandle.tsx`, rules in `sidebar/sidebar-width.ts`, state in `sidebar/use-sidebar-resize.ts`): a drag previews the width and saves it once on release, Escape cancels; dragged 72 px under the minimum it folds the panel (the saved width is kept), dragged out of the rail it unfolds; a double-click restores 296 px; arrows (Shift for 64 px), Home, End resize and Enter folds, saved on key release; the width never exceeds 480 px nor leaves the main view under 560 px | the old edge was a 4 px strip with no sign, mouse only: nobody found it. The pointer is captured and a sheet covers the window once it moves, so a terminal or a web view never swallows the drag; the sheet waits for a move so a double-click still lands on the edge |
 
 Lot 3 tidies what the spaces list.
 
@@ -184,6 +185,7 @@ Multi-profile credential management for switching between Claude accounts:
 - **`credential-utils.ts`** — OS credential storage (Keychain/Windows Credential Manager)
 - **`token-refresh.ts`** — OAuth token lifecycle and automatic refresh
 - **`usage-monitor.ts`** — API usage tracking and rate limiting per profile
+- **`usage-plan.ts`** — the plan of the account each usage snapshot shows (Claude Max 20x, ChatGPT Plus, Copilot Pro+, an API key billed per use…), added on the way to the renderer by `terminal-handlers.ts`; local sources only, a plan the provider does not name stays unnamed. Names are built by `shared/utils/plan-names.ts`
 - **`profile-scorer.ts`** — Scores profiles by usage and availability
 
 ## Terminal System (`src/main/terminal/`)

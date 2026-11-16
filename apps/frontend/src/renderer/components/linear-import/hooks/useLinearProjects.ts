@@ -11,9 +11,12 @@ export function useLinearProjects(projectId: string, selectedTeamId: string) {
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
+		// A slower answer for an earlier choice must not replace this one.
+		let stale = false;
 		const loadProjects = async () => {
 			if (!selectedTeamId) {
 				setProjects([]);
+				setIsLoadingProjects(false);
 				return;
 			}
 
@@ -25,19 +28,23 @@ export function useLinearProjects(projectId: string, selectedTeamId: string) {
 					projectId,
 					selectedTeamId,
 				);
+				if (stale) return;
 				if (result.success && result.data) {
 					setProjects(result.data);
 				} else {
 					setError(result.error || "Failed to load projects");
 				}
 			} catch (err) {
-				setError(err instanceof Error ? err.message : "Unknown error");
+				if (!stale) setError(err instanceof Error ? err.message : "Unknown error");
 			} finally {
-				setIsLoadingProjects(false);
+				if (!stale) setIsLoadingProjects(false);
 			}
 		};
 
 		loadProjects();
+		return () => {
+			stale = true;
+		};
 	}, [projectId, selectedTeamId]);
 
 	return { projects, isLoadingProjects, error, setError };

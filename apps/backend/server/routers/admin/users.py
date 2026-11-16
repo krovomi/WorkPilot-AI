@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import CurrentUser
 from server.auth.jwt_tokens import revoke_all_sessions
 from server.authz.deps import require_org, require_permission, require_platform_admin
+from server.authz.principal import Principal
 from server.db.engine import get_db
 from server.db.models import AuthSession, GlobalRole, OrgMember, User
 from server.schemas import SessionPublic, UserPublic
@@ -58,7 +59,7 @@ async def deactivate_user(
     if user_id == actor.id:
         raise HTTPException(status_code=400, detail="You cannot deactivate yourself")
 
-    user = await _member_of(db, org_id, user_id)
+    user = await _account_of(db, org_id, user_id, actor)
     user.is_active = False
     revoked = await revoke_all_sessions(db, user_id, commit=False)
 
@@ -82,7 +83,7 @@ async def activate_user(
     org_id: str = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ) -> UserPublic:
-    user = await _member_of(db, org_id, user_id)
+    user = await _account_of(db, org_id, user_id, actor)
     user.is_active = True
     await record(
         db,
@@ -179,7 +180,7 @@ async def revoke_user_sessions(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Force a user out of every device now."""
-    await _member_of(db, org_id, user_id)
+    await _account_of(db, org_id, user_id, actor)
     revoked = await revoke_all_sessions(db, user_id, commit=False)
     await record(
         db,
@@ -206,4 +207,30 @@ async def _member_of(db: AsyncSession, org_id: str, user_id: str) -> User:
     )
     if user is None:
         raise HTTPException(status_code=404, detail="Not a member of this organization")
+    return user
+
+
+async def _account_of(
+    db: AsyncSession, org_id: str, user_id: str, actor: Principal
+) -> User:
+    """The account, if this organization's administrator may act on it as a whole.
+
+    Turning an account off or signing it out reaches every organization it
+    belongs to, not only this one. An organization administrator acts on an
+    account of their organization alone; one that is also elsewhere, or that
+    administers the platform, is the platform administrator's to manage.
+    """
+    user = await _member_of(db, org_id, user_id)
+    if actor.is_platform_admin:
+        return user
+    elsewhere = await db.scalar(
+        select(OrgMember.org_id).where(
+            OrgMember.user_id == user_id, OrgMember.org_id != org_id
+        )
+    )
+    if user.role == GlobalRole.ADMIN.value or elsewhere is not None:
+        raise HTTPException(
+            status_code=403,
+            detail="This account is managed by the platform administrator",
+        )
     return user

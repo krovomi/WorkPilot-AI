@@ -77,7 +77,6 @@ from .guardrails import (
     GuardrailRule,
     evaluate_rules,
     guardrails_hook,
-    load_guardrails,
 )
 from .hooks import bash_security_hook, validate_command
 from .parser import (
@@ -189,7 +188,6 @@ __all__ = [
     "ScanFinding",
     # Guardrails
     "guardrails_hook",
-    "load_guardrails",
     "evaluate_rules",
     "GuardrailRule",
     "GuardrailAction",
