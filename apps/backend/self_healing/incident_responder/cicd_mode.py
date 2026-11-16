@@ -30,6 +30,7 @@ from foundation.ci_logs import (
 )
 from rtk import capture_for_model
 
+from ..cicd import flow
 from .models import (
     CICDIncidentData,
     HealingStatus,
@@ -166,6 +167,7 @@ class CICDMode:
             "{{COMMIT_SHA}}": data.get("commit_sha", "unknown"),
             "{{COMMIT_MESSAGE}}": self._get_commit_message(data.get("commit_sha", "")),
             "{{BRANCH}}": data.get("branch", "unknown"),
+            "{{FIRST_BAD_COMMIT}}": flow.render_first_bad(data),
             "{{FAILING_TESTS}}": "\n".join(
                 f"- {t}" for t in data.get("failing_tests", [])
             ),
@@ -340,6 +342,9 @@ You analyze test regressions and generate fixes.
 - Commit: {{COMMIT_SHA}}
 - Branch: {{BRANCH}}
 - Commit message: {{COMMIT_MESSAGE}}
+
+## FIRST BAD COMMIT
+{{FIRST_BAD_COMMIT}}
 
 ## DIFF
 {{DIFF}}
