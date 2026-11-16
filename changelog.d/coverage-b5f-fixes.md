@@ -20,3 +20,4 @@ section: 🐛 Corrections
   `curl` ne prend plus la valeur d'une option (`-o fichier`, `-u`, `-b`, `-A`…) pour l'URL, et
   `-u` / `-b` se lisent comme les en-têtes `Authorization` / `Cookie` qu'ils deviennent, donc
   masqués.
+- **Conformité d'architecture** : un `workspaces` vide ou enraciné dans un `package.json` ne fait plus échouer la lecture du graphe de modules.
