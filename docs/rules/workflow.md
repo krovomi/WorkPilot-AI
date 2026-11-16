@@ -155,7 +155,7 @@ commit vide pour relancer.
 
 Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
 
-- **Couverture** : pytest `--fail-under=83` (`ci.yml`, `apps/backend` et `src/` ; `.coveragerc` mesure aussi les runners lancés en sous-processus), Vitest `coverage.thresholds`
+- **Couverture** : pytest `--fail-under=88` (`ci.yml`, `apps/backend` et `src/` ; `.coveragerc` mesure aussi les runners lancés en sous-processus), Vitest `coverage.thresholds`
   (`apps/frontend/vitest.config.ts`, mesuré sur Linux), Jest `coverageThreshold` de l'app
   mobile (`apps/mobile/package.json`, job `test` de `mobile.yml`). Ce sont des planchers sous le niveau
   mesuré : on les monte quand la suite grandit, on ne les baisse jamais pour merger.

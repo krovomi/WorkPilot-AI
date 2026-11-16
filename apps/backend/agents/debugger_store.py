@@ -3,9 +3,9 @@ Agent Debugger — file-backed persistent store.
 
 Why this exists
 ---------------
-:class:`agents.debugger.DebuggerRegistry` keeps sessions in *process memory*.
-That is fine for the live agent process (where the ``PreToolUse`` hook runs),
-but the Electron UI drives the debugger through
+A debugger that kept its sessions in *process memory* (the former
+``agents.debugger.DebuggerRegistry``) worked inside the live agent process
+(where the ``PreToolUse`` hook runs), but the Electron UI drives the debugger through
 ``runners/agent_debugger_runner.py``, which is spawned as a **one-shot process
 per IPC call**. In-memory state therefore never survives from one call to the
 next: attach in one process, the process exits, and the next call sees an empty
@@ -114,7 +114,7 @@ def _normalize_breakpoint(bp: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Public API — mirrors the DebuggerSession surface used by the runner.
+# Public API — what the runner and the persistent hook use.
 # ---------------------------------------------------------------------------
 
 

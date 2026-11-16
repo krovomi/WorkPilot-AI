@@ -10,11 +10,11 @@ import { EngineTrioPicker } from "../task-engine/EngineTrioPicker";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 
-function sameProvider(a?: string | null, b?: string | null): boolean {
+function sameProvider(a: string, b: string): boolean {
 	if (isClaudeProvider(a) || isClaudeProvider(b)) {
 		return isClaudeProvider(a) && isClaudeProvider(b);
 	}
-	return (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+	return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
 /**

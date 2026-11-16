@@ -4,7 +4,14 @@
  * data, and each rule reads it the way a keyboard or screen reader would.
  */
 import { describe, expect, it } from "vitest";
-import { analyseTrace, contrastRatio, parseRgb, sanitizeTrace, validateScanUrl } from "../dynamic-checks";
+import {
+	analyseTrace,
+	contrastRatio,
+	loopbackPorts,
+	parseRgb,
+	sanitizeTrace,
+	validateScanUrl,
+} from "../dynamic-checks";
 
 const stop = (over: Record<string, unknown> = {}) => ({
 	tag: "BUTTON",
@@ -59,6 +66,39 @@ describe("validateScanUrl", () => {
 		"",
 	])("refuses %s", (url) => {
 		expect(validateScanUrl(url)).toBeNull();
+	});
+
+	const services = new Set([9000, 8765, 80]);
+
+	it.each([
+		"http://127.0.0.1:9000/providers",
+		"http://localhost:9000/",
+		"http://ws-ui.localhost:8765/",
+		"http://[::1]:8765/",
+		"http://localhost/",
+	])("refuses %s on the port of a WorkPilot service", (url) => {
+		expect(validateScanUrl(url, services)).toBeNull();
+	});
+
+	it.each(["http://localhost:3000/", "https://localhost/", "http://127.0.0.1:9001/"])(
+		"still opens %s on another local port",
+		(url) => {
+			expect(validateScanUrl(url, services)).toBe(url);
+		},
+	);
+});
+
+describe("loopbackPorts", () => {
+	it("keeps the port of each address on this computer, the implicit one included", () => {
+		expect(
+			loopbackPorts([
+				"http://127.0.0.1:9000",
+				"http://localhost",
+				"https://localhost",
+				"https://api.example.com:9443",
+				"not an address",
+			]),
+		).toEqual([9000, 80, 443]);
 	});
 });
 
