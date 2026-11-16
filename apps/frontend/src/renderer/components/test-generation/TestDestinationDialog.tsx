@@ -157,6 +157,7 @@ export function TestDestinationDialog({
 											setSelected(CUSTOM);
 										}}
 										placeholder={t("testGeneration:destination.customPlaceholder")}
+										aria-label={t("testGeneration:destination.custom")}
 										className="font-mono text-xs"
 									/>
 									<Button

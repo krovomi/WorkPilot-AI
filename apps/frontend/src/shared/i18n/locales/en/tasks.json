@@ -183,6 +183,9 @@
 		"error": "Error"
 	},
 	"kanban": {
+		"more": {
+			"label": "More board actions"
+		},
 		"abandoned": {
 			"chip": "{{count}} abandoned",
 			"chip_other": "{{count}} abandoned",
@@ -574,7 +577,12 @@
 		"otherProjectWarning": "An emulator appears to be active for another project. Restart it to switch to this task."
 	},
 	"metadata": {
-		"severity": "severity",
+		"securitySeverity": {
+			"low": "Low severity",
+			"medium": "Medium severity",
+			"high": "High severity",
+			"critical": "Critical severity"
+		},
 		"pullRequest": "Pull Request",
 		"showMore": "Show more",
 		"showLess": "Show less",
@@ -584,6 +592,8 @@
 		"acEmpty": "No criteria defined. Click to add some.",
 		"acSyncFromAdo": "Sync from Azure DevOps",
 		"acSyncing": "Syncing…",
+		"acSyncErrorTitle": "Could not sync",
+		"acSyncErrorDesc": "The acceptance criteria could not be read from Azure DevOps.",
 		"acPlaceholder": "One criterion per line…",
 		"acEdit": "Edit",
 		"acSave": "Save",
@@ -611,6 +621,8 @@
 		"extraNotePlaceholder": "Add precisions, constraints or hints. These notes are passed to every pipeline phase (plan, code, QA, review).",
 		"extraNoteHelp": "Saved into requirements.json as additional_context.",
 		"extraNoteSaved": "Saved.",
+		"extraNoteSaveErrorTitle": "Could not save",
+		"extraNoteSaveErrorDesc": "The note could not be saved.",
 		"extraNoteSave": "Save note",
 		"extraNoteSaving": "Saving…",
 		"blockedBy": {
@@ -1344,9 +1356,10 @@
 		"saveError": "Could not save the plan"
 	},
 	"codeEditor": {
-		"deleteFile": "Delete file",
-		"contentPlaceholder": "File content...",
-		"selectFile": "Select a file to edit"
+		"hint": "Remove the files this subtask should leave alone. The files themselves do not change.",
+		"removeFile": "Remove {{name}} from this subtask",
+		"filesRemoved_one": "{{count}} file removed from the plan",
+		"filesRemoved_other": "{{count}} files removed from the plan"
 	},
 	"failure": {
 		"title": "This task failed",

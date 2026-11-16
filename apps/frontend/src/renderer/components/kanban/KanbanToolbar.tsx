@@ -32,13 +32,12 @@ import { toneClass } from "../charter";
 import { TeamRoomBar } from "../collaboration";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
 import { useProjectStore } from "../../stores/project-store";
-import { MultiRepoButton } from "../multi-repo/MultiRepoButton";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
+import { KanbanMoreMenu } from "./KanbanMoreMenu";
 import { QuickCommandBar } from "./QuickCommandBar";
-import { WorktreePurgeButton } from "./WorktreePurgeButton";
 import { ServerBoardNotice, useSelectedServerProject } from "./ServerBoardNotice";
 
 const CATEGORY_OPTIONS = Object.keys(TASK_CATEGORY_LABELS) as TaskCategory[];
@@ -117,7 +116,8 @@ interface KanbanToolbarProps {
 /**
  * Unified board toolbar: search, a single filter+sort panel (colored chips), and
  * the quick-command bar — grouped with vertical separators so each affordance
- * reads as its own zone rather than a flat row of mystery buttons.
+ * reads as its own zone rather than a flat row of mystery buttons. Occasional
+ * actions sit in the "⋯" menu at the end, so the toolbar keeps to one line.
  */
 export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 	const { t } = useTranslation(["tasks", "common"]);
@@ -422,15 +422,6 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 
 			<Separator orientation="vertical" className="h-5" />
 
-			{/* A change across several repositories: one card per repository,
-			    run on this computer, so not on a server board. */}
-			{!serverProject && projectId && (
-				<>
-					<MultiRepoButton projectId={projectId} />
-					<WorktreePurgeButton projectId={projectId} />
-					<Separator orientation="vertical" className="h-5" />
-				</>
-			)}
 
 			{/* Quick Commands run on this computer: a server board has its notice
 			    instead, until commands run on the server. */}
@@ -446,6 +437,14 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 					className="h-8"
 					variant="compact"
 				/>
+			)}
+
+			{/* Occasional actions run on this computer, so not on a server board. */}
+			{!serverProject && projectId && (
+				<>
+					<Separator orientation="vertical" className="h-5" />
+					<KanbanMoreMenu projectId={projectId} />
+				</>
 			)}
 		</div>
 	);

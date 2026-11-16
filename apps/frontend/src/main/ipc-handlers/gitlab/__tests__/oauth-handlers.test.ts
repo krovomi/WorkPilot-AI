@@ -1,232 +1,374 @@
 /**
- * Unit tests for GitLab OAuth handlers
- * Tests validation, sanitization, and utility functions
+ * @vitest-environment node
+ *
+ * The glab CLI sign-in of the GitLab settings, against a stand-in glab
+ * (child_process). The renderer names an instance by its host, as the
+ * settings page sends it; every command is an argument list run by glab's
+ * resolved path; the browser is opened by the main process on the instance's
+ * host only; the renderer learns that glab holds a token, never its value.
  */
-import { describe, expect, it } from "vitest";
 
-// Test the validation and utility functions used in oauth-handlers
-// We recreate the functions here since they're not exported
+import { EventEmitter } from "node:events";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Regex pattern to validate GitLab project format (group/project or group/subgroup/project)
-const GITLAB_PROJECT_PATTERN = /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+$/;
+type Answer = string | Error;
+const state = vi.hoisted(() => ({
+	glabPath: "/usr/bin/glab" as string | null,
+	/** Answers of glab, keyed by its arguments; missing ones fail. */
+	answers: new Map<string, Answer>(),
+	calls: [] as { command: string; args: string[] }[],
+	spawned: [] as { child: FakeChild; command: string; args: string[] }[],
+	openExternal: vi.fn(async (_url: string) => undefined),
+	openTerminal: vi.fn(async (_command: string) => undefined),
+	os: "linux",
+}));
 
-/**
- * Validate that a project string matches the expected format
- */
-function isValidGitLabProject(project: string): boolean {
-	// Allow numeric IDs
-	if (/^\d+$/.test(project)) return true;
-	return GITLAB_PROJECT_PATTERN.test(project);
+class FakeChild extends EventEmitter {
+	stdout = new EventEmitter();
+	stderr = new EventEmitter();
 }
 
-/**
- * Extract hostname from instance URL
- */
-function getHostnameFromUrl(instanceUrl: string): string {
-	try {
-		return new URL(instanceUrl).hostname;
-	} catch {
-		return "gitlab.com";
-	}
+function answerFor(command: string, args: string[]): string {
+	state.calls.push({ command, args });
+	const answer = state.answers.get(args.join(" "));
+	if (answer === undefined) throw new Error(`glab: no answer for ${args.join(" ")}`);
+	if (answer instanceof Error) throw answer;
+	return answer;
 }
 
-/**
- * Redact sensitive information from data before logging
- */
-function redactSensitiveData(data: unknown): unknown {
-	if (typeof data === "string") {
-		// Redact anything that looks like a token (glpat-*, private token patterns)
-		return data
-			.replace(/glpat-[A-Za-z0-9_-]+/g, "glpat-[REDACTED]")
-			.replace(
-				/private[_-]?token[=:]\s*["']?[A-Za-z0-9_-]+["']?/gi,
-				"private_token=[REDACTED]",
-			);
-	}
-	if (typeof data === "object" && data !== null) {
-		if (Array.isArray(data)) {
-			return data.map(redactSensitiveData);
-		}
-		const result: Record<string, unknown> = {};
-		for (const [key, value] of Object.entries(data)) {
-			// Redact known sensitive keys
-			if (/token|password|secret|credential|auth/i.test(key)) {
-				result[key] = "[REDACTED]";
-			} else {
-				result[key] = redactSensitiveData(value);
+vi.mock("node:child_process", () => {
+	const execFileSync = vi.fn((command: string, args: string[]) => answerFor(command, args));
+	const execFile = vi.fn(
+		(
+			command: string,
+			args: string[],
+			_options: unknown,
+			callback: (error: Error | null, result?: { stdout: string }) => void,
+		) => {
+			try {
+				callback(null, { stdout: answerFor(command, args) });
+			} catch (error) {
+				callback(error as Error);
 			}
+		},
+	);
+	const spawn = vi.fn((command: string, args: string[]) => {
+		const child = new FakeChild();
+		state.spawned.push({ child, command, args });
+		return child;
+	});
+	const module = { execFileSync, execFile, spawn };
+	return { ...module, default: module };
+});
+
+vi.mock("../../../cli-tool-manager", () => ({
+	getToolPath: (tool: string) => `/tools/${tool}`,
+}));
+vi.mock("../../../env-utils", () => ({
+	findExecutable: () => state.glabPath,
+	getAugmentedEnv: () => ({ PATH: "/tools" }),
+}));
+vi.mock("../../../open-external", () => ({ openExternalUrl: state.openExternal }));
+vi.mock("../../../platform", () => ({ getCurrentOS: () => state.os }));
+vi.mock("../../claude-code-handlers", () => ({
+	openTerminalWithCommand: state.openTerminal,
+}));
+
+import { ipcMain } from "electron";
+import { IPC_CHANNELS, MASKED_SECRET } from "../../../../shared/constants";
+import {
+	glabInstallCommand,
+	registerGitlabOAuthHandlers,
+	signInUrlOn,
+} from "../oauth-handlers";
+
+const invoke = (channel: string, ...args: unknown[]) =>
+	(
+		ipcMain as unknown as {
+			invokeHandler: (c: string, e: unknown, ...a: unknown[]) => Promise<unknown>;
 		}
-		return result;
-	}
-	return data;
-}
+	).invokeHandler(channel, {}, ...args);
 
-describe("GitLab OAuth Handlers", () => {
-	describe("isValidGitLabProject", () => {
-		it("should accept valid group/project format", () => {
-			expect(isValidGitLabProject("mygroup/myproject")).toBe(true);
-			expect(isValidGitLabProject("my-group/my-project")).toBe(true);
-			expect(isValidGitLabProject("my_group/my_project")).toBe(true);
-			expect(isValidGitLabProject("my.group/my.project")).toBe(true);
+beforeEach(() => {
+	state.glabPath = "/usr/bin/glab";
+	state.answers.clear();
+	state.calls = [];
+	state.spawned = [];
+	state.openExternal.mockReset().mockResolvedValue(undefined);
+	state.openTerminal.mockReset().mockResolvedValue(undefined);
+	state.os = "linux";
+	(ipcMain as unknown as { removeAllListeners: () => void }).removeAllListeners?.();
+	registerGitlabOAuthHandlers();
+});
+
+describe("the glab CLI", () => {
+	it("reports glab's version, run by the path where it was found", async () => {
+		state.answers.set("--version", "glab 1.50.0 (2026-10-01)\nmore");
+		await expect(invoke(IPC_CHANNELS.GITLAB_CHECK_CLI)).resolves.toEqual({
+			success: true,
+			data: { installed: true, version: "glab 1.50.0 (2026-10-01)" },
 		});
+		expect(state.calls[0].command).toBe("/usr/bin/glab");
+	});
 
-		it("should accept nested group/subgroup/project format", () => {
-			expect(isValidGitLabProject("group/subgroup/project")).toBe(true);
-			expect(isValidGitLabProject("org/team/subteam/project")).toBe(true);
+	it("is not installed when it is missing or does not run", async () => {
+		state.glabPath = null;
+		await expect(invoke(IPC_CHANNELS.GITLAB_CHECK_CLI)).resolves.toEqual({
+			success: true,
+			data: { installed: false },
 		});
-
-		it("should accept numeric project IDs", () => {
-			expect(isValidGitLabProject("12345")).toBe(true);
-			expect(isValidGitLabProject("1")).toBe(true);
-			expect(isValidGitLabProject("999999999")).toBe(true);
-		});
-
-		it("should reject invalid project formats", () => {
-			expect(isValidGitLabProject("")).toBe(false);
-			expect(isValidGitLabProject("project")).toBe(false); // No group
-			expect(isValidGitLabProject("/project")).toBe(false); // Missing group
-			expect(isValidGitLabProject("group/")).toBe(false); // Missing project
-			expect(isValidGitLabProject("group//project")).toBe(false); // Empty segment
-		});
-
-		it("should reject paths with special characters", () => {
-			expect(isValidGitLabProject("group/pro ject")).toBe(false); // Space
-			expect(isValidGitLabProject("group/pro@ject")).toBe(false); // @
-			expect(isValidGitLabProject("group/pro#ject")).toBe(false); // #
-			expect(isValidGitLabProject("group/pro$ject")).toBe(false); // $
-		});
-
-		it("should handle paths with dots (allowed in GitLab project names)", () => {
-			// Note: The regex pattern allows dots in project names, which is valid for GitLab
-			// Path traversal protection is handled at the API level, not in project validation
-			expect(isValidGitLabProject("group/project.name")).toBe(true);
-			expect(isValidGitLabProject("my.group/my.project")).toBe(true);
+		state.glabPath = "/usr/bin/glab";
+		await expect(invoke(IPC_CHANNELS.GITLAB_CHECK_CLI)).resolves.toEqual({
+			success: true,
+			data: { installed: false },
 		});
 	});
 
-	describe("getHostnameFromUrl", () => {
-		it("should extract hostname from valid URLs", () => {
-			expect(getHostnameFromUrl("https://gitlab.com")).toBe("gitlab.com");
-			expect(getHostnameFromUrl("https://gitlab.mycompany.com")).toBe(
-				"gitlab.mycompany.com",
-			);
-			expect(getHostnameFromUrl("https://gitlab.example.org:8443")).toBe(
-				"gitlab.example.org",
-			);
-		});
+	it("installs with this OS's package manager, in the user's terminal", async () => {
+		expect(glabInstallCommand("darwin")).toBe("brew install glab");
+		expect(glabInstallCommand("win32")).toBe("winget install --id GitLab.glab");
+		expect(glabInstallCommand("linux")).toBe("sudo snap install glab || brew install glab");
 
-		it("should handle URLs with paths", () => {
-			expect(getHostnameFromUrl("https://gitlab.com/api/v4")).toBe(
-				"gitlab.com",
-			);
+		state.os = "darwin";
+		await expect(invoke(IPC_CHANNELS.GITLAB_INSTALL_CLI)).resolves.toEqual({
+			success: true,
+			data: { command: "brew install glab" },
 		});
+		expect(state.openTerminal).toHaveBeenCalledWith("brew install glab");
+	});
 
-		it("should return gitlab.com for invalid URLs", () => {
-			expect(getHostnameFromUrl("")).toBe("gitlab.com");
-			expect(getHostnameFromUrl("not-a-url")).toBe("gitlab.com");
-			expect(getHostnameFromUrl("://invalid")).toBe("gitlab.com");
+	it("says why the terminal did not open", async () => {
+		state.openTerminal.mockRejectedValueOnce(new Error("no terminal"));
+		await expect(invoke(IPC_CHANNELS.GITLAB_INSTALL_CLI)).resolves.toEqual({
+			success: false,
+			error: "Failed to open terminal for installation: no terminal",
 		});
+		state.openTerminal.mockRejectedValueOnce("down");
+		await expect(invoke(IPC_CHANNELS.GITLAB_INSTALL_CLI)).resolves.toMatchObject({
+			error: "Failed to open terminal for installation: Unknown error",
+		});
+	});
+});
 
-		it("should handle HTTP URLs", () => {
-			expect(getHostnameFromUrl("http://localhost:8080")).toBe("localhost");
+describe("the instance the renderer names", () => {
+	it("is the host the settings page sends, not gitlab.com", async () => {
+		state.answers.set("auth status --hostname=gitlab.acme.dev", "ok");
+		state.answers.set("api user --jq .username --hostname=gitlab.acme.dev", "ada\n");
+
+		await expect(invoke(IPC_CHANNELS.GITLAB_CHECK_AUTH, "gitlab.acme.dev")).resolves.toEqual({
+			success: true,
+			data: { authenticated: true, username: "ada" },
+		});
+		expect(state.calls.every((c) => c.command === "/tools/glab")).toBe(true);
+	});
+
+	it("keeps a port, drops a scheme and a path, and needs no host for gitlab.com", async () => {
+		state.answers.set("auth status --hostname=gitlab.acme.dev:8443", "ok");
+		state.answers.set("api user --jq .username --hostname=gitlab.acme.dev:8443", "");
+		await expect(
+			invoke(IPC_CHANNELS.GITLAB_CHECK_AUTH, "https://gitlab.acme.dev:8443/sub/"),
+		).resolves.toEqual({ success: true, data: { authenticated: true } });
+
+		state.answers.set("auth status", "ok");
+		state.answers.set("api user --jq .username", "linus");
+		await expect(invoke(IPC_CHANNELS.GITLAB_CHECK_AUTH)).resolves.toMatchObject({
+			data: { username: "linus" },
+		});
+		await expect(invoke(IPC_CHANNELS.GITLAB_CHECK_AUTH, "gitlab.com")).resolves.toMatchObject({
+			data: { username: "linus" },
 		});
 	});
 
-	describe("redactSensitiveData", () => {
-		it("should redact GitLab personal access tokens in strings", () => {
-			const data = "Token is glpat-abc123XYZ_def456";
-			const result = redactSensitiveData(data);
-			expect(result).toBe("Token is glpat-[REDACTED]");
-			expect(result).not.toContain("abc123");
+	it.each([
+		["a credential", "https://ada:pat-test-0000@gitlab.acme.dev"],
+		["another protocol", "ftp://gitlab.acme.dev"],
+		["an option", "-oProxyCommand=x"],
+		["not a string", 42],
+		["not a host", "https://"],
+	])("is refused when it holds %s, before glab runs", async (_what, instance) => {
+		for (const channel of [
+			IPC_CHANNELS.GITLAB_CHECK_AUTH,
+			IPC_CHANNELS.GITLAB_START_AUTH,
+			IPC_CHANNELS.GITLAB_GET_TOKEN,
+			IPC_CHANNELS.GITLAB_GET_USER,
+			IPC_CHANNELS.GITLAB_LIST_USER_PROJECTS,
+		]) {
+			await expect(invoke(channel, instance)).resolves.toEqual({
+				success: false,
+				error: "Invalid GitLab instance",
+			});
+		}
+		expect(state.calls).toEqual([]);
+		expect(state.spawned).toEqual([]);
+	});
+});
+
+describe("the sign-in", () => {
+	it("is not signed in when glab says so", async () => {
+		state.answers.set("auth status", new Error("not logged in"));
+		await expect(invoke(IPC_CHANNELS.GITLAB_CHECK_AUTH)).resolves.toEqual({
+			success: true,
+			data: { authenticated: false },
+		});
+	});
+
+	it("is signed in without a name when glab cannot read the user", async () => {
+		state.answers.set("auth status", "ok");
+		await expect(invoke(IPC_CHANNELS.GITLAB_CHECK_AUTH)).resolves.toEqual({
+			success: true,
+			data: { authenticated: true },
+		});
+	});
+
+	it("runs glab auth login and opens its page on the instance only, once", async () => {
+		const pending = invoke(IPC_CHANNELS.GITLAB_START_AUTH, "gitlab.acme.dev");
+		const [{ child, command, args }] = state.spawned;
+		expect(command).toBe("/tools/glab");
+		expect(args).toEqual(["auth", "login", "--web", "--hostname=gitlab.acme.dev"]);
+
+		child.stdout.emit("data", Buffer.from("See https://evil.example/login first"));
+		child.stdout.emit("data", Buffer.from("no link here"));
+		child.stdout.emit(
+			"data",
+			Buffer.from("Open https://gitlab.acme.dev/oauth/authorize?x=1 in your browser"),
+		);
+		child.stdout.emit("data", Buffer.from("Again https://gitlab.acme.dev/oauth/other"));
+		child.emit("close", 0);
+
+		await expect(pending).resolves.toEqual({
+			success: true,
+			data: {
+				deviceCode: "",
+				verificationUrl: "https://gitlab.acme.dev/-/profile/personal_access_tokens",
+				userCode: "",
+			},
+		});
+		expect(state.openExternal).toHaveBeenCalledTimes(1);
+		expect(state.openExternal).toHaveBeenCalledWith(
+			"https://gitlab.acme.dev/oauth/authorize?x=1",
+		);
+	});
+
+	it("still resolves when the browser does not open", async () => {
+		state.openExternal.mockRejectedValueOnce(new Error("no browser"));
+		const pending = invoke(IPC_CHANNELS.GITLAB_START_AUTH);
+		const [{ child }] = state.spawned;
+		child.stdout.emit("data", Buffer.from("https://gitlab.com/oauth/authorize"));
+		child.emit("close", 0);
+		await expect(pending).resolves.toMatchObject({ success: true });
+	});
+
+	it("says why glab failed: its error output, its exit code, or its spawn error", async () => {
+		let pending = invoke(IPC_CHANNELS.GITLAB_START_AUTH);
+		state.spawned[0].child.stderr.emit("data", Buffer.from("denied"));
+		state.spawned[0].child.emit("close", 1);
+		await expect(pending).resolves.toMatchObject({ success: false, error: "denied" });
+
+		pending = invoke(IPC_CHANNELS.GITLAB_START_AUTH);
+		state.spawned[1].child.emit("close", 2);
+		await expect(pending).resolves.toMatchObject({
+			success: false,
+			error: "Authentication failed with exit code 2",
 		});
 
-		it("should redact private token patterns", () => {
-			const data1 = "private_token=abc123xyz";
-			const data2 = 'private-token: "mytoken"';
-			const data3 = "PRIVATE_TOKEN=secret123";
+		pending = invoke(IPC_CHANNELS.GITLAB_START_AUTH);
+		state.spawned[2].child.emit("error", new Error("ENOENT"));
+		await expect(pending).resolves.toMatchObject({ success: false, error: "ENOENT" });
+	});
 
-			expect(redactSensitiveData(data1)).toBe("private_token=[REDACTED]");
-			expect(redactSensitiveData(data2)).toBe("private_token=[REDACTED]");
-			expect(redactSensitiveData(data3)).toBe("private_token=[REDACTED]");
+	it("finds the instance's link among others", () => {
+		expect(signInUrlOn("a https://x.dev/1 b https://gitlab.com/2", "gitlab.com")).toBe(
+			"https://gitlab.com/2",
+		);
+		expect(signInUrlOn("https://[bad/ then nothing", "gitlab.com")).toBeUndefined();
+	});
+});
+
+describe("the token", () => {
+	it("reaches the renderer as the mask, never as its value", async () => {
+		state.answers.set("auth token --hostname=gitlab.acme.dev", "glpat-test-0000\n");
+		const result = await invoke(IPC_CHANNELS.GITLAB_GET_TOKEN, "gitlab.acme.dev");
+		expect(result).toEqual({ success: true, data: { token: MASKED_SECRET } });
+		expect(JSON.stringify(result)).not.toContain("glpat-test-0000");
+	});
+
+	it("is missing when glab holds none or fails", async () => {
+		state.answers.set("auth token", "  \n");
+		await expect(invoke(IPC_CHANNELS.GITLAB_GET_TOKEN)).resolves.toEqual({
+			success: false,
+			error: "No token found. Please authenticate first.",
 		});
-
-		it("should redact sensitive keys in objects", () => {
-			const data = {
-				username: "testuser",
-				token: "secret123",
-				password: "pass456",
-				auth: "bearer xyz",
-				credential: "cred789",
-			};
-
-			const result = redactSensitiveData(data) as Record<string, unknown>;
-
-			expect(result.username).toBe("testuser");
-			expect(result.token).toBe("[REDACTED]");
-			expect(result.password).toBe("[REDACTED]");
-			expect(result.auth).toBe("[REDACTED]");
-			expect(result.credential).toBe("[REDACTED]");
+		state.answers.set("auth token", new Error("not logged in"));
+		await expect(invoke(IPC_CHANNELS.GITLAB_GET_TOKEN)).resolves.toMatchObject({
+			success: false,
 		});
+	});
+});
 
-		it("should redact nested sensitive data", () => {
-			const data = {
-				user: {
-					name: "test",
-					authToken: "secret",
-				},
-				config: {
-					secretValue: "key123",
-				},
-			};
-
-			const result = redactSensitiveData(data) as Record<
-				string,
-				Record<string, unknown>
-			>;
-
-			expect(result.user.name).toBe("test");
-			expect(result.user.authToken).toBe("[REDACTED]");
-			expect(result.config.secretValue).toBe("[REDACTED]");
+describe("the user and their projects", () => {
+	it("gives the user's name, and their display name when it is text", async () => {
+		state.answers.set("api user", JSON.stringify({ username: "ada", name: "Ada L." }));
+		await expect(invoke(IPC_CHANNELS.GITLAB_GET_USER)).resolves.toEqual({
+			success: true,
+			data: { username: "ada", name: "Ada L." },
 		});
-
-		it("should redact tokens in arrays", () => {
-			const data = ["glpat-secret123", "normal text"];
-			const result = redactSensitiveData(data) as string[];
-
-			expect(result[0]).toBe("glpat-[REDACTED]");
-			expect(result[1]).toBe("normal text");
+		state.answers.set("api user", JSON.stringify({ username: "ada", name: 7 }));
+		await expect(invoke(IPC_CHANNELS.GITLAB_GET_USER)).resolves.toEqual({
+			success: true,
+			data: { username: "ada" },
 		});
+	});
 
-		it("should preserve non-sensitive values", () => {
-			expect(redactSensitiveData("normal text")).toBe("normal text");
-			expect(redactSensitiveData(123)).toBe(123);
-			expect(redactSensitiveData(null)).toBe(null);
-			expect(redactSensitiveData(undefined)).toBe(undefined);
-			expect(redactSensitiveData(true)).toBe(true);
+	it("fails on a user without a name, on what is not JSON, and on glab's error", async () => {
+		state.answers.set("api user", "null");
+		await expect(invoke(IPC_CHANNELS.GITLAB_GET_USER)).resolves.toEqual({
+			success: false,
+			error: "Failed to get user info",
 		});
+		state.answers.set("api user", "<html>");
+		await expect(invoke(IPC_CHANNELS.GITLAB_GET_USER)).resolves.toMatchObject({
+			success: false,
+		});
+		state.answers.set("api user", new Error("401"));
+		await expect(invoke(IPC_CHANNELS.GITLAB_GET_USER)).resolves.toEqual({
+			success: false,
+			error: "401",
+		});
+	});
 
-		it("should handle complex nested structures", () => {
-			const data = {
-				items: [
-					{ id: 1, accessToken: "token1" },
-					{ id: 2, accessToken: "token2" },
+	it("lists the user's projects, keeping only entries with a path", async () => {
+		state.answers.set(
+			"repo list --mine -F json --hostname=gitlab.acme.dev",
+			JSON.stringify([
+				{ path_with_namespace: "acme/shop", description: "Shop", visibility: "internal" },
+				{ path_with_namespace: "acme/blog", description: null },
+				{ description: "no path" },
+				null,
+			]),
+		);
+		await expect(
+			invoke(IPC_CHANNELS.GITLAB_LIST_USER_PROJECTS, "gitlab.acme.dev"),
+		).resolves.toEqual({
+			success: true,
+			data: {
+				projects: [
+					{ pathWithNamespace: "acme/shop", description: "Shop", visibility: "internal" },
+					{ pathWithNamespace: "acme/blog", description: null, visibility: "private" },
 				],
-				meta: {
-					secretKey: "key123",
-					count: 2,
-				},
-			};
+			},
+		});
+	});
 
-			const result = redactSensitiveData(data) as {
-				items: Array<{ id: number; accessToken: string }>;
-				meta: { secretKey: string; count: number };
-			};
-
-			expect(result.items[0].id).toBe(1);
-			expect(result.items[0].accessToken).toBe("[REDACTED]");
-			expect(result.items[1].accessToken).toBe("[REDACTED]");
-			expect(result.meta.secretKey).toBe("[REDACTED]");
-			expect(result.meta.count).toBe(2);
+	it("fails on a list that is not one, and on glab's error", async () => {
+		state.answers.set("repo list --mine -F json", JSON.stringify({ message: "nope" }));
+		await expect(invoke(IPC_CHANNELS.GITLAB_LIST_USER_PROJECTS)).resolves.toEqual({
+			success: false,
+			error: "Failed to list projects",
+		});
+		state.answers.set("repo list --mine -F json", new Error("timeout"));
+		await expect(invoke(IPC_CHANNELS.GITLAB_LIST_USER_PROJECTS)).resolves.toEqual({
+			success: false,
+			error: "timeout",
 		});
 	});
 });
