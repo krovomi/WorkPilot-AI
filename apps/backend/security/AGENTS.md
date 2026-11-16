@@ -60,8 +60,6 @@ Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middlewa
 À ne pas citer comme une barrière : ces modules existent mais ne sont branchés sur aucun chemin
 d'exécution d'agent.
 
-- `secure_subprocess.py` : un seul appelant ; la plupart des sous-processus appellent
-  `subprocess` directement (voir la règle S4).
 - `sandbox.py`, `anomaly_detector.py` : n'alimentent qu'un endpoint de statut.
 - `tool_input_validator.py` : extrait l'entrée d'un outil pour l'affichage, ne refuse rien.
 
