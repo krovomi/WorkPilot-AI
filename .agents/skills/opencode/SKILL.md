@@ -23,7 +23,7 @@ metadata:
     - hermes-agent
   workpilot:
     pack: hermes
-    version: 0.1.0
+    version: 0.2.0
     content_sha256: 53aae5e64c7cdd4ff49c128f5d0b33a6977631bdf680ae6d8166ff9a0fa38470
 ---
 

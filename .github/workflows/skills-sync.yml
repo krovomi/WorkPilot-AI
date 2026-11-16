@@ -37,8 +37,12 @@ jobs:
     name: Check upstream skill packs
     runs-on: ubuntu-latest
     steps:
+      # No token left in .git/config: the steps below run the build on
+      # upstream content, and only the last step needs to write.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -78,10 +82,13 @@ jobs:
         if: steps.check.outputs.changed == 'true'
         run: python3 scripts/skills_cli.py build
 
+      # PAT_TOKEN, as the stack and release autopilots use: GitHub starts no
+      # workflow for a push or a pull request made with the default token, so
+      # a sync PR opened with it never got a check and never merged (#1059).
       - name: Open a pull request
         if: steps.check.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
           # Passed through the environment rather than interpolated into the
           # script: a summary containing a quote or a newline would otherwise
           # break out of the shell command.
@@ -96,7 +103,7 @@ jobs:
           git add -A
           printf 'chore(skills): sync upstream packs\n\n%s\n' "$SUMMARY" > /tmp/msg
           git commit -F /tmp/msg
-          git push -u origin "$branch"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${branch}"
           {
             printf 'Opened by the weekly skills sync.\n\n%s\n\n' "$SUMMARY"
             printf 'A release that removes a skill, narrows its targets or adds a\n'
@@ -113,7 +120,7 @@ jobs:
           # silently, with the branch pushed and nobody told. The branch is
           # still the deliverable, so say where it is, in an issue a person
           # gets notified of, and fail loudly only if that fails too.
-          if ! gh pr create --base develop \
+          if ! gh pr create --base develop --head "$branch" \
                  --title "chore(skills): sync upstream packs" \
                  --body-file /tmp/body 2> /tmp/pr-error; then
             reason="$(cat /tmp/pr-error)"

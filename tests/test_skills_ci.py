@@ -65,3 +65,30 @@ def test_the_weekly_sync_builds_from_committed_content_only():
     ]
     assert bootstrap and clean and build
     assert bootstrap[0] < clean[0] < build[0]
+
+
+def _named(steps: list[dict], name: str) -> dict:
+    return next(step for step in steps if step.get("name") == name)
+
+
+def test_the_sync_pull_request_is_opened_with_a_token_that_starts_ci():
+    """GitHub starts no workflow for a push or a pull request made with the
+    default token: #1059 never got a single check, so it could not merge."""
+    steps = _steps("skills-sync.yml", "sync")
+    open_pr = _named(steps, "Open a pull request")
+    assert open_pr["env"]["GH_TOKEN"] == "${{ secrets.PAT_TOKEN || github.token }}"
+    assert "x-access-token:${GH_TOKEN}@github.com" in open_pr["run"]
+    assert '--head "$branch"' in open_pr["run"]
+
+
+def test_the_sync_keeps_no_token_in_the_checkout():
+    """The build runs on upstream content; the write token only exists in the
+    step that pushes."""
+    checkout = _named(_steps("skills-sync.yml", "sync"), "Checkout")
+    assert checkout["with"]["persist-credentials"] is False
+    others = [
+        step
+        for step in _steps("skills-sync.yml", "sync")
+        if step.get("name") != "Open a pull request"
+    ]
+    assert all("PAT_TOKEN" not in str(step) for step in others)
