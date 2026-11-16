@@ -175,7 +175,7 @@ jobs:
           python -m coverage combine .coverage.shard*
           # A floor, not a goal: just under what the suite covers, raised by
           # each lot of the 100 % plan (75.4 % on 15 November 2026, src/ included).
-          python -m coverage report --fail-under=83 | tail -n 3
+          python -m coverage report --fail-under=88 | tail -n 3
           python -m coverage xml -o apps/backend/coverage.xml
 
       # The floor above holds the whole suite; this holds each change at

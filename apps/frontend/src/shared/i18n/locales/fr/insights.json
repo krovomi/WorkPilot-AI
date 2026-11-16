@@ -27,7 +27,8 @@
 		"suggested": "Tâche Suggérée",
 		"creating": "Création...",
 		"created": "Tâche Créée",
-		"create": "Créer une Tâche"
+		"create": "Créer une Tâche",
+		"createFailed": "La tâche n'a pas pu être créée. Réessayez."
 	},
 	"tools": {
 		"tool": "outil",

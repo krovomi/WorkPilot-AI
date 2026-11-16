@@ -265,7 +265,12 @@ export function GitLabIntegration({
 				.replace(/\/$/, "");
 			const tokenResult = await window.electronAPI.getGitLabToken(hostname);
 			if (tokenResult.success && tokenResult.data?.token) {
-				updateEnvConfig({ gitlabToken: tokenResult.data.token });
+				// The mask: saving it with the OAuth method stores glab's token from
+				// the main process.
+				updateEnvConfig({
+					gitlabToken: tokenResult.data.token,
+					gitlabAuthMethod: "oauth",
+				});
 			}
 
 			const userResult = await window.electronAPI.getGitLabUser(hostname);

@@ -397,7 +397,6 @@ export function DocumentationView({ projectId }: DocumentationViewProps) {
 		(s) => s.projects.find((p) => p.id === projectId)?.path ?? "",
 	);
 	const bindProject = useDocumentationStore((s) => s.bindProject);
-	const setStatus = useDocumentationStore((s) => s.setStatus);
 	const run = useDocumentationStore((s) => s.run);
 	const cancel = useDocumentationStore((s) => s.cancel);
 	const running = useDocumentationStore((s) => s.running);
@@ -409,8 +408,6 @@ export function DocumentationView({ projectId }: DocumentationViewProps) {
 	useEffect(() => {
 		if (projectPath) bindProject(projectPath);
 	}, [projectPath, bindProject]);
-
-	useEffect(() => globalThis.electronAPI?.onDocumentationProgress?.(setStatus), [setStatus]);
 
 	useEffect(() => {
 		if (currentFile) setFilePath(currentFile);

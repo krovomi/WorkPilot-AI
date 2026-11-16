@@ -392,6 +392,28 @@ class TestPreflight:
             encoding="utf-8"
         )
 
+    def test_a_master_the_scan_cannot_answer_for_is_withheld(
+        self, react_project, monkeypatch
+    ):
+        import injection_guard
+
+        def broken(self, text, source=""):
+            raise RuntimeError("scanner bug")
+
+        monkeypatch.setattr(injection_guard.InjectionScanner, "scan", broken)
+        master = react_project / "design-system" / "shop" / "MASTER.md"
+        master.parent.mkdir(parents=True)
+        master.write_text("# Ours\n| Primary | `#123456` | `--p` |\n", encoding="utf-8")
+        spec = _spec(react_project, "settings page", [["App.tsx"]])
+
+        result = run_preflight(react_project, spec)
+
+        assert result.status == "withheld" and result.source == "project"
+        design = spec / "uiux" / "design-system.md"
+        assert not design.exists() or "#123456" not in design.read_text(
+            encoding="utf-8"
+        )
+
     def test_persisting_can_be_switched_off(self, react_project, monkeypatch):
         monkeypatch.setenv("UIUX_PERSIST_MASTER", "false")
         spec = _spec(react_project, "settings page", [["App.tsx"]])
