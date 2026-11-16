@@ -20,11 +20,12 @@ import json
 import os
 import shlex
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+from tests.allowlisted_python import allowlisted_python
 
 aiohttp = pytest.importorskip("aiohttp")
 from aiohttp import web  # noqa: E402
@@ -37,7 +38,7 @@ CONCLUSION = {
 
 
 def _python_command(script: str) -> str:
-    args = [sys.executable, "-c", script]
+    args = [allowlisted_python(), "-c", script]
     return subprocess.list2cmdline(args) if os.name == "nt" else shlex.join(args)
 
 
