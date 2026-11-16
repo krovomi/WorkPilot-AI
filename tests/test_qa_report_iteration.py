@@ -8,18 +8,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
-# Add tests directory and backend to path
-sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
-
-# Setup mocks before importing auto-claude modules
-from qa_report_helpers import cleanup_qa_report_mocks, setup_qa_report_mocks
-
-# Setup mocks
-setup_qa_report_mocks()
-
-# Import report functions after mocking
 from qa.criteria import (
     load_implementation_plan,
     save_implementation_plan,
@@ -32,13 +20,6 @@ from qa.report import (
 # =============================================================================
 # FIXTURES
 # =============================================================================
-
-
-@pytest.fixture(scope="module", autouse=True)
-def cleanup_mocked_modules():
-    """Restore original modules after all tests in this module complete."""
-    yield
-    cleanup_qa_report_mocks()
 
 
 @pytest.fixture

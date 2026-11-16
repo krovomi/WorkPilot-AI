@@ -73,9 +73,10 @@ import fnmatch
 import logging
 import os
 import re
-import tempfile
 from pathlib import Path
 from typing import Any
+
+from .scratch_dir import workpilot_scratch_dir
 
 logger = logging.getLogger(__name__)
 
@@ -303,16 +304,6 @@ def protected_config_refusal(path: str, base: Path | None) -> str | None:
     )
 
 
-def workpilot_scratch_dir() -> Path:
-    """The one directory under the system temp root a build may write to.
-
-    Kept narrow deliberately: `tempfile.gettempdir()` is shared with every
-    process on the machine, and naming it as a root would also re-open a
-    worktree that happens to sit under it.
-    """
-    return Path(tempfile.gettempdir()) / "workpilot"
-
-
 def _resolved(path: Path | str) -> Path | None:
     try:
         return Path(path).expanduser().resolve()
@@ -393,6 +384,11 @@ def make_write_path_hook(
     """
     roots = resolve_write_roots(project_dir, spec_dir)
     base = _resolved(project_dir) if project_dir else None
+    # The reinforced sandbox (Settings, Sandbox): a narrowing inside the
+    # roots, read once like them. Imported here: `sandbox` reads this module.
+    from .sandbox import current_policy, write_refusal
+
+    policy = current_policy()
 
     async def _hook(
         input_data: dict[str, Any],
@@ -432,6 +428,12 @@ def make_write_path_hook(
                 logger.warning("write refused on security configuration: %s", target)
                 return _deny(refusal)
 
+            if refusal := write_refusal(
+                policy, target, base, spec_dir, _content_bytes(tool_input)
+            ):
+                logger.warning("write refused by the sandbox: %s", target)
+                return _deny(refusal)
+
         if not roots:
             # Nothing to confine against means the caller gave neither a
             # project nor a spec directory. Refusing every write would break a
@@ -443,6 +445,14 @@ def make_write_path_hook(
         return {}
 
     return _hook
+
+
+def _content_bytes(tool_input: dict[str, Any]) -> int | None:
+    """The size of what a whole-file write sends; None for an edit."""
+    content = tool_input.get("content")
+    if isinstance(content, str):
+        return len(content.encode("utf-8", errors="replace"))
+    return None
 
 
 def _deny(reason: str) -> dict[str, Any]:

@@ -314,50 +314,36 @@
 			"title": "Paramètres d'agent"
 		},
 		"anomaly-detection": {
-			"description": "Surveillance du comportement des agents et alertes",
+			"description": "Le score de confiance de chaque session d'agent, et ce qui la met en pause ou l'arrête",
 			"title": "Détection d'anomalies",
 			"enable": {
 				"title": "Activer la détection d'anomalies",
-				"description": "Surveiller toutes les sessions d'agents pour un comportement suspect"
+				"description": "Surveiller chaque session d'agent, quel que soit le provider"
 			},
 			"trustScore": {
-				"title": "Seuils de score de confiance",
-				"description": "Chaque session d'agent commence à 100. Les anomalies réduisent le score. Les actions se déclenchent à ces seuils.",
-				"pauseThreshold": "Seuil de pause",
-				"pauseDescription": "L'agent est mis en pause et une notification est envoyée",
-				"terminateThreshold": "Seuil de terminaison",
-				"terminateDescription": "L'agent est terminé immédiatement"
+				"title": "Seuils du score de confiance",
+				"description": "Chaque session d'agent commence à 100 ; chaque anomalie le fait baisser.",
+				"pauseThreshold": "Pause à partir de",
+				"pauseDescription": "La tâche est mise en pause et une notification est envoyée ; ses fichiers restent tels quels.",
+				"stopThreshold": "Arrêt à partir de",
+				"stopDescription": "La session est arrêtée et, si c'est activé dans Bac à sable, ses fichiers sont ramenés à l'instantané pris avant elle."
 			},
 			"detectionLimits": {
 				"title": "Limites de détection",
-				"description": "Ajuster quand les types d'anomalies spécifiques se déclenchent.",
-				"massDeletionCount": "Nombre de suppressions massives",
-				"massDeletionDesc": "Suppressions de fichiers avant alerte",
-				"maxRepetitiveErrors": "Erreurs répétitives maximales",
-				"maxRepetitiveDesc": "Erreurs avant alerte",
-				"rapidChangeWindow": "Fenêtre de changement rapide (s)",
-				"rapidChangeDesc": "Fenêtre de temps pour les changements rapides",
-				"tokenUsageMultiplier": "Multiplicateur d'utilisation de tokens",
-				"tokenUsageDesc": "× baseline avant alerte"
+				"description": "À partir de quand certaines anomalies comptent.",
+				"massDeletionCount": "Suppression massive",
+				"massDeletionDesc": "Fichiers supprimés dans une session avant que ça compte",
+				"maxRepetitiveErrors": "Erreurs répétées",
+				"maxRepetitiveDesc": "Appels d'outils en échec dans une session avant que ça compte",
+				"rapidChangeWindow": "Fenêtre des changements rapides (s)",
+				"rapidChangeDesc": "20 écritures dans cette fenêtre comptent comme des changements rapides"
 			},
 			"anomalyTypes": {
-				"title": "Types d'anomalies",
-				"description": "10 types d'anomalies sont surveillés. Chacun réduit le score de confiance d'un montant fixe.",
+				"title": "Ce qui fait baisser le score",
+				"description": "Une commande est jugée sur les programmes qu'elle lance, un chemin sur des noms de fichier entiers : rsync n'est pas nc, .env.example n'est pas .env.",
 				"anomaly": "Anomalie",
 				"severity": "Gravité",
-				"scoreImpact": "Impact sur le score",
-				"types": {
-					"massFileDeletion": "Suppression massive de fichiers",
-					"sensitiveFileAccess": "Accès aux fichiers sensibles",
-					"dangerousCommand": "Commande dangereuse",
-					"unexpectedNetworkAccess": "Accès réseau inattendu",
-					"pathTraversalAttempt": "Tentative de traversée de chemin",
-					"rapidFileChanges": "Changements de fichiers rapides",
-					"excessiveTokenUsage": "Utilisation excessive de tokens",
-					"systemConfigModification": "Modification de configuration système",
-					"repetitiveErrors": "Erreurs répétitives",
-					"longRunningSession": "Session longue"
-				},
+				"scoreImpact": "Score",
 				"severityLevels": {
 					"critical": "critique",
 					"high": "élevée",
@@ -366,8 +352,8 @@
 				}
 			},
 			"sensitivePaths": {
-				"title": "Chemins sensibles (toujours surveillés)",
-				"description": "Ces chemins sont toujours surveillés pour une activité suspecte."
+				"title": "Chemins sensibles",
+				"description": "Lire ou écrire l'un d'eux fait baisser le score, une fois par fichier."
 			}
 		},
 		"appearance": {
@@ -400,56 +386,51 @@
 			"title": "Outils CLI"
 		},
 		"sandbox": {
-			"description": "Isolation de l'exécution des agents et rollback",
 			"title": "Bac à sable",
-			"defaultMode": {
-				"title": "Mode de bac à sable par défaut",
-				"description": "Choisissez le mode d'isolation par défaut pour l'exécution des agents.",
+			"description": "Instantanés avant chaque session d'agent, et les limites d'une session",
+			"snapshots": {
+				"title": "Instantanés et retour arrière",
+				"description": "Avant chaque session d'agent (planification, code, QA), le worktree de la tâche est enregistré dans un commit git caché. Ça marche pour tous les langages et toutes les stacks : les fichiers ignorés (node_modules, bin, obj, .venv…) ne sont pas copiés. On en restaure un depuis la carte d'une tâche en pause.",
+				"enable": "Instantané avant chaque session",
+				"enableHint": "Seulement dans les worktrees de tâche ; le dépôt principal du projet n'est jamais touché.",
+				"autoRollback": "Restaurer automatiquement quand une session est arrêtée",
+				"autoRollbackHint": "Quand la détection d'anomalies arrête une session, ou que l'agent écrit hors des règles du bac à sable. L'état remplacé est gardé lui aussi en instantané.",
+				"keep": "Instantanés gardés par tâche",
+				"keepHint": "Les plus anciens sont supprimés."
+			},
+			"mode": {
+				"title": "Mode d'écriture",
+				"description": "Dans le projet. Une écriture hors du projet est toujours refusée.",
 				"normal": {
 					"label": "Normal",
-					"description": "Liste blanche + limites de ressources"
+					"description": "L'agent écrit partout dans son worktree."
 				},
 				"restricted": {
 					"label": "Restreint",
-					"description": "Liste blanche stricte, limites réduites"
-				},
-				"dryRun": {
-					"label": "Simulation",
-					"description": "Planification uniquement, aucune modification de fichier"
-				},
-				"docker": {
-					"label": "Docker",
-					"description": "Isolation complète du conteneur"
+					"description": "Seuls les chemins listés ci-dessous sont modifiables (les fichiers propres à la tâche le restent)."
 				}
 			},
-			"fileAccess": {
-				"title": "Liste blanche d'accès aux fichiers",
-				"description": "Chemins que les agents sont autorisés à accéder. Les chemins sensibles (.git/, .env, .ssh/) sont toujours bloqués.",
-				"placeholder": "ex: lib/ ou config/app.json",
-				"read": "Lecture",
-				"write": "Écriture",
-				"readWrite": "Lecture/Écriture",
-				"readOnly": "Lecture seule",
-				"add": "Ajouter"
+			"paths": {
+				"title": "Chemins modifiables (mode restreint)",
+				"description": "Relatifs au projet, dossiers ou fichiers. Refusé avant l'écriture quand le provider passe par les hooks de WorkPilot ; pour les agents CLI qui écrivent avec leurs propres outils, l'écriture est détectée, la session arrêtée et l'instantané restauré.",
+				"placeholder": "ex. src/ ou tests/unit",
+				"add": "Ajouter",
+				"remove": "Retirer {{path}}",
+				"invalid": "Un chemin dans le projet, sans .. et non absolu.",
+				"emptyRestricted": "Mode restreint sans chemin : l'agent ne peut écrire que les fichiers propres à la tâche."
 			},
-			"resourceLimits": {
-				"title": "Limites de ressources",
-				"description": "Ressources maximales qu'un agent peut consommer par exécution.",
-				"cpu": "CPU (%)",
-				"ram": "RAM (Mo)",
-				"maxTime": "Temps max (s)",
-				"maxFiles": "Fichiers max",
-				"maxFileSize": "Taille max fichier (Mo)"
+			"limits": {
+				"title": "Limites par session",
+				"description": "Comptées pour tous les providers. 0 veut dire sans limite.",
+				"none": "sans limite",
+				"maxFiles": "Fichiers écrits",
+				"maxFilesHint": "Fichiers distincts ; au-delà, la tâche est mise en pause.",
+				"maxFileSize": "Plus gros fichier",
+				"maxFileSizeHint": "Une écriture plus grosse est refusée (ou arrête la session).",
+				"maxSession": "Plus longue session",
+				"maxSessionHint": "Au-delà, la tâche est mise en pause."
 			},
-			"snapshots": {
-				"title": "Instantanés & Rollback",
-				"description": "Un instantané des fichiers est automatiquement créé avant chaque exécution d'agent. Si l'agent échoue, les fichiers sont restaurés automatiquement.",
-				"warning": "Les instantanés sont créés par bac à sable et stockés en mémoire. Le rollback automatique se déclenche lorsqu'une exécution d'agent échoue ou est terminée par le détecteur d'anomalies. Le rollback manuel est disponible dans la vue des détails de tâche."
-			},
-			"blockedCommands": {
-				"title": "Commandes bloquées (par défaut)",
-				"description": "Ces commandes sont toujours bloquées à l'intérieur du bac à sable."
-			}
+			"always": "Toujours actifs, quels que soient ces réglages : la liste des commandes autorisées, les écritures confinées aux dossiers du build, les fichiers de sécurité protégés, et le bac à sable de l'OS autour des commandes quand le système en a un."
 		},
 		"scheduler": {},
 		"terminal-fonts": {
