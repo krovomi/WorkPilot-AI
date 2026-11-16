@@ -97,6 +97,13 @@ export function useLinearImportModal({
 		[setImportError, setIssuesError, setProjectsError, setTeamsError],
 	);
 
+	// A Linear project belongs to a team: choosing another team drops it, or
+	// the issues were asked for with the old team's project.
+	const selectTeam = useCallback((teamId: string) => {
+		setSelectedTeamId(teamId);
+		setSelectedProjectId("");
+	}, []);
+
 	// Refresh handler
 	const handleRefresh = useCallback(() => {
 		// Force re-fetch by temporarily clearing and resetting team
@@ -151,7 +158,7 @@ export function useLinearImportModal({
 		importResult,
 
 		// Handlers
-		setSelectedTeamId,
+		setSelectedTeamId: selectTeam,
 		setSelectedProjectId,
 		setSearchQuery,
 		setFilterState,
