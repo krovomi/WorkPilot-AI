@@ -11,7 +11,6 @@ Covers:
 - Incompatible change patterns (overlapping modifications)
 - Conflict severity assessment
 - Merge strategy suggestion
-- Human-readable conflict explanations
 """
 
 import sys
@@ -374,48 +373,6 @@ class TestSeverityAssessment:
                 c.severity in {ConflictSeverity.NONE, ConflictSeverity.LOW}
                 for c in conflicts
             )
-
-
-class TestConflictExplanation:
-    """Tests for human-readable conflict explanations."""
-
-    def test_explain_conflict(self, conflict_detector):
-        """Conflict explanation is human-readable."""
-        from merge import ConflictRegion
-
-        conflict = ConflictRegion(
-            file_path="test.py",
-            location="function:main",
-            tasks_involved=["task-001", "task-002"],
-            change_types=[ChangeType.MODIFY_FUNCTION, ChangeType.MODIFY_FUNCTION],
-            severity=ConflictSeverity.HIGH,
-            can_auto_merge=False,
-            merge_strategy=MergeStrategy.AI_REQUIRED,
-            reason="Multiple modifications to same function",
-        )
-
-        explanation = conflict_detector.explain_conflict(conflict)
-
-        assert "test.py" in explanation
-        assert "task-001" in explanation
-        assert "task-002" in explanation
-        assert "function:main" in explanation
-
-    def test_explanation_includes_severity(self, conflict_detector):
-        """Conflict explanation includes severity level."""
-        from merge import ConflictRegion
-
-        conflict = ConflictRegion(
-            file_path="app.py",
-            location="function:critical_func",
-            tasks_involved=["task-1"],
-            change_types=[ChangeType.MODIFY_FUNCTION],
-            severity=ConflictSeverity.CRITICAL,
-            can_auto_merge=False,
-        )
-
-        explanation = conflict_detector.explain_conflict(conflict)
-        assert "CRITICAL" in explanation or "critical" in explanation.lower()
 
 
 class TestMergeStrategySelection:

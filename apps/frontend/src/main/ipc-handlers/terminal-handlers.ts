@@ -18,6 +18,10 @@ import {
 } from "../claude-profile/renderer-view";
 import { migrateSession } from "../claude-profile/session-utils";
 import { getUsageMonitor } from "../claude-profile/usage-monitor";
+import {
+	withProfilesPlans,
+	withUsagePlan,
+} from "../claude-profile/usage-plan";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import { projectStore } from "../project-store";
 import { readSettingsFileAsync } from "../settings-utils";
@@ -667,6 +671,7 @@ export function registerTerminalHandlers(
 					// Use getCurrentUsage for general requests (backward compatibility)
 					usage = monitor.getCurrentUsage();
 				}
+				usage = await withUsagePlan(usage);
 
 				// Also emit the fresh usage so event-based listeners stay in sync
 				if (usage) {
@@ -696,8 +701,9 @@ export function registerTerminalHandlers(
 		): Promise<IPCResult<AllProfilesUsage | null>> => {
 			try {
 				const monitor = getUsageMonitor();
-				const allProfilesUsage =
-					await monitor.getAllProfilesUsage(forceRefresh);
+				const allProfilesUsage = await withProfilesPlans(
+					await monitor.getAllProfilesUsage(forceRefresh),
+				);
 				return { success: true, data: allProfilesUsage };
 			} catch (error) {
 				return {
@@ -928,19 +934,33 @@ export function initializeUsageMonitorForwarding(
 ): void {
 	const monitor = getUsageMonitor();
 
-	// Forward usage updates to renderer
+	// Forward usage updates to renderer, each with its account's plan. One
+	// queue keeps the events in the order the monitor emitted them.
+	let forwarding: Promise<void> = Promise.resolve();
+	const forward = (send: () => Promise<void>) => {
+		// A window closed meanwhile makes send throw: that event is dropped.
+		forwarding = forwarding.then(() => send().catch(() => undefined));
+	};
 	monitor.on("usage-updated", (usage: UsageSnapshot) => {
-		mainWindow.webContents.send(IPC_CHANNELS.USAGE_UPDATED, usage);
+		forward(async () => {
+			const withPlan = await withUsagePlan(usage).catch(() => usage);
+			mainWindow.webContents.send(IPC_CHANNELS.USAGE_UPDATED, withPlan);
+		});
 	});
 
 	// Forward all profiles usage updates to renderer (for multi-profile display)
 	monitor.on(
 		"all-profiles-usage-updated",
 		(allProfilesUsage: AllProfilesUsage) => {
-			mainWindow.webContents.send(
-				IPC_CHANNELS.ALL_PROFILES_USAGE_UPDATED,
-				allProfilesUsage,
-			);
+			forward(async () => {
+				const withPlans = await withProfilesPlans(allProfilesUsage).catch(
+					() => allProfilesUsage,
+				);
+				mainWindow.webContents.send(
+					IPC_CHANNELS.ALL_PROFILES_USAGE_UPDATED,
+					withPlans,
+				);
+			});
 		},
 	);
 
