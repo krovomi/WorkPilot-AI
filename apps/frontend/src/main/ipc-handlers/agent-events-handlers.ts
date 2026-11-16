@@ -48,6 +48,7 @@ import {
 	handlePermissionTaskEvent,
 } from "./task-permission-handlers";
 import { safeSendToRenderer } from "./utils";
+import { registerProviderFailover } from "../provider-failover/provider-failover";
 
 /**
  * Validate that an implementation plan has proper structure with phases and subtasks
@@ -297,6 +298,8 @@ export function registerAgenteventsHandlers(
 	getMainWindow: () => BrowserWindow | null,
 ): void {
 	taskStateManager.configure(getMainWindow);
+	// A task stopped on a limit moves to the next account of the failover chain.
+	registerProviderFailover(agentManager);
 
 	// Track task IDs that have hit rate limits to prevent them from being
 	// incorrectly moved to human_review when the process exits non-zero.
