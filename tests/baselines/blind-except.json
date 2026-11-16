@@ -191,7 +191,7 @@
   "apps/backend/project/stack.py": {"blind": 2, "silent": 0},
   "apps/backend/project/ui_stack.py": {"blind": 2, "silent": 0},
   "apps/backend/prompts_pkg/prompt_generator.py": {"blind": 4, "silent": 3},
-  "apps/backend/prompts_pkg/prompts.py": {"blind": 7, "silent": 0},
+  "apps/backend/prompts_pkg/prompts.py": {"blind": 6, "silent": 0},
   "apps/backend/provider_api.py": {"blind": 28, "silent": 1},
   "apps/backend/provider_models_catalog.py": {"blind": 4, "silent": 1},
   "apps/backend/qa/auto_fix_loop.py": {"blind": 1, "silent": 0},
