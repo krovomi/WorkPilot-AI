@@ -65,5 +65,109 @@
 		"agent_config_updated": "Agent settings changed",
 		"agent_completed": "Agent answered",
 		"agent_failed": "Agent failed"
+	},
+	"roles": {
+		"architect": "Architect",
+		"coder": "Coder",
+		"tester": "Tester",
+		"reviewer": "Reviewer",
+		"documenter": "Documenter",
+		"planner": "Planner",
+		"debugger": "Debugger",
+		"custom": "Custom"
+	},
+	"compose": {
+		"tabManual": "Manual",
+		"tabAuto": "Auto-compose",
+		"tabsLabel": "How to add agents",
+		"intro": "Describe the work, pick a spec or a template: Mission Control suggests a crew across the providers you choose, and a cheaper one if you set a budget.",
+		"templatesLabel": "Template",
+		"templates": {
+			"auto": {
+				"label": "From the description",
+				"hint": "The work decides: its kind, size, domains and tests."
+			},
+			"bug_fix": {
+				"label": "Bug fix",
+				"hint": "A debugger, a coder, a tester when the project has tests."
+			},
+			"new_feature": {
+				"label": "New feature",
+				"hint": "An architect, coders by size, a reviewer, a tester."
+			},
+			"refactor_module": {
+				"label": "Refactor module",
+				"hint": "An architect, coders by size, a critical reviewer."
+			},
+			"incident_response": {
+				"label": "Incident response",
+				"hint": "A flagship debugger, a coder, a reviewer, a post-mortem writer."
+			},
+			"generic": {
+				"label": "Generic",
+				"hint": "A coder and a reviewer."
+			}
+		},
+		"promptLabel": "Work to do",
+		"promptPlaceholder": "e.g. Fix the crash when the login API times out",
+		"specLabel": "Spec of a task",
+		"noSpec": "No spec",
+		"providersLabel": "Providers",
+		"providersHint": "Each role goes to the first provider that has a capable model of its tier.",
+		"providerOrder": "Order of preference: {{list}}",
+		"budgetLabel": "Maximum budget",
+		"budgetPlaceholder": "No limit",
+		"budgetUnits": {
+			"usd": "US dollars",
+			"tokens": "Tokens"
+		},
+		"refine": "Ask a fast model of the first provider for a second opinion",
+		"suggest": "Suggest a crew",
+		"summary": "Template: {{template}} · size: {{complexity}}",
+		"complexity": {
+			"small": "small",
+			"medium": "medium",
+			"large": "large"
+		},
+		"tiers": {
+			"flagship": "flagship",
+			"standard": "standard",
+			"fast": "fast",
+			"local": "local",
+			"provider_default": "provider's choice"
+		},
+		"providerDefault": "Model chosen by the provider",
+		"unpriced": "price unknown",
+		"flatRate": "no token price",
+		"cost": "${{value}}",
+		"tokens": "{{value}} tokens",
+		"total": "Estimated: ${{cost}} · {{tokens}} tokens",
+		"degraded": "Over budget: the full crew costs ${{full}}. Proposed crew: ${{proposed}} (saves ${{delta}}, expected quality {{quality}} %).",
+		"refused": "Budget too low: even the smallest crew needs ${{cost}} and {{tokens}} tokens. Raise the budget or start from a smaller template.",
+		"changes": {
+			"dropped": "{{role}} left out",
+			"model": "{{role}}: {{from}} → {{to}}"
+		},
+		"apply": "Create {{count}} agents",
+		"agentName": "{{role}} {{n}}",
+		"warnings": {
+			"vague_input": "The description is too vague: a generic crew is suggested. Add details or pick a template.",
+			"provider_unsupported": "{{provider}} cannot run an agent on its own here and was left out.",
+			"role_unserved": "No chosen provider has a model fit for the {{role}} role (tool use or context window).",
+			"unpriced_models": "Some models have no price in the catalog: their cost is not counted.",
+			"hints_unusable": "The fast model's answer could not be used: the heuristics decided alone.",
+			"refine_failed": "{{provider}} did not answer the second opinion: the heuristics decided alone."
+		},
+		"errors": {
+			"invalid_request": "The request is not valid.",
+			"invalid_providers": "Pick at least one provider (eight at most).",
+			"unknown_template": "Unknown template.",
+			"invalid_budget": "The budget must be a positive number (a whole number of tokens).",
+			"invalid_project": "The project is not known.",
+			"invalid_spec": "The spec cannot be found in this project.",
+			"no_provider": "None of the chosen providers can run an agent on its own.",
+			"no_capable_model": "None of the chosen providers has a model fit for these roles.",
+			"generic": "Could not suggest a crew: {{error}}"
+		}
 	}
 }

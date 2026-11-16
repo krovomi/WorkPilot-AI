@@ -202,6 +202,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 
 **Agents and orchestration**
 - **Execution waves** (Mission Control): the specs waiting in the backlog are grouped into waves that share no file, from their plans and worktrees, then run wave after wave in merge order with the project's parallelism; no model is called.
+- **Mission Control auto-compose**: a crew of agents suggested from a description, a task's spec or a session template (bug fix, new feature, refactor, incident), mixing the providers you pick, models filtered by their capabilities, priced by the Cost Intelligence catalog, and a cheaper crew under a budget.
 - **Mission Control** to run several agents on one goal, **agent terminals**, **Arena** and **Bounty Board** to compare engines, **Repo bench** to measure them on your own past tasks.
 - Specialised agents: test generator, flaky test detective (with the cause and a fix card), refactorer, docs and drift, accessibility (WCAG 2.2 score and fixes), i18n, API contract watcher, compliance evidence, notebooks (cell dependencies, fresh-kernel runs), migration, self-healing on CI failures, technical debt tracker; their fixes go on a review branch, never straight into your folder.
 - **Release Train** deploys your services itself, in dependency order, with health and smoke checks and a click per production service; the **Git history surgeon** cleans up a branch's commits onto a new branch, same code.

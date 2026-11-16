@@ -3,12 +3,16 @@ import { providerRegistry } from "../../../shared/services/providerRegistry";
 /**
  * AddAgentDialog — Dialog for creating a new agent slot in Mission Control.
  *
- * Allows selecting: name, role, provider, and model.
+ * Allows selecting: name, role, provider, and model — or, under
+ * "Auto-compose", a whole crew suggested from the work (#344).
  */
 
-import { Brain, Cpu, Rocket, User } from "lucide-react";
+import { Brain, Cpu, Rocket, User, Wand2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { MissionControlPlannedAgent } from "../../../shared/types/mission-control";
+import { useMissionControlStore } from "../../stores/mission-control-store";
+import { Tabs } from "../charter";
 import { Button } from "../ui/button";
 import {
 	Dialog,
@@ -27,6 +31,9 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
+import { AutoComposePanel } from "./AutoComposePanel";
+
+type Mode = "manual" | "auto";
 
 interface AddAgentDialogProps {
 	readonly open: boolean;
@@ -81,6 +88,23 @@ export function AddAgentDialog({
 	const [provider, setProvider] = useState("anthropic");
 	const [model, setModel] = useState("");
 	const { models } = useProviderModelCatalog(provider);
+	const [mode, setMode] = useState<Mode>("manual");
+	const createAgent = useMissionControlStore((s) => s.createAgent);
+
+	// One agent per role of the crew, in its order; the dialog closes after.
+	const applyCrew = async (agents: MissionControlPlannedAgent[]) => {
+		for (const agent of agents) {
+			const role = t(`missionControl:roles.${agent.role}`);
+			await createAgent(
+				t("missionControl:compose.agentName", { role, n: agent.key.split("-").pop() }),
+				agent.role,
+				agent.provider,
+				agent.model,
+				agent.model_label,
+			);
+		}
+		onOpenChange(false);
+	};
 
 	// Provider/role changes reset the choice; catalog refreshes preserve it.
 	useEffect(() => {
@@ -116,7 +140,7 @@ export function AddAgentDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="wp-scope sm:max-w-md">
+			<DialogContent className={mode === "auto" ? "wp-scope sm:max-w-2xl" : "wp-scope sm:max-w-md"}>
 				<DialogHeader>
 					<span className="wp-kicker">{t("navigation:items.missionControl")}</span>
 					<DialogTitle className="flex items-center gap-2">
@@ -125,7 +149,22 @@ export function AddAgentDialog({
 					</DialogTitle>
 				</DialogHeader>
 
-				<div className="space-y-4 py-2">
+				<Tabs<Mode>
+					label={t("missionControl:compose.tabsLabel")}
+					value={mode}
+					onChange={setMode}
+					tabs={[
+						{ id: "manual", label: t("missionControl:compose.tabManual"), icon: User },
+						{ id: "auto", label: t("missionControl:compose.tabAuto"), icon: Wand2 },
+					]}
+				/>
+
+				{mode === "auto" && (
+					<AutoComposePanel defaultProvider={provider} onApply={applyCrew} />
+				)}
+
+				{/* The manual form stays mounted under Auto-compose: back on its tab, nothing is lost. */}
+				<div className={mode === "auto" ? "hidden" : "space-y-4 py-2"}>
 					{/* Name */}
 					<div className="space-y-2">
 						<Label className="flex items-center gap-1.5 text-xs">
@@ -236,7 +275,7 @@ export function AddAgentDialog({
 					</div>
 				</div>
 
-				<DialogFooter>
+				<DialogFooter className={mode === "auto" ? "hidden" : undefined}>
 					<Button variant="outline" onClick={() => onOpenChange(false)}>
 						{t("common:cancel", "Cancel")}
 					</Button>

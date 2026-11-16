@@ -295,12 +295,11 @@ def models_for(
     return models, float(snapshot["fetched_at"])
 
 
-def cached_context_window(model: str | None) -> int | None:
-    """The context window models.dev records for ``model``, from the cache only.
+def _cached_record(model: str | None) -> dict[str, Any] | None:
+    """The record models.dev keeps for ``model``, from the cache only.
 
     Never downloads: a session start must not wait on a 5 MB document. None
-    when the model is unknown, the cache was never written, or predates the
-    `limit` field.
+    when the model is unknown, the source is off or the cache was never written.
     """
     if not model or not is_enabled():
         return None
@@ -312,14 +311,30 @@ def cached_context_window(model: str | None) -> int | None:
         if not isinstance(models, list):
             continue
         for record in models:
-            if not _is_record(record) or record["id"].lower() != wanted:
-                continue
-            limit = record.get("limit")
-            context = limit.get("context") if isinstance(limit, dict) else None
-            if (
-                isinstance(context, int)
-                and not isinstance(context, bool)
-                and context > 0
-            ):
-                return context
+            if _is_record(record) and record["id"].lower() == wanted:
+                return record
     return None
+
+
+def cached_context_window(model: str | None) -> int | None:
+    """The context window models.dev records for ``model``, from the cache only.
+
+    None when the model is unknown, the cache was never written, or predates
+    the `limit` field.
+    """
+    record = _cached_record(model)
+    limit = record.get("limit") if record else None
+    context = limit.get("context") if isinstance(limit, dict) else None
+    if isinstance(context, int) and not isinstance(context, bool) and context > 0:
+        return context
+    return None
+
+
+def cached_tool_call(model: str | None) -> bool | None:
+    """Whether models.dev says ``model`` calls tools, from the cache only.
+
+    None when it does not say: an unknown model, no cache, or no field.
+    """
+    record = _cached_record(model)
+    value = record.get("tool_call") if record else None
+    return value if isinstance(value, bool) else None
