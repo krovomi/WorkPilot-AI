@@ -94,6 +94,10 @@ import {
 	createNotebookAgentAPI,
 } from "./modules/notebook-agent-api";
 import {
+	type BrowserRecorderAPI,
+	createBrowserRecorderAPI,
+} from "./modules/browser-recorder-api";
+import {
 	type AgentCoachAPI,
 	createAgentCoachAPI,
 } from "./modules/agent-coach-api";
@@ -339,6 +343,7 @@ export interface ElectronAPI
 		GitSurgeonAPI,
 		ReleaseCoordinatorAPI,
 		NotebookAgentAPI,
+		BrowserRecorderAPI,
 		AgentCoachAPI,
 		OnboardingAgentAPI,
 		SandboxAPI,
@@ -500,6 +505,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createGitSurgeonAPI(),
 		...createReleaseCoordinatorAPI(),
 		...createNotebookAgentAPI(),
+		...createBrowserRecorderAPI(),
 		...createAgentCoachAPI(),
 		...createOnboardingAgentAPI(),
 		...createSandboxAPI(),
