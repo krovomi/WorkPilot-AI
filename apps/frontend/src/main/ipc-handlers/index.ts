@@ -153,6 +153,7 @@ import { setupTestGenerationHandlers } from "./test-generation-handlers";
 import { registerTimeTravelHandlers } from "./time-travel-handlers";
 import { registerLocalBackendHandlers } from "./local-backend-handlers";
 import { registerReplayHandlers } from "./replay-handlers";
+import { registerReplayShareHandlers } from "./replay-share-handlers";
 import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -268,6 +269,7 @@ export { registerTerminalHandlers } from "./terminal-handlers";
 export { setupTestGenerationHandlers } from "./test-generation-handlers";
 export { registerTimeTravelHandlers } from "./time-travel-handlers";
 export { registerReplayHandlers } from "./replay-handlers";
+export { registerReplayShareHandlers } from "./replay-share-handlers";
 export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -551,6 +553,7 @@ export function setupIpcHandlers(
 
 	// Agent Replay + Session History (recorded sessions, via the local backend)
 	registerReplayHandlers();
+	registerReplayShareHandlers();
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);
