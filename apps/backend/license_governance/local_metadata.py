@@ -37,6 +37,35 @@ logger = logging.getLogger(__name__)
 _MAX_READ = 256 * 1024
 
 
+# What a package name may contain to be used as a folder name: no glob
+# metacharacters, no separator other than `/` (npm scopes, Go module paths), no
+# drive or stream syntax. Real package names never need more.
+_UNSAFE_NAME = re.compile(r"[\x00-\x1f*?\[\]\\:<>|\"]")
+
+
+def _plain(name: object, *, slashes: bool = False) -> str | None:
+    """`name` when it can only name a folder below the cache it is joined to."""
+    if not isinstance(name, str) or not name or len(name) > 214:
+        return None
+    if _UNSAFE_NAME.search(name):
+        return None
+    parts = name.split("/")
+    if len(parts) > 1 and not slashes:
+        return None
+    if any(part in ("", ".", "..") for part in parts):
+        return None
+    return name
+
+
+def _inside(root: Path, path: Path) -> bool:
+    """Whether `path`, links followed, is still below `root`."""
+    try:
+        path.resolve().relative_to(root.resolve())
+    except (OSError, ValueError):
+        return False
+    return True
+
+
 def _read(path: Path, limit: int = _MAX_READ) -> str:
     try:
         with path.open(encoding="utf-8", errors="ignore") as fh:
@@ -158,14 +187,19 @@ def _npm_roots(project_dir: Path) -> list[Path]:
     return [r for r in roots if r.is_dir()]
 
 
-def _npm_license(roots: Iterable[Path], name: str) -> str | None:
+def _npm_license(project_dir: Path, roots: Iterable[Path], name: str) -> str | None:
+    if _plain(name, slashes=True) is None or name.count("/") > 1:
+        return None
     for root in roots:
         manifest = root / name / "package.json"
-        if not manifest.is_file():
+        # A package folder of this project, not a link out of it.
+        if not manifest.is_file() or not _inside(project_dir, manifest):
             continue
         try:
             data = json.loads(_read(manifest))
         except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
             continue
         value = data.get("license") or data.get("licenses")
         found = _normalise_license_field(value)
@@ -251,8 +285,11 @@ def license_from_url(url: str | None) -> str | None:
 
 
 def _nuget_license(name: str, version: str) -> str | None:
-    folder = _pick_version_dir(_nuget_root() / name.lower(), version)
-    if folder is None:
+    if _plain(name) is None:
+        return None
+    cache = _nuget_root()
+    folder = _pick_version_dir(cache / name.lower(), version)
+    if folder is None or not _inside(cache, folder):
         return None
     nuspec = next(folder.glob("*.nuspec"), None)
     if nuspec is not None:
@@ -266,9 +303,12 @@ def _nuget_license(name: str, version: str) -> str | None:
                 if tag == "license" and el.get("type") == "expression" and el.text:
                     return el.text.strip()
                 if tag == "license" and el.get("type") == "file" and el.text:
-                    found = detect_license_text(_read(folder / el.text.strip()))
-                    if found:
-                        return found
+                    # The package names its own licence file: one inside it.
+                    named = folder / el.text.strip()
+                    if _inside(folder, named):
+                        found = detect_license_text(_read(named))
+                        if found:
+                            return found
                 if tag == "licenseUrl":
                     found = license_from_url(el.text)
                     if found:
@@ -277,10 +317,13 @@ def _nuget_license(name: str, version: str) -> str | None:
 
 
 def _cargo_license(name: str, version: str) -> str | None:
+    if _plain(name) is None:
+        return None
     home = Path(os.environ.get("CARGO_HOME") or _home() / ".cargo")
     exact = _exact_version(version)
     candidates: list[Path] = []
-    for index in (home / "registry" / "src").glob("*"):
+    sources = home / "registry" / "src"
+    for index in sources.glob("*"):
         if exact and (index / f"{name}-{exact}").is_dir():
             candidates.insert(0, index / f"{name}-{exact}")
         candidates.extend(
@@ -289,6 +332,8 @@ def _cargo_license(name: str, version: str) -> str | None:
             if re.fullmatch(rf"{re.escape(name)}-\d.*", p.name)
         )
     for crate in candidates:
+        if not _inside(sources, crate):
+            continue
         match = re.search(
             r'^\s*license\s*=\s*"([^"]+)"', _read(crate / "Cargo.toml"), re.M
         )
@@ -306,15 +351,22 @@ def _go_escape(path: str) -> str:
 
 
 def _go_license(name: str, version: str) -> str | None:
+    if _plain(name, slashes=True) is None:
+        return None
     gopath = os.environ.get("GOPATH") or str(_home() / "go")
     cache = Path(os.environ.get("GOMODCACHE") or Path(gopath) / "pkg" / "mod")
     escaped = _go_escape(name)
-    exact = cache / f"{escaped}@{version}"
-    candidates = [exact] if exact.is_dir() else []
+    candidates: list[Path] = []
+    if _plain(version) is not None:
+        exact = cache / f"{escaped}@{version}"
+        if exact.is_dir():
+            candidates.append(exact)
     parent, _, leaf = escaped.rpartition("/")
     if (cache / parent).is_dir():
         candidates.extend(sorted((cache / parent).glob(f"{leaf}@*"), reverse=True))
     for module in candidates:
+        if not _inside(cache, module):
+            continue
         found = _license_file_in(module)
         if found:
             return found
@@ -325,9 +377,12 @@ def _maven_license(name: str, version: str) -> str | None:
     if ":" not in name:
         return None
     group, artifact = name.split(":", 1)
-    base = _home() / ".m2" / "repository" / Path(*group.split(".")) / artifact
-    folder = _pick_version_dir(base, version)
-    if folder is None:
+    segments = group.split(".")
+    if any(_plain(part) is None for part in (*segments, artifact)):
+        return None
+    repository = _home() / ".m2" / "repository"
+    folder = _pick_version_dir(repository.joinpath(*segments, artifact), version)
+    if folder is None or not _inside(repository, folder):
         return None
     pom = next(folder.glob("*.pom"), None)
     if pom is None:
@@ -349,13 +404,15 @@ def _maven_license(name: str, version: str) -> str | None:
 
 
 def _pub_license(name: str, version: str) -> str | None:
+    if _plain(name) is None:
+        return None
     cache = Path(os.environ.get("PUB_CACHE") or _home() / ".pub-cache")
     hosted = cache / "hosted" / "pub.dev"
     exact = _exact_version(version)
     candidates = [hosted / f"{name}-{exact}"] if exact else []
     candidates.extend(sorted(hosted.glob(f"{name}-*"), reverse=True))
     for package in candidates:
-        if package.is_dir():
+        if package.is_dir() and _inside(hosted, package):
             found = _license_file_in(package)
             if found:
                 return found
@@ -382,7 +439,7 @@ class LocalLicenseResolver:
         if eco == "npm":
             if self._npm_roots is None:
                 self._npm_roots = _npm_roots(self.project_dir)
-            return _npm_license(self._npm_roots, dep.name)
+            return _npm_license(self.project_dir, self._npm_roots, dep.name)
         if eco == "pypi":
             if self._pypi is None:
                 self._pypi = _pypi_index(_site_packages(self.project_dir))

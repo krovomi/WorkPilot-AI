@@ -246,3 +246,48 @@ async def test_a_hot_swap_reruns_the_same_subtask(loop):
     assert len(prompts) == 2
     assert all("1.1" in p for p in prompts)
     assert _status_of(spec, "1.1") == "completed"
+
+
+# -- the swarm ---------------------------------------------------------------------
+
+
+def _swarm(monkeypatch, coder, spec, *built: str, complete: bool):
+    calls: list[tuple] = []
+
+    async def run_swarm_phase(project_dir, spec_dir, source_spec_dir):
+        calls.append((project_dir, spec_dir, source_spec_dir))
+        if len(calls) == 1:
+            for sid in built:
+                _complete(spec, sid)()
+            return complete
+        return False
+
+    monkeypatch.setattr(coder, "run_swarm_phase", run_swarm_phase)
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_a_swarm_that_built_everything_ends_the_coding(loop, monkeypatch):
+    coder, project, spec, sessions, _ = loop
+    _write_plan(spec, _subtask("1.1"), _subtask("1.2"))
+    calls = _swarm(monkeypatch, coder, spec, "1.1", "1.2", complete=True)
+    prompts = sessions()
+
+    await coder.run_autonomous_agent(project, spec, "test-model", max_iterations=3)
+
+    assert prompts == []
+    assert calls == [(project, spec, None)]
+    assert _status_of(spec, "1.2") == "completed"
+
+
+@pytest.mark.asyncio
+async def test_what_the_swarm_left_is_built_by_the_coder(loop, monkeypatch):
+    coder, project, spec, sessions, _ = loop
+    _write_plan(spec, _subtask("1.1"), _subtask("1.2"))
+    _swarm(monkeypatch, coder, spec, "1.1", complete=False)
+    prompts = sessions(_complete(spec, "1.2"))
+
+    await coder.run_autonomous_agent(project, spec, "test-model", max_iterations=3)
+
+    assert len(prompts) == 1 and "1.2" in prompts[0]
+    assert _status_of(spec, "1.2") == "completed"

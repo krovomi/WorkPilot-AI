@@ -306,3 +306,73 @@ class TestReopening:
         with caplog.at_level(logging.WARNING, logger=progress.__name__):
             assert reopen_interrupted_subtasks(tmp_path) == []
         assert "Could not reopen interrupted subtasks" in caplog.text
+
+
+# -- a swarm worker builds one subtask -------------------------------------------
+
+
+class TestSwarmFocus:
+    PLAN = {
+        "phases": [
+            {"id": "1", "name": "Setup", "subtasks": [{"id": "setup"}]},
+            {
+                "id": "2",
+                "name": "Features",
+                "depends_on": ["1"],
+                "subtasks": [
+                    {"id": "cart", "status": "pending", "title": "cart"},
+                    {"id": "pay", "status": "blocked"},
+                ],
+            },
+        ]
+    }
+
+    @pytest.fixture
+    def spec(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(progress.SWARM_SUBTASK_ENV, "cart")
+        (tmp_path / "implementation_plan.json").write_text(
+            json.dumps(self.PLAN), encoding="utf-8"
+        )
+        return tmp_path
+
+    def test_its_subtask_comes_next_whatever_the_phases_say(self, spec):
+        # Phase 2 waits for phase 1 in the plan; the swarm already ordered it.
+        nxt = progress.get_next_subtask(spec)
+
+        assert (nxt["id"], nxt["status"], nxt["phase_name"]) == (
+            "cart",
+            "pending",
+            "Features",
+        )
+        assert nxt["description"] == "cart"
+        assert progress.is_build_complete(spec) is False
+
+    def test_once_done_nothing_comes_next_and_the_build_is_complete(self, spec):
+        plan = json.loads(json.dumps(self.PLAN))
+        plan["phases"][1]["subtasks"][0]["status"] = "completed"
+        (spec / "implementation_plan.json").write_text(
+            json.dumps(plan), encoding="utf-8"
+        )
+
+        assert progress.get_next_subtask(spec) is None
+        assert progress.is_build_complete(spec) is True
+
+    @pytest.mark.parametrize("focus", ["pay", "ghost"])
+    def test_a_blocked_or_unknown_subtask_is_never_built(
+        self, spec, monkeypatch, focus
+    ):
+        monkeypatch.setenv(progress.SWARM_SUBTASK_ENV, focus)
+
+        assert progress.get_next_subtask(spec) is None
+        assert progress.is_build_complete(spec) is False
+
+    def test_a_subtask_without_a_status_is_pending(self, spec, monkeypatch):
+        monkeypatch.setenv(progress.SWARM_SUBTASK_ENV, "setup")
+
+        assert progress.get_next_subtask(spec)["id"] == "setup"
+
+    def test_outside_a_worker_the_plan_order_holds(self, spec, monkeypatch):
+        monkeypatch.delenv(progress.SWARM_SUBTASK_ENV)
+
+        assert progress.swarm_focus() is None
+        assert progress.get_next_subtask(spec)["id"] == "setup"
