@@ -61,8 +61,8 @@ from ui import (
 from .base import sanitize_error_message
 from .manual_verification import settle_block
 from .memory_manager import save_session_memory
+from .session_guards import SessionGuards
 from .session_recording import SessionRecording, client_usage
-from .tool_breaker import ToolBreaker
 from .tool_display import (
     extract_streaming_command,
     extract_streaming_file_change,
@@ -1121,7 +1121,7 @@ async def run_agent_session(
         provider="claude",
         model=getattr(getattr(client, "options", None), "model", "") or "",
     )
-    breaker = ToolBreaker(spec_dir, phase.value)
+    breaker = SessionGuards(spec_dir, phase.value)
 
     try:
         # Send the query
@@ -1230,7 +1230,6 @@ async def run_agent_session(
                         _rec.tool_use(tool_name, inp)
                         breaker.call(tool_name, inp, getattr(block, "id", None))
 
-                        # Stream tool use events to live view
                         if streaming_wrapper and inp:
                             try:
                                 await streaming_wrapper.emit_tool_use(
@@ -1293,6 +1292,7 @@ async def run_agent_session(
             if breaker.tripped:
                 break
 
+        breaker.close()
         print("\n" + "-" * 70 + "\n")
 
         # Persist SDK session_id so the Kanban UI can offer "Resume" on
@@ -1742,7 +1742,7 @@ async def _run_agent_client_session(
     message_count = 0
     tool_count = 0
     recording = recording or SessionRecording(None, phase, provider="", model="")
-    breaker = ToolBreaker(spec_dir, phase.value)
+    breaker = SessionGuards(spec_dir, phase.value)
 
     # Conversation log context: provider, model and subtask_id are persisted on
     # every message so a different provider can replay the transcript later.
@@ -1937,7 +1937,6 @@ async def _run_agent_client_session(
                     recording.tool_use(tool_name, inp)
                     breaker.call(tool_name, inp, block.tool_id)
 
-                    # Stream tool use events to live view
                     if streaming_wrapper and inp:
                         try:
                             await streaming_wrapper.emit_tool_use(
@@ -2059,6 +2058,7 @@ async def _run_agent_client_session(
             if breaker.tripped:
                 break
 
+        breaker.close()
         print("\n" + "-" * 70 + "\n")
 
         if _context_decision is not None:

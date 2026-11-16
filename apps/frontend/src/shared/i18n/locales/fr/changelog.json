@@ -164,6 +164,9 @@
 		"viewChangelog": "Voir CHANGELOG.md"
 	},
 	"errors": {
+		"imageInvalidType": "Type d'image non valide. Autorisés : {{types}}",
+		"imageSaveFailed": "Échec de l'enregistrement de l'image",
+		"imageProcessFailed": "Échec du traitement de l'image",
 		"noTasks": "Aucune tâche terminée disponible",
 		"noTasksSelected": "Veuillez sélectionner au moins une tâche",
 		"noCommits": "Aucun commit trouvé",

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type {
 	GitLabMergeRequest,
 	GitLabMRReviewProgress,
@@ -74,29 +75,30 @@ export function useGitLabMRs(
 	const [isConnected, setIsConnected] = useState(false);
 	const [projectPath, setProjectPath] = useState<string | null>(null);
 
-	// Get MR review state from the global store
-	const _mrReviews = useMRReviewStore((state) => state.mrReviews);
 	const getMRReviewState = useMRReviewStore((state) => state.getMRReviewState);
-	const getActiveMRReviews = useMRReviewStore(
-		(state) => state.getActiveMRReviews,
-	);
 
-	// Get review state for the selected MR from the store
-	const selectedMRReviewState = useMemo(() => {
-		if (!projectId || selectedMRIid === null) return null;
-		return getMRReviewState(projectId, selectedMRIid);
-	}, [projectId, selectedMRIid, getMRReviewState]);
+	// Selected from the store, not memoised over its getters: the getters never
+	// change, so a memo over them kept the state of the first render and the
+	// selected MR's review never showed its progress or its result.
+	const selectedMRReviewState = useMRReviewStore((state) =>
+		projectId && selectedMRIid !== null
+			? state.getMRReviewState(projectId, selectedMRIid)
+			: null,
+	);
 
 	// Derive values from store state
 	const reviewResult = selectedMRReviewState?.result ?? null;
 	const reviewProgress = selectedMRReviewState?.progress ?? null;
 	const isReviewing = selectedMRReviewState?.isReviewing ?? false;
 
-	// Get list of MR iids currently being reviewed
-	const activeMRReviews = useMemo(() => {
-		if (!projectId) return [];
-		return getActiveMRReviews(projectId).map((review) => review.mrIid);
-	}, [projectId, getActiveMRReviews]);
+	// MR iids currently being reviewed
+	const activeMRReviews = useMRReviewStore(
+		useShallow((state) =>
+			projectId
+				? state.getActiveMRReviews(projectId).map((review) => review.mrIid)
+				: [],
+		),
+	);
 
 	// Helper to get review state for any MR
 	const getReviewStateForMR = useCallback(
