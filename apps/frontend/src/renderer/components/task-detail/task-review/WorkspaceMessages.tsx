@@ -15,21 +15,16 @@ import { PullRequestStats } from "./PullRequestStats";
 import { useTranslation } from "react-i18next";
 import { formatAppDate } from "@/lib/date-format";
 
-interface LoadingMessageProps {
-	readonly message?: string;
-}
-
 /**
  * Displays a loading indicator while workspace info is being fetched
  */
-export function LoadingMessage({
-	message = "Loading workspace info...",
-}: LoadingMessageProps) {
+export function LoadingMessage() {
+	const { t } = useTranslation();
 	return (
 		<div className="rounded-xl border border-border bg-secondary/30 p-4">
 			<div className="flex items-center gap-2 text-muted-foreground">
 				<Loader2 className="h-4 w-4 animate-spin" />
-				<span className="text-sm">{message}</span>
+				<span className="text-sm">{t("taskReview:workspace.loadingInfo")}</span>
 			</div>
 		</div>
 	);
@@ -76,9 +71,9 @@ export function NoWorkspaceMessage({
 
 		setIsMarkingDone(true);
 		try {
-			await persistTaskStatus(task.id, "done");
-			// Auto-close modal after marking as done
-			onClose?.();
+			// A refused move keeps the panel open on the task.
+			const result = await persistTaskStatus(task.id, "done");
+			if (result.success) onClose?.();
 		} catch (err) {
 			console.error("Error marking task as done:", err);
 		} finally {
@@ -237,7 +232,7 @@ export function StagedInProjectMessage({
 			const result = await globalThis.electronAPI.discardWorktree(task.id, true);
 
 			if (!result.success) {
-				setError(result.error || "Failed to delete worktree");
+				setError(result.error || t("taskReview:workspace.deleteWorktreeFailed"));
 				return;
 			}
 
@@ -246,8 +241,9 @@ export function StagedInProjectMessage({
 			if (!statusResult.success) {
 				// Worktree is already deleted but status update failed - inform user of inconsistent state
 				setError(
-					"Worktree deleted but failed to update task status: " +
-						(statusResult.error || "Unknown error"),
+					t("taskReview:workspace.statusAfterDeleteFailed", {
+						error: statusResult.error || t("common:errors.unknownError"),
+					}),
 				);
 				return;
 			}
@@ -257,7 +253,9 @@ export function StagedInProjectMessage({
 		} catch (err) {
 			console.error("Error deleting worktree:", err);
 			setError(
-				err instanceof Error ? err.message : "Failed to delete worktree",
+				err instanceof Error
+					? err.message
+					: t("taskReview:workspace.deleteWorktreeFailed"),
 			);
 		} finally {
 			setIsDeleting(false);
@@ -271,11 +269,21 @@ export function StagedInProjectMessage({
 		try {
 			// Keep the worktree but don't auto-create a PR: the changes are already
 			// staged in the main project, and closing must never push a branch.
-			await persistTaskStatus(task.id, "done", { skipPrCreation: true });
+			const result = await persistTaskStatus(task.id, "done", {
+				skipPrCreation: true,
+			});
+			if (!result.success) {
+				setError(result.error || t("taskReview:workspace.markDoneFailed"));
+				return;
+			}
 			onClose?.();
 		} catch (err) {
 			console.error("Error marking task as done:", err);
-			setError(err instanceof Error ? err.message : "Failed to mark as done");
+			setError(
+				err instanceof Error
+					? err.message
+					: t("taskReview:workspace.markDoneFailed"),
+			);
 		} finally {
 			setIsMarkingDone(false);
 		}
@@ -292,7 +300,7 @@ export function StagedInProjectMessage({
 			const result = await globalThis.electronAPI.clearStagedState(task.id);
 
 			if (!result.success) {
-				setError(result.error || "Failed to reset staged state");
+				setError(result.error || t("taskReview:workspace.resetStagedFailed"));
 				return;
 			}
 
@@ -301,7 +309,9 @@ export function StagedInProjectMessage({
 		} catch (err) {
 			console.error("Error resetting staged state:", err);
 			setError(
-				err instanceof Error ? err.message : "Failed to reset staged state",
+				err instanceof Error
+					? err.message
+					: t("taskReview:workspace.resetStagedFailed"),
 			);
 		} finally {
 			setIsResetting(false);

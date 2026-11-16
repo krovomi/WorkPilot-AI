@@ -11,7 +11,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
-import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
@@ -22,6 +21,7 @@ import {
 	createSpecForIssue,
 	updateImplementationPlanStatus,
 } from "./spec-utils";
+import { autofixIpcMain as ipcMain } from "./autofix-ipc-guard";
 import { getGitHubConfig, githubFetch } from "./utils";
 import { createIPCCommunicators } from "./utils/ipc-communicator";
 import { createContextLogger } from "./utils/logger";
@@ -64,7 +64,6 @@ export interface AutoFixConfig {
 	enabled: boolean;
 	labels: string[];
 	requireHumanApproval: boolean;
-	botToken?: string;
 	model: string;
 	thinkingLevel: string;
 }
@@ -170,7 +169,6 @@ function getAutoFixConfig(project: Project): AutoFixConfig {
 			enabled: data.auto_fix_enabled ?? false,
 			labels: data.auto_fix_labels ?? ["auto-fix"],
 			requireHumanApproval: data.require_human_approval ?? true,
-			botToken: data.bot_token,
 			model: data.model ?? "claude-sonnet-4-5-20250929",
 			thinkingLevel: data.thinking_level ?? "medium",
 		};
@@ -204,12 +202,14 @@ function saveAutoFixConfig(project: Project, config: AutoFixConfig): void {
 		// File doesn't exist or is invalid - use empty config
 	}
 
+	// The runner gets its tokens elsewhere and never keeps one in this file
+	// (`GitHubRunnerConfig.save_settings`): a token found here is dropped.
+	const { bot_token: _botToken, token: _token, ...kept } = existingConfig;
 	const updatedConfig = {
-		...existingConfig,
+		...kept,
 		auto_fix_enabled: config.enabled,
 		auto_fix_labels: config.labels,
 		require_human_approval: config.requireHumanApproval,
-		bot_token: config.botToken,
 		model: config.model,
 		thinking_level: config.thinkingLevel,
 	};
