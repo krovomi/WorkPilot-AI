@@ -125,7 +125,7 @@ describe("GITLAB_MR_REVIEW", () => {
 		expect(options.cwd).toBe(backend());
 		expect(options.args.slice(0, 3)).toEqual([
 			path.join(backend(), "runners", "gitlab", "runner.py"),
-			"--project",
+			"--project-dir",
 			projectDir,
 		]);
 		expect(options.args.slice(-2)).toEqual(["review-mr", "3"]);

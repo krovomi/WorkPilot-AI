@@ -57,7 +57,11 @@ async function gitlabRunnerEnv(
 ): Promise<Record<string, string>> {
 	const config = await getGitLabConfig(project);
 	return config
-		? { GITLAB_TOKEN: config.token, GITLAB_INSTANCE_URL: config.instanceUrl }
+		? {
+				GITLAB_TOKEN: config.token,
+				GITLAB_INSTANCE_URL: config.instanceUrl,
+				GITLAB_PROJECT: config.project,
+			}
 		: {};
 }
 
@@ -66,6 +70,27 @@ async function gitlabRunnerEnv(
  */
 function getGitLabRunnerPath(backendPath: string): string {
 	return path.join(backendPath, "runners", "gitlab", "runner.py");
+}
+
+/**
+ * The GitLab runner's command line. The project folder goes in
+ * `--project-dir`: the runner's `--project` is the GitLab project
+ * (namespace/name), which it reads from GITLAB_PROJECT (`gitlabRunnerEnv`).
+ */
+function gitlabRunnerArgs(
+	backendPath: string,
+	projectPath: string,
+	command: "review-mr" | "followup-review-mr",
+	mrIid: number,
+	options: { model: string; thinkingLevel: string },
+): string[] {
+	return buildRunnerArgs(
+		getGitLabRunnerPath(backendPath),
+		projectPath,
+		command,
+		[mrIid.toString()],
+		{ ...options, projectFlag: "--project-dir" },
+	);
 }
 
 // Debug logging
@@ -293,13 +318,10 @@ async function runMRReview(
 	);
 
 	const { model, thinkingLevel } = getGitLabMRSettings();
-	const args = buildRunnerArgs(
-		getGitLabRunnerPath(backendPath),
-		project.path,
-		"review-mr",
-		[mrIid.toString()],
-		{ model, thinkingLevel },
-	);
+	const args = gitlabRunnerArgs(backendPath, project.path, "review-mr", mrIid, {
+		model,
+		thinkingLevel,
+	});
 
 	debugLog("Spawning MR review process", { args, model, thinkingLevel });
 
@@ -966,11 +988,11 @@ export function registerMRReviewHandlers(
 					});
 
 					const { model, thinkingLevel } = getGitLabMRSettings();
-					const args = buildRunnerArgs(
-						getGitLabRunnerPath(backendPath),
+					const args = gitlabRunnerArgs(
+						backendPath,
 						project.path,
 						"followup-review-mr",
-						[mrIid.toString()],
+						mrIid,
 						{ model, thinkingLevel },
 					);
 

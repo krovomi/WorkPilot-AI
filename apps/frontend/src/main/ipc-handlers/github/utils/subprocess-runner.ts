@@ -749,9 +749,11 @@ export function buildRunnerArgs(
 	options?: {
 		model?: string;
 		thinkingLevel?: string;
+		/** The flag that names the project folder (the GitLab runner's is `--project-dir`). */
+		projectFlag?: string;
 	},
 ): string[] {
-	const args = [runnerPath, "--project", projectPath];
+	const args = [runnerPath, options?.projectFlag ?? "--project", projectPath];
 
 	if (options?.model) {
 		args.push("--model", options.model);
