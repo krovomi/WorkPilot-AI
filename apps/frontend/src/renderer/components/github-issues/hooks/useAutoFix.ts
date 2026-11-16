@@ -116,11 +116,9 @@ export function useAutoFix(projectId: string | undefined) {
 				// Check for new issues (no labels required)
 				const newIssues =
 					await window.electronAPI.github.checkNewIssues(projectId);
-				if (newIssues.length > 0) {
-					// Start individual auto-fix for each new issue (not batching)
-					for (const issue of newIssues) {
-						window.electronAPI.github.startAutoFix(projectId, issue.number);
-					}
+				// Start individual auto-fix for each new issue (not batching)
+				for (const issue of newIssues) {
+					window.electronAPI.github.startAutoFix(projectId, issue.number);
 				}
 			} catch (error) {
 				console.error("[AutoFix] Error checking for new issues:", error);
@@ -137,11 +135,9 @@ export function useAutoFix(projectId: string | undefined) {
 		try {
 			const newIssues =
 				await window.electronAPI.github.checkNewIssues(projectId);
-			if (newIssues.length > 0) {
-				// Start individual auto-fix for each new issue
-				for (const issue of newIssues) {
-					window.electronAPI.github.startAutoFix(projectId, issue.number);
-				}
+			// Start individual auto-fix for each new issue
+			for (const issue of newIssues) {
+				window.electronAPI.github.startAutoFix(projectId, issue.number);
 			}
 		} catch (error) {
 			console.error("[AutoFix] Error checking for new issues:", error);
