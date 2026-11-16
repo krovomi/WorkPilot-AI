@@ -603,3 +603,106 @@ def test_an_unknown_command_prints_the_help(runner, capsys):
     parser = SimpleNamespace(print_help=lambda: print("usage: help"))
     assert runner._dispatch(None, SimpleNamespace(command="later"), parser) is False
     assert "usage: help" in capsys.readouterr().out
+
+
+def test_bisect_streams_each_tested_commit(
+    runner, stand_in, monkeypatch, project, capsys
+):
+    from self_healing.cicd.bisect import BisectResult, BisectStep
+
+    assert (
+        _main(
+            runner,
+            monkeypatch,
+            project,
+            "bisect",
+            "--incident-id",
+            "i1",
+            "--good",
+            "HEAD~3",
+        )
+        == 1
+    )
+    assert json.loads(capsys.readouterr().out)["error"] == "invalid commit id"
+    assert stand_in.calls == []
+
+    async def bisect_incident(incident_id, good, on_step):
+        on_step(BisectStep("b" * 40, "bad", "bad-check"), 1)
+        return BisectResult("found", first_bad="c" * 40)
+
+    stand_in.answers["bisect_incident"] = bisect_incident
+    assert (
+        _main(
+            runner,
+            monkeypatch,
+            project,
+            "bisect",
+            "--incident-id",
+            "i1",
+            "--good",
+            "a" * 12,
+        )
+        == 0
+    )
+    lines = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert [line["step"] for line in lines] == ["bisecting", "bisect", "complete"]
+    assert lines[1]["sha"] == "b" * 40 and lines[1]["tested"] == 1
+    assert lines[2]["bisect"]["first_bad"] == "c" * 40
+
+    stand_in.answers["bisect_incident"] = lambda *a: _none()
+    assert _main(runner, monkeypatch, project, "bisect", "--incident-id", "i2") == 1
+
+
+async def _none():
+    return None
+
+
+def test_a_report_of_a_known_bug_is_grouped(
+    runner, stand_in, monkeypatch, project, capsys
+):
+    from self_healing.incident_responder.orchestrator import GROUPED_STEP
+
+    grouped = _operation(False)
+    grouped.incident.id = "inc-7"
+    grouped.steps = [SimpleNamespace(name=GROUPED_STEP, detail="2 reports, 1 source")]
+    stand_in.answers["handle_production_incident"] = grouped
+    argv = [
+        "production",
+        "--source",
+        "sentry",
+        "--error-type",
+        "TypeError",
+        "--error-message",
+        "x is None",
+        "--external-id",
+        "SEN-1",
+        "--release",
+        "1.4.0",
+    ]
+    assert _main(runner, monkeypatch, project, *argv) == 0
+    error_data = stand_in.calls[0][2]["error_data"]
+    assert (error_data["external_id"], error_data["release"]) == ("SEN-1", "1.4.0")
+    out = capsys.readouterr().out
+    assert "Grouped with incident inc-7" in out and "2 reports, 1 source" in out
+
+    grouped.steps = [SimpleNamespace(name="Detect", detail="")]
+    assert _main(runner, monkeypatch, project, *argv) == 1
+    assert "No fix applied." in capsys.readouterr().out
+
+
+def test_cicd_names_the_first_bad_commit(
+    runner, stand_in, monkeypatch, project, capsys
+):
+    operation = _operation(False)
+    operation.incident.source_data = {
+        "bisect": {"status": "found", "first_bad": "c" * 40}
+    }
+    stand_in.answers["handle_cicd_failure"] = operation
+    argv = ["cicd", "--commit", "abc", "--test-output", "FAILED t", "--good", "d" * 7]
+    assert _main(runner, monkeypatch, project, *argv) == 1
+    assert stand_in.calls[0][2]["good_sha"] == "d" * 7
+    assert f"First bad commit: {'c' * 40}" in capsys.readouterr().out
+
+    operation.incident.source_data = {"bisect": {"status": "flaky"}}
+    assert _main(runner, monkeypatch, project, *argv) == 1
+    assert "First bad commit" not in capsys.readouterr().out

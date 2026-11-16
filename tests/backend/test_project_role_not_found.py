@@ -86,11 +86,22 @@ async def _world() -> dict[str, str]:
 
 async def _check(w: dict[str, str], project_id: str):
     from server.auth.deps import CurrentUser, require_project_role
+    from server.authz.principal import Principal
     from server.db.engine import get_session_factory
     from starlette.requests import Request
 
     request = Request({"type": "http", "method": "GET", "path": "/", "headers": []})
     request.state.org_id = w["org_a"]
+    # As the server's middleware leaves it: alice reads the tasks of org A.
+    request.state.principal = Principal(
+        id=w["alice"],
+        email="alice@example.com",
+        display_name="alice",
+        platform_role="member",
+        org_id=w["org_a"],
+        org_role_slug="contributor",
+        permissions=frozenset({"task.read"}),
+    )
     user = CurrentUser(
         id=w["alice"], email="alice@example.com", display_name="alice", role="member"
     )

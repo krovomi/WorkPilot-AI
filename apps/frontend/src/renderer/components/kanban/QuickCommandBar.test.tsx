@@ -253,7 +253,11 @@ describe("lancer une commande", () => {
 		expect(
 			await screen.findByText("/review · Slash command failed"),
 		).toBeInTheDocument();
-		expect(screen.getByText(/still in \/tmp\/wt/)).toBeInTheDocument();
+		// The toast's description, not the live region that repeats it for about
+		// a second after the toast opens: a slow runner reads it in that window.
+		expect(
+			screen.getByText(/still in \/tmp\/wt/, { selector: "p" }),
+		).toBeInTheDocument();
 	});
 
 	it("une commande sans sortie ni note n'a pas de description", async () => {
@@ -299,7 +303,9 @@ describe("lancer une commande", () => {
 		await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 		await userEvent.type(input(), "/help{Enter}");
 		expect(await screen.findByText("Available commands")).toBeInTheDocument();
-		expect(screen.getByText(/\/review — Review the diff/)).toBeInTheDocument();
+		// The toast shows the list in a <pre>; a moment later Radix also reads it to
+		// screen readers through a hidden live region, which a slow runner reaches.
+		expect(screen.getByText(/\/review — Review the diff/, { selector: "pre" })).toBeInTheDocument();
 		expect(api.fn("runQuickCommand")).not.toHaveBeenCalled();
 	});
 

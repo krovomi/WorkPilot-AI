@@ -17,10 +17,21 @@ from .models import (
 class MigrationPlanner:
     """Generates detailed migration plans."""
 
-    def __init__(self, source_stack: StackInfo, target_stack: StackInfo):
+    def __init__(
+        self,
+        source_stack: StackInfo,
+        target_stack: StackInfo,
+        migration_key: tuple[str, str] | None = None,
+    ):
         self.source_stack = source_stack
         self.target_stack = target_stack
-        self.migration_key = (source_stack.framework, target_stack.framework)
+        # The pair of `SUPPORTED_MIGRATIONS` being planned: frameworks by
+        # default, or the languages when the orchestrator matched on them
+        # (a React project converted from JavaScript to TypeScript).
+        self.migration_key = migration_key or (
+            source_stack.framework,
+            target_stack.framework,
+        )
 
     def create_plan(self) -> MigrationPlan:
         """Create a comprehensive migration plan."""

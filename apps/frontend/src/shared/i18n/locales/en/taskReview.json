@@ -31,12 +31,8 @@
 		"commits": "commits",
 		"branchHasNewCommits": "{{branch}} branch has {{count}} new commit.",
 		"branchHasNewCommits_other": "{{branch}} branch has {{count}} new commits.",
-		"branchHasNewCommitsSinceWorktree": "The {{branch}} branch has {{count}} new commit since this worktree was created.",
-		"branchHasNewCommitsSinceWorktree_other": "The {{branch}} branch has {{count}} new commits since this worktree was created.",
 		"filesNeedMerging": "{{count}} file needs merging.",
 		"filesNeedMerging_other": "{{count}} files need merging.",
-		"filesNeedIntelligentMerging": "{{count}} file will need intelligent merging:",
-		"filesNeedIntelligentMerging_other": "{{count}} files will need intelligent merging:",
 		"branchHasNewCommitsSinceBuild": "{{branch}} branch has {{count}} new commit since this build started.",
 		"branchHasNewCommitsSinceBuild_other": "{{branch}} branch has {{count}} new commits since this build started.",
 		"filesNeedAIMergeDueToRenames": "{{count}} file needs AI merge due to {{renameCount}} file rename.",
@@ -233,9 +229,18 @@
 		"addingNewFile": "Adding new file",
 		"filePath": "File path",
 		"fileContent": "File content",
-		"filesSelected": "files selected",
+		"filesSelectedCount_one": "{{count}} file selected",
+		"filesSelectedCount_other": "{{count}} files selected",
+		"selectFile": "Select {{path}}",
 		"deleteSelected": "Discard selected",
 		"deleting": "Discarding...",
+		"confirmDiscard_one": "Discard {{count}} file for good",
+		"confirmDiscard_other": "Discard {{count}} files for good",
+		"discardHint": "The selected files go back to the base branch's version and new files are deleted.",
+		"discardedTitle": "Changes discarded",
+		"discarded_one": "{{count}} file is back to the base branch",
+		"discarded_other": "{{count}} files are back to the base branch",
+		"discardFailed": "Could not discard: {{files}}",
 		"save": "Save",
 		"saving": "Saving...",
 		"cancel": "Cancel",
@@ -246,6 +251,9 @@
 		"expandAll": "Expand all",
 		"collapseAll": "Collapse all",
 		"error": "Error",
+		"readError": "Could not read {{path}}.",
+		"saveError": "Could not save {{path}}.",
+		"createError": "Could not create {{path}}.",
 		"status": {
 			"added": "added",
 			"deleted": "deleted",
@@ -329,8 +337,6 @@
 		"noSubtasks": "No subtasks defined",
 		"noSubtasksHint": "Implementation subtasks will appear here after planning",
 		"editFiles": "Edit files",
-		"filesDeleted": "{{count}} file(s) deleted",
-		"filesModified": "{{count}} file(s) modified",
 		"saveChanges": "Save Changes",
 		"subtasksCompleted": "{{completed}}/{{total}} subtasks completed",
 		"noSubtasksYet": "No subtasks yet"
@@ -346,7 +352,14 @@
 		"strategy": "Strategy:",
 		"none": "No conflicts detected",
 		"stageWithAi": "Stage with AI Merge",
-		"mergeWithAi": "Merge with AI"
+		"mergeWithAi": "Merge with AI",
+		"severity": {
+			"none": "none",
+			"low": "low",
+			"medium": "medium",
+			"high": "high",
+			"critical": "critical"
+		}
 	},
 	"discard": {
 		"title": "Discard Build",
@@ -355,21 +368,6 @@
 		"filesChanged": "Files changed:",
 		"lines": "Lines:",
 		"discarding": "Discarding..."
-	},
-	"mergePreview": {
-		"conflictsFound_one": "{{count}} Conflict Found",
-		"conflictsFound_other": "{{count}} Conflicts Found",
-		"filesToMerge": "Files to merge: {{count}}",
-		"autoMergeable": "Auto-mergeable: {{count}}",
-		"aiResolved": "AI resolved: {{count}}",
-		"manualReview": "Manual review: {{count}}",
-		"divergedTitle": "Branch Diverged - AI Will Resolve",
-		"noConflicts": "No Conflicts Detected",
-		"viewDetails": "View Details",
-		"diverged": "Branch has diverged - AI will resolve",
-		"aiWillMerge": "AI will automatically merge these conflicts when you click Stage Changes.",
-		"aiWillResolve": "AI will resolve conflicts",
-		"ready": "Ready to merge"
 	},
 	"staged": {
 		"title": "Changes Staged Successfully",
@@ -409,7 +407,21 @@
 		"noWorkspaceTitle": "No Workspace Found",
 		"humanReviewDescription": "Human review required prior to coding. Review your spec.md for any necessary changes.",
 		"noWorkspaceDescription": "No isolated workspace was found for this task. The changes may have been made directly in your project.",
-		"commitsCount": "{{count}} commits"
+		"commitsCount_one": "{{count}} commit",
+		"commitsCount_other": "{{count}} commits",
+		"loadParts": {
+			"mergePreview": "Merge preview",
+			"status": "Worktree status",
+			"diff": "Worktree changes"
+		},
+		"loadError": "{{part}}: {{error}}",
+		"loadFailed": "Could not load: {{part}}",
+		"loadUnexpected": "An unexpected error occurred while loading the workspace information",
+		"loadingInfo": "Loading workspace info...",
+		"deleteWorktreeFailed": "Failed to delete worktree",
+		"statusAfterDeleteFailed": "Worktree deleted but failed to update task status: {{error}}",
+		"markDoneFailed": "Failed to mark as done",
+		"resetStagedFailed": "Failed to reset staged state"
 	},
 	"guided": {
 		"button": "Guided review",
