@@ -184,8 +184,11 @@ class DesignToCodeRunner:
             b64 = base64.b64encode(data).decode("utf-8")
             return f"data:{mime};base64,{b64}"
 
-        # Load from Figma
+        # Load from Figma, a cloud service: refused under strict offline mode.
         if self.figma_url:
+            from services.design_to_code_providers import guard_cloud
+
+            guard_cloud(self.project_dir)
             try:
                 from src.connectors.figma_connector import FigmaConnector
 
