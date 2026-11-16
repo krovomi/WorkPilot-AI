@@ -12,3 +12,6 @@ section: 🐛 Corrections
 - **Tableau blanc → draw.io** : deux boîtes que le modèle de vision donne sous le même identifiant
   ne produisent plus un fichier `.drawio` aux cellules en double (la première l'emporte), et des
   listes d'une autre forme dans sa réponse se lisent comme « rien de dessiné ».
+- **Maquettes Figma** : une réponse de l'API dont les enfants d'un calque ne sont pas une liste
+  n'interrompt plus l'import, et un `.figma.json` écrit à la main dont les libellés sont un texte
+  au lieu d'une liste ne se lit plus lettre par lettre.

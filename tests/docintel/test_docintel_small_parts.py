@@ -259,6 +259,11 @@ class TestSettings:
         assert values.get(settings.VISION_MODEL_ENV) == "llava:13b"
         assert "JIRA_TOKEN" not in values
 
+    def test_without_a_project_only_the_environment_is_read(self, monkeypatch):
+        monkeypatch.setenv(settings.VISION_MODEL_ENV, "llava:7b")
+
+        assert settings.project_env(None) == {settings.VISION_MODEL_ENV: "llava:7b"}
+
     @pytest.mark.parametrize("raw", ["", "lots", "-5", "0"])
     def test_a_size_limit_that_is_no_positive_number_is_the_default(self, raw):
         assert settings.max_bytes({settings.MAX_BYTES_ENV: raw}) == (
