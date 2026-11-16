@@ -11,7 +11,12 @@ import subprocess
 from pathlib import Path
 
 from foundation.git_executable import get_git_executable, run_git
-from foundation.platform import pid_is_running
+from foundation.platform import (
+    build_windows_command,
+    find_executable,
+    is_windows,
+    requires_shell,
+)
 
 __all__ = [
     # Exported helpers
@@ -22,8 +27,6 @@ __all__ = [
     "MAX_PARALLEL_AI_MERGES",
     "LOCK_FILES",
     "BINARY_EXTENSIONS",
-    "MERGE_LOCK_TIMEOUT",
-    "MAX_SYNTAX_FIX_RETRIES",
     # Functions
     "detect_file_renames",
     "apply_path_mapping",
@@ -34,20 +37,16 @@ __all__ = [
     "get_file_content_from_ref",
     "get_binary_file_content_from_ref",
     "get_changed_files_from_branch",
-    "is_process_running",
     "is_binary_file",
     "is_lock_file",
     "validate_merged_syntax",
-    "create_conflict_file_with_git",
     # Backward compat aliases
-    "_is_process_running",
     "_is_binary_file",
     "_is_lock_file",
     "_validate_merged_syntax",
     "_get_file_content_from_ref",
     "_get_binary_file_content_from_ref",
     "_get_changed_files_from_branch",
-    "_create_conflict_file_with_git",
 ]
 
 # Constants for merge limits
@@ -153,13 +152,6 @@ BINARY_EXTENSIONS = {
     ".ppm",
 }
 
-# Merge lock timeout in seconds
-MERGE_LOCK_TIMEOUT = 300  # 5 minutes
-
-# Max retries for AI merge when syntax validation fails
-# Gives AI a chance to fix its mistakes before falling back
-MAX_SYNTAX_FIX_RETRIES = 2
-
 
 def detect_file_renames(
     project_dir: Path,
@@ -185,35 +177,28 @@ def detect_file_renames(
     """
     renames: dict[str, str] = {}
 
-    try:
-        # Use git log with rename detection to find all renames between refs
-        # -M flag enables rename detection
-        # --diff-filter=R shows only renames
-        # --name-status shows status and file names
-        result = run_git(
-            [
-                "log",
-                "--name-status",
-                "-M",
-                "--diff-filter=R",
-                "--format=",  # No commit info, just file changes
-                f"{from_ref}..{to_ref}",
-            ],
-            cwd=project_dir,
-        )
+    # git log with rename detection: -M detects renames, --diff-filter=R keeps
+    # only them, --name-status prints status and paths. run_git never raises:
+    # a failure is a non-zero return code, which leaves the dict empty.
+    result = run_git(
+        [
+            "log",
+            "--name-status",
+            "-M",
+            "--diff-filter=R",
+            "--format=",  # No commit info, just file changes
+            f"{from_ref}..{to_ref}",
+        ],
+        cwd=project_dir,
+    )
 
-        if result.returncode == 0:
-            for line in result.stdout.strip().split("\n"):
-                if line.startswith("R"):
-                    # Format: R100\told_path\tnew_path (tab-separated)
-                    parts = line.split("\t")
-                    if len(parts) >= 3:
-                        old_path = parts[1]
-                        new_path = parts[2]
-                        renames[old_path] = new_path
-
-    except Exception:
-        pass  # Return empty dict on error
+    if result.returncode == 0:
+        for line in result.stdout.strip().split("\n"):
+            if line.startswith("R"):
+                # Format: R100\told_path\tnew_path (tab-separated)
+                parts = line.split("\t")
+                if len(parts) >= 3:
+                    renames[parts[1]] = parts[2]
 
     return renames
 
@@ -367,24 +352,11 @@ def _normalize_path(path: str) -> str:
 
 
 def _is_workpilot_file(file_path: str) -> bool:
-    """Check if a file is in the .workpilot or auto-claude/specs directory.
+    """Check if a file is in the .workpilot directory.
 
     Handles both forward slashes (Unix/Git output) and backslashes (Windows).
     """
-    normalized = _normalize_path(file_path)
-    excluded_patterns = [
-        ".workpilot/",
-        ".workpilot/specs/",
-    ]
-    for pattern in excluded_patterns:
-        if normalized.startswith(pattern):
-            return True
-    return False
-
-
-def is_process_running(pid: int) -> bool:
-    """Check if a process with the given PID is running."""
-    return pid_is_running(pid)
+    return _normalize_path(file_path).startswith(".workpilot/")
 
 
 def is_binary_file(file_path: str) -> bool:
@@ -400,6 +372,53 @@ def is_lock_file(file_path: str) -> bool:
     and should just take the worktree version, then regenerate via install.
     """
     return Path(file_path).name in LOCK_FILES
+
+
+def _esbuild_in(package: Path) -> list[str] | None:
+    """The command that runs the esbuild package at ``package``, if it is there.
+
+    On Windows ``bin/esbuild`` is a Node script: the native ``esbuild.exe``
+    of the platform package next to it runs instead, or Node runs the script.
+    Elsewhere ``bin/esbuild`` runs itself (the native binary or a shebang).
+    """
+    script = package / "bin" / "esbuild"
+    if not script.is_file():
+        return None
+    if not is_windows():
+        return [str(script)]
+    for native in sorted(package.parent.glob("@esbuild/win32-*/esbuild.exe")):
+        return [str(native)]
+    node = find_executable("node")
+    return [node, str(script)] if node else None
+
+
+def _esbuild_command(project_dir: Path, args: list[str]) -> list[str]:
+    """How to run esbuild with ``args`` here, without a shell, on every OS.
+
+    The project's own esbuild comes first (npm, yarn or pnpm layout, in the
+    project or in its parent), then ``npx esbuild``.
+    """
+    for modules in (project_dir / "node_modules", project_dir.parent / "node_modules"):
+        packages = [
+            modules / "esbuild",
+            *sorted((modules / ".pnpm").glob("esbuild@*/node_modules/esbuild")),
+        ]
+        for package in packages:
+            command = _esbuild_in(package)
+            if command:
+                return command + args
+        shim = modules / ".bin" / "esbuild"
+        if not is_windows() and shim.is_file():
+            return [str(shim), *args]
+    npx = find_executable("npx") or "npx"
+    if requires_shell(npx):
+        return build_windows_command(npx, ["esbuild", *args])
+    return [npx, "esbuild", *args]
+
+
+def _is_esbuild_error(line: str) -> bool:
+    """Whether ``line`` is one of esbuild's error lines (``✘ [ERROR] …``)."""
+    return "[ERROR]" in line or ": error:" in line
 
 
 def validate_merged_syntax(
@@ -426,6 +445,7 @@ def validate_merged_syntax(
             # Write to temp file in system temp dir (NOT project dir to avoid HMR triggers)
             with tempfile.NamedTemporaryFile(
                 mode="w",
+                encoding="utf-8",
                 suffix=ext,
                 delete=False,
                 # Don't set dir= to avoid writing to project directory which triggers HMR
@@ -434,34 +454,7 @@ def validate_merged_syntax(
                 tmp_path = tmp.name
 
             try:
-                # Find esbuild binary - try multiple locations
-                esbuild_cmd = None
-
-                # Try to find esbuild in node_modules (works with pnpm, npm, yarn)
-                for search_dir in [project_dir, project_dir.parent]:
-                    # pnpm stores it differently
-                    pnpm_esbuild = search_dir / "node_modules" / ".pnpm"
-                    if pnpm_esbuild.exists():
-                        for esbuild_dir in pnpm_esbuild.glob(
-                            "esbuild@*/node_modules/esbuild/bin/esbuild"
-                        ):
-                            if esbuild_dir.exists():
-                                esbuild_cmd = str(esbuild_dir)
-                                break
-                    # Standard npm/yarn location
-                    npm_esbuild = search_dir / "node_modules" / ".bin" / "esbuild"
-                    if npm_esbuild.exists():
-                        esbuild_cmd = str(npm_esbuild)
-                        break
-                    if esbuild_cmd:
-                        break
-
-                # Fall back to npx if not found
-                if not esbuild_cmd:
-                    esbuild_cmd = "npx"
-                    args = ["npx", "esbuild", tmp_path, "--log-level=error"]
-                else:
-                    args = [esbuild_cmd, tmp_path, "--log-level=error"]
+                args = _esbuild_command(project_dir, [tmp_path, "--log-level=error"])
 
                 # Use esbuild for fast, accurate syntax validation
                 # esbuild infers loader from extension (.tsx, .ts, etc.)
@@ -471,22 +464,28 @@ def validate_merged_syntax(
                     cwd=project_dir,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=15,  # esbuild is fast, 15s is plenty
                 )
 
                 if result.returncode != 0:
-                    # Filter out npm warnings and extract actual errors
-                    error_output = result.stderr.strip()
+                    # Only esbuild's own diagnostic is a verdict: a missing
+                    # Node, an npx that could not fetch esbuild or a warning
+                    # printed before it says nothing about the merged file.
                     error_lines = [
-                        line
-                        for line in error_output.split("\n")
-                        if line
-                        and not line.startswith("npm warn")
-                        and not line.startswith("npm WARN")
+                        line for line in result.stderr.strip().split("\n") if line
                     ]
-                    if error_lines:
-                        # Extract just the error message, not full path
-                        error_msg = "\n".join(error_lines[:3])
+                    first = next(
+                        (
+                            index
+                            for index, line in enumerate(error_lines)
+                            if _is_esbuild_error(line)
+                        ),
+                        None,
+                    )
+                    if first is not None:
+                        error_msg = "\n".join(error_lines[first : first + 3])
                         return False, f"Syntax error: {error_msg}"
 
                 return True, ""
@@ -521,79 +520,10 @@ def validate_merged_syntax(
     return True, ""
 
 
-def create_conflict_file_with_git(
-    main_content: str,
-    worktree_content: str,
-    base_content: str | None,
-    project_dir: Path,
-) -> tuple[str | None, bool]:
-    """
-    Use git merge-file to create a file with conflict markers.
-
-    Returns (merged_content_or_none, had_conflicts).
-    If auto-merged, returns (content, False).
-    If conflicts, returns (content_with_markers, True).
-    """
-    import tempfile
-
-    try:
-        # Create temp files for three-way merge
-        with tempfile.NamedTemporaryFile(
-            mode="w", delete=False, suffix=".tmp"
-        ) as main_f:
-            main_f.write(main_content)
-            main_path = main_f.name
-
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".tmp") as wt_f:
-            wt_f.write(worktree_content)
-            wt_path = wt_f.name
-
-        # Use empty base if not available
-        if base_content:
-            with tempfile.NamedTemporaryFile(
-                mode="w", delete=False, suffix=".tmp"
-            ) as base_f:
-                base_f.write(base_content)
-                base_path = base_f.name
-        else:
-            with tempfile.NamedTemporaryFile(
-                mode="w", delete=False, suffix=".tmp"
-            ) as base_f:
-                base_f.write("")
-                base_path = base_f.name
-
-        try:
-            # git merge-file <current> <base> <other>
-            # Exit codes: 0 = clean merge, 1 = conflicts, >1 = error
-            result = run_git(
-                ["merge-file", "-p", main_path, base_path, wt_path],
-                cwd=project_dir,
-            )
-
-            # Read the merged content
-            merged_content = result.stdout
-
-            # Check for conflicts
-            had_conflicts = result.returncode == 1
-
-            return merged_content, had_conflicts
-
-        finally:
-            # Cleanup temp files
-            Path(main_path).unlink(missing_ok=True)
-            Path(wt_path).unlink(missing_ok=True)
-            Path(base_path).unlink(missing_ok=True)
-
-    except Exception:
-        return None, False
-
-
-# Export the _is_process_running function for backward compatibility
-_is_process_running = is_process_running
+# Private aliases kept for backward compatibility
 _is_binary_file = is_binary_file
 _is_lock_file = is_lock_file
 _validate_merged_syntax = validate_merged_syntax
 _get_file_content_from_ref = get_file_content_from_ref
 _get_binary_file_content_from_ref = get_binary_file_content_from_ref
 _get_changed_files_from_branch = get_changed_files_from_branch
-_create_conflict_file_with_git = create_conflict_file_with_git

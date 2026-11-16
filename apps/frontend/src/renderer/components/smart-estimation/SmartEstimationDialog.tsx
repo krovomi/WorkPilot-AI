@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { TaskSmartEstimate } from "../../../shared/types/smart-estimation";
 import { useProjectStore } from "../../stores/project-store";
 import { persistUpdateTask } from "../../stores/task-store";
 import type { SmartEstimationResult } from "../../stores/smart-estimation-store";
@@ -42,6 +41,8 @@ import {
 import { Label } from "../ui/label";
 import { Progress } from "../ui/progress";
 import { Textarea } from "../ui/textarea";
+import { EstimationCalibrationPanel } from "./EstimationCalibrationPanel";
+import { taskEstimateFrom } from "./task-estimate";
 
 /**
  * SmartEstimationDialog — AI-powered task complexity estimation dialog.
@@ -99,15 +100,10 @@ export function SmartEstimationDialog() {
 		if (persistedRunRef.current === runKey) return;
 		persistedRunRef.current = runKey;
 
-		const estimate: TaskSmartEstimate = {
-			complexityScore: result.complexity_score,
-			confidenceLevel: result.confidence_level,
-			riskFactors: result.risk_factors,
-			qaIterations: result.estimated_qa_iterations,
-			at: new Date().toISOString(),
-		};
+		// The category and the generic figures go with it: the calibration loop
+		// reads them back at merge to compare with what the spec used.
 		void persistUpdateTask(sourceTaskId, {
-			metadata: { smartEstimate: estimate },
+			metadata: { smartEstimate: taskEstimateFrom(result) },
 		});
 	}, [result, sourceTaskId]);
 
@@ -222,12 +218,19 @@ export function SmartEstimationDialog() {
 
 					{/* Result */}
 					{isComplete && result && (
-						<ResultView
-							result={result}
-							copied={copied}
-							onCopy={handleCopy}
-							t={t}
-						/>
+						<>
+							<ResultView
+								result={result}
+								copied={copied}
+								onCopy={handleCopy}
+								t={t}
+							/>
+							<EstimationCalibrationPanel
+								result={result}
+								projectId={selectedProjectId}
+								sourceTaskId={sourceTaskId}
+							/>
+						</>
 					)}
 				</div>
 
