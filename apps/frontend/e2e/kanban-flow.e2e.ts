@@ -88,8 +88,11 @@ test("Start runs the agent: the card codes In Progress, in its own worktree", as
 		"tasks",
 		path.basename(spec),
 	);
-	expect(existsSync(worktree)).toBe(true);
-	expect(git("branch", "--list", "workpilot/*")).toContain(path.basename(spec));
+	// "Coding" can show a moment before the worktree is on disk: wait for it.
+	await expect.poll(() => existsSync(worktree), { timeout: 30_000 }).toBe(true);
+	await expect
+		.poll(() => git("branch", "--list", "workpilot/*"), { timeout: 30_000 })
+		.toContain(path.basename(spec));
 	// Nothing lands on main while the agent works.
 	expect(existsSync(path.join(projectDir, "CONTRIBUTING.md"))).toBe(false);
 });
@@ -103,7 +106,9 @@ test("its QA pass brings it to Human Review with the one file it wrote", async (
 
 	await review.click();
 	await expect(page.getByText("The changes are waiting for your review")).toBeVisible();
-	await expect(page.getByText("1/1 subtasks")).toBeVisible();
+	// The card reaches Human Review before the panel has reread the finished
+	// plan: give the count the time the plan watcher takes.
+	await expect(page.getByText("1/1 subtasks")).toBeVisible({ timeout: 15_000 });
 	await page.getByRole("button", { name: /^View$/ }).click();
 	await expect(page.getByText("1 file changed")).toBeVisible({ timeout: 15_000 });
 	await page.getByText("CONTRIBUTING.md", { exact: true }).last().click();

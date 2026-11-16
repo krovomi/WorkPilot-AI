@@ -38,8 +38,6 @@ export function IssueListHeader({
 	onFilterChange,
 	onRefresh,
 	autoFixEnabled,
-	autoFixRunning,
-	autoFixProcessing,
 	onAutoFixToggle,
 	onAnalyzeAndGroup,
 	isAnalyzing,
@@ -117,11 +115,7 @@ export function IssueListHeader({
 							<Tooltip>
 								<TooltipTrigger asChild>
 									<div className="flex items-center gap-2">
-										{autoFixRunning ? (
-											<Loader2 className="h-4 w-4 text-primary animate-spin" />
-										) : (
-											<Wand2 className="h-4 w-4 text-muted-foreground" />
-										)}
+										<Wand2 className="h-4 w-4 text-muted-foreground" />
 										<Label
 											htmlFor="auto-fix-toggle"
 											className="text-sm cursor-pointer whitespace-nowrap"
@@ -132,21 +126,11 @@ export function IssueListHeader({
 											id="auto-fix-toggle"
 											checked={autoFixEnabled ?? false}
 											onCheckedChange={onAutoFixToggle}
-											disabled={autoFixRunning}
 										/>
 									</div>
 								</TooltipTrigger>
 								<TooltipContent side="bottom" className="max-w-xs">
 									<p>{t("common:githubIssues.autoFix.newIssuesDescription")}</p>
-									{autoFixRunning &&
-										autoFixProcessing !== undefined &&
-										autoFixProcessing > 0 && (
-											<p className="mt-1 text-primary">
-												{t("common:githubIssues.autoFix.processing", {
-												count: autoFixProcessing,
-											})}
-											</p>
-										)}
 								</TooltipContent>
 							</Tooltip>
 						</TooltipProvider>
@@ -160,6 +144,7 @@ export function IssueListHeader({
 					<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 					<Input
 						placeholder={t("common:githubIssues.searchPlaceholder")}
+						aria-label={t("common:githubIssues.searchPlaceholder")}
 						value={searchQuery}
 						onChange={(e) => onSearchChange(e.target.value)}
 						className="pl-9"
@@ -169,7 +154,7 @@ export function IssueListHeader({
 					value={filterState}
 					onValueChange={(value) => onFilterChange(value as FilterState)}
 				>
-					<SelectTrigger className="w-32">
+					<SelectTrigger className="w-32" aria-label={t("common:githubIssues.filterLabel")}>
 						<Filter className="h-4 w-4 mr-2" />
 						<SelectValue />
 					</SelectTrigger>
