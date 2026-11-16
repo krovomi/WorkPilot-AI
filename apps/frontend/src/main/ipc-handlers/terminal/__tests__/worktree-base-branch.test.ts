@@ -86,3 +86,31 @@ describe("the base branch of a terminal worktree", () => {
 		},
 	);
 });
+
+describe("a base branch chosen in the dialog", () => {
+	const createFrom = (name: string, baseBranch: string) =>
+		(ipcMain as unknown as { invokeHandler: (c: string, e: unknown, ...a: unknown[]) => Promise<unknown> }).invokeHandler(
+			IPC_CHANNELS.TERMINAL_WORKTREE_CREATE,
+			{},
+			{ terminalId: "t-1", name, createGitBranch: false, projectPath: state.repo, baseBranch },
+		) as Promise<{ success: boolean; error?: string; config?: { baseBranch: string } }>;
+
+	it.each([["origin/develop"], ["feature/a.b"], ["release/1.2"]])("is taken when it is a branch name, as %j", async (base) => {
+		git("update-ref", "refs/remotes/origin/develop", "main");
+		git("branch", "feature/a.b");
+		git("branch", "release/1.2");
+		const result = await createFrom("chosen", base);
+		expect(result).toMatchObject({ success: true, config: { baseBranch: base } });
+	});
+
+	it.each([["origin/-x"], ["origin/.hidden"], ["a/../b"], ["feature/-y"]])("is refused when a part is not, as %j", async (base) => {
+		const result = await createFrom("refused", base);
+		expect(result).toEqual({ success: false, error: "Invalid base branch name" });
+	});
+
+	it("is passed over in the settings the same way", async () => {
+		state.mainBranch = "origin/-x";
+		const result = await create("settings-passed-over");
+		expect(result).toMatchObject({ success: true, config: { baseBranch: "main" } });
+	});
+});
