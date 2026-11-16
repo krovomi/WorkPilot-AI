@@ -207,6 +207,11 @@ def handle_workspace_choice(
         success_result = manager.merge_worktree(spec_name, delete_after=True)
 
         if success_result:
+            # The same merge as `run.py --merge`: the usage counters, the
+            # learning loop, the brain and the design-system knowledge hear it.
+            from core.merge_event import MergeEvent, publish
+
+            publish(MergeEvent(project_dir, spec_name, automatic=False))
             print()
             print_status("Your feature has been added to your project.", "success")
         else:

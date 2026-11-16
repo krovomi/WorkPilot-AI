@@ -344,6 +344,22 @@ class TestSmartEstimationService:
             assert cost is not None
             assert cost > 0
 
+    def test_estimate_tokens_from_similar_tasks_else_a_prior(self, service):
+        """Tokens: the similar tasks' mean, else a prior the calibration corrects."""
+        similar = [{"tokens_used": 1000}, {"tokens_used": 3000}, {"tokens_used": None}]
+        assert service._estimate_tokens(similar, 7) == 2000
+        assert service._estimate_tokens([{"tokens_used": 0}], 4) == 100_000.0
+        assert service._estimate_tokens([], 2) == 50_000.0
+
+    def test_analyze_task_description_reports_files_and_tokens(self, service):
+        """The generic figures the calibration loop needs are on the result."""
+        with patch.object(service, "_find_similar_tasks", return_value=[]):
+            result = service.analyze_task_description(
+                "Add an api endpoint and a settings page", "/project"
+            )
+        assert result.estimated_files_impacted >= 4
+        assert result.estimated_tokens == result.complexity_score * 25_000.0
+
     def test_get_smart_estimation_service_singleton(self):
         """Test that the service is a singleton"""
         service1 = get_smart_estimation_service()

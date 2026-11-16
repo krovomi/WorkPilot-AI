@@ -73,7 +73,11 @@ _TIMEOUT = 5.0
 
 
 def _http_get_json(url: str) -> dict | None:
-    """Fetch + parse JSON. Returns None on any failure (logged at DEBUG)."""
+    """Fetch + parse a JSON object. None on any failure (logged at DEBUG).
+
+    Every registry answers an object; anything else (a list, a bare string)
+    is an answer no resolver below knows how to read, so it is no answer.
+    """
     try:
         req = urllib.request.Request(
             url, headers={"User-Agent": _USER_AGENT, "Accept": "application/json"}
@@ -84,11 +88,12 @@ def _http_get_json(url: str) -> dict | None:
             payload = resp.read()
             if not payload:
                 return None
-            return json.loads(payload.decode("utf-8"))
+            data = json.loads(payload.decode("utf-8"))
+            return data if isinstance(data, dict) else None
     except (
         urllib.error.URLError,
         urllib.error.HTTPError,
-        json.JSONDecodeError,
+        ValueError,  # JSONDecodeError, and UnicodeDecodeError for a binary body
         TimeoutError,
     ) as e:
         logger.debug("Registry fetch failed for %s: %s", url, e)
@@ -97,6 +102,22 @@ def _http_get_json(url: str) -> dict | None:
         # Catches ConnectionResetError, gaierror, etc. on Windows.
         logger.debug("Registry network error for %s: %s", url, e)
         return None
+
+
+def _strings(value: Any) -> list[str]:
+    """The non-empty strings of a JSON list; a bare string is not a list of them.
+
+    ``" OR ".join("MIT")`` is ``"M OR I OR T"``: a registry that answers one
+    licence as a string instead of a one-item list must not be read letter by
+    letter.
+    """
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item]
+
+
+def _object(value: Any) -> dict:
+    return value if isinstance(value, dict) else {}
 
 
 # ---------------------------------------------------------------------------
@@ -141,10 +162,10 @@ def npm_resolver(dep: DependencyRecord) -> str | None:
     # Latest version's license is the most relevant — fall back to the
     # top-level `license` field if `dist-tags.latest` is missing.
     license_value: str | None = None
-    versions = payload.get("versions") or {}
-    latest_tag = (payload.get("dist-tags") or {}).get("latest")
-    if latest_tag and isinstance(versions, dict):
-        latest_pkg = versions.get(latest_tag) or {}
+    versions = _object(payload.get("versions"))
+    latest_tag = _object(payload.get("dist-tags")).get("latest")
+    if isinstance(latest_tag, str) and latest_tag:
+        latest_pkg = _object(versions.get(latest_tag))
         license_value = _normalise_license_field(latest_pkg.get("license"))
     if not license_value:
         license_value = _normalise_license_field(payload.get("license"))
@@ -171,14 +192,16 @@ def pypi_resolver(dep: DependencyRecord) -> str | None:
     if payload is None:
         return None
 
-    info = payload.get("info") or {}
+    info = _object(payload.get("info"))
     # PyPI fills `license` with the SPDX name OR the full text. Many newer
     # packages prefer classifiers like "License :: OSI Approved :: MIT License".
-    license_value: str | None = info.get("license") or None
+    raw_license = info.get("license")
+    license_value: str | None = raw_license if isinstance(raw_license, str) else None
+    license_value = license_value or None
 
     if not license_value:
-        for classifier in info.get("classifiers") or []:
-            if isinstance(classifier, str) and classifier.startswith("License :: "):
+        for classifier in _strings(info.get("classifiers")):
+            if classifier.startswith("License :: "):
                 # Take the leaf — the part after the last "::".
                 license_value = classifier.split("::")[-1].strip()
                 if license_value:
@@ -187,7 +210,8 @@ def pypi_resolver(dep: DependencyRecord) -> str | None:
     # Some packages ship a 2 KB licence text instead of an SPDX id. We
     # only forward short values to the classifier — anything > 200 chars
     # is almost certainly a full licence text and won't classify cleanly.
-    if license_value and len(license_value) > 200:
+    # An empty classifier leaf ("License :: OSI Approved :: ") is no licence.
+    if not license_value or len(license_value) > 200:
         license_value = None
 
     _cache.put(f"pypi:{dep.name}", license_value)
@@ -238,19 +262,19 @@ def deps_dev_resolver(dep: DependencyRecord) -> str | None:
         package = _http_get_json(base)
         if package is None:
             return None
-        versions = package.get("versions") or []
+        versions = [v for v in package.get("versions") or [] if isinstance(v, dict)]
         default = next(
             (v for v in versions if v.get("isDefault")),
             versions[-1] if versions else None,
         )
-        version = ((default or {}).get("versionKey") or {}).get("version")
-        if not version:
+        version = _object(_object(default).get("versionKey")).get("version")
+        if not isinstance(version, str) or not version:
             _cache.put(key, None)
             return None
     payload = _http_get_json(f"{base}/versions/{urllib.parse.quote(version, safe='')}")
     if payload is None:
         return None
-    licenses = [lic for lic in payload.get("licenses") or [] if isinstance(lic, str)]
+    licenses = _strings(payload.get("licenses"))
     value = (
         " OR ".join(lic for lic in licenses if lic.lower() != "non-standard") or None
     )
@@ -269,12 +293,15 @@ def packagist_resolver(dep: DependencyRecord) -> str | None:
     cached = _cache.get(key)
     if cached is not _MISS:
         return cached
-    payload = _http_get_json(f"https://repo.packagist.org/p2/{dep.name.lower()}.json")
+    name = dep.name.lower()
+    payload = _http_get_json(
+        f"https://repo.packagist.org/p2/{urllib.parse.quote(name, safe='/')}.json"
+    )
     if payload is None:
         return None
-    releases = (payload.get("packages") or {}).get(dep.name.lower()) or []
-    licenses = (releases[0].get("license") if releases else None) or []
-    value = " OR ".join(lic for lic in licenses if isinstance(lic, str)) or None
+    releases = _object(payload.get("packages")).get(name)
+    latest = _object(releases[0]) if isinstance(releases, list) and releases else {}
+    value = " OR ".join(_strings(latest.get("license"))) or None
     _cache.put(key, value)
     return value
 
@@ -291,8 +318,7 @@ def rubygems_resolver(dep: DependencyRecord) -> str | None:
     )
     if payload is None:
         return None
-    licenses = payload.get("licenses") or []
-    value = " OR ".join(lic for lic in licenses if isinstance(lic, str)) or None
+    value = " OR ".join(_strings(payload.get("licenses"))) or None
     _cache.put(key, value)
     return value
 
@@ -310,7 +336,7 @@ def pub_resolver(dep: DependencyRecord) -> str | None:
     )
     if payload is None:
         return None
-    tags = [t for t in payload.get("tags") or [] if isinstance(t, str)]
+    tags = _strings(payload.get("tags"))
     spdx = [
         t.split(":", 1)[1]
         for t in tags

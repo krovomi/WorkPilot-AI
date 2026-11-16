@@ -130,8 +130,9 @@ def _threat(text: str) -> str:
         from injection_guard import InjectionScanner
 
         return InjectionScanner().scan(text, source="design-system").threat_level.value
-    except Exception:  # noqa: BLE001 - a scanner failure is not a verdict
-        return "safe"
+    except Exception:  # noqa: BLE001 - any failure of the scanner
+        # A scan that could not answer is no all-clear: the file is withheld.
+        return "blocked"
 
 
 def _strip_banner(text: str) -> str:

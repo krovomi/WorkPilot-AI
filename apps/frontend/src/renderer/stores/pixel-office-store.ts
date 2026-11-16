@@ -44,8 +44,6 @@ export interface PixelAgent {
 	currentSubtask?: string; // Current subtask description
 	// Terminal-specific fields
 	taskName?: string; // Associated task name (for speech bubble)
-	speechBubble?: string; // Text to show in canvas speech bubble
-	speechBubbleTimer?: number; // Auto-dismiss timer
 	// Waiting queue fields
 	waitingIndex?: number; // Position in the waiting queue (pending/planning tasks only)
 	// Swarm fields
@@ -145,8 +143,8 @@ interface PixelOfficeState {
 
 // ── Activity mapping ──────────────────────────────────────────
 
+/** A terminal that has exited leaves the room: `syncAll` never maps one. */
 function mapTerminalToActivity(terminal: Terminal): AgentActivity {
-	if (terminal.status === "exited") return "exited";
 	if (terminal.isClaudeBusy) return "typing";
 	// Busy was answered above: a Claude session that is not busy waits on you.
 	if (terminal.isClaudeMode && terminal.status === "claude-active") {

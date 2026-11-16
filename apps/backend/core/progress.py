@@ -10,6 +10,7 @@ Enhanced with colored output, icons, and better visual formatting.
 
 import json
 import logging
+import os
 from pathlib import Path
 
 from core.plan_normalization import normalize_subtask_aliases
@@ -119,8 +120,36 @@ def is_build_complete(spec_dir: Path) -> bool:
     Returns:
         True if all subtasks complete, False otherwise
     """
+    focus = swarm_focus()
+    if focus:
+        entry = _focused_subtask(spec_dir, focus)
+        return entry is not None and entry.get("status") == "completed"
     completed, total = count_subtasks(spec_dir)
     return total > 0 and completed == total
+
+
+#: Set for a swarm worker (``run.py --subtask``): the one subtask it builds.
+SWARM_SUBTASK_ENV = "SWARM_SUBTASK_ID"
+
+
+def swarm_focus() -> str | None:
+    """The one subtask this process builds, when it is a swarm worker."""
+    return os.environ.get(SWARM_SUBTASK_ENV) or None
+
+
+def _focused_subtask(spec_dir: Path, subtask_id: str) -> dict | None:
+    """``subtask_id``'s entry in the plan, with its phase, or None."""
+    plan = _read_plan(spec_dir) or {}
+    for phase in plan.get("phases", []):
+        for subtask in phase.get("subtasks", phase.get("chunks", [])):
+            if isinstance(subtask, dict) and subtask.get("id") == subtask_id:
+                return {
+                    **subtask,
+                    "phase_id": phase.get("id", phase.get("phase")),
+                    "phase_name": phase.get("name"),
+                    "phase_num": phase.get("phase"),
+                }
+    return None
 
 
 def get_progress_percentage(spec_dir: Path) -> float:
@@ -307,6 +336,9 @@ def get_current_phase(spec_dir: Path) -> dict | None:
         return None
 
 
+_PENDING = frozenset({"pending", "not_started", "not started"})
+
+
 def get_next_subtask(spec_dir: Path) -> dict | None:
     """
     Find the next subtask to work on, respecting phase dependencies.
@@ -321,6 +353,16 @@ def get_next_subtask(spec_dir: Path) -> dict | None:
 
     if not plan_file.exists():
         return None
+
+    focus = swarm_focus()
+    if focus:
+        # A swarm worker builds its one subtask: the swarm already ordered the
+        # waves, and the subtasks of the other worktrees never complete here.
+        entry = _focused_subtask(spec_dir, focus)
+        if entry is None or entry.get("status", "pending") not in _PENDING:
+            return None
+        subtask_out, _changed = normalize_subtask_aliases(entry)
+        return {**subtask_out, "status": "pending"}
 
     try:
         with open(plan_file, encoding="utf-8") as f:
@@ -365,7 +407,7 @@ def get_next_subtask(spec_dir: Path) -> dict | None:
             # Find first pending subtask in this phase
             for subtask in phase.get("subtasks", phase.get("chunks", [])):
                 status = subtask.get("status", "pending")
-                if status in {"pending", "not_started", "not started"}:
+                if status in _PENDING:
                     subtask_out, _changed = normalize_subtask_aliases(subtask)
                     subtask_out["status"] = "pending"
                     return {

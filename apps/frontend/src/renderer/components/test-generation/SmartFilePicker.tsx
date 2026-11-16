@@ -52,13 +52,6 @@ function isSourceFile(name: string): boolean {
 	return SOURCE_EXTENSIONS.has(ext);
 }
 
-function getFileIcon(node: FileNode) {
-	if (node.isDirectory) return null;
-	return (
-		<FileCode className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-	);
-}
-
 interface SmartFilePickerProps {
 	readonly value: string;
 	readonly onChange: (path: string) => void;
@@ -86,63 +79,66 @@ export function SmartFilePicker({
 	const [filter, setFilter] = useState("");
 	const filterRef = useRef<HTMLInputElement>(null);
 
-	/** Resolve the best starting directory for this tab */
+	/**
+	 * The first candidate sub-folder of the project that exists, relative to
+	 * it ("" for the project itself). Kept relative so that the breadcrumbs are
+	 * built from it whatever separator the project path uses.
+	 */
 	const resolveStartDir = useCallback(
 		async (root: string): Promise<string> => {
 			const candidates = FOLDER_CANDIDATES[tabType] ?? [];
 			for (const candidate of candidates) {
-				const candidatePath = `${root}/${candidate}`.replaceAll("\\", "/");
 				try {
-					const result =
-						await globalThis.electronAPI.listDirectory(candidatePath);
-					if (result.success) return candidatePath;
+					const result = await globalThis.electronAPI.listDirectory(
+						`${root}/${candidate}`,
+					);
+					if (result.success) return candidate;
 				} catch {
 					// try next
 				}
 			}
-			return root;
+			return "";
 		},
 		[tabType],
 	);
 
-	/** Load a directory */
+	/** Load a directory; one that cannot be read shows as empty. */
 	const loadDir = useCallback(async (dirPath: string) => {
 		setLoading(true);
 		setFilter("");
+		let listed: FileNode[] = [];
 		try {
 			const result = await globalThis.electronAPI.listDirectory(dirPath);
 			if (result.success && result.data) {
 				// Show directories + source files only
-				const filtered = result.data.filter(
+				listed = result.data.filter(
 					(n) => n.isDirectory || isSourceFile(n.name),
 				);
-				setEntries(filtered);
-				setCurrentDir(dirPath);
 			}
-		} finally {
-			setLoading(false);
+		} catch {
+			// Shown as an empty directory: the breadcrumbs still lead back.
 		}
+		setEntries(listed);
+		setCurrentDir(dirPath);
+		setLoading(false);
 	}, []);
 
 	/** Open the picker and initialize at the right folder */
 	const handleOpen = useCallback(async () => {
 		setIsOpen(true);
 		if (!currentDir && projectPath) {
-			const startDir = await resolveStartDir(projectPath);
+			const rel = await resolveStartDir(projectPath);
 			// Build initial breadcrumbs relative to project
-			const rel = startDir.replace(projectPath, "").replace(/^[/\\]+/, "");
 			const crumbs: { name: string; path: string }[] = [
 				{ name: activeProject?.name ?? "~", path: projectPath },
 			];
-			if (rel) {
-				let acc = projectPath;
-				for (const part of rel.split(/[/\\]/)) {
-					acc = `${acc}/${part}`;
-					crumbs.push({ name: part, path: acc });
-				}
+			let acc = projectPath;
+			for (const part of rel ? rel.split("/") : []) {
+				acc = `${acc}/${part}`;
+				crumbs.push({ name: part, path: acc });
 			}
 			setBreadcrumbs(crumbs);
-			await loadDir(startDir);
+			await loadDir(acc);
 		}
 	}, [currentDir, projectPath, resolveStartDir, loadDir, activeProject]);
 
@@ -194,9 +190,10 @@ export function SmartFilePicker({
 		? entries.filter((n) => n.name.toLowerCase().includes(filter.toLowerCase()))
 		: entries;
 
-	const displayValue = value
-		? value.replace(projectPath, "").replace(/^[/\\]+/, "") || value
-		: "";
+	const displayValue =
+		projectPath && value.startsWith(projectPath)
+			? value.slice(projectPath.length).replace(/^[/\\]+/, "") || value
+			: value;
 
 	const openStateClasses =
 		"border-[var(--color-accent)] bg-[var(--color-accent)]/5";
@@ -226,6 +223,8 @@ export function SmartFilePicker({
 				aria-expanded={isOpen}
 				onClick={isOpen ? () => setIsOpen(false) : handleOpen}
 				onKeyDown={(e) => {
+					// A key on the clear button is the clear button's.
+					if (e.target !== e.currentTarget) return;
 					if (e.key === "Enter" || e.key === " ") {
 						e.preventDefault();
 						if (isOpen) {
@@ -250,6 +249,7 @@ export function SmartFilePicker({
 						<button
 							type="button"
 							onClick={clearSelection}
+							aria-label={t("testGeneration:filePicker.clear")}
 							className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
 						>
 							<X className="w-3.5 h-3.5" />
@@ -310,12 +310,14 @@ export function SmartFilePicker({
 							value={filter}
 							onChange={(e) => setFilter(e.target.value)}
 							placeholder={t("testGeneration:filePicker.filter")}
+							aria-label={t("testGeneration:filePicker.filter")}
 							className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
 						/>
 						{filter && (
 							<button
 								type="button"
 								onClick={() => setFilter("")}
+								aria-label={t("testGeneration:filePicker.clearFilter")}
 								className="text-muted-foreground hover:text-foreground"
 							>
 								<X className="w-3 h-3" />
@@ -357,7 +359,7 @@ export function SmartFilePicker({
 											{node.isDirectory ? (
 												<Folder className="w-3.5 h-3.5 shrink-0 text-accent opacity-70 group-hover:opacity-100" />
 											) : (
-												getFileIcon(node)
+												<FileCode className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
 											)}
 											<span
 												className={cn(

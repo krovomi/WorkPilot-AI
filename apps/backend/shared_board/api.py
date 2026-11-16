@@ -71,6 +71,7 @@ class CardCreate(BaseModel):
     kind: str | None = None
     # As on the desktop card: when true, the build waits for someone to
     # approve the spec and plan; when false, spec creation approves them.
+    # False is kept only for a person who may approve (``review.approve``).
     require_review: bool = True
     # Engine, priority, category, goal, phone targets and blockers, as the
     # desktop card carries them.
@@ -198,7 +199,9 @@ async def create_card(
     metadata: dict[str, Any] = {
         "sourceType": "server",
         "createdBy": principal.id,
-        "requireReviewBeforeCoding": body.require_review,
+        # Going without a review is the approval right's to choose.
+        "requireReviewBeforeCoding": body.require_review
+        or not principal.has("review.approve"),
     }
     if body.kind:
         metadata.update(kind=body.kind, kindSource="user", kindConfidence=1)

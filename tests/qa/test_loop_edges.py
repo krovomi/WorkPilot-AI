@@ -386,7 +386,12 @@ class TestTheSecurityScan:
             {"type": "low"},
         ]
 
-        async def scan(*_a):
+        from security_reach import evidence_for
+
+        ranked_with = []
+
+        async def scan(*_a, evidence=None):
+            ranked_with.append(evidence)
             return False, None, issues
 
         monkeypatch.setattr(loop, "run_qa_security_scan", scan)
@@ -395,13 +400,15 @@ class TestTheSecurityScan:
         assert emitter.events == [
             ("SECURITY_SCAN_ISSUES", {"critical": 1, "high": 2, "issues": issues})
         ]
+        # The findings are ranked by reach and production use (#364).
+        assert ranked_with == [evidence_for]
 
     async def test_a_broken_opinion_producer_does_not_stop_it(
         self, tmp_path, monkeypatch
     ):
         import consensus_arbiter.opinion_writer as writer
 
-        async def scan(*_a):
+        async def scan(*_a, evidence=None):
             return True, None, []
 
         def broken(*_a):
@@ -412,7 +419,7 @@ class TestTheSecurityScan:
         await loop._run_security_scan(tmp_path, tmp_path, _Emitter())
 
     async def test_a_scan_that_crashes_is_skipped(self, tmp_path, monkeypatch, capsys):
-        async def scan(*_a):
+        async def scan(*_a, evidence=None):
             raise RuntimeError("scanner missing")
 
         monkeypatch.setattr(loop, "run_qa_security_scan", scan)

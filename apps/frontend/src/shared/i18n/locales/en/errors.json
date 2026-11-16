@@ -2,7 +2,8 @@
 	"boundary": {
 		"title": "Something went wrong",
 		"description": "An error occurred while rendering this content.",
-		"tryAgain": "Try Again"
+		"tryAgain": "Try Again",
+		"pageDescription": "This page could not be shown. The rest of the app still works: pick another page in the menu, or try again."
 	},
 	"task": {
 		"parseImplementationPlan": "Failed to parse implementation_plan.json for {{specId}}: {{error}}",

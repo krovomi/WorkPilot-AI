@@ -19,11 +19,11 @@ import { MAX_IMAGES_PER_TASK } from "../../../../../shared/constants";
 import i18n from "../../../../../shared/i18n";
 import type { ImageAttachment } from "../../../../../shared/types";
 import type { ReviewComment } from "../../../../../shared/types/review-comments";
-import { createThumbnail } from "../../../ImageUpload";
+import { createThumbnail } from "../../../../lib/image-attachments";
 import { QAFeedbackSection } from "../QAFeedbackSection";
 
 // jsdom never loads an image, so the thumbnail is made up.
-vi.mock("../../../ImageUpload", async (importOriginal) => ({
+vi.mock("../../../../lib/image-attachments", async (importOriginal) => ({
 	...(await importOriginal<Record<string, unknown>>()),
 	createThumbnail: vi.fn(async () => "data:image/jpeg;base64,thumb"),
 }));
