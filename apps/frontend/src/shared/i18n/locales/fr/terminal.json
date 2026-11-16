@@ -22,8 +22,6 @@
 		"createDescription": "Créer un espace de travail isolé pour ce terminal. Tout le travail se fera dans le répertoire de l'arbre de travail.",
 		"name": "Nom de l'arbre de travail",
 		"namePlaceholder": "ma-fonctionnalite",
-		"nameRequired": "Le nom de l'arbre de travail est requis",
-		"nameInvalid": "Le nom doit commencer et se terminer par une lettre ou un chiffre",
 		"nameHelp": "Lettres minuscules, chiffres, tirets et underscores (les espaces deviennent des tirets)",
 		"associateTask": "Lier a une Tache",
 		"selectTask": "Selectionner une tache...",
@@ -43,6 +41,9 @@
 		"noResults": "Aucun arbre de travail trouvé",
 		"deleteTitle": "Supprimer l'arbre de travail?",
 		"deleteDescription": "Ceci supprimera definitivement l'arbre de travail et sa branche. Les modifications non committées seront perdues.",
+		"deleteDescriptionNoBranch": "Ceci supprimera définitivement l'arbre de travail. Les modifications non committées seront perdues.",
+		"deleteFailed": "Impossible de supprimer l'arbre de travail {{name}}.",
+		"loadFailed": "Impossible de lister les arbres de travail.",
 		"detached": "(détaché)",
 		"remotePushFailed": "Suivi distant non configure",
 		"remotePushFailedDescription": "L'arbre de travail a ete cree mais la branche n'a pas pu etre poussee vers le depot distant. Vous devrez peut-etre executer git push -u manuellement."
@@ -56,7 +57,18 @@
 		"available": "Tâches disponibles",
 		"add": "Ajouter une tâche",
 		"empty": "Aucune tâche disponible",
-		"emptyHint": "Créez des tâches dans le tableau Kanban"
+		"emptyHint": "Créez des tâches dans le tableau Kanban",
+		"phases": {
+			"idle": "Prête",
+			"planning": "Planification",
+			"coding": "Codage",
+			"rate_limit_paused": "Limite atteinte",
+			"auth_failure_paused": "Auth requise",
+			"qa_review": "Revue QA",
+			"qa_fixing": "Correction",
+			"complete": "Terminée",
+			"failed": "Échouée"
+		}
 	},
 	"doubleClickToRename": "Double-cliquez pour renommer"
 }
