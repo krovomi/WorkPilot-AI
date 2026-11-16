@@ -205,6 +205,11 @@ describe("buildPrintWindowScript", () => {
 		expect(script).toContain("$targetPid = 0");
 	});
 
+	it("quotes the output path with every apostrophe doubled", () => {
+		const script = buildPrintWindowScript("C:\\proofs\\l’app's.png", undefined, []);
+		expect(script).toContain("'C:\\proofs\\l’’app''s.png'");
+	});
+
 	it("emits empty defaults when no PID and no names are provided", () => {
 		const script = buildPrintWindowScript("C:\\out.png", undefined, []);
 		expect(script).toContain("$targetPid = 0");
@@ -532,6 +537,16 @@ describe("buildUiAutomationStepScript", () => {
 	it("escapes single quotes in control names", () => {
 		const script = buildUiAutomationStepScript(7, { invoke: "L'article" });
 		expect(script).toContain("NameProperty, 'L''article'");
+	});
+
+	it("doubles the typographic apostrophes PowerShell also reads as quotes", () => {
+		const invoke = buildUiAutomationStepScript(7, { invoke: "L’article" });
+		expect(invoke).toContain("NameProperty, 'L’’article'");
+		const setText = buildUiAutomationStepScript(7, {
+			setText: { name: "Nom ‘client’", value: "d‚x‛" },
+		});
+		expect(setText).toContain("NameProperty, 'Nom ‘‘client’’'");
+		expect(setText).toContain("SetValue('d‚‚x‛‛')");
 	});
 
 	it("returns null when the step has no desktop action", () => {

@@ -17,9 +17,6 @@ interface SwarmState {
 	/** Whether the swarm panel/dialog is open */
 	isOpen: boolean;
 
-	/** Whether swarm mode is enabled for the project */
-	isEnabled: boolean;
-
 	/** Current swarm execution status */
 	status: SwarmStatus | null;
 
@@ -45,7 +42,6 @@ interface SwarmState {
 interface SwarmActions {
 	open: () => void;
 	close: () => void;
-	setEnabled: (enabled: boolean) => void;
 	setConfig: (config: Partial<SwarmConfig>) => void;
 	setError: (error: string | null) => void;
 
@@ -96,7 +92,6 @@ const BRIDGE_UNAVAILABLE = "Swarm mode is unavailable in this environment.";
 
 const initialState: SwarmState = {
 	isOpen: false,
-	isEnabled: false,
 	status: null,
 	config: { ...DEFAULT_SWARM_CONFIG },
 	analysisStats: null,
@@ -114,7 +109,6 @@ export const useSwarmStore = create<SwarmState & SwarmActions>()(
 
 		open: () => set({ isOpen: true }),
 		close: () => set({ isOpen: false }),
-		setEnabled: (enabled) => set({ isEnabled: enabled }),
 		setConfig: (partial) =>
 			set((state) => ({ config: { ...state.config, ...partial } })),
 		setError: (error) => set({ error }),
