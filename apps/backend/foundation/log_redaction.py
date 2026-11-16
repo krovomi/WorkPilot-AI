@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from re import Pattern
 
 # ---------------------------------------------------------------------------
@@ -169,6 +169,22 @@ def redact_text(text: str) -> str:
         return RedactingFilter()._redact(text)
     except Exception:  # noqa: BLE001 - never lose the text over the mask
         return text
+
+
+def text_redactor() -> Callable[[str], str]:
+    """`redact_text` with its patterns read once, for many texts in a row.
+
+    An export masks every text of a recorded session (#347): reading the
+    environment again for each of them would cost more than the masking.
+    """
+    patterns = RedactingFilter()._patterns
+
+    def redact(text: str) -> str:
+        for pattern, replacement in patterns:
+            text = pattern.sub(replacement, text)
+        return text
+
+    return redact
 
 
 # ---------------------------------------------------------------------------

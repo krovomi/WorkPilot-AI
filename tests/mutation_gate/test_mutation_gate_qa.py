@@ -179,3 +179,96 @@ def test_the_fixer_may_change_tests_only(task):
     assert not (repo / "helper.py").exists()
     assert (repo / "tests" / "test_more.py").is_file()
     assert _git(repo, "status", "--porcelain") == ""
+
+
+@pytest.fixture
+def failing(task, monkeypatch):
+    monkeypatch.setenv(MUTATION_ENV, "60")
+    return task
+
+
+def test_the_plan_files_are_mutated_first(failing):
+    repo, spec, scope = failing
+    plan = json.loads((spec / "implementation_plan.json").read_text(encoding="utf-8"))
+    plan["phases"] = [
+        {"subtasks": [{"files_to_modify": ["./shop.py", 7], "files_to_create": None}]},
+        None,
+        {"subtasks": [None, {"files_to_create": ["tests\\test_shop.py", "shop.py"]}]},
+    ]
+    (spec / "implementation_plan.json").write_text(json.dumps(plan), encoding="utf-8")
+
+    assert gate_module._plan_files(spec) == ("shop.py", "tests/test_shop.py")
+    assert mutation_gate(spec, repo, 1, scope) is not None
+
+
+def test_an_unreadable_workflow_declares_nothing(tmp_path, monkeypatch):
+    from workflows.spec import WorkflowError
+
+    def broken(spec_dir):
+        raise WorkflowError("bad yaml")
+
+    monkeypatch.setattr("workflows.registry.load_workflow_for_spec", broken)
+
+    assert threshold_for(tmp_path) is None
+
+
+def test_a_rejection_without_a_plan_still_stands(failing):
+    repo, spec, scope = failing
+    (spec / "implementation_plan.json").unlink()
+
+    assert mutation_gate(spec, repo, 1, scope) is not None
+
+
+def test_an_unwritable_fix_request_does_not_lose_the_rejection(failing):
+    repo, spec, scope = failing
+    (spec / "QA_FIX_REQUEST.md").mkdir()
+
+    issues, verdict = mutation_gate(spec, repo, 1, scope)
+
+    assert issues and "rejected" in verdict
+
+
+def test_a_record_that_cannot_be_written_skips_the_gate(failing):
+    from mutation_gate import RECORD_FILE as RECORD
+
+    repo, spec, scope = failing
+    (spec / RECORD).mkdir()
+
+    assert mutation_gate(spec, repo, 1, scope) is None
+
+
+def test_the_verdict_goes_to_the_task_log(failing, monkeypatch):
+    repo, spec, scope = failing
+    logged: list[tuple[str, str]] = []
+
+    class Log:
+        def log(self, message, kind, phase):
+            logged.append((message, kind.value))
+
+    mutation_gate(spec, repo, 1, scope, task_logger=Log())
+    mutation_gate(spec, repo, 2, None, task_logger=Log())
+
+    assert [kind for _, kind in logged] == ["error", "info"]
+    assert "✗ shop.py:2" in logged[0][0]
+    assert "the change set is unknown" in logged[1][0]
+
+
+def test_a_fixer_that_changed_tests_only_keeps_its_work(task):
+    repo, spec, _ = task
+    head = guard_start(repo, ([{"type": ISSUE_TYPE}], "rejected"))
+    (repo / "tests" / "test_more.py").write_text(
+        "def test_x():\n    assert True\n", encoding="utf-8"
+    )
+
+    assert guard_test_only(repo, spec, head) == []
+    assert guard_test_only(repo, spec, None) == []
+
+
+def test_an_uncommitted_code_change_is_restored_with_nothing_to_commit(task, capsys):
+    repo, spec, _ = task
+    head = guard_start(repo, ([{"type": ISSUE_TYPE}], "rejected"))
+    (repo / "shop.py").write_text("def can_ship(t):\n    return 1\n", encoding="utf-8")
+
+    assert guard_test_only(repo, spec, head) == ["shop.py"]
+    assert (repo / "shop.py").read_text(encoding="utf-8").endswith("t >= 10\n")
+    assert "restored shop.py" in capsys.readouterr().out

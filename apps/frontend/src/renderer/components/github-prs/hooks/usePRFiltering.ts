@@ -3,14 +3,10 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
-import type {
-	NewCommitsCheck,
-	PRData,
-	PRReviewResult,
-} from "../../../../preload/api/modules/github-api";
+import type { PRData } from "../../../../preload/api/modules/github-api";
+import { getPRReviewStatus, type PRReviewInfo } from "../utils/pr-review-status";
 
 export type PRStatusFilter =
-	| "all"
 	| "reviewing"
 	| "not_reviewed"
 	| "reviewed"
@@ -28,11 +24,11 @@ export interface PRFilterState {
 	sortBy: PRSortOption;
 }
 
-interface PRReviewInfo {
-	isReviewing: boolean;
-	result: PRReviewResult | null;
-	newCommitsCheck?: NewCommitsCheck | null;
-}
+const POSTED: ReadonlySet<PRStatusFilter> = new Set([
+	"ready_to_merge",
+	"changes_requested",
+	"ready_for_followup",
+]);
 
 const DEFAULT_FILTERS: PRFilterState = {
 	searchQuery: "",
@@ -40,53 +36,6 @@ const DEFAULT_FILTERS: PRFilterState = {
 	statuses: [],
 	sortBy: "newest",
 };
-
-/**
- * Determine the computed status of a PR based on its review state
- */
-function getPRComputedStatus(reviewInfo: PRReviewInfo | null): PRStatusFilter {
-	// Check if currently reviewing (highest priority)
-	if (reviewInfo?.isReviewing) {
-		return "reviewing";
-	}
-
-	if (!reviewInfo?.result) {
-		return "not_reviewed";
-	}
-
-	const result = reviewInfo.result;
-	const hasPosted =
-		Boolean(result.reviewId) || Boolean(result.hasPostedFindings);
-	// Use overallStatus from review result as source of truth, fallback to severity check
-	const hasBlockingFindings =
-		result.overallStatus === "request_changes" ||
-		result.findings?.some(
-			(f) => f.severity === "critical" || f.severity === "high",
-		);
-	const hasNewCommits = reviewInfo.newCommitsCheck?.hasNewCommits;
-	// Only count commits that happened AFTER findings were posted for follow-up status
-	const hasCommitsAfterPosting =
-		reviewInfo.newCommitsCheck?.hasCommitsAfterPosting;
-
-	// Check for ready for follow-up first (highest priority after posting)
-	// Must have new commits that happened AFTER findings were posted
-	if (hasPosted && hasNewCommits && hasCommitsAfterPosting) {
-		return "ready_for_followup";
-	}
-
-	// Posted with blocking findings
-	if (hasPosted && hasBlockingFindings) {
-		return "changes_requested";
-	}
-
-	// Posted without blocking findings
-	if (hasPosted) {
-		return "ready_to_merge";
-	}
-
-	// Has review result but not posted yet
-	return "reviewed";
-}
 
 export function usePRFiltering(
 	prs: PRData[],
@@ -131,20 +80,11 @@ export function usePRFiltering(
 
 			// Status filter (multi-select)
 			if (filters.statuses.length > 0) {
-				const reviewInfo = getReviewStateForPR(pr.number);
-				const computedStatus = getPRComputedStatus(reviewInfo);
-
-				// Check if PR matches any of the selected statuses
-				const matchesStatus = filters.statuses.some((status) => {
-					// Special handling: 'posted' should match any posted state
-					if (status === "posted") {
-						const hasPosted =
-							reviewInfo?.result?.reviewId ||
-							reviewInfo?.result?.hasPostedFindings;
-						return hasPosted;
-					}
-					return computedStatus === status;
-				});
+				const status = getPRReviewStatus(getReviewStateForPR(pr.number));
+				// "Posted" takes every state a posted review can be in.
+				const matchesStatus = filters.statuses.some((wanted) =>
+					wanted === "posted" ? POSTED.has(status) : status === wanted,
+				);
 
 				if (!matchesStatus) {
 					return false;
@@ -154,37 +94,24 @@ export function usePRFiltering(
 			return true;
 		});
 
-		// Pre-compute timestamps to avoid creating Date objects on every comparison
-		const timestamps = new Map(
-			filtered.map((pr) => [pr.number, new Date(pr.createdAt).getTime()]),
-		);
-
-		// Sort the filtered results
-		return filtered.sort((a, b) => {
-			// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-			const aTime = timestamps.get(a.number)!;
-			// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-			const bTime = timestamps.get(b.number)!;
-
+		// Read each date once, not on every comparison.
+		const dated = filtered.map((pr) => ({
+			pr,
+			time: new Date(pr.createdAt).getTime(),
+			changes: (pr.additions || 0) + (pr.deletions || 0),
+		}));
+		const compare = (a: (typeof dated)[number], b: (typeof dated)[number]) => {
 			switch (filters.sortBy) {
 				case "newest":
-					// Sort by createdAt descending (most recent first)
-					return bTime - aTime;
+					return b.time - a.time;
 				case "oldest":
-					// Sort by createdAt ascending (oldest first)
-					return aTime - bTime;
-				case "largest": {
-					// Sort by total changes (additions + deletions) descending
-					const aChanges = (a.additions || 0) + (a.deletions || 0);
-					const bChanges = (b.additions || 0) + (b.deletions || 0);
-					if (bChanges !== aChanges) return bChanges - aChanges;
-					// Secondary sort by createdAt (newest first) for stable ordering
-					return bTime - aTime;
-				}
-				default:
-					return 0;
+					return a.time - b.time;
+				case "largest":
+					// Then the newest first, for a stable order.
+					return b.changes - a.changes || b.time - a.time;
 			}
-		});
+		};
+		return dated.sort(compare).map(({ pr }) => pr);
 	}, [prs, filters, getReviewStateForPR]);
 
 	// Filter setters
