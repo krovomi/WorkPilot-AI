@@ -41,9 +41,10 @@ const execFileAsync = promisify(execFile);
 // Must start and end with alphanumeric character
 const WORKTREE_NAME_REGEX = /^[a-z0-9][a-z0-9_-]*[a-z0-9]$|^[a-z0-9]$/;
 
-// Validation regex for git branch names - allows alphanumeric, dots, slashes, dashes, underscores
+// Validation regex for git branch names - allows alphanumeric, dots, slashes, dashes, underscores.
+// As git wants a branch name: no part after a slash starts with a dash or a dot, no "..".
 const GIT_BRANCH_REGEX =
-	/^[a-zA-Z0-9][a-zA-Z0-9._/-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/;
+	/^(?!.*\.\.)(?!.*\/[-.])[a-zA-Z0-9][a-zA-Z0-9._/-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/;
 
 // Git worktree list porcelain output parsing constants
 const GIT_PORCELAIN = {
