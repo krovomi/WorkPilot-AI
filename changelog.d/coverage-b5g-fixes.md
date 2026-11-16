@@ -17,3 +17,6 @@ section: 🐛 Corrections
   s'affiche sans erreur.
 - **Cerveau partagé** : l'échec d'un clone n'est plus classé « authentification » parce que le
   chemin ou l'URL qu'il cite contient `403` ou `permission denied`.
+- **Mémoire partagée** : l'avis d'un modèle sur deux notes en conflit est lu même quand le modèle
+  ajoute des accolades après sa réponse, et une entrée de la file d'une autre forme est refusée
+  proprement.
