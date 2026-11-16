@@ -14,7 +14,8 @@ import { DesignImportPanel } from "./DesignImportPanel";
  */
 export function VisualToCodeHub() {
 	const { t } = useTranslation("visualToCode");
-	const { activeMode, setActiveMode } = useVisualToCodeStore();
+	const activeMode = useVisualToCodeStore((s) => s.activeMode);
+	const setActiveMode = useVisualToCodeStore((s) => s.setActiveMode);
 
 	return (
 		<div className="h-full flex flex-col">

@@ -197,15 +197,8 @@ def _candidate_dirs(root: Path) -> list[Path]:
             break
         dirs.extend(next_level)
         frontier = next_level
-    # De-duplicate while keeping order; a symlinked monorepo can list twice.
-    seen: set[str] = set()
-    unique: list[Path] = []
-    for path in dirs:
-        key = str(path)
-        if key not in seen:
-            seen.add(key)
-            unique.append(path)
-    return unique
+    # Each entry is a distinct child of a distinct parent, so no path repeats.
+    return dirs
 
 
 def _gradle_wrapper(directory: Path) -> str:
@@ -420,16 +413,27 @@ def _detect_flutter(directory: Path) -> MobileStack | None:
 
 def _package_json(directory: Path) -> dict:
     try:
-        return json.loads(_read(directory / "package.json") or "{}")
-    except (json.JSONDecodeError, ValueError):
+        data = json.loads(_read(directory / "package.json") or "{}")
+    except ValueError:  # JSONDecodeError is one
         return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _js_dependencies(pkg: dict) -> dict:
+    """Runtime and dev dependencies; a section of another shape counts as none."""
+    merged: dict = {}
+    for key in ("dependencies", "devDependencies"):
+        section = pkg.get(key)
+        if isinstance(section, dict):
+            merged.update(section)
+    return merged
 
 
 def _detect_react_native(directory: Path) -> MobileStack | None:
     pkg = _package_json(directory)
     if not pkg:
         return None
-    deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+    deps = _js_dependencies(pkg)
     if "expo" in deps:
         return MobileStack(
             framework="expo",
@@ -493,8 +497,7 @@ def _detect_react_native(directory: Path) -> MobileStack | None:
 
 
 def _detect_capacitor(directory: Path) -> MobileStack | None:
-    pkg = _package_json(directory)
-    deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+    deps = _js_dependencies(_package_json(directory))
     has_config = any(
         (directory / name).exists()
         for name in (

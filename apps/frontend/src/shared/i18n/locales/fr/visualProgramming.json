@@ -300,6 +300,7 @@
 	"brickDescription": "Ce qu'elle fait",
 	"brickDescriptionExample": "ex. Orchestre les sous-agents et répartit les tâches par modèle.",
 	"brickDelete": "Supprimer la brique",
+	"brickSaveFailed": "La brique n'a pas pu être enregistrée : elle a peut-être été supprimée entre-temps.",
 	"brickSave": "Enregistrer",
 	"brickCreate": "Créer la brique",
 	"edgeEditHint": "Entrée pour valider, Échap pour annuler.",

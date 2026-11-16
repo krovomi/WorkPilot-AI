@@ -44,9 +44,8 @@ type NavigableItem =
 
 interface WorktreeSelectorProps {
 	terminalId: string;
+	/** Shown only for a terminal of a project that has no worktree yet. */
 	projectPath: string;
-	/** Currently attached worktree config, if any */
-	currentWorktree?: TerminalWorktreeConfig;
 	/** Callback to create a new worktree */
 	onCreateWorktree: () => void;
 	/** Callback when an existing worktree is selected */
@@ -67,9 +66,9 @@ function getItemName(item: NavigableItem): string {
 function getItemBranch(item: NavigableItem): string {
 	switch (item.type) {
 		case "terminal":
-			return item.data.branchName ?? "";
+			return item.data.branchName;
 		case "task":
-			return item.data.branch ?? "";
+			return item.data.branch;
 		case "other":
 			return item.data.branch ?? "";
 	}
@@ -95,7 +94,6 @@ function getItemKey(item: NavigableItem): string {
 export function WorktreeSelector({
 	terminalId,
 	projectPath,
-	currentWorktree,
 	onCreateWorktree,
 	onSelectWorktree,
 }: WorktreeSelectorProps) {
@@ -109,6 +107,8 @@ export function WorktreeSelector({
 	const [deleteWorktree, setDeleteWorktree] =
 		useState<TerminalWorktreeConfig | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [loadError, setLoadError] = useState(false);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [focusedIndex, setFocusedIndex] = useState(0);
 	const searchInputRef = useRef<HTMLInputElement>(null);
@@ -123,8 +123,8 @@ export function WorktreeSelector({
 
 	// Fetch worktrees when dropdown opens
 	const fetchWorktrees = async () => {
-		if (!projectPath) return;
 		setIsLoading(true);
+		setLoadError(false);
 		try {
 			// Fetch terminal worktrees, task worktrees, and other worktrees in parallel
 			const [terminalResult, taskResult, otherResult] = await Promise.all([
@@ -137,41 +137,26 @@ export function WorktreeSelector({
 				window.electronAPI.listOtherWorktrees(projectPath),
 			]);
 
-			// Process terminal worktrees
-			if (terminalResult.success && terminalResult.data) {
-				const available = currentWorktree
-					? terminalResult.data.filter(
-							(wt) => wt.worktreePath !== currentWorktree.worktreePath,
-						)
-					: terminalResult.data;
-				setWorktrees(available);
-			}
-
-			// Process task worktrees
-			if (taskResult?.success && taskResult.data?.worktrees) {
-				const availableTaskWorktrees = currentWorktree
-					? taskResult.data.worktrees.filter(
-							(wt) => wt.path !== currentWorktree.worktreePath,
-						)
-					: taskResult.data.worktrees;
-				setTaskWorktrees(availableTaskWorktrees);
-			} else {
-				setTaskWorktrees([]);
-			}
-
-			// Process other worktrees
-			if (otherResult?.success && otherResult.data) {
-				const availableOtherWorktrees = currentWorktree
-					? otherResult.data.filter(
-							(wt) => wt.path !== currentWorktree.worktreePath,
-						)
-					: otherResult.data;
-				setOtherWorktrees(availableOtherWorktrees);
-			} else {
-				setOtherWorktrees([]);
-			}
+			// The terminal has no worktree yet (the header shows its badge instead
+			// of this selector), so every worktree listed is one it can move to.
+			setWorktrees(
+				terminalResult.success && terminalResult.data ? terminalResult.data : [],
+			);
+			setTaskWorktrees(
+				taskResult?.success && taskResult.data ? taskResult.data.worktrees : [],
+			);
+			setOtherWorktrees(
+				otherResult.success && otherResult.data ? otherResult.data : [],
+			);
+			// A project without an id has no task worktrees to list (null).
+			setLoadError(
+				!terminalResult.success ||
+					taskResult?.success === false ||
+					!otherResult.success,
+			);
 		} catch (err) {
 			console.error("Failed to fetch worktrees:", err);
+			setLoadError(true);
 		} finally {
 			setIsLoading(false);
 		}
@@ -246,9 +231,7 @@ export function WorktreeSelector({
 
 	// Compute active descendant for aria
 	const activeDescendant =
-		allItems.length > 0 && focusedIndex < allItems.length
-			? getOptionId(focusedIndex)
-			: undefined;
+		focusedIndex < allItems.length ? getOptionId(focusedIndex) : undefined;
 
 	// Select the focused item
 	const selectItem = useCallback(
@@ -297,7 +280,8 @@ export function WorktreeSelector({
 				}
 				case "Enter": {
 					e.preventDefault();
-					if (allItems.length > 0 && focusedIndex < allItems.length) {
+					// The list can shrink under the focus (a worktree deleted).
+					if (focusedIndex < allItems.length) {
 						selectItem(allItems[focusedIndex]);
 					}
 					break;
@@ -332,33 +316,35 @@ export function WorktreeSelector({
 		if (!open) {
 			setSearchQuery("");
 			setFocusedIndex(0);
+			setDeleteError(null);
 		}
 	};
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: fetchWorktrees is intentionally excluded to prevent infinite loop
 	useEffect(() => {
-		if (isOpen && projectPath) {
+		if (isOpen) {
 			fetchWorktrees();
 		}
 	}, [isOpen, projectPath]);
 
 	// Handle delete worktree
-	const handleDeleteWorktree = async () => {
-		if (!deleteWorktree || !projectPath) return;
+	const handleDeleteWorktree = async (target: TerminalWorktreeConfig) => {
 		setIsDeleting(true);
+		setDeleteError(null);
 		try {
 			const result = await window.electronAPI.removeTerminalWorktree(
 				projectPath,
-				deleteWorktree.name,
-				deleteWorktree.hasGitBranch,
+				target.name,
+				target.hasGitBranch,
 			);
 			if (result.success) {
 				await fetchWorktrees();
 			} else {
-				console.error("Failed to delete worktree:", result.error);
+				setDeleteError(target.name);
 			}
 		} catch (err) {
 			console.error("Failed to delete worktree:", err);
+			setDeleteError(target.name);
 		} finally {
 			setIsDeleting(false);
 			setDeleteWorktree(null);
@@ -493,6 +479,12 @@ export function WorktreeSelector({
 
 					<div className="border-t border-border" />
 
+					{deleteError && (
+						<p role="alert" className="px-2 py-1.5 text-xs text-destructive">
+							{t("terminal:worktree.deleteFailed", { name: deleteError })}
+						</p>
+					)}
+
 					{/* Scrollable results */}
 					<ScrollArea className="max-h-[300px]">
 						<div
@@ -505,6 +497,10 @@ export function WorktreeSelector({
 								<div className="flex items-center justify-center py-2">
 									<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
 								</div>
+							) : loadError && !hasResults ? (
+								<p role="alert" className="py-2 text-center text-xs text-destructive">
+									{t("terminal:worktree.loadFailed")}
+								</p>
 							) : !hasResults ? (
 								<div className="py-2 text-center text-xs text-muted-foreground">
 									{t("terminal:worktree.noResults")}
@@ -563,21 +559,25 @@ export function WorktreeSelector({
 			</Popover>
 
 			{/* Delete Confirmation Dialog */}
+			{/* Opened only by a trash button, so every change reported is a close;
+			    the dialog stays up until the deletion has answered. */}
 			<AlertDialog
 				open={!!deleteWorktree}
-				onOpenChange={(open) => !open && setDeleteWorktree(null)}
+				onOpenChange={() => {
+					if (!isDeleting) setDeleteWorktree(null);
+				}}
 			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>
-							{t("terminal:worktree.deleteTitle", "Delete Worktree?")}
-						</AlertDialogTitle>
-						<AlertDialogDescription>
-							{t(
-								"terminal:worktree.deleteDescription",
-								"This will permanently delete the worktree and its branch. Any uncommitted changes will be lost.",
-							)}
-							{deleteWorktree && (
+				{deleteWorktree && (
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>
+								{t("terminal:worktree.deleteTitle")}
+							</AlertDialogTitle>
+							<AlertDialogDescription>
+								{/* Only a worktree created with its own branch loses one. */}
+								{deleteWorktree.hasGitBranch
+									? t("terminal:worktree.deleteDescription")
+									: t("terminal:worktree.deleteDescriptionNoBranch")}
 								<span className="block mt-2 font-mono text-sm">
 									{deleteWorktree.name}
 									{deleteWorktree.branchName && (
@@ -587,32 +587,35 @@ export function WorktreeSelector({
 										</span>
 									)}
 								</span>
-							)}
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel disabled={isDeleting}>
-							{t("common:cancel")}
-						</AlertDialogCancel>
-						<AlertDialogAction
-							onClick={handleDeleteWorktree}
-							disabled={isDeleting}
-							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-						>
-							{isDeleting ? (
-								<>
-									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									{t("common:buttons.deleting", "Deleting...")}
-								</>
-							) : (
-								<>
-									<Trash2 className="h-4 w-4 mr-2" />
-									{t("common:delete")}
-								</>
-							)}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel disabled={isDeleting}>
+								{t("common:cancel")}
+							</AlertDialogCancel>
+							<AlertDialogAction
+								onClick={(e) => {
+									e.preventDefault();
+									handleDeleteWorktree(deleteWorktree);
+								}}
+								disabled={isDeleting}
+								className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+							>
+								{isDeleting ? (
+									<>
+										<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+										{t("common:buttons.deleting")}
+									</>
+								) : (
+									<>
+										<Trash2 className="h-4 w-4 mr-2" />
+										{t("common:delete")}
+									</>
+								)}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				)}
 			</AlertDialog>
 		</>
 	);

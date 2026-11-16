@@ -1,245 +1,320 @@
-import {
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	writeFileSync,
-} from "node:fs";
+/**
+ * The Azure DevOps handlers: the connection, the repositories, the work items
+ * and their import as tasks (`azure-devops-import.ts`), and two repairs of an
+ * imported task, its display fields and its acceptance criteria. Azure DevOps
+ * is reached through the backend runner (`azure-devops-connector.ts`), the
+ * project's credentials in its environment only. Every channel registers on
+ * `azureDevOpsIpcMain` (`azure-devops-ipc-guard.ts`), which checks what the
+ * renderer sends before the handler runs.
+ */
+
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
-import { ipcMain } from "electron";
-import {
-	AUTO_BUILD_PATHS,
-	getSpecsDir,
-	IPC_CHANNELS,
-} from "../../shared/constants";
+import { AUTO_BUILD_PATHS, getSpecsDir, IPC_CHANNELS } from "../../shared/constants";
 import type {
 	AzureDevOpsImportResult,
+	AzureDevOpsRepository,
 	AzureDevOpsSyncStatus,
 	AzureDevOpsWorkItem,
 	IPCResult,
 	Project,
-	TaskMetadata,
+	Task,
 } from "../../shared/types";
-import { slugifySpecTitle } from "../../shared/utils/spec-slug";
+import { parseAcceptanceCriteriaText } from "../../shared/utils/acceptance-criteria";
 import type { AgentManager } from "../agent";
 import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
-import {
-	parseAcceptanceCriteriaText,
-	stripAcceptanceCriteriaSection,
-} from "../../shared/utils/acceptance-criteria";
-import {
-	inlineAzureDevOpsImages,
-	saveInlinedImagesAsAttachments,
-	stripAzureAttachmentImages,
-} from "./shared/azure-attachments";
-import {
-	sanitizeText,
-	sanitizeUrl,
-	stripControlChars,
-	stripHtml,
-} from "./shared/sanitize";
 import { readIfExists, updateExistingFile } from "../utils/existing-file";
-import { callAzureDevOpsPython } from "./azure-devops-connector";
+import { type AzureDevOpsOperation, callAzureDevOpsPython } from "./azure-devops-connector";
+import { importWorkItem, nextSpecNumber, plainTitle, specIdOf } from "./azure-devops-import";
+import { azureDevOpsIpcMain } from "./azure-devops-ipc-guard";
+import { inlineAzureDevOpsImages, stripAzureAttachmentImages } from "./shared/azure-attachments";
 
+/** The project's Azure DevOps settings, from its `.workpilot/.env`. */
+interface AzureConfig {
+	pat?: string;
+	orgUrl?: string;
+	/** Decoded: the settings may hold it as it appears in a URL (`My%20Project`). */
+	projectName?: string;
+}
+
+/** A project whose settings name an organization and a token. */
+interface Configured {
+	project: Project;
+	config: AzureConfig & { pat: string; orgUrl: string };
+}
+
+type Refusal = { success: false; error: string };
+
+const decodeName = (name: string | undefined): string | undefined => {
+	if (!name) return undefined;
+	try {
+		return decodeURIComponent(name);
+	} catch {
+		return name;
+	}
+};
+
+function readConfig(project: Project): AzureConfig {
+	if (!project.autoBuildPath) return {};
+	try {
+		const vars = readProjectEnv(project);
+		return {
+			pat: vars.AZURE_DEVOPS_PAT || undefined,
+			orgUrl: vars.AZURE_DEVOPS_ORG_URL || undefined,
+			projectName: decodeName(vars.AZURE_DEVOPS_PROJECT),
+		};
+	} catch {
+		return {};
+	}
+}
+
+/** What went wrong: the runner, the file system and these handlers only throw errors. */
+const messageOf = (error: unknown): string => (error as Error).message;
 
 /**
- * Register all Azure DevOps-related IPC handlers
+ * Calls the connector in the project's folder. Its environment holds the
+ * project's credentials, and its Azure DevOps project over any the system has.
  */
+function call<T>(project: Project, config: AzureConfig, operation: AzureDevOpsOperation, params = {}): Promise<T> {
+	const env: Record<string, string> = {};
+	if (config.pat) env.AZURE_DEVOPS_PAT = config.pat;
+	if (config.orgUrl) env.AZURE_DEVOPS_ORG_URL = config.orgUrl;
+	if (config.projectName) env.AZURE_DEVOPS_PROJECT = config.projectName;
+	return callAzureDevOpsPython(
+		path.join(project.path, project.autoBuildPath || ""),
+		operation,
+		params,
+		env,
+	) as Promise<T>;
+}
+
+/** The project and its settings, or why the channel cannot reach Azure DevOps. */
+function configured(projectId: string, mustBeInitialized = false): Configured | Refusal {
+	const project = projectStore.getProject(projectId);
+	if (!project || (mustBeInitialized && !project.autoBuildPath)) {
+		return { success: false, error: mustBeInitialized ? "Project not found or not initialized" : "Project not found" };
+	}
+	const { pat, orgUrl, projectName } = readConfig(project);
+	if (!pat || !orgUrl) {
+		return {
+			success: false,
+			error: mustBeInitialized ? "Azure DevOps not configured" : "Azure DevOps not configured for this project",
+		};
+	}
+	return { project, config: { pat, orgUrl, projectName } };
+}
+
+/** The result of `work`, or its error as the channel's answer. */
+async function attempt<T>(work: () => Promise<T>): Promise<IPCResult<T>> {
+	try {
+		return { success: true, data: await work() };
+	} catch (error) {
+		return { success: false, error: messageOf(error) };
+	}
+}
+
+/** The work item an imported task came from: its identifier is `ADO-<id>`. */
+function workItemIdOf(task: Task): number | undefined {
+	const id = Number(/^ADO-(\d+)$/i.exec(task.metadata?.azureDevOpsIdentifier ?? "")?.[1]);
+	return Number.isSafeInteger(id) && id > 0 ? id : undefined;
+}
+
+const findTask = (projectId: string, taskId: string): Task | undefined =>
+	projectStore.getTasks(projectId).find((task) => task.id === taskId);
+
+/** The JSON object a file holds, or `undefined` when it holds anything else. */
+function parseObject(text: string): Record<string, unknown> | undefined {
+	try {
+		const value: unknown = JSON.parse(text);
+		return typeof value === "object" && value !== null && !Array.isArray(value)
+			? (value as Record<string, unknown>)
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/** Imports the chosen work items of the project's backlog as tasks, one spec folder each. */
+async function importWorkItems(
+	{ project, config }: Configured,
+	workItemIds: number[],
+	requireReviewBeforeCoding: boolean | undefined,
+): Promise<AzureDevOpsImportResult> {
+	const items = await call<AzureDevOpsWorkItem[]>(project, config, "list_work_items", { max_items: 1000 });
+	const wanted = new Set(workItemIds);
+	const selected = items.filter((item) => wanted.has(item.id));
+	if (selected.length === 0) throw new Error("No matching work items found");
+
+	const specsDir = path.join(project.path, getSpecsDir(project.autoBuildPath));
+	mkdirSync(specsDir, { recursive: true });
+	let specNumber = nextSpecNumber(specsDir);
+	const context = { projectId: project.id, specsDir, pat: config.pat, orgUrl: config.orgUrl, requireReviewBeforeCoding };
+	const tasks: Task[] = [];
+	const errors: string[] = [];
+	for (const item of selected) {
+		try {
+			tasks.push(await importWorkItem(item, specIdOf(specNumber, plainTitle(item.title)), context));
+		} catch (error) {
+			errors.push(`Failed to import work item ${item.id}: ${messageOf(error)}`);
+		}
+		specNumber += 1;
+	}
+	projectStore.invalidateTasksCache(project.id);
+	return {
+		success: true,
+		imported: tasks.length,
+		failed: errors.length,
+		errors: errors.length > 0 ? errors : undefined,
+		tasks,
+	};
+}
+
+/**
+ * The accented title of an imported task that has none: older imports only
+ * kept the spec folder name, a slug without accents. A failed fetch leaves it
+ * missing.
+ */
+async function fetchTitle(project: Project, config: AzureConfig, task: Task): Promise<string | undefined> {
+	const workItemId = workItemIdOf(task);
+	if (!workItemId || !config.pat || !config.orgUrl) return undefined;
+	try {
+		const item = await call<{ title?: string }>(project, config, "get_work_item", { work_item_id: workItemId });
+		return plainTitle(item.title ?? "") || undefined;
+	} catch (error) {
+		console.warn("[AZURE_DEVOPS_HYDRATE_TASK_DISPLAY] Title fetch failed (non-fatal):", messageOf(error));
+		return undefined;
+	}
+}
+
+/**
+ * The display fields of an imported task, repaired once, on open: the
+ * accented title when it is missing, and the description with its Azure
+ * DevOps images inlined (they need the PAT, so the renderer cannot load them),
+ * any that still fail stripped so that they never fire a failing request. The
+ * fields that changed are written onto the file as it is by then.
+ */
+async function hydrateTaskDisplay(projectId: string, taskId: string): Promise<{ html: string; title?: string }> {
+	const project = projectStore.getProject(projectId);
+	if (!project) throw new Error("Project not found");
+	const task = findTask(projectId, taskId);
+	if (!task?.specsPath) throw new Error("Task spec directory not found");
+	const requirementsPath = path.join(task.specsPath, AUTO_BUILD_PATHS.REQUIREMENTS);
+	const text = readIfExists(requirementsPath);
+	if (text === null) throw new Error("requirements.json not found");
+	const requirements = parseObject(text);
+	if (!requirements) throw new Error("requirements.json is malformed");
+
+	const config = readConfig(project);
+	const changes: Record<string, string> = {};
+
+	let title = typeof requirements.display_title === "string" ? requirements.display_title : undefined;
+	if (!title) {
+		title = await fetchTitle(project, config, task);
+		if (title) changes.display_title = title;
+	}
+
+	const display = typeof requirements.display_description === "string" ? requirements.display_description : "";
+	const source = display || (typeof requirements.task_description === "string" ? requirements.task_description : "");
+	let html = source;
+	if (source.includes("<img")) {
+		if (config.pat && config.orgUrl) html = await inlineAzureDevOpsImages(source, config.orgUrl, config.pat);
+		html = stripAzureAttachmentImages(html, config.orgUrl);
+		if (html !== display) changes.display_description = html;
+	}
+
+	if (Object.keys(changes).length > 0) {
+		try {
+			updateExistingFile(requirementsPath, (current) => {
+				const latest = parseObject(current);
+				return latest ? JSON.stringify({ ...latest, ...changes }, null, 2) : null;
+			});
+			projectStore.invalidateTasksCache(projectId);
+		} catch (error) {
+			console.warn("[AZURE_DEVOPS_HYDRATE_TASK_DISPLAY] Could not persist display fields:", messageOf(error));
+		}
+	}
+	return { html, title };
+}
+
+/**
+ * The acceptance criteria of a task's work item, read again from Azure DevOps
+ * and written into its metadata and requirements. The work item must be the
+ * one the task was imported from.
+ */
+async function syncTaskCriteria(
+	{ project, config }: Configured,
+	taskId: string,
+	workItemId: number,
+): Promise<{ acceptanceCriteria: string[] }> {
+	const task = findTask(project.id, taskId);
+	if (!task || workItemIdOf(task) !== workItemId) throw new Error("This task was not imported from that work item");
+	const item = await call<{ acceptanceCriteria?: string }>(project, config, "get_work_item", {
+		work_item_id: workItemId,
+	});
+	const acceptanceCriteria = parseAcceptanceCriteriaText(item.acceptanceCriteria ?? undefined);
+	if (task.specsPath) {
+		const write = (file: string, key: string) =>
+			updateExistingFile(path.join(task.specsPath as string, file), (text) => {
+				const content = parseObject(text);
+				return content ? JSON.stringify({ ...content, [key]: acceptanceCriteria }, null, 2) : null;
+			});
+		write("task_metadata.json", "acceptanceCriteria");
+		write(AUTO_BUILD_PATHS.REQUIREMENTS, "acceptance_criteria");
+		projectStore.invalidateTasksCache(project.id);
+	}
+	return { acceptanceCriteria };
+}
+
+/** Register all Azure DevOps-related IPC handlers. */
 export function registerAzureDevOpsHandlers(
 	_agentManager: AgentManager,
 	_getMainWindow: () => BrowserWindow | null,
 ): void {
-	// ============================================
-	// Azure DevOps Integration Operations
-	// ============================================
-
-	/**
-	 * Helper to get Azure DevOps credentials from project env
-	 */
-	const getAzureDevOpsConfig = (
-		project: Project,
-	): {
-		pat: string | null;
-		orgUrl: string | null;
-		projectName: string | null;
-	} => {
-		if (!project.autoBuildPath) {
-			return { pat: null, orgUrl: null, projectName: null };
-		}
-		try {
-			const vars = readProjectEnv(project);
-			return {
-				pat: vars.AZURE_DEVOPS_PAT || null,
-				orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
-				projectName: vars.AZURE_DEVOPS_PROJECT || null,
-			};
-		} catch {
-			return { pat: null, orgUrl: null, projectName: null };
-		}
-	};
-
-	/**
-	 * Helper to normalize project name (URL-decode if needed)
-	 */
-	const normalizeProjectName = (
-		projectName: string | null | undefined,
-	): string | undefined => {
-		if (!projectName) return undefined;
-		// URL-decode project name if it was encoded (e.g., 'MeCa%20Web' → 'MeCa Web')
-		try {
-			return decodeURIComponent(projectName);
-		} catch {
-			return projectName;
-		}
-	};
-
-
-	ipcMain.handle(
+	azureDevOpsIpcMain.handle(
 		IPC_CHANNELS.AZURE_DEVOPS_CHECK_CONNECTION,
 		async (_, projectId: string): Promise<IPCResult<AzureDevOpsSyncStatus>> => {
-			const project = projectStore.getProject(projectId);
-			if (!project) {
-				return { success: false, error: "Project not found" };
+			const ready = configured(projectId);
+			if (!("project" in ready)) {
+				return ready.error === "Project not found"
+					? ready
+					: { success: true, data: { connected: false, error: "Azure DevOps not configured" } };
 			}
-
-			const config = getAzureDevOpsConfig(project);
-			const envOverrides: Record<string, string> = {};
-			if (config.pat) envOverrides.AZURE_DEVOPS_PAT = config.pat;
-			if (config.orgUrl) envOverrides.AZURE_DEVOPS_ORG_URL = config.orgUrl;
-			// Always set AZURE_DEVOPS_PROJECT to override any system env var
-			const normalizedProject = normalizeProjectName(config.projectName);
-			if (normalizedProject)
-				envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
-			if (!config.pat || !config.orgUrl) {
-				return {
-					success: true,
-					data: {
-						connected: false,
-						error: "Azure DevOps not configured",
-					},
-				};
-			}
-
+			const { project, config } = ready;
 			try {
-				const projectPath = path.join(
-					project.path,
-					project.autoBuildPath || "",
-				);
-				const info = (await callAzureDevOpsPython(
-					projectPath,
-					"test_connection",
-					{},
-					envOverrides,
-				)) as Record<string, string>;
-
-				// Use the project name returned by Python (auto-detected from git remote)
-				const detectedProjectName =
-					info?.project || normalizeProjectName(config.projectName);
-
+				// The runner gives the project it detected from the git remote.
+				const info = await call<{ project?: string } | null>(project, config, "test_connection");
 				return {
 					success: true,
-					data: {
-						connected: true,
-						organizationUrl: config.orgUrl,
-						projectName: detectedProjectName,
-					},
+					data: { connected: true, organizationUrl: config.orgUrl, projectName: info?.project || config.projectName },
 				};
-			} catch (error: unknown) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				return {
-					success: true,
-					data: {
-						connected: false,
-						error: errorMessage,
-					},
-				};
+			} catch (error) {
+				return { success: true, data: { connected: false, error: messageOf(error) } };
 			}
 		},
 	);
 
-	ipcMain.handle(
+	azureDevOpsIpcMain.handle(
 		IPC_CHANNELS.AZURE_DEVOPS_LIST_REPOSITORIES,
-		async (
-			_,
-			projectId: string,
-		): Promise<
-			IPCResult<import("../../shared/types").AzureDevOpsRepository[]>
-		> => {
-			const project = projectStore.getProject(projectId);
-			if (!project) {
-				return { success: false, error: "Project not found" };
-			}
-
-			const config = getAzureDevOpsConfig(project);
-			const envOverrides: Record<string, string> = {};
-			if (config.pat) envOverrides.AZURE_DEVOPS_PAT = config.pat;
-			if (config.orgUrl) envOverrides.AZURE_DEVOPS_ORG_URL = config.orgUrl;
-			// Pass project name from env for fallback (Python auto-detects from git remote)
-			const normalizedProject = normalizeProjectName(config.projectName);
-			if (normalizedProject)
-				envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
-
-			if (!config.pat || !config.orgUrl) {
-				return {
-					success: false,
-					error: "Azure DevOps not configured for this project",
-				};
-			}
-
-			try {
-				const projectPath = path.join(
-					project.path,
-					project.autoBuildPath || "",
-				);
-				const repos = (await callAzureDevOpsPython(
-					projectPath,
-					"list_repositories",
-					{}, // Project name is auto-detected in Python from git remote
-					envOverrides,
-				)) as import("../../shared/types").AzureDevOpsRepository[];
-
-				return { success: true, data: repos };
-			} catch (error: unknown) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				return { success: false, error: errorMessage };
-			}
+		async (_, projectId: string): Promise<IPCResult<AzureDevOpsRepository[]>> => {
+			const ready = configured(projectId);
+			if (!("project" in ready)) return ready;
+			return attempt(() => call(ready.project, ready.config, "list_repositories"));
 		},
 	);
 
-	ipcMain.handle(
+	// The repository comes from the git remote: no credential is needed.
+	azureDevOpsIpcMain.handle(
 		IPC_CHANNELS.AZURE_DEVOPS_DETECT_REPOSITORY,
-		async (
-			_,
-			projectId: string,
-		): Promise<IPCResult<{ repository: string | null }>> => {
+		async (_, projectId: string): Promise<IPCResult<{ repository: string | null }>> => {
 			const project = projectStore.getProject(projectId);
-			if (!project) {
-				return { success: false, error: "Project not found" };
-			}
-
-			try {
-				const projectPath = path.join(
-					project.path,
-					project.autoBuildPath || "",
-				);
-
-				const result = (await callAzureDevOpsPython(projectPath, "detect_repository")) as {
-					repository: string | null;
-				};
-
-				return { success: true, data: result };
-			} catch (error: unknown) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				return { success: false, error: errorMessage };
-			}
+			if (!project) return { success: false, error: "Project not found" };
+			return attempt(() => call(project, {}, "detect_repository"));
 		},
 	);
 
-	ipcMain.handle(
+	azureDevOpsIpcMain.handle(
 		IPC_CHANNELS.AZURE_DEVOPS_GET_WORK_ITEMS,
 		async (
 			_,
@@ -248,104 +323,26 @@ export function registerAzureDevOpsHandlers(
 			itemTypes?: string[],
 			maxItems?: number,
 		): Promise<IPCResult<AzureDevOpsWorkItem[]>> => {
-			const project = projectStore.getProject(projectId);
-			if (!project) {
-				return { success: false, error: "Project not found" };
-			}
-
-			const config = getAzureDevOpsConfig(project);
-			const envOverrides: Record<string, string> = {};
-			if (config.pat) envOverrides.AZURE_DEVOPS_PAT = config.pat;
-			if (config.orgUrl) envOverrides.AZURE_DEVOPS_ORG_URL = config.orgUrl;
-			// Always set AZURE_DEVOPS_PROJECT to override any system env var
-			const normalizedProject = normalizeProjectName(config.projectName);
-			if (normalizedProject)
-				envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
-			if (!config.pat || !config.orgUrl) {
-				return {
-					success: false,
-					error: "Azure DevOps not configured for this project",
-				};
-			}
-
-			try {
-				const projectPath = path.join(
-					project.path,
-					project.autoBuildPath || "",
-				);
-
-				const items = (await callAzureDevOpsPython(
-					projectPath,
-					"list_work_items",
-					{
-						item_types: itemTypes,
-						max_items: maxItems || 100,
-					},
-					envOverrides,
-				)) as AzureDevOpsWorkItem[];
-
-				return { success: true, data: items };
-			} catch (error: unknown) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				return { success: false, error: errorMessage };
-			}
+			const ready = configured(projectId);
+			if (!("project" in ready)) return ready;
+			return attempt(() =>
+				call(ready.project, ready.config, "list_work_items", { item_types: itemTypes, max_items: maxItems || 100 }),
+			);
 		},
 	);
 
-	// Fetch a single work item directly by its global ID. Unlike
-	// GET_WORK_ITEMS (which lists the backlog and is capped/filtered), this
-	// resolves any work item — including custom types (e.g. RSD) or items
-	// outside the backlog window — so the import search can find it by ID.
-	ipcMain.handle(
+	// Any work item by its id, custom types and items outside the backlog
+	// window included, so that the import search finds it.
+	azureDevOpsIpcMain.handle(
 		IPC_CHANNELS.AZURE_DEVOPS_GET_WORK_ITEM,
-		async (
-			_,
-			projectId: string,
-			workItemId: number,
-		): Promise<IPCResult<AzureDevOpsWorkItem>> => {
-			const project = projectStore.getProject(projectId);
-			if (!project) {
-				return { success: false, error: "Project not found" };
-			}
-
-			const config = getAzureDevOpsConfig(project);
-			const envOverrides: Record<string, string> = {};
-			if (config.pat) envOverrides.AZURE_DEVOPS_PAT = config.pat;
-			if (config.orgUrl) envOverrides.AZURE_DEVOPS_ORG_URL = config.orgUrl;
-			const normalizedProject = normalizeProjectName(config.projectName);
-			if (normalizedProject)
-				envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
-			if (!config.pat || !config.orgUrl) {
-				return {
-					success: false,
-					error: "Azure DevOps not configured for this project",
-				};
-			}
-
-			try {
-				const projectPath = path.join(
-					project.path,
-					project.autoBuildPath || "",
-				);
-
-				const item = (await callAzureDevOpsPython(
-					projectPath,
-					"get_work_item",
-					{ work_item_id: workItemId },
-					envOverrides,
-				)) as AzureDevOpsWorkItem;
-
-				return { success: true, data: item };
-			} catch (error: unknown) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				return { success: false, error: errorMessage };
-			}
+		async (_, projectId: string, workItemId: number): Promise<IPCResult<AzureDevOpsWorkItem>> => {
+			const ready = configured(projectId);
+			if (!("project" in ready)) return ready;
+			return attempt(() => call(ready.project, ready.config, "get_work_item", { work_item_id: workItemId }));
 		},
 	);
 
-	ipcMain.handle(
+	azureDevOpsIpcMain.handle(
 		IPC_CHANNELS.AZURE_DEVOPS_IMPORT_WORK_ITEMS,
 		async (
 			_,
@@ -353,485 +350,19 @@ export function registerAzureDevOpsHandlers(
 			workItemIds: number[],
 			options?: { requireReviewBeforeCoding?: boolean },
 		): Promise<IPCResult<AzureDevOpsImportResult>> => {
-			const project = projectStore.getProject(projectId);
-			if (!project?.autoBuildPath) {
-				return {
-					success: false,
-					error: "Project not found or not initialized",
-				};
-			}
-
-			const config = getAzureDevOpsConfig(project);
-			const envOverrides: Record<string, string> = {};
-			if (config.pat) envOverrides.AZURE_DEVOPS_PAT = config.pat;
-			if (config.orgUrl) envOverrides.AZURE_DEVOPS_ORG_URL = config.orgUrl;
-			// Always set AZURE_DEVOPS_PROJECT to override any system env var
-			const normalizedProject = normalizeProjectName(config.projectName);
-			if (normalizedProject)
-				envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
-			if (!config.pat || !config.orgUrl) {
-				return { success: false, error: "Azure DevOps not configured" };
-			}
-
-			try {
-				const projectPath = path.join(
-					project.path,
-					project.autoBuildPath || "",
-				);
-
-				// Get work items details (project name auto-detected in Python)
-				const items = (await callAzureDevOpsPython(
-					projectPath,
-					"list_work_items",
-					{
-						max_items: 1000,
-					},
-					envOverrides,
-				)) as AzureDevOpsWorkItem[];
-
-				const selectedItems = items.filter((item) =>
-					workItemIds.includes(item.id),
-				);
-
-				if (selectedItems.length === 0) {
-					return {
-						success: false,
-						error: "No matching work items found",
-					};
-				}
-
-				// Create tasks from work items
-				const specsBaseDir = getSpecsDir(project.autoBuildPath);
-				const specsDir = path.join(project.path, specsBaseDir);
-				if (!existsSync(specsDir)) {
-					mkdirSync(specsDir, { recursive: true });
-				}
-
-				let specNumber = 1;
-				const existingDirs = readdirSync(specsDir, { withFileTypes: true })
-					.filter((dir) => dir.isDirectory())
-					.map((dir) => dir.name);
-				const existingNumbers = existingDirs
-					.map((name) => {
-						const match = name.match(/^(\d+)/);
-						return match ? parseInt(match[1], 10) : 0;
-					})
-					.filter((num) => num > 0);
-				if (existingNumbers.length > 0) {
-					specNumber = Math.max(...existingNumbers) + 1;
-				}
-
-				const importedTasks: import("../../shared/types").Task[] = [];
-				const errors: string[] = [];
-
-				for (const item of selectedItems) {
-					try {
-						// Sanitize inputs.
-						// Le titre Azure DevOps peut contenir du HTML enrichi : on le
-						// réduit en texte brut sur une seule ligne (pas d'interprétation HTML).
-						const safeTitle = sanitizeText(
-							stripHtml(item.title).replace(/\s+/g, " "),
-							200,
-						);
-						const safeDescription = item.description
-							? stripAcceptanceCriteriaSection(
-									sanitizeText(item.description, 5000),
-								)
-							: "";
-
-						// Description HTML conservée pour l'affichage (rendu enrichi).
-						// On inline les images en pièce jointe Azure DevOps (auth PAT)
-						// en data URIs pour qu'elles s'affichent dans le renderer.
-						let displayDescription = item.description
-							? stripAcceptanceCriteriaSection(
-									stripControlChars(item.description, true),
-								)
-							: "";
-						if (displayDescription && config.pat && config.orgUrl) {
-							displayDescription = await inlineAzureDevOpsImages(
-								displayDescription,
-								config.orgUrl,
-								config.pat,
-							);
-						}
-
-						const safeIdentifier = sanitizeText(`ADO-${item.id}`, 100);
-						const safeUrl = item.url ? sanitizeUrl(item.url) : "";
-
-						const slugifiedTitle = slugifySpecTitle(safeTitle) || "task";
-						const specId = `${String(specNumber).padStart(3, "0")}-${slugifiedTitle}`;
-						specNumber += 1;
-
-						const specDir = path.join(specsDir, specId);
-						mkdirSync(specDir, { recursive: true });
-
-						// Les captures du ticket, inlinées pour l'affichage, sont aussi
-						// écrites en pièces jointes : c'est là que les agents les lisent.
-						saveInlinedImagesAsAttachments(
-							displayDescription,
-							specDir,
-							`ado-${item.id}`,
-						);
-
-						// Map work item type to task category
-						let category: string;
-						switch (item.workItemType.toLowerCase()) {
-							case "bug":
-								category = "bug";
-								break;
-							case "task":
-								category = "task";
-								break;
-							case "user story":
-							case "feature":
-								category = "feature";
-								break;
-							default:
-								category = "task";
-						}
-
-						// Map priority (Azure DevOps: 1=highest, 4=lowest -> WorkPilot AI: high/medium/low)
-						let priority = "medium";
-						if (item.priority) {
-							if (item.priority <= 1) priority = "high";
-							else if (item.priority >= 3) priority = "low";
-						}
-
-						const acceptanceCriteriaList = parseAcceptanceCriteriaText(
-							item.acceptanceCriteria,
-						);
-
-						const metadata: TaskMetadata = {
-							sourceType: "imported",
-							category: category as import("../../shared/types").TaskCategory,
-							priority: priority as import("../../shared/types").TaskPriority,
-							azureDevOpsIdentifier: safeIdentifier,
-							azureDevOpsUrl: safeUrl,
-							azureDevOpsState: item.state,
-							azureDevOpsType: item.workItemType,
-							...(acceptanceCriteriaList.length > 0 && {
-								acceptanceCriteria: acceptanceCriteriaList,
-							}),
-							...(options?.requireReviewBeforeCoding && {
-								requireReviewBeforeCoding: true,
-							}),
-						};
-
-						const now = new Date().toISOString();
-
-						// Do NOT pre-create implementation_plan.json with empty phases.
-						// The spec pipeline's planning phase will create it properly with
-						// actual phases and subtasks based on the spec.md it generates.
-						// Pre-creating with phases: [] causes the planner to fail validation
-						// 3 times and the task errors out.
-
-						// Build a rich task description for the spec pipeline
-						const descriptionParts: string[] = [];
-						descriptionParts.push(`# ${safeTitle}`);
-						descriptionParts.push("");
-						descriptionParts.push(
-							`**Source:** Azure DevOps ${item.workItemType} ${safeIdentifier}`,
-						);
-						if (item.state) descriptionParts.push(`**State:** ${item.state}`);
-						if (item.priority)
-							descriptionParts.push(`**Priority:** ${item.priority}`);
-						if (item.areaPath)
-							descriptionParts.push(
-								`**Area:** ${sanitizeText(item.areaPath, 200)}`,
-							);
-						if (item.iterationPath)
-							descriptionParts.push(
-								`**Iteration:** ${sanitizeText(item.iterationPath, 200)}`,
-							);
-						if (item.tags && item.tags.length > 0) {
-							descriptionParts.push(
-								`**Tags:** ${item.tags.map((t) => sanitizeText(t, 100)).join(", ")}`,
-							);
-						}
-						descriptionParts.push("");
-						descriptionParts.push("## Description");
-						descriptionParts.push("");
-						if (safeDescription) {
-							// Réduire la description HTML enrichie Azure DevOps en texte brut
-							// pour le pipeline de spec (les images sont retirées ici).
-							const cleanDescription = stripHtml(safeDescription);
-							descriptionParts.push(cleanDescription || safeTitle);
-						} else {
-							descriptionParts.push(safeTitle);
-						}
-
-						if (acceptanceCriteriaList.length > 0) {
-							descriptionParts.push("");
-							descriptionParts.push("## Acceptance Criteria");
-							descriptionParts.push("");
-							for (const criterion of acceptanceCriteriaList) {
-								descriptionParts.push(`- ${criterion}`);
-							}
-						}
-
-						const richDescription = descriptionParts.join("\n");
-
-						const requirements: Record<string, unknown> = {
-							task_description: richDescription,
-							workflow_type:
-								category === "bug"
-									? "bugfix"
-									: category === "task"
-										? "feature"
-										: category,
-						};
-						// Titre propre et accentué du work item, conservé pour l'affichage.
-						// Le scanner le sert en priorité dans extractTitle, ce qui évite de
-						// retomber sur le nom de dossier slugifié (accents perdus).
-						if (safeTitle) {
-							requirements.display_title = safeTitle;
-						}
-						// HTML enrichi (images Azure DevOps inlinées en data URIs) conservé
-						// séparément pour l'affichage. La scanner le sert en priorité 0
-						// (getRequirementsDisplayDescription) afin que les captures de l'US/RsD
-						// s'affichent sans authentification ni accès réseau au rendu.
-						if (displayDescription) {
-							requirements.display_description = displayDescription;
-						}
-						if (acceptanceCriteriaList.length > 0) {
-							requirements.acceptance_criteria = acceptanceCriteriaList;
-						}
-						const requirementsPath = path.join(
-							specDir,
-							AUTO_BUILD_PATHS.REQUIREMENTS,
-						);
-						writeFileSync(
-							requirementsPath,
-							JSON.stringify(requirements, null, 2),
-							"utf-8",
-						);
-
-						const metadataPath = path.join(specDir, "task_metadata.json");
-						writeFileSync(
-							metadataPath,
-							JSON.stringify(metadata, null, 2),
-							"utf-8",
-						);
-
-						const task: import("../../shared/types").Task = {
-							id: specId,
-							specId,
-							projectId: project.id,
-							title: safeTitle,
-							description: displayDescription || safeDescription,
-							status: "backlog",
-							subtasks: [],
-							logs: [],
-							metadata,
-							createdAt: new Date(now),
-							updatedAt: new Date(now),
-						};
-
-						importedTasks.push(task);
-					} catch (error: unknown) {
-						const errorMessage =
-							error instanceof Error ? error.message : String(error);
-						errors.push(
-							`Failed to import work item ${item.id}: ${errorMessage}`,
-						);
-					}
-				}
-
-				projectStore.invalidateTasksCache(project.id);
-
-				return {
-					success: true,
-					data: {
-						success: true,
-						imported: importedTasks.length,
-						failed: errors.length,
-						errors: errors.length > 0 ? errors : undefined,
-						tasks: importedTasks,
-					},
-				};
-			} catch (error: unknown) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				return { success: false, error: errorMessage };
-			}
+			const ready = configured(projectId, true);
+			if (!("project" in ready)) return ready;
+			return attempt(() => importWorkItems(ready, workItemIds, options?.requireReviewBeforeCoding));
 		},
 	);
 
-	// ============================================
-	// Azure DevOps imported-task display hydration (on demand)
-	// ============================================
-
-	/**
-	 * Hydrate the display fields of an imported Azure DevOps task on open.
-	 *
-	 * Older imports stored the raw work-item HTML in requirements.json and lost
-	 * the clean title (the spec-folder name is slugified, so accents are gone:
-	 * "Fenêtre…" → "fen-tre-…"). Two repairs, both lazy and one-shot:
-	 *
-	 *  - Title: when requirements.display_title is missing, fetch the work item's
-	 *    System.Title via the PAT (accents intact), and persist it. extractTitle
-	 *    serves it with top priority.
-	 *  - Images: `<img src="https://dev.azure.com/.../_apis/wit/attachments/...">`
-	 *    need PAT auth, so the renderer can't load them (ERR_TIMED_OUT). We
-	 *    download + base64-inline them (display_description); any that still fail
-	 *    are stripped so they never re-fire a failing request.
-	 *
-	 * Returns the (cleaned) html and the resolved title so the renderer can show
-	 * them immediately; both are also persisted for subsequent scans.
-	 */
-	ipcMain.handle(
+	azureDevOpsIpcMain.handle(
 		IPC_CHANNELS.AZURE_DEVOPS_HYDRATE_TASK_DISPLAY,
-		async (
-			_,
-			projectId: string,
-			taskId: string,
-		): Promise<IPCResult<{ html: string; title?: string }>> => {
-			try {
-				const project = projectStore.getProject(projectId);
-				if (!project) {
-					return { success: false, error: "Project not found" };
-				}
-
-				const task = projectStore
-					.getTasks(projectId)
-					.find((t) => t.id === taskId);
-				const specDir = task?.specsPath;
-				if (!specDir) {
-					return { success: false, error: "Task spec directory not found" };
-				}
-
-				const requirementsPath = path.join(
-					specDir,
-					AUTO_BUILD_PATHS.REQUIREMENTS,
-				);
-				const requirementsText = readIfExists(requirementsPath);
-				if (requirementsText === null) {
-					return { success: false, error: "requirements.json not found" };
-				}
-
-				let requirements: Record<string, unknown>;
-				try {
-					requirements = JSON.parse(requirementsText);
-				} catch {
-					return { success: false, error: "requirements.json is malformed" };
-				}
-
-				const config = getAzureDevOpsConfig(project);
-				let changed = false;
-
-				// --- Title backfill (accented System.Title) -------------------------
-				let resolvedTitle =
-					typeof requirements.display_title === "string"
-						? requirements.display_title
-						: undefined;
-				const identifier = task?.metadata?.azureDevOpsIdentifier ?? "";
-				const workItemId = Number.parseInt(identifier.replace(/\D/g, ""), 10);
-				if (
-					!resolvedTitle &&
-					Number.isFinite(workItemId) &&
-					workItemId > 0 &&
-					config.pat &&
-					config.orgUrl
-				) {
-					try {
-						const projectPath = path.join(
-							project.path,
-							project.autoBuildPath || "",
-						);
-						const envOverrides: Record<string, string> = {
-							AZURE_DEVOPS_PAT: config.pat,
-							AZURE_DEVOPS_ORG_URL: config.orgUrl,
-						};
-						const normalizedProject = normalizeProjectName(config.projectName);
-						if (normalizedProject)
-							envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
-
-						const rawItem = (await callAzureDevOpsPython(
-							projectPath,
-							"get_work_item",
-							{ work_item_id: workItemId },
-							envOverrides,
-						)) as { id: number; title?: string };
-
-						const cleanTitle = sanitizeText(
-							stripHtml(rawItem.title ?? "").replace(/\s+/g, " "),
-							200,
-						);
-						if (cleanTitle) {
-							requirements.display_title = cleanTitle;
-							resolvedTitle = cleanTitle;
-							changed = true;
-						}
-					} catch (err) {
-						console.warn(
-							"[AZURE_DEVOPS_HYDRATE_TASK_DISPLAY] Title fetch failed (non-fatal):",
-							err,
-						);
-					}
-				}
-
-				// --- Image inlining --------------------------------------------------
-				// Prefer an already-inlined display description, else the raw one.
-				const sourceHtml =
-					typeof requirements.display_description === "string" &&
-					requirements.display_description
-						? requirements.display_description
-						: typeof requirements.task_description === "string"
-							? requirements.task_description
-							: "";
-
-				let html = sourceHtml;
-				if (sourceHtml.includes("<img")) {
-					if (config.pat && config.orgUrl) {
-						html = await inlineAzureDevOpsImages(
-							sourceHtml,
-							config.orgUrl,
-							config.pat,
-						);
-					}
-					// Strip any attachment image that couldn't be inlined (no PAT, or
-					// the download failed) so the renderer never fires a failed request.
-					html = stripAzureAttachmentImages(html, config.orgUrl ?? undefined);
-
-					if (html !== requirements.display_description) {
-						requirements.display_description = html;
-						changed = true;
-					}
-				}
-
-				// Persist both fields together so the scanner serves them next time,
-				// onto the file as it is now: the work item calls above take time.
-				if (changed) {
-					try {
-						updateExistingFile(requirementsPath, (current) => {
-							const latest = JSON.parse(current) as Record<string, unknown>;
-							latest.display_title = requirements.display_title;
-							latest.display_description = requirements.display_description;
-							return JSON.stringify(latest, null, 2);
-						});
-						projectStore.invalidateTasksCache(projectId);
-					} catch (err) {
-						console.warn(
-							"[AZURE_DEVOPS_HYDRATE_TASK_DISPLAY] Could not persist display fields:",
-							err,
-						);
-					}
-				}
-
-				return { success: true, data: { html, title: resolvedTitle } };
-			} catch (error: unknown) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				return { success: false, error: errorMessage };
-			}
-		},
+		(_, projectId: string, taskId: string): Promise<IPCResult<{ html: string; title?: string }>> =>
+			attempt(() => hydrateTaskDisplay(projectId, taskId)),
 	);
 
-	// ============================================
-	// Azure DevOps AC Sync Operation
-	// ============================================
-
-	ipcMain.handle(
+	azureDevOpsIpcMain.handle(
 		IPC_CHANNELS.AZURE_DEVOPS_SYNC_TASK_AC,
 		async (
 			_,
@@ -839,75 +370,9 @@ export function registerAzureDevOpsHandlers(
 			taskId: string,
 			workItemId: number,
 		): Promise<IPCResult<{ acceptanceCriteria: string[] }>> => {
-			const project = projectStore.getProject(projectId);
-			if (!project?.autoBuildPath) {
-				return {
-					success: false,
-					error: "Project not found or not initialized",
-				};
-			}
-
-			const config = getAzureDevOpsConfig(project);
-			const envOverrides: Record<string, string> = {};
-			if (config.pat) envOverrides.AZURE_DEVOPS_PAT = config.pat;
-			if (config.orgUrl) envOverrides.AZURE_DEVOPS_ORG_URL = config.orgUrl;
-			const normalizedProject = normalizeProjectName(config.projectName);
-			if (normalizedProject)
-				envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
-			if (!config.pat || !config.orgUrl) {
-				return { success: false, error: "Azure DevOps not configured" };
-			}
-
-			try {
-				const projectPath = path.join(
-					project.path,
-					project.autoBuildPath || "",
-				);
-
-				const rawItem = (await callAzureDevOpsPython(
-					projectPath,
-					"get_work_item",
-					{ work_item_id: workItemId },
-					envOverrides,
-				)) as { id: number; title: string; acceptanceCriteria?: string };
-
-				const acceptanceCriteriaList = parseAcceptanceCriteriaText(
-					rawItem.acceptanceCriteria ?? undefined,
-				);
-
-				// Persist to disk via TASK_UPDATE path (task_metadata.json + requirements.json)
-				const task = projectStore
-					.getTasks(projectId)
-					.find((t) => t.id === taskId);
-				if (task?.specsPath) {
-					const specDir = task.specsPath;
-					const metadataPath = path.join(specDir, "task_metadata.json");
-					const requirementsPath = path.join(specDir, "requirements.json");
-
-					updateExistingFile(metadataPath, (text) => {
-						const meta = JSON.parse(text);
-						meta.acceptanceCriteria = acceptanceCriteriaList;
-						return JSON.stringify(meta, null, 2);
-					});
-
-					updateExistingFile(requirementsPath, (text) => {
-						const reqs = JSON.parse(text);
-						reqs.acceptance_criteria = acceptanceCriteriaList;
-						return JSON.stringify(reqs, null, 2);
-					});
-
-					projectStore.invalidateTasksCache(projectId);
-				}
-
-				return {
-					success: true,
-					data: { acceptanceCriteria: acceptanceCriteriaList },
-				};
-			} catch (error: unknown) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				return { success: false, error: errorMessage };
-			}
+			const ready = configured(projectId, true);
+			if (!("project" in ready)) return ready;
+			return attempt(() => syncTaskCriteria(ready, taskId, workItemId));
 		},
 	);
 }
