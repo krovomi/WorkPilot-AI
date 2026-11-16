@@ -112,6 +112,33 @@ def test_a_baseline_from_an_explicit_screenshot(project: Path) -> None:
     assert Path(result["data"]["path"]).name == "cart.png"
 
 
+def test_options_in_the_form_the_desktop_app_sends(project: Path) -> None:
+    # The app passes each value glued to its option, as `--name=<value>`.
+    other = _png(_shots(project) / "cart_20261114_120000.png", (10, 20, 30))
+    done = subprocess.run(
+        [
+            sys.executable,
+            str(RUNNER),
+            f"--project={project}",
+            "--json",
+            "baseline",
+            "set",
+            "--name=cart",
+            f"--screenshot={other}",
+        ],
+        cwd=BACKEND,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=120,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    assert json.loads(done.stdout)["data"]["name"] == "cart"
+    code, result, _ = _json(project, "compare", "--name=cart")
+    assert code == 0 and result["data"]["passed"] is True
+
+
 def test_nothing_to_compare_or_promote_without_a_screenshot(project: Path) -> None:
     code, result, _ = _json(project, "compare", "--name", "login")
     assert code == 0
