@@ -21,3 +21,6 @@ section: 🐛 Corrections
   `-u` / `-b` se lisent comme les en-têtes `Authorization` / `Cookie` qu'ils deviennent, donc
   masqués.
 - **Conformité d'architecture** : un `workspaces` vide ou enraciné dans un `package.json` ne fait plus échouer la lecture du graphe de modules.
+- **Exigences tirées des pièces jointes** : un `drafts.json` retouché à la main (une proposition
+  sans tous ses champs, un identifiant accepté d'une autre forme) n'empêche plus la carte de
+  charger ni la décision d'aboutir ; l'entrée incomplète est ignorée.
