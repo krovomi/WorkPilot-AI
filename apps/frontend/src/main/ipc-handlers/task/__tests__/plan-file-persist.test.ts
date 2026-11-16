@@ -206,14 +206,15 @@ describe("updatePlanFile and updatePlanSubtasks", () => {
 		expect(await updatePlanFile(plan, (p) => p)).toBeNull();
 	});
 
-	it("replaces the phases and refreshes the board only after a write", async () => {
+	it("merges the edits into the plan's phases and refreshes the board only after a write", async () => {
 		expect(await updatePlanSubtasks(plan, [], "p1")).toBeNull();
 		expect(state.invalidate).not.toHaveBeenCalled();
 		seed();
-		const phases = [{ name: "P", subtasks: [{ id: "a" }] }];
-		expect(await updatePlanSubtasks(plan, phases, "p1")).toMatchObject({ phases });
+		const edits = [{ id: "a", description: "Do A" }];
+		const phases = [{ subtasks: [{ id: "a", description: "Do A", status: "pending", files_to_modify: [] }] }];
+		expect(await updatePlanSubtasks(plan, edits, "p1")).toMatchObject({ feature: "F", phases });
 		expect(state.invalidate).toHaveBeenCalledWith("p1");
-		expect(await updatePlanSubtasks(plan, phases)).toMatchObject({ phases });
+		expect(await updatePlanSubtasks(plan, edits)).toMatchObject({ phases });
 		expect(state.invalidate).toHaveBeenCalledTimes(1);
 	});
 });
