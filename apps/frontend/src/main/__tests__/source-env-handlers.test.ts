@@ -324,6 +324,18 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 		expect((await saveSettings({ gitPath: "git" })).success).toBe(true);
 	});
 
+	it("bounds the agent safety settings before saving them", async () => {
+		const { saveSettings } = await register();
+		const { readSettingsFile } = await import("../settings-utils");
+		await saveSettings({
+			agentSafety: { sandbox: { mode: "restricted", allowedPaths: ["/etc", "src"] } },
+		});
+		expect(readSettingsFile()?.agentSafety).toMatchObject({
+			sandbox: { mode: "restricted", allowedPaths: ["src"] },
+			anomaly: { pauseBelow: 40 },
+		});
+	});
+
 	it("refuses a backend folder in the temporary folder, and writes nothing", async () => {
 		const { saveSettings } = await register();
 		const settingsFile = path.join(env.userData, "settings.json");

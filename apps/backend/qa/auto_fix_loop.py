@@ -20,108 +20,49 @@ Usage:
 """
 
 import asyncio
-import json
+import contextlib
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
-try:
-    from agents.memory_manager import get_memory_context, save_session_memory
-except ImportError:
-    # Fallback if memory manager not available
-    async def get_memory_context(*args, **kwargs):
-        # Fallback implementation when memory manager is not available
-        # Return empty context string to prevent crashes in environments without memory management
-        return ""
+from agents.memory_manager import get_memory_context, save_session_memory
+from analysis.test_discovery import TestDiscovery
+from core.client import create_agent_client
+from core.task_event import TaskEventEmitter
+from foundation.debug import (
+    debug,
+    debug_error,
+    debug_section,
+    debug_success,
+    debug_warning,
+)
+from phase_config import get_phase_model, get_phase_thinking_budget
+from task_logger import LogPhase, get_task_logger
 
-    def save_session_memory(*args, **kwargs):
-        # Fallback implementation when memory manager is not available
-        # Silently ignore memory save calls to prevent crashes in environments without memory management
-        pass
-
-
-try:
-    from analysis.test_discovery import TestDiscovery
-except ImportError:
-    TestDiscovery = None
-
-try:
-    from core.client import create_agent_client, create_client
-except ImportError:
-
-    def create_client(*args, **kwargs):
-        return None
-
-    def create_agent_client(*args, **kwargs):
-        return None
-
-
-try:
-    from core.task_event import TaskEventEmitter
-except ImportError:
-    TaskEventEmitter = None
-
-try:
-    from foundation.debug import (
-        debug,
-        debug_error,
-        debug_section,
-        debug_success,
-        debug_warning,
-    )
-except ImportError:
-
-    def debug(*args, **kwargs):
-        # Fallback implementation when debug module is not available
-        # Silently ignore debug calls to prevent crashes in environments without debug utilities
-        pass
-
-    def debug_error(*args, **kwargs):
-        # Fallback implementation when debug module is not available
-        # Silently ignore debug error calls to prevent crashes in environments without debug utilities
-        pass
-
-    def debug_section(*args, **kwargs):
-        # Fallback implementation when debug module is not available
-        # Silently ignore debug section calls to prevent crashes in environments without debug utilities
-        pass
-
-    def debug_success(*args, **kwargs):
-        # Fallback implementation when debug module is not available
-        # Silently ignore debug success calls to prevent crashes in environments without debug utilities
-        pass
-
-    def debug_warning(*args, **kwargs):
-        # Fallback implementation when debug module is not available
-        # Silently ignore debug warning calls to prevent crashes in environments without debug utilities
-        pass
-
-
-try:
-    from phase_config import get_phase_model, get_phase_thinking_budget
-except ImportError:
-
-    def get_phase_model(*args, **kwargs):
-        return None
-
-    def get_phase_thinking_budget(*args, **kwargs):
-        return "medium"
-
-
-try:
-    from task_logger import LogPhase, get_task_logger
-except ImportError:
-    LogPhase = None
-
-    def get_task_logger(*args, **kwargs):
-        return None
-
-
+from .auto_fix_metrics import record_auto_fix_run
 from .fixer import run_qa_fixer_session
 
 # Configuration
 DEFAULT_MAX_AUTO_FIX_ATTEMPTS = 5
 TEST_EXECUTION_TIMEOUT = 300.0  # 5 minutes
+
+_JEST_SUMMARY = re.compile(
+    r"Tests:\s+(?:(?P<failed>\d+)\s+failed,\s+)?(?:\d+\s+\w+,\s+)*?"
+    r"\d+\s+passed,\s+(?P<total>\d+)\s+total",
+    re.IGNORECASE,
+)
+#: What the fix request keeps of a run's output: its end, where the failures are.
+_MAX_OUTPUT_IN_REQUEST = 20_000
+
+
+def _tail(output: str) -> str:
+    if len(output) <= _MAX_OUTPUT_IN_REQUEST:
+        return output
+    return "[... earlier output cut ...]\n" + output[-_MAX_OUTPUT_IN_REQUEST:]
+
+
+_COUNT = re.compile(r"\b(\d+)\s+(passed|failed|errors?)\b", re.IGNORECASE)
 
 
 @dataclass
@@ -217,7 +158,7 @@ class AutoFixLoop:
         print("=" * 70)
 
         # Check if tests are available
-        if not self.test_info.has_tests:
+        if not (self.test_info.has_tests and self.test_info.test_command):
             debug_warning("auto_fix_loop", "No tests found in project")
             print("\n⚠️  No tests found in project. Cannot run auto-fix loop.")
             return False
@@ -278,10 +219,7 @@ class AutoFixLoop:
                 print("=" * 70)
                 print(f"\nTests fixed successfully after {attempt_number} attempt(s).")
 
-                # Save success to memory
-                await self._save_success_to_memory(attempt_number, memory_context)
-
-                # Update metrics
+                await self._save_to_memory(success=True)
                 self._update_metrics(success=True, attempts=attempt_number)
 
                 # Emit success event
@@ -316,7 +254,20 @@ class AutoFixLoop:
             print(f"   Test output: {test_result.output[:500]}")
 
             if attempt_number >= max_attempts:
-                # Max attempts reached
+                # The last run is part of the history: without it the
+                # escalation showed the run before it, and counted one
+                # attempt fewer than the loop made.
+                self.attempts.append(
+                    AutoFixAttempt(
+                        attempt_number=attempt_number,
+                        test_result=test_result,
+                        fix_applied=False,
+                        fix_status="not_attempted",
+                        duration=time.time() - attempt_start,
+                        error_pattern=self._analyze_failure(test_result),
+                        timestamp=time.time(),
+                    )
+                )
                 debug_error(
                     "auto_fix_loop",
                     "Max attempts reached without success",
@@ -377,10 +328,7 @@ class AutoFixLoop:
         print(f"\nFailed to fix tests after {max_attempts} attempts.")
         print("Escalating to human review...")
 
-        # Save failure to memory
-        await self._save_failure_to_memory(attempt_number, memory_context)
-
-        # Update metrics
+        await self._save_to_memory(success=False)
         self._update_metrics(success=False, attempts=attempt_number)
 
         # Escalate to human
@@ -409,69 +357,31 @@ class AutoFixLoop:
         return False
 
     async def _run_tests(self) -> AutoFixTestResult:
-        """Execute project tests and return results."""
+        """Run the project's declared test command; its exit code is the verdict.
+
+        The command is the project's own script (a CI ``run:`` block, say), so
+        it runs in a shell, as `bounty_board.signals` explains.
+        """
         start_time = time.time()
+        test_cmd = self.test_info.test_command
+        if not test_cmd:
+            return AutoFixTestResult(
+                executed=False,
+                passed=False,
+                output="",
+                error="No test command available",
+                duration=0.0,
+            )
 
+        debug("auto_fix_loop", f"Executing: {test_cmd}")
         try:
-            test_cmd = self.test_info.test_command
-            if not test_cmd:
-                return AutoFixTestResult(
-                    executed=False,
-                    passed=False,
-                    output="",
-                    error="No test command available",
-                    duration=0.0,
-                )
-
-            debug("auto_fix_loop", f"Executing: {test_cmd}")
-
-            # Execute tests with timeout
             proc = await asyncio.create_subprocess_shell(
                 test_cmd,
                 cwd=self.project_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    proc.communicate(),
-                    timeout=TEST_EXECUTION_TIMEOUT,
-                )
-            except TimeoutError:
-                debug_error("auto_fix_loop", "Tests timed out")
-                proc.kill()
-                try:
-                    await proc.wait()
-                except Exception:
-                    pass
-                return AutoFixTestResult(
-                    executed=True,
-                    passed=False,
-                    output="",
-                    error=f"Timeout after {TEST_EXECUTION_TIMEOUT}s",
-                    duration=TEST_EXECUTION_TIMEOUT,
-                )
-
-            duration = time.time() - start_time
-            passed = proc.returncode == 0
-            output = stdout.decode("utf-8") if stdout else ""
-            error_output = stderr.decode("utf-8") if stderr else ""
-
-            # Parse test counts from output (framework-specific)
-            test_count, failed_count = self._parse_test_counts(output + error_output)
-
-            return AutoFixTestResult(
-                executed=True,
-                passed=passed,
-                output=output + "\n" + error_output,
-                error=error_output if not passed else None,
-                duration=duration,
-                test_count=test_count,
-                failed_count=failed_count,
-            )
-
-        except Exception as e:
+        except OSError as e:
             debug_error("auto_fix_loop", f"Test execution failed: {e}")
             return AutoFixTestResult(
                 executed=False,
@@ -481,42 +391,62 @@ class AutoFixLoop:
                 duration=time.time() - start_time,
             )
 
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=TEST_EXECUTION_TIMEOUT
+            )
+        except TimeoutError:
+            debug_error("auto_fix_loop", "Tests timed out")
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+            await proc.wait()
+            return AutoFixTestResult(
+                executed=True,
+                passed=False,
+                output="",
+                error=f"Timeout after {TEST_EXECUTION_TIMEOUT}s",
+                duration=TEST_EXECUTION_TIMEOUT,
+            )
+
+        passed = proc.returncode == 0
+        # A suite prints in its own encoding (a Windows console's code page,
+        # a test's binary fixture): a strict decode turned a failing run into
+        # "Test execution failed" and lost its whole output.
+        output = stdout.decode("utf-8", errors="replace")
+        error_output = stderr.decode("utf-8", errors="replace")
+        test_count, failed_count = self._parse_test_counts(output + error_output)
+        return AutoFixTestResult(
+            executed=True,
+            passed=passed,
+            output=output + "\n" + error_output,
+            error=None if passed else error_output,
+            duration=time.time() - start_time,
+            test_count=test_count,
+            failed_count=failed_count,
+        )
+
     def _parse_test_counts(self, output: str) -> tuple[int, int]:
+        """(total, failed) read from the runner's summary, for the fix request.
+
+        Jest and Vitest print ``Tests: 2 failed, 5 passed, 7 total``; pytest
+        prints ``2 failed, 5 passed, 1 error in 0.3s``, failures first, which
+        the old pattern (``passed`` then ``failed``) read as 0 failures.
         """
-        Parse test counts from test output.
-
-        Returns:
-            (total_tests, failed_tests)
-        """
-        import re
-
-        # Try jest/vitest format first: "Tests: 2 failed, 5 passed, 7 total" or "Tests: 5 passed, 7 total"
-        jest_match = re.search(
-            r"Tests:\s+(?:(\d+)\s+failed,\s+)?(\d+)\s+passed,\s+(\d+)\s+total",
-            output,
-            re.IGNORECASE,
-        )
-        if jest_match:
-            failed = int(jest_match.group(1)) if jest_match.group(1) else 0
-            total = int(jest_match.group(3))
-            return total, failed
-
-        # Try pytest format: "5 passed, 2 failed"
-        pytest_match = re.search(
-            r"(\d+)\s+passed(?:,\s+(\d+)\s+failed)?", output, re.IGNORECASE
-        )
-        if pytest_match:
-            passed = int(pytest_match.group(1))
-            failed = int(pytest_match.group(2)) if pytest_match.group(2) else 0
-            return passed + failed, failed
-
-        # Default: assume some tests ran if output contains test-related keywords
-        if any(
-            keyword in output.lower()
-            for keyword in ["test", "spec", "pass", "fail", "error"]
-        ):
-            return 1, 1 if "fail" in output.lower() else 0
-
+        jest = _JEST_SUMMARY.search(output)
+        if jest:
+            return int(jest.group("total")), int(jest.group("failed") or 0)
+        counts: dict[str, int] = {}
+        for number, kind in _COUNT.findall(output):
+            # The last summary wins: a suite may echo an earlier one.
+            counts[kind.lower().rstrip("s")] = int(number)
+        if counts:
+            failed = counts.get("failed", 0) + counts.get("error", 0)
+            return counts.get("passed", 0) + failed, failed
+        # A runner whose summary nobody here recognises: one run, failed when
+        # it says so. The exit code, not this, decides pass or fail.
+        lowered = output.lower()
+        if any(word in lowered for word in ("test", "spec", "pass", "fail", "error")):
+            return 1, 1 if "fail" in lowered else 0
         return 0, 0
 
     def _analyze_failure(self, test_result: AutoFixTestResult) -> str:
@@ -571,7 +501,7 @@ The automated tests have failed. Please analyze the test output below and apply 
 
 ### Test Output
 ```
-{test_result.output}
+{_tail(test_result.output)}
 ```
 
 ### Error Details
@@ -613,16 +543,14 @@ The automated tests have failed. Please analyze the test output below and apply 
         fixer_thinking_budget = get_phase_thinking_budget(self.spec_dir, "qa")
 
         while True:
-            # Create client using the provider-agnostic factory
-            fix_client = create_agent_client(
-                project_dir=self.project_dir,
-                spec_dir=self.spec_dir,
-                model=qa_model,
-                agent_type="qa_fixer",
-                max_thinking_tokens=fixer_thinking_budget,
-            )
-
             try:
+                fix_client = create_agent_client(
+                    project_dir=self.project_dir,
+                    spec_dir=self.spec_dir,
+                    model=qa_model,
+                    agent_type="qa_fixer",
+                    max_thinking_tokens=fixer_thinking_budget,
+                )
                 async with fix_client:
                     fix_status, fix_response = await run_qa_fixer_session(
                         fix_client,
@@ -631,7 +559,6 @@ The automated tests have failed. Please analyze the test output below and apply 
                         self.verbose,
                         self.project_dir,
                     )
-                return fix_status, fix_response
             except Exception as e:
                 # Prompt-too-long is a permanent failure; stop retrying and
                 # surface a "reset conversation / switch provider" choice
@@ -642,144 +569,94 @@ The automated tests have failed. Please analyze the test output below and apply 
                     # Shield paused-and-resumed; retry the same attempt.
                     continue
                 raise
+            # The fixer returns the provider's own error instead of raising
+            # it: a rate limit reached here cost an attempt, unshielded.
+            if fix_status == "error" and await handle_rate_limit_pause(
+                RuntimeError(fix_response), self.spec_dir, "auto_fix"
+            ):
+                continue
+            return fix_status, fix_response
 
     async def _load_memory_context(self) -> str:
-        """Load memory context about common test failures."""
-        try:
-            task_data = {
+        """What the project's memory knows about its test failures."""
+        memory_context = await get_memory_context(
+            self.spec_dir,
+            self.project_dir,
+            {
                 "description": "Analyzing common test failure patterns for auto-fix",
                 "id": f"auto_fix_{self.spec_dir.name}",
+            },
+        )
+        if memory_context:
+            debug_success("auto_fix_loop", "Loaded memory context for auto-fix")
+            return memory_context
+        return "No historical patterns found."
+
+    def _patterns(self) -> list[str]:
+        """The failure patterns met in this run, first seen first."""
+        return list(
+            dict.fromkeys(a.error_pattern for a in self.attempts if a.error_pattern)
+        )
+
+    async def _save_to_memory(self, success: bool) -> None:
+        """File what this run learnt in the project's memory.
+
+        It used to call `save_session_memory` with four positional arguments
+        it does not take: the TypeError was caught and logged, and no auto-fix
+        run was ever saved. A suite that passed on the first run taught
+        nothing, and is not saved.
+        """
+        patterns = self._patterns()
+        if not patterns:
+            return
+        command = self.test_info.test_command
+        attempts = len(self.attempts)
+        if success:
+            lesson = {
+                "recommendations": [
+                    f"Failures of `{command}` ({', '.join(patterns)}) were fixed "
+                    f"automatically in {attempts} attempts."
+                ]
             }
-            memory_context = await get_memory_context(
-                self.spec_dir, self.project_dir, task_data
-            )
-
-            if memory_context:
-                debug_success("auto_fix_loop", "Loaded memory context for auto-fix")
-                return memory_context
-            else:
-                return "No historical patterns found."
-        except Exception as e:
-            debug_error("auto_fix_loop", f"Failed to load memory context: {e}")
-            return "Memory context unavailable."
-
-    async def _save_success_to_memory(self, attempts: int, memory_context: str) -> None:
-        """Save successful fix to memory for learning."""
-        try:
-            if not self.attempts:
-                return
-
-            # Get the last attempt that succeeded
-            last_attempt = self.attempts[-1]
-
-            episode_data = {
-                "type": "AUTO_FIX_SUCCESS",
-                "attempts": attempts,
-                "error_pattern": last_attempt.error_pattern,
-                "duration": last_attempt.duration,
-                "test_framework": (
-                    self.test_info.frameworks[0].name
-                    if self.test_info.frameworks
-                    else "unknown"
-                ),
-                "context": memory_context,
+        else:
+            lesson = {
+                "gotchas_encountered": [
+                    f"Auto-fix could not make `{command}` pass in {attempts} "
+                    f"attempts ({', '.join(patterns)}); see AUTO_FIX_ESCALATION.md."
+                ]
             }
-
-            await save_session_memory(
-                self.spec_dir,
-                self.project_dir,
-                {"id": f"auto_fix_success_{self.spec_dir.name}"},
-                json.dumps(episode_data),
-            )
-
-            debug_success("auto_fix_loop", "Saved success to memory")
-        except Exception as e:
-            debug_error("auto_fix_loop", f"Failed to save success to memory: {e}")
-
-    async def _save_failure_to_memory(self, attempts: int, memory_context: str) -> None:
-        """Save failure to memory for learning."""
-        try:
-            if not self.attempts:
-                return
-
-            episode_data = {
-                "type": "AUTO_FIX_FAILURE",
-                "attempts": attempts,
-                "error_patterns": [a.error_pattern for a in self.attempts],
-                "context": memory_context,
-            }
-
-            await save_session_memory(
-                self.spec_dir,
-                self.project_dir,
-                {"id": f"auto_fix_failure_{self.spec_dir.name}"},
-                json.dumps(episode_data),
-            )
-
-            debug_success("auto_fix_loop", "Saved failure to memory")
-        except Exception as e:
-            debug_error("auto_fix_loop", f"Failed to save failure to memory: {e}")
+        run_id = f"auto_fix_{self.spec_dir.name}"
+        await save_session_memory(
+            spec_dir=self.spec_dir,
+            project_dir=self.project_dir,
+            subtask_id=run_id,
+            session_num=attempts,
+            success=success,
+            subtasks_completed=[run_id] if success else [],
+            discoveries={
+                "files_understood": {},
+                "patterns_found": [],
+                "gotchas_encountered": [],
+                **lesson,
+            },
+        )
+        debug_success("auto_fix_loop", "Saved auto-fix run to memory")
 
     def _update_metrics(self, success: bool, attempts: int) -> None:
-        """Update auto-fix metrics in implementation_plan.json."""
-        try:
-            plan_file = self.spec_dir / "implementation_plan.json"
-            if not plan_file.exists():
-                debug_warning(
-                    "auto_fix_loop",
-                    "implementation_plan.json not found, skipping metrics",
-                )
-                return
+        """Record the run in the plan's ``auto_fix_stats``, patterns included.
 
-            plan = json.loads(plan_file.read_text(encoding="utf-8"))
-
-            if "auto_fix_stats" not in plan:
-                plan["auto_fix_stats"] = {
-                    "total_runs": 0,
-                    "successful_runs": 0,
-                    "total_attempts": 0,
-                    "success_rate": 0.0,
-                    "average_attempts": 0.0,
-                    "runs": [],
-                }
-
-            stats = plan["auto_fix_stats"]
-            stats["total_runs"] += 1
-            stats["total_attempts"] += attempts
-
-            if success:
-                stats["successful_runs"] += 1
-
-            stats["success_rate"] = (
-                stats["successful_runs"] / stats["total_runs"]
-                if stats["total_runs"] > 0
-                else 0.0
-            )
-            stats["average_attempts"] = (
-                stats["total_attempts"] / stats["total_runs"]
-                if stats["total_runs"] > 0
-                else 0.0
-            )
-
-            # Record this run
-            stats["runs"].append(
-                {
-                    "timestamp": time.time(),
-                    "success": success,
-                    "attempts": attempts,
-                    "duration": sum(a.duration for a in self.attempts),
-                }
-            )
-
-            # Keep only last 50 runs
-            if len(stats["runs"]) > 50:
-                stats["runs"] = stats["runs"][-50:]
-
-            plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
-            debug_success("auto_fix_loop", "Updated auto-fix metrics")
-
-        except Exception as e:
-            debug_error("auto_fix_loop", f"Failed to update metrics: {e}")
+        The loop kept its own copy of `auto_fix_metrics.record_run`, without
+        the patterns: the dashboard's common patterns stayed empty.
+        """
+        frameworks = self.test_info.frameworks
+        record_auto_fix_run(
+            self.spec_dir,
+            success=success,
+            attempts=attempts,
+            duration=sum(a.duration for a in self.attempts),
+            error_patterns=self._patterns(),
+            test_framework=frameworks[0].name if frameworks else None,
+        )
 
     def _escalate_to_human(self) -> None:
         """Escalate to human review after auto-fix failure."""
@@ -789,7 +666,7 @@ The automated tests have failed. Please analyze the test output below and apply 
             # Build summary of attempts
             attempts_summary = "\n".join(
                 f"**Attempt {a.attempt_number}**: {a.error_pattern} "
-                f"({a.duration:.1f}s, fix_{'applied' if a.fix_applied else 'failed'})"
+                f"({a.duration:.1f}s, fix {a.fix_status})"
                 for a in self.attempts
             )
 
@@ -844,7 +721,7 @@ The automated test-fix loop was unable to resolve all test failures after {len(s
                 },
             )
 
-        except Exception as e:
+        except OSError as e:
             debug_error("auto_fix_loop", f"Failed to create escalation: {e}")
 
 

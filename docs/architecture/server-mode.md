@@ -384,7 +384,9 @@ au dépôt du projet, lu dans son `repo_url` et jamais dans la requête : un app
 l'un de ceux que font les vues (`_ROUTES` : lectures sous `/repos/<dépôt>` et de `/user`, et les
 changements du tableau ci-dessous), et l'URL envoyée est reconstruite à partir des mots de la
 route, du dépôt du projet et de nombres, sans rien recopier de la requête ; la chaîne de requête
-ne garde que les clés des vues, passées en paramètres ; GraphQL ne sert qu'une requête, la liste des PR ouvertes, écrite par le serveur. Ce que l'app
+ne garde que les clés des vues, passées en paramètres ; la seule recherche, le compte des issues
+ouvertes du test de connexion (`/search/issues`), est réécrite par le serveur pour le dépôt du
+projet ; GraphQL ne sert qu'une requête, la liste des PR ouvertes, écrite par le serveur. Ce que l'app
 faisait avec `gh` (diff, commentaire, fusion, mise à jour de la branche) devient l'appel REST
 équivalent (`pr-actions.ts`). « Créer une tâche » sur une issue en fait une carte du tableau
 partagé. L'investigation, l'auto-fix et l'analyse groupée des issues tournent sur l'ordinateur,
