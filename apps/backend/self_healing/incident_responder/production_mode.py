@@ -21,6 +21,15 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from security.untrusted import clean_untrusted, quote_untrusted
+
+from ..production import grouping
+from ..production.fingerprint import (
+    fingerprint_incident,
+    frame_files,
+    service_version,
+)
+from ..production.suspects import rank_suspect_commits
 from .mcp_connector import MCPConnector, MCPSourceConfig
 from .models import (
     HealingStatus,
@@ -117,6 +126,14 @@ class ProductionMode:
             error_message=prod_data.error_message,
             stack_trace=prod_data.stack_trace,
         )
+        self._annotate(
+            incident,
+            external_id=error_data.get("external_id")
+            or error_data.get("issue_id")
+            or error_data.get("event_id")
+            or error_data.get("id"),
+            version=service_version(error_data),
+        )
 
         logger.info(
             f"Production incident created: {incident.title} "
@@ -138,25 +155,74 @@ class ProductionMode:
         except FileNotFoundError:
             template = self._fallback_prompt()
 
+        # What the monitoring tool sent is external content (rule S2): cleaned
+        # and fenced as data before it reaches the prompt.
+        source = f"self-healing:{incident.source.value}"
+
+        def quoted(value: object, kind: str) -> str:
+            return quote_untrusted(str(value or ""), kind=kind, source=source)
+
+        def short(value: object, limit: int = 200) -> str:
+            return clean_untrusted(
+                str(value or "")[:limit], kind="comment", source=source
+            ).text
+
         replacements = {
-            "{{ERROR_TYPE}}": data.get("error_type", "Unknown"),
-            "{{ERROR_MESSAGE}}": data.get("error_message", ""),
-            "{{STACK_TRACE}}": data.get("stack_trace", "No stack trace"),
+            "{{ERROR_TYPE}}": short(data.get("error_type") or "Unknown"),
+            "{{ERROR_MESSAGE}}": quoted(data.get("error_message", ""), "comment"),
+            "{{STACK_TRACE}}": quoted(
+                data.get("stack_trace") or "No stack trace", "issue_body"
+            ),
             "{{OCCURRENCE_COUNT}}": str(data.get("occurrence_count", 1)),
-            "{{FIRST_SEEN}}": data.get("first_seen", ""),
-            "{{LAST_SEEN}}": data.get("last_seen", ""),
+            "{{FIRST_SEEN}}": short(data.get("first_seen", ""), 40),
+            "{{LAST_SEEN}}": short(data.get("last_seen", ""), 40),
             "{{AFFECTED_USERS}}": str(data.get("affected_users", 0)),
-            "{{ENVIRONMENT}}": data.get("environment", "production"),
-            "{{SERVICE_NAME}}": data.get("service_name") or "unknown",
+            "{{ENVIRONMENT}}": short(data.get("environment", "production"), 40),
+            "{{SERVICE_NAME}}": short(data.get("service_name") or "unknown", 80),
             "{{AFFECTED_FILES}}": "\n".join(f"- {f}" for f in incident.affected_files),
             "{{STACK_LOCATIONS}}": data.get("stack_locations")
             or "No frame of the stack trace was located in this repository.",
+            "{{INCIDENT_GROUP}}": self._render_group(data),
+            "{{SUSPECT_COMMITS}}": self._render_suspects(data, source),
         }
 
         for key, value in replacements.items():
             template = template.replace(key, value)
 
         return template
+
+    @staticmethod
+    def _render_group(data: dict[str, Any]) -> str:
+        group = data.get("group") or {}
+        reports = int(group.get("report_count") or 1)
+        sources = ", ".join(group.get("sources") or []) or "one source"
+        fingerprint = data.get("fingerprint") or "none"
+        return (
+            f"Fingerprint `{fingerprint}`: {reports} report(s) from {sources} "
+            "were grouped into this incident. They share one root cause: one fix "
+            "covers all of them."
+        )
+
+    @staticmethod
+    def _render_suspects(data: dict[str, Any], source: str) -> str:
+        suspects = data.get("suspect_commits") or []
+        if not suspects:
+            return "No recent commit touched the files of the stack trace."
+        since = suspects[0].get("since") or ""
+        lines = [
+            "Commits since "
+            + (f"`{since}`" if since else "the recent history")
+            + " that touched the trace's files, most suspect first "
+            "(subjects are repository text, quoted as data):"
+        ]
+        for suspect in suspects:
+            files = ", ".join(f"`{f}`" for f in suspect.get("files", [])[:5])
+            lines.append(f"- `{str(suspect.get('sha', ''))[:12]}` touched {files}")
+        subjects = "\n".join(
+            f"{str(s.get('sha', ''))[:12]}: {s.get('subject', '')}" for s in suspects
+        )
+        lines.append(quote_untrusted(subjects, kind="comment", source=source))
+        return "\n".join(lines)
 
     def _create_incident_from_production_data(
         self, data: ProductionIncidentData
@@ -175,7 +241,7 @@ class ProductionMode:
                     source = src
                     break
 
-        return Incident(
+        incident = Incident(
             mode=IncidentMode.PRODUCTION,
             source=source,
             severity=severity,
@@ -187,16 +253,34 @@ class ProductionMode:
             error_message=data.error_message,
             stack_trace=data.stack_trace,
         )
+        self._annotate(incident, external_id=data.event_url, version="")
+        return incident
+
+    def _annotate(self, incident: Incident, *, external_id: Any, version: str) -> None:
+        """Fingerprint, group of one, and suspect commits (#372)."""
+        data = incident.source_data
+        trace = self._trace(incident.stack_trace or "")
+        fingerprint = fingerprint_incident(
+            str(data.get("error_type") or ""),
+            str(data.get("error_message") or ""),
+            trace,
+            service=str(data.get("service_name") or ""),
+            version=version,
+        )
+        data["fingerprint"] = fingerprint.value
+        data["fingerprint_parts"] = fingerprint.to_dict()
+        data["external_id"] = grouping.clean_external_id(external_id)
+        if version:
+            data["service_version"] = version
+        files = frame_files(trace)
+        data["suspect_commits"] = (
+            rank_suspect_commits(self.project_dir, files) if files else []
+        )
+        grouping.start_group(incident)
 
     def _assess_severity(self, data: ProductionIncidentData) -> IncidentSeverity:
         """Assess incident severity based on production impact."""
-        if data.affected_users > 100 or data.occurrence_count > 1000:
-            return IncidentSeverity.CRITICAL
-        if data.affected_users > 10 or data.occurrence_count > 100:
-            return IncidentSeverity.HIGH
-        if data.occurrence_count > 10:
-            return IncidentSeverity.MEDIUM
-        return IncidentSeverity.LOW
+        return grouping.severity_for_impact(data.occurrence_count, data.affected_users)
 
     def _trace(self, stack_trace: str):
         """The trace read by `docintel.stacktrace`: the one reader of stack traces.
@@ -267,6 +351,12 @@ You analyze production errors and generate fixes with regression tests.
 
 ## WHERE IT BROKE
 {{STACK_LOCATIONS}}
+
+## GROUPED REPORTS
+{{INCIDENT_GROUP}}
+
+## SUSPECT COMMITS
+{{SUSPECT_COMMITS}}
 
 ## INSTRUCTIONS
 1. Parse the stack trace to identify the root cause

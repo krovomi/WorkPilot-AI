@@ -12,6 +12,9 @@ Read and understand the full context of the regression:
 - **Branch:** {{BRANCH}}
 - **Commit message:** {{COMMIT_MESSAGE}}
 
+### First Bad Commit
+{{FIRST_BAD_COMMIT}}
+
 ### Git Diff
 ```
 {{DIFF}}

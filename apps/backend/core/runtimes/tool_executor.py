@@ -27,6 +27,7 @@ from foundation.paging import (
     render_page,
     spill_excerpt,
 )
+from foundation.platform import is_windows
 from harness.domain.tools import canonical_tools
 from rtk import rewrite_command as rtk_rewrite
 from watermarks import clean_generated
@@ -296,6 +297,13 @@ class ToolExecutor:
 
             if refusal := protected_config_refusal(path, self.working_directory):
                 raise ValueError(refusal)
+            # The reinforced sandbox (Settings, Sandbox), as the SDK hook applies it.
+            from security.sandbox import current_policy, write_refusal
+
+            if refusal := write_refusal(
+                current_policy(), str(candidate), self.project_dir, self.spec_dir
+            ):
+                raise ValueError(refusal)
         return candidate
 
     async def execute(self, tool_name: str, arguments: dict[str, Any]) -> Any:
@@ -462,7 +470,7 @@ class ToolExecutor:
         try:
             with open(file_path, encoding="utf-8") as f:
                 text = f.read()
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             raise RuntimeError(f"Error reading file {path}: {e}")
         return render_page(
             page_lines(
@@ -491,6 +499,19 @@ class ToolExecutor:
             logger.info("write refused by a guardrail: %s", refusal)
             return f"Write refused by the project's guardrails: {refusal}"
 
+        from security.sandbox import current_policy, write_refusal
+
+        if isinstance(content, str) and (
+            refusal := write_refusal(
+                current_policy(),
+                str(file_path),
+                self.project_dir,
+                self.spec_dir,
+                len(content.encode("utf-8", errors="replace")),
+            )
+        ):
+            raise ValueError(refusal)
+
         # The other half of the product. Providers that do not use the Claude
         # SDK never reach `create_client`'s PreToolUse hooks, so the same
         # cleaning is applied at the one place their writes go through —
@@ -516,17 +537,10 @@ class ToolExecutor:
 
         try:
             with open(file_path, "w", encoding="utf-8") as f:
-                if empty_file:
-                    # Create empty file
-                    pass
-                elif content is not None:
-                    f.write(content)
-                else:
-                    # Default content if none provided
-                    f.write("")
-            return f"Successfully wrote to {path}"
-        except Exception as e:
+                f.write("" if empty_file else content or "")
+        except OSError as e:
             raise RuntimeError(f"Error writing file {path}: {e}")
+        return f"Successfully wrote to {path}"
 
     def _write_implementation_plan(
         self,
@@ -613,7 +627,7 @@ class ToolExecutor:
                 elif item.is_dir():
                     files.append(item.name + "/")
             return sorted(files)
-        except Exception as e:
+        except OSError as e:
             raise RuntimeError(f"Error listing files in {directory}: {e}")
 
     def _walk_files(self, directory: str):
@@ -723,7 +737,7 @@ class ToolExecutor:
         try:
             dir_path.mkdir(parents=True, exist_ok=True)
             return f"Successfully created directory {path}"
-        except Exception as e:
+        except OSError as e:
             raise RuntimeError(f"Error creating directory {path}: {e}")
 
     async def _run_command(self, command: str | None, cwd: str | None = None) -> str:
@@ -784,7 +798,7 @@ class ToolExecutor:
                     stdin=asyncio.subprocess.DEVNULL,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    start_new_session=os.name != "nt",
+                    start_new_session=not is_windows(),
                 )
 
             try:
@@ -909,7 +923,7 @@ class ToolExecutor:
 
     async def _stop_command(self, process) -> None:
         """Reap the shell and its children when a command times out or is cancelled."""
-        if os.name == "nt":
+        if is_windows():
             killer = await asyncio.create_subprocess_exec(
                 "taskkill",
                 "/PID",
@@ -931,59 +945,41 @@ class ToolExecutor:
 
 
 def _is_brain_tool(name: str) -> bool:
-    try:
-        from brain.runtime import is_brain_tool
+    from brain.runtime import is_brain_tool
 
-        return is_brain_tool(name)
-    except Exception:  # noqa: BLE001 - an optional store never breaks dispatch
-        return False
+    return is_brain_tool(name)
 
 
 def _is_uiux_tool(name: str) -> bool:
-    try:
-        from uiux.integration import is_uiux_tool
+    from uiux.integration import is_uiux_tool
 
-        return is_uiux_tool(name)
-    except Exception:  # noqa: BLE001 - optional design data never breaks dispatch
-        return False
+    return is_uiux_tool(name)
 
 
 def _uiux_tool_definitions(spec_dir: str | Path | None) -> list[dict[str, Any]]:
     """ui-ux-pro-max's tools, when this task's preflight said it is a UI task."""
-    try:
-        from uiux.integration import tool_definitions
+    from uiux.integration import tool_definitions
 
-        return tool_definitions(spec_dir)
-    except Exception:  # noqa: BLE001 - optional design data never breaks a session
-        return []
+    return tool_definitions(spec_dir)
 
 
 def _is_verify_tool(name: str) -> bool:
-    try:
-        from verify.tools import is_verify_tool
+    from verify.tools import is_verify_tool
 
-        return is_verify_tool(name)
-    except Exception:  # noqa: BLE001 - an optional feature never breaks dispatch
-        return False
+    return is_verify_tool(name)
 
 
 def _is_code_search_tool(name: str) -> bool:
-    try:
-        from harness.tools.code_search import is_code_search_tool
+    from harness.tools.code_search import is_code_search_tool
 
-        return is_code_search_tool(name)
-    except Exception:  # noqa: BLE001 - an optional tool never breaks dispatch
-        return False
+    return is_code_search_tool(name)
 
 
 def _code_search_tool_definitions() -> list[dict[str, Any]]:
     """`search_code`; `get_tool_definitions` keeps it for the types that declare it."""
-    try:
-        from harness.tools.code_search import tool_definitions
+    from harness.tools.code_search import tool_definitions
 
-        return tool_definitions()
-    except Exception:  # noqa: BLE001 - an optional tool never breaks a session
-        return []
+    return tool_definitions()
 
 
 #: The agent types that drive a verification and get the `verify_*` tools.
@@ -993,22 +989,16 @@ VERIFY_AGENT_TYPES = frozenset({"verifier"})
 def _verify_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
     if agent_type not in VERIFY_AGENT_TYPES:
         return []
-    try:
-        from verify.tools import tool_definitions
+    from verify.tools import tool_definitions
 
-        return tool_definitions()
-    except Exception:  # noqa: BLE001
-        return []
+    return tool_definitions()
 
 
 def _brain_tool_definitions() -> list[dict[str, Any]]:
     """The shared brain's tools, when a brain exists on this machine."""
-    try:
-        from brain.runtime import tool_definitions
+    from brain.runtime import tool_definitions
 
-        return tool_definitions()
-    except Exception:  # noqa: BLE001 - an optional store never breaks a session
-        return []
+    return tool_definitions()
 
 
 def get_tool_definitions(

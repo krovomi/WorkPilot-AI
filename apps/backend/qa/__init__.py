@@ -18,6 +18,7 @@ Module structure:
     - loop.py: Main QA orchestration loop
     - reviewer.py: QA reviewer agent session
     - fixer.py: QA fixer agent session
+    - session_stream.py: the stream both agents run (logs, replay, usage)
     - report.py: Issue tracking, reporting, escalation
     - criteria.py: Acceptance criteria and status management
     - auto_fix_loop.py: Intelligent auto-fix loops
@@ -65,10 +66,7 @@ from .criteria import (
     should_run_fixes,
     should_run_qa,
 )
-from .fixer import (
-    load_qa_fixer_prompt,
-    run_qa_fixer_session,
-)
+from .fixer import run_qa_fixer_session
 
 # Main loop
 from .loop import run_qa_validation_loop
@@ -143,6 +141,5 @@ __all__ = [
     "_issue_similarity",
     # Agent sessions
     "run_qa_agent_session",
-    "load_qa_fixer_prompt",
     "run_qa_fixer_session",
 ]

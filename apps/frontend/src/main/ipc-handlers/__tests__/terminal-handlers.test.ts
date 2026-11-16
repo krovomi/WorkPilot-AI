@@ -68,6 +68,11 @@ const monitor = vi.hoisted(() => ({ value: null as unknown }));
 
 vi.mock("../../claude-profile-manager", () => ({ getClaudeProfileManager: () => profiles }));
 vi.mock("../../claude-profile/usage-monitor", () => ({ getUsageMonitor: () => monitor.value }));
+// Each account's plan is added by usage-plan.ts (terminal-usage-plan.test.ts): here it adds nothing.
+vi.mock("../../claude-profile/usage-plan", () => ({
+	withUsagePlan: async (usage: unknown) => usage,
+	withProfilesPlans: async (usage: unknown) => usage,
+}));
 vi.mock("../../claude-profile/profile-utils", () => ({
 	createProfileDirectory: async (name: string) => {
 		const dir = path.join(state.home, ".claude-profiles", name.toLowerCase());
@@ -613,7 +618,7 @@ describe("auto-switching and account order", () => {
 		profiles.setAccountPriorityOrder.mockImplementation(thrower("x"));
 		const answers = [
 			await invoke(IPC_CHANNELS.CLAUDE_PROFILE_AUTO_SWITCH_SETTINGS),
-			await invoke(IPC_CHANNELS.CLAUDE_PROFILE_UPDATE_AUTO_SWITCH, {}),
+			await invoke(IPC_CHANNELS.CLAUDE_PROFILE_UPDATE_AUTO_SWITCH, { enabled: true }),
 			await invoke(IPC_CHANNELS.ACCOUNT_PRIORITY_GET),
 			await invoke(IPC_CHANNELS.ACCOUNT_PRIORITY_SET, []),
 		];
@@ -669,16 +674,18 @@ describe("usage", () => {
 		});
 	});
 
-	it("events reach the window once forwarding starts", () => {
+	it("events reach the window once forwarding starts", async () => {
 		const window = { webContents: { send: vi.fn() } };
 		initializeUsageMonitorForwarding(window as never);
 		usage.emit("usage-updated", { a: 1 });
 		usage.emit("all-profiles-usage-updated", { b: 2 });
 		usage.emit("show-swap-notification", { c: 3 });
-		expect(window.webContents.send.mock.calls).toEqual([
-			[IPC_CHANNELS.USAGE_UPDATED, { a: 1 }],
-			[IPC_CHANNELS.ALL_PROFILES_USAGE_UPDATED, { b: 2 }],
-			[IPC_CHANNELS.PROACTIVE_SWAP_NOTIFICATION, { c: 3 }],
-		]);
+		await vi.waitFor(() =>
+			expect(window.webContents.send.mock.calls).toEqual([
+				[IPC_CHANNELS.PROACTIVE_SWAP_NOTIFICATION, { c: 3 }],
+				[IPC_CHANNELS.USAGE_UPDATED, { a: 1 }],
+				[IPC_CHANNELS.ALL_PROFILES_USAGE_UPDATED, { b: 2 }],
+			]),
+		);
 	});
 });

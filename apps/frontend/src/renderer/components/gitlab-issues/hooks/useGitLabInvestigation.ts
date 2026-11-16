@@ -1,63 +1,24 @@
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import type { GitLabIssue } from "../../../../shared/types";
 import {
 	investigateGitLabIssue,
 	useGitLabStore,
 } from "../../../stores/gitlab-store";
-import { loadTasks } from "../../../stores/task-store";
 
+/**
+ * The investigation shown on the issues page. Its events are followed by
+ * setupGitLabInvestigationListeners for the life of the window, not here.
+ */
 export function useGitLabInvestigation(projectId: string | undefined) {
-	const {
-		investigationStatus,
-		lastInvestigationResult,
-		setInvestigationStatus,
-		setInvestigationResult,
-		setError,
-	} = useGitLabStore();
-
-	// Set up event listeners for investigation progress
-	useEffect(() => {
-		if (!projectId) return;
-
-		const cleanupProgress = window.electronAPI.onGitLabInvestigationProgress(
-			(eventProjectId, status) => {
-				if (eventProjectId === projectId) {
-					setInvestigationStatus(status);
-				}
-			},
-		);
-
-		const cleanupComplete = window.electronAPI.onGitLabInvestigationComplete(
-			(eventProjectId, result) => {
-				if (eventProjectId === projectId) {
-					setInvestigationResult(result);
-					// Refresh the task store so the new task appears on the Kanban board
-					if (result.success && result.taskId) {
-						loadTasks(projectId);
-					}
-				}
-			},
-		);
-
-		const cleanupError = window.electronAPI.onGitLabInvestigationError(
-			(eventProjectId, error) => {
-				if (eventProjectId === projectId) {
-					setError(error);
-					setInvestigationStatus({
-						phase: "error",
-						progress: 0,
-						message: error,
-					});
-				}
-			},
-		);
-
-		return () => {
-			cleanupProgress();
-			cleanupComplete();
-			cleanupError();
-		};
-	}, [projectId, setInvestigationStatus, setInvestigationResult, setError]);
+	const investigationStatus = useGitLabStore(
+		(state) => state.investigationStatus,
+	);
+	const lastInvestigationResult = useGitLabStore(
+		(state) => state.lastInvestigationResult,
+	);
+	const setInvestigationStatus = useGitLabStore(
+		(state) => state.setInvestigationStatus,
+	);
 
 	const startInvestigation = useCallback(
 		(issue: GitLabIssue, selectedNoteIds: number[]) => {

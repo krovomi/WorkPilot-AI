@@ -124,6 +124,7 @@ import { registerReleaseCoordinatorHandlers } from "./release-coordinator-handle
 import { setupQualityHandlers } from "./quality-handlers";
 import { registerRoadmapHandlers } from "./roadmap-handlers";
 import { registerScreenshotHandlers } from "./screenshot-handlers";
+import { registerSelfHealingBisectHandlers } from "./self-healing-bisect-handlers";
 import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
@@ -152,6 +153,7 @@ import { setupTestGenerationHandlers } from "./test-generation-handlers";
 import { registerTimeTravelHandlers } from "./time-travel-handlers";
 import { registerLocalBackendHandlers } from "./local-backend-handlers";
 import { registerReplayHandlers } from "./replay-handlers";
+import { registerReplayShareHandlers } from "./replay-share-handlers";
 import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -267,6 +269,7 @@ export { registerTerminalHandlers } from "./terminal-handlers";
 export { setupTestGenerationHandlers } from "./test-generation-handlers";
 export { registerTimeTravelHandlers } from "./time-travel-handlers";
 export { registerReplayHandlers } from "./replay-handlers";
+export { registerReplayShareHandlers } from "./replay-share-handlers";
 export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -467,6 +470,7 @@ export function setupIpcHandlers(
 
 	// Self-Healing Codebase + Incident Responder handlers
 	registerSelfHealingHandlers(getMainWindow);
+	registerSelfHealingBisectHandlers(getMainWindow);
 
 	// Browser Agent handlers (built-in browser for testing and visual validation)
 	registerBrowserAgentHandlers();
@@ -549,6 +553,7 @@ export function setupIpcHandlers(
 
 	// Agent Replay + Session History (recorded sessions, via the local backend)
 	registerReplayHandlers();
+	registerReplayShareHandlers();
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);
