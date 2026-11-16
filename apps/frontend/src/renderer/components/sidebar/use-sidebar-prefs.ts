@@ -4,29 +4,7 @@ import {
 	type SidebarPrefs,
 } from "@shared/types/settings";
 import { saveSettings, useSettingsStore } from "@/stores/settings-store";
-
-// Reorder an array by moving `id` from its current position to the position of `overId`.
-// If either id is missing, the array is returned unchanged so callers don't have to null-check.
-function arrayMoveById(list: string[], id: string, overId: string): string[] {
-	const from = list.indexOf(id);
-	const to = list.indexOf(overId);
-	if (from === -1 || to === -1 || from === to) return list;
-	const next = list.slice();
-	const [moved] = next.splice(from, 1);
-	next.splice(to, 0, moved);
-	return next;
-}
-
-// Merge user-defined order with the authoritative list from code. Unknown ids in prefs
-// (features removed from the codebase) are dropped; new ids not yet in prefs keep their
-// default order and are appended after the user-ordered ones.
-function mergeOrder(preferred: string[], actual: string[]): string[] {
-	const actualSet = new Set(actual);
-	const preferredValid = preferred.filter((id) => actualSet.has(id));
-	const preferredSet = new Set(preferredValid);
-	const missing = actual.filter((id) => !preferredSet.has(id));
-	return [...preferredValid, ...missing];
-}
+import { SHIPPED_ORDER } from "./menu-layout";
 
 export function useSidebarPrefs() {
 	const prefs = useSettingsStore(
@@ -85,34 +63,21 @@ export function useSidebarPrefs() {
 		[update],
 	);
 
-	const reorderGroups = useCallback(
-		(activeId: string, overId: string, actualOrder: string[]) => {
+	// A change to the order (`menu-layout.ts`), built from the preferences as
+	// saved now so two quick moves never undo each other; null saves nothing.
+	const arrange = useCallback(
+		(build: (current: SidebarPrefs) => Partial<SidebarPrefs> | null) => {
 			const current =
 				useSettingsStore.getState().settings.sidebarPrefs ??
 				DEFAULT_SIDEBAR_PREFS;
-			const merged = mergeOrder(current.groupOrder, actualOrder);
-			update({ groupOrder: arrayMoveById(merged, activeId, overId) });
+			const patch = build(current);
+			if (patch) update(patch);
 		},
 		[update],
 	);
 
-	const reorderItems = useCallback(
-		(
-			groupId: string,
-			activeId: string,
-			overId: string,
-			actualOrder: string[],
-		) => {
-			const current =
-				useSettingsStore.getState().settings.sidebarPrefs ??
-				DEFAULT_SIDEBAR_PREFS;
-			const existing = current.itemOrder[groupId] ?? [];
-			const merged = mergeOrder(existing, actualOrder);
-			const next = arrayMoveById(merged, activeId, overId);
-			update({ itemOrder: { ...current.itemOrder, [groupId]: next } });
-		},
-		[update],
-	);
+	// The order as shipped; pins, hidden pages and the menu mode are kept.
+	const resetOrder = useCallback(() => update(SHIPPED_ORDER), [update]);
 
 	const setHideExperimental = useCallback(
 		(value: boolean) => update({ hideExperimental: value }),
@@ -180,8 +145,8 @@ export function useSidebarPrefs() {
 			toggleItemPin,
 			unpinItems,
 			toggleGroupPin,
-			reorderGroups,
-			reorderItems,
+			arrange,
+			resetOrder,
 			setHideExperimental,
 			setActiveSpace,
 			chooseMenuMode,
@@ -189,15 +154,14 @@ export function useSidebarPrefs() {
 			unhideItem,
 			snoozeHideSuggestions,
 			reset,
-			mergeOrder,
 		}),
 		[
 			prefs,
 			toggleItemPin,
 			unpinItems,
 			toggleGroupPin,
-			reorderGroups,
-			reorderItems,
+			arrange,
+			resetOrder,
 			setHideExperimental,
 			setActiveSpace,
 			chooseMenuMode,

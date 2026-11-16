@@ -512,5 +512,27 @@
 		"hint": "Glissez pour redimensionner le menu, double-cliquez pour retrouver sa largeur par défaut",
 		"width": "{{width}} pixels de large",
 		"folded": "Replié"
+	},
+	"customize": {
+		"start": "Personnaliser le menu",
+		"done": "Terminé",
+		"title": "Personnalisez votre menu",
+		"hint": "Glissez une page par sa poignée jusqu'à sa nouvelle place, ou sur un espace du rail pour l'y déplacer. Les flèches font de même au clavier. Seul votre menu change.",
+		"spacePlace": "Sa place dans le rail",
+		"spaceUp": "Monter l'espace {{name}}",
+		"spaceDown": "Descendre l'espace {{name}}",
+		"resetOrder": "Rétablir l'ordre d'origine",
+		"up": "Monter {{name}}",
+		"down": "Descendre {{name}}",
+		"moveTo": "Déplacer {{name}} vers un autre espace",
+		"moveToTitle": "Déplacer {{name}} vers",
+		"announce": {
+			"instructions": "Pour prendre une entrée du menu, appuyez sur Espace ou Entrée. Déplacez-la avec les flèches, appuyez de nouveau sur Espace ou Entrée pour la déposer, ou sur Échap pour annuler.",
+			"start": "{{name}} est prise.",
+			"over": "{{name}} est au-dessus de {{target}}.",
+			"outside": "{{name}} n'est plus au-dessus d'une place possible.",
+			"drop": "{{name}} a été déposée sur {{target}}.",
+			"cancel": "Le déplacement de {{name}} est annulé."
+		}
 	}
 }

@@ -145,8 +145,8 @@ export function TestGenerationDialog({
 		}
 	};
 
+	// The runs below start from `launch`, which only runs a mode that is ready.
 	const handleAnalyzeCoverage = useCallback(async () => {
-		if (!selectedFile) return;
 		setTab("gaps");
 		try {
 			await analyzeCoverage(selectedFile, existingTestPath || undefined);
@@ -156,6 +156,8 @@ export function TestGenerationDialog({
 	}, [selectedFile, existingTestPath, analyzeCoverage]);
 
 	const handleGenerateUnitTests = useCallback(async () => {
+		// Also reached from the gaps of an analysis, after which the file may
+		// have been cleared.
 		if (!selectedFile) return;
 		const choice = await destinationPrompt.prompt(selectedFile, projectPath, {
 			existingTestPath: existingTestPath || undefined,
@@ -184,7 +186,6 @@ export function TestGenerationDialog({
 	]);
 
 	const handleGenerateE2ETests = useCallback(async () => {
-		if (!userStory.trim() || !targetModule.trim()) return;
 		setTab("code");
 		try {
 			await generateE2ETests(userStory, targetModule.trim(), undefined, libraries.chosen);
@@ -198,7 +199,6 @@ export function TestGenerationDialog({
 	const tddRunLanguage =
 		tddLanguage || (isTestStudioLanguage(projectLanguage) ? projectLanguage : FALLBACK_TDD_LANGUAGE);
 	const handleGenerateTDDTests = useCallback(async () => {
-		if (!tddDescription.trim()) return;
 		setTab("code");
 		try {
 			await generateTDDTests(

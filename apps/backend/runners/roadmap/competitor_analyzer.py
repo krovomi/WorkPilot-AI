@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from ui import muted, print_status
 
+from .files import read_object, snapshot, written_since
 from .models import RoadmapPhaseResult
 
 if TYPE_CHECKING:
@@ -75,12 +76,13 @@ class CompetitorAnalyzer:
             )
 
             context = self._build_context()
+            before = snapshot(self.analysis_file)
             success, output = await self.agent_executor.run_agent(
                 "competitor_analysis.md",
                 additional_context=context,
             )
 
-            if success and self.analysis_file.exists():
+            if success and written_since(self.analysis_file, before):
                 validation_result = self._validate_analysis()
                 if validation_result is not None:
                     return validation_result
@@ -122,27 +124,23 @@ Output your findings to competitor_analysis.json.
 
         Returns RoadmapPhaseResult if validation succeeds, None otherwise.
         """
-        try:
-            with open(self.analysis_file, encoding="utf-8") as f:
-                data = json.load(f)
+        data = read_object(self.analysis_file)
+        competitors = data.get("competitors") if data is not None else None
+        if not isinstance(competitors, list):
+            return None
 
-            if "competitors" in data:
-                competitor_count = len(data.get("competitors", []))
-                pain_point_count = sum(
-                    len(c.get("pain_points", [])) for c in data.get("competitors", [])
-                )
-                print_status(
-                    f"Analyzed {competitor_count} competitors, found {pain_point_count} pain points",
-                    "success",
-                )
-                return RoadmapPhaseResult(
-                    "competitor_analysis", True, [str(self.analysis_file)], [], 0
-                )
-
-        except json.JSONDecodeError:
-            pass
-
-        return None
+        pain_point_count = sum(
+            len(c["pain_points"])
+            for c in competitors
+            if isinstance(c, dict) and isinstance(c.get("pain_points"), list)
+        )
+        print_status(
+            f"Analyzed {len(competitors)} competitors, found {pain_point_count} pain points",
+            "success",
+        )
+        return RoadmapPhaseResult(
+            "competitor_analysis", True, [str(self.analysis_file)], [], 0
+        )
 
     def _create_disabled_analysis_file(self):
         """Create an analysis file indicating the feature is disabled."""
