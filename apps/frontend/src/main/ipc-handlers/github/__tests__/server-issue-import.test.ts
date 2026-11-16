@@ -104,6 +104,30 @@ describe("an issue of a server project", () => {
 		expect(mocks.startSpecCreation).not.toHaveBeenCalled();
 	});
 
+	it("counts an issue the server could not turn into a card as failed", async () => {
+		mocks.authedFetch.mockResolvedValue({
+			ok: true,
+			data: {
+				status: 200,
+				body: { number: 3, title: "T", body: "", labels: [], html_url: "u" },
+			},
+		});
+		mocks.createServerCard
+			.mockResolvedValueOnce({ success: false, error: "Board is locked" })
+			.mockResolvedValueOnce({ success: true });
+
+		const result = await importIssues("p-1", [3, 4]);
+
+		expect(result.data).toMatchObject({
+			imported: 0,
+			failed: 2,
+			errors: [
+				"Failed to import #3: Board is locked",
+				"Failed to import #4: Server unavailable",
+			],
+		});
+	});
+
 	it("refuses an issue number that is not one, before any call", async () => {
 		const result = await importIssues("p-1", ["3/../../other", 0, 2.5]);
 		expect(result.data.failed).toBe(3);

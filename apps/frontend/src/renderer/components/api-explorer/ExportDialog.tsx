@@ -4,7 +4,7 @@
  */
 
 import { Check, Copy, Download, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -12,7 +12,7 @@ import {
 	type OpenApiSpec,
 	useApiExplorerStore,
 } from "../../stores/api-explorer-store";
-import { MethodBadge } from "./api-explorer-shared";
+import { isHttpMethod, MethodBadge } from "./api-explorer-shared";
 
 // ── Export Dialog ────────────────────────────────────────────────────────────
 
@@ -21,25 +21,33 @@ export interface ExportDialogProps {
 	readonly onClose: () => void;
 }
 
+/** A header example as Postman shows it: a string as is, anything else as JSON. */
+function exampleText(example: unknown): string {
+	if (example === undefined || example === null) return "";
+	return typeof example === "string" ? example : JSON.stringify(example);
+}
+
+/** A Markdown table cell: a `|` would end the cell, a line break the row. */
+function cell(text: string): string {
+	return text.replaceAll("|", "\\|").replaceAll(/\r?\n/g, " ");
+}
+
 export function buildPostmanCollection(spec: OpenApiSpec, baseUrl: string) {
 	const items: unknown[] = [];
 	const tagMap: Record<string, unknown[]> = {};
 
 	for (const [path, methods] of Object.entries(spec.paths ?? {})) {
 		for (const [method, op] of Object.entries(methods)) {
-			if (
-				["get", "post", "put", "delete", "patch", "head", "options"].includes(
-					method,
-				)
-			) {
-				const tags = op.tags ?? ["default"];
+			if (isHttpMethod(method)) {
+				// An operation with an empty tag list used to vanish from the collection.
+				const tags = op.tags?.length ? op.tags : ["default"];
 				const request: Record<string, unknown> = {
 					method: method.toUpperCase(),
 					header: Object.entries(
 						op.parameters
 							?.filter((p) => p.in === "header")
 							.reduce<Record<string, string>>((acc, p) => {
-								acc[p.name] = p.example ? JSON.stringify(p.example) : "";
+								acc[p.name] = exampleText(p.example);
 								return acc;
 							}, {}) ?? {},
 					).map(([key, value]) => ({ key, value })),
@@ -107,6 +115,8 @@ export function buildMarkdownDocs(spec: OpenApiSpec): string {
 	> = {};
 	for (const [path, methods] of Object.entries(spec.paths ?? {})) {
 		for (const [method, op] of Object.entries(methods)) {
+			// `parameters` and the other path-level keys are not endpoints.
+			if (!isHttpMethod(method)) continue;
 			const tag = op.tags?.[0] ?? "default";
 			if (!tagMap[tag]) tagMap[tag] = [];
 			tagMap[tag].push({ method, path, op });
@@ -131,7 +141,7 @@ export function buildMarkdownDocs(spec: OpenApiSpec): string {
 					"|------|----|------|----------|-------------|",
 					...op.parameters.map(
 						(param) =>
-							`| \`${param.name}\` | ${param.in} | ${param.schema?.type ?? "-"} | ${param.required ? "✓" : "-"} | ${param.description ?? "-"} |`,
+							`| \`${cell(param.name)}\` | ${param.in} | ${param.schema?.type ?? "-"} | ${param.required ? "✓" : "-"} | ${cell(param.description ?? "-")} |`,
 					),
 					"",
 				);
@@ -143,7 +153,7 @@ export function buildMarkdownDocs(spec: OpenApiSpec): string {
 					"| Status | Description |",
 					"|--------|-------------|",
 					...Object.entries(op.responses).map(
-						([status, resp]) => `| ${status} | ${resp.description ?? "-"} |`,
+						([status, resp]) => `| ${status} | ${cell(resp.description ?? "-")} |`,
 					),
 					"",
 				);
@@ -160,28 +170,20 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 	const activeEnv =
 		environments.find((e) => e.id === activeEnvironmentId) ?? environments[0];
 	const [copied, setCopied] = useState(false);
-
-	const httpMethods = [
-		"get",
-		"post",
-		"put",
-		"delete",
-		"patch",
-		"head",
-		"options",
-	];
+	const [copyFailed, setCopyFailed] = useState(false);
+	const titleId = useId();
 
 	const allEndpoints = useMemo(() => {
 		const endpoints: Array<{ key: string; method: string; path: string }> = [];
 		for (const [path, methods] of Object.entries(spec.paths ?? {})) {
 			for (const method of Object.keys(methods)) {
-				if (httpMethods.includes(method)) {
+				if (isHttpMethod(method)) {
 					endpoints.push({ key: `${method}::${path}`, method, path });
 				}
 			}
 		}
 		return endpoints;
-	}, [spec, httpMethods.includes]);
+	}, [spec]);
 
 	const [selectedEndpoints, setSelectedEndpoints] = useState<Set<string>>(
 		() => new Set(allEndpoints.map((e) => e.key)),
@@ -207,9 +209,10 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 	}
 
 	function getFilteredSpec(): OpenApiSpec {
+		// A contract without paths has nothing to leave out, so it stops here.
 		if (selectedEndpoints.size === allEndpoints.length) return spec;
 		const filteredPaths: Record<string, Record<string, OpenApiOperation>> = {};
-		for (const [path, methods] of Object.entries(spec.paths ?? {})) {
+		for (const [path, methods] of Object.entries(spec.paths)) {
 			const filteredMethods: Record<string, OpenApiOperation> = {};
 			for (const [method, op] of Object.entries(methods)) {
 				if (selectedEndpoints.has(`${method}::${path}`)) {
@@ -262,10 +265,18 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 		);
 	}
 
-	function copyOpenApi() {
-		navigator.clipboard.writeText(JSON.stringify(getFilteredSpec(), null, 2));
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
+	async function copyOpenApi() {
+		// The clipboard can refuse; it used to say "copied" all the same.
+		try {
+			await navigator.clipboard.writeText(
+				JSON.stringify(getFilteredSpec(), null, 2),
+			);
+			setCopyFailed(false);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2000);
+		} catch {
+			setCopyFailed(true);
+		}
 	}
 
 	const formats = [
@@ -282,7 +293,7 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 			action: exportPostman,
 		},
 		{
-			label: "Markdown Documentation",
+			label: t("apiExplorer:export.markdownLabel"),
 			description: t("apiExplorer:export.markdownDesc"),
 			icon: "MD",
 			action: exportMarkdown,
@@ -291,14 +302,20 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 
 	return createPortal(
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-			<div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl w-full max-w-md p-6">
+			<div
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby={titleId}
+				className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl w-full max-w-md p-6"
+			>
 				<div className="flex items-center justify-between mb-5">
-					<h2 className="text-base font-semibold text-foreground">
+					<h2 id={titleId} className="text-base font-semibold text-foreground">
 						{t("apiExplorer:export.title")}
 					</h2>
 					<button
 						type="button"
 						onClick={onClose}
+						aria-label={t("apiExplorer:aria.close")}
 						className="text-muted-foreground hover:text-foreground transition-colors"
 					>
 						<X size={18} />
@@ -390,6 +407,11 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 							? t("apiExplorer:export.copied")
 							: t("apiExplorer:export.copySpec")}
 					</button>
+					{copyFailed && (
+						<p role="alert" className="mt-1 text-center text-xs text-destructive">
+							{t("apiExplorer:export.copyFailed")}
+						</p>
+					)}
 				</div>
 			</div>
 		</div>,

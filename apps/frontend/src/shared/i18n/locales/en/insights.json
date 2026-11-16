@@ -24,7 +24,8 @@
 		"suggested": "Suggested Task",
 		"creating": "Creating...",
 		"created": "Task Created",
-		"create": "Create Task"
+		"create": "Create Task",
+		"createFailed": "The task could not be created. Try again."
 	},
 	"tools": {
 		"tool": "tool",

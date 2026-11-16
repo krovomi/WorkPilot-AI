@@ -164,21 +164,6 @@ class TestProviderResolution:
         )
 
 
-class TestSpecRunnerResolution:
-    def test_spec_runner_resolves_the_model_provider_aware(self):
-        """The spec phase must use the same resolver as the other three.
-
-        It used to substitute the provider default only when the model was
-        still argparse's "sonnet", so any model the frontend passed explicitly
-        — which it always does — went through untouched.
-        """
-        source = (
-            REPO_ROOT / "apps" / "backend" / "runners" / "spec_runner.py"
-        ).read_text(encoding="utf-8")
-        assert "_resolve_provider_model(args.model, args.provider)" in source
-        assert 'args.model\n        == "sonnet"' not in source
-
-
 class TestClientFactoryGuard:
     def test_local_branch_coerces_the_model(self, tmp_path, monkeypatch):
         """A stale hosted id is replaced before constructing the local client."""

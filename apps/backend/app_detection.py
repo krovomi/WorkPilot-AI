@@ -8,7 +8,20 @@ No LLM required.
 """
 
 import json
+import re
 from pathlib import Path
+
+# Words in a package.json script name that say it serves the app.
+_SERVING_SCRIPT = re.compile(r"(^|[:._-])(dev|start|serve|preview)($|[:._-])")
+
+
+def _mapping(value: object) -> dict:
+    """A package.json section, or nothing when it is not an object."""
+    return value if isinstance(value, dict) else {}
+
+
+def _serves(script_name: str) -> bool:
+    return bool(_SERVING_SCRIPT.search(script_name.lower()))
 
 
 class AppEmulatorRunner:
@@ -55,11 +68,16 @@ class AppEmulatorRunner:
         try:
             with open(pkg_path, encoding="utf-8") as f:
                 pkg = json.load(f)
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            return None
+        if not isinstance(pkg, dict):
             return None
 
-        scripts = pkg.get("scripts", {})
-        deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+        scripts = _mapping(pkg.get("scripts"))
+        deps = {
+            **_mapping(pkg.get("dependencies")),
+            **_mapping(pkg.get("devDependencies")),
+        }
 
         # Detect framework
         framework = "node"
@@ -107,11 +125,13 @@ class AppEmulatorRunner:
                 )
                 break
 
-        if not start_command and scripts:
-            # Fallback: use first available script
-            pm = self._detect_package_manager()
-            first_script = next(iter(scripts))
-            start_command = f"{pm} run {first_script}"
+        if not start_command:
+            # Another script that serves the app (`dev:web`, `preview`…). Not
+            # just the first one: it can as well be `build`, `test` or `deploy`.
+            serving = [name for name in scripts if _serves(name)]
+            if serving:
+                pm = self._detect_package_manager()
+                start_command = f"{pm} run {serving[0]}"
 
         return {
             "type": app_type,

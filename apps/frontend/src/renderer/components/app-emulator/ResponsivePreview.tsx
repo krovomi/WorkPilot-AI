@@ -3,6 +3,7 @@ import {
 	ArrowRight,
 	Camera,
 	Home,
+	LayoutGrid,
 	MousePointerClick,
 	RotateCw,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import {
 	sameAddress,
 } from "../../../shared/utils/emulator-landing";
 import { Button } from "../ui/button";
+import { DeviceMatrix } from "./DeviceMatrix";
 
 const FORMATS = [
 	{ id: "phone", width: 390, height: 844 },
@@ -154,6 +156,8 @@ export function ResponsivePreview({
 	const [zoom, setZoom] = useState(1);
 	const [loading, setLoading] = useState(true);
 	const [failure, setFailure] = useState<string | null>(null);
+	/** La matrice d'appareils remplace l'aperçu sans démonter le `<webview>`, qui garde son historique. */
+	const [matrix, setMatrix] = useState(false);
 	// The key replaces the webview DOM node, so each replacement needs fresh listeners.
 
 	const homeUrl = useMemo(
@@ -535,7 +539,22 @@ export function ResponsivePreview({
 						</label>
 					</>
 				)}
+				<Button
+					size="sm"
+					variant={matrix ? "secondary" : "outline"}
+					className="ml-auto"
+					aria-pressed={matrix}
+					onClick={() => setMatrix((value) => !value)}
+				>
+					<LayoutGrid className="mr-1 h-3.5 w-3.5" />
+					{t("matrix.toggle")}
+				</Button>
 			</div>
+			{matrix && (
+				<div className="min-h-0 flex-1">
+					<DeviceMatrix serverUrl={url} currentUrl={currentUrl} onCapture={onCapture} />
+				</div>
+			)}
 			{loading && (
 				<div
 					role="status"
@@ -575,7 +594,13 @@ export function ResponsivePreview({
 					</div>
 				</div>
 			)}
-			<div className="min-h-0 flex-1 overflow-auto bg-muted/30">
+			<div
+				className={
+					matrix
+						? "invisible h-0 flex-none overflow-hidden"
+						: "min-h-0 flex-1 overflow-auto bg-muted/30"
+				}
+			>
 				<div
 					className="mx-auto"
 					style={

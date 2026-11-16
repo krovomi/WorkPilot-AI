@@ -16,6 +16,8 @@ from typing import Any
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
+from estimation_calibration import breakdown, calibrate, categorize, load
+
 try:
     from services.smart_estimation_service import get_smart_estimation_service
 
@@ -64,8 +66,27 @@ class SmartEstimationRunner:
             # UI: the product rule is to never give one, and a field that never
             # crosses the boundary cannot leak into a tooltip later. The service
             # still computes it for its own scoring; nothing downstream sees it.
+            #
+            # The generic figures are then corrected by the repository's own
+            # calibration (estimation_calibration): the shown figures are the
+            # calibrated ones, and `calibration.metrics.<m>.base` keeps the
+            # generic one so the sample recorded at merge never compounds.
+            category = categorize(task_description)
+            files = result.estimated_files_impacted
+            calibration = calibrate(
+                load(Path(project_path)),
+                category,
+                {
+                    "cost_usd": result.token_cost_estimate,
+                    "tokens": result.estimated_tokens,
+                    "qa_iterations": result.estimated_qa_iterations,
+                    "files": files,
+                },
+                result.complexity_score,
+            )
+            metrics = calibration["metrics"]
             structured_result = {
-                "complexity_score": result.complexity_score,
+                "complexity_score": calibration["complexity"]["value"],
                 "confidence_level": result.confidence_level,
                 "reasoning": result.reasoning,
                 "similar_tasks": [
@@ -73,9 +94,14 @@ class SmartEstimationRunner:
                     for task in result.similar_tasks
                 ],
                 "risk_factors": result.risk_factors,
-                "estimated_qa_iterations": result.estimated_qa_iterations,
-                "token_cost_estimate": result.token_cost_estimate,
+                "estimated_qa_iterations": metrics["qa_iterations"]["value"],
+                "token_cost_estimate": metrics["cost_usd"]["value"],
+                "estimated_tokens": metrics["tokens"]["value"],
+                "estimated_files": metrics["files"]["value"],
                 "recommendations": result.recommendations,
+                "category": category,
+                "dimensions": breakdown(task_description, files),
+                "calibration": calibration,
             }
 
             # Emit completion event
