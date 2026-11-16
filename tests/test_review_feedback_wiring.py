@@ -48,12 +48,20 @@ import runners.github.orchestrator as orchestrator_module  # noqa: E402
 from learning_loop import review_feedback as rf  # noqa: E402
 from runners.github.context_gatherer import ChangedFile, PRContext  # noqa: E402
 from runners.github.models import (  # noqa: E402
+    FollowupReviewContext,
     GitHubRunnerConfig,
+    MergeVerdict,
     PRReviewFinding,
     PRReviewResult,
     ReviewCategory,
     ReviewPass,
     ReviewSeverity,
+)
+from runners.github.services.learned_suppression import (  # noqa: E402
+    apply_to_followup,
+)
+from runners.github.services.parallel_followup_reviewer import (  # noqa: E402
+    ParallelFollowupReviewer,
 )
 from runners.github.services.parallel_orchestrator_reviewer import (  # noqa: E402
     SPECIALIST_CONFIGS,
@@ -342,3 +350,226 @@ class TestDatasetEdges:
         monkeypatch.setattr(rf, "MAX_PROMPT_CHARS", 250)
         block = rf.prompt_block(tmp_path)
         assert block.count("rejected 3x") == 2
+
+
+def _bare_orchestrator(project: Path, config) -> orchestrator_module.GitHubOrchestrator:
+    orch = orchestrator_module.GitHubOrchestrator.__new__(
+        orchestrator_module.GitHubOrchestrator
+    )
+    orch.project_dir = project
+    orch.github_dir = project / ".workpilot" / "github"
+    orch.github_dir.mkdir(parents=True, exist_ok=True)
+    orch.config = config
+    return orch
+
+
+def _rule(orch, ci_status=None):
+    return lambda remaining: orch._generate_verdict(remaining, [], [], ci_status or {})
+
+
+def _followup(findings, verdict=MergeVerdict.NEEDS_REVISION, blockers=None):
+    return PRReviewResult(
+        pr_number=5,
+        repo="owner/repo",
+        success=True,
+        findings=findings,
+        summary="## Follow-up Review",
+        overall_status="request_changes",
+        verdict=verdict,
+        verdict_reasoning="from the reviewer",
+        blockers=list(blockers or []),
+        is_followup_review=True,
+        unresolved_findings=[f.id for f in findings],
+        new_findings_since_last_review=[f.id for f in findings],
+    )
+
+
+class TestFollowupApplies:
+    """A follow-up review gets the same suppressions and the initial review's verdict rule."""
+
+    def test_without_feedback_nothing_changes(self, tmp_path, config):
+        orch = _bare_orchestrator(tmp_path, config)
+        result = _followup([_finding("a", "Missing docstring on `bar`")])
+        assert not apply_to_followup(tmp_path, result, _rule(orch))
+        assert result.verdict == MergeVerdict.NEEDS_REVISION
+        assert result.summary == "## Follow-up Review"
+
+    def test_a_failed_or_empty_review_is_left_alone(self, tmp_path, config):
+        _rejections(tmp_path, 6)
+        orch = _bare_orchestrator(tmp_path, config)
+        failed = _followup([_finding("a", "Missing docstring on `bar`")])
+        failed.success = False
+        assert not apply_to_followup(tmp_path, failed, _rule(orch))
+        assert not apply_to_followup(tmp_path, _followup([]), _rule(orch))
+
+    def test_dropping_what_made_it_severe_recomputes_the_verdict(
+        self, tmp_path, config
+    ):
+        _rejections(tmp_path, 6)
+        orch = _bare_orchestrator(tmp_path, config)
+        result = _followup(
+            [_finding("noise", "Missing docstring on `bar`")],
+            blockers=["style: Missing docstring on `bar`"],
+        )
+
+        assert apply_to_followup(tmp_path, result, _rule(orch))
+
+        assert result.findings == []
+        assert [s["id"] for s in result.learned_suppressions] == ["noise"]
+        assert result.unresolved_findings == []
+        assert result.new_findings_since_last_review == []
+        assert result.verdict == MergeVerdict.READY_TO_MERGE
+        assert result.overall_status == "approve"
+        assert result.blockers == []
+        assert "Verdict recomputed" in result.summary
+        assert "1 finding(s) hidden and 0 downgraded" in result.summary
+
+    def test_a_downgrade_alone_can_relax_it(self, tmp_path, config):
+        _rejections(tmp_path, 3)
+        orch = _bare_orchestrator(tmp_path, config)
+        finding = _finding("lowered", "Missing docstring on `bar`", ReviewSeverity.HIGH)
+        result = _followup([finding])
+
+        assert apply_to_followup(tmp_path, result, _rule(orch))
+
+        assert finding.severity == ReviewSeverity.LOW
+        assert finding.learned_rejections == 3
+        assert result.verdict == MergeVerdict.READY_TO_MERGE
+        assert "0 finding(s) hidden and 1 downgraded" in result.summary
+
+    def test_pending_ci_keeps_it_out_of_ready(self, tmp_path, config):
+        _rejections(tmp_path, 6)
+        orch = _bare_orchestrator(tmp_path, config)
+        ci = {"pending": 2}
+        result = _followup([_finding("noise", "Missing docstring on `bar`")])
+
+        assert apply_to_followup(tmp_path, result, _rule(orch, ci), ci)
+
+        assert result.verdict == MergeVerdict.NEEDS_REVISION
+        assert "2 check(s) still pending" in result.verdict_reasoning
+
+    def test_a_suppression_never_makes_it_more_severe(self, tmp_path, config):
+        _rejections(tmp_path, 6)
+        orch = _bare_orchestrator(tmp_path, config)
+        # The reviewer let a medium finding through; the rule would not.
+        result = _followup(
+            [
+                _finding("noise", "Missing docstring on `bar`", ReviewSeverity.LOW),
+                _finding("real", "Possible None dereference"),
+            ],
+            verdict=MergeVerdict.READY_TO_MERGE,
+        )
+
+        assert apply_to_followup(tmp_path, result, _rule(orch))
+
+        assert result.verdict == MergeVerdict.READY_TO_MERGE
+        assert [f.id for f in result.findings] == ["real"]
+        assert "Verdict recomputed" not in result.summary
+
+    def test_a_verdict_the_findings_did_not_drive_stands(self, tmp_path, config):
+        _rejections(tmp_path, 6)
+        orch = _bare_orchestrator(tmp_path, config)
+        # Only low findings: the rule says ready either way, the reviewer did not.
+        result = _followup(
+            [
+                _finding("noise", "Missing docstring on `bar`", ReviewSeverity.LOW),
+                _finding("other", "Rename this helper", ReviewSeverity.LOW),
+            ],
+            blockers=[
+                "style: Missing docstring on `bar`",
+                "Unresolved: Rename this helper (a.py:1)",
+            ],
+        )
+
+        assert apply_to_followup(tmp_path, result, _rule(orch))
+
+        assert result.verdict == MergeVerdict.NEEDS_REVISION
+        assert result.verdict_reasoning == "from the reviewer"
+        assert result.blockers == ["Unresolved: Rename this helper (a.py:1)"]
+
+    def test_the_followup_review_saves_it(self, tmp_path, config, monkeypatch):
+        _rejections(tmp_path, 6)
+        orch = _bare_orchestrator(tmp_path, config)
+        orch._jev_worker = None
+        orch._report_progress = lambda *a, **k: None
+        previous = _followup([])
+        previous.is_followup_review = False
+        previous.reviewed_commit_sha = "abc123"
+        asyncio.run(previous.save(orch.github_dir))
+
+        async def _checks(_number):
+            return {}
+
+        orch.gh_client = SimpleNamespace(get_pr_checks_comprehensive=_checks)
+        reviewed: list[str] = []
+        orch.bot_detector = SimpleNamespace(
+            mark_review_started=lambda _n: None,
+            mark_reviewed=lambda _n, sha: reviewed.append(sha),
+        )
+
+        class _Gatherer:
+            def __init__(self, *_a, **_k):
+                pass
+
+            async def gather(self):
+                return FollowupReviewContext(
+                    pr_number=5,
+                    previous_review=previous,
+                    previous_commit_sha="abc123",
+                    current_commit_sha="def456",
+                    commits_since_review=[{"sha": "def456"}],
+                )
+
+        class _Reviewer:
+            def __init__(self, **_k):
+                pass
+
+            async def review_followup(self, _context):
+                result = _followup([_finding("noise", "Missing docstring on `bar`")])
+                result.reviewed_commit_sha = "def456"
+                return result
+
+        async def _nothing(*_a, **_k):
+            return None
+
+        context_gatherer = importlib.import_module("runners.github.context_gatherer")
+        followup_reviewer = importlib.import_module(
+            "runners.github.services.followup_reviewer"
+        )
+        monkeypatch.setattr(context_gatherer, "FollowupContextGatherer", _Gatherer)
+        monkeypatch.setattr(followup_reviewer, "FollowupReviewer", _Reviewer)
+        monkeypatch.setattr(orchestrator_module, "observe_with_hermes", _nothing)
+        jev_reviews = importlib.import_module("integrations.jev.reviews")
+        monkeypatch.setattr(jev_reviews, "evaluate_context", _nothing)
+        config.use_parallel_orchestrator = False
+
+        result = asyncio.run(orch.followup_review_pr(5))
+
+        assert result.success, result.error
+        assert result.verdict == MergeVerdict.READY_TO_MERGE
+        saved = PRReviewResult.load(orch.github_dir, 5)
+        assert saved is not None and saved.findings == []
+        assert saved.learned_suppressions[0]["id"] == "noise"
+        assert reviewed == ["def456"]
+
+
+class TestFollowupPromptCarriesTheBlock:
+    def test_the_parallel_followup_reads_the_project(self, tmp_path, config):
+        _rejections(tmp_path, 3)
+        reviewer = ParallelFollowupReviewer(
+            project_dir=tmp_path,
+            github_dir=tmp_path / ".workpilot" / "github",
+            config=config,
+        )
+        previous = _followup([])
+        context = FollowupReviewContext(
+            pr_number=5,
+            previous_review=previous,
+            previous_commit_sha="abc12345",
+            current_commit_sha="def45678",
+        )
+
+        prompt = reviewer._build_orchestrator_prompt(context)
+
+        assert rf.PROMPT_HEADING in prompt
+        assert "Missing docstring" in prompt

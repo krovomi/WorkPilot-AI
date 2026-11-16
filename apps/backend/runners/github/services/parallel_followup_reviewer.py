@@ -385,7 +385,12 @@ The SDK will run invoked agents in parallel automatically.
 **CRITICAL: Your verdict MUST account for CI status. Failing CI = BLOCKED verdict.**
 """
 
-        return base_prompt + followup_context
+        # The kinds of remark this project rejected (#361), read in the
+        # project's own checkout, never in the PR's worktree. The orchestrator
+        # applies the same rules to the findings once the review is done.
+        from runners.github.services.learned_suppression import learned_prompt_block
+
+        return base_prompt + followup_context + learned_prompt_block(self.project_dir)
 
     async def review(self, context: FollowupReviewContext) -> PRReviewResult:
         """

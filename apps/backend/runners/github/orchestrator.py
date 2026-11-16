@@ -1027,6 +1027,28 @@ class GitHubOrchestrator:
                 result = await reviewer.review_followup(followup_context)
                 result.jev = jev_observation
 
+            # What this project rejected often enough, as in the initial
+            # review; the verdict is then recomputed with the initial review's
+            # rule on the findings that remain (#361).
+            from runners.github.services.learned_suppression import (
+                apply_to_followup,
+            )
+
+            followup_ci = followup_context.ci_status or {}
+            apply_to_followup(
+                self.project_dir,
+                result,
+                lambda remaining: self._generate_verdict(
+                    remaining,
+                    [],
+                    [],
+                    followup_ci,
+                    has_merge_conflicts=followup_context.has_merge_conflicts,
+                    merge_state_status=followup_context.merge_state_status,
+                ),
+                followup_ci,
+            )
+
             # Fallback: ensure CI failures block merge even if AI didn't factor it in
             # (CI status was already passed to AI via followup_context.ci_status)
             failed_checks = followup_context.ci_status.get("failed_checks", [])
