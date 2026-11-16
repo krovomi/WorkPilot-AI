@@ -206,11 +206,14 @@ export function TerminalGrid({
 	}, [jumpToTerminalId, clearTerminalJump]);
 
 	// Reset expanded terminal and clear pending cleanup when project changes
+	const shownProjectRef = useRef(projectPath);
 	useEffect(() => {
+		if (shownProjectRef.current === projectPath) return;
+		shownProjectRef.current = projectPath;
 		setExpandedTerminalId(null);
 		setPendingCleanup(new Map());
 		clearAllCleanupTimers();
-	}, [clearAllCleanupTimers]);
+	}, [projectPath, clearAllCleanupTimers]);
 
 	// Fetch available session dates when project changes
 	useEffect(() => {

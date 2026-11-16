@@ -16,7 +16,6 @@ from pathlib import Path
 from core.worktree import WorktreeManager
 from foundation.debug import debug, debug_warning
 from foundation.platform import is_windows
-from merge import FileTimelineTracker
 from security.constants import ALLOWLIST_FILENAME, PROFILE_FILENAME
 from ui import (
     Icons,
