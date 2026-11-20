@@ -902,3 +902,15 @@ describe("Terminal File Drop - Component Integration", () => {
 		);
 	});
 });
+
+describe("useTerminalFileDrop without a sender", () => {
+	it("writes the dropped path to the terminal through the app API", () => {
+		const sendTerminalInput = vi.fn();
+		Object.assign(window.electronAPI, { sendTerminalInput });
+		const { result } = renderHook(() => useTerminalFileDrop({ terminalId: "term-9" }));
+		act(() => {
+			result.current.handleNativeDrop(createMockDragEvent(createFileReferenceDragData("/src/app.ts", "app.ts")));
+		});
+		expect(sendTerminalInput).toHaveBeenCalledWith("term-9", "'/src/app.ts' ");
+	});
+});

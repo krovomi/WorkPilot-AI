@@ -55,7 +55,6 @@ const IDE_NAMES: Partial<Record<SupportedIDE, string>> = {
 	windsurf: "Windsurf",
 	xcode: "Xcode",
 	zed: "Zed",
-	custom: "Custom...", // Always last
 };
 
 // Terminal display names - alphabetically sorted
@@ -68,7 +67,6 @@ const TERMINAL_NAMES: Partial<Record<SupportedTerminal, string>> = {
 	kitty: "Kitty",
 	konsole: "Konsole",
 	powershell: "PowerShell",
-	system: "System Terminal",
 	tabby: "Tabby",
 	terminal: "Terminal.app",
 	terminator: "Terminator",
@@ -78,7 +76,6 @@ const TERMINAL_NAMES: Partial<Record<SupportedTerminal, string>> = {
 	wezterm: "WezTerm",
 	windowsterminal: "Windows Terminal",
 	zellij: "Zellij",
-	custom: "Custom...", // Always last
 };
 
 /**
@@ -119,15 +116,6 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 	const detectTools = useCallback(async () => {
 		setIsDetecting(true);
 		try {
-			// Check if the API is available (may not be in dev mode or if preload failed)
-			if (!window.electronAPI?.worktreeDetectTools) {
-				console.warn(
-					"[DevToolsStep] Detection API not available, using fallback",
-				);
-				setIsDetecting(false);
-				return;
-			}
-
 			const result = await window.electronAPI.worktreeDetectTools();
 			if (result.success && result.data) {
 				setDetectedTools(result.data as DetectedTools);
@@ -167,10 +155,10 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 				updateSettings(settingsToSave);
 				onNext();
 			} else {
-				setError(result?.error || "Failed to save settings");
+				setError(result?.error || t("onboarding:devtools.saveFailed"));
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Unknown error occurred");
+			setError(err instanceof Error ? err.message : t("onboarding:devtools.saveFailed"));
 		} finally {
 			setIsSaving(false);
 		}
@@ -197,7 +185,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 	// Add remaining IDEs that weren't detected
 	const detectedIDEIds = new Set(detectedTools?.ides.map((t) => t.id) || []);
 	for (const [id, name] of Object.entries(IDE_NAMES)) {
-		if (id !== "custom" && !detectedIDEIds.has(id)) {
+		if (!detectedIDEIds.has(id)) {
 			ideOptions.push({
 				value: id as SupportedIDE,
 				label: name,
@@ -207,7 +195,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 	}
 
 	// Add custom option last
-	ideOptions.push({ value: "custom", label: "Custom...", detected: false });
+	ideOptions.push({ value: "custom", label: t("onboarding:devtools.custom"), detected: false });
 
 	// Build Terminal options with detection status
 	const terminalOptions: Array<{
@@ -219,30 +207,27 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 	// Always add system terminal first
 	terminalOptions.push({
 		value: "system",
-		label: TERMINAL_NAMES.system || "System Terminal",
+		label: t("onboarding:devtools.systemTerminal"),
 		detected: true,
 	});
 
-	// Add detected terminals
-	if (detectedTools) {
-		for (const tool of detectedTools.terminals) {
-			if (tool.id !== "system") {
-				terminalOptions.push({
-					value: tool.id as SupportedTerminal,
-					label: tool.name,
-					detected: true,
-				});
-			}
-		}
+	// Add detected terminals (the system one is already first)
+	const detectedTerminals =
+		detectedTools?.terminals.filter((tool) => tool.id !== "system") ?? [];
+	for (const tool of detectedTerminals) {
+		terminalOptions.push({
+			value: tool.id as SupportedTerminal,
+			label: tool.name,
+			detected: true,
+		});
 	}
 
 	// Add remaining terminals that weren't detected
 	const detectedTerminalIds = new Set(
 		detectedTools?.terminals.map((t) => t.id) || [],
 	);
-	detectedTerminalIds.add("system");
 	for (const [id, name] of Object.entries(TERMINAL_NAMES)) {
-		if (id !== "custom" && !detectedTerminalIds.has(id)) {
+		if (!detectedTerminalIds.has(id)) {
 			terminalOptions.push({
 				value: id as SupportedTerminal,
 				label: name,
@@ -254,7 +239,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 	// Add custom option last
 	terminalOptions.push({
 		value: "custom",
-		label: "Custom...",
+		label: t("onboarding:devtools.custom"),
 		detected: false,
 	});
 
@@ -442,14 +427,11 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 									{detectedTools.ides.map((ide) => (
 										<li key={ide.id}>{ide.name}</li>
 									))}
-									{detectedTools.terminals
-										.filter((t) => t.id !== "system")
-										.map((term) => (
-											<li key={term.id}>{term.name}</li>
-										))}
+									{detectedTerminals.map((term) => (
+										<li key={term.id}>{term.name}</li>
+									))}
 									{detectedTools.ides.length === 0 &&
-										detectedTools.terminals.filter((t) => t.id !== "system")
-											.length === 0 && (
+										detectedTerminals.length === 0 && (
 											<li>
 												{t("onboarding:devtools.noToolsDetected")}
 											</li>

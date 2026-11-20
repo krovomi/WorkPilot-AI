@@ -65,8 +65,8 @@ export function ArchitectureTabs({
 		setDraftName(architecture.name);
 	};
 
-	const commitEditing = () => {
-		if (editingId) onRename(editingId, draftName);
+	const commitEditing = (id: string) => {
+		onRename(id, draftName);
 		setEditingId(null);
 	};
 
@@ -103,9 +103,9 @@ export function ArchitectureTabs({
 									ref={inputRef}
 									value={draftName}
 									onChange={(event) => setDraftName(event.target.value)}
-									onBlur={commitEditing}
+									onBlur={() => commitEditing(architecture.id)}
 									onKeyDown={(event) => {
-										if (event.key === "Enter") commitEditing();
+										if (event.key === "Enter") commitEditing(architecture.id);
 										if (event.key === "Escape") setEditingId(null);
 									}}
 									aria-label={t("renameArchitecture", "Renommer l'architecture")}
@@ -157,31 +157,35 @@ export function ArchitectureTabs({
 				open={pendingDelete !== null}
 				onOpenChange={(open) => !open && setPendingDelete(null)}
 			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>
-							{t("deleteArchitectureTitle", "Supprimer cette architecture ?")}
-						</AlertDialogTitle>
-						<AlertDialogDescription>
-							{t("deleteArchitectureDesc", {
-								defaultValue:
-									"« {{name}} » et tout son historique de construction seront supprimés. Cette action est irréversible.",
-								name: pendingDelete?.name ?? "",
-							})}
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>{t("cancel", "Annuler")}</AlertDialogCancel>
-						<AlertDialogAction
-							onClick={() => {
-								if (pendingDelete) onDelete(pendingDelete.id);
-								setPendingDelete(null);
-							}}
-						>
-							{t("delete", "Supprimer")}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
+				{/* Rendered only with a document to delete, so the action always
+				    names one. */}
+				{pendingDelete ? (
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>
+								{t("deleteArchitectureTitle", "Supprimer cette architecture ?")}
+							</AlertDialogTitle>
+							<AlertDialogDescription>
+								{t("deleteArchitectureDesc", {
+									defaultValue:
+										"« {{name}} » et tout son historique de construction seront supprimés. Cette action est irréversible.",
+									name: pendingDelete.name,
+								})}
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>{t("cancel", "Annuler")}</AlertDialogCancel>
+							<AlertDialogAction
+								onClick={() => {
+									onDelete(pendingDelete.id);
+									setPendingDelete(null);
+								}}
+							>
+								{t("delete", "Supprimer")}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				) : null}
 			</AlertDialog>
 		</>
 	);
