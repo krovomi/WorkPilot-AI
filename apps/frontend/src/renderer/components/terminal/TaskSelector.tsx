@@ -12,7 +12,6 @@ import { PHASE_CONFIG } from "./types";
 import { useTranslation } from "react-i18next";
 
 interface TaskSelectorProps {
-	terminalId: string;
 	backlogTasks: Task[];
 	associatedTask?: Task;
 	onTaskSelect: (taskId: string) => void;
@@ -21,7 +20,6 @@ interface TaskSelectorProps {
 }
 
 export function TaskSelector({
-	terminalId: _terminalId,
 	backlogTasks,
 	associatedTask,
 	onTaskSelect,
@@ -29,7 +27,12 @@ export function TaskSelector({
 	onNewTaskClick,
 }: TaskSelectorProps) {
 	const { t } = useTranslation();
-	const executionPhase = associatedTask?.executionProgress?.phase || "idle";
+	// A phase this build does not know (a newer backend) reads as idle rather
+	// than taking the header down with it.
+	const reported = associatedTask?.executionProgress?.phase ?? "idle";
+	const executionPhase = Object.hasOwn(PHASE_CONFIG, reported)
+		? reported
+		: "idle";
 	const phaseConfig = PHASE_CONFIG[executionPhase];
 	const PhaseIcon = phaseConfig.icon;
 
@@ -54,7 +57,7 @@ export function TaskSelector({
 						) : (
 							<PhaseIcon className="h-3 w-3" />
 						)}
-						<span>{phaseConfig.label}</span>
+						<span>{t(`terminal:taskSelector.phases.${executionPhase}`)}</span>
 						<ChevronDown className="h-2.5 w-2.5 opacity-60" />
 					</button>
 				</DropdownMenuTrigger>
