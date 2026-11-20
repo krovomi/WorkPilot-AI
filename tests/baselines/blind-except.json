@@ -266,7 +266,7 @@
   "apps/backend/runners/github/rate_limiter.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/github/runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/github/services/autofix_processor.py": {"blind": 2, "silent": 0},
-  "apps/backend/runners/github/services/batch_processor.py": {"blind": 3, "silent": 0},
+  "apps/backend/runners/github/services/batch_processor.py": {"blind": 2, "silent": 0},
   "apps/backend/runners/github/services/deep_context_provider.py": {"blind": 5, "silent": 0},
   "apps/backend/runners/github/services/followup_reviewer.py": {"blind": 3, "silent": 0},
   "apps/backend/runners/github/services/parallel_followup_reviewer.py": {"blind": 5, "silent": 0},
