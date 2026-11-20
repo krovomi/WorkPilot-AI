@@ -68,21 +68,34 @@ export function RepositorySection({
 	const isMissing = missingPaths.has(project.id);
 	const git = useGitFacts(project.path, isMissing);
 
+	// A folder change or a terminal that did not happen says so here, rather
+	// than only in the developer console.
+	const [actionError, setActionError] = useState<string | null>(null);
+
 	const handleRepath = async () => {
+		setActionError(null);
 		try {
-			const newPath = await globalThis.electronAPI?.selectDirectory?.();
+			const newPath = await globalThis.electronAPI.selectDirectory();
 			if (!newPath) return;
-			await repathProject(project.id, newPath);
-		} catch (err) {
-			console.error("[RepositorySection] repath failed:", err);
+			if (!(await repathProject(project.id, newPath))) {
+				setActionError(t("projectSections.repository.repathFailed"));
+			}
+		} catch {
+			setActionError(t("projectSections.repository.repathFailed"));
 		}
 	};
 
 	const handleOpenTerminal = async () => {
+		setActionError(null);
 		try {
-			await globalThis.electronAPI?.openTerminal?.(project.path);
-		} catch (err) {
-			console.error("[RepositorySection] open terminal failed:", err);
+			const result = await globalThis.electronAPI.openTerminal(project.path);
+			if (!result.success) {
+				setActionError(
+					result.error || t("projectSections.repository.openTerminalFailed"),
+				);
+			}
+		} catch {
+			setActionError(t("projectSections.repository.openTerminalFailed"));
 		}
 	};
 
@@ -104,6 +117,7 @@ export function RepositorySection({
 							<CopyButton
 								value={project.path}
 								label={t("projectSections.repository.copyPath")}
+								ariaLabel={t("projectSections.repository.copyPathAria")}
 							/>
 							<Tooltip delayDuration={200}>
 								<TooltipTrigger asChild>
@@ -138,6 +152,7 @@ export function RepositorySection({
 								{t("common:projectTab.missingPathDescription")}
 							</p>
 						)}
+						<FieldError message={actionError} />
 					</div>
 				</Row>
 
@@ -148,6 +163,7 @@ export function RepositorySection({
 							<CopyButton
 								value={project.autoBuildPath}
 								label={t("projectSections.repository.copyPath")}
+								ariaLabel={t("projectSections.repository.copyWorkpilotAria")}
 							/>
 						</div>
 					) : (
@@ -332,7 +348,7 @@ function CurrentBranchField({
 		setBusy(true);
 		setError(null);
 		try {
-			const result = await globalThis.electronAPI?.checkoutGitBranch?.(
+			const result = await globalThis.electronAPI.checkoutGitBranch(
 				projectPath,
 				target,
 			);
@@ -434,7 +450,7 @@ function RemoteField({
 		setError(null);
 		setSaved(false);
 		try {
-			const result = await globalThis.electronAPI?.setGitRemote?.(
+			const result = await globalThis.electronAPI.setGitRemote(
 				projectPath,
 				name.trim() || "origin",
 				url.trim(),
@@ -503,6 +519,7 @@ function RemoteField({
 					<CopyButton
 						value={remoteUrl}
 						label={t("projectSections.repository.copyPath")}
+						ariaLabel={t("projectSections.repository.copyRemoteAria")}
 					/>
 				)}
 				{isWebUrl(remoteUrl) && (
@@ -511,7 +528,7 @@ function RemoteField({
 						size="sm"
 						className="h-7 gap-1.5 px-2 text-xs"
 						onClick={() => {
-							void globalThis.electronAPI?.openExternal?.(remoteUrl as string);
+							void globalThis.electronAPI.openExternal(remoteUrl as string);
 						}}
 					>
 						<ExternalLink className="h-3.5 w-3.5" />
@@ -561,6 +578,7 @@ function MainBranchField({
 	const { t } = useTranslation("settings");
 	const listId = useId();
 	const [detecting, setDetecting] = useState(false);
+	const [detectFailed, setDetectFailed] = useState(false);
 
 	// No setter means this pane is rendered read-only by its host; report the
 	// value rather than offering an input that goes nowhere.
@@ -578,14 +596,17 @@ function MainBranchField({
 
 	const detect = async () => {
 		setDetecting(true);
+		setDetectFailed(false);
 		try {
-			const result =
-				await globalThis.electronAPI?.detectMainBranch?.(projectPath);
-			if (result?.success && result.data) {
-				setSettings((prev) => ({ ...prev, mainBranch: result.data as string }));
+			const result = await globalThis.electronAPI.detectMainBranch(projectPath);
+			const branch = result.success ? result.data : null;
+			if (branch) {
+				setSettings((prev) => ({ ...prev, mainBranch: branch }));
+			} else {
+				setDetectFailed(true);
 			}
-		} catch (err) {
-			console.error("[RepositorySection] main branch detection failed:", err);
+		} catch {
+			setDetectFailed(true);
 		} finally {
 			setDetecting(false);
 		}
@@ -640,6 +661,11 @@ function MainBranchField({
 					? t("projectSections.repository.mainBranchHint")
 					: t("projectSections.repository.mainBranchAuto")}
 			</p>
+			<FieldError
+				message={
+					detectFailed ? t("projectSections.repository.mainBranchDetectFailed") : null
+				}
+			/>
 		</div>
 	);
 }
@@ -685,9 +711,12 @@ function PathValue({
 function CopyButton({
 	value,
 	label,
+	ariaLabel,
 }: {
 	readonly value: string;
 	readonly label: string;
+	/** What is copied, for a screen reader: two buttons here read "Copy". */
+	readonly ariaLabel: string;
 }) {
 	const { t } = useTranslation("settings");
 	const [copied, setCopied] = useState(false);
@@ -699,10 +728,9 @@ function CopyButton({
 			await copyPath(value);
 			setCopied(true);
 			setTimeout(() => setCopied(false), 1500);
-		} catch (err) {
+		} catch {
 			// Clipboard access can be denied; leave the button silent rather than
 			// claiming a copy that did not happen.
-			console.error("[RepositorySection] copy failed:", err);
 		}
 	};
 
@@ -712,7 +740,7 @@ function CopyButton({
 			size="sm"
 			className="h-7 gap-1.5 px-2 text-xs"
 			onClick={handleCopy}
-			aria-label={label}
+			aria-label={ariaLabel}
 		>
 			{copied ? (
 				<>
@@ -782,9 +810,9 @@ function useGitFacts(projectPath: string, skip: boolean): GitFacts {
 		setLoading(true);
 		try {
 			const [branch, provider, branchList] = await Promise.all([
-				globalThis.electronAPI?.getCurrentGitBranch?.(projectPath),
-				globalThis.electronAPI?.detectRepoProvider?.(projectPath),
-				globalThis.electronAPI?.getGitBranchesWithInfo?.(projectPath),
+				globalThis.electronAPI.getCurrentGitBranch(projectPath),
+				globalThis.electronAPI.detectRepoProvider(projectPath),
+				globalThis.electronAPI.getGitBranchesWithInfo(projectPath),
 			]);
 			if (!isCurrent()) return;
 			setCurrentBranch(branch?.success ? (branch.data ?? null) : null);
@@ -799,10 +827,9 @@ function useGitFacts(projectPath: string, skip: boolean): GitFacts {
 					? branchList.data.map((b) => b.name)
 					: [],
 			);
-		} catch (err) {
+		} catch {
 			// A folder that is not a repository is an ordinary answer here, not
 			// an error to surface: the rows fall back to their empty state.
-			console.error("[RepositorySection] git lookup failed:", err);
 			if (isCurrent()) clear();
 		} finally {
 			if (isCurrent()) setLoading(false);

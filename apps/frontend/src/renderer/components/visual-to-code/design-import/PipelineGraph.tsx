@@ -41,6 +41,8 @@ function NoteText({ index }: { index: number }) {
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState("");
 	const inputRef = useRef<HTMLTextAreaElement>(null);
+	// Escape leaves through the same blur as Enter, without saving.
+	const cancelled = useRef(false);
 	const text = custom ?? t(DEFAULT_NOTE_KEYS[index]);
 
 	useEffect(() => {
@@ -56,7 +58,8 @@ function NoteText({ index }: { index: number }) {
 				aria-label={t("pipeline.editNote")}
 				onChange={(event) => setDraft(event.target.value)}
 				onBlur={() => {
-					setNote(index, draft === t(DEFAULT_NOTE_KEYS[index]) ? null : draft);
+					if (!cancelled.current) setNote(index, draft === t(DEFAULT_NOTE_KEYS[index]) ? null : draft);
+					cancelled.current = false;
 					setEditing(false);
 				}}
 				onKeyDown={(event) => {
@@ -64,7 +67,10 @@ function NoteText({ index }: { index: number }) {
 						event.preventDefault();
 						(event.target as HTMLTextAreaElement).blur();
 					}
-					if (event.key === "Escape") setEditing(false);
+					if (event.key === "Escape") {
+						cancelled.current = true;
+						(event.target as HTMLTextAreaElement).blur();
+					}
 				}}
 			/>
 		);
@@ -91,8 +97,8 @@ function NoteText({ index }: { index: number }) {
  */
 export function PipelineGraph() {
 	const { t } = useTranslation("designToCode");
-	const graphRef = useRef<HTMLDivElement>(null);
-	const nodeRefs = useRef<Partial<Record<DesignStep, HTMLDivElement | null>>>({});
+	// A callback ref, so the effects that measure the graph run again once it is mounted.
+	const [graph, setGraph] = useState<HTMLDivElement | null>(null);
 	const [height, setHeight] = useState(0);
 	const [wires, setWires] = useState<Wire[]>([]);
 
@@ -126,14 +132,15 @@ export function PipelineGraph() {
 	const meta = (step: DesignStep, state: DesignStepState): string => {
 		if (state === "off") return t("pipeline.off");
 		if (state === "unsupported") return t("pipeline.testsUnsupported");
-		const specCount = result?.design_spec?.components.length ?? live.spec?.components.length;
+		const spec = result?.design_spec
+			? { count: result.design_spec.components.length, colors: Object.keys(result.design_spec.color_palette).length }
+			: live.spec
+				? { count: live.spec.components.length, colors: Object.keys(live.spec.palette).length }
+				: null;
 		switch (step) {
 			case "vision":
-				return specCount !== undefined && state !== "pending"
-					? t("pipeline.meta.visionDone", {
-							count: specCount,
-							colors: Object.keys(result?.design_spec?.color_palette ?? live.spec?.palette ?? {}).length,
-						})
+				return spec && state !== "pending"
+					? t("pipeline.meta.visionDone", spec)
 					: t("pipeline.meta.vision");
 			case "tokens": {
 				const n = result?.design_tokens_used.length ?? live.tokens;
@@ -142,8 +149,8 @@ export function PipelineGraph() {
 					: designSystemPath || t("pipeline.meta.tokens");
 			}
 			case "spec":
-				return specCount !== undefined && state === "done"
-					? t("pipeline.meta.specDone", { count: specCount })
+				return spec && state === "done"
+					? t("pipeline.meta.specDone", { count: spec.count })
 					: t("pipeline.meta.spec");
 			case "code": {
 				const loop = result?.render_loop;
@@ -170,9 +177,10 @@ export function PipelineGraph() {
 					: t("pipeline.meta.tests");
 			case "project":
 				if (writeOutcome) return t("pipeline.meta.projectWritten", { count: writeOutcome.written.length });
-				return state === "ready"
+				// "ready" only follows a finished run, which always carries its result.
+				return state === "ready" && result
 					? t("pipeline.meta.projectReady", {
-							count: (result?.generated_files.length ?? 0) + (result?.visual_tests.length ?? 0),
+							count: result.generated_files.length + result.visual_tests.length,
 						})
 					: t("pipeline.meta.project");
 		}
@@ -180,14 +188,13 @@ export function PipelineGraph() {
 
 	// The graph is laid out from its height; the wires from the cards' boxes.
 	useLayoutEffect(() => {
-		const graph = graphRef.current;
 		if (!graph) return;
 		const measure = () => setHeight(graph.clientHeight);
 		measure();
 		const observer = new ResizeObserver(measure);
 		observer.observe(graph);
 		return () => observer.disconnect();
-	}, []);
+	}, [graph]);
 
 	const step = Math.max(92, (height - NODE_HEIGHT) / (DESIGN_STEPS.length - 1));
 
@@ -199,14 +206,13 @@ export function PipelineGraph() {
 	// Runs after every render and only stores wires that changed: the cards
 	// move with the height, a toggle or a state, and each of those renders.
 	useLayoutEffect(() => {
-		const graph = graphRef.current;
 		if (!graph) return;
 		const box = graph.getBoundingClientRect();
+		// One card per step, in the order of the steps.
+		const cards = Array.from(graph.querySelectorAll(":scope > .di-node"), (card) => card.getBoundingClientRect());
 		const next: Wire[] = [];
-		DESIGN_STEPS.slice(0, -1).forEach((s, i) => {
-			const a = nodeRefs.current[s]?.getBoundingClientRect();
-			const b = nodeRefs.current[DESIGN_STEPS[i + 1]]?.getBoundingClientRect();
-			if (!a || !b) return;
+		cards.slice(0, -1).forEach((a, i) => {
+			const b = cards[i + 1];
 			const x1 = a.left - box.left + a.width / 2;
 			const y1 = a.bottom - box.top;
 			const x2 = b.left - box.left + b.width / 2;
@@ -240,7 +246,7 @@ export function PipelineGraph() {
 				<span className="di-sub">{subtitle}</span>
 			</div>
 
-			<div className="di-graph" ref={graphRef}>
+			<div className="di-graph" ref={setGraph}>
 				<svg className="di-wires" aria-hidden="true">
 					{wires.map((w, i) => (
 						<g key={DESIGN_STEPS[i]}>
@@ -267,9 +273,6 @@ export function PipelineGraph() {
 					return (
 						<div
 							key={s}
-							ref={(el) => {
-								nodeRefs.current[s] = el;
-							}}
 							className="di-node"
 							data-state={state}
 							data-selected={selectedStep === s}

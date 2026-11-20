@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import os
 import sys
@@ -49,36 +50,38 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    if args.command == "review-pr":
-        # Get credentials from environment
-        pat = os.environ.get("AZURE_DEVOPS_PAT")
-        org_url = os.environ.get("AZURE_DEVOPS_ORG_URL")
+    # review-pr, the only command: the credentials come from the environment
+    pat = os.environ.get("AZURE_DEVOPS_PAT")
+    org_url = os.environ.get("AZURE_DEVOPS_ORG_URL")
 
-        if not pat or not org_url:
-            print(
-                "Error: AZURE_DEVOPS_PAT and AZURE_DEVOPS_ORG_URL must be set",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-        project_dir = Path(args.project_dir) if args.project_dir else Path.cwd()
-
-        config = AzureDevOpsRunnerConfig(
-            pat=pat,
-            organization_url=org_url,
-            project=args.project,
-            repository_id=args.repo,
-            model=args.model,
-            thinking_level=args.thinking,
+    if not pat or not org_url:
+        print(
+            "Error: AZURE_DEVOPS_PAT and AZURE_DEVOPS_ORG_URL must be set",
+            file=sys.stderr,
         )
+        sys.exit(1)
 
-        orchestrator = AzureDevOpsOrchestrator(
-            project_dir=project_dir,
-            config=config,
-        )
+    project_dir = Path(args.project_dir) if args.project_dir else Path.cwd()
 
+    config = AzureDevOpsRunnerConfig(
+        pat=pat,
+        organization_url=org_url,
+        project=args.project,
+        repository_id=args.repo,
+        model=args.model,
+        thinking_level=args.thinking,
+    )
+
+    orchestrator = AzureDevOpsOrchestrator(
+        project_dir=project_dir,
+        config=config,
+    )
+
+    # The app parses stdout as one JSON document: the review's progress
+    # lines go to stderr.
+    with contextlib.redirect_stdout(sys.stderr):
         result = asyncio.run(orchestrator.review_pr(args.pr_id))
-        print(json.dumps(result.to_dict(), indent=2))
+    print(json.dumps(result.to_dict(), indent=2))
 
 
 if __name__ == "__main__":
