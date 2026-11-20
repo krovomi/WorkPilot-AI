@@ -246,9 +246,11 @@ class TestBuiltCommands:
         profile = launch.seatbelt_profile(policy)
 
         assert profile.startswith("(version 1)\n(allow default)\n(deny file-write*)")
-        assert f'(subpath "{tmp_path / "work"}")' in profile
+        # Quoted as the profile writes a path: a Windows runner's backslashes
+        # are doubled there, and only there.
+        assert f"(subpath {launch._sb_quote(tmp_path / 'work')})" in profile
         assert "(deny network-outbound)" in profile
-        assert f'(literal "{tmp_path / ".env"}")' in profile
+        assert f"(literal {launch._sb_quote(tmp_path / '.env')})" in profile
 
     def test_a_profile_without_read_only_or_hidden_paths_has_no_such_rules(
         self, tmp_path, monkeypatch

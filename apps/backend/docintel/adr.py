@@ -157,11 +157,9 @@ def _sections(body: str) -> tuple[str, dict[str, str]]:
 
 
 def _first_paragraph(text: str, limit: int = 400) -> str:
-    for block in re.split(r"\n\s*\n", text.strip()):
-        block = " ".join(line.strip() for line in block.splitlines()).strip()
-        if block:
-            return block if len(block) <= limit else block[: limit - 1].rstrip() + "…"
-    return ""
+    first = re.split(r"\n\s*\n", text.strip(), maxsplit=1)[0]
+    block = " ".join(line.strip() for line in first.splitlines()).strip()
+    return block if len(block) <= limit else block[: limit - 1].rstrip() + "…"
 
 
 def _normalise_status(raw: str) -> tuple[str, str]:
