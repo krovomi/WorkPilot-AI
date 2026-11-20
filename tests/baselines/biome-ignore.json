@@ -127,8 +127,6 @@
   "apps/frontend/src/renderer/components/context-aware-snippets/ContextAwareSnippetsDialog.tsx": 1,
   "apps/frontend/src/renderer/components/context/MemoriesTab.tsx": 1,
   "apps/frontend/src/renderer/components/formula-lab/EfficiencyFrontier.tsx": 1,
-  "apps/frontend/src/renderer/components/formula-lab/FormulaCard.tsx": 1,
-  "apps/frontend/src/renderer/components/formula-lab/FormulaLab.tsx": 1,
   "apps/frontend/src/renderer/components/github-issues/components/BatchReviewWizard.tsx": 3,
   "apps/frontend/src/renderer/components/github-issues/components/IssueListItem.tsx": 3,
   "apps/frontend/src/renderer/components/github-prs/components/PRFilterBar.tsx": 1,
