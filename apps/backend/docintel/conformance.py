@@ -598,8 +598,14 @@ def conformance_section(project_dir: Path) -> str:
     withheld: set[str] = set()
     for check in checked:
         lines.append("")
+        # Every label the section renders, the arrows' ends included: a node no
+        # project matches is not a layer but still shows up under "Allowed".
         said = "\n".join(
-            [*check.layers, *(m for ms in check.layers.values() for m in ms)]
+            [
+                *check.layers,
+                *(m for ms in check.layers.values() for m in ms),
+                *(end for edge in check.allowed[:20] for end in edge),
+            ]
         )
         if threat(said, source=f"repository:{check.diagram}") != "safe":
             # The labels are the target repository's text: a diagram the scan
