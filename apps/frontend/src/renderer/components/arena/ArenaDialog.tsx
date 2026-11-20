@@ -482,9 +482,6 @@ function BattleTab() {
 		setActiveBattle,
 		setError,
 		submitVote,
-		handleBattleProgress,
-		handleBattleResult,
-		handleBattleComplete,
 	} = useArenaStore();
 	const selectedProject = useProjectStore((s) =>
 		s.projects.find((p) => p.id === s.selectedProjectId),
@@ -516,32 +513,6 @@ function BattleTab() {
 			return kept.length === prev.length ? prev : kept;
 		});
 	}, [roster.loaded, roster.contenders]);
-
-	// Subscribe to battle events (only when API is available)
-	useEffect(() => {
-		const api = globalThis.electronAPI;
-		if (
-			typeof api?.onArenaBattleProgress !== "function" ||
-			typeof api?.onArenaBattleResult !== "function" ||
-			typeof api?.onArenaBattleComplete !== "function" ||
-			typeof api?.onArenaBattleError !== "function"
-		) {
-			return;
-		}
-		const c1 = api.onArenaBattleProgress(handleBattleProgress);
-		const c2 = api.onArenaBattleResult(handleBattleResult);
-		const c3 = api.onArenaBattleComplete(handleBattleComplete);
-		const c4 = api.onArenaBattleError(
-			({ error: err }: { battleId: string; error: string }) => setError(err),
-		);
-
-		return () => [c1, c2, c3, c4].forEach((c) => c());
-	}, [
-		handleBattleProgress,
-		handleBattleResult,
-		handleBattleComplete,
-		setError,
-	]);
 
 	const selectedContenders = useMemo(
 		() =>

@@ -127,6 +127,8 @@ def _connect_json(
 ) -> ConnectResult:
     try:
         data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except OSError:
+        return _unwritable(spec, path, text, "read")
     except ValueError as exc:
         return ConnectResult(
             spec.name,
@@ -157,13 +159,31 @@ def _connect_json(
         return ConnectResult(spec.name, str(path), "unchanged", text)
     if not apply:
         return ConnectResult(spec.name, str(path), "preview", text)
-    backup = _backup(path)
     servers[SERVER_NAME] = entry
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    try:
+        backup = _backup(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+    except OSError:
+        return _unwritable(spec, path, text, "written")
     return ConnectResult(spec.name, str(path), "written", text, backup=backup)
+
+
+def _unwritable(spec: AgentSpec, path: Path, text: str, what: str) -> ConnectResult:
+    """One agent's file out of reach: that agent says so, the others go on.
+
+    It used to raise, and ``connect_all`` stopped at the first agent whose
+    configuration is a folder, read-only, or locked by the running agent.
+    """
+    return ConnectResult(
+        spec.name,
+        str(path),
+        "error",
+        text,
+        reason=f"{path.name} could not be {what}",
+    )
 
 
 def _connect_claude_cli(spec: AgentSpec, root: Path, text: str) -> ConnectResult | None:
@@ -173,17 +193,22 @@ def _connect_claude_cli(spec: AgentSpec, root: Path, text: str) -> ConnectResult
     if not exe:
         return None
     entry = {"type": "stdio", **server_entry(root)}
-    subprocess.run(
-        [exe, "mcp", "remove", "--scope", "user", SERVER_NAME],
-        capture_output=True,
-        timeout=30,
-    )
-    done = subprocess.run(
-        [exe, "mcp", "add-json", "--scope", "user", SERVER_NAME, json.dumps(entry)],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    try:
+        subprocess.run(
+            [exe, "mcp", "remove", "--scope", "user", SERVER_NAME],
+            capture_output=True,
+            timeout=30,
+        )
+        done = subprocess.run(
+            [exe, "mcp", "add-json", "--scope", "user", SERVER_NAME, json.dumps(entry)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        # A CLI that hangs (waiting for a sign-in) or cannot start: the file
+        # is written directly instead, as when the CLI is not installed.
+        return None
     if done.returncode != 0:
         return None
     return ConnectResult(spec.name, "claude mcp add-json --scope user", "written", text)
@@ -208,9 +233,12 @@ def connect(root: Path, name: str, *, apply: bool = False) -> ConnectResult:
                 return via_cli
         return _connect_json(spec, path, root, apply, text)
 
-    current = (
-        path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
-    )
+    try:
+        current = (
+            path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+        )
+    except OSError:
+        return _unwritable(spec, path, text, "read")
     if (
         spec.mcp_format == "yaml"
         and _START not in current
@@ -241,9 +269,12 @@ def connect(root: Path, name: str, *, apply: bool = False) -> ConnectResult:
         return ConnectResult(spec.name, str(path), "unchanged", text)
     if not apply:
         return ConnectResult(spec.name, str(path), "preview", text)
-    backup = _backup(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(updated, encoding="utf-8")
+    try:
+        backup = _backup(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(updated, encoding="utf-8")
+    except OSError:
+        return _unwritable(spec, path, text, "written")
     return ConnectResult(spec.name, str(path), "written", text, backup=backup)
 
 
