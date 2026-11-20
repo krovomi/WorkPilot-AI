@@ -48,7 +48,12 @@ def _settled(proxy: FilteringProxy) -> None:
     """Wait until the proxy has finished every connection it was handling."""
 
     async def others() -> int:
-        return len(asyncio.all_tasks()) - 1
+        # Count the connections only: on Windows the proactor's own accept
+        # loop is a task too, alive as long as the proxy listens.
+        return sum(
+            task.get_coro().__qualname__ == "FilteringProxy._handle"
+            for task in asyncio.all_tasks()
+        )
 
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
@@ -362,12 +367,14 @@ class TestStarting:
 
 @pytest.mark.skipif(is_windows(), reason="the Unix socket is the Linux sandbox's door")
 class TestUnixSocket:
-    def test_the_socket_is_private_and_answers_then_is_removed(self, tmp_path, origin):
+    def test_the_socket_is_private_and_answers_then_is_removed(
+        self, socket_dir, origin
+    ):
         proxy = FilteringProxy(
-            HostAllowlist.build([f"127.0.0.1:{origin}"]), unix_dir=tmp_path / "s"
+            HostAllowlist.build([f"127.0.0.1:{origin}"]), unix_dir=socket_dir / "s"
         )
         path = proxy.socket_path
-        assert path is not None and path.parent == tmp_path / "s"
+        assert path is not None and path.parent == socket_dir / "s"
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
@@ -382,8 +389,8 @@ class TestUnixSocket:
         assert data.endswith(b"hello /u")
         assert not path.exists()
 
-    def test_a_socket_already_removed_is_no_error_on_close(self, tmp_path):
-        proxy = FilteringProxy(HostAllowlist.build([]), unix_dir=tmp_path)
+    def test_a_socket_already_removed_is_no_error_on_close(self, socket_dir):
+        proxy = FilteringProxy(HostAllowlist.build([]), unix_dir=socket_dir)
         assert proxy.socket_path is not None
         proxy.socket_path.unlink()
 

@@ -87,6 +87,10 @@ def start(runner, project, monkeypatch, capsys):
         raise SystemExit(0)
 
     monkeypatch.setattr(runner.os, "execv", execv)
+    # The hand-over by exec, whatever runs the tests: on Windows main() starts
+    # run.py with subprocess.run instead, which would run a real build. The
+    # Windows hand-over has its own tests, which set is_windows themselves.
+    monkeypatch.setattr(runner, "is_windows", lambda: False)
     # main() writes the provider into os.environ: setting it first makes
     # monkeypatch restore the variable (or its absence) after the test.
     monkeypatch.setenv("SELECTED_LLM_PROVIDER", "")

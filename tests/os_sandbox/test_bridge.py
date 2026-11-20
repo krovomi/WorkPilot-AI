@@ -33,9 +33,9 @@ def _free_port() -> int:
 
 
 @pytest.fixture
-def proxy(tmp_path):
+def proxy(socket_dir):
     """A Unix socket that answers each connection with what it read, upper-cased."""
-    path = str(tmp_path / "proxy.sock")
+    path = str(socket_dir / "proxy.sock")
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(path)
     server.listen(4)
