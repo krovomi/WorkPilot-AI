@@ -38,7 +38,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from .diagrams import _xml, parse_diagram
 from .files import threat
@@ -305,7 +305,17 @@ def _workspace_patterns(project_dir: Path) -> list[str]:
     except OSError:
         pnpm = ""
     patterns += re.findall(r"^\s*-\s*['\"]?([^'\"#\n]+?)['\"]?\s*$", pnpm, re.M)
-    return [p for p in patterns if not p.startswith("!") and ".." not in p]
+    # A pattern is a folder of this repository: an exclusion, an empty one, a
+    # rooted one (`/x`, `C:/x`) or one that climbs out names none, and `glob`
+    # refuses a rooted pattern outright.
+    return [
+        p
+        for p in patterns
+        if p.strip("/ ")
+        and not p.startswith("!")
+        and ".." not in p
+        and not PureWindowsPath(p).anchor
+    ]
 
 
 def _read_workspaces(
