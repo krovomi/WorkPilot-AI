@@ -16,6 +16,92 @@ import { useTranslation } from "react-i18next";
 import { Badge, Button, Input, Label } from "@/components/ui";
 import { useAdminStore } from "@/stores/admin-store";
 import { usePermission } from "@/stores/permissions-store";
+import type {
+	PermissionDescriptor,
+	RoleSummary,
+} from "../../../preload/api/modules/server-admin-api";
+
+function flip(set: Set<string>, key: string): Set<string> {
+	const next = new Set(set);
+	if (next.has(key)) next.delete(key);
+	else next.add(key);
+	return next;
+}
+
+/**
+ * The permissions of one role, grouped by domain. Without `onToggle` the
+ * boxes are read-only (a built-in role, or no right to change roles).
+ */
+function PermissionMatrix({
+	title,
+	byDomain,
+	granted,
+	onToggle,
+	note,
+	onDelete,
+}: {
+	readonly title: string;
+	readonly byDomain: Record<string, PermissionDescriptor[]>;
+	readonly granted: Set<string>;
+	readonly onToggle?: (key: string) => void;
+	readonly note?: string;
+	readonly onDelete?: () => void;
+}) {
+	const { t } = useTranslation("administration");
+	return (
+		<div className="border border-border rounded-md p-4 space-y-4">
+			<div className="flex items-center justify-between">
+				<h3 className="text-sm font-medium">{title}</h3>
+				{onDelete && (
+					<Button
+						size="sm"
+						variant="ghost"
+						title={t("roles.delete")}
+						aria-label={t("roles.delete")}
+						onClick={onDelete}
+					>
+						<Trash2 className="h-4 w-4 text-destructive" />
+					</Button>
+				)}
+			</div>
+
+			{note && <p className="text-xs text-muted-foreground">{note}</p>}
+
+			{Object.entries(byDomain).map(([domain, items]) => (
+				<div key={domain} className="space-y-2">
+					<h4 className="text-xs uppercase tracking-wider text-muted-foreground">
+						{domain}
+					</h4>
+					<div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+						{items.map((permission) => (
+							<label
+								key={permission.key}
+								className={`flex items-center gap-2 text-sm p-1.5 rounded ${
+									onToggle ? "cursor-pointer hover:bg-muted/50" : ""
+								}`}
+							>
+								<input
+									type="checkbox"
+									checked={granted.has(permission.key)}
+									disabled={!onToggle}
+									onChange={() => onToggle?.(permission.key)}
+								/>
+								<span className="font-mono text-xs">{permission.action}</span>
+								{permission.privileged && (
+									<ShieldAlert
+										className="h-3.5 w-3.5 text-destructive"
+										role="img"
+										aria-label={t("roles.privileged")}
+									/>
+								)}
+							</label>
+						))}
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
 
 export function RolesTab() {
 	const { t } = useTranslation("administration");
@@ -52,25 +138,22 @@ export function RolesTab() {
 		return grouped;
 	}, [permissions]);
 
-	const activeSet = creating
-		? draftPermissions
-		: new Set(selected?.permissions ?? []);
-	const editable = creating || (canWrite && selected !== null && !selected.is_system);
+	function toggleDraft(key: string) {
+		setDraftPermissions((prev) => flip(prev, key));
+	}
 
-	function toggle(key: string) {
-		if (!editable) return;
-		if (creating) {
-			setDraftPermissions((prev) => {
-				const next = new Set(prev);
-				next.has(key) ? next.delete(key) : next.add(key);
-				return next;
-			});
-			return;
-		}
-		if (!selected) return;
-		const next = new Set(selected.permissions);
-		next.has(key) ? next.delete(key) : next.add(key);
-		void updateRole(selected.id, { permissions: [...next] });
+	function toggleRole(role: RoleSummary, key: string) {
+		void updateRole(role.id, {
+			permissions: [...flip(new Set(role.permissions), key)],
+		});
+	}
+
+	function startCreating() {
+		setCreating(true);
+		setSelectedId(null);
+		setDraftName("");
+		setDraftSlug("");
+		setDraftPermissions(new Set());
 	}
 
 	async function submitNewRole() {
@@ -96,11 +179,7 @@ export function RolesTab() {
 						<Button
 							size="sm"
 							variant="outline"
-							onClick={() => {
-								setCreating(true);
-								setSelectedId(null);
-								setDraftPermissions(new Set());
-							}}
+							onClick={startCreating}
 						>
 							<Plus className="h-4 w-4 mr-1" />
 							{t("roles.create")}
@@ -179,63 +258,32 @@ export function RolesTab() {
 					</div>
 				)}
 
-				{(selected || creating) && (
-					<div className="border border-border rounded-md p-4 space-y-4">
-						<div className="flex items-center justify-between">
-							<h3 className="text-sm font-medium">
-								{creating ? t("roles.newRole") : selected?.name}
-							</h3>
-							{selected && !selected.is_system && canWrite && (
-								<Button
-									size="sm"
-									variant="ghost"
-									onClick={() => void deleteRole(selected.id)}
-								>
-									<Trash2 className="h-4 w-4 text-destructive" />
-								</Button>
-							)}
-						</div>
+				{creating && (
+					<PermissionMatrix
+						title={t("roles.newRole")}
+						byDomain={byDomain}
+						granted={draftPermissions}
+						onToggle={toggleDraft}
+					/>
+				)}
 
-						{selected?.is_system && (
-							<p className="text-xs text-muted-foreground">
-								{t("roles.builtInReadOnly")}
-							</p>
-						)}
-
-						{Object.entries(byDomain).map(([domain, items]) => (
-							<div key={domain} className="space-y-2">
-								<h4 className="text-xs uppercase tracking-wider text-muted-foreground">
-									{domain}
-								</h4>
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-									{items.map((permission) => (
-										<label
-											key={permission.key}
-											className={`flex items-center gap-2 text-sm p-1.5 rounded ${
-												editable ? "cursor-pointer hover:bg-muted/50" : ""
-											}`}
-										>
-											<input
-												type="checkbox"
-												checked={activeSet.has(permission.key)}
-												disabled={!editable}
-												onChange={() => toggle(permission.key)}
-											/>
-											<span className="font-mono text-xs">
-												{permission.action}
-											</span>
-											{permission.privileged && (
-												<ShieldAlert
-													className="h-3.5 w-3.5 text-destructive"
-													aria-label={t("roles.privileged")}
-												/>
-											)}
-										</label>
-									))}
-								</div>
-							</div>
-						))}
-					</div>
+				{!creating && selected && (
+					<PermissionMatrix
+						title={selected.name}
+						byDomain={byDomain}
+						granted={new Set(selected.permissions)}
+						onToggle={
+							canWrite && !selected.is_system
+								? (key) => toggleRole(selected, key)
+								: undefined
+						}
+						note={selected.is_system ? t("roles.builtInReadOnly") : undefined}
+						onDelete={
+							canWrite && !selected.is_system
+								? () => void deleteRole(selected.id)
+								: undefined
+						}
+					/>
 				)}
 
 				{!selected && !creating && (

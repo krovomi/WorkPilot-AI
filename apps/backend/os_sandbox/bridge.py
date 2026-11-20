@@ -70,7 +70,7 @@ def main(argv: list[str]) -> int:
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         listener.bind(("127.0.0.1", int(port_text)))
-    except (OSError, ValueError):
+    except (OSError, OverflowError, ValueError):  # Overflow: a port past 65535
         return 126
     listener.listen(64)
     threading.Thread(target=_serve, args=(listener, socket_path), daemon=True).start()
