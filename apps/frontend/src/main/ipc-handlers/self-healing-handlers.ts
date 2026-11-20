@@ -13,6 +13,15 @@ import { type BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import {
+	INVALID_INPUT,
+	isIncidentId,
+	isIncidentSource,
+	isModeFilter,
+	isOperationId,
+	modeConfig,
+	sourceConfig,
+} from "./self-healing-inputs";
 
 
 /** Tracks running fix/retry processes by incident ID so they can be cancelled. */
@@ -53,7 +62,8 @@ export function registerSelfHealingHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.SELF_HEALING_GET_INCIDENTS,
-		async (_, projectPath: string, mode?: string) => {
+		async (_, projectPath: string, mode?: unknown) => {
+			if (!isModeFilter(mode)) return INVALID_INPUT;
 			try {
 				const args = ["incidents"];
 				if (mode) args.push("--mode", mode);
@@ -137,7 +147,9 @@ export function registerSelfHealingHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.SELF_HEALING_CICD_CONFIG,
-		async (_, projectPath: string, config: Record<string, unknown>) => {
+		async (_, projectPath: string, raw: unknown) => {
+			const config = modeConfig(raw);
+			if (!config) return INVALID_INPUT;
 			try {
 				const merged = await updateModeConfig(projectPath, "cicd", config);
 				return { success: true, mode: "cicd", config: merged };
@@ -151,17 +163,16 @@ export function registerSelfHealingHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.SELF_HEALING_PRODUCTION_CONNECT,
-		async (_, projectPath: string, sourceConfig: Record<string, unknown>) => {
+		async (_, projectPath: string, raw: unknown) => {
+			const config = sourceConfig(raw);
+			if (!config) return INVALID_INPUT;
 			try {
-				const source =
-					typeof sourceConfig.source === "string" ? sourceConfig.source : "";
-				const result = await runSelfHealingCommand(projectPath, [
-					"connect",
-					"--source",
-					source,
-					"--config",
-					JSON.stringify(sourceConfig),
-				]);
+				// The configuration goes on stdin: it may hold the source's key.
+				const result = await runSelfHealingCommand(
+					projectPath,
+					["connect", "--source", config.source, "--config", "-"],
+					JSON.stringify(config),
+				);
 				return JSON.parse(result);
 			} catch (error) {
 				return { success: false, error: String(error) };
@@ -171,7 +182,8 @@ export function registerSelfHealingHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.SELF_HEALING_PRODUCTION_DISCONNECT,
-		async (_, projectPath: string, source: string) => {
+		async (_, projectPath: string, source: unknown) => {
+			if (!isIncidentSource(source)) return INVALID_INPUT;
 			try {
 				const result = await runSelfHealingCommand(projectPath, [
 					"disconnect",
@@ -187,7 +199,9 @@ export function registerSelfHealingHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.SELF_HEALING_PRODUCTION_CONFIG,
-		async (_, projectPath: string, config: Record<string, unknown>) => {
+		async (_, projectPath: string, raw: unknown) => {
+			const config = modeConfig(raw);
+			if (!config) return INVALID_INPUT;
 			try {
 				const merged = await updateModeConfig(
 					projectPath,
@@ -241,7 +255,9 @@ export function registerSelfHealingHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.SELF_HEALING_PROACTIVE_CONFIG,
-		async (_, projectPath: string, config: Record<string, unknown>) => {
+		async (_, projectPath: string, raw: unknown) => {
+			const config = modeConfig(raw);
+			if (!config) return INVALID_INPUT;
 			try {
 				const merged = await updateModeConfig(projectPath, "proactive", config);
 				return { success: true, mode: "proactive", config: merged };
@@ -255,7 +271,8 @@ export function registerSelfHealingHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.SELF_HEALING_TRIGGER_FIX,
-		async (_, projectPath: string, incidentId: string) => {
+		async (_, projectPath: string, incidentId: unknown) => {
+			if (!isIncidentId(incidentId)) return INVALID_INPUT;
 			const mainWindow = getMainWindow();
 			try {
 				await runSelfHealingCommandStreaming(
@@ -298,7 +315,8 @@ export function registerSelfHealingHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.SELF_HEALING_CANCEL_OPERATION,
-		async (_, projectPath: string, operationId: string) => {
+		async (_, projectPath: string, operationId: unknown) => {
+			if (!isOperationId(operationId)) return INVALID_INPUT;
 			// Kill any running fix process associated with this operation
 			// The operationId may be prefixed with the incidentId — try both
 			for (const [key, proc] of activeFixProcesses.entries()) {
@@ -324,7 +342,8 @@ export function registerSelfHealingHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.SELF_HEALING_DISMISS_INCIDENT,
-		async (_, projectPath: string, incidentId: string) => {
+		async (_, projectPath: string, incidentId: unknown) => {
+			if (!isIncidentId(incidentId)) return INVALID_INPUT;
 			try {
 				const result = await runSelfHealingCommand(projectPath, [
 					"dismiss",
@@ -340,7 +359,8 @@ export function registerSelfHealingHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.SELF_HEALING_RETRY_INCIDENT,
-		async (_, projectPath: string, incidentId: string) => {
+		async (_, projectPath: string, incidentId: unknown) => {
+			if (!isIncidentId(incidentId)) return INVALID_INPUT;
 			const mainWindow = getMainWindow();
 			try {
 				await runSelfHealingCommandStreaming(
@@ -651,6 +671,7 @@ function getRunnerPath(): string {
 async function runSelfHealingCommand(
 	projectPath: string,
 	args: string[],
+	input?: string,
 ): Promise<string> {
 	const env = await pythonRunnerEnv(getBackendDir());
 	return new Promise((resolve, reject) => {
@@ -661,11 +682,12 @@ async function runSelfHealingCommand(
 			[getRunnerPath(), "--project", projectPath, ...args],
 			{
 				cwd: backendDir,
-				stdio: ["ignore", "pipe", "pipe"],
+				stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
 				timeout: 120000,
 				env,
 			},
 		);
+		if (input !== undefined) proc.stdin?.end(input);
 
 		let stdout = "";
 		let stderr = "";

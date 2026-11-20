@@ -1,5 +1,6 @@
 import type { ProjectEnvConfig } from "@shared/types/project";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { useProjectEnvStore } from "../../../stores/project-env-store";
 import { computeSetupCategories } from "../../setup-hub/useSetupStatus";
 import { GUIDE_ANCHORS } from "../anchors";
 import { buildTodoTour } from "../tour-steps";
@@ -108,5 +109,61 @@ describe("buildTodoTour", () => {
 	it("produces an empty tour when there is no project and providers are already configured", () => {
 		const status = computeSetupCategories({ anthropic: true }, null, false);
 		expect(buildTodoTour(status)).toHaveLength(0);
+	});
+
+	it("leaves out a setup item it has no journey for", () => {
+		const status = computeSetupCategories({}, env());
+		status.categories[0].items.unshift({ id: "telemetry", state: "todo", deepLink: { kind: "app", section: "accounts" } });
+		expect(buildTodoTour(status).map((s) => s.anchor)).toEqual(anchorsOf(computeSetupCategories({}, env())));
+	});
+
+	describe("the Next gates read the live project settings", () => {
+		afterEach(() => {
+			useProjectEnvStore.setState({ envConfig: null });
+		});
+
+		const gate = (anchor: string) => {
+			const found = buildTodoTour(computeSetupCategories({}, env())).find((s) => s.anchor === anchor);
+			if (!found?.condition) throw new Error(`no gate on ${anchor}`);
+			return found.condition;
+		};
+		const setEnv = (overrides: Partial<ProjectEnvConfig>) =>
+			useProjectEnvStore.setState({ envConfig: env(overrides) });
+
+		it.each([
+			[GUIDE_ANCHORS.github.enable, { githubEnabled: true }],
+			[GUIDE_ANCHORS.github.token, { githubToken: "gho_test0000" }],
+			[GUIDE_ANCHORS.gitlab.enable, { gitlabEnabled: true }],
+			[GUIDE_ANCHORS.gitlab.token, { gitlabToken: "glpat-test0000" }],
+			[GUIDE_ANCHORS.azureDevOps.enable, { azureDevOpsEnabled: true }],
+			[GUIDE_ANCHORS.azureDevOps.orgUrl, { azureDevOpsOrgUrl: "https://dev.azure.com/example" }],
+			[GUIDE_ANCHORS.azureDevOps.pat, { azureDevOpsPat: "pat-test0000" }],
+			[GUIDE_ANCHORS.jira.enable, { jiraEnabled: true }],
+			[GUIDE_ANCHORS.jira.instanceUrl, { jiraInstanceUrl: "https://example.atlassian.net" }],
+			[GUIDE_ANCHORS.jira.email, { jiraEmail: "dev@example.com" }],
+			[GUIDE_ANCHORS.jira.token, { jiraApiToken: "jira-test0000" }],
+			[GUIDE_ANCHORS.linear.enable, { linearEnabled: true }],
+			[GUIDE_ANCHORS.linear.apiKey, { linearApiKey: "lin_test0000" }],
+			[GUIDE_ANCHORS.cicd.provider, { cicdProvider: "github" }],
+			[GUIDE_ANCHORS.notifications.enable("slack"), { slackNotificationsEnabled: true }],
+			[GUIDE_ANCHORS.notifications.webhook("slack"), { slackWebhookUrl: "https://hooks.example/x" }],
+		] as [string, Partial<ProjectEnvConfig>][])("%s opens once its field is set", (anchor, filled) => {
+			const condition = gate(anchor);
+			expect(condition()).toBe(false);
+			setEnv({});
+			expect(condition()).toBe(false);
+			setEnv(filled);
+			expect(condition()).toBe(true);
+		});
+
+		it("does not count blanks as a value", () => {
+			setEnv({ githubToken: "   " });
+			expect(gate(GUIDE_ANCHORS.github.token)()).toBe(false);
+		});
+
+		it("does not count a disabled CI/CD as chosen", () => {
+			setEnv({ cicdProvider: "none" });
+			expect(gate(GUIDE_ANCHORS.cicd.provider)()).toBe(false);
+		});
 	});
 });

@@ -52,5 +52,9 @@
 		"overview": "Overview",
 		"items": "Items",
 		"project": "Project"
+	},
+	"errors": {
+		"noProject": "No project selected",
+		"createTaskFailed": "Could not create the task from this debt item"
 	}
 }

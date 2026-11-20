@@ -132,7 +132,7 @@ def read_status(spec_dir: Path) -> DeltaStatus | None:
         return None
     try:
         raw = json.loads(target.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError):  # JSON and UTF-8 errors are both ValueError
         logger.debug("unreadable delta status at %s", target)
         return None
     if not isinstance(raw, dict):
@@ -140,12 +140,14 @@ def read_status(spec_dir: Path) -> DeltaStatus | None:
     return DeltaStatus(
         status=str(raw.get("status", STATUS_FAILED)),
         reason=str(raw.get("reason", "")),
-        baseline_revision=raw.get("baselineRevision"),
-        head_revision=raw.get("headRevision"),
-        summary=raw.get("summary") or {},
-        continuity=raw.get("continuity") or {},
-        artifact=raw.get("artifact"),
-        receipt=raw.get("receipt"),
+        # The record is a file anyone can edit: a field of the wrong shape is
+        # read as absent rather than breaking `has_changes` for the tab.
+        baseline_revision=_text(raw.get("baselineRevision")),
+        head_revision=_text(raw.get("headRevision")),
+        summary=_object(raw.get("summary")),
+        continuity=_object(raw.get("continuity")),
+        artifact=_text(raw.get("artifact")),
+        receipt=_text(raw.get("receipt")),
         generated_at=str(raw.get("generatedAt", "")),
     )
 
@@ -225,6 +227,15 @@ def compare_models(
 
 
 def _revision(model: dict[str, Any]) -> str | None:
-    repository = (model.get("meta") or {}).get("repository") or {}
-    revision = repository.get("revision")
+    meta = model.get("meta")
+    repository = meta.get("repository") if isinstance(meta, dict) else None
+    revision = repository.get("revision") if isinstance(repository, dict) else None
     return str(revision) if revision else None
+
+
+def _object(value: object) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _text(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
