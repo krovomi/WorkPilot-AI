@@ -52,5 +52,9 @@
 		"overview": "Vue d'ensemble",
 		"items": "Éléments",
 		"project": "Projet"
+	},
+	"errors": {
+		"noProject": "Aucun projet sélectionné",
+		"createTaskFailed": "Impossible de créer la tâche depuis cet élément de dette"
 	}
 }

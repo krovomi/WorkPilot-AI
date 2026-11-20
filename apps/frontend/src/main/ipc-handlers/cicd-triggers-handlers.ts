@@ -43,6 +43,15 @@ import {
 	readDeployWatch,
 	watchConfigured,
 } from "../cicd/deploy-watch";
+import {
+	CICD_PROVIDERS,
+	isProviderRunId,
+	runsLimit,
+	type TriggerParams,
+	triggerParams,
+} from "../cicd/trigger-inputs";
+
+export { CICD_PROVIDERS };
 
 
 function getBackendPath(): string {
@@ -73,6 +82,8 @@ export function findKnownProject(projectDir: unknown): Project | null {
 }
 
 const UNKNOWN_PROJECT = { success: false, error: "Project not found" } as const;
+const INVALID_TRIGGER = { success: false, error: "Invalid trigger request" } as const;
+const INVALID_RUN_ID = { success: false, error: "Invalid run id" } as const;
 
 /** Renderer field → `.workpilot/.env` key. Nothing outside this list is written. */
 export const CICD_CONFIG_KEYS: Readonly<Record<string, string>> = {
@@ -238,14 +249,6 @@ function saveRun(projectDir: string, run: object): void {
 	);
 }
 
-interface TriggerParams {
-	provider: string;
-	pr_url?: string;
-	branch?: string;
-	workflow?: string;
-	ref?: string;
-}
-
 /** Where a run came from, and the task an automatic one was started for. */
 interface RunOrigin {
 	source?: "manual" | "auto";
@@ -333,8 +336,6 @@ async function triggerPipeline(
 	if (result.success) startDeployWatch(project, run.id);
 	return { id: run.id, triggeredAt: run.triggered_at, result };
 }
-
-export const CICD_PROVIDERS = ["github", "gitlab", "azure", "jenkins"] as const;
 
 /**
  * Whether the CI/CD settings of `project` ask for a pipeline on `event` (an
@@ -478,12 +479,12 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_LIST_RUNS,
-		(_event, projectDir: unknown, limit: number = 50) => {
+		(_event, projectDir: unknown, limit?: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
 			try {
 				const runs = loadRuns(project.path)
-					.slice(0, limit)
+					.slice(0, runsLimit(limit))
 					.map((run) => withWatch(project.path, run));
 				return { success: true, data: runs };
 			} catch (err) {
@@ -494,9 +495,11 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_TRIGGER,
-		async (_event, projectDir: unknown, params: TriggerParams) => {
+		async (_event, projectDir: unknown, raw: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
+			const params = triggerParams(raw);
+			if (!params) return INVALID_TRIGGER;
 			const { result } = await triggerPipeline(project, params);
 			return result;
 		},
@@ -504,9 +507,10 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_GET_RUN_STATUS,
-		async (_event, projectDir: unknown, runId: string) => {
+		async (_event, projectDir: unknown, runId: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
+			if (!isProviderRunId(runId)) return INVALID_RUN_ID;
 			return runRunner(project, [
 				"--action",
 				"status",
@@ -521,9 +525,10 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_CANCEL_RUN,
-		async (_event, projectDir: unknown, runId: string) => {
+		async (_event, projectDir: unknown, runId: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
+			if (!isProviderRunId(runId)) return INVALID_RUN_ID;
 			return runRunner(project, [
 				"--action",
 				"cancel",
@@ -541,9 +546,7 @@ export function registerCICDTriggersHandlers(): void {
 		async (_event, projectDir: unknown, runId: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
-			if (typeof runId !== "string" || !RUN_ID.test(runId)) {
-				return { success: false, error: "Invalid run id" };
-			}
+			if (typeof runId !== "string" || !RUN_ID.test(runId)) return INVALID_RUN_ID;
 			if (liveWatches.isLive(project.path, runId)) {
 				return { success: false, error: "watch-running" };
 			}

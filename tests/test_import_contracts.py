@@ -223,8 +223,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "task_logger",
     },
     # Out of the agents' cycle since A1's third step. The archify map builds its
-    # own prompts; its workflow phase lives in workflows/architecture_map_phase.py.
-    "architecture_visualizer": {"foundation"},
+    # own prompts, the task's text quoted as data (security.untrusted, rule S2);
+    # its workflow phase lives in workflows/architecture_map_phase.py.
+    "architecture_visualizer": {"foundation", "security"},
     # Attachments and diagnostics: the CI parsers and the traceability record
     # are read from foundation, not from self_healing or spec.
     "docintel": {

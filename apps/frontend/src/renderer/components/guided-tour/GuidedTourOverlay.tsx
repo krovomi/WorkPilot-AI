@@ -42,20 +42,6 @@ export function GuidedTourOverlay() {
 	const skipSection = useGuidedTourStore((s) => s.skipSection);
 	const stop = useGuidedTourStore((s) => s.stop);
 
-	const step = isActive ? steps[currentIndex] : undefined;
-
-	// Is there a later step belonging to a different section? (controls whether
-	// "Skip this section" jumps ahead or just ends the tour.)
-	const hasNextSection =
-		!!step &&
-		steps
-			.slice(currentIndex + 1)
-			.some(
-				(s) =>
-					s.section.kind !== step.section.kind ||
-					s.section.section !== step.section.section,
-			);
-
 	const [rect, setRect] = useState<TargetRect | null>(null);
 	const [notFound, setNotFound] = useState(false);
 	// Re-evaluated on a light interval so the gate reflects live typing.
@@ -71,9 +57,9 @@ export function GuidedTourOverlay() {
 	// re-running would re-fire navigateSettings() and cause a render loop.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on step index intentionally
 	useEffect(() => {
+		// The store only activates a tour with steps and keeps the index inside them.
 		if (!isActive) return;
 		const current = steps[currentIndex];
-		if (!current) return;
 		const controller = new AbortController();
 		let cancelled = false;
 		setNotFound(false);
@@ -122,11 +108,11 @@ export function GuidedTourOverlay() {
 			window.setTimeout(() => {
 				if (cancelled) return;
 				const live = document.querySelector<HTMLElement>(selector) ?? el;
-				const focusable = live?.matches(
+				const focusable = live.matches(
 					"input, select, textarea, button, [role=switch]",
 				)
 					? live
-					: live?.querySelector<HTMLElement>(
+					: live.querySelector<HTMLElement>(
 							"input, select, textarea, button, [role=switch]",
 						);
 				focusable?.focus({ preventScroll: true });
@@ -147,7 +133,6 @@ export function GuidedTourOverlay() {
 	useEffect(() => {
 		if (!isActive) return;
 		const current = steps[currentIndex];
-		if (!current) return;
 		let rafId = 0;
 		const sel = guideSelector(current.anchor);
 		const loop = () => {
@@ -179,7 +164,6 @@ export function GuidedTourOverlay() {
 	useEffect(() => {
 		if (!isActive) return;
 		const current = steps[currentIndex];
-		if (!current) return;
 		if (!current.condition) {
 			setGateOpen(true);
 			return;
@@ -214,7 +198,18 @@ export function GuidedTourOverlay() {
 		back();
 	}, [back]);
 
-	if (!isActive || !step) return null;
+	if (!isActive) return null;
+	const step = steps[currentIndex];
+
+	// Is there a later step belonging to a different section? (controls whether
+	// "Skip this section" jumps ahead or just ends the tour.)
+	const hasNextSection = steps
+		.slice(currentIndex + 1)
+		.some(
+			(s) =>
+				s.section.kind !== step.section.kind ||
+				s.section.section !== step.section.section,
+		);
 
 	const canAdvance = step.optional || !step.condition || gateOpen;
 	const pad = SPOTLIGHT_PADDING;

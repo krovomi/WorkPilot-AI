@@ -294,10 +294,8 @@ def visual_proof_captures(spec_dir: Path, roots: list[Path]) -> list[Capture]:
             continue
         image, root = hit
         url = str(shot.get("url") or proof.get("appUrl") or "")
-        try:
-            relative = image.relative_to(root).as_posix()
-        except ValueError:
-            relative = image.name
+        # Each directory is built by joining onto its root: always under it.
+        relative = image.relative_to(root).as_posix()
         found.append(
             Capture(
                 path=relative,
@@ -617,7 +615,12 @@ class VisualQaRecord:
     @classmethod
     def from_dict(cls, payload: dict) -> VisualQaRecord:
         def _list(key: str) -> list[dict]:
-            return [d for d in payload.get(key) or [] if isinstance(d, dict)]
+            # The record is a file on disk: a list replaced by anything else
+            # costs that list, not every later review.
+            value = payload.get(key)
+            if not isinstance(value, list):
+                return []
+            return [d for d in value if isinstance(d, dict)]
 
         return cls(
             captures=_list("captures"),
@@ -631,8 +634,9 @@ class VisualQaRecord:
     def counts(self) -> dict[str, int]:
         out = dict.fromkeys(("high", "medium", "low"), 0)
         for finding in self.findings:
-            if finding.get("severity") in out:
-                out[finding["severity"]] += 1
+            severity = finding.get("severity")
+            if isinstance(severity, str) and severity in out:
+                out[severity] += 1
         return out
 
 
@@ -653,8 +657,9 @@ def _previous_readings(spec_dir: Path) -> dict[tuple[str, str], dict]:
     if previous is None:
         return {}
     return {
-        (c.get("origin", ""), c.get("path", "")): c.get("reading") or {}
+        (str(c.get("origin", "")), str(c.get("path", ""))): reading
         for c in previous.captures
+        if isinstance(reading := c.get("reading"), dict)
     }
 
 
@@ -1056,18 +1061,26 @@ def report_lines(record: VisualQaRecord) -> list[str]:
             if finding.get("detail")
             else ""
         )
+        severity = finding.get("severity")
+        severity = severity.upper() if severity in ("high", "medium", "low") else "?"
         lines.append(
-            f"[{finding.get('severity', '?').upper()}] {finding.get('kind')}{text}{detail}"
+            f"[{severity}] {quote(finding.get('kind', ''), 40)}{text}{detail}"
             f" — {quote(finding.get('capture', ''), 160)}"
         )
     for diff in record.diffs:
-        if diff.get("changed") or diff.get("added") or diff.get("removed"):
+        changed, added, removed = (
+            _count(diff.get(k)) for k in ("changed", "added", "removed")
+        )
+        if changed or added or removed:
             lines.append(
                 f"[DIFF] {quote(diff.get('route') or diff.get('key', ''))}: "
-                f"{len(diff.get('changed') or [])} changed, {len(diff.get('added') or [])} added, "
-                f"{len(diff.get('removed') or [])} removed"
+                f"{changed} changed, {added} added, {removed} removed"
             )
     return lines
+
+
+def _count(value: object) -> int:
+    return len(value) if isinstance(value, list) else 0
 
 
 def report_markdown(record: VisualQaRecord) -> str:

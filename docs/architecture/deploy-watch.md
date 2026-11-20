@@ -99,6 +99,16 @@ Depuis une référence nulle (taux d'erreur à 0), toute hausse au-delà du brui
   fournisseur de l'utilisateur et sa clé, pour le rapport) plus les réglages CI/CD ; le
   déclenchement et le rollback gardent l'environnement sans identifiants.
 
+## Le déclenchement (`runners/cicd_triggers_runner.py`)
+
+Le pipeline que la surveillance suit est lancé avec les mêmes règles de réseau : http(s)
+seulement, aucune redirection suivie, un jeton en https ou vers la machine seulement, et en
+hors-ligne strict seulement une CI sur la machine ou une adresse privée (une politique illisible
+compte comme stricte). Le main (`main/cicd/trigger-inputs.ts`) n'accepte du renderer qu'un des
+quatre fournisseurs, une URL de PR http(s), une branche et un fichier de workflow en noms simples
+et un id d'exécution en chiffres ; le runner revérifie le workflow, le dépôt tiré d'une URL de PR
+github.com et l'id avant de les mettre dans un chemin d'API.
+
 ## Pas encore fait (suite de #366)
 
 Canary par paliers (Flagger, Argo Rollouts, CodeDeploy), notifications vers Slack, PagerDuty ou

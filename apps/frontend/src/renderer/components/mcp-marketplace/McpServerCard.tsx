@@ -4,7 +4,8 @@
  * Displays a single MCP server in the marketplace catalog grid.
  * Shows name, description, launcher, and install/uninstall actions.
  * Installing adds the server to the selected project and to the agents
- * picked in the dialog (see `stores/mcp-marketplace-store.ts`).
+ * picked in the dialog (see `stores/mcp-marketplace-store.ts`); removing
+ * takes it out of the project its installed list was read from.
  */
 
 import {
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import {
 	catalogAgents,
 	localized,
@@ -48,6 +50,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { McpErrorNotice } from "./McpErrorNotice";
 import { McpSecurityBadge, McpSecurityDetails, useMcpServerSecurity } from "./McpSecurityScore";
 
 interface McpServerCardProps {
@@ -56,121 +59,25 @@ interface McpServerCardProps {
 
 export function McpServerCard({ server }: McpServerCardProps) {
 	const { t, i18n } = useTranslation(["common"]);
-	const { isServerInstalled, isInstalling } = useMcpMarketplaceStore();
+	const { installedIn, installing } = useMcpMarketplaceStore(
+		useShallow((s) => ({
+			installedIn: s.installed.some((i) => i.id === server.id) ? s.projectId : null,
+			installing: s.isInstalling === server.id,
+		})),
+	);
 	const projectId = useProjectStore((state) => state.selectedProjectId);
 	const security = useMcpServerSecurity(server, projectId);
-	const projectName = useProjectStore(
-		(state) => state.projects.find((p) => p.id === state.selectedProjectId)?.name,
-	);
-
-	const installed = isServerInstalled(server.id);
-	const installing = isInstalling === server.id;
 	const language = i18n.language;
 
 	const [showInstallDialog, setShowInstallDialog] = useState(false);
 	const [showDetails, setShowDetails] = useState(false);
-	const [values, setValues] = useState<Record<string, string>>({});
-	const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
-	const offeredAgents = catalogAgents(server);
-	const [agents, setAgents] = useState<string[]>(offeredAgents);
 
 	const requiredVars = server.vars.filter((v) => v.required);
-	const optionalVars = server.vars.filter((v) => !v.required);
 
 	const handleInstallClick = () => {
-		setValues({});
-		setAgents(offeredAgents);
+		useMcpMarketplaceStore.getState().setError(null);
 		setShowInstallDialog(true);
 	};
-
-	const handleConfirmInstall = async () => {
-		if (!projectId) return;
-		const success = await installMarketplaceServer(
-			projectId,
-			server.id,
-			values,
-			agents,
-			language,
-		);
-		if (success) {
-			setShowInstallDialog(false);
-		}
-	};
-
-	const handleUninstall = () => {
-		if (projectId) uninstallMarketplaceServer(projectId, server.id);
-	};
-
-	const toggleAgent = (agent: string, checked: boolean) => {
-		setAgents((prev) =>
-			checked ? [...prev, agent] : prev.filter((a) => a !== agent),
-		);
-	};
-
-	const canInstall =
-		Boolean(projectId) &&
-		agents.length > 0 &&
-		missingCatalogVars(server, values).length === 0;
-
-	const renderVar = (envVar: McpMarketplaceServer["vars"][number]) => (
-		<div key={envVar.name} className="space-y-1.5">
-			<Label className="text-sm flex items-center gap-1">
-				{envVar.label}
-				{envVar.required && <span className="text-destructive">*</span>}
-			</Label>
-			<p className="text-xs text-muted-foreground">
-				{localized(envVar.description, language)}
-			</p>
-			<div className="flex gap-2">
-				<div className="relative flex-1">
-					<Input
-						type={
-							envVar.secret && !showSecrets[envVar.name] ? "password" : "text"
-						}
-						placeholder={envVar.placeholder}
-						value={values[envVar.name] || ""}
-						onChange={(e) =>
-							setValues((prev) => ({
-								...prev,
-								[envVar.name]: e.target.value,
-							}))
-						}
-						className="h-9 pr-9"
-					/>
-					{envVar.secret && (
-						<button
-							type="button"
-							onClick={() =>
-								setShowSecrets((prev) => ({
-									...prev,
-									[envVar.name]: !prev[envVar.name],
-								}))
-							}
-							className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-						>
-							{showSecrets[envVar.name] ? (
-								<EyeOff className="h-4 w-4" />
-							) : (
-								<Eye className="h-4 w-4" />
-							)}
-						</button>
-					)}
-				</div>
-				{envVar.helpUrl && (
-					<Button
-						variant="outline"
-						size="icon"
-						className="h-9 w-9 shrink-0"
-						asChild
-					>
-						<a href={envVar.helpUrl} target="_blank" rel="noopener noreferrer">
-							<ExternalLink className="h-4 w-4" />
-						</a>
-					</Button>
-				)}
-			</div>
-		</div>
-	);
 
 	return (
 		<>
@@ -187,6 +94,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 						<div
 							className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg text-white text-sm font-bold"
 							style={{ backgroundColor: server.color }}
+							aria-hidden="true"
 						>
 							{server.name.charAt(0)}
 						</div>
@@ -313,7 +221,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 
 					{/* Action buttons */}
 					<div className="mt-auto pt-2">
-						{installed ? (
+						{installedIn ? (
 							<div className="flex gap-2">
 								<Badge variant="default" className="flex-1 justify-center py-1">
 									{t("mcpMarketplace.installedBadge")}
@@ -322,7 +230,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 									variant="ghost"
 									size="icon"
 									className="h-7 w-7 text-destructive hover:text-destructive"
-									onClick={handleUninstall}
+									onClick={() => uninstallMarketplaceServer(installedIn, server.id)}
 									title={t("mcpMarketplace.uninstall")}
 								>
 									<Trash2 className="h-3.5 w-3.5" />
@@ -352,102 +260,231 @@ export function McpServerCard({ server }: McpServerCardProps) {
 				</div>
 			</div>
 
-			{/* Install Configuration Dialog */}
-			<Dialog open={showInstallDialog} onOpenChange={setShowInstallDialog}>
-				<DialogContent className="sm:max-w-[500px]">
-					<DialogHeader>
-						<DialogTitle className="flex items-center gap-2">
-							<div
-								className="flex items-center justify-center w-8 h-8 rounded-lg text-white text-sm font-bold"
-								style={{ backgroundColor: server.color }}
+			{showInstallDialog && projectId && (
+				<InstallDialog
+					server={server}
+					projectId={projectId}
+					installing={installing}
+					onClose={() => setShowInstallDialog(false)}
+				/>
+			)}
+		</>
+	);
+}
+
+interface InstallDialogProps {
+	readonly server: McpMarketplaceServer;
+	readonly projectId: string;
+	readonly installing: boolean;
+	readonly onClose: () => void;
+}
+
+/** The values and agents asked before installing; it starts empty each time it opens. */
+function InstallDialog({ server, projectId, installing, onClose }: InstallDialogProps) {
+	const { t, i18n } = useTranslation(["common"]);
+	const language = i18n.language;
+	const projectName = useProjectStore(
+		(state) => state.projects.find((p) => p.id === projectId)?.name,
+	);
+	const offeredAgents = catalogAgents(server);
+	const [values, setValues] = useState<Record<string, string>>({});
+	const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+	const [agents, setAgents] = useState<string[]>(offeredAgents);
+
+	const requiredVars = server.vars.filter((v) => v.required);
+	const optionalVars = server.vars.filter((v) => !v.required);
+
+	const handleConfirmInstall = async () => {
+		const success = await installMarketplaceServer(
+			projectId,
+			server.id,
+			values,
+			agents,
+			language,
+		);
+		if (success) onClose();
+	};
+
+	const toggleAgent = (agent: string, checked: boolean) => {
+		setAgents((prev) =>
+			checked ? [...prev, agent] : prev.filter((a) => a !== agent),
+		);
+	};
+
+	const canInstall =
+		agents.length > 0 && missingCatalogVars(server, values).length === 0;
+
+	const renderVar = (envVar: McpMarketplaceServer["vars"][number]) => {
+		const inputId = `mcp-var-${server.id}-${envVar.name}`;
+		const shown = showSecrets[envVar.name] === true;
+		return (
+			<div key={envVar.name} className="space-y-1.5">
+				<Label htmlFor={inputId} className="text-sm flex items-center gap-1">
+					{envVar.label}
+					{envVar.required && <span className="text-destructive">*</span>}
+				</Label>
+				<p className="text-xs text-muted-foreground">
+					{localized(envVar.description, language)}
+				</p>
+				<div className="flex gap-2">
+					<div className="relative flex-1">
+						<Input
+							id={inputId}
+							type={envVar.secret && !shown ? "password" : "text"}
+							placeholder={envVar.placeholder}
+							value={values[envVar.name] ?? ""}
+							onChange={(e) =>
+								setValues((prev) => ({
+									...prev,
+									[envVar.name]: e.target.value,
+								}))
+							}
+							className="h-9 pr-9"
+						/>
+						{envVar.secret && (
+							<button
+								type="button"
+								onClick={() =>
+									setShowSecrets((prev) => ({
+										...prev,
+										[envVar.name]: !shown,
+									}))
+								}
+								aria-label={
+									shown
+										? t("mcpMarketplace.installDialog.hideValue")
+										: t("mcpMarketplace.installDialog.showValue")
+								}
+								aria-pressed={shown}
+								className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 							>
-								{server.name.charAt(0)}
-							</div>
-							{t("mcpMarketplace.installDialog.title", { name: server.name })}
-						</DialogTitle>
-						<DialogDescription>
-							{t("mcpMarketplace.installDialog.description", {
-								project: projectName ?? "",
-							})}
-						</DialogDescription>
-					</DialogHeader>
-
-					<div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
-						{server.requires && (
-							<p className="flex items-center gap-1.5 text-xs text-warning ">
-								<Info className="h-3.5 w-3.5 shrink-0" />
-								{t(`mcpMarketplace.requires.${server.requires}`)}
-							</p>
+								{shown ? (
+									<EyeOff className="h-4 w-4" aria-hidden="true" />
+								) : (
+									<Eye className="h-4 w-4" aria-hidden="true" />
+								)}
+							</button>
 						)}
-
-						{requiredVars.map(renderVar)}
-
-						{optionalVars.length > 0 && (
-							<>
-								<div className="text-xs font-medium text-muted-foreground uppercase tracking-wider pt-2">
-									{t("mcpMarketplace.installDialog.optional")}
-								</div>
-								{optionalVars.map(renderVar)}
-							</>
-						)}
-
-						<div className="space-y-2 pt-2">
-							<Label className="text-sm">
-								{t("mcpMarketplace.installDialog.agents")}
-							</Label>
-							<div className="flex flex-wrap gap-4">
-								{offeredAgents.map((agent) => (
-									<div key={agent} className="flex items-center gap-2">
-										<Checkbox
-											id={`mcp-agent-${server.id}-${agent}`}
-											checked={agents.includes(agent)}
-											onCheckedChange={(checked) =>
-												toggleAgent(agent, checked === true)
-											}
-										/>
-										<Label
-											htmlFor={`mcp-agent-${server.id}-${agent}`}
-											className="text-sm font-normal cursor-pointer"
-										>
-											{t(`mcpMarketplace.agents.${agent}`)}
-										</Label>
-									</div>
-								))}
-							</div>
-							<p className="text-xs text-muted-foreground">
-								{agents.length === 0
-									? t("mcpMarketplace.installDialog.noAgent")
-									: t("mcpMarketplace.installDialog.agentsHint")}
-							</p>
-						</div>
 					</div>
-
-					<DialogFooter>
+					{envVar.helpUrl && (
 						<Button
 							variant="outline"
-							onClick={() => setShowInstallDialog(false)}
+							size="icon"
+							className="h-9 w-9 shrink-0"
+							asChild
 						>
-							{t("common:cancel")}
+							<a
+								href={envVar.helpUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+								aria-label={t("mcpMarketplace.installDialog.openHelp", {
+									name: envVar.label,
+								})}
+							>
+								<ExternalLink className="h-4 w-4" aria-hidden="true" />
+							</a>
 						</Button>
-						<Button
-							onClick={handleConfirmInstall}
-							disabled={!canInstall || installing}
+					)}
+				</div>
+			</div>
+		);
+	};
+
+	return (
+		<Dialog open onOpenChange={onClose}>
+			<DialogContent className="sm:max-w-[500px]">
+				<DialogHeader>
+					<DialogTitle className="flex items-center gap-2">
+						<div
+							className="flex items-center justify-center w-8 h-8 rounded-lg text-white text-sm font-bold"
+							style={{ backgroundColor: server.color }}
+							aria-hidden="true"
 						>
-							{installing ? (
-								<>
-									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									{t("mcpMarketplace.installing")}
-								</>
-							) : (
-								<>
-									<Download className="h-4 w-4 mr-2" />
-									{t("mcpMarketplace.install")}
-								</>
-							)}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-		</>
+							{server.name.charAt(0)}
+						</div>
+						{t("mcpMarketplace.installDialog.title", { name: server.name })}
+					</DialogTitle>
+					<DialogDescription>
+						{t("mcpMarketplace.installDialog.description", {
+							project: projectName ?? "",
+						})}
+					</DialogDescription>
+				</DialogHeader>
+
+				<div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
+					{server.requires && (
+						<p className="flex items-center gap-1.5 text-xs text-warning ">
+							<Info className="h-3.5 w-3.5 shrink-0" />
+							{t(`mcpMarketplace.requires.${server.requires}`)}
+						</p>
+					)}
+
+					{requiredVars.map(renderVar)}
+
+					{optionalVars.length > 0 && (
+						<>
+							<div className="text-xs font-medium text-muted-foreground uppercase tracking-wider pt-2">
+								{t("mcpMarketplace.installDialog.optional")}
+							</div>
+							{optionalVars.map(renderVar)}
+						</>
+					)}
+
+					<div className="space-y-2 pt-2">
+						<Label className="text-sm">
+							{t("mcpMarketplace.installDialog.agents")}
+						</Label>
+						<div className="flex flex-wrap gap-4">
+							{offeredAgents.map((agent) => (
+								<div key={agent} className="flex items-center gap-2">
+									<Checkbox
+										id={`mcp-agent-${server.id}-${agent}`}
+										checked={agents.includes(agent)}
+										onCheckedChange={(checked) =>
+											toggleAgent(agent, checked === true)
+										}
+									/>
+									<Label
+										htmlFor={`mcp-agent-${server.id}-${agent}`}
+										className="text-sm font-normal cursor-pointer"
+									>
+										{t(`mcpMarketplace.agents.${agent}`)}
+									</Label>
+								</div>
+							))}
+						</div>
+						<p className="text-xs text-muted-foreground">
+							{agents.length === 0
+								? t("mcpMarketplace.installDialog.noAgent")
+								: t("mcpMarketplace.installDialog.agentsHint")}
+						</p>
+					</div>
+				</div>
+
+				<McpErrorNotice />
+
+				<DialogFooter>
+					<Button variant="outline" onClick={onClose}>
+						{t("common:cancel")}
+					</Button>
+					<Button
+						onClick={handleConfirmInstall}
+						disabled={!canInstall || installing}
+					>
+						{installing ? (
+							<>
+								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+								{t("mcpMarketplace.installing")}
+							</>
+						) : (
+							<>
+								<Download className="h-4 w-4 mr-2" />
+								{t("mcpMarketplace.install")}
+							</>
+						)}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }

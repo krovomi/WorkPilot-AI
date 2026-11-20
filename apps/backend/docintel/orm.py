@@ -382,7 +382,7 @@ def _read_efcore(files: list[tuple[str, str]], builder: _Builder) -> None:
                 builder.relate("N:N", owner, target, path, line)
             elif first == "HasMany":
                 builder.relate("1:N", owner, target, path, line)
-            elif first == "HasOne":
+            else:  # `HasOne` alone: the regex allows nothing else
                 builder.relate("1:N", target, owner, path, line)
 
     for owner, props in properties.items():
