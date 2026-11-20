@@ -177,6 +177,21 @@ def _title(text: str) -> str:
     return line if len(line) <= _MAX_TITLE else line[: _MAX_TITLE - 1].rstrip() + "…"
 
 
+def _items(value: Any) -> list[Any]:
+    """The entries of a list a model wrote, which it sometimes writes as one.
+
+    A text read with ``for item in value`` is a list of letters: a session's
+    ``"patterns_found": "Use the repository"`` became one note per letter.
+    """
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value] if value else []
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def _as_list(value: Any) -> list[str]:
     if value is None:
         return []
@@ -186,9 +201,10 @@ def _as_list(value: Any) -> list[str]:
 
 
 def _open_brain(*, create: bool) -> Brain | None:
-    """The brain, or ``None`` when memory is off — or absent and not asked to create."""
-    if not is_memory_enabled():
-        return None
+    """The brain, or ``None`` when it is absent and not asked to create.
+
+    Whether memory is on is the caller's question (`ProjectMemory.is_enabled`).
+    """
     brain = Brain()
     if brain.exists:
         return brain
@@ -592,8 +608,8 @@ class ProjectMemory:
     ) -> bool:
         """One session's insights, and its discoveries filed as their own notes."""
         insights = dict(insights or {})
-        discoveries = insights.get("discoveries") or {}
-        for path, purpose in (discoveries.get("files_understood") or {}).items():
+        discoveries = _mapping(insights.get("discoveries"))
+        for path, purpose in _mapping(discoveries.get("files_understood")).items():
             desc = purpose.get("description") if isinstance(purpose, dict) else purpose
             self.record_discovery(str(path), str(desc or ""))
         for pattern in _as_list(discoveries.get("patterns_found")):
@@ -644,14 +660,14 @@ class ProjectMemory:
         """The insight extractor's output, one note per fact."""
         insights = dict(insights or {})
         wrote = False
-        for item in insights.get("file_insights") or []:
+        for item in _items(insights.get("file_insights")):
             if isinstance(item, dict):
                 wrote |= self.record_discovery(
                     str(item.get("path") or ""),
                     str(item.get("purpose") or ""),
                     changes=str(item.get("changes_made") or ""),
                 )
-        for item in insights.get("patterns_discovered") or []:
+        for item in _items(insights.get("patterns_discovered")):
             if isinstance(item, dict):
                 wrote |= self.record_pattern(
                     str(item.get("pattern") or ""),
@@ -660,7 +676,7 @@ class ProjectMemory:
                 )
             else:
                 wrote |= self.record_pattern(str(item))
-        for item in insights.get("gotchas_discovered") or []:
+        for item in _items(insights.get("gotchas_discovered")):
             if isinstance(item, dict):
                 wrote |= self.record_gotcha(
                     str(item.get("gotcha") or ""),
@@ -749,7 +765,7 @@ class ProjectMemory:
         for kind in kinds:
             for rel, meta, body in self._notes(kind, learned=learned):
                 title = str(meta.get("title") or "")
-                score = _score(terms, f"{title}\n{body}") if terms else 0.0
+                score = _score(terms, f"{title}\n{body}")
                 if terms and score <= 0:
                     continue
                 if score < min_score:
@@ -1115,6 +1131,8 @@ def import_legacy_spec_memory(
         try:
             insight = json.loads(file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
+            continue
+        if not isinstance(insight, dict):
             continue
         number = insight.get("session_number") or int(re.sub(r"\D", "", file.stem) or 0)
         count += memory.record_session(int(number), insight)
