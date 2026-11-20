@@ -26,19 +26,15 @@ interface PluginCardProps {
 	plugin: MarketplacePlugin;
 	isInstalled: boolean;
 	isInstalling: boolean;
-	/** A project is selected to install into */
-	canInstall: boolean;
-	onInstall: () => void;
-	onUninstall: () => void;
+	/** What the buttons do in the selected project; `null` when none is selected */
+	actions: { onInstall: () => void; onUninstall: () => void } | null;
 }
 
 export function PluginCard({
 	plugin,
 	isInstalled,
 	isInstalling,
-	canInstall,
-	onInstall,
-	onUninstall,
+	actions,
 }: PluginCardProps) {
 	const { t, i18n } = useTranslation(["common"]);
 	const [showFullDesc, setShowFullDesc] = useState(false);
@@ -108,6 +104,7 @@ export function PluginCard({
 			{description.length > 120 && (
 				<button
 					type="button"
+					aria-expanded={showFullDesc}
 					onClick={() => setShowFullDesc(!showFullDesc)}
 					className="mt-1 text-3xs text-primary hover:underline text-left"
 				>
@@ -120,6 +117,7 @@ export function PluginCard({
 			{/* The skill it installs */}
 			<button
 				type="button"
+				aria-expanded={showSkill}
 				onClick={() => setShowSkill(!showSkill)}
 				className="mt-3 text-3xs text-primary hover:underline text-left"
 			>
@@ -163,7 +161,7 @@ export function PluginCard({
 						variant="outline"
 						size="sm"
 						className="w-full text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-						onClick={onUninstall}
+						onClick={actions?.onUninstall}
 					>
 						{t("common:pluginMarketplace.actions.uninstall")}
 					</Button>
@@ -171,11 +169,9 @@ export function PluginCard({
 					<Button
 						size="sm"
 						className="w-full"
-						onClick={onInstall}
-						disabled={isInstalling || !canInstall}
-						title={
-							canInstall ? undefined : t("common:pluginMarketplace.noProject")
-						}
+						onClick={actions?.onInstall}
+						disabled={isInstalling || !actions}
+						title={actions ? undefined : t("common:pluginMarketplace.noProject")}
 					>
 						{isInstalling ? (
 							<>
