@@ -437,6 +437,30 @@ def test_git_detail_is_one_line_without_credentials():
     assert "[rejected]" in detail
 
 
+@pytest.mark.parametrize(
+    ("url", "kept"),
+    [
+        ("https://tom:pa@ss-word@example.com/k/v.git", "https://example.com/k/v.git"),
+        ("https://tom@work:p@ss@example.com:8443/k", "https://example.com:8443/k"),
+        ("ssh://tom:pa@ss@example.com/k/v.git", "ssh://example.com/k/v.git"),
+    ],
+)
+def test_git_detail_drops_the_whole_sign_in_part(url, kept):
+    from brain.api import _git_detail
+
+    detail = _git_detail(f"fatal: unable to access '{url}': 403")
+
+    assert detail == f"fatal: unable to access '{kept}': 403"
+
+
+def test_git_detail_keeps_an_address_after_the_url():
+    from brain.api import _git_detail
+
+    detail = _git_detail("fatal: https://example.com/k/v.git: ask admin@example.com")
+
+    assert detail == "fatal: https://example.com/k/v.git: ask admin@example.com"
+
+
 @needs_git
 def test_a_failed_sync_shows_what_git_said(client, home, tmp_path):
     vault = _vault(home)
