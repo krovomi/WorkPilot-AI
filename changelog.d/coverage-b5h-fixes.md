@@ -12,3 +12,6 @@ section: 🐛 Corrections
   forme d'un seul texte, ce texte devient une note, au lieu d'une note par lettre ; des
   découvertes de session ou un ancien fichier de session d'une autre forme ne font plus
   échouer l'enregistrement ni l'import de l'ancienne mémoire.
+- **Graphe du cerveau** : un `graph.json` laissé par un autre outil avec des nœuds ou des liens
+  vides (`null`) ou d'une autre forme se lit comme un graphe vide, au lieu de faire échouer
+  chaque recherche jusqu'à la reconstruction suivante.
