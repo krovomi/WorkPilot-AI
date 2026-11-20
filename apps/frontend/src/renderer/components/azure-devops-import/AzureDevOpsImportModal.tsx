@@ -74,14 +74,13 @@ export function AzureDevOpsImportModal({ projectId, open, onOpenChange, onImport
 		}
 	};
 
-	const handleOpenChange = (next: boolean) => {
-		if (!next) {
-			clearTimeout(doneTimer.current);
-			picker.reset();
-			setImportError(null);
-			setImported(null);
-		}
-		onOpenChange(next);
+	// The dialog has no trigger: it only ever asks to close.
+	const close = () => {
+		clearTimeout(doneTimer.current);
+		picker.reset();
+		setImportError(null);
+		setImported(null);
+		onOpenChange(false);
 	};
 
 	const summary = imported
@@ -94,7 +93,7 @@ export function AzureDevOpsImportModal({ projectId, open, onOpenChange, onImport
 		: "";
 
 	return (
-		<Dialog open={open} onOpenChange={handleOpenChange}>
+		<Dialog open={open} onOpenChange={close}>
 			<DialogContent className="sm:max-w-[900px] md:max-w-[1000px] h-[85vh] max-h-[85vh] flex flex-col w-full">
 				<DialogHeader className="shrink-0">
 					<DialogTitle className="flex items-center gap-2 text-foreground">
@@ -198,7 +197,7 @@ export function AzureDevOpsImportModal({ projectId, open, onOpenChange, onImport
 				</div>
 
 				<DialogFooter className="shrink-0">
-					<Button variant="outline" onClick={() => handleOpenChange(false)}>
+					<Button variant="outline" onClick={close}>
 						{imported ? t("settings:azureDevOpsImport.done") : t("settings:azureDevOpsImport.cancel")}
 					</Button>
 					{showPicker && (
