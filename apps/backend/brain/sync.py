@@ -208,7 +208,14 @@ def ensure_ignored(root: Path) -> None:
         return
     sep = "" if not current or current.endswith("\n") else "\n"
     block = "# WorkPilot Brain\n" if "# WorkPilot Brain" not in present else ""
-    path.write_text(current + sep + block + "\n".join(missing) + "\n", encoding="utf-8")
+    try:
+        path.write_text(
+            current + sep + block + "\n".join(missing) + "\n", encoding="utf-8"
+        )
+    except OSError as exc:
+        # A read-only share: the brain still opens and syncs, only without
+        # these lines; raising here failed every sync before it started.
+        logger.debug("brain: ignore file not written: %s", exc)
 
 
 def ensure_repo(root: Path) -> bool:
