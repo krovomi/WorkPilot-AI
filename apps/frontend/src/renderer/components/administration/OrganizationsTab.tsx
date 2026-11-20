@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { Badge, Button, Input, Label } from "@/components/ui";
 import { useAdminStore } from "@/stores/admin-store";
 import { usePermissionsStore } from "@/stores/permissions-store";
+import { useSwitchOrg } from "./use-switch-org";
 
 export function OrganizationsTab() {
 	const { t } = useTranslation("administration");
@@ -21,7 +22,7 @@ export function OrganizationsTab() {
 
 	const isPlatformAdmin = usePermissionsStore((s) => s.isPlatformAdmin);
 	const activeOrgId = usePermissionsStore((s) => s.orgId);
-	const switchOrg = usePermissionsStore((s) => s.switchOrg);
+	const switchOrg = useSwitchOrg();
 
 	const [name, setName] = useState("");
 	const [slug, setSlug] = useState("");
