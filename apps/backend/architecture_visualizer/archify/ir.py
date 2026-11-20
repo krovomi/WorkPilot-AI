@@ -53,6 +53,10 @@ def load(path: Path) -> dict[str, Any]:
         raise IRError(f"no architecture model at {path.name}") from exc
     except json.JSONDecodeError as exc:
         raise IRError(f"{path.name} is not valid JSON: {exc.msg}") from exc
+    except UnicodeDecodeError as exc:
+        raise IRError(f"{path.name} is not UTF-8 text") from exc
+    except OSError as exc:  # a directory, or no permission to read it
+        raise IRError(f"{path.name} cannot be read: {exc.strerror or exc}") from exc
     if not isinstance(data, dict):
         raise IRError(f"{path.name} does not hold a JSON object")
     if data.get("diagram_type") != "architecture":
@@ -67,24 +71,46 @@ def save(path: Path, ir: dict[str, Any]) -> None:
     path.write_text(json.dumps(ir, indent="\t") + "\n", encoding="utf-8")
 
 
+def normalise_path(path: str) -> str:
+    """A cited or changed path as git lists it: posix, no leading `./` or `/`.
+
+    Only those prefixes go. `str.lstrip("./")` would also eat the dot of
+    `.github/` — a source no `git ls-tree` line would ever match again.
+    """
+    path = path.replace("\\", "/")
+    while path.startswith(("./", "/")):
+        path = path[2:] if path.startswith("./") else path[1:]
+    return path
+
+
+def components(ir: dict[str, Any]) -> list[dict[str, Any]]:
+    """The model's components that are objects; nothing when the list is not one.
+
+    The model is written by a session, so its shape is a claim until archify
+    has validated it — and the code that reads it runs before validation.
+    """
+    raw = ir.get("components")
+    return [c for c in raw if isinstance(c, dict)] if isinstance(raw, list) else []
+
+
+def sources(component: dict[str, Any]) -> list[dict[str, Any]]:
+    """A component's cited sources that are objects."""
+    raw = component.get("sources")
+    return [s for s in raw if isinstance(s, dict)] if isinstance(raw, list) else []
+
+
 def component_ids(ir: dict[str, Any]) -> set[str]:
-    return {
-        str(c["id"])
-        for c in ir.get("components", [])
-        if isinstance(c, dict) and c.get("id")
-    }
+    return {str(c["id"]) for c in components(ir) if c.get("id")}
 
 
 def source_paths(ir: dict[str, Any]) -> set[str]:
     """Every repository-relative path any component cites, normalised to posix."""
-    paths: set[str] = set()
-    for component in ir.get("components", []):
-        if not isinstance(component, dict):
-            continue
-        for source in component.get("sources", []) or []:
-            if isinstance(source, dict) and source.get("path"):
-                paths.add(str(source["path"]).replace("\\", "/").lstrip("./"))
-    return paths
+    return {
+        normalise_path(str(source["path"]))
+        for component in components(ir)
+        for source in sources(component)
+        if source.get("path")
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -168,25 +194,20 @@ def pin_repository(
         _strip_evidence(ir)
         return ir, None
 
-    for component in ir.get("components", []):
-        if not isinstance(component, dict):
-            continue
-        sources = component.get("sources")
-        if not isinstance(sources, list):
-            component.pop("sources", None)
-            continue
+    for component in components(ir):
         kept = [
             s
-            for s in sources
-            if isinstance(s, dict)
-            and str(s.get("path", "")).replace("\\", "/").lstrip("./") in tracked
+            for s in sources(component)
+            if normalise_path(str(s.get("path", ""))) in tracked
         ]
         if kept:
             component["sources"] = kept
         else:
             component.pop("sources", None)
 
-    meta = ir.setdefault("meta", {})
+    meta = ir.get("meta")
+    if not isinstance(meta, dict):
+        meta = ir["meta"] = {}
     repository: dict[str, Any] = {"url": url, "revision": sha}
     mode = _link_mode(url)
     if mode:
@@ -197,10 +218,11 @@ def pin_repository(
 
 def _strip_evidence(ir: dict[str, Any]) -> None:
     """Remove provenance wholesale. Half-pinned evidence is a refused render."""
-    ir.get("meta", {}).pop("repository", None)
-    for component in ir.get("components", []):
-        if isinstance(component, dict):
-            component.pop("sources", None)
+    meta = ir.get("meta")
+    if isinstance(meta, dict):
+        meta.pop("repository", None)
+    for component in components(ir):
+        component.pop("sources", None)
 
 
 # --------------------------------------------------------------------------- #

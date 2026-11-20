@@ -51,6 +51,17 @@ def commit_file(cwd: Path, name: str, content: str | bytes, message: str) -> Non
     git(cwd, "commit", "-q", "-m", message)
 
 
+def break_git_file(worktree: Path) -> None:
+    """Point a worktree's `.git` file nowhere.
+
+    Rewritten in place: Git for Windows hides `.git`, and Windows refuses to
+    open a hidden file for a fresh write ("w"), so "r+" keeps its attributes.
+    """
+    with (worktree / ".git").open("r+", encoding="utf-8") as handle:
+        handle.truncate(0)
+        handle.write("gitdir: /nowhere\n")
+
+
 @pytest.fixture
 def repo(isolated_repo, tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -358,7 +369,7 @@ class TestHandleWorkspaceChoice:
     @pytest.mark.parametrize("choice", [WorkspaceChoice.TEST, WorkspaceChoice.LATER])
     def test_instructions_for_a_broken_worktree(self, built, capsys, choice):
         path = built.get_worktree_path(SPEC)
-        (path / ".git").write_text("gitdir: /nowhere\n", encoding="utf-8")
+        break_git_file(path)
 
         finalization.handle_workspace_choice(choice, built.project_dir, SPEC, built)
 

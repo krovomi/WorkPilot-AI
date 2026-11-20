@@ -62,32 +62,3 @@ class ArchitectureDiagram:
     edges: list[DependencyEdge] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
     generated_at: str = field(default_factory=lambda: datetime.now().isoformat())
-
-    def to_dict(self) -> dict:
-        return {
-            "diagram_type": self.diagram_type.value,
-            "title": self.title,
-            "nodes": [
-                {
-                    "id": n.id,
-                    "name": n.name,
-                    "path": n.path,
-                    "type": n.type.value,
-                    "language": n.language,
-                    "size_lines": n.size_lines,
-                    "description": n.description,
-                }
-                for n in self.nodes
-            ],
-            "edges": [
-                {
-                    "source_id": e.source_id,
-                    "target_id": e.target_id,
-                    "edge_type": e.edge_type.value,
-                    "label": e.label,
-                }
-                for e in self.edges
-            ],
-            "metadata": self.metadata,
-            "generated_at": self.generated_at,
-        }

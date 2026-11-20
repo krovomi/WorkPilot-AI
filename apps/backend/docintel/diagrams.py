@@ -311,10 +311,18 @@ def _decode_excalidraw_payload(text: str) -> dict | None:
     return payload if isinstance(payload, dict) else None
 
 
+def _bound(arrow: dict, key: str) -> str:
+    """The element an arrow end is bound to, or "" for a free end."""
+    binding = arrow.get(key)
+    element = binding.get("elementId") if isinstance(binding, dict) else None
+    return str(element) if element else ""
+
+
 def parse_excalidraw_scene(scene: dict) -> DiagramModel | None:
+    listed = scene.get("elements")
     elements = [
         e
-        for e in scene.get("elements") or []
+        for e in (listed if isinstance(listed, list) else [])
         if isinstance(e, dict) and not e.get("isDeleted")
     ]
     if not elements:
@@ -330,10 +338,11 @@ def parse_excalidraw_scene(scene: dict) -> DiagramModel | None:
     arrows = [e for e in elements if e.get("type") in ("arrow", "line")]
     referenced: set[str] = set()
     for arrow in arrows:
-        for key in ("startBinding", "endBinding"):
-            binding = arrow.get(key) or {}
-            if binding.get("elementId"):
-                referenced.add(str(binding["elementId"]))
+        referenced.update(
+            bound
+            for bound in (_bound(arrow, "startBinding"), _bound(arrow, "endBinding"))
+            if bound
+        )
 
     diagram = DiagramModel(format="excalidraw")
     ids = {str(e.get("id", "")) for e in elements}
@@ -358,14 +367,13 @@ def parse_excalidraw_scene(scene: dict) -> DiagramModel | None:
         )
 
     for arrow in arrows:
-        start = (arrow.get("startBinding") or {}).get("elementId")
-        end = (arrow.get("endBinding") or {}).get("elementId")
+        start, end = _bound(arrow, "startBinding"), _bound(arrow, "endBinding")
         if not start or not end:
             continue
         diagram.edges.append(
             DiagramEdge(
-                source=str(start),
-                target=str(end),
+                source=start,
+                target=end,
                 label=" ".join(bound_text.get(str(arrow.get("id", "")), [])),
                 source_end=_EXCALIDRAW_ER_ENDS.get(
                     str(arrow.get("startArrowhead")), ""
