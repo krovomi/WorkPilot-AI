@@ -8,7 +8,7 @@
          (src/main/mcp-apps/view-protocol.ts).
          media-src blob: the verifier's scenario video, which main fetches from
          the local backend and the page shows from a blob URL (no host added). -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob:; img-src 'self' data: blob: https://*.githubusercontent.com https://*.supabase.co https://dev.azure.com https://*.dev.azure.com https://*.visualstudio.com https://*.vsassets.io; connect-src 'self' http://localhost:3000 http://localhost:8000 http://localhost:9000 http://127.0.0.1:9000 ws://localhost:8765 https://*.ingest.us.sentry.io https://api.openai.com https://open.er-api.com https://api.frankfurter.dev; frame-src 'self' http://localhost:* https: workpilot-mcp-app:" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob:; img-src 'self' data: blob: https://*.githubusercontent.com https://*.supabase.co https://dev.azure.com https://*.dev.azure.com https://*.visualstudio.com https://*.vsassets.io; connect-src 'self' http://localhost:3000 http://localhost:8000 http://localhost:9000 http://127.0.0.1:9000 ws://localhost:8765 https://*.ingest.us.sentry.io https://api.openai.com https://open.er-api.com; frame-src 'self' http://localhost:* https: workpilot-mcp-app:" />
     <!-- Local fonts with fallbacks -->
     <link rel="stylesheet" href="./fonts.css">
     <style>
