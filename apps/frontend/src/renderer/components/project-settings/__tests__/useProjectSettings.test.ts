@@ -265,9 +265,8 @@ describe("connection checks", () => {
 		await waitFor(() =>
 			expect(result.current.isCheckingAzureDevOps).toBe(false),
 		);
-		expect(result.current.azureDevOpsConnectionStatus).toEqual({
-			connected: true,
-		});
+		// New settings, no answer: the old status no longer describes them.
+		expect(result.current.azureDevOpsConnectionStatus).toBeNull();
 
 		api.checkAzureDevOpsConnection.mockRejectedValueOnce(new Error("down"));
 		await act(() => result.current.updateEnvConfig({ azureDevOpsPat: "p3" }));
@@ -302,7 +301,7 @@ describe("connection checks", () => {
 		stores.checkGitHubConnection.mockResolvedValueOnce(null);
 		await act(() => result.current.updateEnvConfig({ githubRepo: "o/r2" }));
 		await waitFor(() => expect(result.current.isCheckingGitHub).toBe(false));
-		expect(result.current.gitHubConnectionStatus).toEqual({ connected: true });
+		expect(result.current.gitHubConnectionStatus).toBeNull();
 
 		stores.checkGitHubConnection.mockRejectedValueOnce(new Error("down"));
 		await act(() => result.current.updateEnvConfig({ githubRepo: "o/r3" }));
@@ -339,7 +338,7 @@ describe("connection checks", () => {
 		api.checkGitLabConnection.mockResolvedValueOnce({ success: false });
 		await act(() => result.current.updateEnvConfig({ gitlabProject: "g/b" }));
 		await waitFor(() => expect(result.current.isCheckingGitLab).toBe(false));
-		expect(result.current.gitLabConnectionStatus).toEqual({ connected: true });
+		expect(result.current.gitLabConnectionStatus).toBeNull();
 
 		api.checkGitLabConnection.mockRejectedValueOnce(new Error("down"));
 		await act(() => result.current.updateEnvConfig({ gitlabProject: "g/c" }));
