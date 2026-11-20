@@ -14,6 +14,7 @@
  * refused when it is a link.
  */
 
+import { randomBytes } from "node:crypto";
 import {
 	appendFileSync,
 	lstatSync,
@@ -190,8 +191,9 @@ function compact(file: string): void {
 		.split("\n")
 		.filter((line) => line.trim());
 	const kept = lines.slice(-KEEP_LINES_ON_COMPACT);
-	const temp = `${file}.${process.pid}.tmp`;
-	writeFileSync(temp, `${kept.join("\n")}\n`, "utf-8");
+	// A new name each time, created only if nothing is there yet.
+	const temp = `${file}.${randomBytes(8).toString("hex")}.tmp`;
+	writeFileSync(temp, `${kept.join("\n")}\n`, { encoding: "utf-8", flag: "wx" });
 	renameSync(temp, file);
 }
 

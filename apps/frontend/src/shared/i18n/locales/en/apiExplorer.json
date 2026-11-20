@@ -101,7 +101,7 @@
 			"grantType": "Grant Type",
 			"grants": {
 				"client_credentials": "Client Credentials",
-				"authorization_code": "Authorization Code (With PKCE)",
+				"authorization_code": "Authorization Code",
 				"password": "Password"
 			},
 			"configureToken": "Configure New Token",
@@ -172,7 +172,11 @@
 		"clearSearch": "Clear the search",
 		"editEnvironment": "Edit {{name}}",
 		"removeEnvironment": "Remove {{name}}",
-		"showToken": "Show the token"
+		"showToken": "Show the token",
+		"showSecret": "Show the value",
+		"copyResponse": "Copy the response",
+		"useRow": "Send",
+		"removeRow": "Remove"
 	},
 	"title": "API Studio",
 	"description": "Load an OpenAPI contract, or let WorkPilot scan the project routes on every stack, then send requests and export the contract."

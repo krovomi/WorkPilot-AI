@@ -6,6 +6,7 @@
  * "installed" is read from that project's folders by the main process.
  */
 
+import i18n from "i18next";
 import { create } from "zustand";
 import type {
 	InstalledPlugin,
@@ -124,23 +125,32 @@ export async function loadPluginCatalog(): Promise<void> {
 		if (result?.success) {
 			store.setCatalog(result.data);
 		} else {
-			store.setError(result?.error || "Failed to load catalog");
+			store.setError(
+				result?.error || i18n.t("common:pluginMarketplace.errors.loadCatalog"),
+			);
 		}
 	} catch (err) {
 		store.setError(
-			err instanceof Error ? err.message : "Failed to load catalog",
+			err instanceof Error
+				? err.message
+				: i18n.t("common:pluginMarketplace.errors.loadCatalog"),
 		);
 	} finally {
 		store.setCatalogLoading(false);
 	}
 }
 
+/** The last `loadInstalledPlugins` call: only its answer may land. */
+let installedRequest = 0;
+
 /** Reads which catalog plugins the project has as skills. */
 export async function loadInstalledPlugins(
 	projectId: string | null | undefined,
 ): Promise<void> {
+	const request = ++installedRequest;
 	const store = usePluginMarketplaceStore.getState();
 	if (!projectId) {
+		store.setInstalledLoading(false);
 		store.setInstalled(null, []);
 		return;
 	}
@@ -150,14 +160,30 @@ export async function loadInstalledPlugins(
 			"pluginMarketplace:getInstalled",
 			{ projectId },
 		);
-		store.setInstalled(projectId, result?.success ? result.data : []);
+		// The person picked another project while this one was read.
+		if (request !== installedRequest) return;
+		if (result?.success) {
+			store.setInstalled(projectId, result.data);
+		} else {
+			store.setInstalled(projectId, []);
+			store.setError(
+				result?.error ||
+					i18n.t("common:pluginMarketplace.errors.loadInstalled"),
+			);
+		}
 	} catch (err) {
-		console.error(
-			"[Plugin Marketplace] Failed to load installed plugins:",
-			err,
+		if (request !== installedRequest) return;
+		// Keep the last list only when it is this project's.
+		if (usePluginMarketplaceStore.getState().projectId !== projectId) {
+			store.setInstalled(projectId, []);
+		}
+		store.setError(
+			err instanceof Error
+				? err.message
+				: i18n.t("common:pluginMarketplace.errors.loadInstalled"),
 		);
 	} finally {
-		store.setInstalledLoading(false);
+		if (request === installedRequest) store.setInstalledLoading(false);
 	}
 }
 
@@ -177,10 +203,10 @@ export async function installPlugin(
 			await loadInstalledPlugins(projectId);
 			return true;
 		}
-		store.setError(result?.error || "Installation failed");
+		store.setError(result?.error || i18n.t("common:pluginMarketplace.errors.install"));
 		return false;
 	} catch (err) {
-		store.setError(err instanceof Error ? err.message : "Installation failed");
+		store.setError(err instanceof Error ? err.message : i18n.t("common:pluginMarketplace.errors.install"));
 		return false;
 	} finally {
 		store.setIsInstalling(null);
@@ -202,10 +228,10 @@ export async function uninstallPlugin(
 			await loadInstalledPlugins(projectId);
 			return true;
 		}
-		store.setError(result?.error || "Uninstall failed");
+		store.setError(result?.error || i18n.t("common:pluginMarketplace.errors.uninstall"));
 		return false;
 	} catch (err) {
-		store.setError(err instanceof Error ? err.message : "Uninstall failed");
+		store.setError(err instanceof Error ? err.message : i18n.t("common:pluginMarketplace.errors.uninstall"));
 		return false;
 	}
 }

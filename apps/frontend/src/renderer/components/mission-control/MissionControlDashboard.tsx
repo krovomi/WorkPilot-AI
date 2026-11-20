@@ -6,6 +6,8 @@
 import { Activity, AlertTriangle, Brain, GitBranch, Plus, Power, PowerOff, RefreshCw, Rocket, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
+import { appDateLocale } from "../../lib/date-format";
 import { useMissionControlStore } from "../../stores/mission-control-store";
 import {
 	CharterButton,
@@ -21,6 +23,7 @@ import {
 	Stats,
 } from "../charter";
 import { WavesView } from "../conflict-predictor/WavesView";
+import { formatElapsed } from "./agent-format";
 import { AddAgentDialog, AgentEventLog, AgentPanel, DecisionTreeViewer } from "./index";
 
 const FEATURES = [
@@ -29,14 +32,6 @@ const FEATURES = [
 	{ key: "featureDecisionTree", icon: GitBranch },
 	{ key: "featureLiveView", icon: Activity },
 ] as const;
-
-function formatElapsed(seconds: number): string {
-	if (seconds < 60) return `${Math.floor(seconds)}s`;
-	if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
-	const h = Math.floor(seconds / 3600);
-	const m = Math.floor((seconds % 3600) / 60);
-	return `${h}h ${m}m`;
-}
 
 export function MissionControlDashboard() {
 	const { t } = useTranslation(["missionControl", "common", "navigation"]);
@@ -59,9 +54,32 @@ export function MissionControlDashboard() {
 		selectAgent,
 		startPolling,
 		stopPolling,
-	} = useMissionControlStore();
+	} = useMissionControlStore(
+		useShallow((s) => ({
+			session: s.session,
+			isActive: s.isActive,
+			agents: s.agents,
+			selectedAgentId: s.selectedAgentId,
+			decisionTrees: s.decisionTrees,
+			events: s.events,
+			isLoading: s.isLoading,
+			error: s.error,
+			startSession: s.startSession,
+			stopSession: s.stopSession,
+			fetchState: s.fetchState,
+			createAgent: s.createAgent,
+			removeAgent: s.removeAgent,
+			startAgent: s.startAgent,
+			stopAgent: s.stopAgent,
+			selectAgent: s.selectAgent,
+			startPolling: s.startPolling,
+			stopPolling: s.stopPolling,
+		})),
+	);
 
 	const [showAddAgent, setShowAddAgent] = useState(false);
+	// null: nothing refused yet; "" a refusal without a reason.
+	const [createError, setCreateError] = useState<string | null>(null);
 
 	// Coming back to the page finds the session still open in the backend,
 	// with the agents that kept running meanwhile.
@@ -82,12 +100,21 @@ export function MissionControlDashboard() {
 	const selectedTree = selectedAgentId ? (decisionTrees[selectedAgentId] ?? null) : null;
 
 	const runningCount = agents.filter((a) => a.status === "running").length;
-	const totalTokens = agents.reduce((sum, a) => sum + (a.tokens?.total_tokens ?? 0), 0);
-	const totalCost = agents.reduce((sum, a) => sum + (a.tokens?.estimated_cost_usd ?? 0), 0);
+	const totalTokens = agents.reduce((sum, a) => sum + a.tokens.total_tokens, 0);
+	const totalCost = agents.reduce((sum, a) => sum + a.tokens.estimated_cost_usd, 0);
 
+	const openAddAgent = () => {
+		setCreateError(null);
+		setShowAddAgent(true);
+	};
 	const handleAddAgent = async (name: string, role: string, provider: string, model: string, modelLabel: string) => {
-		await createAgent(name, role, provider, model, modelLabel);
+		const agent = await createAgent(name, role, provider, model, modelLabel);
+		if (!agent) {
+			setCreateError(useMissionControlStore.getState().error ?? "");
+			return false;
+		}
 		setShowAddAgent(false);
+		return true;
 	};
 
 	const header = (actions: React.ReactNode) => (
@@ -101,8 +128,8 @@ export function MissionControlDashboard() {
 		/>
 	);
 
-	// Before a session: what it does, and one button to launch it.
-	if (!isActive) {
+	// Before a session (or after the backend ended it): what it does, and one button to launch it.
+	if (!session || !isActive) {
 		return (
 			<ModuleStage scroll="page" data-testid="mission-control-view">
 				{header(
@@ -152,7 +179,7 @@ export function MissionControlDashboard() {
 					<CharterButton icon={PowerOff} variant="danger" onClick={() => void stopSession()}>
 						{t("missionControl:stopSession")}
 					</CharterButton>
-					<CharterButton variant="primary" icon={Plus} onClick={() => setShowAddAgent(true)}>
+					<CharterButton variant="primary" icon={Plus} onClick={openAddAgent}>
 						{t("missionControl:addAgent")}
 					</CharterButton>
 				</>,
@@ -161,7 +188,7 @@ export function MissionControlDashboard() {
 				<div className="flex flex-wrap items-center gap-2">
 					<span className="wp-kicker">{t("missionControl:session")}</span>
 					<Chip tone="green">
-						<span className="font-mono">{session?.session_id ?? "—"}</span>
+						<span className="font-mono">{session.session_id}</span>
 					</Chip>
 				</div>
 
@@ -171,7 +198,7 @@ export function MissionControlDashboard() {
 						value={t("missionControl:agentsRunning", { running: runningCount, total: agents.length })}
 						tone="blue"
 					/>
-					<Stat label={t("missionControl:statTokens")} value={totalTokens.toLocaleString()} tone="violet" />
+					<Stat label={t("missionControl:statTokens")} value={totalTokens.toLocaleString(appDateLocale())} tone="violet" />
 					<Stat
 						label={t("missionControl:statCost")}
 						value={t("missionControl:costValue", { value: totalCost.toFixed(4) })}
@@ -179,7 +206,7 @@ export function MissionControlDashboard() {
 					/>
 					<Stat
 						label={t("missionControl:statElapsed")}
-						value={formatElapsed(session?.elapsed_seconds ?? 0)}
+						value={formatElapsed(session.elapsed_seconds)}
 						tone="orange"
 					/>
 				</Stats>
@@ -240,7 +267,12 @@ export function MissionControlDashboard() {
 
 				<WavesView />
 			</Page>
-			<AddAgentDialog open={showAddAgent} onOpenChange={setShowAddAgent} onAdd={handleAddAgent} />
+			<AddAgentDialog
+				open={showAddAgent}
+				onOpenChange={setShowAddAgent}
+				onAdd={handleAddAgent}
+				error={createError}
+			/>
 		</ModuleStage>
 	);
 }
