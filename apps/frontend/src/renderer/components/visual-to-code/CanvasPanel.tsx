@@ -58,7 +58,7 @@ import "./flow-canvas.css";
 import { saveAs } from "file-saver";
 import { toast } from "@/hooks/use-toast";
 import {
-	blockMeta,
+	blockLabelKey,
 	FRAMEWORKS_BY_TYPE,
 	needsFramework,
 } from "../../lib/architecture-blocks";
@@ -131,6 +131,20 @@ import {
 export type { DiagramType } from "../../stores/visual-to-code-store";
 
 const DIAGRAM_TYPES: DiagramType[] = ["architecture", "flowchart", "mockup"];
+
+/** A block whose stack is being chosen before it is placed. */
+interface PendingNode {
+	id: string;
+	type: string;
+	position: { x: number; y: number };
+}
+
+/** The start of an exported file's name, per diagram type. */
+const EXPORT_PREFIX: Record<DiagramType, string> = {
+	architecture: "architectural",
+	flowchart: "organigramme",
+	mockup: "mockup",
+};
 
 /**
  * How long editing has to settle before a construction step is recorded.
@@ -242,12 +256,7 @@ export const CanvasPanel: React.FC = () => {
 		string | null
 	>(null);
 	const loadInputRef = useRef<HTMLInputElement>(null);
-	const [showFrameworkModal, setShowFrameworkModal] = useState(false);
-	const [pendingNode, setPendingNode] = useState<{
-		id: string;
-		type: string;
-		position: { x: number; y: number };
-	} | null>(null);
+	const [pendingNode, setPendingNode] = useState<PendingNode | null>(null);
 	const [customFramework, setCustomFramework] = useState("");
 	// biome-ignore lint/suspicious/noExplicitAny: ReactFlow instance has no exported type in v11
 	const reactFlowRef = useRef<any>(null);
@@ -482,18 +491,7 @@ export const CanvasPanel: React.FC = () => {
 		if (!globalThis.electronAPI?.runVisualProgramming) {
 			toast({
 				title: t("aiNotAvailable", "IA non disponible"),
-				description: "Electron API manquante",
-				variant: "destructive",
-			});
-			return;
-		}
-		if (nodes.length === 0) {
-			toast({
-				title: t("emptyDiagram", "Diagramme vide"),
-				description: t(
-					"addBlocksFirst",
-					"Ajoutez des blocs avant de générer du code.",
-				),
+				description: t("aiNotAvailableDesc", "Le pont vers l'application est absent."),
 				variant: "destructive",
 			});
 			return;
@@ -520,7 +518,7 @@ export const CanvasPanel: React.FC = () => {
 		if (!globalThis.electronAPI?.runVisualProgramming) {
 			toast({
 				title: t("aiNotAvailable", "IA non disponible"),
-				description: "Electron API manquante",
+				description: t("aiNotAvailableDesc", "Le pont vers l'application est absent."),
 				variant: "destructive",
 			});
 			return;
@@ -590,18 +588,8 @@ export const CanvasPanel: React.FC = () => {
 		});
 	};
 
+	// Reached only from a button disabled on an empty canvas.
 	const handleScaffold = async () => {
-		if (nodes.length === 0) {
-			toast({
-				title: t("emptyDiagram", "Diagramme vide"),
-				description: t(
-					"addBlocksFirst",
-					"Ajoutez des blocs avant de scaffolder l'architecture.",
-				),
-				variant: "destructive",
-			});
-			return;
-		}
 		// Prefill the new-project form; default to the active project when one is
 		// open, else force greenfield.
 		const stacks = [
@@ -635,57 +623,44 @@ export const CanvasPanel: React.FC = () => {
 		if (dir) setNewProjectLocation(dir);
 	};
 
+	/**
+	 * Reached only from a button disabled until the chosen target is complete:
+	 * an active project to write into, or a name and a folder for a new one.
+	 */
 	const confirmScaffold = async () => {
 		setShowScaffoldDialog(false);
 		setIsScaffolding(true);
 		try {
-			let projectId: string | null = null;
-			if (scaffoldMode === "active") {
-				projectId =
-					useProjectStore.getState().activeProjectId ?? activeProject?.id ?? null;
-			} else {
-				if (!newProjectName.trim() || !newProjectLocation.trim()) {
-					toast({
-						title: t("newProjectIncomplete", "Projet incomplet"),
-						description: t(
-							"newProjectIncompleteDesc",
-							"Renseignez un nom et un emplacement.",
-						),
-						variant: "destructive",
-					});
-					return;
-				}
-				const created = await globalThis.electronAPI?.createProjectFolder?.(
-					newProjectLocation.trim(),
-					newProjectName.trim(),
-					initGit,
-				);
-				if (!created?.success || !created.data) {
-					toast({
-						title: t("newProjectError", "Échec de la création du projet"),
-						description: created?.error,
-						variant: "destructive",
-					});
-					return;
-				}
-				const registered = await registerProject(created.data.path);
-				if (!registered) {
-					toast({
-						title: t("newProjectError", "Échec de la création du projet"),
-						variant: "destructive",
-					});
-					return;
-				}
-				projectId = registered.project.id;
+			// The project the dialog named, not whichever is active by the time
+			// the button is pressed: the person confirmed that one. The button
+			// stays disabled in this mode until there is one.
+			const target = scaffoldMode === "active" ? activeProject : null;
+			if (target) {
+				await runScaffold(target.id);
+				return;
 			}
-			if (!projectId) {
+			const created = await globalThis.electronAPI?.createProjectFolder?.(
+				newProjectLocation.trim(),
+				newProjectName.trim(),
+				initGit,
+			);
+			if (!created?.success || !created.data) {
 				toast({
-					title: t("noActiveProject", "Aucun projet actif"),
+					title: t("newProjectError", "Échec de la création du projet"),
+					description: created?.error,
 					variant: "destructive",
 				});
 				return;
 			}
-			await runScaffold(projectId);
+			const registered = await registerProject(created.data.path);
+			if (!registered) {
+				toast({
+					title: t("newProjectError", "Échec de la création du projet"),
+					variant: "destructive",
+				});
+				return;
+			}
+			await runScaffold(registered.project.id);
 		} finally {
 			setIsScaffolding(false);
 		}
@@ -711,7 +686,7 @@ export const CanvasPanel: React.FC = () => {
 		(type: string | undefined, position: { x: number; y: number }) => {
 			const id = genNodeId();
 			const label = type
-				? t(blockMeta(type)?.labelKey ?? type, type)
+				? t(blockLabelKey(type), type)
 				: t("newBlock", "Nouveau bloc");
 			setNodes((nds) => [
 				...nds,
@@ -749,7 +724,6 @@ export const CanvasPanel: React.FC = () => {
 			if (needsFramework(type)) {
 				setPendingNode({ id: genNodeId(), type, position });
 				setCustomFramework("");
-				setShowFrameworkModal(true);
 				return;
 			}
 			createNode(type, position);
@@ -767,7 +741,6 @@ export const CanvasPanel: React.FC = () => {
 	};
 
 	const handleAutoLayout = () => {
-		if (nodes.length === 0) return;
 		setNodes((nds) => autoLayout(nds, sanitizeEdges(nds, edges)));
 		globalThis.setTimeout(
 			() => reactFlowRef.current?.fitView?.({ padding: 0.2, duration: 300 }),
@@ -790,17 +763,11 @@ export const CanvasPanel: React.FC = () => {
 		);
 	};
 
-	const getDiagramPrefix = (type: string) => {
-		if (type === "architecture") return "architectural";
-		if (type === "flowchart") return "organigramme";
-		if (type === "mockup") return "mockup";
-		return "diagram";
-	};
 
 	const getDefaultFileName = () => {
 		const now = new Date();
 		const pad = (n: number, l: number = 2) => n.toString().padStart(l, "0");
-		return `${getDiagramPrefix(diagramType)}-export-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}.json`;
+		return `${EXPORT_PREFIX[diagramType]}-export-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}.json`;
 	};
 
 	/**
@@ -813,14 +780,12 @@ export const CanvasPanel: React.FC = () => {
 	 * and the previous architecture is one tab away.
 	 */
 	const handleNewArchitecture = () => {
-		setShowFrameworkModal(false);
 		setPendingNode(null);
 		createArchitecture();
 	};
 
 	const handleDuplicateArchitecture = () => {
 		if (!activeArchitectureId) return;
-		setShowFrameworkModal(false);
 		setPendingNode(null);
 		duplicateArchitecture(activeArchitectureId);
 	};
@@ -836,7 +801,7 @@ export const CanvasPanel: React.FC = () => {
 			if (!globalThis.electronAPI?.saveJsonFile) {
 				toast({
 					title: t("saveError", "Erreur lors de la sauvegarde"),
-					description: "Electron API non disponible",
+					description: t("aiNotAvailableDesc", "Le pont vers l'application est absent."),
 					variant: "destructive",
 				});
 				return;
@@ -849,7 +814,7 @@ export const CanvasPanel: React.FC = () => {
 			if (!result?.success) {
 				toast({
 					title: t("saveError", "Erreur lors de la sauvegarde"),
-					description: result?.error || "Erreur inconnue",
+					description: result?.error || t("unknownError", "Erreur inconnue"),
 					variant: "destructive",
 				});
 				return;
@@ -949,33 +914,29 @@ export const CanvasPanel: React.FC = () => {
 		event.dataTransfer.dropEffect = "copy";
 	};
 
-	const handleFrameworkSelect = (framework: string) => {
-		if (!pendingNode) return;
-		const meta = blockMeta(pendingNode.type);
-		const typeLabel = t(meta?.labelKey ?? pendingNode.type, pendingNode.type);
+	/** Create the pending block with the stack chosen in the dialog. */
+	const handleFrameworkSelect = (node: PendingNode, framework: string) => {
+		const typeLabel = t(blockLabelKey(node.type), node.type);
 		setNodes((nds) => [
 			...nds,
 			{
-				id: pendingNode.id,
-				position: pendingNode.position,
+				id: node.id,
+				position: node.position,
 				data: {
 					label: `${typeLabel} ${framework}`.trim(),
-					type: pendingNode.type,
+					type: node.type,
 					framework,
 				},
 				type: "editable",
 			},
 		]);
-		setShowFrameworkModal(false);
 		setPendingNode(null);
 		setCustomFramework("");
 	};
 
 	/** Create the block with no stack chosen — the inspector can set one later. */
-	const skipFramework = () => {
-		if (!pendingNode) return;
-		createNode(pendingNode.type, pendingNode.position);
-		setShowFrameworkModal(false);
+	const skipFramework = (node: PendingNode) => {
+		createNode(node.type, node.position);
 		setPendingNode(null);
 		setCustomFramework("");
 	};
@@ -998,8 +959,7 @@ export const CanvasPanel: React.FC = () => {
 	// being renamed silently deleted the current selection.
 	useEffect(() => {
 		const isTextEntry = (target: EventTarget | null) => {
-			const el = target as HTMLElement | null;
-			if (!el) return false;
+			const el = target as HTMLElement;
 			const tag = el.tagName;
 			return (
 				tag === "INPUT" ||
@@ -1008,8 +968,15 @@ export const CanvasPanel: React.FC = () => {
 				el.isContentEditable
 			);
 		};
+		/** A dialog or a popover over the canvas owns its own keys. */
+		const isOverlay = (target: EventTarget | null) =>
+			target instanceof Element &&
+			target.closest('[role="dialog"], [role="alertdialog"], [role="menu"]') !== null;
 		const onKeyDown = (e: KeyboardEvent) => {
-			if (isTextEntry(e.target)) return;
+			if (isTextEntry(e.target) || isOverlay(e.target)) return;
+			// The hub keeps this panel mounted behind the design-import tab; a
+			// Backspace or a Ctrl+Z typed there must not edit a canvas nobody sees.
+			if (useVisualToCodeStore.getState().activeMode !== "canvas") return;
 			const mod = e.ctrlKey || e.metaKey;
 			if (mod && e.key.toLowerCase() === "z") {
 				e.preventDefault();
@@ -1256,9 +1223,6 @@ export const CanvasPanel: React.FC = () => {
 		}
 	};
 
-	const frameworkOptions = pendingNode
-		? (FRAMEWORKS_BY_TYPE[pendingNode.type] ?? [])
-		: [];
 
 	return (
 		<div className="flex flex-col h-full flex-1 relative">
@@ -1708,7 +1672,13 @@ export const CanvasPanel: React.FC = () => {
 			</div>
 
 			{/* Technology chooser */}
-			<Dialog open={showFrameworkModal} onOpenChange={setShowFrameworkModal}>
+			{/* Open while a block waits for its stack, so every action below has one. */}
+			<Dialog
+				open={pendingNode !== null}
+				// Radix only ever reports the closing of a controlled dialog.
+				onOpenChange={() => setPendingNode(null)}
+			>
+				{pendingNode ? (
 				<DialogContent>
 					<DialogTitle>{t("chooseFramework")}</DialogTitle>
 					<DialogDescription>
@@ -1718,13 +1688,13 @@ export const CanvasPanel: React.FC = () => {
 						)}
 					</DialogDescription>
 					<div className="mt-3 grid grid-cols-3 gap-1.5">
-						{frameworkOptions.map((fw) => (
+						{FRAMEWORKS_BY_TYPE[pendingNode.type].map((fw) => (
 							<Button
 								key={fw}
 								variant="outline"
 								size="sm"
 								className="h-8 text-xs"
-								onClick={() => handleFrameworkSelect(fw)}
+								onClick={() => handleFrameworkSelect(pendingNode, fw)}
 							>
 								{t(fw, fw)}
 							</Button>
@@ -1745,7 +1715,7 @@ export const CanvasPanel: React.FC = () => {
 								onChange={(e) => setCustomFramework(e.target.value)}
 								onKeyDown={(e) => {
 									if (e.key === "Enter" && customFramework.trim()) {
-										handleFrameworkSelect(customFramework.trim());
+										handleFrameworkSelect(pendingNode, customFramework.trim());
 									}
 								}}
 								placeholder={t("otherStackPlaceholder", "ex. Quarkus")}
@@ -1755,34 +1725,30 @@ export const CanvasPanel: React.FC = () => {
 								size="sm"
 								variant="secondary"
 								disabled={!customFramework.trim()}
-								onClick={() => handleFrameworkSelect(customFramework.trim())}
+								onClick={() => handleFrameworkSelect(pendingNode, customFramework.trim())}
 							>
 								{t("use", "Utiliser")}
 							</Button>
 						</div>
 					</div>
 					<DialogFooter className="mt-4">
-						<Button variant="ghost" onClick={skipFramework}>
+						<Button variant="ghost" onClick={() => skipFramework(pendingNode)}>
 							{t("skipStack", "Sans technologie")}
 						</Button>
 						<Button
 							variant="ghost"
-							onClick={() => {
-								setShowFrameworkModal(false);
-								setPendingNode(null);
-							}}
+							onClick={() => setPendingNode(null)}
 						>
 							{t("cancel", "Annuler")}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
+				) : null}
 			</Dialog>
 
 			<Dialog
 				open={showSaveAsDialog}
-				onOpenChange={(open) => {
-					if (!open) cancelSaveAs();
-				}}
+				onOpenChange={cancelSaveAs}
 			>
 				<DialogContent>
 					<DialogTitle>
@@ -1879,7 +1845,7 @@ export const CanvasPanel: React.FC = () => {
 					<div className="mt-4 flex flex-col gap-2">
 						<button
 							type="button"
-							onClick={() => activeProject && setScaffoldMode("active")}
+							onClick={() => setScaffoldMode("active")}
 							disabled={!activeProject}
 							className={`text-left rounded-md border p-3 text-sm transition-colors disabled:opacity-50 ${
 								scaffoldMode === "active"

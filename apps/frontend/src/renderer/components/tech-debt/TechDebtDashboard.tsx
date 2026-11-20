@@ -1,5 +1,6 @@
 import { ArrowRight, FileWarning, Gauge, RefreshCw, TrendingDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
 import type { DebtItem } from "../../../preload/api/modules/tech-debt-api";
 import type { Lang } from "../../lib/debt-task-spec";
@@ -30,22 +31,24 @@ interface Props {
 
 export function TechDebtDashboard({ projectPath }: Props) {
 	const { t, i18n } = useTranslation(["techDebt", "common"]);
-	const lang: Lang = i18n.language?.toLowerCase().startsWith("fr")
-		? "fr"
-		: "en";
-	const {
-		items,
-		trend,
-		summary,
-		filters,
-		scanning,
-		error,
-		lastScannedAt,
-		setFilter,
-		scan,
-		refresh,
-		createTaskFromItem,
-	} = useTechDebtStore();
+	const lang: Lang = i18n.language.startsWith("fr") ? "fr" : "en";
+	const { loadedPath, items, trend, summary, filters, scanning, error, lastScannedAt } = useTechDebtStore(
+		useShallow((s) => ({
+			loadedPath: s.projectPath,
+			items: s.items,
+			trend: s.trend,
+			summary: s.summary,
+			filters: s.filters,
+			scanning: s.scanning,
+			error: s.error,
+			lastScannedAt: s.lastScannedAt,
+		})),
+	);
+	const setFilter = useTechDebtStore((s) => s.setFilter);
+	const scan = useTechDebtStore((s) => s.scan);
+	const refresh = useTechDebtStore((s) => s.refresh);
+	const createTaskFromItem = useTechDebtStore((s) => s.createTaskFromItem);
+	const setError = useTechDebtStore((s) => s.setError);
 
 	const [projectInput, setProjectInput] = useState(projectPath ?? "");
 	const [creatingItemId, setCreatingItemId] = useState<string | null>(null);
@@ -54,27 +57,24 @@ export function TechDebtDashboard({ projectPath }: Props) {
 		title: string;
 	} | null>(null);
 
-	// On arrival, load any previously persisted debt items (fast, read-only).
-	// A full scan is expensive and is only triggered when the user clicks the
-	// button — auto-scanning here would keep the button disabled the whole time.
+	// On arrival, and when the selected project changes, show that project's
+	// saved debt items (fast, read-only) and nothing of the previous one. A full
+	// scan is expensive and only runs on the button.
 	useEffect(() => {
-		if (projectPath && !items.length && !scanning) {
-			void refresh(projectPath);
-		}
-	}, [projectPath, items.length, scanning, refresh]);
+		setProjectInput(projectPath ?? "");
+		setCreatedTask(null);
+		if (projectPath && useTechDebtStore.getState().projectPath !== projectPath) void refresh(projectPath);
+	}, [projectPath, refresh]);
 
 	const filteredItems = useMemo(() => {
 		return items.filter((item) => {
 			if (item.roi < filters.minScore) return false;
-			if (filters.kind && item.kind !== filters.kind) return false;
-			if (
-				filters.search &&
-				!`${item.file_path} ${item.message}`
-					.toLowerCase()
-					.includes(filters.search.toLowerCase())
-			)
-				return false;
-			return true;
+			// The search matches what its placeholder promises: file, message and tags.
+			const query = filters.search.trim().toLowerCase();
+			return (
+				!query ||
+				`${item.file_path} ${item.message} ${item.tags.join(" ")}`.toLowerCase().includes(query)
+			);
 		});
 	}, [items, filters]);
 
@@ -85,24 +85,25 @@ export function TechDebtDashboard({ projectPath }: Props) {
 
 	const canScan = !scanning && !!projectInput.trim();
 
-	const handleScan = () => {
-		if (canScan) void scan(projectInput.trim());
-	};
+	// The button is disabled while it cannot scan, so it is the only guard.
+	const handleScan = () => void scan(projectInput.trim());
 
 	// Resolve the target project id: the dashboard is fed a raw path, but tasks
 	// are keyed by project id. Match the registered project by path, and fall
 	// back to the active project.
-	const resolveProjectId = (): string | null => {
+	const resolveProjectId = (target: string | null): string | null => {
 		const projState = useProjectStore.getState();
-		const target = projectInput.trim();
 		const byPath = projState.projects.find((p) => p.path === target);
 		return byPath?.id ?? projState.activeProjectId ?? null;
 	};
 
 	const handleCreateTask = async (item: DebtItem) => {
-		if (!projectInput.trim() || creatingItemId) return;
-		const projectId = resolveProjectId();
-		if (!projectId) return;
+		// The items belong to the project they were read for, not to the path typed since.
+		const projectId = resolveProjectId(loadedPath);
+		if (!projectId) {
+			setError(t("techDebt:errors.noProject"));
+			return;
+		}
 		setCreatingItemId(item.id);
 		try {
 			const task = await createTaskFromItem(projectId, item, lang);
@@ -112,11 +113,10 @@ export function TechDebtDashboard({ projectPath }: Props) {
 		}
 	};
 
-	const openCreatedTaskInKanban = () => {
-		if (!createdTask) return;
+	const openInKanban = (taskId: string) => {
 		globalThis.dispatchEvent(
 			new CustomEvent("workpilot:navigate-view", {
-				detail: { view: "kanban", taskId: createdTask.id },
+				detail: { view: "kanban", taskId },
 			}),
 		);
 	};
@@ -169,7 +169,7 @@ export function TechDebtDashboard({ projectPath }: Props) {
 							<Notice tone="green" icon={ArrowRight} role="status">
 								<button
 									type="button"
-									onClick={openCreatedTaskInKanban}
+									onClick={() => openInKanban(createdTask.id)}
 									className="flex w-full items-center justify-between gap-2 text-left"
 								>
 									<span className="truncate">

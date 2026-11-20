@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { SetupDeepLink } from "../../setup-hub/useSetupStatus";
-import { type GuidedStep, useGuidedTourStore } from "../guided-tour-store";
+import { type GuidedStep, startGuidedTour, useGuidedTourStore } from "../guided-tour-store";
 
 const proj = (section: SetupDeepLink["section"]): SetupDeepLink => ({
 	kind: "project",
@@ -56,5 +56,39 @@ describe("guided-tour store: skipSection", () => {
 		s.skipSection(); // linear is last section -> end
 		expect(useGuidedTourStore.getState().isActive).toBe(false);
 		expect(useGuidedTourStore.getState().steps).toHaveLength(0);
+	});
+});
+
+describe("guided-tour store: navigation", () => {
+	beforeEach(() => {
+		useGuidedTourStore.getState().stop();
+	});
+
+	it("does not start a tour without steps", () => {
+		useGuidedTourStore.getState().startTour([]);
+		expect(useGuidedTourStore.getState().isActive).toBe(false);
+	});
+
+	it("goes back but never before the first step", () => {
+		const s = useGuidedTourStore.getState();
+		s.startTour(TOUR);
+		s.back();
+		expect(useGuidedTourStore.getState().currentIndex).toBe(0);
+		s.next();
+		s.next();
+		s.back();
+		expect(useGuidedTourStore.getState().currentIndex).toBe(1);
+	});
+
+	it("has nothing to skip when no tour runs", () => {
+		useGuidedTourStore.getState().skipSection();
+		expect(useGuidedTourStore.getState()).toMatchObject({ isActive: false, currentIndex: 0 });
+	});
+
+	it("starts a tour from outside React and keeps the settings navigator", () => {
+		const navigate = () => undefined;
+		useGuidedTourStore.getState().registerNavigate(navigate);
+		startGuidedTour(TOUR);
+		expect(useGuidedTourStore.getState()).toMatchObject({ isActive: true, currentIndex: 0, navigateSettings: navigate });
 	});
 });
