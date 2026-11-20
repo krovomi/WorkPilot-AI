@@ -10,10 +10,23 @@ prompt lives (`docs/architecture/agent-prompts.md`).
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
+
+from security.untrusted import quote_untrusted
 
 # apps/backend/prompts
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
+
+
+def code_span(text: str) -> str:
+    """A repository name inside a Markdown code span, on one line.
+
+    A file or package name is the target repository's text: a backtick or a
+    line break in it would end the span and put the rest of it in the prompt
+    as prose.
+    """
+    return re.sub(r"[`\x00-\x1f\x7f]", "_", text)
 
 
 def _load(filename: str) -> str:
@@ -49,13 +62,17 @@ def architecture_delta_section(
 ) -> str:
     """The "you are updating an existing model" half of the authoring prompt."""
     listing = (
-        "\n".join(f"- `{path}`" for path in changed_files[:200])
+        "\n".join(f"- `{code_span(path)}`" for path in changed_files[:200])
         or "_The set of changed files could not be determined._"
     )
+    summary = task_summary.strip()
     section = _load("architecture_map_delta.md")
     section = section.replace("{{BASELINE_JSON}}", baseline_json)
     section = section.replace(
-        "{{TASK_SUMMARY}}", task_summary.strip() or "_No summary available._"
+        "{{TASK_SUMMARY}}",
+        quote_untrusted(summary, kind="issue_body", source="task description")
+        if summary
+        else "_No summary available._",
     )
     section = section.replace("{{CHANGED_FILES}}", listing)
     return section
