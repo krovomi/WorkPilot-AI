@@ -79,6 +79,16 @@
 			"profileCreatedAuthFailed": "Profile created but failed to prepare authentication: {{error}}",
 			"authPrepareFailed": "Failed to prepare authentication: {{error}}",
 			"authStartFailedMessage": "Failed to start authentication. Please try again."
+		},
+		"errors": {
+			"loadFailed": "The accounts could not be loaded.",
+			"invalidName": "The account name must contain at least one letter or number.",
+			"addFailed": "The account could not be added.",
+			"deleteFailed": "The account could not be deleted.",
+			"renameFailed": "The account could not be renamed.",
+			"setActiveFailed": "The account could not be made active.",
+			"authFailed": "Authentication could not be started for this account.",
+			"tokenFailed": "The token could not be saved."
 		}
 	},
 	"completion": {
@@ -168,7 +178,12 @@
 			"instructions": "The installer will open in your terminal. Follow the prompts to complete installation."
 		},
 		"learnMore": "Learn more about AI CLI",
-		"pathLabel": "Path:"
+		"pathLabel": "Path:",
+		"refresh": "Check again",
+		"errors": {
+			"checkFailed": "The AI CLI installation could not be checked.",
+			"installFailed": "The installation could not be started."
+		}
 	},
 	"devtools": {
 		"title": "Developer Tools",
@@ -191,6 +206,8 @@
 		},
 		"detectedSummary": "Detected on your system:",
 		"noToolsDetected": "No additional tools detected (VS Code and system terminal will be used)",
+		"systemTerminal": "System Terminal",
+		"saveFailed": "The tools could not be saved. Try again.",
 		"custom": "Custom...",
 		"saveAndContinue": "Save & Continue"
 	},

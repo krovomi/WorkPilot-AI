@@ -79,6 +79,16 @@
 			"profileCreatedAuthFailed": "Profil créé mais échec de la préparation de l'authentification : {{error}}",
 			"authPrepareFailed": "Échec de la préparation de l'authentification : {{error}}",
 			"authStartFailedMessage": "Échec du démarrage de l'authentification. Veuillez réessayer."
+		},
+		"errors": {
+			"loadFailed": "Les comptes n'ont pas pu être chargés.",
+			"invalidName": "Le nom du compte doit contenir au moins une lettre ou un chiffre.",
+			"addFailed": "Le compte n'a pas pu être ajouté.",
+			"deleteFailed": "Le compte n'a pas pu être supprimé.",
+			"renameFailed": "Le compte n'a pas pu être renommé.",
+			"setActiveFailed": "Le compte n'a pas pu devenir le compte actif.",
+			"authFailed": "L'authentification de ce compte n'a pas pu démarrer.",
+			"tokenFailed": "Le jeton n'a pas pu être enregistré."
 		}
 	},
 	"completion": {
@@ -168,7 +178,12 @@
 			"instructions": "L'installateur s'ouvrira dans votre terminal. Suivez les instructions pour terminer l'installation."
 		},
 		"learnMore": "En savoir plus sur le CLI IA",
-		"pathLabel": "Chemin :"
+		"pathLabel": "Chemin :",
+		"refresh": "Vérifier à nouveau",
+		"errors": {
+			"checkFailed": "L'installation du CLI IA n'a pas pu être vérifiée.",
+			"installFailed": "L'installation n'a pas pu être lancée."
+		}
 	},
 	"devtools": {
 		"title": "Outils de développement",
@@ -191,6 +206,8 @@
 		},
 		"detectedSummary": "Détecté sur votre système :",
 		"noToolsDetected": "Aucun outil supplémentaire détecté (VS Code et le terminal système seront utilisés)",
+		"systemTerminal": "Terminal du système",
+		"saveFailed": "Les outils n'ont pas pu être enregistrés. Réessayez.",
 		"custom": "Personnalisé...",
 		"saveAndContinue": "Enregistrer et continuer"
 	},
