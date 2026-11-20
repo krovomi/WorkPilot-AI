@@ -1205,7 +1205,8 @@
 			"installing": "Installation...",
 			"uninstall": "Désinstaller",
 			"enable": "Activer",
-			"disable": "Désactiver"
+			"disable": "Désactiver",
+			"uninstallNamed": "Désinstaller {{name}}"
 		},
 		"sdk": {
 			"title": "SDK de Plugins",
@@ -1276,14 +1277,26 @@
 			"openFolderFailed": "Impossible d’ouvrir le dossier du plugin",
 			"done": "Terminé",
 			"namePlaceholder": "Mon super plugin",
-			"untitled": "Sans titre"
+			"createFailed": "Impossible de créer le plugin",
+			"copyFailed": "Impossible de copier la configuration",
+			"fieldIdInvalid": "Lettres minuscules, chiffres et tirets simples (mon-plugin)",
+			"fieldTemplateContentPlaceholder": "# Modèle de spec\n\n## Exigences\n...",
+			"configFile": "Écrit dans plugin.config.json, dans le dossier du plugin"
 		},
 		"byAuthor": "par {{author}}",
 		"noProject": "Sélectionnez un projet : les plugins s'installent dans les skills d'un projet.",
 		"installedIn": "Dans {{paths}}",
 		"howToUse": "Lancez-le avec /{{id}} dans la barre de commandes du Kanban, ou laissez l'agent s'en servir.",
 		"showSkill": "Voir le skill",
-		"hideSkill": "Masquer le skill"
+		"hideSkill": "Masquer le skill",
+		"sortBy": "Trier les plugins",
+		"loading": "Chargement des plugins",
+		"errors": {
+			"loadCatalog": "Impossible de charger le catalogue",
+			"loadInstalled": "Impossible de lire les plugins installés dans ce projet",
+			"install": "Échec de l’installation",
+			"uninstall": "Échec de la désinstallation"
+		}
 	},
 	"chatHistory": {
 		"title": "Historique des conversations",

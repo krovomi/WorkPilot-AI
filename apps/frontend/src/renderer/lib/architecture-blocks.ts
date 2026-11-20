@@ -240,6 +240,11 @@ export function blockMeta(type?: string): BlockMeta | undefined {
 	return type ? BY_TYPE[type] : undefined;
 }
 
+/** The i18n key naming a type's block, or the type itself when it has none. */
+export function blockLabelKey(type: string): string {
+	return BY_TYPE[type]?.labelKey ?? type;
+}
+
 /** Accent colour for a type, falling back to the neutral custom accent. */
 export function blockAccent(type?: string): string {
 	return blockMeta(type)?.accent ?? "#64748b";
