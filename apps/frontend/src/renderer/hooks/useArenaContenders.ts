@@ -18,7 +18,7 @@ import { getStaticProviders } from "@shared/utils/providers";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useShallow } from "zustand/react/shallow";
-import { fetchAgenticCapabilities } from "./useAgenticCapabilities";
+import { capabilityOf, fetchAgenticCapabilities } from "./useAgenticCapabilities";
 import { fetchProviderModelCatalog } from "./useProviderModelCatalog";
 
 export interface ArenaRoster {
@@ -84,11 +84,11 @@ export function useArenaContenders(): ArenaRoster {
 
 			const allConfigured = providers.filter((p) => status[p.name]);
 			const degrading = allConfigured
-				.filter((p) => capabilities[p.name]?.hasAdapter === false)
+				.filter((p) => capabilityOf(capabilities, p.name)?.hasAdapter === false)
 				.map((p) => ({
 					name: p.name,
 					label: p.label,
-					degradesTo: capabilities[p.name]?.degradesTo || "claude",
+					degradesTo: capabilityOf(capabilities, p.name)?.degradesTo || "claude",
 				}));
 			const degradingNames = new Set(degrading.map((p) => p.name));
 			const configured = allConfigured.filter(
