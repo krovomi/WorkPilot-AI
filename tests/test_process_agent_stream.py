@@ -14,54 +14,10 @@ Covers:
 - Error handling in stream processing
 """
 
-import importlib.util
-import sys
-import types
-from pathlib import Path as _Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-# Mock claude_agent_sdk before any imports that transitively need it
-_mock_sdk = MagicMock()
-_mock_sdk.ClaudeSDKClient = MagicMock()
-_mock_sdk.ClaudeAgentOptions = MagicMock()
-_mock_sdk.AgentDefinition = MagicMock()
-_mock_sdk.types = MagicMock()
-_mock_sdk.types.HookMatcher = MagicMock()
-sys.modules["claude_agent_sdk"] = _mock_sdk
-sys.modules["claude_agent_sdk.types"] = _mock_sdk.types
-
-# Create runners package hierarchy WITHOUT triggering runners/__init__.py
-# (which eagerly imports ideation_runner → cli → qa → claude_agent_sdk chain)
-_BACKEND = _Path(__file__).parent.parent / "apps" / "backend"
-_runners_path = str(_BACKEND / "runners")
-
-for _pkg, _subpath in [
-    ("runners", "runners"),
-    ("runners.github", "runners/github"),
-    ("runners.github.services", "runners/github/services"),
-]:
-    if _pkg not in sys.modules:
-        _mod = types.ModuleType(_pkg)
-        _mod.__path__ = [str(_BACKEND / _subpath)]
-        _mod.__package__ = _pkg
-        sys.modules[_pkg] = _mod
-
-# Now load sdk_utils directly
-_sdk_utils_path = _BACKEND / "runners" / "github" / "services" / "sdk_utils.py"
-_spec = importlib.util.spec_from_file_location(
-    "runners.github.services.sdk_utils",
-    _sdk_utils_path,
-    submodule_search_locations=[],
-)
-_sdk_utils_mod = importlib.util.module_from_spec(_spec)
-sys.modules["runners.github.services.sdk_utils"] = _sdk_utils_mod
-_spec.loader.exec_module(_sdk_utils_mod)
-
-process_agent_stream = _sdk_utils_mod.process_agent_stream
-
 from core.agent_client import (
     AgentClient,
     AgentMessage,
@@ -71,6 +27,7 @@ from core.agent_client import (
     CopilotAgentClient,
     MessageRole,
 )
+from runners.github.services.sdk_utils import process_agent_stream
 
 # =============================================================================
 # Helpers
