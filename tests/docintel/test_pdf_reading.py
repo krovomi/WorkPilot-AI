@@ -160,6 +160,16 @@ class TestLayout:
         assert pdf._layout_text(page) == "Ab\n   C"
 
 
+class _DamagedPage:
+    """A page whose text layer cannot be read, as pdfium reports a broken one."""
+
+    def __init__(self, index: int):
+        self.index = index
+
+    def get_textpage(self):
+        raise RuntimeError(f"page {self.index} is damaged")
+
+
 class _Document:
     def __init__(self, pages: int, close_error: bool):
         self.pages = pages
@@ -169,7 +179,7 @@ class _Document:
         return self.pages
 
     def __getitem__(self, index: int):
-        raise RuntimeError(f"page {index} is damaged")
+        return _DamagedPage(index)
 
     def close(self) -> None:
         if self.close_error:
