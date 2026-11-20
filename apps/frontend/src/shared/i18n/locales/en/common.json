@@ -1396,7 +1396,8 @@
 		"password": "Password",
 		"localAccountButton": "Sign in",
 		"localModeButton": "Local mode",
-		"haveInvite": "I have an invitation"
+		"haveInvite": "I have an invitation",
+		"failed": "Could not sign in"
 	},
 	"acceptInvite": {
 		"title": "Create your account",

@@ -1396,7 +1396,8 @@
 		"password": "Mot de passe",
 		"localAccountButton": "Connexion",
 		"localModeButton": "Mode local",
-		"haveInvite": "J'ai une invitation"
+		"haveInvite": "J'ai une invitation",
+		"failed": "Connexion impossible"
 	},
 	"acceptInvite": {
 		"title": "Créer votre compte",
