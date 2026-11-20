@@ -96,7 +96,7 @@ export function QuotasTab() {
 										setDraft((prev) => ({ ...prev, [field]: e.target.value }))
 									}
 								/>
-								{used !== null && used !== undefined && (
+								{used !== null && (
 									<span className="text-xs text-muted-foreground whitespace-nowrap">
 										{t("quotas.currentlyUsed", { count: used })}
 									</span>

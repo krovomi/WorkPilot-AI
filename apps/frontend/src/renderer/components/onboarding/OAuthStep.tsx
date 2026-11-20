@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import type { ClaudeProfile } from "../../../shared/types";
 import { useToast } from "../../hooks/use-toast";
+import { isMacOS } from "../../lib/os-detection";
 import { cn } from "../../lib/utils";
 import { loadClaudeProfiles as loadGlobalClaudeProfiles } from "../../stores/claude-profile-store";
 import { AuthTerminal } from "../settings/AuthTerminal";
@@ -88,6 +89,16 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 	// and showed a fresh install as "Authenticated".
 	const hasAuthenticatedProfile = claudeProfiles.some(isProfileSignedIn);
 
+	// A thrown IPC error carries the main process's message; anything else
+	// (or a refused call without a reason) falls back to a translated one.
+	const describeError = useCallback(
+		(err: unknown, key: string) =>
+			err instanceof Error ? err.message : t(`oauth.errors.${key}`),
+		[t],
+	);
+	const refusal = (reason: string | undefined, key: string) =>
+		reason || t(`oauth.errors.${key}`);
+
 	// Reusable function to load Claude profiles
 	const loadClaudeProfiles = useCallback(async () => {
 		setIsLoadingProfiles(true);
@@ -99,13 +110,15 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 				setActiveProfileId(result.data.activeProfileId);
 				// Also update the global store
 				await loadGlobalClaudeProfiles();
+			} else {
+				setError(result.error || t("oauth.errors.loadFailed"));
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to load profiles");
+			setError(describeError(err, "loadFailed"));
 		} finally {
 			setIsLoadingProfiles(false);
 		}
-	}, []);
+	}, [describeError, t]);
 
 	// Load Claude profiles on mount
 	useEffect(() => {
@@ -113,9 +126,8 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 	}, [loadClaudeProfiles]);
 
 	// Profile management handlers - following patterns from IntegrationSettings.tsx
+	// Only reachable with a name: the button is disabled and Enter is ignored without one.
 	const handleAddProfile = async () => {
-		if (!newProfileName.trim()) return;
-
 		setIsAddingProfile(true);
 		setError(null);
 		try {
@@ -129,8 +141,7 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 
 			// Validate that sanitized slug is not empty (e.g., "!!!" becomes "")
 			if (!profileSlug) {
-				setError("Profile name must contain at least one letter or number");
-				setIsAddingProfile(false);
+				setError(t("oauth.errors.invalidName"));
 				return;
 			}
 
@@ -142,42 +153,38 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 				createdAt: new Date(),
 			});
 
-			if (result.success && result.data) {
-				await loadClaudeProfiles();
-				const savedProfileName = newProfileName.trim();
-				setNewProfileName("");
+			if (!result.success || !result.data) {
+				setError(refusal(result.error, "addFailed"));
+				return;
+			}
+			await loadClaudeProfiles();
+			setNewProfileName("");
 
-				// Get terminal config for authentication
-				const authResult = await globalThis.electronAPI.authenticateClaudeProfile(
-					result.data.id,
-				);
+			// Get terminal config for authentication
+			const authResult = await globalThis.electronAPI.authenticateClaudeProfile(
+				result.data.id,
+			);
 
-				if (authResult.success && authResult.data) {
-					setAuthenticatingProfileId(result.data.id);
+			if (authResult.success && authResult.data) {
+				setAuthenticatingProfileId(result.data.id);
 
-					// Set up embedded auth terminal
-					setAuthTerminal({
-						terminalId: authResult.data.terminalId,
-						configDir: authResult.data.configDir,
-						profileId: result.data.id,
-						profileName: savedProfileName,
-					});
-
-					console.warn(
-						"[OAuthStep] New profile auth terminal ready:",
-						authResult.data,
-					);
-				} else {
-					toast({
-						variant: "destructive",
-						title: t("oauth.alerts.profileCreatedAuthFailed", {
-							error: authResult.error || t("oauth.toast.tryAgain"),
-						}),
-					});
-				}
+				// Set up embedded auth terminal
+				setAuthTerminal({
+					terminalId: authResult.data.terminalId,
+					configDir: authResult.data.configDir,
+					profileId: result.data.id,
+					profileName,
+				});
+			} else {
+				toast({
+					variant: "destructive",
+					title: t("oauth.alerts.profileCreatedAuthFailed", {
+						error: authResult.error || t("oauth.toast.tryAgain"),
+					}),
+				});
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to add profile");
+			setError(describeError(err, "addFailed"));
 			toast({
 				variant: "destructive",
 				title: t("oauth.toast.addProfileFailed"),
@@ -195,9 +202,11 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 			const result = await globalThis.electronAPI.deleteClaudeProfile(profileId);
 			if (result.success) {
 				await loadClaudeProfiles();
+			} else {
+				setError(refusal(result.error, "deleteFailed"));
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to delete profile");
+			setError(describeError(err, "deleteFailed"));
 		} finally {
 			setDeletingProfileId(null);
 		}
@@ -213,20 +222,23 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 		setEditingProfileName("");
 	};
 
-	const handleRenameProfile = async () => {
-		if (!editingProfileId || !editingProfileName.trim()) return;
+	const handleRenameProfile = async (profileId: string) => {
+		const name = editingProfileName.trim();
+		if (!name) return;
 
 		setError(null);
 		try {
 			const result = await globalThis.electronAPI.renameClaudeProfile(
-				editingProfileId,
-				editingProfileName.trim(),
+				profileId,
+				name,
 			);
 			if (result.success) {
 				await loadClaudeProfiles();
+			} else {
+				setError(refusal(result.error, "renameFailed"));
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to rename profile");
+			setError(describeError(err, "renameFailed"));
 		} finally {
 			setEditingProfileId(null);
 			setEditingProfileName("");
@@ -240,11 +252,11 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 			if (result.success) {
 				setActiveProfileId(profileId);
 				await loadGlobalClaudeProfiles();
+			} else {
+				setError(refusal(result.error, "setActiveFailed"));
 			}
 		} catch (err) {
-			setError(
-				err instanceof Error ? err.message : "Failed to set active profile",
-			);
+			setError(describeError(err, "setActiveFailed"));
 		}
 	};
 
@@ -255,31 +267,20 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 	}, []);
 
 	// Handle auth terminal success
-	const handleAuthTerminalSuccess = useCallback(
-		async (email?: string) => {
-			console.warn("[OAuthStep] Auth success:", email);
+	// The terminal shows its own errors and stays open until the user closes it.
+	const handleAuthTerminalSuccess = useCallback(async () => {
+		// Close terminal immediately
+		setAuthTerminal(null);
+		setAuthenticatingProfileId(null);
 
-			// Close terminal immediately
-			setAuthTerminal(null);
-			setAuthenticatingProfileId(null);
+		// Reload profiles to get updated auth state
+		await loadClaudeProfiles();
+	}, [loadClaudeProfiles]);
 
-			// Reload profiles to get updated auth state
-			await loadClaudeProfiles();
-		},
-		[loadClaudeProfiles],
-	);
-
-	// Handle auth terminal error
-	const handleAuthTerminalError = useCallback((error: string) => {
-		console.error("[OAuthStep] Auth error:", error);
-		// Don't auto-close on error - let user see the error and close manually
-	}, []);
-
-	const handleAuthenticateProfile = async (profileId: string) => {
-		// Find the profile name for display
-		const profile = claudeProfiles.find((p) => p.id === profileId);
-		const profileName = profile?.name || "Profile";
-
+	const handleAuthenticateProfile = async ({
+		id: profileId,
+		name: profileName,
+	}: ClaudeProfile) => {
 		setAuthenticatingProfileId(profileId);
 		setError(null);
 		try {
@@ -305,12 +306,8 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 				profileId,
 				profileName,
 			});
-
-			console.warn("[OAuthStep] Auth terminal ready:", result.data);
 		} catch (err) {
-			setError(
-				err instanceof Error ? err.message : "Failed to authenticate profile",
-			);
+			setError(describeError(err, "authFailed"));
 			toast({
 				variant: "destructive",
 				title: t("oauth.alerts.authStartFailedMessage"),
@@ -319,23 +316,18 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 		}
 	};
 
+	// Opening or closing the entry always starts from an empty, hidden token.
 	const toggleTokenEntry = (profileId: string) => {
-		if (expandedTokenProfileId === profileId) {
-			setExpandedTokenProfileId(null);
-			setManualToken("");
-			setManualTokenEmail("");
-			setShowManualToken(false);
-		} else {
-			setExpandedTokenProfileId(profileId);
-			setManualToken("");
-			setManualTokenEmail("");
-			setShowManualToken(false);
-		}
+		setExpandedTokenProfileId(
+			expandedTokenProfileId === profileId ? null : profileId,
+		);
+		setManualToken("");
+		setManualTokenEmail("");
+		setShowManualToken(false);
 	};
 
+	// The save button is disabled until a token is typed.
 	const handleSaveManualToken = async (profileId: string) => {
-		if (!manualToken.trim()) return;
-
 		setSavingTokenProfileId(profileId);
 		setError(null);
 		try {
@@ -362,7 +354,7 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 				});
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to save token");
+			setError(describeError(err, "tokenFailed"));
 			toast({
 				variant: "destructive",
 				title: t("oauth.toast.tokenSaveFailed"),
@@ -432,7 +424,7 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 						</Card>
 
 						{/* Keychain explanation - macOS only */}
-						{navigator.platform.toLowerCase().includes("mac") && (
+						{isMacOS() && (
 							<Card className="border border-border bg-muted/30">
 								<CardContent className="p-5">
 									<div className="flex items-start gap-4">
@@ -490,6 +482,7 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 															? editingProfileName
 															: profile.name
 														)
+															.trim()
 															.charAt(0)
 															.toUpperCase()}
 													</div>
@@ -505,7 +498,7 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 																	autoFocus
 																	onKeyDown={(e) => {
 																		if (e.key === "Enter")
-																			handleRenameProfile();
+																			handleRenameProfile(profile.id);
 																		if (e.key === "Escape")
 																			cancelEditingProfile();
 																	}}
@@ -513,7 +506,12 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 																<Button
 																	variant="ghost"
 																	size="icon"
-																	onClick={handleRenameProfile}
+																	onClick={() =>
+																		handleRenameProfile(profile.id)
+																	}
+																	aria-label={t(
+																		"common:accessibility.saveEditAriaLabel",
+																	)}
 																	className="h-7 w-7 text-success hover:text-success hover:bg-success/10"
 																>
 																	<Check className="h-3 w-3" />
@@ -522,6 +520,9 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 																	variant="ghost"
 																	size="icon"
 																	onClick={cancelEditingProfile}
+																	aria-label={t(
+																		"common:accessibility.cancelEditAriaLabel",
+																	)}
 																	className="h-7 w-7 text-muted-foreground hover:text-foreground"
 																>
 																	<X className="h-3 w-3" />
@@ -572,7 +573,7 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 																variant="outline"
 																size="sm"
 																onClick={() =>
-																	handleAuthenticateProfile(profile.id)
+																	handleAuthenticateProfile(profile)
 																}
 																disabled={
 																	authenticatingProfileId === profile.id
@@ -691,6 +692,11 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 																	onClick={() =>
 																		setShowManualToken(!showManualToken)
 																	}
+																	aria-label={
+																		showManualToken
+																			? t("oauth.buttons.hideToken")
+																			: t("oauth.buttons.showToken")
+																	}
 																	className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 																>
 																	{showManualToken ? (
@@ -763,7 +769,6 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 											profileName={authTerminal.profileName}
 											onClose={handleAuthTerminalClose}
 											onAuthSuccess={handleAuthTerminalSuccess}
-											onAuthError={handleAuthTerminalError}
 										/>
 									</div>
 								</div>
