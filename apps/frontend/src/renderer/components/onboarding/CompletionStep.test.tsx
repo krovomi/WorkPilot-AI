@@ -71,4 +71,41 @@ describe("CompletionStep", () => {
 		expect(screen.getByText("completion.checking")).toBeInTheDocument();
 		expect(screen.queryByText("completion.setupComplete")).not.toBeInTheDocument();
 	});
+
+	it("treats a failed check as nothing connected", async () => {
+		getStaticProviders.mockRejectedValue(new Error("offline"));
+		render(<CompletionStep onFinish={vi.fn()} />);
+		expect(await screen.findByText("completion.titleNotReady")).toBeInTheDocument();
+	});
+
+	it("ignores an answer that comes after the step is closed", async () => {
+		let answer: (value: unknown) => void = () => undefined;
+		getStaticProviders.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+		const consoleError = vi.spyOn(console, "error");
+		const { unmount } = render(<CompletionStep onFinish={vi.fn()} />);
+		unmount();
+		answer({ providers, status: { copilot: true } });
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(consoleError).not.toHaveBeenCalled();
+		consoleError.mockRestore();
+	});
+
+	it("opens the task creator or the settings, and finishes", async () => {
+		getStaticProviders.mockResolvedValue({ providers, status: { copilot: true } });
+		const onFinish = vi.fn();
+		const onOpenTaskCreator = vi.fn();
+		const onOpenSettings = vi.fn();
+		render(
+			<CompletionStep onFinish={onFinish} onOpenTaskCreator={onOpenTaskCreator} onOpenSettings={onOpenSettings} />,
+		);
+		await screen.findByText("completion.setupComplete");
+		fireEvent.click(screen.getByRole("button", { name: "completion.createTask.action" }));
+		fireEvent.click(screen.getByRole("button", { name: "completion.customizeSettings.action" }));
+		fireEvent.click(screen.getByRole("button", { name: /completion\.finish/ }));
+		expect(onOpenTaskCreator).toHaveBeenCalledTimes(1);
+		expect(onOpenSettings).toHaveBeenCalledTimes(1);
+		expect(onFinish).toHaveBeenCalledTimes(1);
+		// The documentation card has no action of its own.
+		expect(screen.getAllByRole("button")).toHaveLength(3);
+	});
 });

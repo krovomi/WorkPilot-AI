@@ -58,6 +58,21 @@ def read_file(path):
         finally:
             temp_path.unlink()
 
+    def test_allows_a_method_named_open(self, tmp_path):
+        """`def open(...)` declares a method; it is not a call to open()."""
+        path = tmp_path / "fake.py"
+        path.write_text(
+            "class Opener:\n"
+            "    def open(self, request, timeout):\n"
+            "        return request\n",
+            encoding="utf-8",
+        )
+
+        checker = EncodingChecker()
+
+        assert checker.check_file(path) is True
+        assert checker.issues == []
+
     def test_allows_binary_mode_without_encoding(self):
         """Should allow binary mode without encoding (correct behavior)."""
         code = """

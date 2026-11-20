@@ -91,7 +91,12 @@ def _installed(root: str, model: str) -> str | None:
             f"{root}/api/tags", timeout=_PROBE_TIMEOUT_SECONDS
         ) as response:
             payload = json.loads(response.read().decode("utf-8", errors="replace"))
-        names = {str(m.get("name", "")) for m in payload.get("models") or []}
+        models = payload.get("models") if isinstance(payload, dict) else None
+        names = {
+            str(m.get("name", ""))
+            for m in (models if isinstance(models, list) else [])
+            if isinstance(m, dict)
+        }
         wanted = {model, f"{model}:latest"} if ":" not in model else {model}
         reason = None if names & wanted else "model-not-installed"
     except (OSError, ValueError, urllib.error.URLError):
@@ -159,5 +164,6 @@ def ask(image: Path, prompt: str, env: dict[str, str]) -> tuple[str, str]:
     except (OSError, ValueError, urllib.error.URLError):
         logger.debug("docintel: ollama vision failed on %s", image, exc_info=True)
         return "", "failed"
-    text = str(payload.get("response") or "").strip()
+    answer = payload.get("response") if isinstance(payload, dict) else None
+    text = str(answer or "").strip()
     return (text, "") if text else ("", "empty")

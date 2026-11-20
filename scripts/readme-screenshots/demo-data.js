@@ -835,12 +835,144 @@
 				weeklyResetTimestamp: new Date(now + 4 * day).toISOString(),
 				fetchedAt: new Date(),
 				limitType: "session",
+				plan: { billing: "subscription", name: "Claude Max 5x" },
 				usageWindows: {
 					sessionWindowLabel: "5-hour",
 					weeklyWindowLabel: "7-day",
 				},
 			},
 		}),
+		// Usage breakdown: two Claude accounts, each with the plan its sign-in reports.
+		requestAllProfilesUsage: async () => ({
+			success: true,
+			data: {
+				activeProfile: {
+					sessionPercent: 34,
+					weeklyPercent: 21,
+					profileId: "work",
+					profileName: "Work",
+					fetchedAt: new Date(),
+					plan: { billing: "subscription", name: "Claude Max 5x" },
+				},
+				allProfiles: [
+					{
+						profileId: "work",
+						profileName: "Work",
+						profileEmail: "dev@acme.example",
+						sessionPercent: 34,
+						weeklyPercent: 21,
+						isAuthenticated: true,
+						isRateLimited: false,
+						availabilityScore: 70,
+						isActive: true,
+						plan: { billing: "subscription", name: "Claude Max 5x" },
+					},
+					{
+						profileId: "personal",
+						profileName: "Personal",
+						profileEmail: "me@example.com",
+						sessionPercent: 8,
+						weeklyPercent: 46,
+						isAuthenticated: true,
+						isRateLimited: false,
+						availabilityScore: 60,
+						isActive: false,
+						plan: { billing: "subscription", name: "Claude Pro" },
+					},
+				],
+				fetchedAt: new Date(),
+			},
+		}),
+		// AI accounts: Claude (two sign-ins), Copilot, OpenAI and Mistral keys,
+		// Ollama; failover on. Keys are placeholders, never real values.
+		getClaudeProfiles: ok({
+			profiles: [
+				{
+					id: "work",
+					name: "Work",
+					email: "dev@acme.example",
+					isDefault: true,
+					isAuthenticated: true,
+					createdAt: ago(40 * day),
+				},
+				{
+					id: "personal",
+					name: "Personal",
+					email: "me@example.com",
+					isDefault: false,
+					isAuthenticated: true,
+					createdAt: ago(12 * day),
+				},
+			],
+			activeProfileId: "work",
+		}),
+		checkClaudeOAuth: async () => ({ isAuthenticated: true }),
+		checkCopilotAuth: async () => ({
+			success: true,
+			data: { authenticated: true, username: "acme-dev" },
+		}),
+		getAutoSwitchSettings: ok({
+			enabled: true,
+			proactiveSwapEnabled: true,
+			sessionThreshold: 95,
+			weeklyThreshold: 99,
+			autoSwitchOnRateLimit: true,
+			autoSwitchOnAuthFailure: true,
+			usageCheckInterval: 30000,
+		}),
+		// Code Migration: the analysis answers at once with the planner's plan.
+		onCodeMigrationComplete: (callback) => {
+			window.__DEMO_MIGRATION_DONE__ = callback;
+			return () => {};
+		},
+		startCodeMigration: (request) => {
+			const plan = {
+				migration_id: "mig-demo",
+				description: request.migrationDescription,
+				source: "React 18",
+				target: "React 19",
+				risk_level: "medium",
+				total_steps: 9,
+				phases: [
+					{
+						name: "Prepare",
+						steps: ["Upgrade react and react-dom", "Update @types/react"],
+					},
+					{
+						name: "Replace removed APIs",
+						steps: [
+							"ReactDOM.render → createRoot",
+							"String refs → useRef",
+							"propTypes → TypeScript types",
+						],
+					},
+					{
+						name: "Adopt the new defaults",
+						steps: ["ref as a prop instead of forwardRef", "Actions for forms"],
+					},
+					{ name: "Validate", steps: ["Type-check", "Run the test suite"] },
+				],
+			};
+			setTimeout(
+				() =>
+					window.__DEMO_MIGRATION_DONE__?.({
+						status: "completed",
+						migration_description: request.migrationDescription,
+						dry_run: true,
+						plan,
+						execution: { status: "skipped" },
+						summary: {
+							migration_id: plan.migration_id,
+							description: plan.description,
+							dry_run: true,
+							plan_status: "ready",
+							execution_status: "skipped",
+							files_modified: 0,
+						},
+					}),
+				300,
+			);
+		},
 		getDashboardSnapshot: async () => ({ success: true, snapshot }),
 		// Agent Terminals: no pty in the preview, so the capture writes the
 		// session text itself through the output listener kept here.
@@ -854,6 +986,28 @@
 			return () => {};
 		},
 		__wrap: {
+			getSettings: (r) => {
+				if (!r?.data) return r;
+				const tested = { date: ago(20 * min).toISOString(), success: true };
+				return {
+					...r,
+					data: {
+						...r.data,
+						selectedProvider: "anthropic",
+						globalOpenAIApiKey: "••••••••",
+						globalMistralApiKey: "••••••••",
+						testResult_anthropic: tested,
+						testResult_copilot: tested,
+						testResult_openai: tested,
+						testResult_mistral: tested,
+						testResult_ollama: tested,
+					},
+				};
+			},
+			invoke: (r, channel) =>
+				channel === "github-copilot:getStatus"
+					? { installed: true, authenticated: true, username: "acme-dev" }
+					: r,
 			getProjects: (r) => {
 				if (!r || !Array.isArray(r.data)) return r;
 				return {
