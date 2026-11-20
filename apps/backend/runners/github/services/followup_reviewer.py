@@ -203,13 +203,10 @@ class FollowupReviewer:
             verdict_reasoning=verdict_reasoning,
         )
 
-        # Map verdict to overall_status
-        if verdict == MergeVerdict.BLOCKED:
+        # Map verdict to overall_status (the follow-up verdict is never
+        # MERGE_WITH_CHANGES: low findings alone are ready to merge)
+        if verdict in (MergeVerdict.BLOCKED, MergeVerdict.NEEDS_REVISION):
             overall_status = "request_changes"
-        elif verdict == MergeVerdict.NEEDS_REVISION:
-            overall_status = "request_changes"
-        elif verdict == MergeVerdict.MERGE_WITH_CHANGES:
-            overall_status = "comment"
         else:
             overall_status = "approve"
 
@@ -737,22 +734,20 @@ Analyze this follow-up review context and provide your structured response.
                                             result
                                         )
 
-                        # Also check for direct structured_output attribute (SDK validated JSON)
-                        if (
-                            hasattr(message, "structured_output")
-                            and message.structured_output
-                        ):
-                            logger.info(
-                                "[Followup] Found structured_output attribute on message"
-                            )
-                            safe_print(
-                                "[Followup] Using SDK structured output (direct attribute)",
-                                flush=True,
-                            )
-                            result = FollowupReviewResponse.model_validate(
-                                message.structured_output
-                            )
-                            return self._convert_structured_to_internal(result)
+                    # The SDK also hands the validated JSON over as an attribute
+                    # (the ResultMessage's `structured_output`).
+                    if getattr(message, "structured_output", None):
+                        logger.info(
+                            "[Followup] Found structured_output attribute on message"
+                        )
+                        safe_print(
+                            "[Followup] Using SDK structured output (direct attribute)",
+                            flush=True,
+                        )
+                        result = FollowupReviewResponse.model_validate(
+                            message.structured_output
+                        )
+                        return self._convert_structured_to_internal(result)
 
                     # Handle ResultMessage for errors
                     if msg_type == "ResultMessage":
