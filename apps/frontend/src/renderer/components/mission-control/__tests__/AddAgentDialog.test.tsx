@@ -1,6 +1,7 @@
 /**
  * The add-agent dialog offers a manual agent or a whole suggested crew; a
  * crew is created one agent per role, in its order, then the dialog closes.
+ * A refused agent stops the crew and keeps the dialog open.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -32,7 +33,7 @@ import { AddAgentDialog } from "../AddAgentDialog";
 afterEach(cleanup);
 
 it("creates the suggested crew from the Auto-compose tab and closes", async () => {
-	const createAgent = vi.fn().mockResolvedValue(null);
+	const createAgent = vi.fn().mockResolvedValue({ id: "agent" });
 	useMissionControlStore.setState({ createAgent });
 	const onOpenChange = vi.fn();
 	render(<AddAgentDialog open onOpenChange={onOpenChange} onAdd={vi.fn()} />);
@@ -49,4 +50,17 @@ it("creates the suggested crew from the Auto-compose tab and closes", async () =
 		["Debugger 1", "debugger", "openai", "m1", "M1"],
 		["Coder 2", "coder", "pi", "", ""],
 	]);
+});
+
+it("stops the crew at the first refused agent and stays open", async () => {
+	const createAgent = vi.fn().mockResolvedValue(null);
+	useMissionControlStore.setState({ createAgent });
+	const onOpenChange = vi.fn();
+	render(<AddAgentDialog open onOpenChange={onOpenChange} onAdd={vi.fn()} />);
+
+	fireEvent.click(screen.getByRole("tab", { name: "Auto-compose" }));
+	fireEvent.click(screen.getByRole("button", { name: "anthropic" }));
+	await waitFor(() => expect(createAgent).toHaveBeenCalledTimes(1));
+	expect(createAgent).toHaveBeenCalledWith("Debugger 1", "debugger", "openai", "m1", "M1");
+	expect(onOpenChange).not.toHaveBeenCalled();
 });

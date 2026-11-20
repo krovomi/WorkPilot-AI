@@ -327,6 +327,15 @@ def test_instruction_paths_cannot_leave_the_brain(client, home):
         ("fatal: could not read Username for 'https://github.com'", "auth"),
         ("remote: Repository not found.", "not-found"),
         (
+            "fatal: unable to access 'https://x/': "
+            "The requested URL returned error: 403",
+            "auth",
+        ),
+        ("remote: HTTP 403 Forbidden", "auth"),
+        # The quoted path is a name, not a reason: pytest numbers its folders.
+        ("fatal: repository '/tmp/pytest-403/missing.git' does not exist", "not-found"),
+        ("fatal: repository '/srv/permission denied/x' does not exist", "not-found"),
+        (
             "fatal: 'C:/Users/x/missing.git' does not appear to be a git repository",
             "not-found",
         ),
@@ -435,6 +444,30 @@ def test_git_detail_is_one_line_without_credentials():
     assert "ghp_secret" not in detail and "tom" not in detail
     assert "\n" not in detail and "hint" not in detail
     assert "[rejected]" in detail
+
+
+@pytest.mark.parametrize(
+    ("url", "kept"),
+    [
+        ("https://tom:pa@ss-word@example.com/k/v.git", "https://example.com/k/v.git"),
+        ("https://tom@work:p@ss@example.com:8443/k", "https://example.com:8443/k"),
+        ("ssh://tom:pa@ss@example.com/k/v.git", "ssh://example.com/k/v.git"),
+    ],
+)
+def test_git_detail_drops_the_whole_sign_in_part(url, kept):
+    from brain.api import _git_detail
+
+    detail = _git_detail(f"fatal: unable to access '{url}': 403")
+
+    assert detail == f"fatal: unable to access '{kept}': 403"
+
+
+def test_git_detail_keeps_an_address_after_the_url():
+    from brain.api import _git_detail
+
+    detail = _git_detail("fatal: https://example.com/k/v.git: ask admin@example.com")
+
+    assert detail == "fatal: https://example.com/k/v.git: ask admin@example.com"
 
 
 @needs_git
