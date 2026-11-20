@@ -154,7 +154,6 @@
   "apps/frontend/src/renderer/components/phase35/i18n-editor/EntryCell.tsx": 1,
   "apps/frontend/src/renderer/components/pixel-office/AgentBubble.tsx": 1,
   "apps/frontend/src/renderer/components/plugin-marketplace/PluginCreatorWizard.tsx": 11,
-  "apps/frontend/src/renderer/components/project-settings/GitHubOAuthFlow.tsx": 1,
   "apps/frontend/src/renderer/components/prompt-optimizer/PromptOptimizerDialog.tsx": 2,
   "apps/frontend/src/renderer/components/settings/AgentProfileSettings.tsx": 1,
   "apps/frontend/src/renderer/components/settings/ApiKeyConfigContent.tsx": 5,

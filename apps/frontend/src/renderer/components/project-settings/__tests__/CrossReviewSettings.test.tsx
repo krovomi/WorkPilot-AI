@@ -4,7 +4,7 @@
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectSettings } from "../../../../shared/types";
 import { CrossReviewSettings } from "../CrossReviewSettings";
 
@@ -14,17 +14,19 @@ vi.mock("react-i18next", () => ({
 		i18n: { language: "en" },
 	}),
 }));
+const context = vi.hoisted(() => ({
+	selectedProvider: "anthropic",
+	providers: [
+		{ name: "anthropic", label: "Claude" },
+		{ name: "openai", label: "OpenAI" },
+	],
+}));
+const DEFAULT_PROVIDERS = [...context.providers];
 vi.mock("../../ProviderContext", () => ({
-	useProviderContext: () => ({ selectedProvider: "anthropic" }),
+	useProviderContext: () => ({ selectedProvider: context.selectedProvider }),
 }));
 vi.mock("../../../hooks/useConfiguredProviders", () => ({
-	useConfiguredProviders: () => ({
-		providers: [
-			{ name: "anthropic", label: "Claude" },
-			{ name: "openai", label: "OpenAI" },
-		],
-		loading: false,
-	}),
+	useConfiguredProviders: () => ({ providers: context.providers, loading: false }),
 }));
 vi.mock("../../task-engine/EngineTrioPicker", () => ({
 	EngineTrioPicker: ({
@@ -69,6 +71,29 @@ function Harness({ initial = BASE }: { initial?: ProjectSettings }) {
 }
 
 describe("CrossReviewSettings", () => {
+	beforeEach(() => {
+		context.selectedProvider = "anthropic";
+		context.providers = [...DEFAULT_PROVIDERS];
+	});
+
+	it("falls back to the only provider there is, or to OpenAI with none", () => {
+		context.selectedProvider = "";
+		context.providers = [{ name: "claude", label: "Claude" }];
+		const first = render(<Harness />);
+		fireEvent.click(screen.getByRole("switch"));
+		expect(JSON.parse(screen.getByTestId("saved").textContent ?? "").provider).toBe(
+			"claude",
+		);
+		first.unmount();
+
+		context.providers = [];
+		render(<Harness />);
+		fireEvent.click(screen.getByRole("switch"));
+		expect(JSON.parse(screen.getByTestId("saved").textContent ?? "").provider).toBe(
+			"openai",
+		);
+	});
+
 	it("is off by default", () => {
 		render(<Harness />);
 		expect(screen.getByRole("switch")).not.toBeChecked();
@@ -120,5 +145,20 @@ describe("CrossReviewSettings", () => {
 		fireEvent.click(screen.getByRole("switch"));
 
 		expect(screen.getByTestId("saved")).toHaveTextContent("null");
+	});
+
+	it("compares two other providers whatever their spelling", () => {
+		render(
+			<Harness
+				initial={{
+					...BASE,
+					provider: "openai",
+					crossReview: { provider: " OpenAI ", model: "", effort: "low" },
+				}}
+			/>,
+		);
+		expect(screen.getByRole("alert")).toHaveTextContent(
+			"projectSections.general.crossReviewSameProvider",
+		);
 	});
 });

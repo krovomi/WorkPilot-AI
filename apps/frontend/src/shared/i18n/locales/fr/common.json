@@ -69,7 +69,9 @@
 		"hideTokenEntryAriaLabel": "Masquer la saisie du jeton",
 		"enterTokenManuallyAriaLabel": "Saisir le jeton manuellement",
 		"renameProfileAriaLabel": "Renommer le profil",
-		"deleteProfileAriaLabel": "Supprimer le profil"
+		"deleteProfileAriaLabel": "Supprimer le profil",
+		"showSecretAriaLabel": "Afficher la valeur",
+		"hideSecretAriaLabel": "Masquer la valeur"
 	},
 	"diffViewer": {
 		"noContent": "Aucun contenu de diff disponible pour ce fichier",
@@ -752,6 +754,9 @@
 		"hasAuthenticatedAccount": "Vous avez au moins un compte Claude authentifié. Vous pouvez passer à l'étape suivante.",
 		"authNotDetected": "L'authentification n'a pas été détectée. Veuillez compléter /login dans le terminal en premier.",
 		"noProfileSelected": "Aucun profil sélectionné pour la vérification",
+		"profilesLoadFailed": "Impossible de lire les profils Claude",
+		"terminalOpenFailed": "Impossible d'ouvrir le terminal de connexion",
+		"verifyFailed": "Impossible de vérifier la connexion",
 		"alerts": {
 			"profileCreatedAuthFailed": "Profil créé, mais échec du démarrage de l'authentification : {{error}}",
 			"authPrepareFailed": "Échec de la préparation de l'authentification : {{error}}",
@@ -1398,7 +1403,8 @@
 		"password": "Mot de passe",
 		"localAccountButton": "Connexion",
 		"localModeButton": "Mode local",
-		"haveInvite": "J'ai une invitation"
+		"haveInvite": "J'ai une invitation",
+		"failed": "Connexion impossible"
 	},
 	"acceptInvite": {
 		"title": "Créer votre compte",
