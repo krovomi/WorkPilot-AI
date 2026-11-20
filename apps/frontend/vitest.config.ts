@@ -43,9 +43,9 @@ export default defineConfig({
 			// floor when the suite grows, never lower it to merge.
 			thresholds: {
 				statements: 69.9,
-				lines: 70.2,
-				functions: 66.9,
-				branches: 64.5,
+				lines: 70.3,
+				functions: 67,
+				branches: 64.6,
 			},
 		},
 		// Mock Electron modules for unit tests
