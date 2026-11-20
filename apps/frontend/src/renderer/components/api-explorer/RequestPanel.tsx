@@ -19,9 +19,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui";
 import {
-	type AuthType,
 	makeEndpointKey,
-	type OAuth2GrantType,
 	type OpenApiOperation,
 	type OpenApiParameter,
 	type OpenApiSpec,
@@ -40,6 +38,17 @@ import {
 
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
+import { RequestAuthTab } from "./RequestAuthTab";
+import { basicAuthHeader, findResponseToken } from "./request-auth";
+
+export { CustomSelect } from "./request-controls";
+
+const COPY_LABELS = {
+	idle: "apiExplorer:aria.copyResponse",
+	copied: "apiExplorer:export.copied",
+	failed: "apiExplorer:export.copyFailed",
+} as const;
+
 // ── Schema Viewer ────────────────────────────────────────────────────────────
 
 export interface SchemaViewerProps {
@@ -229,25 +238,6 @@ export function RequestPanel({
 		requestAuth.oauth2AccessToken,
 	]);
 
-	// Extract a token from a JSON response body (common field names)
-	const TOKEN_FIELDS = [
-		"access_token",
-		"token",
-		"jwt",
-		"auth_token",
-		"id_token",
-		"bearer_token",
-		"accessToken",
-		"authToken",
-		"idToken",
-	] as const;
-
-	const [showAuthToken, setShowAuthToken] = useState(false);
-	const [showAuthPassword, setShowAuthPassword] = useState(false);
-	const [showOAuth2Secret, setShowOAuth2Secret] = useState(false);
-	const [showOAuth2Token, setShowOAuth2Token] = useState(false);
-	const [isGettingOAuth2Token, setIsGettingOAuth2Token] = useState(false);
-	const [oauth2TokenError, setOAuth2TokenError] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState<
 		"params" | "auth" | "headers" | "body" | "docs"
 	>("params");
@@ -261,29 +251,15 @@ export function RequestPanel({
 	const isDraggingDivider = useRef(false);
 	const dragStartY = useRef(0);
 	const dragStartHeight = useRef(0);
-	const [copiedResponse, setCopiedResponse] = useState(false);
+	const [copiedResponse, setCopiedResponse] = useState<
+		"copied" | "failed" | null
+	>(null);
 	const [savedToken, setSavedToken] = useState(false);
 
-	const extractedToken = useMemo<string | null>(() => {
-		if (
-			!responseBody ||
-			!responseStatus ||
-			responseStatus < 200 ||
-			responseStatus >= 300
-		)
-			return null;
-		try {
-			const json = JSON.parse(responseBody) as Record<string, unknown>;
-			for (const field of TOKEN_FIELDS) {
-				if (typeof json[field] === "string" && json[field].length > 10) {
-					return json[field];
-				}
-			}
-		} catch {
-			/* not JSON */
-		}
-		return null;
-	}, [responseBody, responseStatus, TOKEN_FIELDS]);
+	const extractedToken = useMemo(
+		() => findResponseToken(responseBody, responseStatus),
+		[responseBody, responseStatus],
+	);
 
 	// Auto-select the best format and language when a new response arrives
 	useEffect(() => {
@@ -339,7 +315,7 @@ export function RequestPanel({
 	function addCustomQueryRow() {
 		setCustomQueryRows((r) => [
 			...r,
-			{ id: `cqr-${Date.now()}`, enabled: true, key: "", value: "" },
+			{ id: `cqr-${crypto.randomUUID()}`, enabled: true, key: "", value: "" },
 		]);
 	}
 	function updateCustomQueryRow(
@@ -358,7 +334,7 @@ export function RequestPanel({
 	function addCustomHeaderRow() {
 		setCustomHeaderRows((r) => [
 			...r,
-			{ id: `chr-${Date.now()}`, enabled: true, key: "", value: "" },
+			{ id: `chr-${crypto.randomUUID()}`, enabled: true, key: "", value: "" },
 		]);
 	}
 	function updateCustomHeaderRow(
@@ -374,17 +350,21 @@ export function RequestPanel({
 		setCustomHeaderRows((r) => r.filter((row) => row.id !== id));
 	}
 
-	const pathParams = useMemo(
-		() => (operation.parameters ?? []).filter((p) => p.in === "path"),
+	const parameters = useMemo(
+		() => operation.parameters ?? [],
 		[operation.parameters],
+	);
+	const pathParams = useMemo(
+		() => parameters.filter((p) => p.in === "path"),
+		[parameters],
 	);
 	const queryParams = useMemo(
-		() => (operation.parameters ?? []).filter((p) => p.in === "query"),
-		[operation.parameters],
+		() => parameters.filter((p) => p.in === "query"),
+		[parameters],
 	);
 	const headerParams = useMemo(
-		() => (operation.parameters ?? []).filter((p) => p.in === "header"),
-		[operation.parameters],
+		() => parameters.filter((p) => p.in === "header"),
+		[parameters],
 	);
 
 	const hasBody =
@@ -422,66 +402,70 @@ export function RequestPanel({
 	async function sendRequest() {
 		setIsSendingRequest(true);
 		clearResponse();
-
-		const headers: Record<string, string> = {
-			// Environment-level headers
-			...Object.fromEntries(
-				Object.entries(activeEnv?.headers ?? {}).filter(([, v]) => v),
-			),
-			// Spec-defined header params
-			...Object.fromEntries(
-				Object.entries(requestHeaders).filter(([, v]) => v),
-			),
-			// User-added custom headers
-			...Object.fromEntries(
-				customHeaderRows
-					.filter((r) => r.enabled && r.key)
-					.map((r) => [r.key, r.value]),
-			),
-		};
-
-		// Build final URL — resolvedUrl already includes spec+custom query params, but for API key in query we rebuild
-		let finalUrl = resolvedUrl;
-
-		// Authentication
-		if (requestAuth.type === "bearer" && requestAuth.bearer) {
-			headers.Authorization = `Bearer ${requestAuth.bearer}`;
-		} else if (
-			requestAuth.type === "basic" &&
-			(requestAuth.username || requestAuth.password)
-		) {
-			headers.Authorization = `Basic ${btoa(`${requestAuth.username}:${requestAuth.password}`)}`;
-		} else if (
-			requestAuth.type === "apikey" &&
-			requestAuth.keyName &&
-			requestAuth.keyValue
-		) {
-			if (requestAuth.keyLocation === "header") {
-				headers[requestAuth.keyName] = requestAuth.keyValue;
-			} else {
-				// Append API key to query string
-				const sep = finalUrl.includes("?") ? "&" : "?";
-				finalUrl += `${sep}${encodeURIComponent(requestAuth.keyName)}=${encodeURIComponent(requestAuth.keyValue)}`;
-			}
-		} else if (requestAuth.type === "inherited") {
-			if (
-				activeEnv?.token &&
-				!headers.Authorization &&
-				!headers.authorization
-			) {
-				headers.Authorization = `Bearer ${activeEnv.token}`;
-			}
-		} else if (requestAuth.type === "oauth2" && requestAuth.oauth2AccessToken) {
-			const prefix = requestAuth.oauth2HeaderPrefix || "Bearer";
-			headers.Authorization = `${prefix} ${requestAuth.oauth2AccessToken}`;
-		}
-		// type === 'none' → no Authorization header added
-
-		if (hasBody && requestBody) {
-			headers["Content-Type"] = "application/json";
-		}
-
+		// Building the request can throw too (a lone surrogate in a value
+		// cannot be encoded); it must still end the sending.
 		try {
+			const headers: Record<string, string> = {
+				// Environment-level headers
+				...Object.fromEntries(
+					Object.entries(activeEnv?.headers ?? {}).filter(([, v]) => v),
+				),
+				// Spec-defined header params
+				...Object.fromEntries(
+					Object.entries(requestHeaders).filter(([, v]) => v),
+				),
+				// User-added custom headers
+				...Object.fromEntries(
+					customHeaderRows
+						.filter((r) => r.enabled && r.key)
+						.map((r) => [r.key, r.value]),
+				),
+			};
+
+			// Build final URL — resolvedUrl already includes spec+custom query params, but for API key in query we rebuild
+			let finalUrl = resolvedUrl;
+
+			// Authentication
+			if (requestAuth.type === "bearer" && requestAuth.bearer) {
+				headers.Authorization = `Bearer ${requestAuth.bearer}`;
+			} else if (
+				requestAuth.type === "basic" &&
+				(requestAuth.username || requestAuth.password)
+			) {
+				headers.Authorization = basicAuthHeader(
+					requestAuth.username,
+					requestAuth.password,
+				);
+			} else if (
+				requestAuth.type === "apikey" &&
+				requestAuth.keyName &&
+				requestAuth.keyValue
+			) {
+				if (requestAuth.keyLocation === "header") {
+					headers[requestAuth.keyName] = requestAuth.keyValue;
+				} else {
+					// Append API key to query string
+					const sep = finalUrl.includes("?") ? "&" : "?";
+					finalUrl += `${sep}${encodeURIComponent(requestAuth.keyName)}=${encodeURIComponent(requestAuth.keyValue)}`;
+				}
+			} else if (requestAuth.type === "inherited") {
+				if (
+					activeEnv?.token &&
+					!headers.Authorization &&
+					!headers.authorization
+				) {
+					headers.Authorization = `Bearer ${activeEnv.token}`;
+				}
+			} else if (requestAuth.type === "oauth2" && requestAuth.oauth2AccessToken) {
+				const prefix = requestAuth.oauth2HeaderPrefix || "Bearer";
+				headers.Authorization = `${prefix} ${requestAuth.oauth2AccessToken}`;
+			}
+			// type === 'none' → no Authorization header added
+
+			if (hasBody && requestBody) {
+				headers["Content-Type"] = "application/json";
+			}
+
 			const result = await globalThis.electronAPI.proxyHttpRequest({
 				url: finalUrl,
 				method: method.toUpperCase(),
@@ -495,7 +479,8 @@ export function RequestPanel({
 					result.statusText ??
 					(result.success ? "OK" : t("apiExplorer:request.networkError")),
 				headers: result.headers ?? {},
-				body: result.body ?? "",
+				// A refused request has no body, only the main's reason.
+				body: result.body ?? result.error ?? "",
 				time: result.time ?? 0,
 			});
 		} catch (err) {
@@ -509,73 +494,14 @@ export function RequestPanel({
 		}
 	}
 
-	async function handleGetOAuth2Token() {
-		setIsGettingOAuth2Token(true);
-		setOAuth2TokenError(null);
+	async function copyResponse() {
 		try {
-			const {
-				oauth2GrantType,
-				oauth2TokenUrl,
-				oauth2AuthUrl,
-				oauth2ClientId,
-				oauth2ClientSecret,
-				oauth2Scope,
-			} = requestAuth;
-
-			if (oauth2GrantType === "authorization_code") {
-				// For auth code flow, open auth URL in browser — user pastes token manually
-				if (oauth2AuthUrl) {
-					window.open(oauth2AuthUrl, "_blank");
-				}
-				setIsGettingOAuth2Token(false);
-				return;
-			}
-
-			if (!oauth2TokenUrl) {
-				setOAuth2TokenError(t("apiExplorer:auth.oauth2.missingTokenUrl"));
-				setIsGettingOAuth2Token(false);
-				return;
-			}
-
-			const body = new URLSearchParams();
-			body.append("grant_type", oauth2GrantType);
-			if (oauth2ClientId) body.append("client_id", oauth2ClientId);
-			if (oauth2ClientSecret) body.append("client_secret", oauth2ClientSecret);
-			if (oauth2Scope) body.append("scope", oauth2Scope);
-			if (oauth2GrantType === "password") {
-				body.append("username", requestAuth.username);
-				body.append("password", requestAuth.password);
-			}
-
-			const res = await fetch(oauth2TokenUrl, {
-				method: "POST",
-				headers: { "Content-Type": "application/x-www-form-urlencoded" },
-				body: body.toString(),
-			});
-			const data = (await res.json()) as Record<string, unknown>;
-			if (typeof data.access_token === "string") {
-				setRequestAuth({ oauth2AccessToken: data.access_token });
-			} else {
-				const errDesc =
-					typeof data.error_description === "string"
-						? data.error_description
-						: null;
-				const errCode = typeof data.error === "string" ? data.error : null;
-				setOAuth2TokenError(
-					errDesc ?? errCode ?? t("apiExplorer:auth.oauth2.tokenError"),
-				);
-			}
-		} catch (err) {
-			setOAuth2TokenError(String(err));
-		} finally {
-			setIsGettingOAuth2Token(false);
+			await navigator.clipboard.writeText(responseBody);
+			setCopiedResponse("copied");
+		} catch {
+			setCopiedResponse("failed");
 		}
-	}
-
-	function copyResponse() {
-		navigator.clipboard.writeText(responseBody);
-		setCopiedResponse(true);
-		setTimeout(() => setCopiedResponse(false), 2000);
+		setTimeout(() => setCopiedResponse(null), 2000);
 	}
 
 	function updatePathParam(name: string, value: string) {
@@ -710,6 +636,8 @@ export function RequestPanel({
 									keyPlaceholder={t("apiExplorer:request.paramKey")}
 									valuePlaceholder={t("apiExplorer:request.paramValue")}
 									addLabel={t("apiExplorer:request.addParam")}
+									useLabel={t("apiExplorer:aria.useRow")}
+									removeLabel={t("apiExplorer:aria.removeRow")}
 								/>
 							</div>
 						</div>
@@ -741,474 +669,17 @@ export function RequestPanel({
 								keyPlaceholder={t("apiExplorer:request.headerKey")}
 								valuePlaceholder={t("apiExplorer:request.headerValue")}
 								addLabel={t("apiExplorer:request.addHeader")}
+								useLabel={t("apiExplorer:aria.useRow")}
+								removeLabel={t("apiExplorer:aria.removeRow")}
 							/>
 						</div>
 					)}
 
 					{activeTab === "auth" && (
-						<div className="space-y-4">
-							{/* Auth type selector */}
-							<div>
-								{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-								<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-									{t("apiExplorer:auth.type")}
-								</label>
-								<CustomSelect
-									value={requestAuth.type}
-									onChange={(v) => setRequestAuth({ type: v as AuthType })}
-									options={(
-										[
-											"inherited",
-											"none",
-											"bearer",
-											"basic",
-											"apikey",
-											"oauth2",
-										] as AuthType[]
-									).map((type) => ({
-										value: type,
-										label: t(`apiExplorer:auth.types.${type}`),
-									}))}
-								/>
-							</div>
-
-							{/* Inherited from environment */}
-							{requestAuth.type === "inherited" && (
-								<div
-									className={`rounded-lg p-3 text-xs ${activeEnv?.token ? "bg-warning/5 border border-warning/20" : "bg-card border border-[var(--color-border)]"}`}
-								>
-									{activeEnv?.token ? (
-										<div className="flex items-start gap-2">
-											<span className="text-warning mt-0.5">🔑</span>
-											<div>
-												<div className="font-medium text-warning">
-													{t("apiExplorer:auth.inheritedFrom", {
-														env: activeEnv.name,
-													})}
-												</div>
-												<div className="text-muted-foreground mt-0.5 font-mono">
-													Authorization: Bearer ••••{activeEnv.token.slice(-6)}
-												</div>
-											</div>
-										</div>
-									) : (
-										<div className="text-muted-foreground">
-											{t("apiExplorer:auth.noEnvToken", {
-												env: activeEnv?.name ?? "Local",
-											})}
-											<button
-												type="button"
-												onClick={onOpenEnvManager}
-												className="ml-1 text-[var(--color-primary)] hover:underline focus:outline-none font-medium"
-											>
-												{t("apiExplorer:auth.configureEnv")}
-											</button>
-										</div>
-									)}
-								</div>
-							)}
-
-							{/* No auth */}
-							{requestAuth.type === "none" && (
-								<div className="text-xs text-muted-foreground bg-card border border-[var(--color-border)] rounded-lg p-3">
-									{t("apiExplorer:auth.noAuthDesc")}
-								</div>
-							)}
-
-							{/* Bearer Token */}
-							{requestAuth.type === "bearer" && (
-								<div className="space-y-2">
-									{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-									<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block">
-										{t("apiExplorer:auth.token")}
-									</label>
-									<div className="flex gap-2">
-										<input
-											type={showAuthToken ? "text" : "password"}
-											className="flex-1 bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
-											value={requestAuth.bearer}
-											onChange={(e) =>
-												setRequestAuth({ bearer: e.target.value })
-											}
-											placeholder={t("apiExplorer:auth.tokenPlaceholder")}
-										/>
-										<button
-											type="button"
-											onClick={() => setShowAuthToken((v) => !v)}
-											className="px-3 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded-md bg-card transition-colors text-sm"
-										>
-											{showAuthToken ? "🙈" : "👁"}
-										</button>
-									</div>
-									<div className="text-3xs text-muted-foreground">
-										{t("apiExplorer:auth.bearerHint")}
-									</div>
-								</div>
-							)}
-
-							{/* Basic Auth */}
-							{requestAuth.type === "basic" && (
-								<div className="space-y-2">
-									<div>
-										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-											{t("apiExplorer:auth.username")}
-										</label>
-										<Input
-											type="text"
-											className="w-full px-3 py-2 text-sm h-auto"
-											value={requestAuth.username}
-											onChange={(e) =>
-												setRequestAuth({ username: e.target.value })
-											}
-											placeholder={t("apiExplorer:auth.usernamePlaceholder")}
-										/>
-									</div>
-									<div>
-										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-											{t("apiExplorer:auth.password")}
-										</label>
-										<div className="flex gap-2">
-											<input
-												type={showAuthPassword ? "text" : "password"}
-												className="flex-1 bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:border-[var(--color-accent)]"
-												value={requestAuth.password}
-												onChange={(e) =>
-													setRequestAuth({ password: e.target.value })
-												}
-												placeholder="••••••••"
-											/>
-											<button
-												type="button"
-												onClick={() => setShowAuthPassword((v) => !v)}
-												className="px-3 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded-md bg-card transition-colors text-sm"
-											>
-												{showAuthPassword ? "🙈" : "👁"}
-											</button>
-										</div>
-									</div>
-									<div className="text-3xs text-muted-foreground">
-										{t("apiExplorer:auth.basicHint")}
-									</div>
-								</div>
-							)}
-
-							{/* API Key */}
-							{requestAuth.type === "apikey" && (
-								<div className="space-y-2">
-									<div className="grid grid-cols-2 gap-2">
-										<div>
-											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-												{t("apiExplorer:auth.keyName")}
-											</label>
-											<Input
-												spellCheck={false}
-												type="text"
-												className="w-full px-3 py-2 text-sm font-mono h-auto"
-												value={requestAuth.keyName}
-												onChange={(e) =>
-													setRequestAuth({ keyName: e.target.value })
-												}
-												placeholder="X-API-Key"
-											/>
-										</div>
-										<div>
-											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-												{t("apiExplorer:auth.addTo")}
-											</label>
-											<CustomSelect
-												value={requestAuth.keyLocation}
-												onChange={(v) =>
-													setRequestAuth({
-														keyLocation: v as "header" | "query",
-													})
-												}
-												options={[
-													{
-														value: "header",
-														label: t("apiExplorer:auth.locationHeader"),
-													},
-													{
-														value: "query",
-														label: t("apiExplorer:auth.locationQuery"),
-													},
-												]}
-											/>
-										</div>
-									</div>
-									<div>
-										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-											{t("apiExplorer:auth.keyValue")}
-										</label>
-										<Input
-											spellCheck={false}
-											type="text"
-											className="w-full px-3 py-2 text-sm font-mono h-auto"
-											value={requestAuth.keyValue}
-											onChange={(e) =>
-												setRequestAuth({ keyValue: e.target.value })
-											}
-											placeholder={t("apiExplorer:auth.keyValuePlaceholder")}
-										/>
-									</div>
-								</div>
-							)}
-
-							{/* OAuth 2.0 */}
-							{requestAuth.type === "oauth2" && (
-								<div className="space-y-3">
-									{/* Grant Type */}
-									<div>
-										{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-										<label className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-											{t("apiExplorer:auth.oauth2.grantType")}
-										</label>
-										<CustomSelect
-											value={requestAuth.oauth2GrantType}
-											onChange={(v) =>
-												setRequestAuth({
-													oauth2GrantType: v as OAuth2GrantType,
-												})
-											}
-											options={[
-												{
-													value: "client_credentials",
-													label: t(
-														"apiExplorer:auth.oauth2.grants.client_credentials",
-													),
-												},
-												{
-													value: "authorization_code",
-													label: t(
-														"apiExplorer:auth.oauth2.grants.authorization_code",
-													),
-												},
-												{
-													value: "password",
-													label: t("apiExplorer:auth.oauth2.grants.password"),
-												},
-											]}
-										/>
-									</div>
-
-									{/* Configure New Token */}
-									<div className="border border-[var(--color-border)] rounded-lg p-3 space-y-2.5">
-										<div className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider">
-											{t("apiExplorer:auth.oauth2.configureToken")}
-										</div>
-
-										{/* Auth URL — only for authorization_code */}
-										{requestAuth.oauth2GrantType === "authorization_code" && (
-											<div>
-												{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-												<label className="text-3xs text-muted-foreground block mb-1">
-													{t("apiExplorer:auth.oauth2.authUrl")}
-												</label>
-												<Input
-													spellCheck={false}
-													type="url"
-													className="w-full px-3 py-1.5 text-xs font-mono h-auto"
-													value={requestAuth.oauth2AuthUrl}
-													onChange={(e) =>
-														setRequestAuth({ oauth2AuthUrl: e.target.value })
-													}
-													placeholder="https://auth.example.com/authorize"
-												/>
-											</div>
-										)}
-
-										{/* Token URL */}
-										{requestAuth.oauth2GrantType !== "authorization_code" && (
-											<div>
-												{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-												<label className="text-3xs text-muted-foreground block mb-1">
-													{t("apiExplorer:auth.oauth2.tokenUrl")}
-												</label>
-												<Input
-													spellCheck={false}
-													type="url"
-													className="w-full px-3 py-1.5 text-xs font-mono h-auto"
-													value={requestAuth.oauth2TokenUrl}
-													onChange={(e) =>
-														setRequestAuth({ oauth2TokenUrl: e.target.value })
-													}
-													placeholder="https://auth.example.com/token"
-												/>
-											</div>
-										)}
-
-										{/* Client ID */}
-										<div>
-											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-3xs text-muted-foreground block mb-1">
-												{t("apiExplorer:auth.oauth2.clientId")}
-											</label>
-											<Input
-												spellCheck={false}
-												type="text"
-												className="w-full px-3 py-1.5 text-xs font-mono h-auto"
-												value={requestAuth.oauth2ClientId}
-												onChange={(e) =>
-													setRequestAuth({ oauth2ClientId: e.target.value })
-												}
-												placeholder="client_id"
-											/>
-										</div>
-
-										{/* Client Secret */}
-										<div>
-											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-3xs text-muted-foreground block mb-1">
-												{t("apiExplorer:auth.oauth2.clientSecret")}
-											</label>
-											<div className="flex gap-2">
-												<input
-													type={showOAuth2Secret ? "text" : "password"}
-													className="flex-1 bg-background border border-[var(--color-border)] rounded-md px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
-													value={requestAuth.oauth2ClientSecret}
-													onChange={(e) =>
-														setRequestAuth({
-															oauth2ClientSecret: e.target.value,
-														})
-													}
-													placeholder="client_secret"
-												/>
-												<button
-													type="button"
-													onClick={() => setShowOAuth2Secret((v) => !v)}
-													className="px-2.5 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded-md bg-background transition-colors text-sm"
-												>
-													{showOAuth2Secret ? "🙈" : "👁"}
-												</button>
-											</div>
-										</div>
-
-										{/* Scope */}
-										<div>
-											{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-											<label className="text-3xs text-muted-foreground block mb-1">
-												{t("apiExplorer:auth.oauth2.scope")}
-											</label>
-											<Input
-												spellCheck={false}
-												type="text"
-												className="w-full px-3 py-1.5 text-xs font-mono h-auto"
-												value={requestAuth.oauth2Scope}
-												onChange={(e) =>
-													setRequestAuth({ oauth2Scope: e.target.value })
-												}
-												placeholder="openid profile email"
-											/>
-										</div>
-
-										{/* Password fields — only for password grant */}
-										{requestAuth.oauth2GrantType === "password" && (
-											<div className="grid grid-cols-2 gap-2">
-												<div>
-													{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-													<label className="text-3xs text-muted-foreground block mb-1">
-														{t("apiExplorer:auth.username")}
-													</label>
-													<Input
-														type="text"
-														className="w-full px-3 py-1.5 text-xs h-auto"
-														value={requestAuth.username}
-														onChange={(e) =>
-															setRequestAuth({ username: e.target.value })
-														}
-														placeholder={t(
-															"apiExplorer:auth.usernamePlaceholder",
-														)}
-													/>
-												</div>
-												<div>
-													{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-													<label className="text-3xs text-muted-foreground block mb-1">
-														{t("apiExplorer:auth.password")}
-													</label>
-													<Input
-														type="password"
-														className="w-full px-3 py-1.5 text-xs h-auto"
-														value={requestAuth.password}
-														onChange={(e) =>
-															setRequestAuth({ password: e.target.value })
-														}
-														placeholder="••••••••"
-													/>
-												</div>
-											</div>
-										)}
-
-										{/* Error */}
-										{oauth2TokenError && (
-											<div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-2.5 py-1.5">
-												{oauth2TokenError}
-											</div>
-										)}
-
-										{/* Get Token button */}
-										<button
-											type="button"
-											onClick={handleGetOAuth2Token}
-											disabled={isGettingOAuth2Token}
-											className="w-full py-2 rounded-md text-xs font-semibold bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
-										>
-											{isGettingOAuth2Token && (
-												<Loader2 size={12} className="animate-spin" />
-											)}
-											{requestAuth.oauth2GrantType === "authorization_code"
-												? t("apiExplorer:auth.oauth2.openBrowser")
-												: t("apiExplorer:auth.oauth2.getToken")}
-										</button>
-									</div>
-
-									{/* Current Token */}
-									<div className="space-y-2">
-										<div className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider">
-											{t("apiExplorer:auth.oauth2.currentToken")}
-										</div>
-										<div className="flex gap-2">
-											<input
-												type={showOAuth2Token ? "text" : "password"}
-												className="flex-1 bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
-												value={requestAuth.oauth2AccessToken}
-												onChange={(e) =>
-													setRequestAuth({ oauth2AccessToken: e.target.value })
-												}
-												placeholder={t(
-													"apiExplorer:auth.oauth2.tokenPlaceholder",
-												)}
-											/>
-											<button
-												type="button"
-												onClick={() => setShowOAuth2Token((v) => !v)}
-												className="px-3 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded-md bg-card transition-colors text-sm"
-											>
-												{showOAuth2Token ? "🙈" : "👁"}
-											</button>
-										</div>
-										<div className="flex items-center gap-2">
-											<span className="text-3xs text-muted-foreground">
-												{t("apiExplorer:auth.oauth2.headerPrefix")}
-											</span>
-											<Input
-												spellCheck={false}
-												type="text"
-												className="w-24 px-2 py-1 text-xs font-mono h-auto"
-												value={requestAuth.oauth2HeaderPrefix}
-												onChange={(e) =>
-													setRequestAuth({ oauth2HeaderPrefix: e.target.value })
-												}
-											/>
-										</div>
-									</div>
-								</div>
-							)}
-						</div>
+						<RequestAuthTab
+							activeEnv={activeEnv}
+							onOpenEnvManager={onOpenEnvManager}
+						/>
 					)}
 
 					{activeTab === "body" && hasBody && (
@@ -1246,13 +717,13 @@ export function RequestPanel({
 									</p>
 								</div>
 							)}
-							{(operation.parameters ?? []).length > 0 && (
+							{parameters.length > 0 && (
 								<div>
 									<h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
 										{t("apiExplorer:detail.parameters")}
 									</h4>
 									<div className="space-y-2">
-										{(operation.parameters ?? []).map((p) => (
+										{parameters.map((p) => (
 											<div
 												key={`${p.in}-${p.name}`}
 												className="flex items-start gap-3 p-2.5 rounded-lg bg-card border border-[var(--color-border)]"
@@ -1336,7 +807,7 @@ export function RequestPanel({
 								</div>
 							)}
 							{!operation.description &&
-								(operation.parameters ?? []).length === 0 &&
+								parameters.length === 0 &&
 								!requestBodySchema &&
 								responseCodes.length === 0 && (
 									<div className="text-sm text-muted-foreground text-center py-8">
@@ -1499,9 +970,11 @@ export function RequestPanel({
 									<button
 										type="button"
 										onClick={copyResponse}
-										className="text-muted-foreground hover:text-foreground transition-colors"
+										aria-label={t(COPY_LABELS[copiedResponse ?? "idle"])}
+										title={t(COPY_LABELS[copiedResponse ?? "idle"])}
+										className={`transition-colors ${copiedResponse === "failed" ? "text-destructive" : "text-muted-foreground hover:text-foreground"}`}
 									>
-										{copiedResponse ? (
+										{copiedResponse === "copied" ? (
 											<Check size={13} className="text-success" />
 										) : (
 											<Copy size={13} />
@@ -1670,12 +1143,10 @@ export function LangDropdown({
 		return () => document.removeEventListener("mousedown", handler);
 	}, [open]);
 
-	function handleOpen() {
+	function handleOpen(event: React.MouseEvent<HTMLButtonElement>) {
 		onActivate?.();
-		if (btnRef.current) {
-			const rect = btnRef.current.getBoundingClientRect();
-			setDropdownPos({ top: rect.bottom + 4, left: rect.left });
-		}
+		const rect = event.currentTarget.getBoundingClientRect();
+		setDropdownPos({ top: rect.bottom + 4, left: rect.left });
 		setOpen((v) => !v);
 	}
 
@@ -1685,6 +1156,8 @@ export function LangDropdown({
 				ref={btnRef}
 				type="button"
 				onClick={handleOpen}
+				title={t("apiExplorer:response.format.languageTitle")}
+				aria-expanded={open}
 				className={`flex items-center gap-0.5 pl-0 pr-1.5 py-1 text-2xs transition-colors cursor-pointer ${
 					active
 						? "text-muted-foreground hover:text-foreground"
@@ -1737,89 +1210,6 @@ export function LangDropdown({
 	);
 }
 
-export interface CustomSelectOption {
-	value: string;
-	label: string;
-}
-
-export interface CustomSelectProps {
-	value: string;
-	onChange: (value: string) => void;
-	options: CustomSelectOption[];
-	className?: string;
-}
-
-export function CustomSelect({
-	value,
-	onChange,
-	options,
-	className,
-}: CustomSelectProps) {
-	const [open, setOpen] = useState(false);
-	const containerRef = useRef<HTMLDivElement>(null);
-	const selected = options.find((o) => o.value === value);
-
-	useEffect(() => {
-		if (!open) return;
-		function handler(e: MouseEvent) {
-			if (
-				containerRef.current &&
-				!containerRef.current.contains(e.target as Node)
-			)
-				setOpen(false);
-		}
-		document.addEventListener("mousedown", handler);
-		return () => document.removeEventListener("mousedown", handler);
-	}, [open]);
-
-	return (
-		<div ref={containerRef} className={`relative ${className ?? ""}`}>
-			<button
-				type="button"
-				onClick={() => setOpen((v) => !v)}
-				className="flex items-center justify-between w-full bg-card border border-[var(--color-border)] rounded-md px-3 py-2 text-[length:inherit] text-foreground hover:border-primary/40 focus:outline-none focus:border-[var(--color-accent)] cursor-pointer transition-colors"
-			>
-				<span>{selected?.label ?? value}</span>
-				<ChevronDown
-					size={14}
-					className={`text-muted-foreground shrink-0 ml-2 transition-transform ${open ? "rotate-180" : ""}`}
-				/>
-			</button>
-			{open && (
-				<div
-					className="absolute z-50 top-full left-0 min-w-full w-max mt-1 bg-[var(--card)] border border-[var(--color-border)] rounded-md shadow-xl overflow-hidden"
-					style={{ backdropFilter: "none" }}
-				>
-					{options.map((opt) => (
-						<button
-							key={opt.value}
-							type="button"
-							onClick={() => {
-								onChange(opt.value);
-								setOpen(false);
-							}}
-							className={`flex items-center gap-2 w-full px-3 py-2 text-[length:inherit] text-left transition-colors hover:bg-card ${
-								opt.value === value
-									? "text-foreground bg-card"
-									: "text-muted-foreground"
-							}`}
-						>
-							{opt.value === value && (
-								<Check
-									size={13}
-									className="shrink-0 text-[var(--color-primary)]"
-								/>
-							)}
-							{opt.value !== value && <span className="w-[13px] shrink-0" />}
-							{opt.label}
-						</button>
-					))}
-				</div>
-			)}
-		</div>
-	);
-}
-
 export interface KVRow {
 	id: string;
 	enabled: boolean;
@@ -1836,9 +1226,12 @@ export interface KeyValueEditorProps {
 	onAdd: () => void;
 	onUpdate: (id: string, field: CustomRowField, val: CustomRowValue) => void;
 	onRemove: (id: string) => void;
-	keyPlaceholder?: string;
-	valuePlaceholder?: string;
+	keyPlaceholder: string;
+	valuePlaceholder: string;
 	addLabel: string;
+	/** Names a row's tick box and its remove button, by the row's key. */
+	useLabel: string;
+	removeLabel: string;
 }
 
 export function KeyValueEditor({
@@ -1846,9 +1239,11 @@ export function KeyValueEditor({
 	onAdd,
 	onUpdate,
 	onRemove,
-	keyPlaceholder = "Key",
-	valuePlaceholder = "Value",
+	keyPlaceholder,
+	valuePlaceholder,
 	addLabel,
+	useLabel,
+	removeLabel,
 }: KeyValueEditorProps) {
 	return (
 		<div className="space-y-1.5">
@@ -1857,6 +1252,7 @@ export function KeyValueEditor({
 					<input
 						type="checkbox"
 						checked={row.enabled}
+						aria-label={`${useLabel} ${row.key}`.trim()}
 						onChange={(e) => onUpdate(row.id, "enabled", e.target.checked)}
 						className="w-3.5 h-3.5 shrink-0 accent-[var(--color-primary)] cursor-pointer"
 					/>
@@ -1877,6 +1273,7 @@ export function KeyValueEditor({
 					<button
 						type="button"
 						onClick={() => onRemove(row.id)}
+						aria-label={`${removeLabel} ${row.key}`.trim()}
 						className="shrink-0 p-1 text-muted-foreground hover:text-destructive transition-colors"
 					>
 						<Trash2 size={13} />

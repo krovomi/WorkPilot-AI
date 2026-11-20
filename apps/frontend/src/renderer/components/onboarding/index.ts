@@ -5,10 +5,8 @@
 
 export { AuthChoiceStep } from "./AuthChoiceStep";
 export { CompletionStep } from "./CompletionStep";
-export { FirstSpecStep } from "./FirstSpecStep";
 // Legacy export for backward compatibility
 export { OAuthStep } from "./OAuthStep";
-export { OllamaModelSelector } from "./OllamaModelSelector";
 export { OnboardingWizard } from "./OnboardingWizard";
 export { PrivacyStep } from "./PrivacyStep";
 export { WelcomeStep } from "./WelcomeStep";
