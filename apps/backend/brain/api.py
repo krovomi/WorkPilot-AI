@@ -174,7 +174,9 @@ def _checked_remote(value: str | None) -> tuple[str | None, str | None]:
         return None, "invalid-remote"
 
 
-_USERINFO = re.compile(r"(\b[a-z][a-z0-9+.-]*://)[^/@\s]+@", re.I)
+# Everything up to the last "@" before the host: a sign-in part may itself hold
+# an "@", and the part after the first one is still part of it.
+_USERINFO = re.compile(r"(\b[a-z][a-z0-9+.-]*://)[^/?#\s]+@", re.I)
 
 
 def _git_detail(text: str | None) -> str | None:
@@ -195,6 +197,10 @@ def _git_detail(text: str | None) -> str | None:
     return detail[:300] or None
 
 
+_QUOTED = re.compile(r"'[^'\n]*'")
+_HTTP_403 = re.compile(r"(?:error|http|status)[: ]+403\b|\b403 forbidden")
+
+
 def _clone_error(text: str) -> str:
     """What went wrong with a clone, as a code the UI translates.
 
@@ -202,14 +208,15 @@ def _clone_error(text: str) -> str:
     versions; the response carries a code instead, and the message stays in
     the backend's log.
     """
-    low = (text or "").lower()
-    if any(
+    # git quotes the URL or path it names; a folder called `pytest-403` or
+    # `permission denied` says nothing about why the clone failed.
+    low = _QUOTED.sub("''", text or "").lower()
+    if _HTTP_403.search(low) or any(
         k in low
         for k in (
             "permission denied",
             "authentication",
             "could not read username",
-            "403",
         )
     ):
         return "auth"
