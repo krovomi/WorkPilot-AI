@@ -101,6 +101,9 @@ class ParallelFollowupReviewer:
         self.config = config
         self.progress_callback = progress_callback
         self.worktree_manager = PRWorktreeManager(project_dir, PR_WORKTREE_DIR)
+        self.prompts_dir = (
+            Path(__file__).parent.parent.parent.parent / "prompts" / "github"
+        )
 
     def _report_progress(self, phase: str, progress: int, message: str, **kwargs):
         """Report progress if callback is set."""
@@ -108,12 +111,10 @@ class ParallelFollowupReviewer:
             import sys
 
             if "orchestrator" in sys.modules:
+                # The runner imports the orchestrator by its bare name.
                 ProgressCallback = sys.modules["orchestrator"].ProgressCallback
             else:
-                try:
-                    from ..orchestrator import ProgressCallback
-                except ImportError:
-                    from orchestrator import ProgressCallback
+                from runners.github.orchestrator import ProgressCallback
 
             self.progress_callback(
                 ProgressCallback(
@@ -123,9 +124,7 @@ class ParallelFollowupReviewer:
 
     def _load_prompt(self, filename: str) -> str:
         """Load a prompt file from the prompts/github directory."""
-        prompt_file = (
-            Path(__file__).parent.parent.parent.parent / "prompts" / "github" / filename
-        )
+        prompt_file = self.prompts_dir / filename
         if prompt_file.exists():
             return prompt_file.read_text(encoding="utf-8")
         logger.warning(f"Prompt file not found: {prompt_file}")
@@ -780,7 +779,7 @@ The SDK will run invoked agents in parallel automatically.
             for rv in response.resolution_verifications:
                 if rv.status == "resolved":
                     resolved_ids.append(rv.finding_id)
-                elif rv.status in ("unresolved", "partially_resolved", "cant_verify"):
+                else:  # unresolved, partially_resolved, cant_verify
                     # Check if finding was validated and dismissed as false positive
                     if rv.finding_id in dismissed_ids:
                         # Finding-validator determined this was a false positive - skip it
@@ -1225,12 +1224,10 @@ Agents invoked: {agents_str}
             else:
                 return "**🟠 Needs revision** - See details below."
 
-        elif verdict == MergeVerdict.MERGE_WITH_CHANGES:
+        else:  # MERGE_WITH_CHANGES
             if pending_ci > 0:
                 return (
                     "**🟡 Can merge once CI passes** - Minor suggestions, no blockers."
                 )
             else:
                 return "**🟡 Can merge** - Minor suggestions noted, no blockers."
-
-        return "**📝 Review complete** - See details below."
