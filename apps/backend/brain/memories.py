@@ -40,7 +40,16 @@ from pathlib import Path
 
 from .agents import AGENTS, AgentSpec, agent
 from .home import digest_path, kind_dir
-from .notes import Note, inside, iter_notes, now_iso, read_note, slugify, write_note
+from .notes import (
+    Note,
+    inside,
+    iter_notes,
+    listed,
+    now_iso,
+    read_note,
+    slugify,
+    write_note,
+)
 
 __all__ = [
     "BRIDGE_START",
@@ -275,8 +284,8 @@ def remember(
     score, match = best
     if match is not None and score >= _threshold():
         note = read_note(root, match.rel)
-        agents = list(note.meta.get("agents") or [])
-        sources = list(note.meta.get("sources") or [])
+        agents = listed(note.meta.get("agents"))
+        sources = listed(note.meta.get("sources"))
         changed = False
         if agent_name not in agents:
             agents.append(agent_name)
@@ -284,7 +293,7 @@ def remember(
         if source and source not in sources:
             sources.append(source)
             changed = True
-        tasks = list(note.meta.get("tasks") or [])
+        tasks = listed(note.meta.get("tasks"))
         if task and task not in tasks:
             tasks.append(task)
             note.meta["tasks"] = tasks

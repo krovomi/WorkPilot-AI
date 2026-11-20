@@ -212,8 +212,12 @@ def load_graph(path: Path) -> dict[str, Any]:
         return {"nodes": [], "links": []}
     if not isinstance(data, dict):
         return {"nodes": [], "links": []}
-    data.setdefault("nodes", [])
-    data.setdefault("links", data.pop("edges", []))
+    # Graphify, or a person, may have written it: ``"nodes": null`` made every
+    # reader of the graph raise, so every recall failed until the next rebuild.
+    edges = data.pop("edges", None)
+    nodes, links = data.get("nodes"), data.get("links", edges)
+    data["nodes"] = nodes if isinstance(nodes, list) else []
+    data["links"] = links if isinstance(links, list) else []
     return data
 
 

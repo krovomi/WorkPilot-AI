@@ -721,7 +721,10 @@ def main():
         "--source", required=True, help="Source name (sentry, datadog, etc.)"
     )
     connect_parser.add_argument(
-        "--config", required=True, dest="config_json", help="JSON source configuration"
+        "--config",
+        required=True,
+        dest="config_json",
+        help="JSON source configuration, or - to read it from stdin",
     )
 
     # Disconnect subcommand
@@ -814,8 +817,10 @@ def _dispatch(
     if cmd == "config":
         return runner.run_config(mode=args.mode, data_json=args.data)
     if cmd == "connect":
+        # "-" reads the configuration from stdin, so a key stays off the command line.
+        config_json = sys.stdin.read() if args.config_json == "-" else args.config_json
         return asyncio.run(
-            runner.run_connect(source=args.source, config_json=args.config_json)
+            runner.run_connect(source=args.source, config_json=config_json)
         )
     if cmd == "disconnect":
         return asyncio.run(runner.run_disconnect(source=args.source))

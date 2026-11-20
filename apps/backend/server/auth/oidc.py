@@ -21,7 +21,7 @@ import threading
 import jwt as pyjwt
 from server.config import get_settings
 from server.db.models import IdentityProvider, User, UserIdentity
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -84,21 +84,49 @@ def validate_id_token(id_token: str) -> dict:
     return claims
 
 
+def _is_true(value: object) -> bool:
+    return value is True or (isinstance(value, str) and value.lower() == "true")
+
+
+def _address(value: object) -> str:
+    if not isinstance(value, str) or "@" not in value:
+        return ""
+    return value.strip().lower()
+
+
+def verified_email(claims: dict) -> str:
+    """The address Entra vouches for in these claims, or ``""``.
+
+    A member of the tenant signs in with their user principal name
+    (``preferred_username``), whose domain the tenant itself has verified. A
+    guest's ``preferred_username`` and any ``email`` claim come from another
+    directory or from an editable attribute: they count only when Entra marks
+    the address's domain as verified (the optional ``xms_edov`` claim).
+    A guest is a token whose ``idp`` names another issuer, or whose optional
+    ``acct`` claim is 1.
+    """
+    if _is_true(claims.get("xms_edov")):
+        email = _address(claims.get("email"))
+        if email:
+            return email
+    idp = claims.get("idp")
+    member = idp in (None, "", claims.get("iss")) and str(claims.get("acct", 0)) != "1"
+    return _address(claims.get("preferred_username")) if member else ""
+
+
 async def provision_entra_user(db: AsyncSession, claims: dict) -> User:
     """JIT provisioning: find or create the user behind an Entra identity.
 
     Matching order:
-    1. Existing identity (provider=entra, subject=oid) -> that user.
-    2. Existing user with the same email -> attach an entra identity
-       (lets a pre-created local/admin account link to SSO seamlessly).
-    3. Otherwise create a new active member.
+    1. Existing identity (provider=entra, subject=oid) -> that user. The
+       object id is stable within the tenant the server trusts.
+    2. A verified address (``verified_email``) names an existing account that
+       has no other Entra identity -> the identity is attached (lets a
+       pre-created local/admin account link to SSO).
+    3. A verified address and no account -> a new active member.
+    An address Entra does not vouch for links and creates nothing.
     """
     oid = claims["oid"]
-    email = (
-        (claims.get("preferred_username") or claims.get("email") or "").strip().lower()
-    )
-    display_name = (claims.get("name") or email or oid).strip()
-
     identity = await db.scalar(
         select(UserIdentity).where(
             UserIdentity.provider == IdentityProvider.ENTRA.value,
@@ -111,15 +139,17 @@ async def provision_entra_user(db: AsyncSession, claims: dict) -> User:
             raise OidcError("Account is disabled")
         return user
 
-    user = None
-    if email:
-        user = await db.scalar(select(User).where(User.email == email))
-    if user is not None and not user.is_active:
-        raise OidcError("Account is disabled")
-
-    if user is None:
-        if not email:
-            raise OidcError("Entra id_token carries no usable email claim")
+    email = verified_email(claims)
+    if not email:
+        raise OidcError("Entra gave no verified email for this account")
+    user = await db.scalar(select(User).where(User.email == email))
+    if user is not None:
+        if not user.is_active:
+            raise OidcError("Account is disabled")
+        if await _first_entra_subject(db, user.id) is not None:
+            raise OidcError("This account is linked to another Entra sign-in")
+    else:
+        display_name = (claims.get("name") or email).strip()
         user = User(email=email, display_name=display_name)
         db.add(user)
         await db.flush()
@@ -133,4 +163,28 @@ async def provision_entra_user(db: AsyncSession, claims: dict) -> User:
         )
     )
     await db.commit()
+    # Two first sign-ins for the same account may pass the check above at the
+    # same time: the earliest link stays and the other is taken back.
+    if await _first_entra_subject(db, user.id) != oid:
+        await db.execute(
+            delete(UserIdentity).where(
+                UserIdentity.provider == IdentityProvider.ENTRA.value,
+                UserIdentity.subject == oid,
+            )
+        )
+        await db.commit()
+        raise OidcError("This account is linked to another Entra sign-in")
     return user
+
+
+async def _first_entra_subject(db: AsyncSession, user_id: str) -> str | None:
+    """The Entra sign-in an account was linked to first, if any."""
+    return await db.scalar(
+        select(UserIdentity.subject)
+        .where(
+            UserIdentity.user_id == user_id,
+            UserIdentity.provider == IdentityProvider.ENTRA.value,
+        )
+        .order_by(UserIdentity.created_at, UserIdentity.id)
+        .limit(1)
+    )
