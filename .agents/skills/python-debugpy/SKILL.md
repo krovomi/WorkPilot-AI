@@ -23,7 +23,7 @@ metadata:
     - node-inspect-debugger
   workpilot:
     pack: hermes
-    version: 0.1.0
+    version: 0.2.0
     content_sha256: 76383a4d01ff6a2c40d04c4034948356bc2a2830c81001fceeef179350a9abbb
 ---
 
