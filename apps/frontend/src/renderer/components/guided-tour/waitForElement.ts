@@ -13,6 +13,11 @@ export function waitForElement(
 	signal?: AbortSignal,
 ): Promise<HTMLElement | null> {
 	return new Promise((resolve) => {
+		// An abort listener added to an already aborted signal never fires.
+		if (signal?.aborted) {
+			resolve(null);
+			return;
+		}
 		const existing = document.querySelector<HTMLElement>(selector);
 		if (existing) {
 			resolve(existing);
@@ -28,8 +33,8 @@ export function waitForElement(
 		};
 		signal?.addEventListener("abort", onAbort, { once: true });
 
+		// Abort cancels the pending frame, so a tick never runs after it.
 		const tick = () => {
-			if (signal?.aborted) return;
 			const el = document.querySelector<HTMLElement>(selector);
 			if (el) {
 				signal?.removeEventListener("abort", onAbort);

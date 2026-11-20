@@ -352,10 +352,14 @@ export function startContextMeshAnalysis(
 	model?: string,
 	thinkingLevel?: string,
 ): void {
-	const store = useContextMeshStore.getState();
-	store.setPhase("analyzing");
-	store.setStatus("Starting analysis...");
-	store.appendStreamingOutput("");
+	// A new run starts clean: the last run's output and error are not its
+	// own. No status yet, so the dashboard shows its translated "analyzing".
+	useContextMeshStore.setState({
+		phase: "analyzing",
+		status: "",
+		streamingOutput: "",
+		error: null,
+	});
 	window.electronAPI.send("contextMesh:runAnalysis", model, thinkingLevel);
 }
 

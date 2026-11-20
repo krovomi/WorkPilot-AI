@@ -11,6 +11,7 @@ one that calls a model.
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import subprocess
@@ -580,6 +581,38 @@ def test_connect_and_disconnect_reach_the_orchestrator(
         "success": False,
         "source": "sentry",
     }
+
+
+def test_connect_reads_its_configuration_from_stdin(
+    runner, stand_in, monkeypatch, project, capsys
+):
+    stand_in.answers["connect_production_source"] = True
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(
+            '{"server_url": "https://sentry.example", "api_key": "placeholder-key"}'
+        ),
+    )
+    assert (
+        _main(
+            runner,
+            monkeypatch,
+            project,
+            "connect",
+            "--source",
+            "sentry",
+            "--config",
+            "-",
+        )
+        == 0
+    )
+    source_config = stand_in.calls[0][1][0]
+    assert (source_config.server_url, source_config.api_key) == (
+        "https://sentry.example",
+        "placeholder-key",
+    )
+    capsys.readouterr()
 
 
 def test_the_orchestrator_follows_the_saved_config(runner, project):
