@@ -18,6 +18,7 @@
 	"noFrames": "Aucun appel en pause.",
 	"continue": "Continuer",
 	"skip": "Ignorer",
+	"refused": "Le débogueur a refusé ce changement : l'appel en pause est peut-être déjà terminé.",
 	"description": "Mettez un agent en pause avant un appel d’outil qui correspond à un point d’arrêt, inspectez son entrée, puis laissez-le continuer ou ignorez l’appel. Fonctionne avec tous les fournisseurs et toutes les stacks.",
 	"kickers": {
 		"sessions": "Sessions",

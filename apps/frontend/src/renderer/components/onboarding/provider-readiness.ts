@@ -10,6 +10,12 @@ import type { ProvidersResponse } from "../../../shared/utils/providers";
 import type { APIProfile } from "../../../shared/types/profile";
 import { detectProvider } from "../../../shared/utils/provider-detection";
 
+/** The provider of an endpoint, a local Ollama server being Ollama. */
+function providerOf(baseUrl: string): string {
+	const provider = detectProvider(baseUrl);
+	return provider === "ollama_local" ? "ollama" : provider;
+}
+
 /**
  * The labels of the providers ready to use, in the pickers' order.
  *
@@ -26,7 +32,7 @@ export function readyProviderLabels(
 	const withKey = profiles.filter((profile) => profile.apiKey?.trim());
 	const ollamaConfigured =
 		Boolean(String(settings.globalOllamaApiUrl ?? "").trim()) ||
-		withKey.some((profile) => detectProvider(profile.baseUrl) === "ollama");
+		withKey.some((profile) => providerOf(profile.baseUrl) === "ollama");
 
 	const labels = response.providers
 		.filter((provider) => response.status[provider.name] === true)
@@ -35,7 +41,7 @@ export function readyProviderLabels(
 
 	const listed = new Set(response.providers.map((provider) => provider.name));
 	for (const profile of withKey) {
-		const detected = profile.baseUrl ? detectProvider(profile.baseUrl) : "";
+		const detected = profile.baseUrl ? providerOf(profile.baseUrl) : "";
 		if (!detected || !listed.has(detected)) labels.push(profile.name);
 	}
 	return [...new Set(labels)];

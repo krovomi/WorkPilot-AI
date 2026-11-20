@@ -37,15 +37,11 @@ export interface UseXtermReturn {
 	terminalRef: React.RefObject<HTMLDivElement | null>;
 	/** Ref to the xterm.js Terminal instance */
 	xtermRef: React.MutableRefObject<XTerm | null>;
-	/** Ref to the FitAddon instance */
-	fitAddonRef: React.MutableRefObject<FitAddon | null>;
 	/**
 	 * Fit the terminal content to the container dimensions.
 	 * @returns boolean indicating whether fit was successful (had valid dimensions)
 	 */
 	fit: () => boolean;
-	/** Write data to the terminal */
-	write: (data: string) => void;
 	/** Write a line to the terminal */
 	writeln: (data: string) => void;
 	/** Focus the terminal */
@@ -56,8 +52,6 @@ export interface UseXtermReturn {
 	cols: number;
 	/** Current number of rows */
 	rows: number;
-	/** Whether dimensions have been measured and are ready */
-	dimensionsReady: boolean;
 }
 
 export function useXterm({
@@ -78,10 +72,14 @@ export function useXterm({
 		rows: 24,
 	});
 
-	// Get font settings from store
-	// Note: We subscribe to the entire store here for initial terminal creation.
-	// The subscription effect below handles reactive updates for font changes.
-	const fontSettings = useTerminalFontSettingsStore();
+	// The xterm handlers are attached once, when it is created; they call the
+	// callbacks of the latest render through this ref. (Auto-naming hands a new
+	// onCommandEnter when the terminal enters Claude mode, and the terminal a
+	// new onResize on every render.)
+	const callbacksRef = useRef({ onCommandEnter, onResize, onDimensionsReady });
+	useEffect(() => {
+		callbacksRef.current = { onCommandEnter, onResize, onDimensionsReady };
+	});
 
 	// Initialize xterm.js UI
 	useEffect(() => {
@@ -101,6 +99,8 @@ export function useXterm({
 
 		debugLog(`[useXterm] Initializing xterm for terminal: ${terminalId}`);
 
+		// Later changes reach the open terminal through the subscription below.
+		const fontSettings = useTerminalFontSettingsStore.getState();
 		const xterm = new XTerm({
 			cursorBlink: fontSettings.cursorBlink,
 			cursorStyle: fontSettings.cursorStyle,
@@ -230,7 +230,7 @@ export function useXterm({
 							debugLog(
 								`[useXterm] Dimensions ready for terminal: ${terminalId}, cols: ${cols}, rows: ${rows}, containerWidth: ${rect.width}, containerHeight: ${rect.height}`,
 							);
-							onDimensionsReady?.(cols, rows);
+							callbacksRef.current.onDimensionsReady?.(cols, rows);
 						}
 					} else {
 						// Container not ready yet, retry after a short delay
@@ -267,9 +267,7 @@ export function useXterm({
 			if (data === "\r" || data === "\n") {
 				const command = commandBufferRef.current;
 				commandBufferRef.current = "";
-				if (onCommandEnter) {
-					onCommandEnter(command);
-				}
+				callbacksRef.current.onCommandEnter?.(command);
 			} else if (data === "\x7f" || data === "\b") {
 				commandBufferRef.current = commandBufferRef.current.slice(0, -1);
 			} else if (data === "\x03") {
@@ -281,41 +279,20 @@ export function useXterm({
 
 		// Handle resize
 		xterm.onResize(({ cols, rows }) => {
-			if (onResize) {
-				onResize(cols, rows);
-			}
+			callbacksRef.current.onResize?.(cols, rows);
 		});
+		// Disposal is the parent's call (dispose()), after it saved the buffer.
+	}, [terminalId]);
 
-		return () => {
-			// Cleanup handled by parent component
-		};
-	}, [
-		terminalId,
-		onCommandEnter,
-		onResize,
-		onDimensionsReady,
-		fontSettings.cursorAccentColor,
-		fontSettings.cursorBlink,
-		fontSettings.cursorStyle,
-		fontSettings.fontFamily.join,
-		fontSettings.fontSize,
-		fontSettings.fontWeight,
-		fontSettings.letterSpacing,
-		fontSettings.lineHeight,
-		fontSettings.scrollback,
-	]);
-
-	// Subscribe to font settings changes and update terminal reactively
-	// This effect runs after xterm is created and re-runs when terminalId changes,
-	// ensuring the subscription always uses the latest xterm instance
+	// Subscribe to font settings changes and update the open terminal reactively.
+	// It reads the terminal at each change: after dispose() there is none to
+	// update, and a terminal created again is the one that gets the change.
 	useEffect(() => {
-		const xterm = xtermRef.current;
-		if (!xterm) return;
-
-		// Update terminal options when font settings change
 		const updateTerminalOptions = (
 			settings: ReturnType<typeof useTerminalFontSettingsStore.getState>,
 		) => {
+			const xterm = xtermRef.current;
+			if (!xterm) return;
 			xterm.options.cursorBlink = settings.cursorBlink;
 			xterm.options.cursorStyle = settings.cursorStyle;
 			xterm.options.fontSize = settings.fontSize;
@@ -333,18 +310,8 @@ export function useXterm({
 			xterm.refresh(0, xterm.rows - 1);
 		};
 
-		// Subscribe to store changes - when terminalId changes, this effect re-runs,
-		// cleaning up the old subscription and creating a new one for the new xterm instance
-		const unsubscribe = useTerminalFontSettingsStore.subscribe(() => {
-			// Get latest settings from store
-			const latestSettings = useTerminalFontSettingsStore.getState();
-
-			// Update terminal options with latest settings
-			updateTerminalOptions(latestSettings);
-		});
-
-		return unsubscribe;
-	}, []); // Only terminalId needed - re-subscribe when terminal changes
+		return useTerminalFontSettingsStore.subscribe(updateTerminalOptions);
+	}, []);
 
 	// Register xterm write callback with terminal-store for global output listener
 	// This allows the global listener to write directly to xterm when terminal is visible
@@ -394,7 +361,7 @@ export function useXterm({
 					// Notify when dimensions become valid (for late PTY creation)
 					if (!dimensionsReadyCalledRef.current && cols > 0 && rows > 0) {
 						dimensionsReadyCalledRef.current = true;
-						onDimensionsReady?.(cols, rows);
+						callbacksRef.current.onDimensionsReady?.(cols, rows);
 					}
 				}
 			}
@@ -411,7 +378,7 @@ export function useXterm({
 				resizeObserver.disconnect();
 			};
 		}
-	}, [onDimensionsReady]);
+	}, []);
 
 	// Listen for terminal refit events (triggered after drag-drop reorder)
 	useEffect(() => {
@@ -449,12 +416,6 @@ export function useXterm({
 			}
 		}
 		return false;
-	}, []);
-
-	const write = useCallback((data: string) => {
-		if (xtermRef.current) {
-			xtermRef.current.write(data);
-		}
 	}, []);
 
 	const writeln = useCallback((data: string) => {
@@ -533,14 +494,11 @@ export function useXterm({
 	return {
 		terminalRef,
 		xtermRef,
-		fitAddonRef,
 		fit,
-		write,
 		writeln,
 		focus,
 		dispose,
 		cols: dimensions.cols,
 		rows: dimensions.rows,
-		dimensionsReady: dimensionsReadyCalledRef.current,
 	};
 }

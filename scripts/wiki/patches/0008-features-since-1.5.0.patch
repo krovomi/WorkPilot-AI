@@ -1,0 +1,493 @@
+From 21cc0d0dbcb445de2ac4c9f5e0523e5aadd2cc44 Mon Sep 17 00:00:00 2001
+From: WorkPilot Wiki Bot <noreply@workpilot.ai>
+Date: Mon, 16 Nov 2026 19:33:01 +0000
+Subject: [PATCH] docs(wiki): AI accounts and failover, sandbox and trust
+ score, code migration, menu, REA, WinDev, memory lifecycle
+
+---
+ AI-Providers.fr.md       | 19 ++++++++-----------
+ AI-Providers.md          | 12 ++++++++++++
+ Advanced-Features.fr.md  | 26 ++++++++++++++++++++------
+ Advanced-Features.md     | 24 ++++++++++++++++++++++++
+ Memory-System.fr.md      | 10 ++++++++++
+ Memory-System.md         | 13 +++++++++++++
+ Security.fr.md           | 32 +++++++++++++++++++++++---------
+ Security.md              | 17 +++++++++++++++++
+ Specialized-Agents.fr.md | 18 ++++++++++++++++++
+ Specialized-Agents.md    | 14 ++++++++++++++
+ User-Interface.fr.md     | 33 +++++++++++++++++++++++++++++++--
+ User-Interface.md        | 33 +++++++++++++++++++++++++++++++--
+ 12 files changed, 221 insertions(+), 30 deletions(-)
+
+diff --git a/AI-Providers.fr.md b/AI-Providers.fr.md
+index 6ceff64..8122913 100644
+--- a/AI-Providers.fr.md
++++ b/AI-Providers.fr.md
+@@ -61,21 +61,18 @@ AZURE_OPENAI_ENDPOINT=https://xxx.openai.azure.com
+ 
+ ## 👥 Multi-profils & bascule automatique
+ 
+-C'est une des fonctionnalités les plus appréciées : **enregistrer plusieurs profils** (même fournisseur ou fournisseurs différents) et laisser WorkPilot AI **basculer automatiquement** quand un compte atteint son rate limit.
++C'est une des fonctionnalités les plus appréciées : **enregistrer plusieurs comptes** (même fournisseur ou fournisseurs différents) et laisser WorkPilot AI **basculer automatiquement** quand un compte atteint sa limite ou perd sa connexion.
+ 
+-### Créer plusieurs profils
+-1. **Paramètres → Fournisseurs IA → Ajouter un profil**
+-2. Nommez le profil (ex : « Claude perso », « Claude équipe », « OpenAI fallback »)
+-3. Ajoutez autant de profils que nécessaire
++### La page Comptes IA
++**Paramètres → Comptes IA** dit combien de providers sont connectés, lequel est par défaut, si le basculement automatique est actif et ce qui demande attention. Chaque provider est une carte qui dit comment il se connecte (connexion, CLI, clé d'API, local), s'il répond (un provider connecté jamais testé l'est une fois, discrètement), son usage et l'âge de sa clé, avec une recherche et des filtres (connectés, à connecter, à vérifier).
++
++![Comptes IA](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/ai-accounts.png)
+ 
+ ### Comment la bascule fonctionne
+-`profile-scorer.ts` évalue chaque profil selon :
+-- **Disponibilité** (pas en cooldown rate limit)
+-- **Usage récent** (équilibrage de charge)
+-- **Modèle compatible** avec la tâche
+-- **Coût estimé**
++L'onglet **Basculement auto** ordonne une chaîne : chaque compte Claude, chaque profil API, et chaque provider sans compte à lui ici (Copilot par `gh`, une clé dans les réglages, Ollama, un CLI d'agent). Une tâche arrêtée par une limite ou une connexion perdue reprend sur l'entrée utilisable suivante, par le même chemin que « Reprendre avec… », à la phase où elle s'est arrêtée ; le journal de la tâche dit d'où vers où elle est passée. Une entrée déjà essayée pour cette tâche est sautée pendant 6 heures, une entrée retirée de la chaîne garde sa place, et une tâche change au plus 6 fois. Conception : [provider-failover.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/provider-failover.md).
+ 
+-Quand un profil atteint son rate limit, il est marqué en cooldown et le scoreur choisit automatiquement le suivant — le tout **sans interruption** de la tâche en cours.
++### Nom du forfait
++La répartition de l'utilisation affiche le forfait de chaque compte tel que le fournisseur l'indique : Claude Pro, Max 5x ou Max 20x (lu dans la connexion de Claude Code), ChatGPT Plus ou Pro (Codex CLI), Copilot Free, Pro, Pro+, Business ou Enterprise, Windsurf, Cursor. Un compte facturé par clé d'API dit « Clé API · à l'usage » ; un fournisseur qui ne nomme pas son forfait affiche « Abonnement ». Rien n'est deviné et aucun appel réseau n'est ajouté.
+ 
+ ### Stockage sécurisé
+ - **macOS** : Keychain
+diff --git a/AI-Providers.md b/AI-Providers.md
+index f00859d..52045c9 100644
+--- a/AI-Providers.md
++++ b/AI-Providers.md
+@@ -44,4 +44,16 @@ A first-run wizard walks through setting up any provider and reports honestly wh
+ 
+ ---
+ 
++## AI accounts and automatic failover
++
++**Settings → AI accounts** sums up how many providers are connected, which one is the default, whether automatic failover is on and what needs attention. Each provider is a card that says how it signs in (sign-in, CLI, API key, local), whether it answers (a connected provider never tested is tested once, quietly), its usage and the age of its key, with a search and filters (connected, to connect, needs attention).
++
++![AI accounts](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/ai-accounts.png)
++
++The **Auto failover** tab orders a chain of entries: each Claude account, each API profile, and each provider without an account of its own here (Copilot through `gh`, a key in the settings, Ollama, an agent CLI). A task stopped by a rate limit or a lost connection resumes on the next usable entry, through the same path as « Resume with… », at the phase where it stopped; the task's log says from where to where it moved. An entry already tried for that task is skipped for 6 hours, an entry you removed from the chain keeps its place, and a task moves at most 6 times. Design: [provider-failover.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/provider-failover.md).
++
++**Plan names.** The usage breakdown shows each account's plan as the provider reports it: Claude Pro, Max 5x or Max 20x (read from Claude Code's sign-in), ChatGPT Plus or Pro (Codex CLI), Copilot Free, Pro, Pro+, Business or Enterprise, Windsurf, Cursor. An account billed by API key says « API key · pay as you go »; a provider that does not name its plan shows « Subscription ». Nothing is guessed and no extra network call is made.
++
++---
++
+ ➡️ Continue: [Memory system](Memory-System)
+diff --git a/Advanced-Features.fr.md b/Advanced-Features.fr.md
+index 237c63e..3ca09bb 100644
+--- a/Advanced-Features.fr.md
++++ b/Advanced-Features.fr.md
+@@ -22,6 +22,12 @@ Le **Mission Control** est un **dashboard multi-agents** inspiré des salles de
+ - Surveiller un batch de 20 PR Reviews automatiques
+ - Voir l'état d'un Self-Healing en cours sur plusieurs incidents simultanés
+ 
++### Vagues d'exécution
++Mission Control regroupe les specs du backlog et de la file en vagues qui ne partagent aucun fichier, d'après leurs plans et ce que leurs worktrees ont déjà modifié, quelle que soit la langue (un manifeste de dépendances ou un lockfile pèse plus). Il montre le plan vague par vague, l'ordre de merge, les paires les plus risquées, les cycles de dépendances et une spec qui dérive hors de son plan ; **Exécuter dans l'ordre optimal** lance chaque vague par le démarrage habituel des tâches, chacune avec son provider, dans la limite des tâches parallèles du projet, et replanifie le reste à chaque vague. Aucun modèle n'est appelé. Conception : [execution-waves.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/execution-waves.md).
++
++### Mode Essaim
++Quand **Paramètres → Mode Essaim** est actif, les sous-tâches que le plan permet de mener côte à côte sont construites en même temps, chacune dans son propre worktree, et fusionnées dans la branche de la tâche après chaque vague ; une sous-tâche en conflit revient au codeur de la tâche. Conception : [swarm.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/swarm.md).
++
+ ---
+ 
+ ## 🎮 Arena Mode
+@@ -49,13 +55,13 @@ Le **Mission Control** est un **dashboard multi-agents** inspiré des salles de
+ 
+ ## 👥 Pair Programming
+ 
+-Mode de **programmation en binôme** avec une IA en temps réel.
++Mode de **programmation en binôme** avec une IA participante.
+ 
+-- Vous codez dans votre éditeur
+-- L'IA **commente, suggère, challenge** en streaming
+-- Conversation-driven : vous pouvez discuter du design avant d'implémenter
+-- Changements appliqués uniquement sur votre validation
+-- Idéal pour explorer une nouvelle API ou un framework inconnu
++- Dans une salle, **Inviter l'IA** ajoute WorkPilot IA, qui répond à chaque message avec le fournisseur et le modèle choisis pour la page (tous les providers)
++- Elle lit la conversation et le fichier de la salle, choisi dans le projet ouvert
++- Un bloc de code qu'elle propose s'affiche comme **suggestion** sur ce fichier, sans rien écrire
++- La salle dit qu'elle reste sur cet ordinateur
++- Sur un projet du serveur, un message du chat d'équipe qui mentionne `@ia` reçoit une réponse de l'IA, marquée 🤖, calculée par l'app de son auteur avec le fournisseur de sa page Insights
+ 
+ ---
+ 
+@@ -205,6 +211,14 @@ Depuis la 1.4.0, la page analyse le projet, montre la stack source détectée et
+ une tâche Kanban qui fait la migration dans un worktree isolé : plus de migration annoncée « en file
+ d'attente » qui ne s'exécutait jamais.
+ 
++La page affiche désormais le plan qu'elle a fait : la stack détectée, la cible (la dernière stack
++nommée dans la phrase : « de React vers Vue » vise Vue), si le plan est connu, son risque, ses phases
++et ses étapes ; la tâche Kanban créée depuis la page les reçoit dans sa description. Une stack dont
++le framework reste est planifiée par ses langages (une app React passée de JavaScript à TypeScript,
++un service Java converti en Kotlin).
++
++![Migration de code](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/code-migration.png)
++
+ ---
+ 
+ ## 🎨 Import Design (refait en 1.4.0)
+diff --git a/Advanced-Features.md b/Advanced-Features.md
+index 99d5fdd..04ddb4b 100644
+--- a/Advanced-Features.md
++++ b/Advanced-Features.md
+@@ -28,4 +28,28 @@ On top of this, **guardrails as code** enforce a versioned, layered policy that
+ 
+ ---
+ 
++## Swarm mode
++
++When **Settings → Swarm Mode** is on, the subtasks the plan allows to run side by side are built at the same time, each in its own worktree, and merged into the task's branch after each wave; a subtask in conflict goes back to the task's coder. Design: [swarm.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/swarm.md).
++
++## Execution waves (Mission Control)
++
++Mission Control groups the specs waiting in the backlog and the queue into waves that share no file, from their plans and from what their worktrees already changed, in any language (a dependency manifest or a lockfile weighs more). It shows the plan wave by wave, the merge order, the riskiest pairs, dependency cycles and a spec drifting outside its plan; **Run in the optimal order** starts each wave through the usual task start, each task with its own provider, within the project's parallel tasks, and replans the rest after each wave. No model is called. Design: [execution-waves.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/execution-waves.md).
++
++## Pair programming with an AI participant
++
++In a Pair Programming room, **Invite the AI** adds WorkPilot AI, which answers each message with the provider and model chosen for the page (every provider). It reads the conversation and the room's file, chosen in the open project; a code block it proposes shows as a suggestion on that file, never written. The room says it stays on this computer. On a server project, a team chat message that mentions `@ia` gets an AI reply, marked 🤖, computed by its author's app with the provider of their Insights page.
++
++## Sharing an agent replay
++
++A recorded session exports as a `.wpreplay` file a teammate imports into their WorkPilot (and compares with one of theirs), or as one HTML page anyone opens without installing anything. Secrets and local folders are always masked; reasoning, token counts and costs, and file contents leave only if you say so. Annotated bookmarks mark the steps of a finished session and travel with it. Design: [replay-sharing.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/replay-sharing.md).
++
++## Code migration
++
++The **Code migration** page (Toolbox) analyses a framework, version or language migration on any stack and shows the source stack, the target (the last stack named in the sentence), whether the plan is known, its risk, phases and steps. **Create the Kanban task** puts that plan in the task's description, and the task migrates in an isolated worktree. A stack that keeps its framework is planned by its languages (a React app moved from JavaScript to TypeScript, a Java service converted to Kotlin).
++
++![Code migration](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/code-migration.png)
++
++---
++
+ ➡️ Continue: [Contributing](Contributing)
+diff --git a/Memory-System.fr.md b/Memory-System.fr.md
+index 644bf25..9c07517 100644
+--- a/Memory-System.fr.md
++++ b/Memory-System.fr.md
+@@ -81,6 +81,16 @@ Les réponses sont injectées dans le contexte des agents, réduisant la redonda
+ ### Oubli / invalidation
+ Certaines connaissances deviennent **obsolètes** (ex : décision révoquée dans une spec ultérieure). Graphiti gère l'**invalidation temporelle** : les nœuds périmés sont marqués et exclus des requêtes par défaut.
+ 
++### Journal, corbeille et épingles
++Chaque décision sur la mémoire d'un projet (créée, modifiée, oubliée, restaurée, épinglée, fusionnée, archivée) est une ligne d'un journal en clair rangé dans le cerveau partagé, avec son auteur (vous, un agent, la synchronisation, le learning loop) et sa raison ; chaque mémoire a son historique.
++
++- **Oublier** met la note à la corbeille pendant 30 jours, d'où **Restaurer** la remet en place (avec un avertissement si elle contredit une mémoire actuelle).
++- **Épingler** (50 par projet) la protège de toute suppression automatique.
++- L'onglet **Cycle de vie** de Contexte montre le journal ; l'onglet Mémoires porte les actions sur chaque mémoire.
++- Une note reçue d'une synchronisation d'équipe qui contredit une note du projet (« toujours » contre « jamais », deux valeurs pour un même réglage, deux recommandations opposées) est repérée sans modèle, hors ligne. Les cas sûrs se règlent seuls (la note épinglée, le pattern le plus sûr ou la note bien plus récente l'emporte) ; les autres attendent côte à côte que vous gardiez l'une, écriviez la note canonique ou disiez que ce n'est pas un conflit. Un modèle peut donner son avis sur demande, sans jamais trancher.
++
++Conception : [memory-lifecycle.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/memory-lifecycle.md).
++
+ ---
+ 
+ ## 🔍 Questions typiques que Graphiti aide à répondre
+diff --git a/Memory-System.md b/Memory-System.md
+index d631115..bd5b52c 100644
+--- a/Memory-System.md
++++ b/Memory-System.md
+@@ -36,4 +36,17 @@ Two companion features extend the same philosophy: the **personal coach** learns
+ 
+ ---
+ 
++## Memory lifecycle and team conflicts
++
++Every decision about a project's memory (created, edited, forgotten, restored, pinned, merged, archived) is a line of a plain journal kept in the shared brain, with its author (you, an agent, the sync, the learning loop) and its reason; each memory has its own history.
++
++- **Forget** puts the note in a trash for 30 days, from which **Restore** puts it back (with a warning if it contradicts a current memory).
++- **Pin** (50 per project) protects a memory from any automatic removal.
++- The **Lifecycle** tab of Context shows the journal; the Memories tab has the actions on each memory.
++- A note brought by a team sync that contradicts a note of the project (« always » against « never », two values for the same setting, opposite recommendations) is detected without a model, offline. Safe cases settle themselves (the pinned note, the safer pattern or the much more recent note wins); the others wait side by side until you keep one, write the canonical note or say it is not a conflict. A model can give its opinion on request, never decide.
++
++Design: [memory-lifecycle.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/memory-lifecycle.md).
++
++---
++
+ ➡️ Continue: [Architecture](Architecture)
+diff --git a/Security.fr.md b/Security.fr.md
+index 991974b..cbd3482 100644
+--- a/Security.fr.md
++++ b/Security.fr.md
+@@ -270,18 +270,32 @@ Pour un contrôle total, combinez :
+ 
+ ---
+ 
++## 📸 Instantanés, score de confiance et arrêt d'urgence
++
++Ces gardes fonctionnent de la même façon avec tous les providers (SDK Claude, Codex, Copilot, OpenCode, pi, agents ACP, OpenAI, Google, modèles compatibles et locaux) et toutes les stacks.
++
++- **Instantanés et retour arrière** — avant chaque session d'agent (planification, codage, QA), le worktree de la tâche est enregistré comme un commit git caché ; les fichiers ignorés (`node_modules`, `bin`, `obj`, `.venv`…) ne sont pas copiés. La carte d'une tâche en pause liste ses instantanés et en restaure un après confirmation ; l'état remplacé est gardé comme instantané lui aussi.
++- **Score de confiance** — chaque session démarre à 100 et chaque anomalie le fait baisser : chemin hors du projet ou dans le système (−30), suppression de masse (−25), commande dangereuse (−20), accès à un secret ou à l'historique git (−20), accès réseau, configuration de sécurité modifiée… Au seuil de pause (40 par défaut) ou en dessous, la tâche se met en pause et une notification dit pourquoi ; au seuil d'arrêt (20) ou en dessous, la session est arrêtée et son instantané restauré. La carte affiche le score et ce qui l'a fait baisser.
++- **Mode d'écriture restreint** — l'agent n'écrit que dans les chemins listés (les fichiers de la tâche restent modifiables) ; les limites par session plafonnent le nombre de fichiers écrits, le plus gros fichier, etc.
++- **Coupe-circuit** — un agent qui fait cinq fois le même appel d'outil avec les mêmes arguments et obtient le même résultat, sans modifier de fichier, est mis en pause ; la carte nomme l'outil.
++- **Arrêter tous les agents** — le bouton rouge au pied du menu tant qu'une tâche tourne (Ctrl+Maj+.) met en pause chaque tâche en cours, à reprendre depuis sa carte.
++- **Budgets de coût** — un budget du projet par période et un plafond par tâche sont vérifiés avant chaque session d'agent ; la tâche se met en pause à son plafond (« Relever et reprendre » sur la carte), et une tâche qui dépense sans terminer de sous-tâche est mise en pause elle aussi.
++
++Réglages : **Sécurité et performance → Détection d'anomalies** (seuils et ce qui fait baisser le score) et **Bac à sable** (instantanés, mode d'écriture, limites). Conception : [agent-safety.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/agent-safety.md), [agent-kill-switch.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/agent-kill-switch.md), [cost-budgets.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/cost-budgets.md).
++
++![Réglages du bac à sable](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/sandbox.png)
++
++---
++
+ ## 🎛 Paramètres de sécurité
+ 
+-Dans l'application : **Paramètres → Sécurité**
++Dans l'application : **Paramètres → Sécurité et performance**
+ 
+-| Option | Effet |
+-|--------|-------|
+-| Strict allowlist | Bloque toute commande non explicitement autorisée |
+-| Confirmation avant écriture | Demande validation humaine avant chaque `write_file` |
+-| Timeout par commande | Durée max avant kill (défaut : 5 min) |
+-| Désactiver le réseau | Bloque `curl`, `wget`, etc. |
+-| Redaction des secrets | Scan et redacte avant envoi au LLM |
+-| Audit log | Fichier de log de toutes les actions sensibles |
++| Page | Contenu |
++|------|---------|
++| Garde-fous des agents | Les règles que les agents respectent avant Write / Edit / Bash, sur tous les providers, enregistrées dans `.workpilot/guardrails.json` ; `workpilot.policy.yaml` du dépôt et votre fichier global ajoutent les leurs |
++| Détection d'anomalies | Activation, seuils de pause et d'arrêt du score de confiance, limites de détection (suppression de masse, erreurs répétées, rafale d'écritures), barème des anomalies |
++| Bac à sable | Instantané avant chaque session, restauration automatique, nombre d'instantanés gardés, mode d'écriture normal ou restreint, chemins autorisés, limites par session |
+ 
+ ---
+ 
+diff --git a/Security.md b/Security.md
+index 2063f28..7e9d573 100644
+--- a/Security.md
++++ b/Security.md
+@@ -29,4 +29,21 @@ WorkPilot AI treats every piece of external content an agent reads — issues, P
+ 
+ ---
+ 
++## Snapshots, trust score and emergency stop
++
++These guards work the same on every provider (Claude SDK, Codex, Copilot, OpenCode, pi, ACP agents, OpenAI, Google, compatible and local models) and every stack.
++
++- **Snapshots and rollback** — before each agent session (planning, coding, QA) the task's worktree is saved as a hidden git commit; ignored files (`node_modules`, `bin`, `obj`, `.venv`…) are not copied. The card of a paused task lists its snapshots and restores one after confirmation; the replaced state is kept as a snapshot too.
++- **Trust score** — each session starts at 100, and each anomaly lowers it: a path outside the project or into the system (−30), a mass deletion (−25), a dangerous command (−20), access to a secret or to the git history (−20), network access, a security configuration changed… At or below the pause threshold (40 by default) the task pauses and a notification says why; at or below the stop threshold (20) the session is stopped and its snapshot restored. The card shows the score and what lowered it.
++- **Restricted write mode** — the agent may write only the paths you list (the task's own files stay writable); limits per session cap the files written, the largest file and more.
++- **Circuit breaker** — an agent that makes the same tool call with the same arguments and gets the same result five times, without changing a file, is paused; the card names the tool.
++- **Stop all agents** — the red button at the foot of the menu while a task runs (Ctrl+Shift+.) pauses every running task, each resumed from its card.
++- **Cost budgets** — a project budget per period and a limit per task are checked before every agent session; the task pauses at its limit (« Raise and resume » on the card) and a task that spends without finishing a subtask is paused too.
++
++Settings: **Security & performance → Anomaly Detection** (thresholds and what lowers the score) and **Sandbox** (snapshots, write mode, limits). Design: [agent-safety.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/agent-safety.md), [agent-kill-switch.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/agent-kill-switch.md), [cost-budgets.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/cost-budgets.md).
++
++![Sandbox settings](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/sandbox.png)
++
++---
++
+ ➡️ Continue: [Customization](Customization)
+diff --git a/Specialized-Agents.fr.md b/Specialized-Agents.fr.md
+index f9fa85e..238a74e 100644
+--- a/Specialized-Agents.fr.md
++++ b/Specialized-Agents.fr.md
+@@ -123,6 +123,24 @@ Migrer un projet d'une version/framework à une autre **en gérant les breaking
+ - Webpack → Vite
+ - Enzyme → React Testing Library
+ 
++La page **Migration de code** (Boîte à outils) montre le plan avant toute modification : stack détectée, cible, risque, phases et étapes ; « Créer la tâche Kanban » le confie à une tâche qui migre dans un worktree isolé.
++
++---
++
++## 🔬 REA : ce qu'un build livré expose
++
++[REA](https://github.com/morluto/rea) (npm `rea-agents`) lit un build sans le lancer. WorkPilot en épingle une version (installée en un clic depuis **Outils CLI**) et n'exécute que ses lectures statiques, sans shell ni identifiants.
++
++- **Porte « Exposition de l'artefact »** — après la QA, REA lit la sortie de build laissée par la tâche (bundle Electron ou Tauri, APK, build web et ses source maps, dossier `publish` .NET, jar, wheel, exécutable Rust…) et signale ce qu'elle expose. Par défaut elle prévient ; en `strict`, ou quand le workflow déclare la porte dure `artifact-exposure`, un check exposé au seuil renvoie la tâche au fixer. Le Release Train passe par la même étape `exposure` avant de déployer chaque service.
++- **API publique .NET gardée pendant une migration** — après la QA d'une tâche .NET, chaque bibliothèque touchée est construite avant et après la tâche dans des copies jetables et REA compare les deux assemblies : un membre public retiré, rendu interne, renommé ou dont la signature change est signalé. La porte bloque pendant une migration .NET préparée par WorkPilot, ou quand le workflow déclare `public-api-stable`.
++- Ce que REA n'a pas pu trancher ne bloque jamais, et une vérification qui n'a pas pu tourner n'est jamais comptée comme réussie. Conception : [rea.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/rea.md).
++
++---
++
++## 🪟 WinDev, WebDev et WinDev Mobile
++
++Un projet sauvegardé au format texte (option Git, version 25 et plus) reçoit les skills `wlangage` et `windev-text-format`, et chaque agent du Kanban sait qu'il ne modifie que le code WLangage, jamais les propriétés que seul l'éditeur produit ni les fichiers binaires ; ce que seul l'éditeur sait faire devient une étape « À faire dans l'éditeur WinDev ». Une porte de la QA compare chaque fichier WinDev changé à sa version d'avant la tâche et renvoie au fixer tout ce que seul l'éditeur sait écrire (binaire modifié, contrôle ou élément inventé, `procedure_id` en double, fichier qui ne se lit plus). Le WLangage est coloré dans la vue des diffs et peut être traduit vers les autres langages ; un projet au format natif est signalé au lieu d'être deviné, et la compilation et les tests restent à lancer dans WinDev. Conception : [windev.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/windev.md).
++
+ ---
+ 
+ ## 📚 Documenter
+diff --git a/Specialized-Agents.md b/Specialized-Agents.md
+index 5742ca1..3a02d60 100644
+--- a/Specialized-Agents.md
++++ b/Specialized-Agents.md
+@@ -89,4 +89,18 @@ A **personal coach** agent complements this set by learning your coding style pe
+ 
+ ---
+ 
++## REA: what a shipped build exposes
++
++[REA](https://github.com/morluto/rea) (npm `rea-agents`) reads a build without running it. WorkPilot pins one version (installed in one click from **CLI Tools**) and runs only its static readers, without a shell or your credentials.
++
++- **Artifact exposure gate** — after QA, REA reads the build output the task left (Electron or Tauri bundle, APK, web build and its source maps, .NET `publish` folder, jar, wheel, Rust binary…) and reports what it exposes. It warns by default; in `strict`, or when the workflow declares the hard gate `artifact-exposure`, an exposed check at the threshold sends the task back to the fixer. The Release Train runs the same `exposure` step before deploying each service.
++- **Public .NET API kept during a migration** — after QA on a .NET task, each library it touches is built before and after the task in throwaway copies and REA compares the two assemblies: a public member removed, made internal, renamed or with a changed signature is reported. It blocks during a .NET migration prepared by WorkPilot, or when the workflow declares `public-api-stable`.
++- What REA could not decide never blocks, and a check that could not run never counts as passed. Design: [rea.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/rea.md).
++
++## WinDev, WebDev and WinDev Mobile
++
++A project saved in text format (Git option, version 25 and later) gets the `wlangage` and `windev-text-format` skills, and every Kanban agent knows it edits only WLangage code, never the properties only the editor writes nor binary files; what only the editor can do becomes a « To do in the WinDev editor » step. A QA gate compares each changed WinDev file with its version before the task and sends back anything only the editor may write (a binary changed, an invented control or element, a duplicated `procedure_id`, a file that no longer reads). WLangage is coloured in the diff viewer and can be translated to other languages; a project in native format is reported instead of guessed, and compiling and testing stay in WinDev. Design: [windev.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/windev.md).
++
++---
++
+ ➡️ Continue: [Integrations](Integrations)
+diff --git a/User-Interface.fr.md b/User-Interface.fr.md
+index 740bbe1..2a1195a 100644
+--- a/User-Interface.fr.md
++++ b/User-Interface.fr.md
+@@ -19,6 +19,7 @@ Le menu latéral donne accès à toutes les fonctionnalités. Voici les plus imp
+ | **Architecture Visualizer** | Graphes de dépendances et de modules |
+ | **Changelog** | Notes de version générées automatiquement |
+ | **Analytics** | Coût, consommation, temps d'exécution |
++| **Migration de code** | Migrations de framework, de version et de langage, planifiées ici et appliquées par une tâche Kanban |
+ | **Formula Lab** | Estimation coût/succès par Fournisseur × Modèle × Effort |
+ | **Agent Coach** | Conseils coût/modèle basés sur l'usage réel |
+ | **Carbon Profiler** | Empreinte énergie/carbone des exécutions |
+@@ -32,6 +33,10 @@ commandes ou une notification s'ouvre dans son hub, sur son onglet. Sur un serve
+ l'[app mobile](Advanced-Features.fr#-app-mobile-ios-et-android) suit le même Kanban depuis
+ iPhone et Android.
+ 
++Le menu vous appartient : glissez une page sur un autre espace du rail, réordonnez les épingles de « Mon menu », ou passez par **Personnaliser le menu** (monter, descendre, déplacer vers un espace, déplacer l'espace) à la souris comme au clavier ; **Rétablir l'ordre d'origine** garde vos épingles et vos pages masquées. Glissez le bord droit du menu pour l'élargir ou le rétrécir (de 240 à 480 px, double-clic pour revenir à la largeur par défaut, Tab puis les flèches au clavier). Sur un serveur d'équipe, le menu arrangé vous suit sur chacun de vos postes.
++
++![Personnaliser le menu](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/menu-customize.png)
++
+ Depuis la 1.4.0, tous les modules et toutes les pages de paramètres partagent **une seule charte UI**, reprise de « Visuel vers Code » : un en-tête avec son groupe en kicker, des onglets en pastilles avec compteurs, des cartes à rail coloré, une barre de commande en bas avec un seul bouton principal, dans tous les thèmes et les deux langues.
+ 
+ ---
+@@ -52,6 +57,8 @@ Depuis la 1.4.0, tous les modules et toutes les pages de paramètres partagent *
+ | **Terminé** | Fusionné ou PR créée |
+ | **Build rouge** | Visible quand la CI du projet a tourné sur une branche de tâche : un run rouge y déplace la carte et lance une réparation automatique, jusqu'à trois fois |
+ 
++La barre d'outils tient sur une ligne dès 1 280 px de large : rafraîchir, recherche, filtres, vues enregistrées et commande rapide. Son menu « ⋯ » contient **Multi-dépôts** (un changement sur plusieurs dépôts, une carte par dépôt) et **Purger** (libère la place prise par les worktrees des cartes terminées), chacun avec une phrase qui dit à quoi il sert. Tant qu'une tâche tourne, le bouton rouge **Arrêter tous les agents** au pied du rail (Ctrl+Maj+.) met en pause chaque tâche en cours.
++
+ ### Tâches découpées
+ 
+ Une tâche trop grosse pour une petite PR se découpe d'elle-même après la planification en cartes « Partie k/N » (voir [Fonctionnalités avancées](Advanced-Features.fr)). Les parties d'une même tâche partagent une couleur et une marque écrite ; un clic sur la marque n'affiche que ce groupe, et la pastille de la barre d'outils réaffiche tout.
+@@ -167,6 +174,14 @@ Choisissez un fichier et un mode (gaps de couverture, unitaires, E2E, TDD) : les
+ 
+ ---
+ 
++## 🔁 Migration de code
++
++Dans la Boîte à outils, **Migration de code** analyse une migration de framework, de version ou de langage sur n'importe quelle stack (.NET, Java, Kotlin, Angular, Vue, React, TypeScript, Python, Go, Rust…). Choisissez un exemple ou écrivez votre phrase : la page montre la stack détectée, la cible (la dernière stack nommée : « de React vers Vue » vise Vue), si le planificateur connaît la migration, son risque, ses phases et ses étapes. **Créer la tâche Kanban** confie ce plan à une tâche, qui migre dans un worktree isolé avec la spec, le plan, le code et la QA habituels ; la page elle-même ne modifie jamais le projet.
++
++![Migration de code](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/code-migration.png)
++
++---
++
+ ## 🏗 Architecture Visualizer
+ 
+ Génère **interactivement** :
+@@ -217,17 +232,31 @@ Les paramètres sont groupés par thème (projet, intégrations et connexions, i
+ 
+ | Section | Contenu |
+ |---------|---------|
+-| **Fournisseurs IA** | Ajout/suppression de profils, modèle par défaut, par phase |
++| **Comptes IA** | Chaque provider en carte (connexion, réponse, usage, âge de la clé), provider par défaut, chaîne de basculement automatique |
+ | **Agent Tools → MCP Servers** | Activer/désactiver MCP (Chrome DevTools, grepai, custom) |
+ | **Intégrations** | GitHub, GitLab, Azure DevOps, Linear, Jira, Teams |
+ | **Kanban** | Colonnes personnalisées, automatisations |
+ | **Mémoire** | Activation Graphiti, fournisseur embedder |
+ | **Apparence** | Thème, langue, police |
+-| **Sécurité** | Allowlist, paramètres de sandbox |
++| **Sécurité et performance** | Garde-fous des agents, détection d'anomalies (score de confiance), bac à sable : instantanés et retour arrière, mode d'écriture restreint, limites par session |
+ | **Diagnostic** | Tests de connexion, version des dépendances |
+ 
+ ---
+ 
++### Comptes IA
++
++La page dit combien de providers sont connectés, lequel est par défaut, si le basculement automatique est actif et ce qui demande attention, puis liste chaque provider avec une recherche et des filtres (connectés, à connecter, à vérifier). L'onglet **Basculement auto** ordonne la chaîne qu'une tâche suit quand elle atteint une limite ou perd sa connexion. Voir [Fournisseurs IA](AI-Providers.fr).
++
++![Comptes IA](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/ai-accounts.png)
++
++### Bac à sable
++
++Avant chaque session d'agent, le worktree de la tâche est enregistré comme un commit git caché ; une session arrêtée par la surveillance des anomalies y revient. Le mode restreint ne laisse l'agent écrire que dans les chemins listés, et les limites par session plafonnent le nombre de fichiers écrits, leur taille, etc. Voir [Sécurité](Security.fr).
++
++![Bac à sable](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/sandbox.png)
++
++---
++
+ ## 🧭 Onboarding guidé
+ 
+ Pour bien démarrer après l'installation :
+diff --git a/User-Interface.md b/User-Interface.md
+index f169390..348eef0 100644
+--- a/User-Interface.md
++++ b/User-Interface.md
+@@ -19,6 +19,7 @@ The sidebar gives access to all features. Here are the most important ones for a
+ | **Architecture Visualizer** | Dependency and module graphs |
+ | **Changelog** | Auto-generated release notes |
+ | **Analytics** | Cost, consumption, execution time |
++| **Code migration** | Framework, version and language migrations, planned here and applied by a Kanban task |
+ | **Settings** | AI providers, integrations, preferences |
+ 
+ Since 1.3.4, views that overlap are grouped into **tabbed hubs** (agent history, costs and
+@@ -27,6 +28,10 @@ refactoring, arena): no view is removed, and a view opened from the command pale
+ notification opens in its hub, on its tab. On a team server, the iOS and Android app follows the
+ same Kanban from your phone.
+ 
++The menu is yours: drag a page onto another space of the rail, reorder the pins of « My menu », or use **Customize the menu** (up, down, move to a space, move the space) with the mouse or the keyboard; **Restore the original order** keeps your pins and hidden pages. Drag the right edge of the menu to widen or narrow it (240 to 480 px, double-click resets it, Tab then the arrows from the keyboard). On a team server, the menu you arranged follows you on every computer.
++
++![Customize the menu](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/menu-customize.png)
++
+ Since 1.4.0, every module and every Settings page share **one UI charter**, taken from Visual to Code: a header with its group as kicker, pill tabs with counters, cards with a coloured rail, a command bar at the bottom with a single primary button, in every theme and both languages.
+ 
+ ---
+@@ -47,6 +52,8 @@ Since 1.4.0, every module and every Settings page share **one UI charter**, take
+ | **Done** | Merged or PR created |
+ | **Red Build** | Shown when the project's CI has run on a task branch: a red run moves the card here and starts an automatic repair, up to three times |
+ 
++The toolbar holds on one line from 1,280 px wide: refresh, search, filters, saved views and the quick command. Its « ⋯ » menu holds **Multi-repo** (one change across several repositories, one card per repository) and **Purge** (frees the disk space held by the worktrees of finished cards), each with a sentence saying what it does. While a task runs, the red **Stop all agents** button at the foot of the rail (Ctrl+Shift+.) pauses every running task.
++
+ ### Split tasks
+ 
+ A task too big for one small PR splits itself after planning into « Part k/N » cards (see [Advanced features](Advanced-Features)). The parts of one task share a colour and a written mark; a click on the mark shows only that group, and the toolbar chip shows everything again.
+@@ -162,6 +169,14 @@ Pick a file and a mode (coverage gaps, unit, E2E, TDD): the four steps of the ru
+ 
+ ---
+ 
++## 🔁 Code migration
++
++In the Toolbox, **Code migration** analyses a framework, version or language migration on any stack (.NET, Java, Kotlin, Angular, Vue, React, TypeScript, Python, Go, Rust…). Pick an example or write your own sentence: the page shows the stack it detected, the target (the last stack named: « from React to Vue » targets Vue), whether the planner knows the migration, its risk and its phases and steps. **Create the Kanban task** hands that plan to a task, which migrates in an isolated worktree with the usual spec, plan, code and QA; the page itself never changes the project.
++
++![Code migration](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/code-migration.png)
++
++---
++
+ ## 🏗 Architecture Visualizer
+ 
+ **Interactively** generates:
+@@ -212,17 +227,31 @@ Settings are grouped by theme (project, integrations and connections, interface
+ 
+ | Section | Contents |
+ |---------|----------|
+-| **AI Providers** | Add/remove profiles, default model, per phase |
++| **AI accounts** | Every provider as a card (how it signs in, whether it answers, usage, age of its key), default provider, automatic failover chain |
+ | **Agent Tools → MCP Servers** | Enable/disable MCPs (Chrome DevTools, grepai, custom) |
+ | **Integrations** | GitHub, GitLab, Azure DevOps, Linear, Jira, Teams |
+ | **Kanban** | Custom columns, automations |
+ | **Memory** | Graphiti activation, embedder provider |
+ | **Appearance** | Theme, language, font |
+-| **Security** | Allowlist, sandbox settings |
++| **Security & performance** | Agent guardrails, anomaly detection (trust score), sandbox: snapshots and rollback, restricted write mode, limits per session |
+ | **Diagnostics** | Connection tests, dependency versions |
+ 
+ ---
+ 
++### AI accounts
++
++The page sums up how many providers are connected, which one is the default, whether automatic failover is on and what needs attention, then lists every provider with search and filters (connected, to connect, needs attention). The **Auto failover** tab orders the chain a task follows when it hits a limit or loses its connection. See [AI providers](AI-Providers).
++
++![AI accounts](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/ai-accounts.png)
++
++### Sandbox
++
++Before each agent session the task's worktree is saved as a hidden git commit; a session stopped by the anomaly watch is rolled back to it. Restricted mode lets the agent write only the paths you list, and limits per session cap the files written, their size and more. See [Security](Security).
++
++![Sandbox](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/sandbox.png)
++
++---
++
+ ## Next step
+ 
+ ➡️ [Create a spec — from request to validated specification](Creating-a-Spec)
+-- 
+2.43.0
+

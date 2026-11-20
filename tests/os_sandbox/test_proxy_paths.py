@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import http.server
+import shutil
 import socket
 import stat
+import tempfile
 import threading
 import time
 import types
+from pathlib import Path
 
 import pytest
 from foundation.platform import is_windows
@@ -45,10 +48,17 @@ def origin():
 
 
 def _settled(proxy: FilteringProxy) -> None:
-    """Wait until the proxy has finished every connection it was handling."""
+    """Wait until the proxy has finished every connection it was handling.
+
+    Only the connection handlers count: on Windows the proactor keeps a task
+    of its own pending on every listening socket (its `accept`), forever.
+    """
 
     async def others() -> int:
-        return len(asyncio.all_tasks()) - 1
+        return sum(
+            getattr(task.get_coro(), "__qualname__", "") == "FilteringProxy._handle"
+            for task in asyncio.all_tasks()
+        )
 
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
@@ -360,14 +370,26 @@ class TestStarting:
             FilteringProxy(HostAllowlist.build([]), unix_dir=None)
 
 
+@pytest.fixture
+def short_dir():
+    """A folder short enough for a Unix socket path.
+
+    macOS caps the path at 104 bytes, and pytest's ``tmp_path`` there
+    (``/private/var/folders/…``) is longer than that.
+    """
+    folder = Path(tempfile.mkdtemp(prefix="wp-proxy-", dir="/tmp"))
+    yield folder
+    shutil.rmtree(folder, ignore_errors=True)
+
+
 @pytest.mark.skipif(is_windows(), reason="the Unix socket is the Linux sandbox's door")
 class TestUnixSocket:
-    def test_the_socket_is_private_and_answers_then_is_removed(self, tmp_path, origin):
+    def test_the_socket_is_private_and_answers_then_is_removed(self, short_dir, origin):
         proxy = FilteringProxy(
-            HostAllowlist.build([f"127.0.0.1:{origin}"]), unix_dir=tmp_path / "s"
+            HostAllowlist.build([f"127.0.0.1:{origin}"]), unix_dir=short_dir / "s"
         )
         path = proxy.socket_path
-        assert path is not None and path.parent == tmp_path / "s"
+        assert path is not None and path.parent == short_dir / "s"
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
@@ -382,8 +404,8 @@ class TestUnixSocket:
         assert data.endswith(b"hello /u")
         assert not path.exists()
 
-    def test_a_socket_already_removed_is_no_error_on_close(self, tmp_path):
-        proxy = FilteringProxy(HostAllowlist.build([]), unix_dir=tmp_path)
+    def test_a_socket_already_removed_is_no_error_on_close(self, short_dir):
+        proxy = FilteringProxy(HostAllowlist.build([]), unix_dir=short_dir)
         assert proxy.socket_path is not None
         proxy.socket_path.unlink()
 

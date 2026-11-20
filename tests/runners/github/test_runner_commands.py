@@ -18,8 +18,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from gh_fake import write_fake_gh  # noqa: E402
+from tests.gh_fake import write_fake_gh
 
 RUNNER = (
     Path(__file__).resolve().parents[3]
