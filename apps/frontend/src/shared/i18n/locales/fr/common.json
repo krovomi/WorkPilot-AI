@@ -240,7 +240,9 @@
 			"checkTerminal": "Vérifiez la section Terminaux d'agent dans la barre latérale pour compléter la connexion OAuth.",
 			"authStartFailed": "Échec du démarrage de l'authentification",
 			"addProfileFailed": "Échec de l'ajout du profil",
-			"tryAgain": "Veuillez réessayer."
+			"tryAgain": "Veuillez réessayer.",
+			"autoSwitchFailed": "Échec de l'enregistrement du basculement automatique",
+			"switchFailed": "Échec du changement de compte"
 		},
 		"sdk": {
 			"title": "Limite de taux IA",
