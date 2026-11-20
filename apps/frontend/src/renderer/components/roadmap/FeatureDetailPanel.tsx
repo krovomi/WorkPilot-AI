@@ -16,7 +16,6 @@ import {
 	ROADMAP_COMPLEXITY_COLORS,
 	ROADMAP_IMPACT_COLORS,
 	ROADMAP_PRIORITY_COLORS,
-	ROADMAP_PRIORITY_LABELS,
 } from "../../../shared/constants";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -34,6 +33,7 @@ export function FeatureDetailPanel({
 }: Readonly<FeatureDetailPanelProps>) {
 	const { t } = useTranslation("common");
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+	const linkedSpecId = feature.linkedSpecId;
 
 	const getSeverityColorClass = (severity: string) => {
 		switch (severity) {
@@ -47,10 +47,8 @@ export function FeatureDetailPanel({
 	};
 
 	const handleDelete = () => {
-		if (onDelete) {
-			onDelete(feature.id);
-			onClose();
-		}
+		onDelete(feature.id);
+		onClose();
 	};
 
 	return (
@@ -64,13 +62,13 @@ export function FeatureDetailPanel({
 								variant="outline"
 								className={ROADMAP_PRIORITY_COLORS[feature.priority]}
 							>
-								{ROADMAP_PRIORITY_LABELS[feature.priority]}
+								{t(`roadmap:priorityLabels.${feature.priority}`)}
 							</Badge>
 							<Badge
 								variant="outline"
 								className={`${ROADMAP_COMPLEXITY_COLORS[feature.complexity]}`}
 							>
-								{feature.complexity}
+								{t(`roadmap:levels.complexityBadge.${feature.complexity}`)}
 							</Badge>
 						</div>
 						<h2 className="font-semibold truncate">{feature.title}</h2>
@@ -128,7 +126,7 @@ export function FeatureDetailPanel({
 							<div
 								className={`text-lg font-semibold ${ROADMAP_COMPLEXITY_COLORS[feature.complexity]}`}
 							>
-								{feature.complexity}
+								{t(`roadmap:levels.complexity.${feature.complexity}`)}
 							</div>
 							<div className="text-xs text-muted-foreground">{t("roadmap:featureDetail.complexity")}</div>
 						</Card>
@@ -136,7 +134,7 @@ export function FeatureDetailPanel({
 							<div
 								className={`text-lg font-semibold ${ROADMAP_IMPACT_COLORS[feature.impact]}`}
 							>
-								{feature.impact}
+								{t(`roadmap:levels.impact.${feature.impact}`)}
 							</div>
 							<div className="text-xs text-muted-foreground">{t("roadmap:featureDetail.impact")}</div>
 						</Card>
@@ -230,9 +228,7 @@ export function FeatureDetailPanel({
 												variant="outline"
 												className={`text-xs ${getSeverityColorClass(insight.severity)}`}
 											>
-												{t("roadmap:featureDetail.severity", {
-												severity: insight.severity,
-											})}
+												{t(`roadmap:levels.severity.${insight.severity}`)}
 											</Badge>
 										</div>
 									</div>
@@ -242,11 +238,11 @@ export function FeatureDetailPanel({
 					)}
 				</div>
 			</ScrollArea>
-			{feature.linkedSpecId ? (
+			{linkedSpecId ? (
 				<div className="shrink-0 p-4 border-t border-border">
 					<Button
 						className="w-full"
-						onClick={() => onGoToTask(feature.linkedSpecId ?? "")}
+						onClick={() => onGoToTask(linkedSpecId)}
 					>
 						<ExternalLink className="h-4 w-4 mr-2" />
 						{t("roadmap:features.goToTask")}

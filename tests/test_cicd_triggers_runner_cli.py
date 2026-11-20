@@ -299,8 +299,16 @@ def sent(monkeypatch: pytest.MonkeyPatch):
     calls: list[dict] = []
     answers: list[dict] = []
 
-    def http_request(url, method="GET", headers=None, body=None):
-        calls.append({"url": url, "method": method, "headers": headers, "body": body})
+    def http_request(url, method="GET", headers=None, body=None, *, project=None):
+        calls.append(
+            {
+                "url": url,
+                "method": method,
+                "headers": headers,
+                "body": body,
+                "project": project,
+            }
+        )
         return answers.pop(0)
 
     monkeypatch.setattr(runner, "http_request", http_request)
