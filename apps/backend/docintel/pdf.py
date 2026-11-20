@@ -293,8 +293,3 @@ def render_pages(path: Path, pages: list[int]) -> Iterator[tuple[int, Path]]:
         except Exception:  # noqa: BLE001 - a page that will not render is a gap
             logger.debug("docintel: rendering %s failed", path, exc_info=True)
             return
-
-
-def page_count(path: Path) -> int:
-    """Pages in the document, 0 when it cannot be opened."""
-    return read_text(path, 0).total

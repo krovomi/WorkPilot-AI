@@ -242,12 +242,9 @@ def _parse_diagram(root: Path, args: dict[str, Any]) -> Any:
 
 
 def _attachments(root: Path, args: dict[str, Any]) -> Any:
-    spec_id = str(args["spec_id"])
-    if "/" in spec_id or "\\" in spec_id or spec_id in ("", ".", ".."):
-        raise ValueError(f"spec_id is not a directory name: {spec_id!r}")
-    spec_dir = _inside(root, f".workpilot/specs/{spec_id}")
-    if not spec_dir.is_dir():
-        raise ValueError(f"no task {spec_id!r} in this project")
+    spec_dir = _spec_dir(root, args)
+    if spec_dir is None:
+        raise KeyError("spec_id")
     result = run_preflight(spec_dir, root, persist=False)
     return {
         "documents": [doc.to_dict() for doc in result.documents],

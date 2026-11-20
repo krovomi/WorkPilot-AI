@@ -14,6 +14,7 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { webLink } from "@shared/utils/web-link";
 import { formatAppDateTime } from "@/lib/date-format";
 import { CharterButton, Chip, Chips, Panel, type Tone } from "../charter";
 
@@ -51,6 +52,7 @@ export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry, child
 	const isActionable = ["pending", "failed", "escalated"].includes(incident.status);
 	const tone = SEVERITY_TONE[incident.severity] ?? "muted";
 	const StatusIcon = STATUS_ICON[incident.status] ?? CircleDashed;
+	const prLink = webLink(incident.fix_pr_url);
 
 	return (
 		<Panel rail tone={tone}>
@@ -84,9 +86,9 @@ export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry, child
 							</Chips>
 						</div>
 					)}
-					{incident.fix_pr_url && (
+					{prLink && (
 						<a
-							href={incident.fix_pr_url}
+							href={prLink}
 							className="mt-1 inline-block text-xs text-primary hover:underline"
 							target="_blank"
 							rel="noopener noreferrer"
