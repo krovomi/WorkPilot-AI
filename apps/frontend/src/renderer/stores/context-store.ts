@@ -205,6 +205,9 @@ export async function loadRecentMemories(
 	projectId: string,
 	limit: number = 20,
 ): Promise<void> {
+	// A late refresh for a project no longer shown (a pin that answered after
+	// the switch) would hold the shown project's spinner for good.
+	if (!isShown(projectId)) return;
 	const store = useContextStore.getState();
 	store.setMemoriesLoading(true);
 

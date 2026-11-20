@@ -214,10 +214,22 @@ describe("recent memories", () => {
 		expect(state()).toMatchObject({ recentMemories: [{ id: "p1-m" }], memoriesLoading: false });
 	});
 
-	it("drops the memories of a project no longer on screen", async () => {
-		useContextStore.setState({ memoriesLoading: true });
+	it("reads nothing for a project no longer on screen, and leaves the spinner alone", async () => {
+		api.getRecentMemories.mockClear();
 		await loadRecentMemories("p2");
-		expect(state()).toMatchObject({ recentMemories: [{ id: "p1-m" }], memoriesLoading: true });
+		expect(api.getRecentMemories).not.toHaveBeenCalled();
+		expect(state()).toMatchObject({ recentMemories: [{ id: "p1-m" }], memoriesLoading: false });
+	});
+
+	it("drops the memories that come back after the switch to another project", async () => {
+		const late = deferred();
+		api.getRecentMemories.mockReturnValueOnce(late.promise);
+		const loading = loadRecentMemories("p1");
+		await loadProjectContext("p2");
+		useContextStore.setState({ memoriesLoading: true });
+		late.resolve({ success: true, data: [{ id: "late" }] });
+		await loading;
+		expect(state()).toMatchObject({ recentMemories: [{ id: "p2-m" }], memoriesLoading: true });
 	});
 });
 

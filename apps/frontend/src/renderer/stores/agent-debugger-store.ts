@@ -1,3 +1,4 @@
+import i18n from "i18next";
 import { create } from "zustand";
 import type {
 	BreakpointSpec,
@@ -121,7 +122,13 @@ async function change(
 	const { sessionId } = get();
 	if (!sessionId) return;
 	try {
-		await call(sessionId);
+		const result = await call(sessionId);
+		// The runner answers a refusal (a frame that already resumed, say)
+		// instead of failing: it is just as much the person's to see.
+		if ((result as { ok?: boolean } | undefined)?.ok === false) {
+			set({ error: i18n.t("agentDebugger:refused") });
+			return;
+		}
 	} catch (e) {
 		set({ error: (e as Error).message });
 		return;

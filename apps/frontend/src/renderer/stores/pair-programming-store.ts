@@ -15,7 +15,6 @@ import {
 	type GeneratedReview,
 	parseGeneratedReview,
 } from "../../shared/types/generated-review";
-import { useProjectStore } from "./project-store";
 import type {
 	AiAction,
 	PairMessage,
@@ -192,10 +191,13 @@ export async function startPairSession(
 	params: StartSessionParams,
 ): Promise<void> {
 	const store = usePairProgrammingStore.getState();
+	shownProject = params.projectId;
 	store.reset();
 	store.setStatus("planning", say("starting"));
 
 	const result = await globalThis.electronAPI.startPairSession(params);
+	// Another project was shown while this was out: its page loads its own.
+	if (!isShown(params.projectId)) return;
 	if (result.success && result.data) {
 		store.setSession(result.data);
 		store.setStatus("planning", say("planning"));
@@ -237,16 +239,27 @@ export function sendPairMessage(
 }
 
 /**
+ * The project whose session the store holds: the one the page shows, which
+ * can be a project tab other than the selected project.
+ */
+let shownProject: string | null = null;
+const isShown = (projectId: string): boolean => projectId === shownProject;
+
+/**
  * Show the session of the project on screen. The store holds one project's
- * session at a time, so a project switch would otherwise keep showing the
- * last project's session, and its Stop button would stop it under the wrong
- * project. The main process keeps each project's chat and AI log, so they
- * come back with the session.
+ * session at a time, so a project switch clears the last project's session at
+ * once: kept until the answer, its chat would show under the new project and
+ * Send would reach the new project's session. The main process keeps each
+ * project's chat and AI log, so they come back with the session.
  */
 export async function loadPairSession(projectId: string): Promise<void> {
+	if (!isShown(projectId)) {
+		shownProject = projectId;
+		usePairProgrammingStore.getState().reset();
+	}
 	const result = await globalThis.electronAPI.getPairSession(projectId);
-	// Another project was chosen while this was out.
-	if (projectId !== useProjectStore.getState().selectedProjectId) return;
+	// Another project was shown while this was out.
+	if (!isShown(projectId)) return;
 	const session = result.success ? (result.data ?? null) : null;
 	const store = usePairProgrammingStore.getState();
 	// Already the session on screen: the listeners keep it up to date.
@@ -270,10 +283,9 @@ export function setupPairProgrammingListeners(): () => void {
 	const store = usePairProgrammingStore.getState;
 
 	// The project is read at event time rather than captured when the listener
-	// is registered: the subscription now outlives both the page and the
-	// project selection, and the store holds one project's session at a time.
-	const isCurrentProject = (pid: string): boolean =>
-		pid === useProjectStore.getState().selectedProjectId;
+	// is registered: the subscription outlives both the page and the project
+	// shown, and the store holds one project's session at a time.
+	const isCurrentProject = isShown;
 
 	const unsubChunk = globalThis.electronAPI.onPairStreamChunk(
 		(pid: string, chunk: PairStreamChunk) => {

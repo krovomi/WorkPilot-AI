@@ -156,18 +156,20 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set) => ({
 			);
 			// Refused by the main process: nothing was written, so the page
 			// must not show the new values as saved.
+			// Another project is shown now: neither the values nor a refusal
+			// are its own.
+			if (!isShown(projectDir)) return;
 			if (!result?.success) {
 				set({ error: result?.error ?? "Failed to save CI/CD config" });
 				return;
 			}
-			if (!isShown(projectDir)) return;
 			set((state) => ({
 				config: state.config
 					? { ...state.config, ...config }
 					: (config as CICDConfig),
 			}));
 		} catch (err) {
-			set({ error: String(err) });
+			if (isShown(projectDir)) set({ error: String(err) });
 		}
 	},
 
@@ -195,11 +197,11 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set) => ({
 				return { success: true };
 			}
 			const err = result.error ?? "Trigger failed";
-			set({ error: err });
+			if (isShown(projectDir)) set({ error: err });
 			return { success: false, error: err };
 		} catch (err) {
 			const msg = String(err);
-			set({ error: msg });
+			if (isShown(projectDir)) set({ error: msg });
 			return { success: false, error: msg };
 		} finally {
 			set({ isTriggering: false });
@@ -211,13 +213,13 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set) => ({
 		try {
 			const result = await globalThis.electronAPI.rollbackDeployment(projectDir, runId);
 			if (!result.success) {
-				set({ error: result.error ?? "Rollback failed" });
+				if (isShown(projectDir)) set({ error: result.error ?? "Rollback failed" });
 				return false;
 			}
 			await readRuns(projectDir);
 			return true;
 		} catch (err) {
-			set({ error: String(err) });
+			if (isShown(projectDir)) set({ error: String(err) });
 			return false;
 		} finally {
 			set({ rollingBack: null });

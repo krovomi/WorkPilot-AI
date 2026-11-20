@@ -93,7 +93,8 @@ describe("capturing a screenshot", () => {
 			channel === "browserAgent:getScreenshotImage" ? { success: false } : { success: true, data: { path: "/x.png" } },
 		);
 		await state().captureScreenshot("/p", "home", "u");
-		expect(state()).toMatchObject({ browserStatus: "ready", browserScreenshot: "data:previous", isCapturing: false });
+		// The last preview was not this capture: it goes.
+		expect(state()).toMatchObject({ browserStatus: "ready", browserScreenshot: null, isCapturing: false });
 
 		invoke.mockImplementation(async (channel: string) => {
 			if (channel === "browserAgent:getScreenshotImage") throw new Error("gone");

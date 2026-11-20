@@ -74,7 +74,8 @@ export const useGuardrailsStore = create<GuardrailsState>((set, get) => ({
 		set({ loading: true, error: null, loadFailed: false, diffCheck: null });
 		// Another project: the last one's rules and results are not its own.
 		if (projectPath !== loadedPath) {
-			set({ doc: { version: 1, rules: [] }, dirty: false, lastTest: null, policy: null, activity: null });
+			// A diff check still out for the last project no longer holds this one's button.
+			set({ doc: { version: 1, rules: [] }, dirty: false, lastTest: null, policy: null, activity: null, checking: false });
 		}
 		try {
 			const doc = await globalThis.electronAPI.loadGuardrails(projectPath);

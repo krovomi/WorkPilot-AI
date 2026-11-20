@@ -29,7 +29,6 @@ beforeEach(async () => {
 	await i18n.changeLanguage("en");
 	handlers.clear();
 	state().reset();
-	useProjectStore.setState({ selectedProjectId: "p1" });
 	const on = (name: string) =>
 		vi.fn((handler: Handler) => {
 			handlers.set(name, handler);
@@ -49,6 +48,9 @@ beforeEach(async () => {
 		onPairReview: on("review"),
 	};
 	(globalThis as unknown as { electronAPI: unknown }).electronAPI = api;
+	// The page shows project p1.
+	await loadPairSession("p1");
+	api.getPairSession.mockClear();
 });
 
 describe("a session", () => {
@@ -203,7 +205,7 @@ describe("the session of the project on screen", () => {
 		state().reset();
 		let started: (value: unknown) => void = vi.fn();
 		api.startPairSession.mockReturnValueOnce(new Promise((resolve) => (started = resolve)));
-		const starting = startPairSession({} as never);
+		const starting = startPairSession({ projectId: "p1" } as never);
 		await loadPairSession("p1");
 		expect(state().status).toBe("planning");
 		started({ success: true, data: session("s9") });
@@ -211,10 +213,36 @@ describe("the session of the project on screen", () => {
 		expect(state().session?.id).toBe("s9");
 	});
 
-	it("drops an answer for a project no longer chosen", async () => {
-		state().setSession(session("s1"));
+	it("shows the project of its page, whichever project is selected", async () => {
 		useProjectStore.setState({ selectedProjectId: "p2" });
+		api.getPairSession.mockResolvedValueOnce({ success: true, data: session("s1") });
 		await loadPairSession("p1");
 		expect(state().session?.id).toBe("s1");
+	});
+
+	it("clears the last project's session at once, and drops its late answers", async () => {
+		state().setSession(session("s1"));
+		state().addMessage({ id: "m", role: "user", content: "for p1", timestamp: "" });
+		let answer: (value: unknown) => void = vi.fn();
+		api.getPairSession.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+		const loading = loadPairSession("p2");
+		expect(state()).toMatchObject({ session: null, messages: [] });
+
+		let late: (value: unknown) => void = vi.fn();
+		api.getPairSession.mockReturnValueOnce(new Promise((resolve) => (late = resolve)));
+		const back = loadPairSession("p1");
+		answer({ success: true, data: session("s2", { projectId: "p2" }) });
+		await loading;
+		expect(state().session).toBeNull();
+		late({ success: true, data: null });
+		await back;
+
+		let started: (value: unknown) => void = vi.fn();
+		api.startPairSession.mockReturnValueOnce(new Promise((resolve) => (started = resolve)));
+		const starting = startPairSession({ projectId: "p1" } as never);
+		await loadPairSession("p3");
+		started({ success: true, data: session("s9") });
+		await starting;
+		expect(state()).toMatchObject({ session: null, status: "idle" });
 	});
 });

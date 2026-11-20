@@ -6,6 +6,7 @@
  *
  * @vitest-environment jsdom
  */
+import i18n from "i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAgentDebuggerStore } from "../agent-debugger-store";
 
@@ -139,6 +140,18 @@ describe("changing the attached session", () => {
 		api[method].mockRejectedValueOnce(new Error("refused"));
 		await expect(action()).resolves.toBeUndefined();
 		expect(state().error).toBe("refused");
+		expect(api.getDebugState).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		["add a breakpoint", "setBreakpoint", () => state().addBreakpoint({ id: "x" } as never)],
+		["resume a frame", "resumeFrame", () => state().resume("f1", "skip")],
+	])("shows that the runner refused to %s, and reads nothing again", async (_name, method, action) => {
+		await i18n.changeLanguage("en");
+		api.getDebugState.mockClear();
+		api[method].mockResolvedValueOnce({ ok: false, reason: "unknown_frame" });
+		await action();
+		expect(state().error).toBe("The debugger refused this change: the paused call may have ended already.");
 		expect(api.getDebugState).not.toHaveBeenCalled();
 	});
 });

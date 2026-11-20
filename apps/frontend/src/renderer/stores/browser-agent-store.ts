@@ -149,10 +149,8 @@ export const useBrowserAgentStore = create<BrowserAgentState>((set, get) => ({
 				const imgResult = await get().loadScreenshotImage(result.data.path);
 				// The capture is done either way: a preview that cannot be read
 				// must not leave the browser "navigating" for good.
-				set({
-					browserStatus: "ready",
-					...(imgResult ? { browserScreenshot: imgResult } : {}),
-				});
+				// An unreadable preview clears the last one: it was not this capture.
+				set({ browserStatus: "ready", browserScreenshot: imgResult ?? null });
 			} else {
 				set({
 					error: result?.error || "Screenshot capture failed",

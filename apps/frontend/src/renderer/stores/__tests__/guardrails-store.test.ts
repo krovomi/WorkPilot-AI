@@ -123,6 +123,8 @@ describe("another project", () => {
 		];
 		await state().load("/b");
 		await vi.waitFor(() => expect(state().activity).toEqual({ path: "/b", pending: [] }));
+		// The last project's diff check, still out, does not hold this one's button.
+		expect(state().checking).toBe(false);
 		rules.resolve({ rules: [rule("late")] });
 		failing.reject(new Error("late"));
 		insights.resolve({ path: "/a" });
@@ -137,6 +139,7 @@ describe("another project", () => {
 			error: null,
 			policy: { path: "/b" },
 			diffCheck: null,
+			checking: false,
 			lastTest: null,
 		});
 	});

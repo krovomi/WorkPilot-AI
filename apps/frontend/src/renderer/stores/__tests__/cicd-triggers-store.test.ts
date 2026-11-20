@@ -132,6 +132,18 @@ describe("saving the config", () => {
 		await saving;
 		expect(state().config).toMatchObject({ provider: "github", project: "/b" });
 	});
+
+	it("shows no refusal or failure of a save for the project left behind", async () => {
+		const refused = deferred();
+		const failing = deferred();
+		invoke.mockReturnValueOnce(refused.promise).mockReturnValueOnce(failing.promise);
+		const saving = [state().setConfig("/a", { enabled: false }), state().setConfig("/a", { enabled: false })];
+		await state().loadConfig("/b");
+		refused.resolve({ success: false, error: "unknown key" });
+		failing.reject(new Error("disk full"));
+		await Promise.all(saving);
+		expect(state()).toMatchObject({ error: null, config: { project: "/b" } });
+	});
 });
 
 describe("triggering a pipeline", () => {
@@ -158,5 +170,21 @@ describe("triggering a pipeline", () => {
 		invoke.mockRejectedValueOnce(new Error("x"));
 		expect(await state().triggerPipeline("/a", { provider: "github" })).toEqual({ success: false, error: "Error: x" });
 		expect(state()).toMatchObject({ error: "Error: x", isTriggering: false });
+	});
+
+	it("shows no trigger failure for the project left behind", async () => {
+		const refused = deferred();
+		const failing = deferred();
+		invoke.mockReturnValueOnce(refused.promise).mockReturnValueOnce(failing.promise);
+		const triggering = [state().triggerPipeline("/a", { provider: "github" }), state().triggerPipeline("/a", { provider: "github" })];
+		await state().loadConfig("/b");
+		refused.resolve({ success: false, error: "no token" });
+		failing.reject(new Error("x"));
+		// The caller still hears why; the page of another project does not.
+		expect(await Promise.all(triggering)).toEqual([
+			{ success: false, error: "no token" },
+			{ success: false, error: "Error: x" },
+		]);
+		expect(state()).toMatchObject({ error: null, isTriggering: false });
 	});
 });
