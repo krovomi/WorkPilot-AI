@@ -79,6 +79,16 @@
 			"profileCreatedAuthFailed": "Profil créé mais échec de la préparation de l'authentification : {{error}}",
 			"authPrepareFailed": "Échec de la préparation de l'authentification : {{error}}",
 			"authStartFailedMessage": "Échec du démarrage de l'authentification. Veuillez réessayer."
+		},
+		"errors": {
+			"loadFailed": "Les comptes n'ont pas pu être chargés.",
+			"invalidName": "Le nom du compte doit contenir au moins une lettre ou un chiffre.",
+			"addFailed": "Le compte n'a pas pu être ajouté.",
+			"deleteFailed": "Le compte n'a pas pu être supprimé.",
+			"renameFailed": "Le compte n'a pas pu être renommé.",
+			"setActiveFailed": "Le compte n'a pas pu devenir le compte actif.",
+			"authFailed": "L'authentification de ce compte n'a pas pu démarrer.",
+			"tokenFailed": "Le jeton n'a pas pu être enregistré."
 		}
 	},
 	"completion": {
@@ -168,7 +178,12 @@
 			"instructions": "L'installateur s'ouvrira dans votre terminal. Suivez les instructions pour terminer l'installation."
 		},
 		"learnMore": "En savoir plus sur le CLI IA",
-		"pathLabel": "Chemin :"
+		"pathLabel": "Chemin :",
+		"refresh": "Vérifier à nouveau",
+		"errors": {
+			"checkFailed": "L'installation du CLI IA n'a pas pu être vérifiée.",
+			"installFailed": "L'installation n'a pas pu être lancée."
+		}
 	},
 	"devtools": {
 		"title": "Outils de développement",
@@ -191,36 +206,10 @@
 		},
 		"detectedSummary": "Détecté sur votre système :",
 		"noToolsDetected": "Aucun outil supplémentaire détecté (VS Code et le terminal système seront utilisés)",
+		"systemTerminal": "Terminal du système",
+		"saveFailed": "Les outils n'ont pas pu être enregistrés. Réessayez.",
 		"custom": "Personnalisé...",
 		"saveAndContinue": "Enregistrer et continuer"
-	},
-	"ollama": {
-		"notInstalled": {
-			"title": "Ollama non installé",
-			"description": "Ollama fournit des modèles d'embeddings locaux gratuits pour la recherche sémantique. Installez-le en un clic pour activer cette fonctionnalité.",
-			"installSuccess": "Installation lancée dans votre terminal. Terminez l'installation là-bas, puis cliquez sur Réessayer.",
-			"installButton": "Installer Ollama",
-			"installing": "Installation...",
-			"retry": "Réessayer",
-			"learnMore": "En savoir plus",
-			"fallbackNote": "La mémoire fonctionnera toujours avec la recherche par mots-clés même sans Ollama."
-		},
-		"notRunning": {
-			"title": "Ollama non démarré",
-			"description": "Ollama est installé mais non démarré. Lancez Ollama pour utiliser les modèles d'embeddings locaux.",
-			"retry": "Réessayer",
-			"fallbackNote": "La mémoire fonctionnera toujours avec la recherche par mots-clés même sans embeddings."
-		},
-		"dimensions": "({{count}} dim.)",
-		"checking": "Vérification des modèles Ollama...",
-		"recommended": "Recommandé",
-		"highestQuality": "Meilleure qualité",
-		"fastest": "Le plus rapide",
-		"installed": "Installé",
-		"downloading": "Téléchargement...",
-		"download": "Télécharger",
-		"selectHint": "Choisissez un modèle installé pour la recherche sémantique. La mémoire fonctionne en recherche par mots-clés même sans embeddings.",
-		"startingDownload": "Démarrage du téléchargement..."
 	},
 	"authChoice": {
 		"title": "Choisissez votre IA",
@@ -233,18 +222,6 @@
 		"skip": "Passer pour l'instant",
 		"otherTitle": "Utiliser une autre IA",
 		"otherDescription": "OpenAI Codex, GitHub Copilot, Gemini, OpenCode, Ollama, Mistral et d'autres : connectez un compte, un CLI ou une clé API."
-	},
-	"firstSpec": {
-		"title": "Créez votre première tâche",
-		"description": "Décrivez ce que vous voulez construire et laissez WorkPilot AI s'occuper du reste",
-		"openedTitle": "Créateur de tâche ouvert",
-		"openedDescription": "Parfait ! Créez votre première tâche maintenant ou continuez l'assistant. Vous pourrez toujours créer des tâches plus tard depuis le tableau de bord.",
-		"tipsTitle": "Conseils pour de bonnes tâches",
-		"exampleTitle": "Exemple de description de tâche :",
-		"example": "« Ajoute un interrupteur de mode sombre dans la page des paramètres. Il doit garder la préférence de l'utilisateur dans localStorage et appliquer le thème tout de suite, sans recharger la page. Utilise les variables de couleur existantes de styles/theme.css. »",
-		"open": "Ouvrir le créateur de tâche",
-		"continueHint": "Vous pouvez continuer l'assistant maintenant ou créer d'autres tâches.",
-		"skipHint": "Vous pouvez passer cette étape et créer des tâches plus tard depuis le tableau de bord."
 	},
 	"providers": {
 		"title": "Connectez vos fournisseurs d'IA",

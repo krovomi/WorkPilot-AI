@@ -53,42 +53,35 @@ export const STATUS_COLORS: Record<TerminalStatus, string> = {
 
 export const PHASE_CONFIG: Record<
 	ExecutionPhase,
-	{ label: string; color: string; icon: React.ElementType }
+	{ color: string; icon: React.ElementType }
 > = {
 	idle: {
-		label: "Ready",
 		color: "bg-muted text-muted-foreground",
 		icon: Circle,
 	},
-	planning: { label: "Planning", color: "bg-info/20 text-info", icon: Search },
-	coding: { label: "Coding", color: "bg-primary/20 text-primary", icon: Code2 },
+	planning: { color: "bg-info/20 text-info", icon: Search },
+	coding: { color: "bg-primary/20 text-primary", icon: Code2 },
 	rate_limit_paused: {
-		label: "Rate Limited",
 		color: "bg-orange-500/20 text-orange-400",
 		icon: PauseCircle,
 	},
 	auth_failure_paused: {
-		label: "Auth Required",
 		color: "bg-destructive/20 text-destructive",
 		icon: KeyRound,
 	},
 	qa_review: {
-		label: "QA Review",
 		color: "bg-warning/20 text-warning",
 		icon: Search,
 	},
 	qa_fixing: {
-		label: "Fixing",
 		color: "bg-warning/20 text-warning",
 		icon: Wrench,
 	},
 	complete: {
-		label: "Complete",
 		color: "bg-success/20 text-success",
 		icon: CheckCircle2,
 	},
 	failed: {
-		label: "Failed",
 		color: "bg-destructive/20 text-destructive",
 		icon: AlertCircle,
 	},

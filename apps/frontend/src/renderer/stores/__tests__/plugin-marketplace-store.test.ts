@@ -146,24 +146,76 @@ describe("loadInstalledPlugins", () => {
 		});
 	});
 
-	it("lists nothing without a project, or when the main process refuses", async () => {
+	it("lists nothing without a project, or when the main process refuses, and says why", async () => {
 		store().setInstalled("old", [installedOf("x")]);
 		await loadInstalledPlugins(undefined);
 		expect(store()).toMatchObject({ projectId: null, installed: [] });
 		expect(invoke).not.toHaveBeenCalled();
 
-		invoke.mockResolvedValue({ success: false });
+		invoke.mockResolvedValueOnce({ success: false, error: "Unknown project" });
 		await loadInstalledPlugins("proj");
-		expect(store()).toMatchObject({ projectId: "proj", installed: [] });
+		expect(store()).toMatchObject({ projectId: "proj", installed: [], error: "Unknown project" });
+
+		invoke.mockResolvedValueOnce(undefined);
+		await loadInstalledPlugins("proj");
+		expect(store().error).toBe("Could not read the plugins installed in this project");
 	});
 
-	it("keeps the last list when the read throws", async () => {
-		const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+	it("keeps the project's last list when the read throws, and says why", async () => {
 		store().setInstalled("proj", [installedOf("x")]);
-		invoke.mockRejectedValue(new Error("down"));
+		invoke.mockRejectedValueOnce(new Error("down"));
 		await loadInstalledPlugins("proj");
-		expect(store()).toMatchObject({ installed: [installedOf("x")], isInstalledLoading: false });
-		consoleError.mockRestore();
+		expect(store()).toMatchObject({
+			installed: [installedOf("x")],
+			isInstalledLoading: false,
+			error: "down",
+		});
+
+		// Another project's list is not this one's.
+		invoke.mockRejectedValueOnce("down");
+		await loadInstalledPlugins("other");
+		expect(store()).toMatchObject({
+			projectId: "other",
+			installed: [],
+			error: "Could not read the plugins installed in this project",
+		});
+	});
+
+	it("applies only the answer of the last project asked for", async () => {
+		const answers: Array<(v: unknown) => void> = [];
+		const failures: Array<(e: unknown) => void> = [];
+		invoke.mockImplementation(
+			() =>
+				new Promise((resolve, reject) => {
+					answers.push(resolve);
+					failures.push(reject);
+				}),
+		);
+		const first = loadInstalledPlugins("first");
+		const second = loadInstalledPlugins("second");
+		answers[1]({ success: true, data: [installedOf("b")] });
+		await second;
+		answers[0]({ success: true, data: [installedOf("a")] });
+		await first;
+		expect(store()).toMatchObject({ projectId: "second", installed: [installedOf("b")] });
+
+		// A late failure of an earlier read changes nothing either, and a read
+		// that ends early does not stop the spinner of the one still running.
+		const third = loadInstalledPlugins("third");
+		const fourth = loadInstalledPlugins("fourth");
+		failures[2](new Error("late"));
+		await third;
+		expect(store()).toMatchObject({ isInstalledLoading: true, error: null });
+		answers[3]({ success: true, data: [] });
+		await fourth;
+		expect(store()).toMatchObject({ projectId: "fourth", isInstalledLoading: false });
+
+		// Leaving every project while a read runs drops its answer.
+		const fifth = loadInstalledPlugins("fifth");
+		await loadInstalledPlugins(null);
+		answers[4]({ success: true, data: [installedOf("e")] });
+		await fifth;
+		expect(store()).toMatchObject({ projectId: null, installed: [], isInstalledLoading: false });
 	});
 });
 
