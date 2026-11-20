@@ -24,6 +24,7 @@ import { OrganizationsTab } from "./OrganizationsTab";
 import { OverviewTab } from "./OverviewTab";
 import { QuotasTab } from "./QuotasTab";
 import { RolesTab } from "./RolesTab";
+import { useSwitchOrg } from "./use-switch-org";
 import { PageHeader } from "../ui/page-header";
 
 import { NativeSelect } from "../ui/native-select";
@@ -37,14 +38,11 @@ type TabId =
 	| "audit"
 	| "quotas";
 
-interface TabDef {
+/** A tab is gated by one permission, or reserved to platform administrators (cross-tenant). */
+type TabDef = {
 	readonly id: TabId;
 	readonly labelKey: string;
-	/** Permission required to see this tab at all. */
-	readonly permission?: string;
-	/** Platform administrators only (cross-tenant). */
-	readonly platformOnly?: boolean;
-}
+} & ({ readonly permission: string } | { readonly platformOnly: true });
 
 const TABS: readonly TabDef[] = [
 	{ id: "overview", labelKey: "tabs.overview", permission: "analytics.read" },
@@ -72,7 +70,7 @@ export function AdministrationView() {
 	const orgId = usePermissionsStore((s) => s.orgId);
 	const organizations = usePermissionsStore((s) => s.organizations);
 	const loadPermissions = usePermissionsStore((s) => s.load);
-	const switchOrg = usePermissionsStore((s) => s.switchOrg);
+	const switchOrg = useSwitchOrg();
 
 	const error = useAdminStore((s) => s.error);
 	const clearError = useAdminStore((s) => s.clearError);
@@ -97,15 +95,14 @@ export function AdministrationView() {
 		);
 	}
 
-	const visible = TABS.filter((tab) => {
-		if (tab.platformOnly) return isPlatformAdmin;
-		if (!tab.permission) return true;
-		return unrestricted || isPlatformAdmin || permissions.has(tab.permission);
-	});
+	const visible = TABS.filter((tab) =>
+		"platformOnly" in tab
+			? isPlatformAdmin
+			: unrestricted || isPlatformAdmin || permissions.has(tab.permission),
+	);
 
-	const current = visible.some((tab) => tab.id === active)
-		? active
-		: (visible[0]?.id ?? "overview");
+	// A tab that stopped being allowed (another organization) gives way to the first one left.
+	const current = (visible.find((tab) => tab.id === active) ?? visible[0])?.id;
 
 	return (
 		<div className="p-6 space-y-6 overflow-auto h-full">
@@ -176,7 +173,8 @@ export function AdministrationView() {
 						))}
 					</nav>
 
-					<div>
+					{/* Keyed by organization: a switch reloads the tab's data instead of showing the previous one's. */}
+					<div key={orgId}>
 						{current === "overview" && <OverviewTab />}
 						{current === "members" && <MembersTab />}
 						{current === "groups" && <GroupsTab />}
