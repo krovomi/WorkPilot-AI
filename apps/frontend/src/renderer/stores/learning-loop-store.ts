@@ -52,6 +52,27 @@ const initialState = {
 	isLoading: false,
 };
 
+/**
+ * Keep the summary's counts in step with a pattern that left the list, or was
+ * replaced by `added`: the dialog shows them next to the list.
+ */
+function recount(
+	summary: LearningSummary | null,
+	removed: LearningPattern,
+	added?: LearningPattern,
+): LearningSummary | null {
+	if (!summary) return null;
+	const counts = { ...summary };
+	const count = (pattern: LearningPattern, by: number) => {
+		counts.total_patterns += by;
+		if (pattern.enabled) counts.enabled_count += by;
+		else counts.disabled_count += by;
+	};
+	count(removed, -1);
+	if (added) count(added, 1);
+	return counts;
+}
+
 export const useLearningLoopStore = create<LearningLoopState>((set) => ({
 	...initialState,
 
@@ -97,19 +118,25 @@ export const useLearningLoopStore = create<LearningLoopState>((set) => ({
 	setIsLoading: (isLoading) => set({ isLoading }),
 
 	updatePatternInList: (patternId, updates) =>
-		set((state) => ({
-			patterns: state.patterns.map((p) =>
-				p.pattern_id === patternId ? { ...p, ...updates } : p,
-			),
-		})),
+		set((state) => {
+			const before = state.patterns.find((p) => p.pattern_id === patternId);
+			if (!before) return {};
+			const after = { ...before, ...updates };
+			return {
+				patterns: state.patterns.map((p) => (p === before ? after : p)),
+				summary: recount(state.summary, before, after),
+			};
+		}),
 
 	removePatternFromList: (patternId) =>
-		set((state) => ({
-			patterns: state.patterns.filter((p) => p.pattern_id !== patternId),
-			summary: state.summary
-				? { ...state.summary, total_patterns: state.summary.total_patterns - 1 }
-				: null,
-		})),
+		set((state) => {
+			const removed = state.patterns.find((p) => p.pattern_id === patternId);
+			if (!removed) return {};
+			return {
+				patterns: state.patterns.filter((p) => p !== removed),
+				summary: recount(state.summary, removed),
+			};
+		}),
 
 	reset: () => set(initialState),
 }));
@@ -325,7 +352,7 @@ export function setupLearningLoopListeners(): () => void {
 			if (result.summary) {
 				store().setSummary(result.summary);
 			}
-			store().setStatus("Analysis complete");
+			store().setStatus("");
 		},
 	);
 

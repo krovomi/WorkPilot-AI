@@ -211,7 +211,32 @@ const SHOTS = {
 			.click();
 		await page.waitForTimeout(2500);
 	},
+	"ai-accounts": (page) => openSettingsSection(page, "AI accounts"),
+	sandbox: (page) => openSettingsSection(page, "Sandbox"),
+	"code-migration": async (page) => {
+		await openView(page, "Code migration", "Toolbox");
+		await page
+			.locator("#code-migration-description")
+			.fill("Upgrade the storefront from React 18 to React 19");
+		await page.getByRole("button", { name: "Analyse" }).click();
+		await page.waitForTimeout(1500);
+	},
+	"menu-customize": async (page) => {
+		await page.getByText("Customize the menu", { exact: true }).first().click();
+		await page.waitForTimeout(1500);
+	},
 };
+
+/** Opens Settings on one section of its navigation. */
+async function openSettingsSection(page, label) {
+	await page
+		.getByRole("button", { name: "Application Settings" })
+		.first()
+		.click();
+	await page.waitForTimeout(1500);
+	await page.getByText(label, { exact: true }).first().click();
+	await page.waitForTimeout(2000);
+}
 
 (async () => {
 	const only = process.argv.slice(2);
