@@ -393,7 +393,13 @@ class WaveExecutor:
             await stderr_task
             duration = time.time() - start
 
-            stderr_output = b"".join(stderr_chunks).decode("utf-8", errors="replace")
+            # One line ending on every OS: a worker on Windows writes "\r\n",
+            # and the error is read on a card and in logs that expect "\n".
+            stderr_output = (
+                b"".join(stderr_chunks)
+                .decode("utf-8", errors="replace")
+                .replace("\r\n", "\n")
+            )
 
             success = process.returncode == 0
             error = None

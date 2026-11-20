@@ -422,8 +422,10 @@ MONOREPO = {
 }
 
 
-def test_inferred_rules_only_warn(tmp_path, capsys):
+def test_inferred_rules_only_warn(tmp_path, capsys, runtime):
     repo, spec_dir = _project(tmp_path, rules=None)
+    # Inferred rules still ask the reviewer: a double answers, not a real model.
+    stand_in = runtime(StandInRuntime({"ai_violations": []}))
     (repo / "apps" / "api").mkdir(parents=True)
     (repo / "apps" / "web").mkdir(parents=True)
     (repo / "apps" / "web" / "page.ts").write_text(
@@ -440,6 +442,7 @@ def test_inferred_rules_only_warn(tmp_path, capsys):
     assert report["violations"] == []
     assert report["warnings"], "a cross-service import is a warning when inferred"
     assert "\u26a0" in capsys.readouterr().out
+    assert stand_in.clients[0]["agent_type"] == "architecture_reviewer"
 
 
 @pytest.mark.parametrize("content", ["[1]", "{broken"])

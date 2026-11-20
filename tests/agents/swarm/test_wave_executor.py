@@ -271,3 +271,17 @@ def test_a_result_defaults_to_no_error() -> None:
     assert SubtaskResult("s", True) == SubtaskResult(
         subtask_id="s", success=True, duration_seconds=0.0, error=None
     )
+
+
+async def test_a_worker_error_reads_the_same_on_every_os(
+    world: dict[str, Path],
+) -> None:
+    _plan(world, s1=["crlf"])
+    nodes = _nodes("s1", wave=1)
+
+    result = await _executor(world).execute_wave(
+        Wave(index=1, subtask_ids=["s1"]), nodes
+    )
+
+    [failed] = result.results
+    assert failed.error == "Traceback\nboom: the real error\n"
