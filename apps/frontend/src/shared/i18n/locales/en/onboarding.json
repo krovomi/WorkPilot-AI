@@ -211,34 +211,6 @@
 		"custom": "Custom...",
 		"saveAndContinue": "Save & Continue"
 	},
-	"ollama": {
-		"notInstalled": {
-			"title": "Ollama not installed",
-			"description": "Ollama provides free, local embedding models for semantic search. Install it with one click to enable this feature.",
-			"installSuccess": "Installation started in your terminal. Complete the installation there, then click Retry.",
-			"installButton": "Install Ollama",
-			"installing": "Installing...",
-			"retry": "Retry",
-			"learnMore": "Learn more",
-			"fallbackNote": "Memory will still work with keyword search even without Ollama."
-		},
-		"notRunning": {
-			"title": "Ollama not running",
-			"description": "Ollama is installed but not running. Start Ollama to use local embedding models.",
-			"retry": "Retry",
-			"fallbackNote": "Memory will still work with keyword search even without embeddings."
-		},
-		"dimensions": "({{count}} dim)",
-		"checking": "Checking Ollama models...",
-		"recommended": "Recommended",
-		"highestQuality": "Highest Quality",
-		"fastest": "Fastest",
-		"installed": "Installed",
-		"downloading": "Downloading...",
-		"download": "Download",
-		"selectHint": "Select an installed model for semantic search. Memory works with keyword search even without embeddings.",
-		"startingDownload": "Starting download..."
-	},
 	"authChoice": {
 		"title": "Choose Your AI",
 		"description": "Pick the AI that will plan, write and review your code. You can add others or switch later in Settings → Accounts.",
@@ -250,18 +222,6 @@
 		"skip": "Skip for now",
 		"otherTitle": "Use another AI",
 		"otherDescription": "OpenAI Codex, GitHub Copilot, Gemini, OpenCode, Ollama, Mistral and more: connect an account, a CLI or an API key."
-	},
-	"firstSpec": {
-		"title": "Create Your First Task",
-		"description": "Describe what you want to build and let WorkPilot AI handle the rest",
-		"openedTitle": "Task Creator Opened",
-		"openedDescription": "Great! You can create your first task now or continue with the wizard. You can always create tasks later from the main dashboard.",
-		"tipsTitle": "Tips for Great Tasks",
-		"exampleTitle": "Example Task Description:",
-		"example": "\"Add a dark mode toggle to the settings page. It should persist the user's preference in localStorage and apply the theme immediately without page reload. Use the existing color variables in styles/theme.css.\"",
-		"open": "Open Task Creator",
-		"continueHint": "You can continue with the wizard now or create more tasks.",
-		"skipHint": "You can skip this step and create tasks later from the dashboard."
 	},
 	"providers": {
 		"title": "Connect Your AI Providers",

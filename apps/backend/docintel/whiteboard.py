@@ -115,6 +115,14 @@ def _label(value: object) -> str:
     return text[:MAX_LABEL]
 
 
+def _entries(payload: dict, key: str) -> list[dict]:
+    """The objects listed under ``key``; anything else the model wrote is skipped."""
+    listed = payload.get(key)
+    return (
+        [e for e in listed if isinstance(e, dict)] if isinstance(listed, list) else []
+    )
+
+
 def model_from_answer(payload: object) -> DiagramModel | None:
     """The vision model's JSON as a `DiagramModel`, or None when it drew nothing.
 
@@ -128,27 +136,32 @@ def model_from_answer(payload: object) -> DiagramModel | None:
     ids: dict[str, str] = {}
 
     def register(raw: object, prefix: str) -> str:
-        key = str(raw or "").strip() or f"{prefix}{len(ids) + 1}"
-        if key not in ids:
-            ids[key] = f"{prefix}{len(ids) + 1}"
+        """A fresh id for a box, or "" when the model declared that id before.
+
+        Two cells under one id make a file draw.io refuses to open, so the
+        first declaration wins. A box without an id gets a key no arrow can
+        name, since an arrow to it could only be a guess.
+        """
+        key = str(raw or "").strip() or f"\0{len(ids)}"
+        if key in ids:
+            return ""
+        ids[key] = f"{prefix}{len(ids) + 1}"
         return ids[key]
 
-    containers = [c for c in payload.get("containers") or [] if isinstance(c, dict)]
-    for item in containers[:MAX_NODES]:
+    for item in _entries(payload, "containers")[:MAX_NODES]:
         label = _label(item.get("label"))
-        if label:
-            diagram.nodes.append(
-                DiagramNode(id=register(item.get("id"), "c"), label=label)
-            )
+        node_id = register(item.get("id"), "c") if label else ""
+        if node_id:
+            diagram.nodes.append(DiagramNode(id=node_id, label=label))
     container_ids = {n.id for n in diagram.nodes}
 
-    for item in [n for n in payload.get("nodes") or [] if isinstance(n, dict)][
-        :MAX_NODES
-    ]:
+    for item in _entries(payload, "nodes")[:MAX_NODES]:
         label = _label(item.get("label"))
         if not label:
             continue
         node_id = register(item.get("id"), "n")
+        if not node_id:
+            continue
         parent = ids.get(str(item.get("container") or "").strip(), "")
         diagram.nodes.append(
             DiagramNode(
@@ -158,9 +171,7 @@ def model_from_answer(payload: object) -> DiagramModel | None:
             )
         )
     known = {n.id for n in diagram.nodes}
-    for item in [e for e in payload.get("edges") or [] if isinstance(e, dict)][
-        :MAX_EDGES
-    ]:
+    for item in _entries(payload, "edges")[:MAX_EDGES]:
         source = ids.get(str(item.get("from") or item.get("source") or "").strip(), "")
         target = ids.get(str(item.get("to") or item.get("target") or "").strip(), "")
         if source in known and target in known and source != target:
