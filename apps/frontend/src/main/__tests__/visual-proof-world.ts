@@ -7,7 +7,7 @@
  * the one-shot LLM call. Waiting costs no time: `delay` moves a fake clock.
  */
 import { EventEmitter } from "node:events";
-import { mkdtempSync, rmSync } from "node:fs";
+import { type PathLike, mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -46,6 +46,13 @@ export interface SpawnCall {
 	proc: FakeProcess;
 }
 
+export interface CaptureSource {
+	id: string;
+	name: string;
+	width: number;
+	height: number;
+}
+
 interface World {
 	windows: boolean;
 	/** Answer of each played program, by program name (`gh`, `powershell`, a path…). */
@@ -53,9 +60,15 @@ interface World {
 	execs: ExecCall[];
 	spawns: SpawnCall[];
 	spawnPid: number | undefined;
+	/** What happens on the machine when a program is launched (a window opens…). */
+	onSpawn: ((call: SpawnCall) => void) | null;
 	/** `findCommandInPath` answers. */
 	onPath: Map<string, string>;
+	/** Files the test machine says it does not have, whatever the real disk holds. */
+	absent: Set<string>;
 	msbuild: { command: string; argsPrefix: string[] } | null;
+	/** Windows Electron's desktopCapturer lists. */
+	sources: CaptureSource[];
 	/** Pages the hidden browser loaded, in order. */
 	visits: string[];
 	/** A load the hidden browser fails, by URL. */
@@ -82,8 +95,11 @@ export const world: World = {
 	execs: [],
 	spawns: [],
 	spawnPid: 7000,
+	onSpawn: null,
 	onPath: new Map(),
+	absent: new Set(),
 	msbuild: null,
+	sources: [],
 	visits: [],
 	failLoads: new Set(),
 	llm: null,
@@ -100,8 +116,11 @@ export function resetWorld(): void {
 	world.execs = [];
 	world.spawns = [];
 	world.spawnPid = 7000;
+	world.onSpawn = null;
 	world.onPath = new Map();
+	world.absent = new Set();
 	world.msbuild = null;
+	world.sources = [];
 	world.visits = [];
 	world.failLoads = new Set();
 	world.llm = null;
@@ -157,9 +176,17 @@ export async function childProcessModule() {
 	const spawn = (cmd: string, args: string[], options: SpawnCall["options"]) => {
 		const call = { cmd, args, options, proc: new FakeProcess(world.spawnPid) };
 		world.spawns.push(call);
+		world.onSpawn?.(call);
 		return call.proc;
 	};
 	return { ...actual, execFile, spawn, default: { ...actual, execFile, spawn } };
+}
+
+/** `vi.mock("node:fs", …)`: the real disk, less the files in `world.absent`. */
+export async function fsModule() {
+	const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+	const existsSync = (file: PathLike) => !world.absent.has(String(file)) && actual.existsSync(file);
+	return { ...actual, existsSync, default: { ...actual, existsSync } };
 }
 
 /** `vi.mock("../platform", …)`. */
@@ -281,10 +308,21 @@ export const browserWindows = FakeBrowserWindow.opened;
 /** `vi.mock("electron", …)`. */
 export async function electronModule() {
 	const actual = await vi.importActual<Record<string, unknown>>("electron");
+	const desktopCapturer = {
+		getSources: async () =>
+			world.sources.map((source) => ({
+				...source,
+				thumbnail: {
+					getSize: () => ({ width: source.width, height: source.height }),
+					toPNG: () => Buffer.from(`PNG ${source.name}`),
+				},
+			})),
+	};
 	return {
 		...actual,
 		BrowserWindow: FakeBrowserWindow,
-		default: { ...actual, BrowserWindow: FakeBrowserWindow },
+		desktopCapturer,
+		default: { ...actual, BrowserWindow: FakeBrowserWindow, desktopCapturer },
 	};
 }
 

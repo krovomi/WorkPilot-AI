@@ -1,5 +1,6 @@
 import { Eye, EyeOff } from "lucide-react";
 import { forwardRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Input } from "../ui/input";
 
 interface PasswordInputProps
@@ -21,6 +22,7 @@ interface PasswordInputProps
  */
 export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
 	function PasswordInput({ value, onChange, placeholder, className, ...rest }, ref) {
+		const { t } = useTranslation("common");
 		const [showPassword, setShowPassword] = useState(false);
 
 		return (
@@ -37,6 +39,12 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
 				<button
 					type="button"
 					onClick={() => setShowPassword(!showPassword)}
+					aria-label={t(
+						showPassword
+							? "accessibility.hideSecretAriaLabel"
+							: "accessibility.showSecretAriaLabel",
+					)}
+					aria-pressed={showPassword}
 					className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 				>
 					{showPassword ? (
