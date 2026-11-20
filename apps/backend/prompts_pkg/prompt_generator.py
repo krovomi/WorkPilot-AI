@@ -110,13 +110,12 @@ def detect_worktree_isolation(project_dir: Path) -> tuple[bool, Path | None]:
         match = re.search(pattern, project_str)
         if match:
             # Extract the parent project path (everything before the worktree marker)
-            parent = Path(project_str[: match.start()] or resolved_dir.anchor)
-            # A worktree at the root of a filesystem: on Windows what is left
+            # Everything before the worktree marker, from the filesystem's
+            # root: at the root of a Windows drive the text before the marker
             # is the bare drive ("D:"), which names the drive's current
             # folder, not its root.
-            if not parent.root:
-                parent = Path(resolved_dir.anchor)
-            return True, parent
+            anchor = resolved_dir.anchor
+            return True, Path(anchor) / project_str[len(anchor) : match.start()]
 
     return False, None
 
