@@ -116,6 +116,11 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 _OPENER = urllib.request.build_opener(_NoRedirect())
+# A CI server on this machine is called directly: a proxy from the environment
+# would otherwise receive what may go over plain http only to this machine.
+_DIRECT_OPENER = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}), _NoRedirect()
+)
 
 
 def http_request(
@@ -132,7 +137,8 @@ def http_request(
         return {"status": 0, "error": refusal}
     req = urllib.request.Request(url, data=body, headers=headers or {}, method=method)
     try:
-        with _OPENER.open(req, timeout=30) as resp:
+        opener = _DIRECT_OPENER if _reach(url) == "loopback" else _OPENER
+        with opener.open(req, timeout=30) as resp:
             content = resp.read().decode("utf-8")
             try:
                 return {"status": resp.status, "body": json.loads(content)}

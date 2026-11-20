@@ -207,6 +207,24 @@ def test_a_redirect_is_answered_as_it_came(monkeypatch: pytest.MonkeyPatch) -> N
     assert server.paths == ["/job"]
 
 
+def test_a_ci_server_on_this_machine_is_called_without_a_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proxy, server = _Redirecting(), _Redirecting()
+    for name in ("HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"):
+        monkeypatch.setenv(name, proxy.url)
+    for name in ("NO_PROXY", "no_proxy"):
+        monkeypatch.delenv(name, raising=False)
+    try:
+        answer = runner.http_request(server.url + "/job", method="POST", headers=TOKEN)
+    finally:
+        proxy.close()
+        server.close()
+    assert answer["status"] == 302
+    assert server.paths == ["/job"]
+    assert proxy.paths == []
+
+
 # --- values that end up in an API path ---------------------------------------------
 
 
