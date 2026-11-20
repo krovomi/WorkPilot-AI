@@ -422,7 +422,10 @@ MONOREPO = {
 }
 
 
-def test_inferred_rules_only_warn(tmp_path, capsys):
+def test_inferred_rules_only_warn(tmp_path, capsys, monkeypatch):
+    # No runtime: whichever test imported `core` earlier in the session must
+    # not let this gate start a real reviewer session.
+    monkeypatch.setattr(agent_runtime, "_runtime", None)
     repo, spec_dir = _project(tmp_path, rules=None)
     (repo / "apps" / "api").mkdir(parents=True)
     (repo / "apps" / "web").mkdir(parents=True)

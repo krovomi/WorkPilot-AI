@@ -44,6 +44,10 @@ if step == "fail":
     sys.exit(1)
 if step == "silent":
     sys.exit(3)
+if step == "crlf":
+    # What a worker's text-mode stderr holds on Windows, on every OS.
+    sys.stderr.buffer.write(b"Traceback\r\nboom: the real error\r\n")
+    sys.exit(1)
 if step == "long":
     # One event longer than a pipe buffer, then a last line with no line end.
     print('__TASK_EVENT__:{"diff": "' + "d" * 100_000 + '"}', flush=True)
