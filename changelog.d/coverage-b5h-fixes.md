@@ -15,3 +15,7 @@ section: 🐛 Corrections
 - **Graphe du cerveau** : un `graph.json` laissé par un autre outil avec des nœuds ou des liens
   vides (`null`) ou d'une autre forme se lit comme un graphe vide, au lieu de faire échouer
   chaque recherche jusqu'à la reconstruction suivante.
+- **Connexion du cerveau aux agents** : un fichier de configuration d'agent illisible ou
+  impossible à écrire est signalé pour cet agent seulement, et les autres agents sont quand
+  même connectés ; une CLI Claude Code qui ne répond pas ou ne démarre pas laisse WorkPilot
+  écrire sa configuration directement, au lieu de faire échouer la connexion.
