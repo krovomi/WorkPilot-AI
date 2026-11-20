@@ -393,8 +393,7 @@ class WaveExecutor:
             await stderr_task
             duration = time.time() - start
 
-            # One line ending on every OS: a worker on Windows writes "\r\n",
-            # and the error is read on a card and in logs that expect "\n".
+            # One line end on every OS: Windows writes CRLF to a piped stderr.
             stderr_output = (
                 b"".join(stderr_chunks)
                 .decode("utf-8", errors="replace")
