@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..analyzer import ArchitectureAnalyzer
+from .prompts import code_span
 
 logger = logging.getLogger(__name__)
 
@@ -265,18 +266,19 @@ def render_section(evidence: Evidence) -> str:
 
     if evidence.languages:
         spread = ", ".join(
-            f"{lang} ({count} files)" for lang, count in evidence.languages.items()
+            f"{code_span(lang)} ({count} files)"
+            for lang, count in evidence.languages.items()
         )
         lines += [f"**Languages.** {spread}", ""]
 
     if evidence.entrypoints:
         lines += ["**Entrypoints.**"]
-        lines += [f"- `{path}`" for path in evidence.entrypoints]
+        lines += [f"- `{code_span(path)}`" for path in evidence.entrypoints]
         lines.append("")
 
     if evidence.infrastructure:
         lines += ["**Deployment and runtime boundaries.**"]
-        lines += [f"- `{path}`" for path in evidence.infrastructure]
+        lines += [f"- `{code_span(path)}`" for path in evidence.infrastructure]
         lines.append("")
 
     if evidence.modules:
@@ -288,7 +290,8 @@ def render_section(evidence: Evidence) -> str:
             "|---|---|---|---|---|",
         ]
         lines += [
-            f"| `{m['path']}` | {m['language']} | {m['lines']} | "
+            f"| `{code_span(m['path']).replace('|', '_')}` | {m['language']} | "
+            f"{m['lines']} | "
             f"{m['importedBy']} | {m['imports']} |"
             for m in evidence.modules
         ]
@@ -301,13 +304,14 @@ def render_section(evidence: Evidence) -> str:
             + "on every request look identical here.",
             "",
         ]
-        lines += [f"- `{a}` → `{b}`" for a, b in evidence.edges]
+        lines += [f"- `{code_span(a)}` → `{code_span(b)}`" for a, b in evidence.edges]
         lines.append("")
 
     if evidence.manifests:
         lines += ["**Declared dependencies.**", ""]
         for manifest, names in evidence.manifests.items():
-            lines.append(f"- `{manifest}`: {', '.join(names)}")
+            listed = ", ".join(code_span(name) for name in names)
+            lines.append(f"- `{code_span(manifest)}`: {listed}")
         lines.append("")
 
     return "\n".join(lines)

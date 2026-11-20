@@ -45,7 +45,14 @@ def build_prompt(a_text: str, b_text: str, detail: str = "") -> str:
 
     quoted_a = quote_untrusted(a_text, kind="comment", source="memory note A")
     quoted_b = quote_untrusted(b_text, kind="comment", source="memory note B")
-    hint = f"\nThe deterministic detector flagged: {detail[:200]}\n" if detail else ""
+    # The detail is built from words of the two notes, so it is fenced too.
+    hint = (
+        "\nThe deterministic detector flagged:\n"
+        + quote_untrusted(detail[:200], kind="comment", source="memory notes")
+        + "\n"
+        if detail
+        else ""
+    )
     return (
         "Two notes of a project's memory may contradict each other.\n"
         f"{hint}\nNote A:\n{quoted_a}\n\nNote B:\n{quoted_b}\n\n"
