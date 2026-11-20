@@ -12,12 +12,12 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Progress } from "../ui/progress";
 import type { PhaseCardProps } from "./types";
+import { hasCompetitorInsight } from "./utils";
 import { useTranslation } from "react-i18next";
 
 export function PhaseCard({
 	phase,
 	features,
-	isFirst: _isFirst,
 	onFeatureSelect,
 	onConvertToSpec,
 	onGoToTask,
@@ -43,17 +43,14 @@ export function PhaseCard({
 		if (feature.status === "done") {
 			return <CheckCircle2 className="h-4 w-4 text-success shrink-0" />;
 		}
-		if (feature.linkedSpecId) {
+		const linkedSpecId = feature.linkedSpecId;
+		if (linkedSpecId) {
 			return (
 				<Button
 					variant="ghost"
 					size="sm"
 					className="h-6 px-2"
-					onClick={(e) => {
-						e.stopPropagation();
-						// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-						onGoToTask(feature.linkedSpecId!);
-					}}
+					onClick={() => onGoToTask(linkedSpecId)}
 				>
 					<ExternalLink className="h-3 w-3 mr-1" />
 					{t("roadmap:phaseCard.viewTask")}
@@ -65,10 +62,7 @@ export function PhaseCard({
 				variant="ghost"
 				size="sm"
 				className="h-6 px-2 shrink-0"
-				onClick={(e) => {
-					e.stopPropagation();
-					onConvertToSpec(feature);
-				}}
+				onClick={() => onConvertToSpec(feature)}
 			>
 				<Play className="h-3 w-3 mr-1" />
 				{t("roadmap:featureCard.build")}
@@ -95,7 +89,7 @@ export function PhaseCard({
 					</div>
 				</div>
 				<Badge variant={phase.status === "completed" ? "default" : "outline"}>
-					{phase.status}
+					{t(`roadmap:phaseStatus.${phase.status}`, { defaultValue: phase.status })}
 				</Badge>
 			</div>
 
@@ -150,27 +144,26 @@ export function PhaseCard({
 				</h4>
 				<div className="grid gap-2">
 					{features.slice(0, 5).map((feature) => (
-						// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
-						// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled elsewhere
-						// biome-ignore lint/a11y/noNoninteractiveElementInteractions: selectable feature row
 						<div
 							key={feature.id}
-							className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
-							onClick={() => onFeatureSelect(feature)}
+							className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
 						>
-							<div className="flex items-center gap-2 flex-1 min-w-0">
+							<button
+								type="button"
+								className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer"
+								onClick={() => onFeatureSelect(feature)}
+							>
 								<Badge
 									variant="outline"
 									className={`text-xs ${ROADMAP_PRIORITY_COLORS[feature.priority]}`}
 								>
-									{feature.priority}
+									{t(`roadmap:priorityLabels.${feature.priority}`)}
 								</Badge>
 								<span className="text-sm truncate">{feature.title}</span>
-								{feature.competitorInsightIds &&
-									feature.competitorInsightIds.length > 0 && (
-										<TrendingUp className="h-3 w-3 text-primary shrink-0" />
-									)}
-							</div>
+								{hasCompetitorInsight(feature) && (
+									<TrendingUp className="h-3 w-3 text-primary shrink-0" />
+								)}
+							</button>
 							{getActionButton(feature)}
 						</div>
 					))}

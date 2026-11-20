@@ -165,7 +165,7 @@ export function PrivacyStep({ onNext, onBack }: PrivacyStepProps) {
 
 				{/* Error Display */}
 				{error && (
-					<div className="flex items-start gap-2 p-3 mt-6 rounded-md bg-destructive/10 text-destructive text-sm">
+					<div className="flex items-start gap-2 p-3 mt-6 rounded-md bg-destructive/10 text-destructive text-sm" role="alert">
 						<AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
 						{error}
 					</div>

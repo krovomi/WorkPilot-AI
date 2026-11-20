@@ -582,9 +582,8 @@ def _by_compiled(frame: StackFrame, index: RepoIndex) -> tuple[str, str]:
     )
     if cut < 0:
         return "", ""
+    # Never empty: the last segment is the `.js` file, which no cut name is.
     tail = segments[cut + 1 :]
-    if not tail:
-        return "", ""
     stem = Path(tail[-1]).stem
     found: list[str] = []
     for suffix in (".ts", ".tsx", ".mts", ".cts"):
