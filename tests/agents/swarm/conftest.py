@@ -39,11 +39,18 @@ if step == "ok":
     sys.exit(0)
 if step == "fail":
     # More than a pipe buffer on stderr: the executor must keep reading it.
-    # A warning comes first and the error last, as an interpreter writes them.
-    sys.stderr.write("a warning\n" + "E" * 100_000 + "\nboom: the real error")
+    # A warning comes first and the error last, as an interpreter writes them,
+    # with the line ends of Windows, where text written to stderr gets CRLF.
+    text = "a warning\r\n" + "E" * 100_000 + "\r\nboom: the real error"
+    sys.stderr.buffer.write(text.encode("utf-8"))
+    sys.stderr.flush()
     sys.exit(1)
 if step == "silent":
     sys.exit(3)
+if step == "crlf":
+    # What a worker's text-mode stderr holds on Windows, on every OS.
+    sys.stderr.buffer.write(b"Traceback\r\nboom: the real error\r\n")
+    sys.exit(1)
 if step == "long":
     # One event longer than a pipe buffer, then a last line with no line end.
     print('__TASK_EVENT__:{"diff": "' + "d" * 100_000 + '"}', flush=True)

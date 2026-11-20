@@ -129,6 +129,8 @@ const ARCHITECTURE = {
 };
 
 const storeState = {
+	// The canvas tab is the one on screen: its shortcuts only act there.
+	activeMode: "canvas" as string,
 	architectures: [ARCHITECTURE] as (typeof ARCHITECTURE)[],
 	activeArchitectureId: "arch-1" as string | null,
 	createArchitecture: vi.fn(),

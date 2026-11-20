@@ -7,6 +7,7 @@
 import {
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	realpathSync,
 	rmSync,
@@ -247,6 +248,21 @@ describe("recordFeedback", () => {
 		const kept = lines();
 		expect(kept).toHaveLength(KEEP_LINES_ON_COMPACT);
 		expect(kept.at(-1)).toMatchObject({ finding_id: "f-1", verdict: "accepted" });
+	});
+
+	it("compacts through a fresh temporary file and leaves nothing else beside it", () => {
+		writeReview(7, [FINDING]);
+		const file = path.join(project, FEEDBACK_RELATIVE_PATH);
+		const stale = `${file}.${process.pid}.tmp`;
+		writeFileSync(stale, "stale\n");
+		const filler = JSON.stringify({ v: 1, pr: 1, finding_id: "old", pad: "x".repeat(500) });
+		writeFileSync(file, `${`${filler}\n`.repeat(2_500)}`);
+		const valid = validateFeedback(7, { findingId: "f-1", verdict: "accepted" });
+		expect(recordFeedback(project, must(valid)).success).toBe(true);
+		expect(lines()).toHaveLength(KEEP_LINES_ON_COMPACT);
+		expect(readFileSync(stale, "utf-8")).toBe("stale\n");
+		const left = readdirSync(path.dirname(file)).filter((name) => name.endsWith(".tmp"));
+		expect(left).toEqual([path.basename(stale)]);
 	});
 });
 
