@@ -109,87 +109,7 @@ describe("OnboardingWizard Integration Tests", () => {
 		vi.clearAllMocks();
 	});
 
-	describe("OAuth Path Navigation", () => {
-		// Skipped: OAuth integration tests require full OAuth step mocking - not API Profile related
-		it.skip("should navigate: welcome → auth-choice → oauth", async () => {
-			render(<OnboardingWizard {...defaultProps} />);
-
-			// Start at welcome step
-			expect(screen.getByText(/Welcome to WorkPilot AI/)).toBeInTheDocument();
-
-			// Click "Get Started" to go to auth-choice
-			const getStartedButton = screen.getByRole("button", {
-				name: /Get Started/,
-			});
-			fireEvent.click(getStartedButton);
-
-			// Should now show auth choice step
-			await waitFor(() => {
-				expect(
-					screen.getByText(/Choose Your Authentication Method/),
-				).toBeInTheDocument();
-			});
-
-			// Click OAuth option
-			const oauthButton = screen.getByTestId("auth-option-oauth");
-			fireEvent.click(oauthButton);
-
-			// Should navigate to oauth step
-			await waitFor(() => {
-				expect(screen.getByText(/Sign in with Anthropic/)).toBeInTheDocument();
-			});
-		});
-
-		// Skipped: OAuth path test requires full OAuth step mocking
-		it.skip("should show correct progress indicator for OAuth path", async () => {
-			render(<OnboardingWizard {...defaultProps} />);
-
-			// Click through to auth-choice
-			fireEvent.click(screen.getByRole("button", { name: /Get Started/ }));
-			await waitFor(() => {
-				expect(
-					screen.getByText(/Choose Your Authentication Method/),
-				).toBeInTheDocument();
-			});
-
-			// Verify progress indicator shows 5 steps
-			const progressIndicators = document.querySelectorAll('[class*="step"]');
-			expect(progressIndicators.length).toBeGreaterThanOrEqual(4); // At least 4 steps shown
-		});
-	});
-
 	describe("API Key Path Navigation", () => {
-		// Skipped: Test requires ProfileEditDialog integration mock
-		it.skip("should skip oauth step when API key path chosen", async () => {
-			render(<OnboardingWizard {...defaultProps} />);
-
-			// Start at welcome step
-			expect(screen.getByText(/Welcome to WorkPilot AI/)).toBeInTheDocument();
-
-			// Click "Get Started" to go to auth-choice
-			fireEvent.click(screen.getByRole("button", { name: /Get Started/ }));
-			await waitFor(() => {
-				expect(
-					screen.getByText(/Choose Your Authentication Method/),
-				).toBeInTheDocument();
-			});
-
-			// Click API Key option
-			const apiKeyButton = screen.getByTestId("auth-option-apikey");
-			fireEvent.click(apiKeyButton);
-
-			// Profile dialog should open
-			await waitFor(() => {
-				expect(screen.getByTestId("profile-edit-dialog")).toBeInTheDocument();
-			});
-
-			// Close dialog (simulating profile creation - in real scenario this would trigger skip)
-			const closeButton = screen.queryByText(/Close|Cancel/);
-			if (closeButton) {
-				fireEvent.click(closeButton);
-			}
-		});
-
 		it("should not show OAuth step text on auth-choice screen", async () => {
 			render(<OnboardingWizard {...defaultProps} />);
 
@@ -330,51 +250,6 @@ describe("OnboardingWizard Integration Tests", () => {
 		});
 	});
 
-	describe("Step Progress Indicator", () => {
-		// Skipped: Progress indicator tests require step-by-step CSS class inspection
-		it.skip("should display progress indicator for non-welcome/completion steps", async () => {
-			render(<OnboardingWizard {...defaultProps} />);
-
-			// On welcome step, no progress indicator shown
-			expect(screen.queryByText(/Welcome/)).toBeInTheDocument();
-			const _progressBeforeNav = document.querySelector('[class*="progress"]');
-			// Progress indicator may not be visible on welcome step
-
-			// Navigate to auth-choice
-			fireEvent.click(screen.getByRole("button", { name: /Get Started/ }));
-			await waitFor(() => {
-				expect(
-					screen.getByText(/Choose Your Authentication Method/),
-				).toBeInTheDocument();
-			});
-
-			// Progress indicator should now be visible
-			// The WizardProgress component should be rendered
-			const progressElement = document.querySelector('[class*="step"]');
-			expect(progressElement).toBeTruthy();
-		});
-
-		// Skipped: Step count test requires i18n step labels
-		it.skip("should show correct number of steps (5 total)", async () => {
-			render(<OnboardingWizard {...defaultProps} />);
-
-			// Navigate to auth-choice
-			fireEvent.click(screen.getByRole("button", { name: /Get Started/ }));
-			await waitFor(() => {
-				expect(
-					screen.getByText(/Choose Your Authentication Method/),
-				).toBeInTheDocument();
-			});
-
-			// Check for step labels in progress indicator
-			const steps = ["Welcome", "Auth Method", "OAuth", "Done"];
-
-			// At least some step labels should be present (not all may be visible at current step)
-			const visibleSteps = steps.filter((step) => screen.queryByText(step));
-			expect(visibleSteps.length).toBeGreaterThan(0);
-		});
-	});
-
 	describe("AC Coverage", () => {
 		it("AC1: First-run screen displays with two auth options", async () => {
 			render(<OnboardingWizard {...defaultProps} />);
@@ -390,29 +265,6 @@ describe("OnboardingWizard Integration Tests", () => {
 			// Both options should be visible
 			expect(screen.getByText(/Sign in with Anthropic/)).toBeInTheDocument();
 			expect(screen.getByText(/Use Custom API Key/)).toBeInTheDocument();
-		});
-
-		// Skipped: OAuth path test requires full OAuth step mocking
-		it.skip("AC2: OAuth path initiates existing OAuth flow", async () => {
-			render(<OnboardingWizard {...defaultProps} />);
-
-			fireEvent.click(screen.getByText(/Get Started/));
-			await waitFor(() => {
-				expect(
-					screen.getByText(/Choose Your Authentication Method/),
-				).toBeInTheDocument();
-			});
-
-			const oauthButton = screen.getByTestId("auth-option-oauth");
-			fireEvent.click(oauthButton);
-
-			// Should proceed to OAuth step
-			await waitFor(() => {
-				// OAuth step content should be visible
-				expect(
-					document.querySelector(".fullscreen-dialog"),
-				).toBeInTheDocument();
-			});
 		});
 
 		it("AC3: API Key path opens profile management dialog", async () => {
