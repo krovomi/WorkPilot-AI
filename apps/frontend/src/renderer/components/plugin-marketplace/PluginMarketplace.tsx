@@ -2,6 +2,7 @@ import type { PluginMarketplaceTab } from "@shared/types/plugin-marketplace";
 import { AlertTriangle, BookOpen, Package, Puzzle, type LucideIcon } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import {
 	loadInstalledPlugins,
 	loadPluginCatalog,
@@ -34,7 +35,14 @@ const TABS: Array<{
 export function PluginMarketplace() {
 	const { t } = useTranslation(["common", "navigation"]);
 	const { activeTab, setActiveTab, installed, error } =
-		usePluginMarketplaceStore();
+		usePluginMarketplaceStore(
+			useShallow((state) => ({
+				activeTab: state.activeTab,
+				setActiveTab: state.setActiveTab,
+				installed: state.installed,
+				error: state.error,
+			})),
+		);
 
 	const projectId = useProjectStore((state) => state.selectedProjectId);
 

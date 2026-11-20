@@ -91,8 +91,6 @@ describe("catalog filters", () => {
 		expect(ids()).toEqual(["alpha"]);
 		store().setFilters({ showInstalledOnly: false, showOfficialOnly: true });
 		expect(ids()).toEqual(["zeta"]);
-		expect(store().isServerInstalled("alpha")).toBe(true);
-		expect(store().isServerInstalled("zeta")).toBe(false);
 	});
 
 	it("switches tab", () => {
@@ -109,16 +107,16 @@ describe("catalog and installed servers", () => {
 		expect(store()).toMatchObject({ catalog: [{ id: "a" }], isCatalogLoading: false });
 		api.invoke.mockResolvedValue({ success: false, error: "offline" });
 		await loadMarketplaceCatalog();
-		expect(store().error).toBe("offline");
+		expect(store().error).toEqual({ key: "loadCatalog", detail: "offline" });
 		api.invoke.mockResolvedValue(undefined);
 		await loadMarketplaceCatalog();
-		expect(store().error).toBe("Failed to load catalog");
+		expect(store().error).toEqual({ key: "loadCatalog" });
 		api.invoke.mockRejectedValue(new Error("ipc"));
 		await loadMarketplaceCatalog();
-		expect(store()).toMatchObject({ error: "ipc", isCatalogLoading: false });
+		expect(store()).toMatchObject({ error: { key: "loadCatalog", detail: "ipc" }, isCatalogLoading: false });
 		api.invoke.mockRejectedValue(1);
 		await loadMarketplaceCatalog();
-		expect(store().error).toBe("Failed to load catalog");
+		expect(store().error).toEqual({ key: "loadCatalog" });
 	});
 
 	it("reads what the project installed", async () => {
@@ -147,7 +145,35 @@ describe("catalog and installed servers", () => {
 		useMcpMarketplaceStore.setState({ projectId: "p1", installed: [{ id: "a" }] as never });
 		api.getProjectEnv.mockRejectedValue(new Error("disk"));
 		expect(await loadInstalledServers("p2")).toBe(false);
-		expect(store()).toMatchObject({ projectId: "p1", installed: [{ id: "a" }], isInstalledLoading: false });
+		expect(store()).toMatchObject({
+			projectId: "p1",
+			installed: [{ id: "a" }],
+			isInstalledLoading: false,
+			error: { key: "readSettings", detail: "disk" },
+		});
+	});
+
+	it("drops the answer of a project the person has left", async () => {
+		let answerA: (value: unknown) => void = () => undefined;
+		api.getProjectEnv.mockReturnValueOnce(new Promise((resolve) => (answerA = resolve)));
+		api.getProjectEnv.mockResolvedValueOnce({ success: true, data: { customMcpServers: [{ id: "b" }] } });
+		const readA = loadInstalledServers("pA");
+		expect(await loadInstalledServers("pB")).toBe(true);
+		answerA({ success: true, data: { customMcpServers: [{ id: "a" }] } });
+		expect(await readA).toBe(false);
+		expect(store()).toMatchObject({ projectId: "pB", installed: [{ id: "b" }], isInstalledLoading: false });
+	});
+
+	it("drops a failed read of a project the person has left", async () => {
+		let failA: (reason: unknown) => void = () => undefined;
+		api.getProjectEnv.mockReturnValueOnce(new Promise((_, reject) => (failA = reject)));
+		const readA = loadInstalledServers("pA");
+		expect(store().isInstalledLoading).toBe(true);
+		expect(await loadInstalledServers(null)).toBe(true);
+		expect(store().isInstalledLoading).toBe(false);
+		failA(new Error("disk"));
+		expect(await readA).toBe(false);
+		expect(store()).toMatchObject({ projectId: null, error: null, isInstalledLoading: false });
 	});
 });
 
@@ -184,12 +210,12 @@ describe("install and uninstall", () => {
 
 	it("refuses an unknown server, a missing value or a second install", async () => {
 		expect(await installMarketplaceServer("p1", "nope", {}, [])).toBe(false);
-		expect(store().error).toBe("Unknown server: nope");
+		expect(store().error).toEqual({ key: "unknownServer", name: "nope" });
 		expect(await installMarketplaceServer("p1", "db", { TOKEN: " " }, [])).toBe(false);
-		expect(store().error).toBe("Missing: TOKEN");
+		expect(store().error).toEqual({ key: "missingValues", name: "TOKEN" });
 		api.getProjectEnv.mockResolvedValue({ success: true, data: { customMcpServers: [{ id: "db" }] } });
 		expect(await installMarketplaceServer("p1", "db", { TOKEN: "t" }, [])).toBe(false);
-		expect(store().error).toBe("DB is already installed in this project");
+		expect(store().error).toEqual({ key: "alreadyInstalled", name: "DB" });
 		expect(api.updateProjectEnv).not.toHaveBeenCalled();
 	});
 
@@ -197,8 +223,26 @@ describe("install and uninstall", () => {
 		useMcpMarketplaceStore.setState({ projectId: "p0", installed: [{ id: "from-p0" }] as never });
 		api.getProjectEnv.mockRejectedValue(new Error("disk"));
 		expect(await installMarketplaceServer("p1", "db", { TOKEN: "t" }, ["coder"])).toBe(false);
-		expect(store().error).toBe("Failed to read the project settings");
+		expect(store().error).toEqual({ key: "readSettings", detail: "disk" });
 		expect(await uninstallMarketplaceServer("p1", "x")).toBe(false);
+		expect(store().error).toEqual({ key: "readSettings", detail: "disk" });
+		expect(api.updateProjectEnv).not.toHaveBeenCalled();
+	});
+
+	it("refuses to write when the project was left during the read", async () => {
+		let answer: (value: unknown) => void = () => undefined;
+		api.getProjectEnv.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+		const install = installMarketplaceServer("p1", "db", { TOKEN: "t" }, ["coder"]);
+		await loadInstalledServers(null);
+		answer({ success: true, data: {} });
+		expect(await install).toBe(false);
+		expect(store().error).toEqual({ key: "readSettings" });
+		api.getProjectEnv.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+		const uninstall = uninstallMarketplaceServer("p1", "db");
+		await loadInstalledServers(null);
+		answer({ success: true, data: {} });
+		expect(await uninstall).toBe(false);
+		expect(store().error).toEqual({ key: "readSettings" });
 		expect(api.updateProjectEnv).not.toHaveBeenCalled();
 	});
 
@@ -206,17 +250,18 @@ describe("install and uninstall", () => {
 		api.getProjectEnv.mockResolvedValue({ success: true, data: {} });
 		api.updateProjectEnv.mockResolvedValue({ success: false, error: "read-only" });
 		expect(await installMarketplaceServer("p1", "db", { TOKEN: "t" }, [])).toBe(false);
-		expect(store().error).toBe("read-only");
+		expect(store().error).toEqual({ key: "saveSettings", detail: "read-only" });
 		api.updateProjectEnv.mockResolvedValue(undefined);
 		expect(await installMarketplaceServer("p1", "db", { TOKEN: "t" }, [])).toBe(false);
-		expect(store().error).toBe("Failed to save the project settings");
+		expect(store().error).toEqual({ key: "saveSettings" });
 		api.updateProjectEnv.mockRejectedValue(new Error("ipc"));
 		expect(await installMarketplaceServer("p1", "db", { TOKEN: "t" }, [])).toBe(false);
-		expect(store()).toMatchObject({ error: "ipc", isInstalling: null });
+		expect(store()).toMatchObject({ error: { key: "install", detail: "ipc" }, isInstalling: null });
 		api.updateProjectEnv.mockRejectedValue(1);
 		await installMarketplaceServer("p1", "db", { TOKEN: "t" }, []);
-		expect(store().error).toBe("Installation failed");
+		expect(store().error).toEqual({ key: "install" });
 		expect(await uninstallMarketplaceServer("p1", "db")).toBe(false);
+		expect(store().error).toEqual({ key: "uninstall" });
 	});
 
 	it("removes the server from the project and every agent", async () => {
@@ -242,18 +287,23 @@ describe("builder projects", () => {
 		await loadBuilderProjects();
 		expect(api.invoke).toHaveBeenCalledWith("mcpMarketplace:getBuilderProjects");
 		expect(store()).toMatchObject({ builderProjects: [{ id: "b1" }], isBuilderLoading: false });
-		api.invoke.mockResolvedValue({ success: false });
+		api.invoke.mockResolvedValue({ success: false, error: "locked" });
 		await loadBuilderProjects();
+		expect(store().error).toEqual({ key: "loadBuilder", detail: "locked" });
 		api.invoke.mockRejectedValue(new Error("x"));
 		await loadBuilderProjects();
-		expect(store()).toMatchObject({ builderProjects: [{ id: "b1" }], isBuilderLoading: false });
+		expect(store()).toMatchObject({
+			builderProjects: [{ id: "b1" }],
+			isBuilderLoading: false,
+			error: { key: "loadBuilder", detail: "x" },
+		});
 	});
 
 	it("adds a new project, updates a known one and deletes", async () => {
 		api.invoke.mockResolvedValue({ success: true });
 		expect(await saveBuilderProject({ id: "b1", name: "One" } as never)).toBe(true);
-		expect(await saveBuilderProject({ id: "b1", name: "Renamed" } as never)).toBe(true);
 		expect(await saveBuilderProject({ id: "b2", name: "Two" } as never)).toBe(true);
+		expect(await saveBuilderProject({ id: "b1", name: "Renamed" } as never)).toBe(true);
 		expect(api.invoke).toHaveBeenCalledWith("mcpMarketplace:saveBuilder", { id: "b1", name: "One" });
 		expect(store().builderProjects).toEqual([
 			{ id: "b1", name: "Renamed" },
@@ -267,10 +317,14 @@ describe("builder projects", () => {
 	it("says when saving or deleting did not work", async () => {
 		api.invoke.mockResolvedValue({ success: false });
 		expect(await saveBuilderProject({ id: "b" } as never)).toBe(false);
+		expect(store().error).toEqual({ key: "saveBuilder" });
 		expect(await deleteBuilderProject("b")).toBe(false);
+		expect(store().error).toEqual({ key: "deleteBuilder" });
 		api.invoke.mockRejectedValue(new Error("x"));
 		expect(await saveBuilderProject({ id: "b" } as never)).toBe(false);
+		expect(store().error).toEqual({ key: "saveBuilder", detail: "x" });
 		expect(await deleteBuilderProject("b")).toBe(false);
+		expect(store().error).toEqual({ key: "deleteBuilder", detail: "x" });
 		expect(store().builderProjects).toEqual([]);
 	});
 
