@@ -19,6 +19,8 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from foundation.platform import is_macos
+
 from .stacks import ANDROID, IOS, MobilePlatform, MobileStack, detect_stack
 from .toolchain import android_sdk_root, find_tool
 
@@ -64,14 +66,7 @@ class PlatformReport:
 
 
 def _is_macos() -> bool:
-    try:
-        from foundation.platform import is_macos
-
-        return bool(is_macos())
-    except Exception:  # noqa: BLE001
-        import platform as _platform
-
-        return _platform.system().lower() == "darwin"
+    return bool(is_macos())
 
 
 def _check(tool: str, remedy: str, *, required: bool = True) -> ToolCheck:
