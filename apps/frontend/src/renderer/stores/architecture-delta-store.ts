@@ -65,6 +65,30 @@ function patch(taskId: string, changes: Partial<Entry>): void {
 	}));
 }
 
+/**
+ * Resolve the artifact of a delta that has one and show it on the task,
+ * unless the task moved on while the URL was being resolved: closed, or given
+ * another status by a newer load or run. Only a mapped delta with something
+ * to show has an artifact; every other state renders text or nothing, so an
+ * older artifact is dropped rather than left behind.
+ */
+async function showArtifact(
+	taskId: string,
+	status: ArchitectureDeltaStatus | null,
+): Promise<void> {
+	let artifactUrl: string | null = null;
+	if (status?.status === "mapped" && status.hasChanges && status.artifact) {
+		const resolved = await window.electronAPI.resolveArchitectureArtifact(
+			status.artifact,
+		);
+		artifactUrl = resolved.success ? (resolved.data?.url ?? null) : null;
+	}
+	if (useArchitectureDeltaStore.getState().byTask[taskId]?.status !== status) {
+		return;
+	}
+	patch(taskId, { artifactUrl });
+}
+
 export const useArchitectureDeltaStore = create<ArchitectureDeltaState>(
 	(set) => ({
 		byTask: {},
@@ -90,18 +114,7 @@ export const useArchitectureDeltaStore = create<ArchitectureDeltaState>(
 			const status = result.data ?? null;
 			patch(taskId, { loading: false, status, error: null });
 
-			// Only a mapped delta with something to show has an artifact worth
-			// resolving; every other state renders text or nothing.
-			if (status?.status === "mapped" && status.hasChanges && status.artifact) {
-				const resolved = await window.electronAPI.resolveArchitectureArtifact(
-					status.artifact,
-				);
-				patch(taskId, {
-					artifactUrl: resolved.success ? (resolved.data?.url ?? null) : null,
-				});
-			} else {
-				patch(taskId, { artifactUrl: null });
-			}
+			await showArtifact(taskId, status);
 		},
 
 		regenerate: async ({
@@ -161,14 +174,7 @@ export function setupArchitectureDeltaListeners(): () => void {
 			runningTaskId = null;
 			patch(taskId, { running: false, status, error: null });
 
-			if (status.status === "mapped" && status.hasChanges && status.artifact) {
-				const resolved = await window.electronAPI.resolveArchitectureArtifact(
-					status.artifact,
-				);
-				patch(taskId, {
-					artifactUrl: resolved.success ? (resolved.data?.url ?? null) : null,
-				});
-			}
+			await showArtifact(taskId, status);
 		},
 	);
 

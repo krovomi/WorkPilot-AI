@@ -9,7 +9,10 @@ interface Props {
 	readonly creatingItemId?: string | null;
 }
 
-/** The debt items as charter cards: kind, location, message, cost / effort / ROI. */
+/**
+ * The debt items as charter cards: kind, location, message, cost / effort / ROI.
+ * One task is created at a time: every button waits while one is.
+ */
 export function DebtItemsTable({ items, onCreateTask, creatingItemId }: Props) {
 	const { t } = useTranslation(["techDebt", "common"]);
 	if (!items.length) {
@@ -38,7 +41,7 @@ export function DebtItemsTable({ items, onCreateTask, creatingItemId }: Props) {
 							<CharterButton
 								size="sm"
 								icon={ListPlus}
-								disabled={creatingItemId === item.id}
+								disabled={creatingItemId != null}
 								onClick={() => onCreateTask(item)}
 							>
 								{creatingItemId === item.id
