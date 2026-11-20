@@ -90,10 +90,23 @@ export interface MissionControlSession {
 	elapsed_seconds: number;
 }
 
+/** What the backend logs (`mission_control/orchestrator.py`, `_log_event`). */
+export type MissionControlEventType =
+	| "agent_created"
+	| "agent_removed"
+	| "agent_started"
+	| "agent_paused"
+	| "agent_resumed"
+	| "agent_stopped"
+	| "agent_config_updated"
+	| "agent_completed"
+	| "agent_failed";
+
 export interface MissionControlEvent {
-	type: string;
+	type: MissionControlEventType;
 	timestamp: number;
-	data: Record<string, unknown>;
+	/** Every event names its agent; a start carries its task, a failure its error. */
+	data: { agent_id: string; task?: string; error?: string } & Record<string, unknown>;
 }
 
 export interface MissionControlState {

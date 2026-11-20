@@ -17,19 +17,16 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useState } from "react";
-import { cn } from "../../lib/utils";
-import type {
-	DecisionNode,
-	DecisionTree,
-} from "../../stores/mission-control-store";
-import { ScrollArea } from "../ui/scroll-area";
 import { useTranslation } from "react-i18next";
+import { cn } from "../../lib/utils";
+import type { DecisionNode, DecisionTree } from "../../stores/mission-control-store";
+import { ScrollArea } from "../ui/scroll-area";
 
 interface DecisionTreeViewerProps {
 	readonly tree: DecisionTree;
 }
 
-const NODE_ICONS: Record<string, React.ElementType> = {
+const NODE_ICONS: Record<DecisionNode["node_type"], React.ElementType> = {
 	root: GitBranch,
 	thinking: Brain,
 	tool_call: Wrench,
@@ -39,7 +36,7 @@ const NODE_ICONS: Record<string, React.ElementType> = {
 	branch: GitBranch,
 };
 
-const NODE_COLORS: Record<string, string> = {
+const NODE_COLORS: Record<DecisionNode["node_type"], string> = {
 	root: "text-primary border-primary/30 bg-primary/5",
 	thinking: "text-purple-500 border-purple-500/30 bg-purple-500/5",
 	tool_call: "text-blue-500 border-blue-500/30 bg-blue-500/5",
@@ -49,10 +46,7 @@ const NODE_COLORS: Record<string, string> = {
 	branch: "text-cyan-500 border-cyan-500/30 bg-cyan-500/5",
 };
 
-const STATUS_INDICATORS: Record<
-	string,
-	{ icon: React.ElementType; color: string }
-> = {
+const STATUS_INDICATORS: Record<DecisionNode["status"], { icon: React.ElementType; color: string }> = {
 	active: { icon: Circle, color: "text-blue-500 animate-pulse" },
 	completed: { icon: CheckCircle2, color: "text-success" },
 	failed: { icon: XCircle, color: "text-destructive" },
@@ -61,7 +55,9 @@ const STATUS_INDICATORS: Record<
 
 export function DecisionTreeViewer({ tree }: DecisionTreeViewerProps) {
 	const { t } = useTranslation();
-	if (!tree.root_id || tree.node_count === 0) {
+	// A tree whose root is missing from its nodes has nothing to draw either.
+	const root = tree.root_id ? tree.nodes[tree.root_id] : undefined;
+	if (!root) {
 		return (
 			<div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
 				{t("missionControl:noDecisions")}
@@ -73,7 +69,7 @@ export function DecisionTreeViewer({ tree }: DecisionTreeViewerProps) {
 		<ScrollArea className="h-64">
 			<div className="space-y-0.5 pr-2">
 				<TreeNode
-					node={tree.nodes[tree.root_id]}
+					node={root}
 					allNodes={tree.nodes}
 					currentNodeId={tree.current_node_id}
 					depth={0}
@@ -92,9 +88,9 @@ interface TreeNodeProps {
 
 function TreeNode({ node, allNodes, currentNodeId, depth }: TreeNodeProps) {
 	const [expanded, setExpanded] = useState(true);
-	const Icon = NODE_ICONS[node.node_type] ?? Circle;
-	const colorClass = NODE_COLORS[node.node_type] ?? NODE_COLORS.root;
-	const statusInfo = STATUS_INDICATORS[node.status] ?? STATUS_INDICATORS.active;
+	const Icon = NODE_ICONS[node.node_type];
+	const colorClass = NODE_COLORS[node.node_type];
+	const statusInfo = STATUS_INDICATORS[node.status];
 	const StatusIcon = statusInfo.icon;
 	const isCurrent = node.id === currentNodeId;
 	const hasChildren = node.children.length > 0;
@@ -122,12 +118,9 @@ function TreeNode({ node, allNodes, currentNodeId, depth }: TreeNodeProps) {
 					isCurrent && "bg-primary/5 ring-1 ring-primary/20",
 				)}
 				style={{ paddingLeft: `${depth * 16 + 4}px` }}
+				aria-expanded={hasChildren ? expanded : undefined}
+				// A button already clicks on Enter and Space: a key handler of its own toggled twice.
 				onClick={() => hasChildren && setExpanded(!expanded)}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						hasChildren && setExpanded(!expanded);
-					}
-				}}
 			>
 				{/* Expand/collapse toggle */}
 				<span className="w-3.5 h-3.5 shrink-0 flex items-center justify-center mt-0.5">

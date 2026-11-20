@@ -86,6 +86,17 @@ class ApiExchange:
 # Cleaning: routes, headers, secrets
 # ---------------------------------------------------------------------------
 
+
+def _as_list(value) -> list:
+    """A list from somebody else's file, or none: a collection edited by hand
+    holds a string or a number where a list was, and that reads as nothing."""
+    return value if isinstance(value, list) else []
+
+
+def _as_dict(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
 _VARIABLE_HOST = re.compile(r"^\{\{[^}]+\}\}")
 
 
@@ -188,7 +199,7 @@ def _postman_url(url) -> str:
 
 def _postman_items(items, source: str) -> list[ApiExchange]:
     out: list[ApiExchange] = []
-    for item in items or []:
+    for item in _as_list(items):
         if not isinstance(item, dict):
             continue
         if isinstance(item.get("item"), list):
@@ -201,19 +212,18 @@ def _postman_items(items, source: str) -> list[ApiExchange]:
             continue
         headers = {
             str(h.get("key", "")): str(h.get("value", ""))
-            for h in request.get("header") or []
+            for h in _as_list(request.get("header"))
             if isinstance(h, dict) and not h.get("disabled")
         }
         body = request.get("body") or {}
         raw = body.get("raw", "") if isinstance(body, dict) else ""
         status = None
-        for response in item.get("response") or []:
+        for response in _as_list(item.get("response")):
             if isinstance(response, dict) and str(response.get("code", "")).isdigit():
                 status = int(response["code"])
                 break
-        for event in item.get("event") or []:
-            script = (event or {}).get("script") or {}
-            exec_ = script.get("exec") if isinstance(script, dict) else None
+        for event in _as_list(item.get("event")):
+            exec_ = _as_dict(_as_dict(event).get("script")).get("exec")
             source_text = (
                 "\n".join(exec_) if isinstance(exec_, list) else str(exec_ or "")
             )
@@ -299,33 +309,30 @@ def parse_openapi(document: dict, source: str) -> list[ApiExchange]:
         if not isinstance(operations, dict):
             continue
         route = f"{base}/{str(route).lstrip('/')}" if base else route
-        shared = operations.get("parameters") or []
+        shared = _as_list(operations.get("parameters"))
         for method, operation in operations.items():
             if method.upper() not in METHODS or not isinstance(operation, dict):
                 continue
-            responses = operation.get("responses") or {}
+            responses = _as_dict(operation.get("responses"))
             codes = sorted(str(c) for c in responses if str(c).isdigit())
             success = next(
                 (c for c in codes if c.startswith("2")), codes[0] if codes else ""
             )
             headers: dict[str, str] = {}
             body = ""
-            for parameter in [*shared, *(operation.get("parameters") or [])]:
+            for parameter in [*shared, *_as_list(operation.get("parameters"))]:
                 if not isinstance(parameter, dict):
                     continue
                 if parameter.get("in") == "header" and parameter.get("required"):
-                    example = parameter.get("example") or (
-                        parameter.get("schema") or {}
+                    example = parameter.get("example") or _as_dict(
+                        parameter.get("schema")
                     ).get("example")
                     headers[str(parameter.get("name", ""))] = str(
                         example or f"<{parameter.get('name')}>"
                     )
                 elif parameter.get("in") == "body":
                     body = _example(parameter)
-            request_body = operation.get("requestBody") or {}
-            content = (
-                request_body.get("content") if isinstance(request_body, dict) else None
-            )
+            content = _as_dict(operation.get("requestBody")).get("content")
             if isinstance(content, dict):
                 media = content.get("application/json") or next(
                     iter(content.values()), {}
@@ -381,7 +388,7 @@ def parse_http_file(text: str, source: str) -> list[ApiExchange]:
                 headers[m["name"]] = m["value"]
             index += 1
         body = "\n".join(lines[index:]).strip()
-        if exchange := _exchange(
+        exchange = _exchange(
             request["method"],
             request["url"],
             headers,
@@ -390,15 +397,53 @@ def parse_http_file(text: str, source: str) -> list[ApiExchange]:
             name="",
             origin="http-file",
             source=source,
-        ):
-            out.append(exchange)
+        )
+        # `_REQUEST_LINE` only matches a known method followed by a URL.
+        assert exchange is not None
+        out.append(exchange)
     return out
 
 
 _CURL_DATA = ("-d", "--data", "--data-raw", "--data-binary", "--data-ascii", "--json")
-#: Options that take a value; every other option is a flag.
-_CURL_VALUED = {"-X", "--request", "-H", "--header", "--url", *_CURL_DATA}
-_CURL_SHORT_VALUED = ("-X", "-H", "-d")
+#: Credentials curl takes as options, read as the header they become, so the
+#: header is masked like any other credential instead of taken for the URL.
+_CURL_CREDENTIALS = {
+    "-u": "Authorization",
+    "--user": "Authorization",
+    "-b": "Cookie",
+    "--cookie": "Cookie",
+}
+#: Options that take a value; every other option is a flag. One missing here
+#: has its value read as the URL: `-o out.json` would name the route.
+_CURL_VALUED = {
+    "-X",
+    "--request",
+    "-H",
+    "--header",
+    "--url",
+    *_CURL_DATA,
+    *_CURL_CREDENTIALS,
+    "-o",
+    "--output",
+    "-A",
+    "--user-agent",
+    "-e",
+    "--referer",
+    "-w",
+    "--write-out",
+    "-m",
+    "--max-time",
+    "--connect-timeout",
+    "-x",
+    "--proxy",
+    "-c",
+    "--cookie-jar",
+    "-F",
+    "--form",
+    "-T",
+    "--upload-file",
+}
+_CURL_SHORT_VALUED = tuple(o for o in _CURL_VALUED if len(o) == 2)
 
 
 def _curl_option(argv: list[str], index: int) -> tuple[str, str, int]:
@@ -446,6 +491,8 @@ def parse_curl(text: str, source: str) -> list[ApiExchange]:
             elif arg in ("-H", "--header"):
                 name, _, val = value.partition(":")
                 headers[name.strip()] = val.strip()
+            elif arg in _CURL_CREDENTIALS:
+                headers[_CURL_CREDENTIALS[arg]] = value
             elif arg in _CURL_DATA:
                 body = value
                 if arg == "--json":
