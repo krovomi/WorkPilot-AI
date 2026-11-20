@@ -45,10 +45,17 @@ def origin():
 
 
 def _settled(proxy: FilteringProxy) -> None:
-    """Wait until the proxy has finished every connection it was handling."""
+    """Wait until the proxy has finished every connection it was handling.
+
+    Only the connection handlers count: on Windows the proactor keeps a task
+    of its own pending on every listening socket (its `accept`), forever.
+    """
 
     async def others() -> int:
-        return len(asyncio.all_tasks()) - 1
+        return sum(
+            getattr(task.get_coro(), "__qualname__", "") == "FilteringProxy._handle"
+            for task in asyncio.all_tasks()
+        )
 
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
