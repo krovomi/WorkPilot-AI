@@ -69,4 +69,8 @@ describe("setup wizard paths", () => {
 		expect(neighbourStep("claude", "welcome", -1)).toBe("welcome");
 		expect(neighbourStep("claude", "completion", 1)).toBe("completion");
 	});
+
+	it("stays on a step that is not on the path", () => {
+		expect(neighbourStep("other", "oauth", 1)).toBe("oauth");
+	});
 });
