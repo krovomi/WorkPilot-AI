@@ -39,16 +39,18 @@ def labelled_by(login: str, label: str = "auto-fix") -> dict:
 
 
 MAINTAINER = {
-    "api /repos/own/repo/issues/5/events": labelled_by("ann"),
-    "api /repos/own/repo/collaborators/ann/permission": {
+    "api --method GET /repos/own/repo/issues/5/events": labelled_by("ann"),
+    "api --method GET /repos/own/repo/collaborators/ann/permission": {
         "stdout": json.dumps({"permission": "admin"})
     },
 }
 STRANGER = {
-    "api /repos/own/repo/issues/5/events": labelled_by("eve"),
-    "api /repos/own/repo/collaborators/eve/permission": {"code": 1},
-    "api /repos/own/repo": {"stdout": json.dumps({"owner": {"type": "User"}})},
-    "api /repos/own/repo/contributors": {"stdout": "[]"},
+    "api --method GET /repos/own/repo/issues/5/events": labelled_by("eve"),
+    "api --method GET /repos/own/repo/collaborators/eve/permission": {"code": 1},
+    "api --method GET /repos/own/repo": {
+        "stdout": json.dumps({"owner": {"type": "User"}})
+    },
+    "api --method GET /repos/own/repo/contributors": {"stdout": "[]"},
 }
 
 
@@ -262,9 +264,12 @@ def test_only_labels_a_maintainer_added_count(
     gh.answer(
         {
             **MAINTAINER,
-            "api /repos/own/repo/issues/8/events": labelled_by("eve"),
+            "api --method GET /repos/own/repo/issues/8/events": labelled_by("eve"),
             **{k: v for k, v in STRANGER.items() if "events" not in k},
-            "api /repos/own/repo/issues/7/events": {"stderr": "HTTP 500", "code": 1},
+            "api --method GET /repos/own/repo/issues/7/events": {
+                "stderr": "HTTP 500",
+                "code": 1,
+            },
         }
     )
     found = asyncio.run(

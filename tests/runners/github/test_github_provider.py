@@ -189,7 +189,15 @@ def test_closing_comments_first_then_closes(provider, gh):
     assert run(provider.close_issue(5, comment="Fixed")) is True
     assert run(provider.close_pr(7)) is True
     calls = gh.calls()
-    assert calls[0] == ["issue", "comment", "7", "--body", "Superseded"]
+    assert calls[0] == [
+        "issue",
+        "comment",
+        "7",
+        "--body",
+        "Superseded",
+        "-R",
+        "own/repo",
+    ]
     assert calls[1] == ["pr", "close", "7", "-R", "own/repo"]
     assert calls[3] == ["issue", "close", "5", "-R", "own/repo"]
 
@@ -301,8 +309,16 @@ def test_labels_are_applied_removed_created_and_listed(provider, gh):
     run(provider.create_label(LabelData(name="plain", color="ffffff")))
     labels = run(provider.list_labels())
     calls = gh.calls()
-    assert calls[0] == ["issue", "edit", "5", "--add-label", "bug"]
-    assert calls[1] == ["issue", "edit", "5", "--remove-label", "wontfix"]
+    assert calls[0] == ["issue", "edit", "5", "--add-label", "bug", "-R", "own/repo"]
+    assert calls[1] == [
+        "issue",
+        "edit",
+        "5",
+        "--remove-label",
+        "wontfix",
+        "-R",
+        "own/repo",
+    ]
     assert calls[2] == [
         "label",
         "create",
@@ -341,11 +357,13 @@ def test_a_comment_answers_no_id(provider, gh):
 def test_repository_facts_come_from_the_api(provider, gh):
     gh.answer(
         {
-            "api /repos/own/repo": {"stdout": json.dumps({"default_branch": "trunk"})},
-            "api /repos/own/repo/collaborators/ann/permission": {
+            "api --method GET /repos/own/repo": {
+                "stdout": json.dumps({"default_branch": "trunk"})
+            },
+            "api --method GET /repos/own/repo/collaborators/ann/permission": {
                 "stdout": json.dumps({"permission": "write"})
             },
-            "api /repos/own/repo/collaborators/eve/permission": {
+            "api --method GET /repos/own/repo/collaborators/eve/permission": {
                 "stderr": "HTTP 404",
                 "code": 1,
             },
@@ -354,14 +372,15 @@ def test_repository_facts_come_from_the_api(provider, gh):
     assert run(provider.get_default_branch()) == "trunk"
     assert run(provider.check_permissions("ann")) == "write"
     assert run(provider.check_permissions("eve")) == "none"
-    gh.answer({"api /repos/own/repo": {"stdout": "{}"}})
+    gh.answer({"api --method GET /repos/own/repo": {"stdout": "{}"}})
     assert run(provider.get_default_branch()) == "main"
 
 
 def test_api_get_passes_parameters(provider, gh):
-    gh.answer({"api /rate_limit": {"stdout": json.dumps({"ok": True})}})
+    gh.answer({"api --method GET /rate_limit": {"stdout": json.dumps({"ok": True})}})
     assert run(provider.api_get("/rate_limit", {"page": "2"})) == {"ok": True}
-    assert gh.calls()[0] == ["api", "/rate_limit", "-f", "page=2"]
+    # A GET, with the parameters in the query string, not a POST body
+    assert gh.calls()[0] == ["api", "--method", "GET", "/rate_limit", "-f", "page=2"]
 
 
 def test_api_post_sends_the_body_as_json(provider, gh, tmp_path):

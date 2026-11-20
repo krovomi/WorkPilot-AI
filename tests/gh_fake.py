@@ -33,16 +33,19 @@ from pathlib import Path
 __all__ = ["FakeGh", "write_fake_gh"]
 
 _PROGRAM = """
-import json, sys
+import json, os, sys, time
 from pathlib import Path
 here = Path(__file__).parent
 args = sys.argv[1:]
 with open(here / "gh-calls.jsonl", "a", encoding="utf-8") as log:
     log.write(json.dumps(args) + "\\n")
+with open(here / "gh-repos.jsonl", "a", encoding="utf-8") as log:
+    log.write(json.dumps(os.environ.get("GH_REPO")) + "\\n")
 answers = json.loads((here / "gh-answers.json").read_text(encoding="utf-8"))
 joined = " ".join(args)
 keys = sorted((k for k in answers if joined == k or joined.startswith(k + " ")), key=len)
 answer = answers[keys[-1]] if keys else {"stderr": "fake gh: no answer for " + joined, "code": 1}
+time.sleep(answer.get("sleep", 0))
 sys.stdout.write(answer.get("stdout", ""))
 sys.stderr.write(answer.get("stderr", ""))
 sys.exit(answer.get("code", 0))
@@ -62,6 +65,15 @@ class FakeGh:
             json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()
         ]
 
+    def repos(self) -> list[str | None]:
+        """The GH_REPO each call ran with, in the order of `calls()` (None: unset)."""
+        log = self.directory / "gh-repos.jsonl"
+        if not log.exists():
+            return []
+        return [
+            json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()
+        ]
+
     def answer(self, answers: dict[str, dict]) -> None:
         (self.directory / "gh-answers.json").write_text(
             json.dumps(answers), encoding="utf-8"
@@ -71,8 +83,9 @@ class FakeGh:
 def write_fake_gh(directory: Path, answers: dict[str, dict]) -> FakeGh:
     """Write an executable fake `gh` in `directory` and return it.
 
-    Each answer is ``{"stdout": str, "stderr": str, "code": int}`` (all
-    optional). A command without an answer fails with exit code 1.
+    Each answer is ``{"stdout": str, "stderr": str, "code": int, "sleep": float}``
+    (all optional; ``sleep`` makes the call hang that many seconds before it
+    answers). A command without an answer fails with exit code 1.
     """
     directory.mkdir(parents=True, exist_ok=True)
     program = directory / "fake_gh.py"

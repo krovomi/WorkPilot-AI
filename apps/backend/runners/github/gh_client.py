@@ -14,8 +14,10 @@ This eliminates the risk of indefinite hangs in GitHub automation workflows.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import UTC
 from pathlib import Path
@@ -138,6 +140,9 @@ class GHClient:
                 "GitHub CLI (gh) not found. Install from https://cli.github.com/"
             )
         cmd = [gh_exec] + args
+        # `-R` only reaches the subcommands that take it: `gh api` resolves its
+        # `{owner}/{repo}` placeholders from GH_REPO, or else from the cwd's remote.
+        env = {**os.environ, "GH_REPO": self.repo} if self.repo else None
         start_time = asyncio.get_event_loop().time()
 
         # Pre-flight rate limit check
@@ -162,6 +167,7 @@ class GHClient:
                 proc = await asyncio.create_subprocess_exec(
                     *cmd,
                     cwd=self.project_dir,
+                    env=env,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -172,12 +178,10 @@ class GHClient:
                         proc.communicate(), timeout=timeout
                     )
                 except TimeoutError:
-                    # Kill the hung process
-                    try:
+                    # Kill the hung process (it may have exited in the meantime)
+                    with contextlib.suppress(ProcessLookupError):
                         proc.kill()
-                        await proc.wait()
-                    except Exception as e:
-                        logger.warning(f"Failed to kill hung process: {e}")
+                    await proc.wait()
 
                     # Calculate backoff delay
                     backoff_delay = 2 ** (attempt - 1)
@@ -477,6 +481,7 @@ class GHClient:
             "--json",
             ",".join(json_fields),
         ]
+        args = self._add_repo_flag(args)
 
         result = await self.run(args)
         return json.loads(result.stdout)
@@ -514,6 +519,7 @@ class GHClient:
             "--json",
             ",".join(json_fields),
         ]
+        args = self._add_repo_flag(args)
 
         result = await self.run(args)
         return json.loads(result.stdout)
@@ -527,7 +533,7 @@ class GHClient:
             body: Comment body
         """
         args = ["issue", "comment", str(issue_number), "--body", body]
-        await self.run(args)
+        await self.run(self._add_repo_flag(args))
 
     async def issue_add_labels(self, issue_number: int, labels: list[str]) -> None:
         """
@@ -547,7 +553,7 @@ class GHClient:
             "--add-label",
             ",".join(labels),
         ]
-        await self.run(args)
+        await self.run(self._add_repo_flag(args))
 
     async def issue_remove_labels(self, issue_number: int, labels: list[str]) -> None:
         """
@@ -568,7 +574,7 @@ class GHClient:
             ",".join(labels),
         ]
         # Don't raise on error - labels might not exist
-        await self.run(args, raise_on_error=False)
+        await self.run(self._add_repo_flag(args), raise_on_error=False)
 
     async def api_get(self, endpoint: str, params: dict[str, str] | None = None) -> Any:
         """
@@ -581,7 +587,9 @@ class GHClient:
         Returns:
             JSON response
         """
-        args = ["api", endpoint]
+        # Explicit GET: with fields and no --method, gh sends a POST and puts
+        # the fields in its body; with GET they go to the query string.
+        args = ["api", "--method", "GET", endpoint]
 
         if params:
             for key, value in params.items():
@@ -655,14 +663,10 @@ class GHClient:
 
         # Use gh api to add assignees
         endpoint = f"/repos/{{owner}}/{{repo}}/issues/{pr_number}/assignees"
-        args = [
-            "api",
-            endpoint,
-            "-X",
-            "POST",
-            "-f",
-            f"assignees={','.join(assignees)}",
-        ]
+        # The API takes an array: one `assignees[]` field per login.
+        args = ["api", endpoint, "-X", "POST"]
+        for login in assignees:
+            args.extend(["-f", f"assignees[]={login}"])
         await self.run(args)
 
     async def compare_commits(self, base_sha: str, head_sha: str) -> dict[str, Any]:

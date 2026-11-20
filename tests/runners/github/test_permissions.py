@@ -448,14 +448,19 @@ ORG_REPO = {
 async def test_an_org_the_token_cannot_read_only_limits_team_checks(
     gh, tmp_path, caplog
 ):
-    gh.answer({"api /repos/own/repo": ORG_REPO, "api /orgs/own": {"code": 1}})
+    gh.answer(
+        {
+            "api --method GET /repos/own/repo": ORG_REPO,
+            "api --method GET /orgs/own": {"code": 1},
+        }
+    )
     await _checker(tmp_path).verify_token_scopes()
     assert "Consider adding 'read:org' scope" in caplog.text
 
 
 @pytest.mark.asyncio
 async def test_a_repository_gh_cannot_reach_fails_the_token_check(gh, tmp_path):
-    gh.answer({"api /repos/own/repo": {"stderr": "HTTP 404", "code": 1}})
+    gh.answer({"api --method GET /repos/own/repo": {"stderr": "HTTP 404", "code": 1}})
     with pytest.raises(PermissionError, match="Could not verify token permissions"):
         await _checker(tmp_path).verify_token_scopes()
 
@@ -464,7 +469,7 @@ async def test_a_repository_gh_cannot_reach_fails_the_token_check(gh, tmp_path):
 async def test_a_label_event_without_an_actor_proves_nothing(gh, tmp_path):
     gh.answer(
         {
-            "api /repos/own/repo/issues/3/events": {
+            "api --method GET /repos/own/repo/issues/3/events": {
                 "stdout": '[{"event": "labeled", "label": {"name": "auto-fix"}}]'
             }
         }
@@ -477,11 +482,11 @@ async def test_a_label_event_without_an_actor_proves_nothing(gh, tmp_path):
 async def test_read_access_and_failed_lookups_leave_no_role(gh, tmp_path):
     gh.answer(
         {
-            "api /repos/own/repo/collaborators/eve/permission": {
+            "api --method GET /repos/own/repo/collaborators/eve/permission": {
                 "stdout": '{"permission": "read"}'
             },
-            "api /repos/own/repo": {"code": 1},
-            "api /repos/own/repo/contributors": {"code": 1},
+            "api --method GET /repos/own/repo": {"code": 1},
+            "api --method GET /repos/own/repo/contributors": {"code": 1},
         }
     )
     assert await _checker(tmp_path).get_user_role("eve") == "NONE"
@@ -491,10 +496,14 @@ async def test_read_access_and_failed_lookups_leave_no_role(gh, tmp_path):
 async def test_someone_outside_the_org_is_judged_by_contributions(gh, tmp_path):
     gh.answer(
         {
-            "api /repos/own/repo/collaborators/eve/permission": {"code": 1},
-            "api /repos/own/repo": ORG_REPO,
-            "api /orgs/own/members/eve": {"code": 1},
-            "api /repos/own/repo/contributors": {"stdout": '[{"login": "eve"}]'},
+            "api --method GET /repos/own/repo/collaborators/eve/permission": {
+                "code": 1
+            },
+            "api --method GET /repos/own/repo": ORG_REPO,
+            "api --method GET /orgs/own/members/eve": {"code": 1},
+            "api --method GET /repos/own/repo/contributors": {
+                "stdout": '[{"login": "eve"}]'
+            },
         }
     )
     assert await _checker(tmp_path).get_user_role("eve") == "CONTRIBUTOR"
@@ -511,7 +520,7 @@ async def test_a_user_github_did_not_name_has_no_permission(
 
 @pytest.mark.asyncio
 async def test_org_membership_is_unknown_when_the_repository_is(gh, tmp_path):
-    gh.answer({"api /repos/own/repo": {"code": 1}})
+    gh.answer({"api --method GET /repos/own/repo": {"code": 1}})
     assert await _checker(tmp_path).check_org_membership("eve") is False
 
 

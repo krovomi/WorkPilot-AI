@@ -30,13 +30,17 @@ GH_VERSION = {"--version": {"stdout": "gh version 2.80.0\n"}}
 def gh(tmp_path, monkeypatch):
     """A fake `gh` the backend finds first (tests/gh_fake.py).
 
-    It always passes the CLI check (`gh --version`), and `calls()` leaves that
-    check out, so a test sees only the commands the code under test sent.
+    It always passes the CLI check (`gh --version`), and `calls()` (with
+    `repos()`, the GH_REPO of each call) leaves that check out, so a test sees
+    only the commands the code under test sent.
     """
     fake = write_fake_gh(tmp_path / "gh", GH_VERSION)
-    answer, calls = fake.answer, fake.calls
+    answer, calls, repos = fake.answer, fake.calls, fake.repos
     fake.answer = lambda answers: answer({**GH_VERSION, **answers})
     fake.calls = lambda: [c for c in calls() if c != ["--version"]]
+    fake.repos = lambda: [
+        r for c, r in zip(calls(), repos(), strict=True) if c != ["--version"]
+    ]
     monkeypatch.setenv("GITHUB_CLI_PATH", str(fake.path))
     import core.gh_executable as gh_executable
 
