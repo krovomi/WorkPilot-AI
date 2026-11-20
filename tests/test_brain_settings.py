@@ -327,6 +327,15 @@ def test_instruction_paths_cannot_leave_the_brain(client, home):
         ("fatal: could not read Username for 'https://github.com'", "auth"),
         ("remote: Repository not found.", "not-found"),
         (
+            "fatal: unable to access 'https://x/': "
+            "The requested URL returned error: 403",
+            "auth",
+        ),
+        ("remote: HTTP 403 Forbidden", "auth"),
+        # The quoted path is a name, not a reason: pytest numbers its folders.
+        ("fatal: repository '/tmp/pytest-403/missing.git' does not exist", "not-found"),
+        ("fatal: repository '/srv/permission denied/x' does not exist", "not-found"),
+        (
             "fatal: 'C:/Users/x/missing.git' does not appear to be a git repository",
             "not-found",
         ),
