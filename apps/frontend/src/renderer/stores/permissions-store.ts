@@ -33,7 +33,9 @@ interface PermissionsState {
 	load: () => Promise<void>;
 	reset: () => void;
 	setUnrestricted: (value: boolean) => void;
-	switchOrg: (orgId: string) => Promise<{ ok: boolean; error?: string }>;
+	switchOrg: (
+		orgId: string,
+	) => Promise<{ ok: true } | { ok: false; error: string }>;
 	can: (permission: string) => boolean;
 	canAny: (...permissions: string[]) => boolean;
 }
