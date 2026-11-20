@@ -1,4 +1,5 @@
 {
+	"processExited": "Process exited with code {{code}}",
 	"expand": {
 		"expand": "Expand terminal",
 		"collapse": "Collapse terminal"
@@ -22,8 +23,6 @@
 		"createDescription": "Create an isolated workspace for this terminal. All work will happen in the worktree directory.",
 		"name": "Worktree Name",
 		"namePlaceholder": "my-feature",
-		"nameRequired": "Worktree name is required",
-		"nameInvalid": "Name must start and end with a letter or number",
 		"nameHelp": "Lowercase letters, numbers, dashes, and underscores (spaces become hyphens)",
 		"associateTask": "Link to Task",
 		"selectTask": "Select a task...",
@@ -43,6 +42,9 @@
 		"noResults": "No worktrees found",
 		"deleteTitle": "Delete Worktree?",
 		"deleteDescription": "This will permanently delete the worktree and its branch. Any uncommitted changes will be lost.",
+		"deleteDescriptionNoBranch": "This will permanently delete the worktree. Any uncommitted changes will be lost.",
+		"deleteFailed": "Could not delete the worktree {{name}}.",
+		"loadFailed": "Could not list the worktrees.",
 		"detached": "(detached)",
 		"remotePushFailed": "Remote Tracking Not Set Up",
 		"remotePushFailedDescription": "Worktree created but the branch could not be pushed to remote. You may need to run git push -u manually."
@@ -56,7 +58,18 @@
 		"available": "Available tasks",
 		"add": "Add new task",
 		"empty": "No tasks available",
-		"emptyHint": "Create tasks in the Kanban board"
+		"emptyHint": "Create tasks in the Kanban board",
+		"phases": {
+			"idle": "Ready",
+			"planning": "Planning",
+			"coding": "Coding",
+			"rate_limit_paused": "Rate limited",
+			"auth_failure_paused": "Auth required",
+			"qa_review": "QA review",
+			"qa_fixing": "Fixing",
+			"complete": "Complete",
+			"failed": "Failed"
+		}
 	},
 	"doubleClickToRename": "Double-click to rename"
 }

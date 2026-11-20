@@ -63,6 +63,14 @@ function canonical(provider: string): string {
 	return value;
 }
 
+/** A provider's entry in the matrix, whatever spelling the UI gives it. */
+export function capabilityOf(
+	capabilities: AgenticCapabilities,
+	provider: string,
+): AgenticCapability | undefined {
+	return capabilities[canonical(provider)];
+}
+
 export interface AgenticCapabilitiesState {
 	capabilities: AgenticCapabilities;
 	/** Faux uniquement quand la matrice dit explicitement « pas d'adaptateur ». */
@@ -95,18 +103,18 @@ export function useAgenticCapabilities(): AgenticCapabilitiesState {
 	return {
 		capabilities,
 		hasAdapter: (provider) =>
-			capabilities[canonical(provider)]?.hasAdapter !== false,
+			capabilityOf(capabilities, provider)?.hasAdapter !== false,
 		degradesTo: (provider) => {
-			const entry = capabilities[canonical(provider)];
+			const entry = capabilityOf(capabilities, provider);
 			if (!entry || entry.hasAdapter) return null;
 			return entry.degradesTo || "claude";
 		},
 		contextCompact: (provider) => {
-			const value = capabilities[canonical(provider)]?.contextCompact;
+			const value = capabilityOf(capabilities, provider)?.contextCompact;
 			return value === "native" || value === "emulated" ? value : null;
 		},
 		contextUsage: (provider) => {
-			const value = capabilities[canonical(provider)]?.contextUsage;
+			const value = capabilityOf(capabilities, provider)?.contextUsage;
 			return value === "exact" || value === "reported" || value === "estimated"
 				? value
 				: null;

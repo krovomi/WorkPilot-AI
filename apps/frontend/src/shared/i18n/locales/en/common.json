@@ -69,7 +69,9 @@
 		"hideTokenEntryAriaLabel": "Hide token entry",
 		"enterTokenManuallyAriaLabel": "Enter token manually",
 		"renameProfileAriaLabel": "Rename profile",
-		"deleteProfileAriaLabel": "Delete profile"
+		"deleteProfileAriaLabel": "Delete profile",
+		"showSecretAriaLabel": "Show the value",
+		"hideSecretAriaLabel": "Hide the value"
 	},
 	"diffViewer": {
 		"noContent": "No diff content available for this file",
@@ -752,6 +754,9 @@
 		"hasAuthenticatedAccount": "You have at least one authenticated Claude account. You can continue to the next step.",
 		"authNotDetected": "Authentication not detected. Please complete /login in the terminal first.",
 		"noProfileSelected": "No profile selected for verification",
+		"profilesLoadFailed": "Could not read the Claude profiles",
+		"terminalOpenFailed": "Could not open the sign-in terminal",
+		"verifyFailed": "Could not check the sign-in",
 		"alerts": {
 			"profileCreatedAuthFailed": "Profile created, but failed to start authentication: {{error}}",
 			"authPrepareFailed": "Failed to prepare authentication: {{error}}",
@@ -1000,7 +1005,10 @@
 			"optional": "Optional",
 			"agents": "Agents that use it",
 			"agentsHint": "You can change this later in Agent Tools.",
-			"noAgent": "Pick at least one agent."
+			"noAgent": "Pick at least one agent.",
+			"showValue": "Show the value",
+			"hideValue": "Hide the value",
+			"openHelp": "Where to get {{name}}"
 		},
 		"installedTab": {
 			"empty": "No MCP server in this project",
@@ -1041,12 +1049,41 @@
 			"httpConfiguration": "HTTP Configuration",
 			"transformTemplate": "Transform Template",
 			"transformPlaceholder": "Template for transforming input data...",
-			"paramDescriptionPlaceholder": "Description"
+			"paramDescriptionPlaceholder": "Description",
+			"addTool": "Add a tool",
+			"removeParam": "Remove the parameter",
+			"paramName": "Parameter name",
+			"paramType": "Parameter type",
+			"paramDescription": "Parameter description",
+			"colorCode": "Color code",
+			"httpMethod": "HTTP method",
+			"httpPath": "Path",
+			"chain": "Chain",
+			"paramTypes": {
+				"string": "Text",
+				"number": "Number",
+				"boolean": "Yes / no",
+				"array": "List",
+				"object": "Object"
+			}
 		},
 		"officialOnly": "Official",
 		"official": "Official",
 		"community": "Community",
 		"noProject": "Select a project: servers are installed per project.",
+		"errors": {
+			"loadCatalog": "The catalog could not be loaded.",
+			"loadBuilder": "Your builder servers could not be loaded.",
+			"unknownServer": "{{name}} is not in the catalog.",
+			"missingValues": "Fill in: {{name}}.",
+			"alreadyInstalled": "{{name}} is already installed in this project.",
+			"readSettings": "The project settings could not be read: nothing was changed.",
+			"saveSettings": "The project settings could not be saved.",
+			"install": "The server could not be installed.",
+			"uninstall": "The server could not be removed.",
+			"saveBuilder": "The server could not be saved.",
+			"deleteBuilder": "The server could not be deleted."
+		},
 		"requires": {
 			"uv": "Needs uv (uvx) on this machine.",
 			"az": "Needs the Azure CLI, signed in with az login."
@@ -1068,6 +1105,7 @@
 			"title": "Security",
 			"checking": "Reading the registry and known vulnerabilities…",
 			"recheck": "Check again",
+			"readFailed": "The registry could not be read.",
 			"checkedAt": "Registry read {{date}}",
 			"unchecked": {
 				"remote": "Runs on its vendor's servers: nothing of it runs on this machine, and there is no package to check.",
@@ -1167,7 +1205,8 @@
 			"installing": "Installing...",
 			"uninstall": "Uninstall",
 			"enable": "Enable",
-			"disable": "Disable"
+			"disable": "Disable",
+			"uninstallNamed": "Uninstall {{name}}"
 		},
 		"sdk": {
 			"title": "Plugin SDK",
@@ -1238,14 +1277,26 @@
 			"openFolderFailed": "Could not open the plugin folder",
 			"done": "Done",
 			"namePlaceholder": "My Awesome Plugin",
-			"untitled": "Untitled"
+			"createFailed": "Could not create the plugin",
+			"copyFailed": "Could not copy the configuration",
+			"fieldIdInvalid": "Use lowercase letters, digits and single hyphens (my-plugin)",
+			"fieldTemplateContentPlaceholder": "# Spec template\n\n## Requirements\n...",
+			"configFile": "Written to plugin.config.json in the plugin folder"
 		},
 		"byAuthor": "by {{author}}",
 		"noProject": "Select a project: plugins are installed into a project's skills.",
 		"installedIn": "In {{paths}}",
 		"howToUse": "Run it with /{{id}} in the Kanban command bar, or let the agent pick it up.",
 		"showSkill": "Show the skill",
-		"hideSkill": "Hide the skill"
+		"hideSkill": "Hide the skill",
+		"sortBy": "Sort plugins",
+		"loading": "Loading plugins",
+		"errors": {
+			"loadCatalog": "Failed to load catalog",
+			"loadInstalled": "Could not read the plugins installed in this project",
+			"install": "Installation failed",
+			"uninstall": "Uninstall failed"
+		}
 	},
 	"chatHistory": {
 		"title": "Chat History",
@@ -1391,7 +1442,8 @@
 		"password": "Password",
 		"localAccountButton": "Sign in",
 		"localModeButton": "Local mode",
-		"haveInvite": "I have an invitation"
+		"haveInvite": "I have an invitation",
+		"failed": "Could not sign in"
 	},
 	"acceptInvite": {
 		"title": "Create your account",

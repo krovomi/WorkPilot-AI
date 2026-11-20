@@ -7,7 +7,7 @@ import {
 	RefreshCw,
 	Sparkles,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
@@ -34,17 +34,17 @@ export function ClaudeOAuthFlow({ onSuccess, onCancel }: ClaudeOAuthFlowProps) {
 		string | null
 	>(null);
 
-	// Track if we've already started auth to prevent double-execution
-	const hasStartedRef = useRef(false);
 	// Track the auto-advance timeout so we can cancel it on unmount/re-render
 	const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	const handleStartAuth = async () => {
-		if (hasStartedRef.current) {
-			return;
-		}
-		hasStartedRef.current = true;
+	useEffect(
+		() => () => {
+			if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+		},
+		[],
+	);
 
+	const handleStartAuth = async () => {
 		setStatus("authenticating");
 		setError(null);
 
@@ -53,7 +53,7 @@ export function ClaudeOAuthFlow({ onSuccess, onCancel }: ClaudeOAuthFlowProps) {
 			const profilesResult = await globalThis.electronAPI.getClaudeProfiles();
 
 			if (!profilesResult.success || !profilesResult.data) {
-				throw new Error("Failed to get Claude profiles");
+				throw new Error(t("oauth.profilesLoadFailed"));
 			}
 
 			const activeProfileId = profilesResult.data.activeProfileId;
@@ -63,17 +63,14 @@ export function ClaudeOAuthFlow({ onSuccess, onCancel }: ClaudeOAuthFlowProps) {
 				await globalThis.electronAPI.authenticateClaudeProfile(activeProfileId);
 
 			if (!result.success) {
-				throw new Error(
-					result.error || "Failed to open terminal for authentication",
-				);
+				throw new Error(result.error || t("oauth.terminalOpenFailed"));
 			}
 
 			setAuthenticatingProfileId(activeProfileId);
 		} catch (err) {
 			console.error("[ClaudeOAuth] Authentication failed:", err);
-			setError(err instanceof Error ? err.message : "Authentication failed");
+			setError(err instanceof Error ? err.message : t("oauth.authFailed"));
 			setStatus("error");
-			hasStartedRef.current = false;
 		}
 	};
 
@@ -106,13 +103,12 @@ export function ClaudeOAuthFlow({ onSuccess, onCancel }: ClaudeOAuthFlowProps) {
 			}
 		} catch (err) {
 			console.error("[ClaudeOAuth] Verification failed:", err);
-			setError(err instanceof Error ? err.message : "Verification failed");
+			setError(err instanceof Error ? err.message : t("oauth.verifyFailed"));
 			setStatus("authenticating");
 		}
 	};
 
 	const handleRetry = () => {
-		hasStartedRef.current = false;
 		setStatus("ready");
 		setError(null);
 		setAuthenticatingProfileId(null);
