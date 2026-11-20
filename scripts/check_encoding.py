@@ -237,6 +237,12 @@ class EncodingChecker:
         # positives outnumbered the real findings in `tests/`. Check 2 below
         # has always balanced properly; this one had not caught up.
         for match in re.finditer(r"(?<![a-zA-Z_\.])open\s*\(", scan):
+            # `def open(self, …)` declares a method of that name (a fake
+            # opener in a test): it opens nothing.
+            if re.search(
+                r"\bdef\s+$", scan[max(0, match.start() - 16) : match.start()]
+            ):
+                continue
             call = _call_source(
                 content, match.start(), content.index("(", match.start())
             )

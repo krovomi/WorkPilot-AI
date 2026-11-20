@@ -441,7 +441,11 @@ class TestEntraSignIn:
             ({"oid": None}, "id_token is missing the 'oid' claim"),
             (
                 {"preferred_username": None, "oid": "entra-object-2"},
-                "Entra id_token carries no usable email claim",
+                "Entra gave no verified email for this account",
+            ),
+            (
+                {"preferred_username": "not-an-address", "oid": "entra-object-2"},
+                "Entra gave no verified email for this account",
             ),
         ],
     )
@@ -449,6 +453,130 @@ class TestEntraSignIn:
         answer = await self.exchange(world, self.id_token(entra, **claims))
         assert answer.status_code == 401
         assert answer.json()["detail"] == detail
+
+    async def _accounts(self, email: str) -> int:
+        from server.db.engine import get_session_factory
+        from server.db.models import User
+        from sqlalchemy import func, select
+
+        async with get_session_factory()() as db:
+            return await db.scalar(
+                select(func.count()).select_from(User).where(User.email == email)
+            )
+
+    @pytest.mark.parametrize(
+        "claims",
+        [
+            {"idp": "https://sts.windows.net/another-tenant/"},
+            {"idp": "live.com"},
+            {"acct": 1},
+            {"acct": "1"},
+            {"preferred_username": None, "email": "viewer_a@example.com"},
+            {
+                "preferred_username": None,
+                "email": "viewer_a@example.com",
+                "xms_edov": False,
+            },
+        ],
+    )
+    async def test_an_address_entra_does_not_vouch_for_links_nothing(
+        self, world, entra, claims
+    ):
+        base = {"preferred_username": "viewer_a@example.com", "oid": "entra-guest"}
+        answer = await self.exchange(world, self.id_token(entra, **{**base, **claims}))
+        assert answer.status_code == 401
+        assert answer.json()["detail"] == (
+            "Entra gave no verified email for this account"
+        )
+
+    async def test_an_unvouched_address_creates_no_account(self, world, entra):
+        token = self.id_token(entra, idp="live.com", preferred_username="new@x.org")
+        answer = await self.exchange(world, token)
+        assert answer.status_code == 401
+        assert await self._accounts("new@x.org") == 0
+
+    @pytest.mark.parametrize("edov", [True, "true", "True"])
+    async def test_an_email_whose_domain_entra_verified_links(self, world, entra, edov):
+        token = self.id_token(
+            entra,
+            idp="https://sts.windows.net/another-tenant/",
+            preferred_username="someone@elsewhere.org",
+            email="Viewer_A@example.com",
+            xms_edov=edov,
+        )
+        answer = await self.exchange(world, token)
+        assert answer.status_code == 200, answer.text
+        assert answer.json()["user"]["id"] == world.users["viewer_a"]
+
+    async def test_a_member_whose_issuer_is_its_own_idp_is_a_member(self, world, entra):
+        token = self.id_token(
+            entra,
+            idp=f"https://login.microsoftonline.com/{self.TENANT}/v2.0",
+            xms_edov=True,  # no email claim: the member's name is used
+        )
+        answer = await self.exchange(world, token)
+        assert answer.status_code == 200, answer.text
+        assert answer.json()["user"]["email"] == "grace@example.com"
+
+    async def test_an_account_keeps_the_entra_sign_in_it_has(self, world, entra):
+        first = await self.exchange(world, self.id_token(entra))
+        assert first.status_code == 200, first.text
+        other = await self.exchange(world, self.id_token(entra, oid="entra-object-9"))
+        assert other.status_code == 401
+        assert other.json()["detail"] == (
+            "This account is linked to another Entra sign-in"
+        )
+        again = await self.exchange(
+            world, self.id_token(entra, idp="live.com", preferred_username="x@y.z")
+        )
+        assert again.status_code == 200, again.text
+        assert again.json()["user"]["id"] == first.json()["user"]["id"]
+
+    async def test_of_two_first_sign_ins_at_once_the_earliest_link_stays(
+        self, world, entra, monkeypatch
+    ):
+        from datetime import UTC, datetime
+
+        from server.auth import oidc
+        from server.db.engine import get_session_factory
+        from server.db.models import IdentityProvider, UserIdentity
+        from sqlalchemy import select
+
+        async with get_session_factory()() as db:
+            db.add(
+                UserIdentity(
+                    user_id=world.users["viewer_a"],
+                    provider=IdentityProvider.ENTRA.value,
+                    subject="entra-object-early",
+                    created_at=datetime(2020, 1, 1, tzinfo=UTC),
+                )
+            )
+            await db.commit()
+        real = oidc._first_entra_subject
+        calls = []
+
+        async def raced(db, user_id):
+            calls.append(user_id)
+            # The first look comes before the other sign-in's link is visible.
+            return None if len(calls) == 1 else await real(db, user_id)
+
+        monkeypatch.setattr(oidc, "_first_entra_subject", raced)
+        token = self.id_token(entra, preferred_username="viewer_a@example.com")
+        answer = await self.exchange(world, token)
+        assert answer.status_code == 401
+        assert answer.json()["detail"] == (
+            "This account is linked to another Entra sign-in"
+        )
+        async with get_session_factory()() as db:
+            subjects = (
+                await db.scalars(
+                    select(UserIdentity.subject).where(
+                        UserIdentity.user_id == world.users["viewer_a"],
+                        UserIdentity.provider == IdentityProvider.ENTRA.value,
+                    )
+                )
+            ).all()
+        assert subjects == ["entra-object-early"]
 
     async def test_a_token_signed_by_another_key_is_refused(self, world, entra):
         from cryptography.hazmat.primitives.asymmetric import rsa

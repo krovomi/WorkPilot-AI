@@ -325,6 +325,12 @@ def forget(
     }
 
 
+def _lifecycle(note: Note) -> dict[str, Any]:
+    """The note's ``lifecycle`` record; empty when a hand edit left another shape."""
+    info = note.meta.get("lifecycle")
+    return info if isinstance(info, dict) else {}
+
+
 def _trash_notes(root: Path, base: Path | str) -> Iterator[tuple[str, Note]]:
     try:
         top = inside(root, Path(base) / LIFECYCLE_DIR / "forgotten")
@@ -347,7 +353,7 @@ def trash(
     moment = _now(now)
     out = []
     for rel, note in _trash_notes(root, base):
-        info = note.meta.get("lifecycle") or {}
+        info = _lifecycle(note)
         until = _parse_ts(info.get("restore_until"))
         trash_id = _remainder(base, rel, "forgotten")
         out.append(
@@ -377,7 +383,7 @@ def purge_expired(root: Path, base: Path | str, *, now: datetime | None = None) 
     moment = _now(now)
     purged = 0
     for rel, note in list(_trash_notes(root, base)):
-        info = note.meta.get("lifecycle") or {}
+        info = _lifecycle(note)
         until = _parse_ts(info.get("restore_until"))
         if until is None or until > moment:
             continue
@@ -424,7 +430,7 @@ def restore(
         return {"ok": False, "code": "not-found"}
     moment = _now(now)
     note = read_note(root, trash_rel)
-    until = _parse_ts((note.meta.get("lifecycle") or {}).get("restore_until"))
+    until = _parse_ts(_lifecycle(note).get("restore_until"))
     if until is not None and until <= moment:
         return {"ok": False, "code": "expired"}
     if inside(root, live).exists():
@@ -511,6 +517,7 @@ def link_variants(root: Path, canonical: str, variants: list[str]) -> None:
         note = read_note(root, canonical)
     except (OSError, ValueError):
         return
-    known = [str(v) for v in note.meta.get("variants") or []]
+    listed = note.meta.get("variants")
+    known = [str(v) for v in listed] if isinstance(listed, list) else []
     note.meta["variants"] = list(dict.fromkeys([*known, *variants]))
     write_note(root, note)
