@@ -26,8 +26,11 @@ const LAST_SERVER_URL_KEY = "workpilot-last-server-url";
 
 export function ServerLoginScreen() {
 	const { t } = useTranslation();
-	const { serverUrl, loginLocal, loginEntra, loginSso, switchToLocalMode } =
-		useServerSessionStore();
+	const serverUrl = useServerSessionStore((s) => s.serverUrl);
+	const loginLocal = useServerSessionStore((s) => s.loginLocal);
+	const loginEntra = useServerSessionStore((s) => s.loginEntra);
+	const loginSso = useServerSessionStore((s) => s.loginSso);
+	const switchToLocalMode = useServerSessionStore((s) => s.switchToLocalMode);
 
 	const [view, setView] = useState<"login" | "invite">("login");
 
@@ -44,47 +47,78 @@ export function ServerLoginScreen() {
 
 	// Probe the server's auth config whenever the URL settles, so the UI
 	// only offers the methods the server actually supports.
+	// An answer for a URL the user has since changed is dropped, and a server
+	// that cannot be reached offers the local account only.
 	useEffect(() => {
-		if (!url.trim()) return;
+		const target = url.trim();
+		if (!target) return;
+		let current = true;
 		const handle = setTimeout(async () => {
-			const config = await window.electronAPI.serverAuth.getConfig(url.trim());
-			setEntraEnabled(config.ok ? config.data.entra_enabled : null);
-			setSsoName(
-				config.ok && config.data.sso_enabled ? config.data.sso_name || "SSO" : null,
-			);
+			let enabled: boolean | null = null;
+			let sso: string | null = null;
+			try {
+				const config = await window.electronAPI.serverAuth.getConfig(target);
+				if (config.ok) {
+					enabled = config.data.entra_enabled;
+					sso = config.data.sso_enabled ? config.data.sso_name || "SSO" : null;
+				}
+			} catch {
+				// unreachable server: same as an unknown configuration
+			}
+			if (current) {
+				setEntraEnabled(enabled);
+				setSsoName(sso);
+			}
 		}, 500);
-		return () => clearTimeout(handle);
+		return () => {
+			current = false;
+			clearTimeout(handle);
+		};
 	}, [url]);
+
+	// A refused or failed sign-in says why, in the app's language when the server gave no reason.
+	const signIn = useCallback(
+		async (method: "local" | "entra", run: () => Promise<{ ok: boolean; error?: string }>) => {
+			setError(null);
+			setBusy(method);
+			try {
+				const result = await run();
+				if (!result.ok) setError(result.error || t("serverLogin.failed"));
+			} catch (err) {
+				setError(err instanceof Error ? err.message : t("serverLogin.failed"));
+			} finally {
+				setBusy(null);
+			}
+		},
+		[t],
+	);
 
 	const rememberUrl = useCallback((value: string) => {
 		localStorage.setItem(LAST_SERVER_URL_KEY, value);
 	}, []);
 
-	const handleLocalLogin = useCallback(async () => {
-		setError(null);
-		setBusy("local");
-		try {
-			const trimmed = url.trim();
-			rememberUrl(trimmed);
-			const result = await loginLocal(trimmed, email.trim(), password);
-			if (!result.ok) setError(result.error || "Connexion impossible");
-		} finally {
-			setBusy(null);
-		}
-	}, [url, email, password, loginLocal, rememberUrl]);
+	const handleLocalLogin = useCallback(
+		() =>
+			signIn("local", () => {
+				const trimmed = url.trim();
+				rememberUrl(trimmed);
+				return loginLocal(trimmed, email.trim(), password);
+			}),
+		[signIn, url, email, password, loginLocal, rememberUrl],
+	);
 
-	const handleEntraLogin = useCallback(async () => {
-		setError(null);
-		setBusy("entra");
-		try {
-			const trimmed = url.trim();
-			rememberUrl(trimmed);
-			const result = await loginEntra(trimmed);
-			if (!result.ok) setError(result.error || "Connexion impossible");
-		} finally {
-			setBusy(null);
-		}
-	}, [url, loginEntra, rememberUrl]);
+	const handleEntraLogin = useCallback(
+		() =>
+			signIn("entra", () => {
+				const trimmed = url.trim();
+				rememberUrl(trimmed);
+				return loginEntra(trimmed);
+			}),
+		[signIn, url, loginEntra, rememberUrl],
+	);
+
+	// Enter in the password field follows the same rule as the button.
+	const canLogin = !!url.trim() && !!email.trim() && !!password && busy === null;
 
 	const handleSsoLogin = useCallback(async () => {
 		setError(null);
@@ -111,19 +145,16 @@ export function ServerLoginScreen() {
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<Server className="h-5 w-5" />
-						{t("serverLogin.title", "Connexion au serveur WorkPilot")}
+						{t("serverLogin.title")}
 					</CardTitle>
 					<CardDescription>
-						{t(
-							"serverLogin.description",
-							"Connectez-vous à un serveur partagé, ou continuez en mode local.",
-						)}
+						{t("serverLogin.description")}
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<div className="space-y-2">
 						<Label htmlFor="server-url">
-							{t("serverLogin.serverUrl", "URL du serveur")}
+							{t("serverLogin.serverUrl")}
 						</Label>
 						<Input
 							id="server-url"
@@ -144,7 +175,7 @@ export function ServerLoginScreen() {
 							{busy === "entra" ? (
 								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
 							) : null}
-							{t("serverLogin.entraButton", "Se connecter avec Microsoft")}
+							{t("serverLogin.entraButton")}
 						</Button>
 					)}
 
@@ -167,7 +198,7 @@ export function ServerLoginScreen() {
 
 					<div className="space-y-2">
 						<Label htmlFor="login-email">
-							{t("serverLogin.email", "Email")}
+							{t("serverLogin.email")}
 						</Label>
 						<Input
 							id="login-email"
@@ -176,7 +207,7 @@ export function ServerLoginScreen() {
 							onChange={(e) => setEmail(e.target.value)}
 						/>
 						<Label htmlFor="login-password">
-							{t("serverLogin.password", "Mot de passe")}
+							{t("serverLogin.password")}
 						</Label>
 						<Input
 							id="login-password"
@@ -184,7 +215,7 @@ export function ServerLoginScreen() {
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
 							onKeyDown={(e) => {
-								if (e.key === "Enter") void handleLocalLogin();
+								if (e.key === "Enter" && canLogin) void handleLocalLogin();
 							}}
 						/>
 					</div>
@@ -199,15 +230,13 @@ export function ServerLoginScreen() {
 						<Button
 							className="flex-1"
 							variant="secondary"
-							disabled={
-								!url.trim() || !email.trim() || !password || busy !== null
-							}
+							disabled={!canLogin}
 							onClick={handleLocalLogin}
 						>
 							{busy === "local" ? (
 								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
 							) : null}
-							{t("serverLogin.localAccountButton", "Connexion")}
+							{t("serverLogin.localAccountButton")}
 						</Button>
 						<Button
 							className="flex-1"
@@ -216,7 +245,7 @@ export function ServerLoginScreen() {
 							onClick={() => void switchToLocalMode()}
 						>
 							<Monitor className="mr-2 h-4 w-4" />
-							{t("serverLogin.localModeButton", "Mode local")}
+							{t("serverLogin.localModeButton")}
 						</Button>
 					</div>
 
@@ -229,7 +258,7 @@ export function ServerLoginScreen() {
 							setView("invite");
 						}}
 					>
-						{t("serverLogin.haveInvite", "J'ai une invitation")}
+						{t("serverLogin.haveInvite")}
 					</button>
 				</CardContent>
 			</Card>

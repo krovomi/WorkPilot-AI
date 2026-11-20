@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { saveAs } from "file-saver";
+import { useShallow } from "zustand/react/shallow";
 import type { GeneratedFile } from "@preload/api/modules/visual-programming-api";
 import { useVisualToCodeStore } from "../../stores/visual-to-code-store";
 import { Button } from "../ui/button";
@@ -41,7 +42,6 @@ export function GeneratedCodeDock() {
 	const {
 		phase,
 		error,
-		status,
 		streamedFiles,
 		writingFile,
 		codeResult,
@@ -49,16 +49,24 @@ export function GeneratedCodeDock() {
 		selectFile,
 		setDockOpen,
 		dockOpen,
-	} = useVisualToCodeStore();
+	} = useVisualToCodeStore(
+		useShallow((s) => ({
+			phase: s.phase,
+			error: s.error,
+			streamedFiles: s.streamedFiles,
+			writingFile: s.writingFile,
+			codeResult: s.codeResult,
+			selectedFile: s.selectedFile,
+			selectFile: s.selectFile,
+			setDockOpen: s.setDockOpen,
+			dockOpen: s.dockOpen,
+		})),
+	);
 
 	if (!dockOpen) return null;
 
 	const running = phase === "generating";
 	const current = streamedFiles[selectedFile];
-	// `status` is the backend's own English progress line; the filename is more
-	// useful than either when there is one, because it is the only signal that
-	// says the model is *producing* rather than merely running.
-	const progressLine = writingFile ?? status;
 
 	return (
 		<aside
@@ -78,13 +86,17 @@ export function GeneratedCodeDock() {
 					<p className="truncate text-sm font-medium">
 						{t("generatedCodeTitle", "Code généré par IA")}
 					</p>
-					{running && progressLine && (
+					{/* The filename is the only signal that says the model is
+					    *producing* rather than merely running. The backend's own
+					    progress line is English whatever the app's language, so
+					    it is not shown. */}
+					{running && (
 						<p className="truncate text-xs text-muted-foreground">
 							{writingFile
 								? t("dockWriting", "Écriture de {{file}}…", {
 										file: baseName(writingFile),
 									})
-								: progressLine}
+								: t("generating", "Génération…")}
 						</p>
 					)}
 					{!running && streamedFiles.length > 0 && (

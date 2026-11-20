@@ -69,7 +69,9 @@
 		"hideTokenEntryAriaLabel": "Hide token entry",
 		"enterTokenManuallyAriaLabel": "Enter token manually",
 		"renameProfileAriaLabel": "Rename profile",
-		"deleteProfileAriaLabel": "Delete profile"
+		"deleteProfileAriaLabel": "Delete profile",
+		"showSecretAriaLabel": "Show the value",
+		"hideSecretAriaLabel": "Hide the value"
 	},
 	"diffViewer": {
 		"noContent": "No diff content available for this file",
@@ -752,6 +754,9 @@
 		"hasAuthenticatedAccount": "You have at least one authenticated Claude account. You can continue to the next step.",
 		"authNotDetected": "Authentication not detected. Please complete /login in the terminal first.",
 		"noProfileSelected": "No profile selected for verification",
+		"profilesLoadFailed": "Could not read the Claude profiles",
+		"terminalOpenFailed": "Could not open the sign-in terminal",
+		"verifyFailed": "Could not check the sign-in",
 		"alerts": {
 			"profileCreatedAuthFailed": "Profile created, but failed to start authentication: {{error}}",
 			"authPrepareFailed": "Failed to prepare authentication: {{error}}",
@@ -1388,12 +1393,12 @@
 		"serverUrl": "Server URL",
 		"entraButton": "Sign in with Microsoft",
 		"ssoButton": "Sign in with {{name}}",
-		"failed": "Could not sign in",
 		"email": "Email",
 		"password": "Password",
 		"localAccountButton": "Sign in",
 		"localModeButton": "Local mode",
-		"haveInvite": "I have an invitation"
+		"haveInvite": "I have an invitation",
+		"failed": "Could not sign in"
 	},
 	"acceptInvite": {
 		"title": "Create your account",
