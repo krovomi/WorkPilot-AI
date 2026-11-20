@@ -62,7 +62,10 @@ def attachment_paths(spec_dir: Path) -> list[Path]:
         )
     except (OSError, ValueError):
         requirements = {}
-    for entry in requirements.get("attached_images") or []:
+    listed = (
+        requirements.get("attached_images") if isinstance(requirements, dict) else None
+    )
+    for entry in listed if isinstance(listed, list) else []:
         relative = entry.get("path") if isinstance(entry, dict) else None
         if not relative:
             continue
