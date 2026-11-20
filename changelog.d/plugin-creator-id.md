@@ -1,0 +1,5 @@
+---
+section: 🐛 Corrections
+---
+
+- **Créateur de plugins** : l'identifiant d'un nouveau plugin est revérifié par l'application avant que son dossier soit créé (minuscules, chiffres et tirets simples, 64 caractères au plus).
