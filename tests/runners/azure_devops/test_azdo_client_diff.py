@@ -1,191 +1,204 @@
-"""Tests for the improved `AzDOClient.get_pr_diff`.
+"""What an Azure DevOps PR review reads from Azure Repos, and the comment it can post.
 
-We don't hit Azure — we mock the underlying repos client. The point is
-to confirm that the rewritten diff path produces a real unified-diff
-output and falls back to a pseudo-diff on the documented failure modes.
+Azure DevOps has no unified-diff endpoint: `AzDOClient` rebuilds one from the
+PR's branches and the files of its latest iteration, and falls back to a
+per-file summary (path, change type, line counts) whenever it cannot read both
+sides of a file. The Azure Repos API is a scripted stand-in (conftest.py);
+the client, the shared connector and its models are the real ones.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
-from unittest.mock import MagicMock
+from pathlib import Path
 
 import pytest
 from runners.azure_devops.azdo_client import AzDOClient
 
 
-@dataclass
-class _FakePRFile:
-    path: str
-    change_type: str = "edit"
-    additions: int = 0
-    deletions: int = 0
+@pytest.fixture
+def client(tmp_path: Path, azure) -> AzDOClient:
+    return AzDOClient(
+        project_dir=tmp_path,
+        pat=azure.pat,
+        organization_url=azure.org_url,
+        project=azure.project,
+        repository_id=azure.repo,
+    )
 
 
-@dataclass
-class _FakePRDetails:
-    source_ref_name: str = "refs/heads/feature-branch"
-    target_ref_name: str = "refs/heads/main"
-
-
-def _make_client() -> AzDOClient:
-    """Build an AzDOClient and inject a fully mocked repos client."""
-    client = AzDOClient.__new__(AzDOClient)
-    client.project_dir = None  # unused in these tests
-    client.pat = "pat"
-    client.organization_url = "https://dev.azure.com/x"
-    client.project = "ProjectX"
-    client.repository_id = "RepoX"
-    client._repos_client = MagicMock()
-    return client
-
-
-class TestUnifiedDiff:
-    def test_modified_file_produces_unified_diff(self) -> None:
-        client = _make_client()
-        repos = client._repos_client
-        repos.get_pull_request_files.return_value = [_FakePRFile(path="src/x.py")]
-        repos.get_pull_request_details.return_value = _FakePRDetails()
-        # First call (target/main) returns old content, second (source/feature) returns new.
-        repos.get_file_content.side_effect = [
-            "def f():\n    return 1\n",  # target = main
-            "def f():\n    return 2\n",  # source = feature
-        ]
-
-        diff = client.get_pr_diff(pr_id=42)
-
-        assert "--- a/src/x.py" in diff
-        assert "+++ b/src/x.py" in diff
-        # Real diff content, not just a comment.
-        assert "-    return 1" in diff
-        assert "+    return 2" in diff
-
-    def test_added_file_uses_empty_target_side(self) -> None:
-        client = _make_client()
-        repos = client._repos_client
-        repos.get_pull_request_files.return_value = [
-            _FakePRFile(path="new.py", change_type="add")
-        ]
-        repos.get_pull_request_details.return_value = _FakePRDetails()
-        # Only the source side is fetched (target is short-circuited to "")
-        repos.get_file_content.return_value = "print('hi')\n"
-
-        diff = client.get_pr_diff(pr_id=1)
-        assert "+print('hi')" in diff
-        # `add` skips the target fetch, so get_file_content is called once
-        assert repos.get_file_content.call_count == 1
-
-    def test_deleted_file_uses_empty_source_side(self) -> None:
-        client = _make_client()
-        repos = client._repos_client
-        repos.get_pull_request_files.return_value = [
-            _FakePRFile(path="old.py", change_type="delete")
-        ]
-        repos.get_pull_request_details.return_value = _FakePRDetails()
-        repos.get_file_content.return_value = "print('bye')\n"
-
-        diff = client.get_pr_diff(pr_id=1)
-        assert "-print('bye')" in diff
-        assert repos.get_file_content.call_count == 1
-
-
-class TestFallbacks:
-    def test_pseudo_diff_when_pr_details_fail(self) -> None:
-        client = _make_client()
-        repos = client._repos_client
-        repos.get_pull_request_files.return_value = [
-            _FakePRFile(path="x.py", additions=3, deletions=1)
-        ]
-        repos.get_pull_request_details.side_effect = RuntimeError("API down")
-
-        diff = client.get_pr_diff(pr_id=1)
-        assert "# Change type: edit" in diff
-        assert "# +3 additions" in diff
-        assert "# -1 deletions" in diff
-
-    def test_pseudo_diff_when_branches_missing(self) -> None:
-        client = _make_client()
-        repos = client._repos_client
-        repos.get_pull_request_files.return_value = [_FakePRFile(path="x.py")]
-        # Returns details object but with empty refs
-        repos.get_pull_request_details.return_value = _FakePRDetails(
-            source_ref_name="", target_ref_name=""
+class TestTheDiffIsRebuiltFromBothBranches:
+    def test_an_edited_file_shows_its_changed_lines(self, client, azure):
+        azure.change("/src/total.py")
+        azure.files[("main", "/src/total.py")] = "def total():\n    return 1\n"
+        azure.files[("feature/checkout", "/src/total.py")] = (
+            "def total():\n    return 2\n"
         )
 
-        diff = client.get_pr_diff(pr_id=1)
-        assert "# Change type" in diff
+        diff = client.get_pr_diff(7)
 
-    def test_pseudo_diff_per_file_when_content_fetch_fails(self) -> None:
-        client = _make_client()
-        repos = client._repos_client
-        repos.get_pull_request_files.return_value = [
-            _FakePRFile(path="ok.py"),
-            _FakePRFile(path="broken.py"),
+        assert "--- a//src/total.py" in diff
+        assert "+++ b//src/total.py" in diff
+        assert "-    return 1" in diff
+        assert "+    return 2" in diff
+        assert azure.connections == [
+            {"base_url": azure.org_url, "creds": azure.connections[0]["creds"]}
         ]
-        repos.get_pull_request_details.return_value = _FakePRDetails()
 
-        # ok.py succeeds (and the contents differ so the diff isn't empty);
-        # broken.py raises and triggers the per-file fallback.
-        call_index = {"i": 0}
+    def test_a_relative_path_is_read_from_the_repository_root(self, client, azure):
+        azure.change("docs/readme.md")
+        azure.files[("main", "/docs/readme.md")] = "old\n"
+        azure.files[("feature/checkout", "/docs/readme.md")] = "new\n"
 
-        def fake_content(*args, **kwargs):
-            file_path = kwargs.get("file_path", "")
-            if "broken.py" in file_path:
-                raise RuntimeError("404")
-            # Return alternating contents for ok.py so we get a real diff
-            call_index["i"] += 1
-            return f"x = {call_index['i']}\n"
+        diff = client.get_pr_diff(7)
 
-        repos.get_file_content.side_effect = fake_content
-
-        diff = client.get_pr_diff(pr_id=1)
-        assert "ok.py" in diff
-        # broken.py falls back to pseudo-diff
-        assert "broken.py" in diff
-        assert "# Change type" in diff
-
-    def test_max_files_cap_emits_pseudo_diff_for_excess(self) -> None:
-        client = _make_client()
-        repos = client._repos_client
-        repos.get_pull_request_files.return_value = [
-            _FakePRFile(path=f"f{i}.py") for i in range(5)
+        assert "-old" in diff and "+new" in diff
+        assert azure.fetched == [
+            ("main", "/docs/readme.md"),
+            ("feature/checkout", "/docs/readme.md"),
         ]
-        repos.get_pull_request_details.return_value = _FakePRDetails()
-        repos.get_file_content.return_value = "x = 1\n"
 
-        diff = client.get_pr_diff(pr_id=1, max_files=2)
-        # 2 real diffs + 3 pseudo-diff entries
-        assert diff.count("# Change type") == 3
+    def test_an_added_file_is_only_read_on_the_pr_branch(self, client, azure):
+        azure.change("/new.py", "add")
+        azure.files[("feature/checkout", "/new.py")] = "print('hi')\n"
 
-    def test_huge_file_falls_back(self) -> None:
-        client = _make_client()
-        repos = client._repos_client
-        repos.get_pull_request_files.return_value = [_FakePRFile(path="huge.bin")]
-        repos.get_pull_request_details.return_value = _FakePRDetails()
-        repos.get_file_content.return_value = "x" * 1_000_000  # past max_file_bytes
+        diff = client.get_pr_diff(7)
 
-        diff = client.get_pr_diff(pr_id=1, max_file_bytes=10_000)
-        assert "# Change type" in diff
-        # No actual diff lines since we fell back early
-        assert "+xxx" not in diff
+        assert "+print('hi')" in diff
+        assert azure.fetched == [("feature/checkout", "/new.py")]
+
+    def test_a_deleted_file_is_only_read_on_the_target_branch(self, client, azure):
+        azure.change("/old.py", "Delete")
+        azure.files[("main", "/old.py")] = "print('bye')\n"
+
+        diff = client.get_pr_diff(7)
+
+        assert "-print('bye')" in diff
+        assert azure.fetched == [("main", "/old.py")]
+
+    def test_tag_refs_and_bare_branch_names_are_both_understood(self, client, azure):
+        azure.pr.source_ref_name = "hotfix"
+        azure.pr.target_ref_name = "refs/tags/v1.0"
+        azure.change("/a.py")
+        azure.files[("v1.0", "/a.py")] = "a = 1\n"
+        azure.files[("hotfix", "/a.py")] = "a = 2\n"
+
+        diff = client.get_pr_diff(7)
+
+        assert "+a = 2" in diff
+        assert azure.fetched == [("v1.0", "/a.py"), ("hotfix", "/a.py")]
+
+    def test_an_unchanged_file_adds_nothing(self, client, azure):
+        azure.change("/same.py")
+        azure.files[("main", "/same.py")] = "x = 1\n"
+        azure.files[("feature/checkout", "/same.py")] = "x = 1\n"
+
+        assert client.get_pr_diff(7) == ""
 
 
-class TestRefStripping:
-    def test_strip_ref_handles_heads_and_tags(self) -> None:
-        assert AzDOClient._strip_ref("refs/heads/main") == "main"
-        assert AzDOClient._strip_ref("refs/tags/v1.0") == "v1.0"
-        assert AzDOClient._strip_ref("feature-x") == "feature-x"
-        assert AzDOClient._strip_ref(None) is None
-        assert AzDOClient._strip_ref("") is None
+class TestTheSummaryStandsInForWhatCannotBeRead:
+    def test_an_unreadable_pr_gives_a_summary_of_every_file(self, client, azure):
+        azure.change("/x.py", additions=3, deletions=1)
+        azure.change("/y.py")
+        # The changes are read, then the PR itself cannot be.
+        azure.failures["get_pull_request"] = RuntimeError("503 Service Unavailable")
 
-    def test_read_attr_handles_obj_dict_or_none(self) -> None:
-        assert AzDOClient._read_attr(None, "x") is None
-        assert AzDOClient._read_attr({"x": 1}, "x") == 1
-        assert AzDOClient._read_attr({"x": 1}, "missing") is None
-        obj: Any = type("T", (), {"x": 42})()
-        assert AzDOClient._read_attr(obj, "x") == 42
+        diff = client.get_pr_diff(7)
+
+        assert diff == (
+            "--- a//x.py\n+++ b//x.py\n# Change type: edit\n"
+            "# +3 additions\n# -1 deletions\n"
+            "\n"
+            "--- a//y.py\n+++ b//y.py\n# Change type: edit\n"
+        )
+        assert azure.fetched == []
+
+    def test_a_pr_without_branch_refs_gives_a_summary(self, client, azure):
+        azure.pr.source_ref_name = None
+        azure.change("/x.py")
+
+        assert (
+            client.get_pr_diff(7) == "--- a//x.py\n+++ b//x.py\n# Change type: edit\n"
+        )
+        assert azure.fetched == []
+
+    def test_a_file_missing_on_a_branch_is_summarised_alone(self, client, azure):
+        azure.change("/ok.py")
+        azure.change("/gone.py", "rename")
+        azure.files[("main", "/ok.py")] = "v = 1\n"
+        azure.files[("feature/checkout", "/ok.py")] = "v = 2\n"
+
+        diff = client.get_pr_diff(7)
+
+        assert "+v = 2" in diff
+        assert "--- a//gone.py\n+++ b//gone.py\n# Change type: rename\n" in diff
+
+    def test_an_entry_without_path_or_type_is_still_listed(self, client, azure):
+        azure.change("", "")
+
+        assert client.get_pr_diff(7) == (
+            "--- a/unknown\n+++ b/unknown\n# Change type: edit\n"
+        )
+
+    def test_files_past_the_cap_are_only_summarised(self, client, azure):
+        for i in range(5):
+            azure.change(f"/f{i}.py")
+            azure.files[("main", f"/f{i}.py")] = "x = 0\n"
+            azure.files[("feature/checkout", f"/f{i}.py")] = f"x = {i + 1}\n"
+
+        diff = client.get_pr_diff(7, max_files=2)
+
+        assert diff.count("@@") == 4  # two real hunks, two @@ markers each
+        assert diff.count("# Change type: edit") == 3
+        assert {path for _, path in azure.fetched} == {"/f0.py", "/f1.py"}
+
+    @pytest.mark.parametrize("big_side", ["main", "feature/checkout"])
+    def test_a_file_too_big_on_either_side_is_summarised(self, client, azure, big_side):
+        azure.change("/huge.bin")
+        azure.files[("main", "/huge.bin")] = "a\n"
+        azure.files[("feature/checkout", "/huge.bin")] = "b\n"
+        azure.files[(big_side, "/huge.bin")] = "x" * 20_000
+
+        diff = client.get_pr_diff(7, max_file_bytes=10_000)
+
+        assert diff == "--- a//huge.bin\n+++ b//huge.bin\n# Change type: edit\n"
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+class TestThePullRequest:
+    def test_the_details_are_the_connectors_view_of_the_pr(self, client, azure):
+        azure.change("/a.py", additions=2, deletions=1)
+
+        details = client.get_pull_request(7)
+
+        assert details["title"] == "Add checkout page"
+        assert details["sourceRefName"] == "refs/heads/feature/checkout"
+        assert details["createdBy"] == {"displayName": "Ada Lovelace"}
+        assert details["files"][0]["path"] == "/a.py"
+        assert (details["additions"], details["deletions"]) == (2, 1)
+
+    def test_one_connection_serves_every_call(self, client, azure):
+        client.get_pull_request(7)
+        client.get_pr_diff(7)
+
+        assert len(azure.connections) == 1
+
+
+class TestPostingAComment:
+    def test_the_comment_opens_an_active_thread_on_the_pr(self, client, azure):
+        assert client.post_pr_comment(7, "Looks good.") is True
+
+        assert azure.threads == [
+            {
+                "pr": 7,
+                "repo": azure.repo,
+                "project": azure.project,
+                "status": "active",
+                "comments": ["Looks good."],
+            }
+        ]
+
+    def test_a_refused_comment_is_reported_not_raised(self, client, azure, capsys):
+        azure.failures["create_thread"] = RuntimeError("403 Forbidden")
+
+        assert client.post_pr_comment(7, "Looks good.") is False
+        assert azure.threads == []
+        assert "Failed to post comment: 403 Forbidden" in capsys.readouterr().out

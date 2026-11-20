@@ -139,7 +139,6 @@ export function TerminalHeader({
 				)}
 				{isClaudeMode && (
 					<TaskSelector
-						terminalId={terminalId}
 						backlogTasks={backlogTasks}
 						associatedTask={associatedTask}
 						onTaskSelect={onTaskSelect}
@@ -170,7 +169,6 @@ export function TerminalHeader({
 						<WorktreeSelector
 							terminalId={terminalId}
 							projectPath={projectPath}
-							currentWorktree={worktreeConfig}
 							onCreateWorktree={onCreateWorktree}
 							onSelectWorktree={onSelectWorktree}
 						/>
