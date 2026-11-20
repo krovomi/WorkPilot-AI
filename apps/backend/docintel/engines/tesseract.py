@@ -9,9 +9,10 @@ secret found in them then withholds the image rather than masking it.
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
+
+from foundation.platform import find_executable
 
 from .. import settings
 from .base import OcrBox, OcrOutcome, lines_from_boxes
@@ -24,12 +25,7 @@ def tesseract_path(env: dict[str, str]) -> str | None:
     explicit = str(env.get(settings.TESSERACT_PATH_ENV) or "").strip()
     if explicit:
         return explicit if Path(explicit).is_file() else None
-    try:
-        from foundation.platform import find_executable
-
-        return find_executable("tesseract")
-    except Exception:  # noqa: BLE001 - the platform layer is optional in tests
-        return shutil.which("tesseract")
+    return find_executable("tesseract")
 
 
 def _run(binary: str, image: Path, langs: str | None) -> subprocess.CompletedProcess:

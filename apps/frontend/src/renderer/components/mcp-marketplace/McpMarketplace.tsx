@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import type {
 	McpCategory,
 	McpMarketplaceTab,
@@ -41,6 +42,7 @@ import {
 } from "../charter";
 import { Input } from "../ui/input";
 import { McpBuilder } from "./McpBuilder";
+import { McpErrorNotice } from "./McpErrorNotice";
 import { McpInstalledList } from "./McpInstalledList";
 import { McpServerCard } from "./McpServerCard";
 
@@ -79,6 +81,7 @@ const CATEGORIES: { value: McpCategory | "all"; labelKey: string }[] = [
 	{ value: "cloud", labelKey: "mcpMarketplace.categories.cloud" },
 	{ value: "testing", labelKey: "mcpMarketplace.categories.testing" },
 	{ value: "web", labelKey: "mcpMarketplace.categories.web" },
+	{ value: "security", labelKey: "mcpMarketplace.categories.security" },
 	{ value: "ai", labelKey: "mcpMarketplace.categories.ai" },
 ];
 
@@ -89,14 +92,23 @@ export function McpMarketplace() {
 		setActiveTab,
 		filters,
 		setFilters,
-		getFilteredCatalog,
-		installed,
+		installedCount,
 		isCatalogLoading,
-	} = useMcpMarketplaceStore();
+	} = useMcpMarketplaceStore(
+		useShallow((s) => ({
+			activeTab: s.activeTab,
+			setActiveTab: s.setActiveTab,
+			filters: s.filters,
+			setFilters: s.setFilters,
+			installedCount: s.installed.length,
+			isCatalogLoading: s.isCatalogLoading,
+		})),
+	);
+	const filteredCatalog = useMcpMarketplaceStore(
+		useShallow((s) => s.getFilteredCatalog()),
+	);
 
 	const projectId = useProjectStore((state) => state.selectedProjectId);
-
-	const filteredCatalog = getFilteredCatalog();
 
 	// Load data on mount
 	useEffect(() => {
@@ -126,7 +138,7 @@ export function McpMarketplace() {
 				actions={
 					<>
 						<Chip tone="blue" dot={false}>
-							{installed.length} {t("mcpMarketplace.installedCount")}
+							{installedCount} {t("mcpMarketplace.installedCount")}
 						</Chip>
 						<CharterButton variant="ghost" icon={RefreshCw} onClick={handleRefresh}>
 							{t("mcpMarketplace.refresh")}
@@ -141,11 +153,12 @@ export function McpMarketplace() {
 						id: tab.id,
 						label: t(tab.labelKey),
 						icon: tab.icon,
-						count: tab.id === "installed" ? installed.length : undefined,
+						count: tab.id === "installed" ? installedCount : undefined,
 					}))}
 					value={activeTab}
 					onChange={setActiveTab}
 				/>
+				<McpErrorNotice className="mt-3" />
 			</div>
 
 			{/* Catalog tab content */}

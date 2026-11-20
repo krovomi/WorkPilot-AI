@@ -196,23 +196,14 @@ export function OnboardingWizard({
 						onConnectProvider={connectProvider}
 					/>
 				);
-			default:
-				return null;
 		}
 	};
 
-	// Handle dialog close - ask for confirmation if not completed
-	const handleOpenChange = useCallback(
-		(newOpen: boolean) => {
-			if (!newOpen) {
-				// If closing before completion, skip the wizard
-				completeWizard();
-			} else {
-				onOpenChange(newOpen);
-			}
-		},
-		[completeWizard, onOpenChange],
-	);
+	// The dialog has no trigger, so Radix only calls this to close it: closing
+	// it before the end skips the rest of the setup.
+	const handleOpenChange = useCallback(() => {
+		void completeWizard();
+	}, [completeWizard]);
 
 	return (
 		<FullScreenDialog open={open} onOpenChange={handleOpenChange}>
