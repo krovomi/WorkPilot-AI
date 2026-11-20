@@ -7,7 +7,7 @@
  */
 
 import { AlertTriangle, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { scoreServer } from "../../../shared/mcp-catalog/security-score";
 import type { McpMarketplaceServer } from "../../../shared/types/mcp-marketplace";
@@ -28,18 +28,28 @@ export interface McpServerSecurity {
 	check: (refresh?: boolean) => Promise<void>;
 }
 
-/** The score of `server`, from the catalog until the registry has been read. */
+/**
+ * The score of `server`, from the catalog until the registry has been read
+ * for `projectId` (its offline mode changes the read). Only the latest read
+ * is shown: the answer of an earlier one, or one for another project, is
+ * dropped.
+ */
 export function useMcpServerSecurity(
 	server: McpMarketplaceServer,
 	projectId: string | null,
 ): McpServerSecurity {
 	const local = useMemo(() => scoreServer(server), [server]);
-	const [read, setRead] = useState<McpSecurityScore | null>(null);
+	const [read, setRead] = useState<{
+		projectId: string | null;
+		score: McpSecurityScore;
+	} | null>(null);
 	const [checking, setChecking] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const latest = useRef(0);
 
 	const check = useCallback(
 		async (refresh = false) => {
+			const call = ++latest.current;
 			setChecking(true);
 			setError(null);
 			try {
@@ -48,18 +58,20 @@ export function useMcpServerSecurity(
 					projectId,
 					refresh,
 				});
-				if (result.success && result.data) setRead(result.data);
+				if (call !== latest.current) return;
+				if (result.success && result.data) setRead({ projectId, score: result.data });
 				else setError(result.error ?? "");
 			} catch (err) {
-				setError(err instanceof Error ? err.message : String(err));
+				if (call === latest.current) setError(err instanceof Error ? err.message : String(err));
 			} finally {
-				setChecking(false);
+				if (call === latest.current) setChecking(false);
 			}
 		},
 		[server.id, projectId],
 	);
 
-	return { score: read ?? local, checking, error, check };
+	const score = read?.projectId === projectId ? read.score : local;
+	return { score, checking, error, check };
 }
 
 const LEVEL_CLASS: Record<McpSecurityLevel, string> = {
@@ -131,9 +143,9 @@ export function McpSecurityDetails({ security }: { readonly security: McpServerS
 				)}
 			</div>
 			{checking && <p>{t("mcpMarketplace.security.checking")}</p>}
-			{error && (
+			{error !== null && (
 				<p role="alert" className="text-destructive">
-					{error}
+					{error || t("mcpMarketplace.security.readFailed")}
 				</p>
 			)}
 			{note && !checking && <p>{t(note)}</p>}
