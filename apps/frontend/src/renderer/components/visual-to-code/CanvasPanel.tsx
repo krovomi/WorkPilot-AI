@@ -58,7 +58,7 @@ import "./flow-canvas.css";
 import { saveAs } from "file-saver";
 import { toast } from "@/hooks/use-toast";
 import {
-	blockMeta,
+	blockLabelKey,
 	FRAMEWORKS_BY_TYPE,
 	needsFramework,
 } from "../../lib/architecture-blocks";
@@ -631,10 +631,12 @@ export const CanvasPanel: React.FC = () => {
 		setShowScaffoldDialog(false);
 		setIsScaffolding(true);
 		try {
-			if (scaffoldMode === "active") {
-				// The project the dialog named, not whichever is active by the time
-				// the button is pressed: the person confirmed that one.
-				if (activeProject) await runScaffold(activeProject.id);
+			// The project the dialog named, not whichever is active by the time
+			// the button is pressed: the person confirmed that one. The button
+			// stays disabled in this mode until there is one.
+			const target = scaffoldMode === "active" ? activeProject : null;
+			if (target) {
+				await runScaffold(target.id);
 				return;
 			}
 			const created = await globalThis.electronAPI?.createProjectFolder?.(
@@ -684,7 +686,7 @@ export const CanvasPanel: React.FC = () => {
 		(type: string | undefined, position: { x: number; y: number }) => {
 			const id = genNodeId();
 			const label = type
-				? t(blockMeta(type)?.labelKey ?? type, type)
+				? t(blockLabelKey(type), type)
 				: t("newBlock", "Nouveau bloc");
 			setNodes((nds) => [
 				...nds,
@@ -914,8 +916,7 @@ export const CanvasPanel: React.FC = () => {
 
 	/** Create the pending block with the stack chosen in the dialog. */
 	const handleFrameworkSelect = (node: PendingNode, framework: string) => {
-		const meta = blockMeta(node.type);
-		const typeLabel = t(meta?.labelKey ?? node.type, node.type);
+		const typeLabel = t(blockLabelKey(node.type), node.type);
 		setNodes((nds) => [
 			...nds,
 			{
