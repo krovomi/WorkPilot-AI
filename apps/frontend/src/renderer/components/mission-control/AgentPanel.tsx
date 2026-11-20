@@ -21,6 +21,10 @@ import {
 	Wrench,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { MissionControlAgentStatus } from "../../../shared/types/mission-control";
+import { providerRegistry } from "../../../shared/services/providerRegistry";
+import { appDateLocale } from "../../lib/date-format";
 import { cn } from "../../lib/utils";
 import type { AgentSlot } from "../../stores/mission-control-store";
 import { Badge } from "../ui/badge";
@@ -33,9 +37,9 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { useTranslation } from "react-i18next";
-
 import { Input } from "../ui/input";
+import { formatElapsed, ROLE_EMOJI } from "./agent-format";
+
 interface AgentPanelProps {
 	readonly agent: AgentSlot;
 	readonly isSelected: boolean;
@@ -46,7 +50,7 @@ interface AgentPanelProps {
 	readonly onShowDecisionTree: () => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS: Record<MissionControlAgentStatus, string> = {
 	idle: "bg-gray-500/10 text-gray-500 border-gray-500/30",
 	running: "bg-success/10 text-success border-success/30",
 	paused: "bg-warning/10 text-warning border-warning/30",
@@ -55,24 +59,13 @@ const STATUS_COLORS: Record<string, string> = {
 	waiting: "bg-purple-500/10 text-purple-500 border-purple-500/30",
 };
 
-const STATUS_DOT: Record<string, string> = {
+const STATUS_DOT: Record<MissionControlAgentStatus, string> = {
 	idle: "bg-gray-500",
 	running: "bg-success animate-pulse",
 	paused: "bg-warning",
 	completed: "bg-blue-500",
 	error: "bg-destructive",
 	waiting: "bg-purple-500 animate-pulse",
-};
-
-const ROLE_LABELS: Record<string, string> = {
-	architect: "🏗️ Architect",
-	coder: "💻 Coder",
-	tester: "🧪 Tester",
-	reviewer: "👁️ Reviewer",
-	documenter: "📝 Documenter",
-	planner: "📋 Planner",
-	debugger: "🐛 Debugger",
-	custom: "⚙️ Custom",
 };
 
 export function AgentPanel({
@@ -87,30 +80,41 @@ export function AgentPanel({
 	const { t } = useTranslation();
 	const [taskInput, setTaskInput] = useState("");
 
-	const statusColor = STATUS_COLORS[agent.status] ?? STATUS_COLORS.idle;
-	const statusDot = STATUS_DOT[agent.status] ?? STATUS_DOT.idle;
+	const provider = providerRegistry.getProvider(agent.provider)?.label ?? agent.provider;
+	// Each Enter or click hands the task over once, then clears the field.
+	const submitTask = () => {
+		if (!taskInput.trim()) return;
+		onStart(taskInput);
+		setTaskInput("");
+	};
 
 	return (
 		<Card
 			className={cn(
-				"border transition-all duration-200 cursor-pointer hover:shadow-md",
+				"border transition-all duration-200 hover:shadow-md",
 				isSelected
 					? "border-primary/50 shadow-lg shadow-primary/5 ring-1 ring-primary/20"
 					: "border-border/50 hover:border-border",
 			)}
-			onClick={onSelect}
 		>
 			<CardContent className="p-3 space-y-3">
 				{/* Header: Name + Status + Menu */}
 				<div className="flex items-center justify-between gap-2">
 					<div className="flex items-center gap-2 min-w-0">
-						<div className={cn("h-2 w-2 rounded-full shrink-0", statusDot)} />
-						<span className="font-semibold text-sm truncate">{agent.name}</span>
+						<div className={cn("h-2 w-2 rounded-full shrink-0", STATUS_DOT[agent.status])} />
+						<button
+							type="button"
+							className="font-semibold text-sm truncate text-left hover:underline"
+							aria-pressed={isSelected}
+							onClick={onSelect}
+						>
+							{agent.name}
+						</button>
 						<Badge
 							variant="outline"
-							className={cn("text-3xs px-1.5 py-0", statusColor)}
+							className={cn("text-3xs px-1.5 py-0", STATUS_COLORS[agent.status])}
 						>
-							{agent.status}
+							{t(`missionControl:status.${agent.status}`)}
 						</Badge>
 					</div>
 					<DropdownMenu>
@@ -119,7 +123,7 @@ export function AgentPanel({
 								variant="ghost"
 								size="icon"
 								className="h-6 w-6 shrink-0"
-								onClick={(e) => e.stopPropagation()}
+								aria-label={t("missionControl:agentPanel.actions", { name: agent.name })}
 							>
 								<MoreVertical className="h-3.5 w-3.5" />
 							</Button>
@@ -140,10 +144,12 @@ export function AgentPanel({
 
 				{/* Role + Provider/Model */}
 				<div className="flex items-center gap-2 text-xs text-muted-foreground">
-					<span>{ROLE_LABELS[agent.role] ?? agent.role}</span>
+					<span>
+						{ROLE_EMOJI[agent.role]} {t(`missionControl:roles.${agent.role}`)}
+					</span>
 					<span className="text-border">•</span>
 					<span className="truncate">
-						{agent.provider ? `${agent.provider}:` : ""}
+						{provider && `${provider}: `}
 						{agent.model_label || agent.model || t("missionControl:agentPanel.noModel")}
 					</span>
 				</div>
@@ -221,7 +227,7 @@ export function AgentPanel({
 									variant="secondary"
 									className="text-3xs font-mono px-1.5"
 								>
-									{f.split("/").pop()}
+									{f.split(/[\\/]/).pop()}
 								</Badge>
 							))}
 							{agent.active_files.length > 3 && (
@@ -237,11 +243,11 @@ export function AgentPanel({
 				<div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 border-t border-border/30">
 					<div className="flex items-center gap-1" title={t("missionControl:statTokens")}>
 						<Cpu className="h-3 w-3" />
-						{agent.tokens.total_tokens.toLocaleString()}
+						{agent.tokens.total_tokens.toLocaleString(appDateLocale())}
 					</div>
 					<div className="flex items-center gap-1" title={t("missionControl:statCost")}>
-						<DollarSign className="h-3 w-3" />$
-						{agent.tokens.estimated_cost_usd.toFixed(4)}
+						<DollarSign className="h-3 w-3" />
+						{t("missionControl:costValue", { value: agent.tokens.estimated_cost_usd.toFixed(4) })}
 					</div>
 					<div className="flex items-center gap-1" title={t("missionControl:statElapsed")}>
 						<Clock className="h-3 w-3" />
@@ -250,25 +256,17 @@ export function AgentPanel({
 				</div>
 
 				{/* Controls */}
-				{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: stop-propagation container */}
-				{/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation container */}
-				{/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard handled by controls inside */}
-				<div
-					className="flex items-center gap-1.5 pt-1"
-					onClick={(e) => e.stopPropagation()}
-				>
+				<div className="flex items-center gap-1.5 pt-1">
 					{agent.status === "idle" && (
 						<>
 							<Input
 								type="text"
 								placeholder={t("missionControl:agentPanel.taskPlaceholder")}
+								aria-label={t("missionControl:agentPanel.taskLabel", { name: agent.name })}
 								value={taskInput}
 								onChange={(e) => setTaskInput(e.target.value)}
 								onKeyDown={(e) => {
-									if (e.key === "Enter" && taskInput.trim()) {
-										onStart(taskInput);
-										setTaskInput("");
-									}
+									if (e.key === "Enter") submitTask();
 								}}
 								className="flex-1 text-xs px-2 py-1 h-auto"
 							/>
@@ -276,12 +274,9 @@ export function AgentPanel({
 								variant="default"
 								size="icon"
 								className="h-6 w-6"
-								onClick={() => {
-									if (taskInput.trim()) {
-										onStart(taskInput);
-										setTaskInput("");
-									}
-								}}
+								aria-label={t("missionControl:agentPanel.start")}
+								disabled={!taskInput.trim()}
+								onClick={submitTask}
 							>
 								<Play className="h-3 w-3" />
 							</Button>
@@ -292,6 +287,7 @@ export function AgentPanel({
 							variant="destructive"
 							size="sm"
 							className="h-6 text-xs"
+							aria-label={t("missionControl:agentPanel.stopAgent", { name: agent.name })}
 							onClick={onStop}
 						>
 							<Square className="h-3 w-3 mr-1" />
@@ -323,10 +319,4 @@ export function AgentPanel({
 			</CardContent>
 		</Card>
 	);
-}
-
-function formatElapsed(seconds: number): string {
-	if (seconds < 60) return `${Math.floor(seconds)}s`;
-	if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-	return `${Math.floor(seconds / 3600)}h${Math.floor((seconds % 3600) / 60)}m`;
 }

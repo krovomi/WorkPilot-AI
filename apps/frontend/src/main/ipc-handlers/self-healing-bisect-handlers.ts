@@ -24,8 +24,8 @@ import type {
 } from "../../shared/types/self-healing";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { isIncidentId } from "./self-healing-inputs";
 
-const INCIDENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const COMMIT_ID = /^[0-9a-fA-F]{7,40}$/;
 const OUTCOMES = new Set(["good", "bad", "skip"]);
 const ROLES = new Set(["bad-check", "flaky-check", "good-check", "search"]);
@@ -38,7 +38,7 @@ export function bisectArgs(
 	incidentId: unknown,
 	goodSha: unknown,
 ): { args: string[] } | { error: string } {
-	if (typeof incidentId !== "string" || !INCIDENT_ID.test(incidentId)) {
+	if (!isIncidentId(incidentId)) {
 		return { error: "invalid incident id" };
 	}
 	const args = ["bisect", "--incident-id", incidentId];
