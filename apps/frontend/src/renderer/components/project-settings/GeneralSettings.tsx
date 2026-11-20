@@ -70,8 +70,8 @@ export function GeneralSettings({
 
 	// Resolve the active agent profile + its flagship for a read-only summary.
 	// The actual model picker lives in Settings → Agent (AgentProfileSettings).
-	const appSettings = useSettingsStore((s) => s.settings);
-	const selectedProfileId = appSettings.selectedAgentProfile || "auto";
+	const selectedProfileId =
+		useSettingsStore((s) => s.settings.selectedAgentProfile) || "auto";
 	const selectedProfile =
 		DEFAULT_AGENT_PROFILES.find((p) => p.id === selectedProfileId) ||
 		DEFAULT_AGENT_PROFILES[0];
@@ -95,6 +95,17 @@ export function GeneralSettings({
 	const [identity, setIdentity] = useState<GitIdentityDraft>(EMPTY_GIT_IDENTITY);
 	const blockerKey =
 		repairableBlocker === "not-a-git-repo" ? "notGitRepo" : "noCommits";
+
+	// From the latest settings, so that two changes before a render both stay.
+	const setProject = (patch: Partial<ProjectSettingsType>) =>
+		setSettings((previous) => ({ ...previous, ...patch }));
+	const setNotification = (
+		patch: Partial<ProjectSettingsType["notifications"]>,
+	) =>
+		setSettings((previous) => ({
+			...previous,
+			notifications: { ...previous.notifications, ...patch },
+		}));
 
 	const handleOpenAgentSettings = () => {
 		globalThis.dispatchEvent(
@@ -306,23 +317,19 @@ export function GeneralSettings({
 							<div className="space-y-0.5">
 								<p className="text-sm font-medium text-foreground">
 									{t("projectSections.agentConfiguration.summary", {
-										defaultValue: "Profil : {{profile}} · Modèle phare : {{model}}",
 										profile: selectedProfile.name,
 										model: flagshipLabel || "—",
 									})}
 								</p>
 								<p className="text-xs text-muted-foreground">
-									{t("projectSections.agentConfiguration.managedInSettings", {
-										defaultValue:
-											"Géré dans Paramètres → Agent. Cliquez pour modifier.",
-									})}
+									{t("projectSections.agentConfiguration.managedInSettings")}
 								</p>
 							</div>
 							<ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
 						</button>
 						<div className="flex items-center justify-between pt-2">
 							<div className="space-y-0.5">
-								<Label className="font-normal text-foreground">
+								<Label htmlFor="use-claude-md" className="font-normal text-foreground">
 									{t("projectSections.general.useClaudeMd")}
 								</Label>
 								<p className="text-xs text-muted-foreground">
@@ -330,15 +337,14 @@ export function GeneralSettings({
 								</p>
 							</div>
 							<Switch
+								id="use-claude-md"
 								checked={settings.useClaudeMd ?? true}
-								onCheckedChange={(checked) =>
-									setSettings({ ...settings, useClaudeMd: checked })
-								}
+								onCheckedChange={(checked) => setProject({ useClaudeMd: checked })}
 							/>
 						</div>
 						<div className="flex items-center justify-between pt-2">
 							<div className="space-y-0.5">
-								<Label className="font-normal text-foreground">
+								<Label htmlFor="tdd-mode" className="font-normal text-foreground">
 									{t("projectSections.general.tddMode")}
 								</Label>
 								<p className="text-xs text-muted-foreground">
@@ -346,15 +352,14 @@ export function GeneralSettings({
 								</p>
 							</div>
 							<Switch
+								id="tdd-mode"
 								checked={settings.tddMode ?? false}
-								onCheckedChange={(checked) =>
-									setSettings({ ...settings, tddMode: checked })
-								}
+								onCheckedChange={(checked) => setProject({ tddMode: checked })}
 							/>
 						</div>
 						<div className="flex items-center justify-between pt-2">
 							<div className="space-y-0.5">
-								<Label className="font-normal text-foreground">
+								<Label htmlFor="verify-loop" className="font-normal text-foreground">
 									{t("projectSections.general.verifyLoop")}
 								</Label>
 								<p className="text-xs text-muted-foreground">
@@ -362,10 +367,9 @@ export function GeneralSettings({
 								</p>
 							</div>
 							<Switch
+								id="verify-loop"
 								checked={settings.verifyLoop ?? true}
-								onCheckedChange={(checked) =>
-									setSettings({ ...settings, verifyLoop: checked })
-								}
+								onCheckedChange={(checked) => setProject({ verifyLoop: checked })}
 							/>
 						</div>
 						<div className="flex items-center justify-between pt-2">
@@ -380,9 +384,7 @@ export function GeneralSettings({
 							<Switch
 								id="spec-by-example"
 								checked={settings.specByExample ?? false}
-								onCheckedChange={(checked) =>
-									setSettings({ ...settings, specByExample: checked })
-								}
+								onCheckedChange={(checked) => setProject({ specByExample: checked })}
 							/>
 						</div>
 						<AutoSplitSettings settings={settings} setSettings={setSettings} />
@@ -402,71 +404,43 @@ export function GeneralSettings({
 						</h3>
 						<div className="space-y-4">
 							<div className="flex items-center justify-between">
-								<Label className="font-normal text-foreground">
+								<Label htmlFor="notify-task-complete" className="font-normal text-foreground">
 									{t("notifications.onTaskComplete")}
 								</Label>
 								<Switch
+									id="notify-task-complete"
 									checked={settings.notifications.onTaskComplete}
-									onCheckedChange={(checked) =>
-										setSettings({
-											...settings,
-											notifications: {
-												...settings.notifications,
-												onTaskComplete: checked,
-											},
-										})
-									}
+									onCheckedChange={(checked) => setNotification({ onTaskComplete: checked })}
 								/>
 							</div>
 							<div className="flex items-center justify-between">
-								<Label className="font-normal text-foreground">
+								<Label htmlFor="notify-task-failed" className="font-normal text-foreground">
 									{t("notifications.onTaskFailed")}
 								</Label>
 								<Switch
+									id="notify-task-failed"
 									checked={settings.notifications.onTaskFailed}
-									onCheckedChange={(checked) =>
-										setSettings({
-											...settings,
-											notifications: {
-												...settings.notifications,
-												onTaskFailed: checked,
-											},
-										})
-									}
+									onCheckedChange={(checked) => setNotification({ onTaskFailed: checked })}
 								/>
 							</div>
 							<div className="flex items-center justify-between">
-								<Label className="font-normal text-foreground">
+								<Label htmlFor="notify-review-needed" className="font-normal text-foreground">
 									{t("notifications.onReviewNeeded")}
 								</Label>
 								<Switch
+									id="notify-review-needed"
 									checked={settings.notifications.onReviewNeeded}
-									onCheckedChange={(checked) =>
-										setSettings({
-											...settings,
-											notifications: {
-												...settings.notifications,
-												onReviewNeeded: checked,
-											},
-										})
-									}
+									onCheckedChange={(checked) => setNotification({ onReviewNeeded: checked })}
 								/>
 							</div>
 							<div className="flex items-center justify-between">
-								<Label className="font-normal text-foreground">
+								<Label htmlFor="notify-sound" className="font-normal text-foreground">
 									{t("notifications.sound")}
 								</Label>
 								<Switch
+									id="notify-sound"
 									checked={settings.notifications.sound}
-									onCheckedChange={(checked) =>
-										setSettings({
-											...settings,
-											notifications: {
-												...settings.notifications,
-												sound: checked,
-											},
-										})
-									}
+									onCheckedChange={(checked) => setNotification({ sound: checked })}
 								/>
 							</div>
 						</div>

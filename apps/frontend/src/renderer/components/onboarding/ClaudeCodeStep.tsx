@@ -10,7 +10,7 @@ import {
 	Terminal,
 	X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
@@ -47,6 +47,11 @@ export function ClaudeCodeStep({
 	const [isInstalling, setIsInstalling] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [installSuccess, setInstallSuccess] = useState(false);
+	// The check that follows an install, dropped if the step closes first.
+	const recheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	useEffect(() => () => {
+		if (recheckTimer.current) clearTimeout(recheckTimer.current);
+	}, []);
 
 	// Check Claude Code version on mount
 	const checkVersion = useCallback(async () => {
@@ -55,13 +60,6 @@ export function ClaudeCodeStep({
 		setInstallSuccess(false);
 
 		try {
-			if (!window.electronAPI?.checkClaudeCodeVersion) {
-				console.warn("[ClaudeCodeStep] Version check API not available");
-				setStatus("error");
-				setError("Version check API not available");
-				return;
-			}
-
 			const result = await window.electronAPI.checkClaudeCodeVersion();
 
 			if (result.success && result.data) {
@@ -76,14 +74,14 @@ export function ClaudeCodeStep({
 				}
 			} else {
 				setStatus("error");
-				setError(result.error || "Failed to check version");
+				setError(result.error || t("cli.errors.checkFailed"));
 			}
 		} catch (err) {
 			console.error("Failed to check Claude Code version:", err);
 			setStatus("error");
-			setError(err instanceof Error ? err.message : "Unknown error");
+			setError(err instanceof Error ? err.message : t("cli.errors.checkFailed"));
 		}
-	}, []);
+	}, [t]);
 
 	useEffect(() => {
 		checkVersion();
@@ -95,24 +93,19 @@ export function ClaudeCodeStep({
 		setError(null);
 
 		try {
-			if (!window.electronAPI?.installClaudeCode) {
-				setError("Install API not available");
-				return;
-			}
-
 			const result = await window.electronAPI.installClaudeCode();
 
 			if (result.success) {
 				setInstallSuccess(true);
 				// Re-check version after a short delay to give user time to complete installation
-				setTimeout(() => {
-					checkVersion();
+				recheckTimer.current = setTimeout(() => {
+					void checkVersion();
 				}, 5000);
 			} else {
-				setError(result.error || "Failed to start installation");
+				setError(result.error || t("cli.errors.installFailed"));
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Unknown error");
+			setError(err instanceof Error ? err.message : t("cli.errors.installFailed"));
 		} finally {
 			setIsInstalling(false);
 		}
@@ -151,7 +144,7 @@ export function ClaudeCodeStep({
 			case "not-found":
 				return t("cli.status.notFound", "Not Installed");
 			case "error":
-				return error || "Error checking status";
+				return error;
 		}
 	};
 
@@ -270,6 +263,8 @@ export function ClaudeCodeStep({
 									size="sm"
 									onClick={checkVersion}
 									disabled={status === "loading" || isInstalling}
+									aria-label={t("cli.refresh")}
+									title={t("cli.refresh")}
 								>
 									<RefreshCw
 										className={`h-4 w-4 ${status === "loading" ? "animate-spin" : ""}`}
@@ -279,8 +274,8 @@ export function ClaudeCodeStep({
 						</CardContent>
 					</Card>
 
-					{/* Error message */}
-					{error && status !== "loading" && (
+					{/* An install that failed; a failed check is already the status line. */}
+					{error && status !== "error" && (
 						<Card className="border border-destructive/30 bg-destructive/10">
 							<CardContent className="p-4">
 								<p className="text-sm text-destructive">{error}</p>
@@ -341,9 +336,7 @@ export function ClaudeCodeStep({
 							variant="link"
 							size="sm"
 							className="text-muted-foreground gap-1"
-							onClick={() =>
-								window.electronAPI?.openExternal?.("https://claude.ai/code")
-							}
+							onClick={() => window.electronAPI.openExternal("https://claude.ai/code")}
 						>
 							{t("cli.learnMore", "Learn more about Claude Code")}
 							<ExternalLink className="h-3 w-3" />
