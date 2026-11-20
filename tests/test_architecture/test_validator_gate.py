@@ -422,7 +422,17 @@ MONOREPO = {
 }
 
 
-def test_inferred_rules_only_warn(tmp_path, capsys):
+def test_inferred_rules_only_warn(tmp_path, capsys, monkeypatch):
+    # Inferred rules keep the AI review on. Once `core` is imported by an
+    # earlier test, the real runtime is installed and the review would start
+    # the CLI, so it gets a double that finds nothing.
+    reviewed: list[Path] = []
+
+    async def review(**kwargs):
+        reviewed.append(kwargs["project_dir"])
+        return []
+
+    monkeypatch.setattr(ai_reviewer, "run_architecture_ai_review", review)
     repo, spec_dir = _project(tmp_path, rules=None)
     (repo / "apps" / "api").mkdir(parents=True)
     (repo / "apps" / "web").mkdir(parents=True)
@@ -439,6 +449,7 @@ def test_inferred_rules_only_warn(tmp_path, capsys):
     assert passed is True
     assert report["violations"] == []
     assert report["warnings"], "a cross-service import is a warning when inferred"
+    assert reviewed == [repo]
     assert "\u26a0" in capsys.readouterr().out
 
 

@@ -330,6 +330,13 @@ Entra sign-in is on only when both Entra variables are set; local accounts work
 either way. Neither identifier is a secret: `GET /auth/config` hands both to the
 sign-in page.
 
+An Entra sign-in finds its account by the person's object id (`oid`). The first
+sign-in links to, or creates, an account only with an address Entra vouches for:
+the user principal name of a member of the tenant, or the `email` claim when the
+optional `xms_edov` claim says its domain is verified. Guests (`idp` from another
+directory) need `xms_edov` in the app registration's optional claims. An account
+keeps the Entra sign-in it was first linked to.
+
 The phone app signs in with the same app registration, as a public client
 (authorization code with PKCE, no secret on the phone). Add a **Mobile and
 desktop applications** platform to the registration with the redirect URI

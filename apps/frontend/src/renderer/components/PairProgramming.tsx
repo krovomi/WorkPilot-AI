@@ -29,6 +29,7 @@ import {
 	type PairMessage,
 	type PairStatus,
 	type StartSessionParams,
+	loadPairSession,
 	sendPairMessage,
 	startPairSession,
 	stopPairSession,
@@ -246,8 +247,13 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 	const chatEndRef = useRef<HTMLDivElement>(null);
 	const streamEndRef = useRef<HTMLDivElement>(null);
 
-	// The store holds one session at a time: a session started in another
-	// project is not this project's, and its Stop or messages must not be sent here.
+	// The store holds one project's session: show this project's.
+	useEffect(() => {
+		void loadPairSession(projectId);
+	}, [projectId]);
+
+	// Until that load clears it, a session of another project is not this
+	// project's, and its Stop or messages must not be sent here.
 	const foreignSession = storedSession !== null && storedSession.projectId !== projectId;
 	const session = foreignSession ? null : storedSession;
 

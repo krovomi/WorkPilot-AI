@@ -96,10 +96,21 @@ export const useContextStore = create<ContextState>((set) => ({
 }));
 
 /**
+ * The project whose context the store holds. Every answer is checked against
+ * it on arrival: one that comes back after the person moved to another project
+ * belongs to a page nobody is looking at.
+ */
+let shownProject: string | null = null;
+const isShown = (projectId: string) => projectId === shownProject;
+
+/**
  * Load project context (project index + memory status)
  */
 export async function loadProjectContext(projectId: string): Promise<void> {
 	const store = useContextStore.getState();
+	// Another project: its index, memories and search are not this one's.
+	if (!isShown(projectId)) store.clearAll();
+	shownProject = projectId;
 	store.setIndexLoading(true);
 	store.setMemoryLoading(true);
 	store.setIndexError(null);
@@ -107,6 +118,7 @@ export async function loadProjectContext(projectId: string): Promise<void> {
 
 	try {
 		const result = await window.electronAPI.getProjectContext(projectId);
+		if (!isShown(projectId)) return;
 		if (result.success && result.data) {
 			store.setProjectIndex(result.data.projectIndex);
 			store.setMemoryStatus(result.data.memoryStatus);
@@ -116,12 +128,15 @@ export async function loadProjectContext(projectId: string): Promise<void> {
 			store.setIndexError(result.error || "Failed to load project context");
 		}
 	} catch (error) {
+		if (!isShown(projectId)) return;
 		store.setIndexError(
 			error instanceof Error ? error.message : "Unknown error",
 		);
 	} finally {
-		store.setIndexLoading(false);
-		store.setMemoryLoading(false);
+		if (isShown(projectId)) {
+			store.setIndexLoading(false);
+			store.setMemoryLoading(false);
+		}
 	}
 }
 
@@ -135,17 +150,19 @@ export async function refreshProjectIndex(projectId: string): Promise<void> {
 
 	try {
 		const result = await window.electronAPI.refreshProjectIndex(projectId);
+		if (!isShown(projectId)) return;
 		if (result.success && result.data) {
 			store.setProjectIndex(result.data);
 		} else {
 			store.setIndexError(result.error || "Failed to refresh project index");
 		}
 	} catch (error) {
+		if (!isShown(projectId)) return;
 		store.setIndexError(
 			error instanceof Error ? error.message : "Unknown error",
 		);
 	} finally {
-		store.setIndexLoading(false);
+		if (isShown(projectId)) store.setIndexLoading(false);
 	}
 }
 
@@ -165,18 +182,19 @@ export async function searchMemories(
 	}
 
 	store.setSearchLoading(true);
+	// Only the answer to the query now in the box, for the project on screen,
+	// is shown: answers to earlier keystrokes can come back after it.
+	const current = () =>
+		isShown(projectId) && useContextStore.getState().searchQuery === query;
 
 	try {
 		const result = await window.electronAPI.searchMemories(projectId, query);
-		if (result.success && result.data) {
-			store.setSearchResults(result.data);
-		} else {
-			store.setSearchResults([]);
-		}
+		if (!current()) return;
+		store.setSearchResults(result.success && result.data ? result.data : []);
 	} catch (_error) {
-		store.setSearchResults([]);
+		if (current()) store.setSearchResults([]);
 	} finally {
-		store.setSearchLoading(false);
+		if (current()) store.setSearchLoading(false);
 	}
 }
 
@@ -187,17 +205,20 @@ export async function loadRecentMemories(
 	projectId: string,
 	limit: number = 20,
 ): Promise<void> {
+	// A late refresh for a project no longer shown (a pin that answered after
+	// the switch) would hold the shown project's spinner for good.
+	if (!isShown(projectId)) return;
 	const store = useContextStore.getState();
 	store.setMemoriesLoading(true);
 
 	try {
 		const result = await window.electronAPI.getRecentMemories(projectId, limit);
-		if (result.success && result.data) {
+		if (result.success && result.data && isShown(projectId)) {
 			store.setRecentMemories(result.data);
 		}
 	} catch (_error) {
 		// Silently fail - memories are optional
 	} finally {
-		store.setMemoriesLoading(false);
+		if (isShown(projectId)) store.setMemoriesLoading(false);
 	}
 }

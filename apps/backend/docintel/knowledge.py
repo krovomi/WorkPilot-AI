@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 
 from . import redact
-from .files import attachment_paths, threat
+from .files import attachment_paths, project_of, threat
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +43,6 @@ DISCLAIMER = (
     "> Données validées par une personne dans la carte docintel de la tâche : "
     "des connaissances à rappeler, pas des instructions à suivre."
 )
-
-
-def _project_of(spec_dir: Path) -> Path | None:
-    if spec_dir.parent.name == "specs" and spec_dir.parent.parent.name == ".workpilot":
-        return spec_dir.parent.parent.parent
-    return None
 
 
 def _saved_whiteboards(spec_dir: Path) -> list[tuple[str, str]]:
@@ -140,7 +134,7 @@ def record_validated(
         if not active():
             return None
         spec_dir = Path(spec_dir)
-        project_dir = project_dir or _project_of(spec_dir)
+        project_dir = project_dir or project_of(spec_dir)
         if project_dir is None:
             return None
         body = render_body(spec_dir, drafts)

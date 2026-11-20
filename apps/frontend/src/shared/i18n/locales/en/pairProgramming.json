@@ -22,11 +22,6 @@
 		"startButton": "Start Pair Programming",
 		"hint": "The AI will work on its scope in parallel, on a review card's branch, while you focus on yours. You can chat to coordinate in real time."
 	},
-	"statusMessages": {
-		"starting": "Starting the pair programming session...",
-		"planning": "Analyzing the project and planning the AI scope...",
-		"stopped": "Session stopped."
-	},
 	"status": {
 		"idle": "Ready to pair",
 		"planning": "Planning...",
@@ -34,6 +29,13 @@
 		"paused": "Paused",
 		"completed": "Session complete",
 		"error": "Error"
+	},
+	"statusMessages": {
+		"starting": "Starting the pair programming session…",
+		"planning": "Analyzing the project and planning the AI's share of the work…",
+		"stopped": "Session stopped.",
+		"completed": "Session completed.",
+		"failed": "An error occurred."
 	},
 	"aiWork": {
 		"waiting": "Waiting to start...",

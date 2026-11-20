@@ -22,11 +22,6 @@
 		"startButton": "Démarrer le pair programming",
 		"hint": "L'IA travaillera sur son périmètre en parallèle, sur la branche d'une carte en revue, pendant que vous vous concentrez sur le vôtre. Vous pouvez chatter pour vous coordonner en temps réel."
 	},
-	"statusMessages": {
-		"starting": "Démarrage de la session de pair programming...",
-		"planning": "Analyse du projet et planification du périmètre de l'IA...",
-		"stopped": "Session arrêtée."
-	},
 	"status": {
 		"idle": "Prêt",
 		"planning": "Planification...",
@@ -34,6 +29,13 @@
 		"paused": "En pause",
 		"completed": "Session terminée",
 		"error": "Erreur"
+	},
+	"statusMessages": {
+		"starting": "Démarrage de la session de pair programming…",
+		"planning": "Analyse du projet et répartition du travail de l'IA…",
+		"stopped": "Session arrêtée.",
+		"completed": "Session terminée.",
+		"failed": "Une erreur est survenue."
 	},
 	"aiWork": {
 		"waiting": "En attente de démarrage...",

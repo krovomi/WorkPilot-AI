@@ -1,6 +1,7 @@
 /**
  * AI Pair Programming: the setup steps, then the running session (your work,
- * the coordination chat, the AI's work) driven by the real store.
+ * the coordination chat, the AI's work) driven by the real store, for the
+ * project the page is opened for.
  */
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -9,6 +10,7 @@ import i18n from "../../../shared/i18n";
 import {
 	type AiAction,
 	type PairSession,
+	loadPairSession,
 	usePairProgrammingStore,
 } from "../../stores/pair-programming-store";
 import { PairProgramming } from "../PairProgramming";
@@ -31,7 +33,14 @@ const api = {
 	stopPairSession: vi.fn(),
 	sendPairMessage: vi.fn(),
 	createWorktreePR: vi.fn(),
+	getPairSession: vi.fn(),
 };
+
+/** The main process keeps each project's session: here, the one the store holds. */
+function storedSessionOf(projectId: string) {
+	const session = usePairProgrammingStore.getState().session;
+	return Promise.resolve({ success: true, data: session?.projectId === projectId ? session : null });
+}
 
 const scrollIntoView = vi.fn();
 
@@ -55,7 +64,10 @@ describe("PairProgramming", () => {
 		await i18n.changeLanguage("en");
 		usePairProgrammingStore.getState().reset();
 		for (const fn of Object.values(api)) fn.mockReset();
+		api.getPairSession.mockImplementation(storedSessionOf);
 		Object.assign(globalThis.electronAPI, api);
+		// The page shows project p1.
+		await loadPairSession("p1");
 		scrollIntoView.mockReset();
 		HTMLElement.prototype.scrollIntoView = scrollIntoView;
 	});
@@ -91,7 +103,7 @@ describe("PairProgramming", () => {
 				aiScope: "API",
 			});
 			// The planning text the store writes is translated.
-			expect(await screen.findByText("Analyzing the project and planning the AI scope...")).toBeInTheDocument();
+			expect(await screen.findByText("Analyzing the project and planning the AI's share of the work…")).toBeInTheDocument();
 			expect(screen.getByRole("heading", { name: "Add login" })).toBeInTheDocument();
 		});
 
@@ -312,6 +324,21 @@ describe("PairProgramming", () => {
 			render(<PairProgramming projectId="p1" />);
 			expect(screen.getByRole("heading", { name: "Paused work" })).toBeInTheDocument();
 			expect(screen.getByText("Ready to pair")).toBeInTheDocument();
+		});
+
+		it("loads the session of the project on screen, and none of the last project's", async () => {
+			api.getPairSession.mockImplementation(async (projectId: string) => ({
+				success: true,
+				data: projectId === "p1" ? { ...SESSION, goal: "Refactor the parser" } : null,
+			}));
+			const { rerender } = render(<PairProgramming projectId="p1" />);
+			expect(await screen.findByRole("heading", { name: "Refactor the parser" })).toBeInTheDocument();
+			expect(api.getPairSession).toHaveBeenCalledWith("p1");
+
+			rerender(<PairProgramming projectId="p2" />);
+			await waitFor(() => expect(screen.queryByText("Refactor the parser")).toBeNull());
+			expect(api.getPairSession).toHaveBeenLastCalledWith("p2");
+			expect(screen.getByText("Session Goal")).toBeInTheDocument();
 		});
 
 		it("does not show another project's session on this project's page", async () => {
