@@ -21,7 +21,7 @@ import threading
 import jwt as pyjwt
 from server.config import get_settings
 from server.db.models import IdentityProvider, User, UserIdentity
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -146,13 +146,7 @@ async def provision_entra_user(db: AsyncSession, claims: dict) -> User:
     if user is not None:
         if not user.is_active:
             raise OidcError("Account is disabled")
-        other = await db.scalar(
-            select(UserIdentity).where(
-                UserIdentity.user_id == user.id,
-                UserIdentity.provider == IdentityProvider.ENTRA.value,
-            )
-        )
-        if other is not None:
+        if await _first_entra_subject(db, user.id) is not None:
             raise OidcError("This account is linked to another Entra sign-in")
     else:
         display_name = (claims.get("name") or email).strip()
@@ -169,4 +163,28 @@ async def provision_entra_user(db: AsyncSession, claims: dict) -> User:
         )
     )
     await db.commit()
+    # Two first sign-ins for the same account may pass the check above at the
+    # same time: the earliest link stays and the other is taken back.
+    if await _first_entra_subject(db, user.id) != oid:
+        await db.execute(
+            delete(UserIdentity).where(
+                UserIdentity.provider == IdentityProvider.ENTRA.value,
+                UserIdentity.subject == oid,
+            )
+        )
+        await db.commit()
+        raise OidcError("This account is linked to another Entra sign-in")
     return user
+
+
+async def _first_entra_subject(db: AsyncSession, user_id: str) -> str | None:
+    """The Entra sign-in an account was linked to first, if any."""
+    return await db.scalar(
+        select(UserIdentity.subject)
+        .where(
+            UserIdentity.user_id == user_id,
+            UserIdentity.provider == IdentityProvider.ENTRA.value,
+        )
+        .order_by(UserIdentity.created_at, UserIdentity.id)
+        .limit(1)
+    )

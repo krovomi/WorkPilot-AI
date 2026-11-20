@@ -532,6 +532,52 @@ class TestEntraSignIn:
         assert again.status_code == 200, again.text
         assert again.json()["user"]["id"] == first.json()["user"]["id"]
 
+    async def test_of_two_first_sign_ins_at_once_the_earliest_link_stays(
+        self, world, entra, monkeypatch
+    ):
+        from datetime import UTC, datetime
+
+        from server.auth import oidc
+        from server.db.engine import get_session_factory
+        from server.db.models import IdentityProvider, UserIdentity
+        from sqlalchemy import select
+
+        async with get_session_factory()() as db:
+            db.add(
+                UserIdentity(
+                    user_id=world.users["viewer_a"],
+                    provider=IdentityProvider.ENTRA.value,
+                    subject="entra-object-early",
+                    created_at=datetime(2020, 1, 1, tzinfo=UTC),
+                )
+            )
+            await db.commit()
+        real = oidc._first_entra_subject
+        calls = []
+
+        async def raced(db, user_id):
+            calls.append(user_id)
+            # The first look comes before the other sign-in's link is visible.
+            return None if len(calls) == 1 else await real(db, user_id)
+
+        monkeypatch.setattr(oidc, "_first_entra_subject", raced)
+        token = self.id_token(entra, preferred_username="viewer_a@example.com")
+        answer = await self.exchange(world, token)
+        assert answer.status_code == 401
+        assert answer.json()["detail"] == (
+            "This account is linked to another Entra sign-in"
+        )
+        async with get_session_factory()() as db:
+            subjects = (
+                await db.scalars(
+                    select(UserIdentity.subject).where(
+                        UserIdentity.user_id == world.users["viewer_a"],
+                        UserIdentity.provider == IdentityProvider.ENTRA.value,
+                    )
+                )
+            ).all()
+        assert subjects == ["entra-object-early"]
+
     async def test_a_token_signed_by_another_key_is_refused(self, world, entra):
         from cryptography.hazmat.primitives.asymmetric import rsa
 
