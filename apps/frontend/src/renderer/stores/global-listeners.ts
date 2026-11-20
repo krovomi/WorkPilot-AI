@@ -6,6 +6,7 @@ import { setupAgentCoachListeners } from "./agent-coach-store";
 import { setupApiWatcherListeners } from "./api-watcher-store";
 import { setupAppEmulatorListeners } from "./app-emulator-store";
 import { setupArchitectureDeltaListeners } from "./architecture-delta-store";
+import { setupArenaListeners } from "./arena-store";
 import { setupAutomationsListeners } from "./automations-store";
 import {
 	setupArchitectureVisualizerListeners,
@@ -92,6 +93,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["AppEmulator", setupAppEmulatorListeners],
 	["ArchitectureDelta", setupArchitectureDeltaListeners],
 	["ArchitectureVisualizer", setupArchitectureVisualizerListeners],
+	// An Arena battle's answers arrive while its tab or dialog may be closed.
+	["Arena", setupArenaListeners],
 	// Cards an automation rule created appear on the board without a reload.
 	["Automations", setupAutomationsListeners],
 	["Bench", setupBenchListeners],
