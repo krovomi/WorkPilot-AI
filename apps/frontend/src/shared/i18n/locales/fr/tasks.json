@@ -273,7 +273,10 @@
 		"bulkRestoreSuccess": "{{count}} tâche(s) restaurée(s)",
 		"sortActiveDragHint": "Réorganisation manuelle désactivée tant qu'un tri est actif. Repassez en « Ordre manuel » pour glisser-déposer.",
 		"aging": {
-			"idleFor": "Inactive depuis {{duration}}"
+			"idleFor": "Inactive depuis {{duration}}",
+			"days": "{{count}}j",
+			"hours": "{{count}}h",
+			"minutes": "{{count}}min"
 		},
 		"stale": {
 			"chip": "{{count}} inactive(s)",

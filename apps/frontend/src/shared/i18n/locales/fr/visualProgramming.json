@@ -166,7 +166,6 @@
 	"noBlockMatch": "Aucun bloc ne correspond.",
 	"blockCount": "{{count}} blocs",
 	"paletteHint": "Glissez un bloc sur le canvas, ou cliquez-le.",
-	"showPalette": "Afficher la palette",
 	"deleteBlock": "Supprimer le bloc",
 	"diagramType": "Type de diagramme",
 	"diagramType_architecture": "Architecture",

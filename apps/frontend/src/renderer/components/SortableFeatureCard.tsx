@@ -15,6 +15,12 @@ import { Card } from "./ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { useTranslation } from "react-i18next";
 
+/** Names of the services a feature can be imported from (product names, never translated). */
+const SOURCE_NAMES: Partial<Record<string, string>> = {
+	canny: "Canny",
+	github_issue: "GitHub",
+};
+
 interface SortableFeatureCardProps {
 	readonly feature: RoadmapFeature;
 	readonly roadmap?: Roadmap;
@@ -55,8 +61,9 @@ export function SortableFeatureCard({
 	const phaseName = roadmap?.phases.find((p) => p.id === feature.phaseId)?.name;
 
 	// Check if feature has external source (e.g., Canny)
-	const isExternal =
-		feature.source?.provider && feature.source.provider !== "internal";
+	const provider = feature.source?.provider;
+	const isExternal = provider !== undefined && provider !== "internal";
+	const linkedSpecId = feature.linkedSpecId;
 
 	return (
 		<div
@@ -130,15 +137,14 @@ export function SortableFeatureCard({
 						</h3>
 					</div>
 					<div className="shrink-0">
-						{feature.linkedSpecId ? (
+						{linkedSpecId ? (
 							<Button
 								variant="outline"
 								size="sm"
 								className="h-7 px-2"
 								onClick={(e) => {
 									e.stopPropagation();
-									// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-									onGoToTask?.(feature.linkedSpecId!);
+									onGoToTask?.(linkedSpecId);
 								}}
 							>
 								<ExternalLink className="h-3 w-3 mr-1" />
@@ -178,7 +184,7 @@ export function SortableFeatureCard({
 							ROADMAP_COMPLEXITY_COLORS[feature.complexity],
 						)}
 					>
-						{feature.complexity}
+						{t(`roadmap:featureCard.complexityLevel.${feature.complexity}`)}
 					</Badge>
 					<Badge
 						variant="outline"
@@ -187,7 +193,7 @@ export function SortableFeatureCard({
 							ROADMAP_IMPACT_COLORS[feature.impact],
 						)}
 					>
-						{feature.impact}
+						{t(`roadmap:featureCard.impactLevel.${feature.impact}`)}
 					</Badge>
 					{/* Show vote count if from external source */}
 					{feature.votes !== undefined && feature.votes > 0 && (
@@ -214,12 +220,14 @@ export function SortableFeatureCard({
 									variant="outline"
 									className="text-3xs px-1.5 py-0 text-orange-500 border-orange-500/30"
 								>
-									{feature.source?.provider === "canny" ? "Canny" : t("roadmap:featureCard.external")}
+									{provider === "canny"
+										? "Canny"
+										: t("roadmap:featureCard.external")}
 								</Badge>
 							</TooltipTrigger>
 							<TooltipContent>
 								{t("roadmap:featureCard.importedFrom", {
-									provider: feature.source?.provider,
+									provider: SOURCE_NAMES[provider] ?? provider,
 								})}
 							</TooltipContent>
 						</Tooltip>

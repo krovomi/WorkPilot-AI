@@ -166,7 +166,6 @@
 	"noBlockMatch": "No block matches.",
 	"blockCount": "{{count}} blocks",
 	"paletteHint": "Drag a block onto the canvas, or click it.",
-	"showPalette": "Show the palette",
 	"deleteBlock": "Delete block",
 	"diagramType": "Diagram type",
 	"diagramType_architecture": "Architecture",

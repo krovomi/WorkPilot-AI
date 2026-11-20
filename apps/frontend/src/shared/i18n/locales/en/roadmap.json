@@ -195,7 +195,17 @@
 		"build": "Build",
 		"impact": "{{impact}} impact",
 		"competitorInsightTitle": "Competitor Insight",
-		"external": "External"
+		"external": "External",
+		"complexityLevel": {
+			"low": "Low complexity",
+			"medium": "Medium complexity",
+			"high": "High complexity"
+		},
+		"impactLevel": {
+			"low": "Low impact",
+			"medium": "Medium impact",
+			"high": "High impact"
+		}
 	},
 	"featureDetail": {
 		"severity": "{{severity}} severity",

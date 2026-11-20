@@ -195,7 +195,17 @@
 		"build": "Construire",
 		"impact": "impact {{impact}}",
 		"competitorInsightTitle": "Info concurrentielle",
-		"external": "Externe"
+		"external": "Externe",
+		"complexityLevel": {
+			"low": "Complexité faible",
+			"medium": "Complexité moyenne",
+			"high": "Complexité élevée"
+		},
+		"impactLevel": {
+			"low": "Impact faible",
+			"medium": "Impact moyen",
+			"high": "Impact élevé"
+		}
 	},
 	"featureDetail": {
 		"severity": "gravité {{severity}}",

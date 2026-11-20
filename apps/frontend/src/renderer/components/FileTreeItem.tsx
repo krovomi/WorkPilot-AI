@@ -8,6 +8,7 @@ import {
 	FileText,
 	Folder,
 	Loader2,
+	type LucideIcon,
 } from "lucide-react";
 import {
 	type DragEvent,
@@ -26,59 +27,40 @@ interface FileTreeItemProps {
 	isExpanded: boolean;
 	isLoading: boolean;
 	onToggle: () => void;
-	onSelectFolder?: (path: string) => void; // Ajout de onSelectFolder en tant que prop facultative
+	/** Clicking a folder also picks it (the save dialog of the canvas). */
+	onSelectFolder?: (path: string) => void;
+	selectedFolder?: string;
 }
 
-// Get appropriate icon based on file extension
-function getFileIcon(name: string): React.ReactNode {
-	const ext = name.split(".").pop()?.toLowerCase();
+// The icon and colour of a file, by extension; anything else is a plain file.
+const FILE_KINDS: ReadonlyArray<
+	readonly [readonly string[], LucideIcon, string]
+> = [
+	[
+		["ts", "tsx", "js", "jsx", "py", "rb", "go", "rs", "java", "c", "cpp"],
+		FileCode,
+		"text-info",
+	],
+	[["h", "cs", "php", "swift", "kt"], FileCode, "text-info"],
+	[["json", "yaml", "yml", "toml"], FileJson, "text-warning"],
+	[["md", "txt", "rst"], FileText, "text-muted-foreground"],
+	[
+		["png", "jpg", "jpeg", "gif", "svg", "webp", "ico"],
+		FileImage,
+		"text-purple-400",
+	],
+	[["css", "scss", "sass", "less"], FileCode, "text-pink-400"],
+	[["html", "htm"], FileCode, "text-orange-400"],
+];
 
-	switch (ext) {
-		case "ts":
-		case "tsx":
-		case "js":
-		case "jsx":
-		case "py":
-		case "rb":
-		case "go":
-		case "rs":
-		case "java":
-		case "c":
-		case "cpp":
-		case "h":
-		case "cs":
-		case "php":
-		case "swift":
-		case "kt":
-			return <FileCode className="h-4 w-4 text-info" />;
-		case "json":
-		case "yaml":
-		case "yml":
-		case "toml":
-			return <FileJson className="h-4 w-4 text-warning" />;
-		case "md":
-		case "txt":
-		case "rst":
-			return <FileText className="h-4 w-4 text-muted-foreground" />;
-		case "png":
-		case "jpg":
-		case "jpeg":
-		case "gif":
-		case "svg":
-		case "webp":
-		case "ico":
-			return <FileImage className="h-4 w-4 text-purple-400" />;
-		case "css":
-		case "scss":
-		case "sass":
-		case "less":
-			return <FileCode className="h-4 w-4 text-pink-400" />;
-		case "html":
-		case "htm":
-			return <FileCode className="h-4 w-4 text-orange-400" />;
-		default:
-			return <File className="h-4 w-4 text-muted-foreground" />;
-	}
+function getFileIcon(name: string): React.ReactNode {
+	const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
+	const [, Icon, colour] = FILE_KINDS.find(([exts]) => exts.includes(ext)) ?? [
+		[],
+		File,
+		"text-muted-foreground",
+	];
+	return <Icon className={cn("h-4 w-4", colour)} />;
 }
 
 export function FileTreeItem({
@@ -87,12 +69,9 @@ export function FileTreeItem({
 	isExpanded,
 	isLoading,
 	onToggle,
-	onSelectFolder, // Ajout de onSelectFolder dans les props
+	onSelectFolder,
 	selectedFolder,
-}: FileTreeItemProps & {
-	onSelectFolder?: (path: string) => void;
-	selectedFolder?: string;
-}) {
+}: FileTreeItemProps) {
 	const { t } = useTranslation("common");
 	const [isDragging, setIsDragging] = useState(false);
 	const dragImageRef = useRef<HTMLDivElement | null>(null);
@@ -123,13 +102,12 @@ export function FileTreeItem({
 		}
 	};
 
+	// Bound on folders only.
 	const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
 		if (e.key === "Enter" || e.key === " ") {
 			e.preventDefault();
 			e.stopPropagation();
-			if (node.isDirectory) {
-				onToggle();
-			}
+			onToggle();
 		}
 	};
 
@@ -181,14 +159,7 @@ export function FileTreeItem({
 		}
 	};
 
-	const _handleSelectFolder = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		if (node.isDirectory) {
-			onSelectFolder?.(node.path); // Appelle onSelectFolder avec le chemin du dossier si défini
-		}
-	};
-
-	// Ajoute un effet visuel sur le dossier sélectionné
+	// The folder picked in a folder picker is highlighted.
 	const isSelected = selectedFolder === node.path;
 
 	// Determine which icon to show in the expand/collapse button
@@ -234,7 +205,7 @@ export function FileTreeItem({
 				node.isDirectory &&
 					"focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
 				isDragging && "opacity-50 bg-accent ring-2 ring-primary",
-				isSelected && "bg-primary text-white", // Highlight si sélectionné
+				isSelected && "bg-primary text-primary-foreground",
 			)}
 			style={{ paddingLeft: `${depth * 12 + 8}px` }}
 			onClick={handleClick}
@@ -245,6 +216,7 @@ export function FileTreeItem({
 					: undefined
 			}
 			aria-expanded={node.isDirectory ? isExpanded : undefined}
+			aria-pressed={node.isDirectory && onSelectFolder ? isSelected : undefined}
 		>
 			{/* Expand/collapse chevron for directories */}
 			{node.isDirectory ? (
@@ -282,7 +254,12 @@ export function FileTreeItem({
 			)}
 
 			{/* Name */}
-			<span className="text-xs truncate flex-1 text-foreground">
+			<span
+				className={cn(
+					"text-xs truncate flex-1",
+					isSelected ? "text-primary-foreground" : "text-foreground",
+				)}
+			>
 				{node.name}
 			</span>
 		</div>

@@ -273,7 +273,10 @@
 		"bulkRestoreSuccess": "{{count}} task(s) restored",
 		"sortActiveDragHint": "Manual reordering is disabled while a sort is active. Switch back to \"Manual order\" to drag and drop.",
 		"aging": {
-			"idleFor": "Idle for {{duration}}"
+			"idleFor": "Idle for {{duration}}",
+			"days": "{{count}}d",
+			"hours": "{{count}}h",
+			"minutes": "{{count}}min"
 		},
 		"stale": {
 			"chip": "{{count}} idle",
