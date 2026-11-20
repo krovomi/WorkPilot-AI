@@ -14,7 +14,6 @@ export interface RoadmapProps {
 export interface PhaseCardProps {
 	phase: RoadmapPhase;
 	features: RoadmapFeature[];
-	isFirst: boolean;
 	onFeatureSelect: (feature: RoadmapFeature) => void;
 	onConvertToSpec: (feature: RoadmapFeature) => void;
 	onGoToTask: (specId: string) => void;
@@ -33,7 +32,7 @@ export interface FeatureDetailPanelProps {
 	onClose: () => void;
 	onConvertToSpec: (feature: RoadmapFeature) => void;
 	onGoToTask: (specId: string) => void;
-	onDelete?: (featureId: string) => void;
+	onDelete: (featureId: string) => void;
 	competitorInsights?: CompetitorPainPoint[];
 }
 

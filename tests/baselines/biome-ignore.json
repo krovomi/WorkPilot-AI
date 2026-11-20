@@ -153,8 +153,6 @@
   "apps/frontend/src/renderer/components/pixel-office/AgentBubble.tsx": 1,
   "apps/frontend/src/renderer/components/plugin-marketplace/PluginCreatorWizard.tsx": 11,
   "apps/frontend/src/renderer/components/prompt-optimizer/PromptOptimizerDialog.tsx": 2,
-  "apps/frontend/src/renderer/components/roadmap/FeatureCard.tsx": 1,
-  "apps/frontend/src/renderer/components/roadmap/PhaseCard.tsx": 4,
   "apps/frontend/src/renderer/components/settings/AgentProfileSettings.tsx": 1,
   "apps/frontend/src/renderer/components/settings/ApiKeyConfigContent.tsx": 5,
   "apps/frontend/src/renderer/components/settings/CleanProviderSection.tsx": 1,
