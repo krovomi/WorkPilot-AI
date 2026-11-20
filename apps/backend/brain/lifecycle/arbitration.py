@@ -46,7 +46,7 @@ from typing import Any
 
 from ..memories import redact
 from ..notes import Note, inside, now_iso, read_note, slugify, write_note
-from .contradictions import CHECKED_FOLDERS, compare, find_for, statement
+from .contradictions import CHECKED_FOLDERS, find_for, statement
 from .journal import JournalEntry, append, preview_of
 from .store import FOLDER_KIND, FOLDERS, archive, link_variants, own_text
 
@@ -144,6 +144,23 @@ def _save(root: Path, data: dict[str, Any]) -> None:
         logger.warning("brain: conflict queue not saved: %s", exc)
 
 
+def _path_of(item: dict[str, Any], side: str) -> str:
+    """The vault path of one side of a queued pair; "" when it has none.
+
+    The queue is a file on this machine that a person may have edited: a side
+    that is not an object names no note.
+    """
+    entry = item.get(side)
+    return str(entry.get("path") or "") if isinstance(entry, dict) else ""
+
+
+def _strings(value: Any) -> list[str]:
+    """A frontmatter list as strings; a single value written by hand is one item."""
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    return [str(value)] if value else []
+
+
 def _exists(root: Path, rel: str) -> bool:
     try:
         return inside(root, rel).is_file()
@@ -157,8 +174,7 @@ def open_conflicts(root: Path, base: str | None = None) -> list[dict[str, Any]]:
     live = [
         item
         for item in data["open"]
-        if _exists(root, str(item.get("a", {}).get("path") or ""))
-        and _exists(root, str(item.get("b", {}).get("path") or ""))
+        if _exists(root, _path_of(item, "a")) and _exists(root, _path_of(item, "b"))
     ]
     if len(live) != len(data["open"]):
         data["open"] = live
@@ -188,8 +204,8 @@ def _side(rel: str, note: Note) -> dict[str, Any]:
         "updated": str(note.meta.get("updated") or note.meta.get("created") or ""),
         "pinned": note.meta.get("pinned") is True,
         "confidence": _confidence(note),
-        "agents": [str(a) for a in note.meta.get("agents") or []][:5],
-        "tasks": [str(t) for t in note.meta.get("tasks") or []][:5],
+        "agents": _strings(note.meta.get("agents"))[:5],
+        "tasks": _strings(note.meta.get("tasks"))[:5],
     }
 
 
@@ -449,8 +465,8 @@ def resolve(
     if entry is None:
         return {"ok": False, "code": "not-found"}
     base = str(entry.get("base") or "")
-    a_rel = str(entry.get("a", {}).get("path") or "")
-    b_rel = str(entry.get("b", {}).get("path") or "")
+    a_rel, b_rel = _path_of(entry, "a"), _path_of(entry, "b")
+    a_side = entry["a"] if isinstance(entry.get("a"), dict) else {}
     where = _memory_of(a_rel)
     if (
         not where
@@ -538,7 +554,7 @@ def resolve(
             action="resolve",
             actor=actor,
             note=canonical or a_rel,
-            title=str(entry.get("a", {}).get("title") or ""),
+            title=str(a_side.get("title") or ""),
             reason_code=reason_code,
             reason=str(entry.get("detail") or ""),
             related=[r for r in (a_rel, b_rel) if r != canonical],
@@ -546,9 +562,3 @@ def resolve(
     )
     _save(root, data)
     return {"ok": True, "canonical": canonical}
-
-
-def compare_texts(a: str, b: str) -> dict[str, str] | None:
-    """The detector on two raw texts (the restore warning, tests)."""
-    found = compare(a, b)
-    return {"signal": found.signal, "detail": found.detail} if found else None
