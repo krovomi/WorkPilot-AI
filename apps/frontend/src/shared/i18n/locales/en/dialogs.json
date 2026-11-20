@@ -297,7 +297,14 @@
 		"model": "Model",
 		"thinkingLevel": "Thinking Level",
 		"cancel": "Cancel",
-		"apply": "Apply"
+		"apply": "Apply",
+		"thinkingHints": {
+			"none": "No extended thinking",
+			"low": "Brief consideration",
+			"medium": "Moderate analysis",
+			"high": "Deep thinking",
+			"ultrathink": "Maximum reasoning depth"
+		}
 	},
 	"removeProject": {
 		"title": "Remove Project?",

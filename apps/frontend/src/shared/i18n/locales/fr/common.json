@@ -532,7 +532,10 @@
 		"cancel": "Annuler ce téléchargement",
 		"retry": "Réessayer",
 		"cancelledLabel": "Annulé",
-		"hint": "Les téléchargements continuent en arrière-plan, même si vous fermez cette tâche."
+		"hint": "Les téléchargements continuent en arrière-plan, même si vous fermez cette tâche.",
+		"hoursRemaining": "encore {{count}} h",
+		"minutesRemaining": "encore {{count}} min",
+		"secondsRemaining": "encore {{count}} s"
 	},
 	"ideation": {
 		"converting": "Conversion...",
