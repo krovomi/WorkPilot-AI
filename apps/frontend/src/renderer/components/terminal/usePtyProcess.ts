@@ -169,8 +169,8 @@ export function usePtyProcess({
 			return;
 		}
 
-		// Clear retry counter since we're proceeding with creation
-		recreationRetryCountRef.current = 0;
+		// The retry count is kept across attempts: it is reset on success or
+		// once the recreation gives up, so failed attempts end in onError.
 
 		const store = getStore();
 		const terminalState = store.terminals.find((t) => t.id === terminalId);

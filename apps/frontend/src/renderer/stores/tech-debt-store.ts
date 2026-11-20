@@ -62,11 +62,17 @@ const failure = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export const useTechDebtStore = create<TechDebtState>((set, get) => {
 	// A read for another project empties the view first, and an answer for a
-	// project the view has since left is dropped.
-	const switchTo = (projectPath: string) => {
-		if (get().projectPath !== projectPath) set({ ...EMPTY, projectPath, scanning: false });
+	// view the store has since left is dropped, even when it came back to the
+	// same project since: each switch starts a new view.
+	let view = 0;
+	const switchTo = (projectPath: string): number => {
+		if (get().projectPath !== projectPath) {
+			view += 1;
+			set({ ...EMPTY, projectPath, scanning: false });
+		}
+		return view;
 	};
-	const current = (projectPath: string) => get().projectPath === projectPath;
+	const current = (asked: number) => asked === view;
 
 	return {
 		projectPath: null,
@@ -78,11 +84,11 @@ export const useTechDebtStore = create<TechDebtState>((set, get) => {
 			set((state) => ({ filters: { ...state.filters, [key]: value } })),
 
 		scan: async (projectPath) => {
-			switchTo(projectPath);
+			const asked = switchTo(projectPath);
 			set({ scanning: true, error: null });
 			try {
 				const { result } = await globalThis.electronAPI.scanTechDebt({ projectPath });
-				if (!current(projectPath)) return;
+				if (!current(asked)) return;
 				set({
 					items: result.items,
 					trend: result.trend,
@@ -91,25 +97,25 @@ export const useTechDebtStore = create<TechDebtState>((set, get) => {
 					lastScannedAt: result.scanned_at,
 				});
 			} catch (e) {
-				if (current(projectPath)) set({ error: failure(e), scanning: false });
+				if (current(asked)) set({ error: failure(e), scanning: false });
 			}
 		},
 
 		refresh: async (projectPath) => {
-			switchTo(projectPath);
+			const asked = switchTo(projectPath);
 			try {
 				const { result } = await globalThis.electronAPI.listDebtItems({
 					projectPath,
 					minScore: get().filters.minScore,
 				});
-				if (!current(projectPath)) return;
+				if (!current(asked)) return;
 				set({
 					items: result.items,
 					trend: result.trend,
 					summary: result.summary,
 				});
 			} catch (e) {
-				if (current(projectPath)) set({ error: failure(e) });
+				if (current(asked)) set({ error: failure(e) });
 			}
 		},
 
@@ -131,7 +137,9 @@ export const useTechDebtStore = create<TechDebtState>((set, get) => {
 
 		setError: (error) => set({ error }),
 
-		clear: () =>
-			set({ ...EMPTY, projectPath: null, filters: DEFAULT_FILTERS, scanning: false }),
+		clear: () => {
+			view += 1;
+			set({ ...EMPTY, projectPath: null, filters: DEFAULT_FILTERS, scanning: false });
+		},
 	};
 });
