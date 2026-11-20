@@ -202,7 +202,8 @@
 	},
 	"code": {
 		"copy": "Copier",
-		"copied": "Copié"
+		"copied": "Copié",
+		"copyFailed": "Copie refusée"
 	},
 	"composer": {
 		"target": "Cible",
@@ -220,6 +221,7 @@
 		"taskCreated": "Tâche créée",
 		"creatingTask": "Création…",
 		"createTask": "Créer une tâche Kanban",
+		"taskFailed": "La tâche n'a pas pu être créée. Réessayez.",
 		"regenerate": "Régénérer",
 		"written_one": "{{count}} fichier en revue",
 		"written_other": "{{count}} fichiers en revue",
