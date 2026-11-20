@@ -39,8 +39,11 @@ if step == "ok":
     sys.exit(0)
 if step == "fail":
     # More than a pipe buffer on stderr: the executor must keep reading it.
-    # A warning comes first and the error last, as an interpreter writes them.
-    sys.stderr.write("a warning\n" + "E" * 100_000 + "\nboom: the real error")
+    # A warning comes first and the error last, as an interpreter writes them,
+    # with the line ends of Windows, where text written to stderr gets CRLF.
+    text = "a warning\r\n" + "E" * 100_000 + "\r\nboom: the real error"
+    sys.stderr.buffer.write(text.encode("utf-8"))
+    sys.stderr.flush()
     sys.exit(1)
 if step == "silent":
     sys.exit(3)
