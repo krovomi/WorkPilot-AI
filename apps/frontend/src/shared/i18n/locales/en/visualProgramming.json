@@ -298,6 +298,7 @@
 	"brickDescription": "What it does",
 	"brickDescriptionExample": "e.g. Orchestrates the sub-agents and dispatches tasks by model.",
 	"brickDelete": "Delete brick",
+	"brickSaveFailed": "The brick could not be saved: it may have been deleted meanwhile.",
 	"brickSave": "Save",
 	"brickCreate": "Create brick",
 	"edgeEditHint": "Enter to confirm, Esc to cancel.",

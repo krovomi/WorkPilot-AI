@@ -2083,7 +2083,9 @@
 		"pending": "Pending invitations",
 		"none": "No pending invitations.",
 		"expires": "expires",
-		"revoke": "Revoke"
+		"revoke": "Revoke",
+		"copyLink": "Copy the link",
+		"copyFailed": "The link could not be copied"
 	},
 	"jiraImport": {
 		"title": "Import Jira Issues",

@@ -2,19 +2,25 @@ import { Check, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { BRICK_ACCENTS, isAccent } from "../../lib/custom-bricks";
 
-interface ColorSwatchesProps {
+interface ColorSwatchesBase {
 	/** `#rrggbb`, or undefined when the colour is automatic. */
 	value: string | undefined;
-	/** `undefined` returns to the automatic colour. */
-	onChange: (value: string | undefined) => void;
 	/** Accessible name of the group ("Connectors", "Background"…). */
 	label: string;
 	swatches?: string[];
-	/** Offer "automatic" (no colour of one's own). */
-	allowAuto?: boolean;
 	/** Colour the picker opens on when there is no value. */
 	fallback?: string;
 }
+
+/**
+ * Offering "automatic" (no colour of one's own) is what lets the picker hand
+ * back `undefined`; without it, the caller always gets a colour.
+ */
+type ColorSwatchesProps = ColorSwatchesBase &
+	(
+		| { allowAuto: true; onChange: (value: string | undefined) => void }
+		| { allowAuto?: false; onChange: (value: string) => void }
+	);
 
 /**
  * A row of colour swatches, a free colour picker and, when the colour can be
@@ -22,22 +28,16 @@ interface ColorSwatchesProps {
  * inspector and the canvas colours, so every colour on the canvas is picked
  * the same way.
  */
-export function ColorSwatches({
-	value,
-	onChange,
-	label,
-	swatches = BRICK_ACCENTS,
-	allowAuto = false,
-	fallback = "#f97316",
-}: ColorSwatchesProps) {
+export function ColorSwatches(props: ColorSwatchesProps) {
+	const { value, onChange, label, swatches = BRICK_ACCENTS, fallback = "#f97316" } = props;
 	const { t } = useTranslation("visualProgramming");
 	const current = isAccent(value) ? value.toLowerCase() : undefined;
 	return (
 		<fieldset className="flex flex-wrap items-center gap-1.5" aria-label={label}>
-			{allowAuto ? (
+			{props.allowAuto ? (
 				<button
 					type="button"
-					onClick={() => onChange(undefined)}
+					onClick={() => props.onChange(undefined)}
 					aria-pressed={current === undefined}
 					title={t("colorAuto", "Automatique")}
 					aria-label={t("colorAuto", "Automatique")}
