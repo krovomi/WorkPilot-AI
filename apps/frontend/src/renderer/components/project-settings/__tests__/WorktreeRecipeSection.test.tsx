@@ -114,4 +114,33 @@ describe("WorktreeRecipeSection", () => {
 		expect(await screen.findByRole("alert")).toHaveTextContent("a command is a list");
 		expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
 	});
+
+	it("shows nothing and reads nothing without a project folder", () => {
+		const { container } = render(<WorktreeRecipeSection />);
+		expect(container.innerHTML).toBe("");
+		expect(api.getWorktreeRecipe).not.toHaveBeenCalled();
+	});
+
+	it("says why the recipe could not be read, and forgets it once it works", async () => {
+		api.getWorktreeRecipe.mockResolvedValue({ success: false, error: "toml: line 3" });
+		const { unmount } = render(<WorktreeRecipeSection projectPath="/repo" />);
+		expect(await screen.findByText("toml: line 3")).toBeInTheDocument();
+		unmount();
+
+		api.getWorktreeRecipe.mockResolvedValue({ success: true, data: detectedState });
+		api.saveDetectedWorktreeRecipe.mockResolvedValue({ success: false });
+		render(<WorktreeRecipeSection projectPath="/repo" />);
+		fireEvent.click(await screen.findByRole("button", { name: /worktree\.toml/i }));
+		expect(
+			await screen.findByText("The worktree recipe could not be read or saved."),
+		).toBeInTheDocument();
+
+		api.saveDetectedWorktreeRecipe.mockResolvedValue({ success: true, data: detectedState });
+		fireEvent.click(screen.getByRole("button", { name: /worktree\.toml/i }));
+		await waitFor(() =>
+			expect(
+				screen.queryByText("The worktree recipe could not be read or saved."),
+			).toBeNull(),
+		);
+	});
 });
