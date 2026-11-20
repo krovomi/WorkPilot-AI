@@ -1066,6 +1066,10 @@
 		"capture": "Capturer",
 		"capturing": "Capture...",
 		"noSources": "Aucun écran ou fenêtre trouvé",
+		"kind": {
+			"screen": "Écran",
+			"window": "Fenêtre"
+		},
 		"errors": {
 			"getSources": "Échec de l'obtention des sources de capture d'écran",
 			"fetchSources": "Échec de la récupération des sources de capture d'écran",

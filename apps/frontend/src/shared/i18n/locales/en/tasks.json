@@ -1066,6 +1066,10 @@
 		"capture": "Capture",
 		"capturing": "Capturing...",
 		"noSources": "No screens or windows found",
+		"kind": {
+			"screen": "Screen",
+			"window": "Window"
+		},
 		"errors": {
 			"getSources": "Failed to get screenshot sources",
 			"fetchSources": "Failed to fetch screenshot sources",

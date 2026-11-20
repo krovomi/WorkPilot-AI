@@ -490,7 +490,8 @@
 			"busy": "REA is already being installed."
 		},
 		"noCredentials": "REA runs without your credentials, from a folder of its own, and only reads files.",
-		"docsFailed": "The link did not open: {{error}}"
+		"docsFailed": "The link did not open: {{error}}",
+		"checkFailed": "The check did not complete: {{error}}"
 	},
 	"cliStatus": {
 		"installFailed": "Installation failed",

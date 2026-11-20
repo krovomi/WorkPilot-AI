@@ -84,7 +84,6 @@
   "apps/frontend/src/renderer/components/GitHubSetupModal.tsx": 5,
   "apps/frontend/src/renderer/components/GlobalDownloadIndicator.tsx": 2,
   "apps/frontend/src/renderer/components/KanbanBoard.tsx": 2,
-  "apps/frontend/src/renderer/components/KeyboardShortcutsOverlay.tsx": 3,
   "apps/frontend/src/renderer/components/LearningExplanationCard.tsx": 2,
   "apps/frontend/src/renderer/components/PRFilesModal.tsx": 4,
   "apps/frontend/src/renderer/components/PhaseProgressIndicator.tsx": 1,

@@ -1430,7 +1430,29 @@
 		"title": "Keyboard Shortcuts",
 		"pressBefore": "Press",
 		"escapeKey": "Escape",
-		"pressAfter": "to close · Single-key shortcuts work when not typing in an input"
+		"pressAfter": "to close · Menu shortcuts (two letters, typed one after the other) work when a project is open and you are not typing in a field",
+		"groups": {
+			"navigation": "Navigation",
+			"general": "General",
+			"terminal": "Terminals",
+			"menu": "Menu"
+		},
+		"items": {
+			"goKanban": "Go to Kanban",
+			"goTerminals": "Go to Terminals",
+			"goInsights": "Go to Insights",
+			"goRoadmap": "Go to Roadmap",
+			"openSettings": "Open Settings",
+			"commandPalette": "Command palette",
+			"shortcuts": "Keyboard shortcuts",
+			"newTask": "New task",
+			"addProject": "Add a project (outside Terminals)",
+			"voiceAssistant": "Voice assistant",
+			"stopAgents": "Stop all agents",
+			"closeDialog": "Close a dialog or overlay",
+			"newTerminal": "New terminal (in Terminals)",
+			"closeTerminal": "Close the terminal (in Terminals)"
+		}
 	},
 	"learningMode": {
 		"level": "Level: {{level}}",

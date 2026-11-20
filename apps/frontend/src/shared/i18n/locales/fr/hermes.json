@@ -120,7 +120,8 @@
 		"description": "L'agent de Nous Research, qui apprend hors de WorkPilot. Ce qu'il apprend arrive dans la file de relecture, à traiter depuis le panneau d'une tâche.",
 		"pending_one": "{{count}} skill attend votre relecture dans le panneau d'une tâche.",
 		"pending_other": "{{count}} skills attendent votre relecture dans le panneau d'une tâche.",
-		"docs": "Documentation de {{name}}"
+		"docs": "Documentation de {{name}}",
+		"docsFailed": "Le lien ne s'est pas ouvert : {{error}}"
 	},
 	"errors": {
 		"backendUnreachable": "Le backend local de WorkPilot n’a pas répondu. Démarrez-le (ou relancez l’application), puis actualisez."
