@@ -89,10 +89,8 @@ def active(root: Path | None = None) -> bool:
     """Turned on, and a brain actually exists to serve."""
     if not enabled():
         return False
-    try:
-        return is_brain(root or brain_dir())
-    except OSError:
-        return False
+    # `is_brain` answers False for a folder it cannot look into.
+    return is_brain(root or brain_dir())
 
 
 def mcp_server_config(

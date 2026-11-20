@@ -28,6 +28,38 @@ import type {
 	CustomMcpServer,
 } from "../../shared/types/project";
 
+/** What went wrong, worded by the view (`mcpMarketplace.errors.<key>`). */
+export type McpMarketplaceErrorKey =
+	| "loadCatalog"
+	| "loadBuilder"
+	| "unknownServer"
+	| "missingValues"
+	| "alreadyInstalled"
+	| "readSettings"
+	| "saveSettings"
+	| "install"
+	| "uninstall"
+	| "saveBuilder"
+	| "deleteBuilder";
+
+export interface McpMarketplaceError {
+	key: McpMarketplaceErrorKey;
+	/** The server, or the missing values, the sentence names */
+	name?: string;
+	/** The main process's or the exception's own message, when there is one */
+	detail?: string;
+}
+
+function failure(
+	key: McpMarketplaceErrorKey,
+	detail?: unknown,
+	name?: string,
+): McpMarketplaceError {
+	const text =
+		detail instanceof Error ? detail.message : typeof detail === "string" ? detail : "";
+	return { key, ...(name ? { name } : {}), ...(text ? { detail: text } : {}) };
+}
+
 interface McpMarketplaceState {
 	activeTab: McpMarketplaceTab;
 	filters: McpMarketplaceFilters;
@@ -44,7 +76,7 @@ interface McpMarketplaceState {
 	isCatalogLoading: boolean;
 	isInstalledLoading: boolean;
 	isBuilderLoading: boolean;
-	error: string | null;
+	error: McpMarketplaceError | null;
 
 	setActiveTab: (tab: McpMarketplaceTab) => void;
 	setFilters: (filters: Partial<McpMarketplaceFilters>) => void;
@@ -67,10 +99,9 @@ interface McpMarketplaceState {
 	setCatalogLoading: (loading: boolean) => void;
 	setInstalledLoading: (loading: boolean) => void;
 	setBuilderLoading: (loading: boolean) => void;
-	setError: (error: string | null) => void;
+	setError: (error: McpMarketplaceError | null) => void;
 
 	getFilteredCatalog: () => McpMarketplaceServer[];
-	isServerInstalled: (serverId: string) => boolean;
 }
 
 const defaultFilters: McpMarketplaceFilters = {
@@ -172,10 +203,6 @@ export const useMcpMarketplaceStore = create<McpMarketplaceState>(
 
 			return filtered;
 		},
-
-		isServerInstalled: (serverId) => {
-			return get().installed.some((s) => s.id === serverId);
-		},
 	}),
 );
 
@@ -191,32 +218,38 @@ export async function loadMarketplaceCatalog(): Promise<void> {
 		if (result?.success) {
 			store.setCatalog(result.data);
 		} else {
-			store.setError(result?.error || "Failed to load catalog");
+			store.setError(failure("loadCatalog", result?.error));
 		}
 	} catch (err) {
-		store.setError(
-			err instanceof Error ? err.message : "Failed to load catalog",
-		);
+		store.setError(failure("loadCatalog", err));
 	} finally {
 		store.setCatalogLoading(false);
 	}
 }
 
+/** The latest read of a project's servers; an older answer is dropped. */
+let installedRead = 0;
+
 /**
  * Reads the project's custom MCP servers and agent overrides; false when they
- * could not be read, the store then still holding what it held before.
+ * could not be read, the store then still holding what it held before. The
+ * answer of a read that a later one (another project) replaced is dropped,
+ * and false.
  */
 export async function loadInstalledServers(
 	projectId: string | null | undefined,
 ): Promise<boolean> {
 	const store = useMcpMarketplaceStore.getState();
+	const read = ++installedRead;
 	if (!projectId) {
 		store.setProjectServers(null, [], {});
+		store.setInstalledLoading(false);
 		return true;
 	}
 	store.setInstalledLoading(true);
 	try {
 		const result = await globalThis.electronAPI.getProjectEnv(projectId);
+		if (read !== installedRead) return false;
 		if (result?.success && result.data) {
 			store.setProjectServers(
 				projectId,
@@ -229,9 +262,10 @@ export async function loadInstalledServers(
 		return true;
 	} catch (err) {
 		console.error("[MCP Marketplace] Failed to load project servers:", err);
+		if (read === installedRead) store.setError(failure("readSettings", err));
 		return false;
 	} finally {
-		store.setInstalledLoading(false);
+		if (read === installedRead) store.setInstalledLoading(false);
 	}
 }
 
@@ -247,7 +281,7 @@ async function saveProjectServers(
 		agentMcpOverrides: overrides,
 	});
 	if (!result?.success) {
-		store.setError(result?.error || "Failed to save the project settings");
+		store.setError(failure("saveSettings", result?.error));
 		return false;
 	}
 	store.setProjectServers(projectId, servers, overrides);
@@ -267,14 +301,15 @@ export async function installMarketplaceServer(
 	language = "en",
 ): Promise<boolean> {
 	const store = useMcpMarketplaceStore.getState();
+	store.setError(null);
 	const entry = store.catalog.find((s) => s.id === serverId);
 	if (!entry) {
-		store.setError(`Unknown server: ${serverId}`);
+		store.setError(failure("unknownServer", undefined, serverId));
 		return false;
 	}
 	const built = buildCatalogServer(entry, values, language);
 	if (!built.ok) {
-		store.setError(`Missing: ${built.missing.join(", ")}`);
+		store.setError(failure("missingValues", undefined, built.missing.join(", ")));
 		return false;
 	}
 	store.setIsInstalling(serverId);
@@ -283,12 +318,12 @@ export async function installMarketplaceServer(
 		// a failed read the store still holds an older (or another project's)
 		// list, and writing it would replace this project's servers.
 		if (!(await loadInstalledServers(projectId))) {
-			store.setError("Failed to read the project settings");
+			store.setError(useMcpMarketplaceStore.getState().error ?? failure("readSettings"));
 			return false;
 		}
 		const { installed, agentOverrides } = useMcpMarketplaceStore.getState();
 		if (installed.some((s) => s.id === serverId)) {
-			store.setError(`${entry.name} is already installed in this project`);
+			store.setError(failure("alreadyInstalled", undefined, entry.name));
 			return false;
 		}
 		return await saveProjectServers(
@@ -297,7 +332,7 @@ export async function installMarketplaceServer(
 			withServerForAgents(agentOverrides, serverId, agents),
 		);
 	} catch (err) {
-		store.setError(err instanceof Error ? err.message : "Installation failed");
+		store.setError(failure("install", err));
 		return false;
 	} finally {
 		store.setIsInstalling(null);
@@ -309,15 +344,21 @@ export async function uninstallMarketplaceServer(
 	projectId: string,
 	serverId: string,
 ): Promise<boolean> {
+	const store = useMcpMarketplaceStore.getState();
+	store.setError(null);
 	try {
-		if (!(await loadInstalledServers(projectId))) return false;
+		if (!(await loadInstalledServers(projectId))) {
+			store.setError(useMcpMarketplaceStore.getState().error ?? failure("readSettings"));
+			return false;
+		}
 		const { installed, agentOverrides } = useMcpMarketplaceStore.getState();
 		return await saveProjectServers(
 			projectId,
 			installed.filter((s) => s.id !== serverId),
 			withoutServer(agentOverrides, serverId),
 		);
-	} catch {
+	} catch (err) {
+		store.setError(failure("uninstall", err));
 		return false;
 	}
 }
@@ -332,9 +373,12 @@ export async function loadBuilderProjects(): Promise<void> {
 		);
 		if (result?.success) {
 			store.setBuilderProjects(result.data);
+		} else {
+			store.setError(failure("loadBuilder", result?.error));
 		}
 	} catch (err) {
 		console.error("[MCP Marketplace] Failed to load builder projects:", err);
+		store.setError(failure("loadBuilder", err));
 	} finally {
 		store.setBuilderLoading(false);
 	}
@@ -344,6 +388,7 @@ export async function saveBuilderProject(
 	project: McpBuilderProject,
 ): Promise<boolean> {
 	const store = useMcpMarketplaceStore.getState();
+	store.setError(null);
 
 	try {
 		const result = await globalThis.electronAPI?.invoke(
@@ -359,8 +404,10 @@ export async function saveBuilderProject(
 			}
 			return true;
 		}
+		store.setError(failure("saveBuilder", result?.error));
 		return false;
-	} catch {
+	} catch (err) {
+		store.setError(failure("saveBuilder", err));
 		return false;
 	}
 }
@@ -369,6 +416,7 @@ export async function deleteBuilderProject(
 	projectId: string,
 ): Promise<boolean> {
 	const store = useMcpMarketplaceStore.getState();
+	store.setError(null);
 
 	try {
 		const result = await globalThis.electronAPI?.invoke(
@@ -379,8 +427,10 @@ export async function deleteBuilderProject(
 			store.removeBuilderProject(projectId);
 			return true;
 		}
+		store.setError(failure("deleteBuilder", result?.error));
 		return false;
-	} catch {
+	} catch (err) {
+		store.setError(failure("deleteBuilder", err));
 		return false;
 	}
 }

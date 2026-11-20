@@ -17,14 +17,12 @@ export function DebtTrendChart({ trend }: Props) {
 	const max = Math.max(...trend.map((p) => p.total_items), 1);
 	const width = 400;
 	const height = 120;
-	const step = trend.length > 1 ? width / (trend.length - 1) : 0;
-	const points = trend
-		.map((p, i) => {
-			const x = i * step;
-			const y = height - (p.total_items / max) * (height - 10) - 5;
-			return `${x},${y}`;
-		})
-		.join(" ");
+	const y = (p: DebtTrendPoint) => height - (p.total_items / max) * (height - 10) - 5;
+	// A single scan draws a flat line across the chart rather than an invisible point.
+	const points =
+		trend.length === 1
+			? `0,${y(trend[0])} ${width},${y(trend[0])}`
+			: trend.map((p, i) => `${(i * width) / (trend.length - 1)},${y(p)}`).join(" ");
 	const first = trend[0];
 	const last = trend[trend.length - 1];
 	const delta = last.total_items - first.total_items;
