@@ -124,9 +124,14 @@ class DraftSet:
     @classmethod
     def from_dict(cls, payload: dict) -> DraftSet:
         def pick(model, item: dict):
-            return model(
-                **{k: v for k, v in item.items() if k in model.__dataclass_fields__}
-            )
+            # A record edited by hand, or written by another version, that
+            # lacks a field is dropped, not a reason the card cannot load.
+            try:
+                return model(
+                    **{k: v for k, v in item.items() if k in model.__dataclass_fields__}
+                )
+            except TypeError:
+                return None
 
         tables: list[TableDraft] = []
         for item in payload.get("tables") or []:
@@ -138,23 +143,25 @@ class DraftSet:
                     table=RuleTable.from_dict(item["table"]),
                     source=str(item.get("source", "")),
                     tests=[
-                        pick(TestDraft, t)
+                        test
                         for t in item.get("tests") or []
-                        if isinstance(t, dict)
+                        if isinstance(t, dict) and (test := pick(TestDraft, t))
                     ],
                     status=str(item.get("status", "proposed")),
                 )
             )
         return cls(
             requirements=[
-                pick(RequirementDraft, r)
+                draft
                 for r in payload.get("requirements") or []
                 if isinstance(r, dict)
+                and (draft := pick(RequirementDraft, r))
+                and draft.kind in ("FR", "NFR")
             ],
             criteria=[
-                pick(CriterionDraft, c)
+                draft
                 for c in payload.get("criteria") or []
-                if isinstance(c, dict)
+                if isinstance(c, dict) and (draft := pick(CriterionDraft, c))
             ],
             tables=tables,
             sources=[str(s) for s in payload.get("sources") or []],
@@ -662,9 +669,11 @@ def decide(
         kind: max(
             taken[kind],
             *(
-                int(d.id.split("-")[1])
+                int(match.group(2))
                 for d in drafts.requirements
-                if d.status == "accepted" and d.kind == kind and d.id
+                if d.status == "accepted"
+                and d.kind == kind
+                and (match := _ID.fullmatch(str(d.id)))
             ),
             0,
         )

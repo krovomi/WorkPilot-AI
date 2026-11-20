@@ -11,6 +11,7 @@ projects keep no ADRs and most tasks attach nothing.
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 
@@ -25,6 +26,8 @@ from .sequence import sequence_section
 from .spec_drafts import load_drafts
 from .tables import expected_column
 from .visual_qa import load_visual_qa, report_lines
+
+logger = logging.getLogger(__name__)
 
 MAX_SECTION_CHARS = 12000
 MAX_DOC_CHARS = 2500
@@ -376,47 +379,29 @@ def visual_qa_section(spec_dir: Path) -> str:
 
 
 def docintel_section(project_dir: Path, spec_dir: Path | None = None) -> str:
-    """Both sections, in the order a reader needs them. Never raises."""
-    parts: list[str] = []
-    try:
-        if adrs := adr_section(Path(project_dir)):
-            parts.append(adrs)
-    except Exception:  # noqa: BLE001 - a missing section never stops a phase
-        pass
-    try:
-        if rules := conformance_section(Path(project_dir)):
-            parts.append(rules)
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        if spec_dir is not None and (attached := attachments_section(Path(spec_dir))):
-            parts.append(attached)
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        if spec_dir is not None and (located := diagnostics_section(Path(spec_dir))):
-            parts.append(located)
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        if spec_dir is not None and (rules := rules_section(Path(spec_dir))):
-            parts.append(rules)
-    except Exception:  # noqa: BLE001
-        pass
-    # Lot C: the data model, the flows and the HTTP calls, against the code.
-    # Each is empty unless the task or the repository carries such a source.
+    """Every section, in the order a reader needs them. Never raises."""
+    project = Path(project_dir)
+    spec = Path(spec_dir) if spec_dir is not None else None
     readers = (
-        lambda: erd_section(Path(project_dir), spec_dir),
-        lambda: sequence_section(Path(project_dir), spec_dir),
-        lambda: api_tests_section(Path(project_dir), spec_dir),
+        lambda: adr_section(project),
+        lambda: conformance_section(project),
+        lambda: attachments_section(spec) if spec is not None else "",
+        lambda: diagnostics_section(spec) if spec is not None else "",
+        lambda: rules_section(spec) if spec is not None else "",
+        # Lot C: the data model, the flows and the HTTP calls, against the code.
+        # Each is empty unless the task or the repository carries such a source.
+        lambda: erd_section(project, spec_dir),
+        lambda: sequence_section(project, spec_dir),
+        lambda: api_tests_section(project, spec_dir),
         # Lot E: what the captures of the running app show. Written by the QA
         # loop, so empty for the planner and the first coding session.
-        lambda: visual_qa_section(Path(spec_dir)) if spec_dir is not None else "",
+        lambda: visual_qa_section(spec) if spec is not None else "",
     )
+    parts: list[str] = []
     for read in readers:
         try:
             if section := read():
                 parts.append(section)
         except Exception:  # noqa: BLE001 - a missing section never stops a phase
-            pass
+            logger.debug("docintel: a prompt section failed", exc_info=True)
     return "\n\n".join(parts)
