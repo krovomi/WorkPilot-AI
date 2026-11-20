@@ -63,12 +63,33 @@ function getSubscriptionTranslationKey(subscriptionType?: string): string {
  */
 const OAUTH_FALLBACK = {
 	type: "oauth" as const,
-	name: "OAuth",
-	provider: "anthropic" as const,
-	providerLabel: "Anthropic",
-	badgeColor:
-		"bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500/15",
+	provider: "anthropic",
 } as const;
+
+/** A provider the badges do not know (LM Studio, a custom one…) keeps its own name. */
+function badgeColorOf(provider: string): string {
+	return (
+		getProviderBadgeColor(provider as ApiProvider) ??
+		getProviderBadgeColor("unknown")
+	);
+}
+
+type GithubCliStatus = {
+	available: boolean;
+	isAuth?: boolean;
+	username?: string;
+};
+
+type WindsurfAccount = {
+	userName?: string;
+	planName?: string;
+	usageInfo?: {
+		usedMessages: number;
+		totalMessages: number;
+		usedFlowActions: number;
+		totalFlowActions: number;
+	};
+};
 
 export function AuthStatusIndicator() {
 	const { profiles, activeProfileId } = useSettingsStore(
@@ -83,118 +104,86 @@ export function AuthStatusIndicator() {
 	const { usageProvider: selectedProvider } = useProviderContext();
 
 	// Track GitHub CLI status for Copilot provider
-	const [githubStatus, setGithubStatus] = useState<{
-		available: boolean;
-		isAuth?: boolean;
-		username?: string;
-	} | null>(null);
+	const [githubStatus, setGithubStatus] = useState<GithubCliStatus | null>(
+		null,
+	);
 	const [isLoadingGithubStatus, setIsLoadingGithubStatus] = useState(false);
 
 	// Track Windsurf account info
-	const [windsurfAccount, setWindsurfAccount] = useState<{
-		userName?: string;
-		planName?: string;
-		usageInfo?: {
-			usedMessages: number;
-			totalMessages: number;
-			usedFlowActions: number;
-			totalFlowActions: number;
-		};
-	} | null>(null);
+	const [windsurfAccount, setWindsurfAccount] =
+		useState<WindsurfAccount | null>(null);
 	const [isLoadingWindsurfAccount, setIsLoadingWindsurfAccount] =
 		useState(false);
 
 	// Get Claude subscription info from the profile store (populated from Keychain credentials)
-	const { profiles: claudeProfiles, activeProfileId: activeClaudeProfileId } =
-		useClaudeProfileStore();
-	const activeClaudeProfile = claudeProfiles.find(
-		(p) => p.id === activeClaudeProfileId,
+	const claudeSubscriptionType = useClaudeProfileStore(
+		(s) => s.profiles.find((p) => p.id === s.activeProfileId)?.subscriptionType,
 	);
-	const claudeSubscriptionType = activeClaudeProfile?.subscriptionType;
 
-	// Subscribe to provider/profile change events
+	// Fetch GitHub CLI status when Copilot provider is selected. An answer that
+	// arrives after the provider changed is dropped.
 	useEffect(() => {
-		// This effect can be used for future provider/profile change handling
-	}, []);
-
-	// Fetch GitHub CLI status when Copilot provider is selected
-	useEffect(() => {
-		if (selectedProvider === "copilot") {
-			setIsLoadingGithubStatus(true);
-
-			globalThis.electronAPI
-				.getGithubCliStatus?.()
-				.then(
-					// Le type vient du pont : le reecrire ici le faisait diverger
-					// (`data` requis alors qu'il est optionnel).
-					(result) => {
-						if (result.success && result.data) {
-							setGithubStatus(result.data);
-						} else {
-							setGithubStatus({ available: false });
-						}
-					},
-				)
-				.catch((error: Error) => {
-					console.warn(
-						"[AuthStatusIndicator] Failed to fetch GitHub CLI status:",
-						error,
-					);
-					setGithubStatus({ available: false });
-				})
-				.finally(() => {
-					setIsLoadingGithubStatus(false);
-				});
-		} else {
-			setGithubStatus(null);
+		setGithubStatus(null);
+		if (selectedProvider !== "copilot") {
 			setIsLoadingGithubStatus(false);
+			return;
 		}
+		let current = true;
+		setIsLoadingGithubStatus(true);
+		(async () => {
+			let status: GithubCliStatus = { available: false };
+			try {
+				const result = await globalThis.electronAPI.getGithubCliStatus();
+				if (result.success && result.data) status = result.data;
+			} catch (error) {
+				console.warn(
+					"[AuthStatusIndicator] Failed to fetch GitHub CLI status:",
+					error,
+				);
+			}
+			if (!current) return;
+			setGithubStatus(status);
+			setIsLoadingGithubStatus(false);
+		})();
+		return () => {
+			current = false;
+		};
 	}, [selectedProvider]);
 
-	// Fetch Windsurf account info when Windsurf provider is selected
+	// Fetch Windsurf account info when Windsurf provider is selected. An answer
+	// that arrives after the provider changed is dropped.
 	useEffect(() => {
-		if (selectedProvider === "windsurf") {
-			setIsLoadingWindsurfAccount(true);
-
-			globalThis.electronAPI
-				.detectWindsurfToken?.()
-				.then(
-					(result: {
-						success: boolean;
-						userName?: string;
-						planName?: string;
-						usageInfo?: {
-							usedMessages: number;
-							totalMessages: number;
-							usedFlowActions: number;
-							totalFlowActions: number;
-						};
-					}) => {
-						if (result.success) {
-							setWindsurfAccount({
-								userName: result.userName,
-								planName: result.planName,
-								usageInfo: result.usageInfo,
-							});
-						} else {
-							setWindsurfAccount(null);
-						}
-					},
-				)
-				.catch((error: Error) => {
-					console.warn(
-						"[AuthStatusIndicator] Failed to fetch Windsurf account info:",
-						error,
-					);
-					setWindsurfAccount(null);
-				})
-				.finally(() => {
-					setIsLoadingWindsurfAccount(false);
-				});
-		} else {
-			setWindsurfAccount(null);
+		setWindsurfAccount(null);
+		if (selectedProvider !== "windsurf") {
 			setIsLoadingWindsurfAccount(false);
+			return;
 		}
+		let current = true;
+		setIsLoadingWindsurfAccount(true);
+		(async () => {
+			let account: WindsurfAccount | null = null;
+			try {
+				const result = await globalThis.electronAPI.detectWindsurfToken();
+				if (result.success) {
+					account = {
+						userName: result.userName,
+						planName: result.planName,
+						usageInfo: result.usageInfo,
+					};
+				}
+			} catch (error) {
+				console.warn(
+					"[AuthStatusIndicator] Failed to fetch Windsurf account info:",
+					error,
+				);
+			}
+			if (!current) return;
+			setWindsurfAccount(account);
+			setIsLoadingWindsurfAccount(false);
+		})();
+		return () => {
+			current = false;
+		};
 	}, [selectedProvider]);
 
 	// Derive auth status purely from selectedProvider + profiles (no IPC calls)
@@ -203,8 +192,7 @@ export function AuthStatusIndicator() {
 			const providerProfile = profiles.find(
 				(p) => detectProvider(p.baseUrl) === selectedProvider,
 			);
-			const provider = selectedProvider as ApiProvider;
-			const providerLabel = getProviderLabel(provider);
+			const provider = selectedProvider;
 
 			if (providerProfile) {
 				return {
@@ -212,10 +200,7 @@ export function AuthStatusIndicator() {
 					name: providerProfile.name,
 					id: providerProfile.id,
 					baseUrl: providerProfile.baseUrl,
-					createdAt: providerProfile.createdAt,
 					provider,
-					providerLabel,
-					badgeColor: getProviderBadgeColor(provider),
 				};
 			}
 
@@ -224,40 +209,33 @@ export function AuthStatusIndicator() {
 				return OAUTH_FALLBACK;
 			}
 
-			return {
-				type: "provider" as const,
-				name: providerLabel,
-				provider,
-				providerLabel,
-				badgeColor: getProviderBadgeColor(provider),
-			};
+			return { type: "provider" as const, provider };
 		}
 
 		if (activeProfileId) {
 			const activeProfile = profiles.find((p) => p.id === activeProfileId);
 			if (activeProfile) {
-				const provider = detectProvider(activeProfile.baseUrl);
-				const providerLabel = getProviderLabel(provider);
 				return {
 					type: "profile" as const,
 					name: activeProfile.name,
 					id: activeProfile.id,
 					baseUrl: activeProfile.baseUrl,
-					createdAt: activeProfile.createdAt,
-					provider,
-					providerLabel,
-					badgeColor: getProviderBadgeColor(provider),
+					provider: detectProvider(activeProfile.baseUrl),
 				};
 			}
 		}
 
-		// Final fallback — use OAUTH_FALLBACK only for Anthropic, generic provider otherwise
+		// No provider observed and no active profile: the Claude Code subscription.
 		return OAUTH_FALLBACK;
 	}, [selectedProvider, profiles, activeProfileId]);
 
 	const isOAuth = authStatus.type === "oauth";
 	const Icon = isOAuth ? Lock : Key;
-	const badgeLabel = getProviderLabel(authStatus.provider);
+	const badgeLabel =
+		authStatus.provider === "unknown"
+			? t("common:usage.providerUnknown")
+			: (getProviderLabel(authStatus.provider as ApiProvider) ??
+				authStatus.provider);
 
 	// Render provider-specific content based on selected provider
 	const providerSpecificContent = useMemo(() => {
@@ -477,12 +455,6 @@ export function AuthStatusIndicator() {
 		badgeLabel,
 	]);
 
-	// Helper function to get full ID for display
-	const getFullId = (id: string | undefined): string => {
-		if (!id) return "";
-		return id;
-	};
-
 	return (
 		<div className="flex items-center gap-2">
 			{/* Provider Badge + Tooltip */}
@@ -491,7 +463,7 @@ export function AuthStatusIndicator() {
 					<TooltipTrigger asChild>
 						<button
 							type="button"
-							className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border transition-all hover:opacity-80 ${authStatus.badgeColor}`}
+							className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border transition-all hover:opacity-80 ${badgeColorOf(authStatus.provider)}`}
 							aria-label={t("common:usage.authenticationAriaLabel", {
 								provider: badgeLabel,
 							})}
@@ -566,28 +538,22 @@ export function AuthStatusIndicator() {
 									<div className="flex items-center justify-between">
 										<div className="flex items-center gap-1.5 text-muted-foreground">
 											<Fingerprint className="h-3 w-3" />
-											<span className="text-3xs">
-												{t("common:usage.id")}
-											</span>
+											<span className="text-3xs">{t("common:usage.id")}</span>
 										</div>
-										{authStatus.id && (
-											<span className="text-xs text-muted-foreground ml-2">
-												{getFullId(authStatus.id)}
-											</span>
-										)}
+										<span className="text-xs text-muted-foreground ml-2">
+											{authStatus.id}
+										</span>
 									</div>
 									{/* API Endpoint */}
-									{authStatus.baseUrl && (
-										<div className="pt-1">
-											<div className="flex items-center gap-1.5 text-3xs text-muted-foreground mb-1">
-												<ExternalLink className="h-3 w-3" />
-												<span>{t("common:usage.apiEndpoint")}</span>
-											</div>
-											<div className="text-3xs font-mono bg-muted px-2 py-1.5 rounded break-all border">
-												{authStatus.baseUrl}
-											</div>
+									<div className="pt-1">
+										<div className="flex items-center gap-1.5 text-3xs text-muted-foreground mb-1">
+											<ExternalLink className="h-3 w-3" />
+											<span>{t("common:usage.apiEndpoint")}</span>
 										</div>
-									)}
+										<div className="text-3xs font-mono bg-muted px-2 py-1.5 rounded break-all border">
+											{authStatus.baseUrl}
+										</div>
+									</div>
 								</div>
 							) : (
 								providerSpecificContent

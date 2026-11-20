@@ -466,7 +466,6 @@
 		"orgUrlPlaceholder": "https://dev.azure.com/monorganisation",
 		"pat": "Token PAT",
 		"patPlaceholder": "Personal Access Token",
-		"required": "Tous les champs sont obligatoires.",
 		"invalidUrl": "URL Azure DevOps invalide.",
 		"save": "Valider"
 	}
