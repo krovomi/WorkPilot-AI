@@ -80,6 +80,7 @@
 					"openWindsurfLogin": "windsurf.com/account",
 					"orManual": "Ou connectez-vous manuellement :",
 					"saveAndConnect": "Enregistrer et connecter",
+					"saveFailed": "Impossible d'enregistrer le jeton Windsurf détecté. Relancez la détection ou collez une clé dans l'onglet Clé API.",
 					"saveSuccess": "Connexion Windsurf enregistrée avec succès !",
 					"terminalInstructions": "Cela ouvrira un terminal où vous pourrez exécuter la commande `/login` pour vous authentifier.",
 					"tokenDetected": "Clé API détectée",

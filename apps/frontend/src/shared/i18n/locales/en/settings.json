@@ -87,6 +87,7 @@
 					"openWindsurfLogin": "windsurf.com/account",
 					"tokenDetected": "API key detected",
 					"saveAndConnect": "Save & Connect",
+					"saveFailed": "Could not save the detected Windsurf token. Detect it again, or paste a key in the API Key tab.",
 					"saveSuccess": "Windsurf connection saved successfully!",
 					"accountInfo": "Authenticated Account",
 					"accountName": "Name",

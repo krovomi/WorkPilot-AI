@@ -1154,6 +1154,7 @@ export const IPC_CHANNELS = {
 	CREDENTIAL_CHECK_CLAUDE_OAUTH: "credential:checkClaudeOAuth",
 	CREDENTIAL_CHECK_OPENAI_CODEX_OAUTH: "credential:checkOpenAICodexOAuth",
 	CREDENTIAL_DETECT_WINDSURF_TOKEN: "credential:detectWindsurfToken",
+	CREDENTIAL_SAVE_DETECTED_WINDSURF_TOKEN: "credential:saveDetectedWindsurfToken",
 	CREDENTIAL_GET_ACTIVE: "credential:getActive",
 	CREDENTIAL_SET_ACTIVE: "credential:setActive",
 	CREDENTIAL_TEST_PROVIDER: "credential:testProvider",
