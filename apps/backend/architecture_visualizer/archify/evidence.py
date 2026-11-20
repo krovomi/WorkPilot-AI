@@ -106,12 +106,31 @@ class Evidence:
         }
 
 
+#: Directories whose files are someone else's code or a build's output.
+_VENDORED = frozenset({"node_modules", ".venv", "venv", "dist", "build", ".git"})
+
+
+def _vendored(project_dir: Path, path: Path, names: frozenset[str] = _VENDORED) -> bool:
+    """Whether ``path`` sits under one of ``names`` *inside the project*.
+
+    The parts are taken relative to the project: a project checked out under
+    ``~/build/`` is still a project, and every one of its files would otherwise
+    be skipped.
+    """
+    return any(part in names for part in path.relative_to(project_dir).parts)
+
+
 def _read_json(path: Path) -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError):  # JSON and UTF-8 errors are both ValueError
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def _names(value: object) -> list[str]:
+    """The keys of a manifest's dependency table; nothing when it is not one."""
+    return [str(key) for key in value] if isinstance(value, dict) else []
 
 
 def _dependencies(project_dir: Path) -> dict[str, list[str]]:
@@ -123,10 +142,7 @@ def _dependencies(project_dir: Path) -> dict[str, list[str]]:
     found: dict[str, list[str]] = {}
     for name in _MANIFESTS:
         for path in sorted(project_dir.rglob(name)):
-            if any(
-                part in {"node_modules", ".venv", "venv", "dist", "build", ".git"}
-                for part in path.parts
-            ):
+            if _vendored(project_dir, path):
                 continue
             rel = str(path.relative_to(project_dir)).replace("\\", "/")
             names: list[str] = []
@@ -134,16 +150,17 @@ def _dependencies(project_dir: Path) -> dict[str, list[str]]:
                 data = _read_json(path)
                 names = sorted(
                     {
-                        *(data.get("dependencies") or {}),
-                        *(data.get("peerDependencies") or {}),
+                        *_names(data.get("dependencies")),
+                        *_names(data.get("peerDependencies")),
                     }
                 )
             elif name == "pyproject.toml":
                 try:
                     data = tomllib.loads(path.read_text(encoding="utf-8"))
-                except (OSError, tomllib.TOMLDecodeError):
+                except (OSError, ValueError):  # TOML and UTF-8 errors
                     data = {}
-                raw = (data.get("project") or {}).get("dependencies") or []
+                project = data.get("project")
+                raw = project.get("dependencies") if isinstance(project, dict) else []
                 names = [
                     str(d)
                     .split("[")[0]
@@ -151,13 +168,13 @@ def _dependencies(project_dir: Path) -> dict[str, list[str]]:
                     .split(">")[0]
                     .split("<")[0]
                     .strip()
-                    for d in raw
+                    for d in (raw if isinstance(raw, list) else [])
                     if isinstance(d, str)
                 ]
             elif name.startswith("requirements"):
                 try:
                     lines = path.read_text(encoding="utf-8").splitlines()
-                except OSError:
+                except (OSError, ValueError):  # unreadable, or not UTF-8
                     lines = []
                 names = [
                     line.split("=")[0].split(">")[0].split("<")[0].split("[")[0].strip()
@@ -175,10 +192,7 @@ def _entrypoints(project_dir: Path) -> list[str]:
     hits: list[str] = []
     for name in _ENTRYPOINT_NAMES:
         for path in sorted(project_dir.rglob(name)):
-            if any(
-                part in {"node_modules", ".venv", "venv", "dist", "build", ".git"}
-                for part in path.parts
-            ):
+            if _vendored(project_dir, path):
                 continue
             hits.append(str(path.relative_to(project_dir)).replace("\\", "/"))
             if len(hits) >= MAX_ENTRYPOINTS:
@@ -190,9 +204,7 @@ def _infrastructure(project_dir: Path) -> list[str]:
     hits: list[str] = []
     for name in _INFRA_FILES:
         for path in sorted(project_dir.rglob(name)):
-            if any(
-                part in {"node_modules", ".venv", "venv", ".git"} for part in path.parts
-            ):
+            if _vendored(project_dir, path, _VENDORED - {"dist", "build"}):
                 continue
             hits.append(str(path.relative_to(project_dir)).replace("\\", "/"))
             if len(hits) >= 20:
@@ -230,9 +242,8 @@ def collect(project_dir: Path) -> Evidence:
     edges: list[tuple[str, str]] = []
     for edge in graph.edges:
         if edge.source_id in kept and edge.target_id in kept:
-            source, target = by_id.get(edge.source_id), by_id.get(edge.target_id)
-            if source and target:
-                edges.append((source.path, target.path))
+            # `kept` is drawn from the graph's own nodes, so both ends exist.
+            edges.append((by_id[edge.source_id].path, by_id[edge.target_id].path))
         if len(edges) >= MAX_EDGES:
             break
 
