@@ -1,4 +1,5 @@
 {
+	"processExited": "Process exited with code {{code}}",
 	"expand": {
 		"expand": "Expand terminal",
 		"collapse": "Collapse terminal"

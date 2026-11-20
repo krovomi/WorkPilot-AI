@@ -178,6 +178,8 @@ export const FILE_EXEMPTIONS: Readonly<
 		{ text: "?↗ ref", reason: OPENAPI },
 		{ text: "items:", reason: OPENAPI },
 		{ text: "?any", reason: OPENAPI },
+	],
+	"components/api-explorer/RequestAuthTab.tsx": [
 		{ text: "Authorization: Bearer ••••", reason: HTTP_HEADER },
 		{ text: "@placeholder=X-API-Key", reason: HTTP_HEADER },
 		{

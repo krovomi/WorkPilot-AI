@@ -131,9 +131,8 @@ def _invoke(args: list[str], timeout: int = DEFAULT_TIMEOUT) -> Receipt:
     stdout = completed.stdout or ""
     if stdout.strip().startswith("{"):
         try:
-            parsed = json.loads(stdout)
-            if isinstance(parsed, dict):
-                payload = parsed
+            # Text that parses and starts with `{` is an object, nothing else.
+            payload = json.loads(stdout)
         except json.JSONDecodeError:
             logger.debug("archify %s produced non-JSON stdout", args[0] if args else "")
 

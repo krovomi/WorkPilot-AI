@@ -30,6 +30,13 @@
 		"completed": "Session terminée",
 		"error": "Erreur"
 	},
+	"statusMessages": {
+		"starting": "Démarrage de la session de pair programming…",
+		"planning": "Analyse du projet et répartition du travail de l'IA…",
+		"stopped": "Session arrêtée.",
+		"completed": "Session terminée.",
+		"failed": "Une erreur est survenue."
+	},
 	"aiWork": {
 		"waiting": "En attente de démarrage...",
 		"planning": "Analyse du projet et planification...",

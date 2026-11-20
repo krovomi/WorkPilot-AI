@@ -1,7 +1,8 @@
 {
+	"processExited": "Processus terminé avec le code {{code}}",
 	"expand": {
 		"expand": "Agrandir le terminal",
-		"collapse": "Reduire le terminal"
+		"collapse": "Réduire le terminal"
 	},
 	"resume": {
 		"pending": "Reprise disponible",

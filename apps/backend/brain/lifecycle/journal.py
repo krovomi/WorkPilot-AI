@@ -196,7 +196,11 @@ def append(
     *,
     now: datetime | None = None,
 ) -> JournalEntry | None:
-    """Add *entry* to this month's journal of the memory at *base*. Never raises."""
+    """Add *entry* to this month's journal of the memory at *base*.
+
+    A disk that refuses the write is logged and answered with ``None``; only an
+    action or reason outside the closed lists raises, as the caller's mistake.
+    """
     if entry.action not in ACTIONS:
         raise ValueError(f"unknown lifecycle action {entry.action!r}")
     if entry.reason_code not in REASONS:
@@ -234,21 +238,24 @@ def _parse(line: str) -> JournalEntry | None:
         return None
     if not isinstance(data, dict) or data.get("action") not in ACTIONS:
         return None
-    try:
-        return JournalEntry(
-            action=str(data["action"]),
-            actor=normalise_actor(str(data.get("actor") or "")),
-            note=str(data.get("note") or ""),
-            title=str(data.get("title") or ""),
-            preview=str(data.get("preview") or ""),
-            reason_code=str(data.get("reason_code") or "recorded"),
-            reason=str(data.get("reason") or ""),
-            related=[str(r) for r in data.get("related") or [] if isinstance(r, str)],
-            ts=str(data.get("ts") or ""),
-            id=str(data.get("id") or ""),
-        )
-    except (KeyError, TypeError):
-        return None
+    related = data.get("related")
+    return JournalEntry(
+        action=str(data["action"]),
+        actor=normalise_actor(str(data.get("actor") or "")),
+        note=str(data.get("note") or ""),
+        title=str(data.get("title") or ""),
+        preview=str(data.get("preview") or ""),
+        reason_code=str(data.get("reason_code") or "recorded"),
+        reason=str(data.get("reason") or ""),
+        # A line merged from a teammate's vault is text anyone could edit: a
+        # `related` that is not a list names no note (a string is not a list
+        # of its letters).
+        related=[r for r in related if isinstance(r, str)]
+        if isinstance(related, list)
+        else [],
+        ts=str(data.get("ts") or ""),
+        id=str(data.get("id") or ""),
+    )
 
 
 def read(
@@ -276,7 +283,9 @@ def read(
             continue
         for line in lines:
             entry = _parse(line)
-            if entry is None or entry.id in seen:
+            # The same line merged twice (two machines) is one entry; a line
+            # without an id has nothing to match and is kept.
+            if entry is None or (entry.id and entry.id in seen):
                 continue
             if note and entry.note != note and note not in entry.related:
                 continue
