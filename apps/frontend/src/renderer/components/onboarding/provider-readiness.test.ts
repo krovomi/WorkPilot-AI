@@ -49,4 +49,19 @@ describe("readyProviderLabels", () => {
 	it("ignores a profile without a key", () => {
 		expect(readyProviderLabels(response({}), [profile({ apiKey: "  " })])).toEqual([]);
 	});
+
+	it("counts Ollama through a profile that points at it", () => {
+		expect(
+			readyProviderLabels(response({ ollama: true }), [profile({ name: "Local", baseUrl: "http://localhost:11434/v1" })]),
+		).toEqual(["Ollama"]);
+	});
+
+	it("names a profile without an endpoint, and lists a provider once", () => {
+		expect(
+			readyProviderLabels(response({ openai: true }), [
+				profile({ name: "Sans URL", baseUrl: "" }),
+				profile({ id: "p2", name: "OpenAI", baseUrl: "https://api.openai.com/v1" }),
+			]),
+		).toEqual(["OpenAI", "Sans URL"]);
+	});
 });
