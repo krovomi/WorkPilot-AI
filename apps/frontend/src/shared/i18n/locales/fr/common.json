@@ -1005,7 +1005,10 @@
 			"optional": "Facultatif",
 			"agents": "Agents qui l'utilisent",
 			"agentsHint": "Modifiable plus tard dans Outils des agents.",
-			"noAgent": "Choisissez au moins un agent."
+			"noAgent": "Choisissez au moins un agent.",
+			"showValue": "Afficher la valeur",
+			"hideValue": "Masquer la valeur",
+			"openHelp": "Où obtenir {{name}}"
 		},
 		"installedTab": {
 			"empty": "Aucun serveur MCP dans ce projet",
@@ -1046,12 +1049,41 @@
 			"httpConfiguration": "Configuration HTTP",
 			"transformTemplate": "Modèle de transformation",
 			"transformPlaceholder": "Modèle de transformation des données d'entrée...",
-			"paramDescriptionPlaceholder": "Description"
+			"paramDescriptionPlaceholder": "Description",
+			"addTool": "Ajouter un outil",
+			"removeParam": "Supprimer le paramètre",
+			"paramName": "Nom du paramètre",
+			"paramType": "Type du paramètre",
+			"paramDescription": "Description du paramètre",
+			"colorCode": "Code couleur",
+			"httpMethod": "Méthode HTTP",
+			"httpPath": "Chemin",
+			"chain": "Enchaînement",
+			"paramTypes": {
+				"string": "Texte",
+				"number": "Nombre",
+				"boolean": "Oui / non",
+				"array": "Liste",
+				"object": "Objet"
+			}
 		},
 		"officialOnly": "Officiels",
 		"official": "Officiel",
 		"community": "Communauté",
 		"noProject": "Sélectionnez un projet : les serveurs s'installent par projet.",
+		"errors": {
+			"loadCatalog": "Le catalogue n'a pas pu être chargé.",
+			"loadBuilder": "Vos serveurs du constructeur n'ont pas pu être chargés.",
+			"unknownServer": "{{name}} n'est pas dans le catalogue.",
+			"missingValues": "À remplir : {{name}}.",
+			"alreadyInstalled": "{{name}} est déjà installé dans ce projet.",
+			"readSettings": "Les réglages du projet n'ont pas pu être lus : rien n'a été modifié.",
+			"saveSettings": "Les réglages du projet n'ont pas pu être enregistrés.",
+			"install": "Le serveur n'a pas pu être installé.",
+			"uninstall": "Le serveur n'a pas pu être retiré.",
+			"saveBuilder": "Le serveur n'a pas pu être enregistré.",
+			"deleteBuilder": "Le serveur n'a pas pu être supprimé."
+		},
 		"requires": {
 			"uv": "Nécessite uv (uvx) sur cette machine.",
 			"az": "Nécessite Azure CLI, connecté avec az login."
@@ -1073,6 +1105,7 @@
 			"title": "Sécurité",
 			"checking": "Lecture du registre et des vulnérabilités connues…",
 			"recheck": "Vérifier à nouveau",
+			"readFailed": "Le registre n'a pas pu être lu.",
 			"checkedAt": "Registre lu le {{date}}",
 			"unchecked": {
 				"remote": "Tourne sur les serveurs de son éditeur : rien ne tourne sur cette machine, et il n'y a pas de paquet à vérifier.",
