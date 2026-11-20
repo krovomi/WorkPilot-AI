@@ -15,6 +15,13 @@ beforeEach(() => {
 	useCICDTriggersStore.setState({ error: null, rollingBack: null, runs: [] });
 });
 
+// The dashboard is on the project before anything is rolled back.
+beforeEach(async () => {
+	await useCICDTriggersStore.getState().loadRuns("/p");
+	useCICDTriggersStore.setState({ runs: [] });
+	invoke.mockClear();
+});
+
 describe("rollback", () => {
 	it("rolls back, then reads the runs again", async () => {
 		rollbackDeployment.mockResolvedValue({ success: true });
@@ -42,5 +49,19 @@ describe("rollback", () => {
 			error: "Error: bridge down",
 			rollingBack: null,
 		});
+	});
+
+	it("shows no rollback failure for the project left behind", async () => {
+		let refuse: (value: unknown) => void = vi.fn();
+		let fail: (reason: unknown) => void = vi.fn();
+		rollbackDeployment
+			.mockReturnValueOnce(new Promise((resolve) => (refuse = resolve)))
+			.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)));
+		const rollingBack = [useCICDTriggersStore.getState().rollback("/p", "42"), useCICDTriggersStore.getState().rollback("/p", "43")];
+		await useCICDTriggersStore.getState().loadRuns("/q");
+		refuse({ success: false, error: "watch-running" });
+		fail(new Error("bridge down"));
+		expect(await Promise.all(rollingBack)).toEqual([false, false]);
+		expect(useCICDTriggersStore.getState()).toMatchObject({ error: null, rollingBack: null });
 	});
 });

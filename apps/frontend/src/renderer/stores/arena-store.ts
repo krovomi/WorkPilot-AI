@@ -4,7 +4,6 @@ import type {
 	ArenaBattleCompleteEvent,
 	ArenaBattleProgressEvent,
 	ArenaBattleResultEvent,
-	ArenaBattleStatus,
 	ArenaLabel,
 	ArenaParticipant,
 } from "@shared/types/arena";
@@ -45,11 +44,7 @@ interface ArenaActions {
 	closeDialog: () => void;
 
 	setActiveBattle: (battle: ArenaBattle | null) => void;
-	setBattles: (battles: ArenaBattle[]) => void;
-	setAnalytics: (analytics: ArenaAnalytics) => void;
 	setIsStartingBattle: (v: boolean) => void;
-	setIsLoadingHistory: (v: boolean) => void;
-	setIsLoadingAnalytics: (v: boolean) => void;
 	setError: (error: string | null) => void;
 
 	/** Handle streaming chunk from a participant */
@@ -61,11 +56,8 @@ interface ArenaActions {
 	/** Handle full battle completion */
 	handleBattleComplete: (event: ArenaBattleCompleteEvent) => void;
 
-	/** Handle a battle that failed as a whole */
+	/** Handle a battle that stopped on an error */
 	handleBattleError: (event: { battleId: string; error: string }) => void;
-
-	/** Update battle status */
-	updateBattleStatus: (battleId: string, status: ArenaBattleStatus) => void;
 
 	/** Submit a vote for a battle */
 	submitVote: (battleId: string, winnerLabel: ArenaLabel) => void;
@@ -104,11 +96,7 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 	closeDialog: () => set({ isOpen: false }),
 
 	setActiveBattle: (battle) => set({ activeBattle: battle }),
-	setBattles: (battles) => set({ battles }),
-	setAnalytics: (analytics) => set({ analytics }),
 	setIsStartingBattle: (v) => set({ isStartingBattle: v }),
-	setIsLoadingHistory: (v) => set({ isLoadingHistory: v }),
-	setIsLoadingAnalytics: (v) => set({ isLoadingAnalytics: v }),
 	setError: (error) => set({ error }),
 
 	handleBattleProgress: (event) => {
@@ -171,17 +159,9 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 
 	handleBattleError: ({ battleId, error }) => {
 		const { activeBattle } = get();
-		// The error of a battle the person has already left behind is not news
-		// about the one on screen.
 		if (!activeBattle || activeBattle.id !== battleId) return;
+		// The battle is over: left on "running", it would spin for ever.
 		set({ activeBattle: { ...activeBattle, status: "error" }, error });
-	},
-
-	updateBattleStatus: (battleId, status) => {
-		const { activeBattle } = get();
-		if (activeBattle?.id === battleId) {
-			set({ activeBattle: { ...activeBattle, status } });
-		}
 	},
 
 	submitVote: async (battleId, winnerLabel) => {

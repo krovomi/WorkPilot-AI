@@ -92,9 +92,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["ApiWatcher", setupApiWatcherListeners],
 	["AppEmulator", setupAppEmulatorListeners],
 	["ArchitectureDelta", setupArchitectureDeltaListeners],
-	["ArchitectureVisualizer", setupArchitectureVisualizerListeners],
-	// An Arena battle's answers arrive while its tab or dialog may be closed.
 	["Arena", setupArenaListeners],
+	["ArchitectureVisualizer", setupArchitectureVisualizerListeners],
 	// Cards an automation rule created appear on the board without a reload.
 	["Automations", setupAutomationsListeners],
 	["Bench", setupBenchListeners],
