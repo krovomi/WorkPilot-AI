@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -238,6 +239,32 @@ async def test_cancelling_kills_the_running_subtasks(world: dict[str, Path]) -> 
 
 
 @pytest.mark.asyncio
+async def test_a_subtask_cancelled_then_swept_reports_its_kill(
+    world: dict[str, Path],
+) -> None:
+    _plan(world, one=["hang"])
+    executor = _executor(world)
+    run = asyncio.create_task(
+        executor.execute_wave(Wave(index=0, subtask_ids=["one"]), _nodes("one"))
+    )
+    for _ in range(200):
+        if executor._running_processes:
+            break
+        await asyncio.sleep(0.05)
+
+    assert await executor.cancel_subtask("one") is True
+    # The child dies before the loop runs again; sweeping the wave then must
+    # not touch it, or its exit is reaped where the loop cannot see it.
+    time.sleep(0.5)
+    await executor.cancel_all()
+    result = await asyncio.wait_for(run, timeout=30)
+
+    killed = "Exit code 1" if is_windows() else "Exit code -9"
+    [only] = result.results
+    assert only.error and only.error.startswith(killed)
+
+
+@pytest.mark.asyncio
 async def test_a_process_that_already_exited_is_not_an_error_to_cancel(
     world: dict[str, Path],
 ) -> None:
@@ -271,3 +298,17 @@ def test_a_result_defaults_to_no_error() -> None:
     assert SubtaskResult("s", True) == SubtaskResult(
         subtask_id="s", success=True, duration_seconds=0.0, error=None
     )
+
+
+async def test_a_worker_error_reads_the_same_on_every_os(
+    world: dict[str, Path],
+) -> None:
+    _plan(world, s1=["crlf"])
+    nodes = _nodes("s1", wave=1)
+
+    result = await _executor(world).execute_wave(
+        Wave(index=1, subtask_ids=["s1"]), nodes
+    )
+
+    [failed] = result.results
+    assert failed.error == "Traceback\nboom: the real error\n"
