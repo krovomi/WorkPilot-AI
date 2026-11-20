@@ -161,7 +161,11 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-	root = realpathSync(mkdtempSync(path.join(tmpdir(), "terminal-worktrees-")));
+	// The native call: on Windows the temp folder can be a short 8.3 name
+	// (RUNNER~1) that git, and the handlers after it, give in its long form.
+	root = realpathSync.native(
+		mkdtempSync(path.join(tmpdir(), "terminal-worktrees-")),
+	);
 	state.projects = [];
 	state.windows = undefined;
 	faults.rm = faults.readdir = faults.symlink = faults.git = undefined;
