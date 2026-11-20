@@ -23,7 +23,7 @@ function StatCard({
 	readonly icon: React.ElementType;
 	readonly label: string;
 	readonly value: string | number;
-	readonly hint?: string;
+	readonly hint: string;
 	readonly tone?: "default" | "warning";
 }) {
 	return (
@@ -46,9 +46,7 @@ function StatCard({
 				>
 					{value}
 				</div>
-				{hint ? (
-					<div className="text-xs text-muted-foreground mt-1">{hint}</div>
-				) : null}
+				<div className="text-xs text-muted-foreground mt-1">{hint}</div>
 			</CardContent>
 		</Card>
 	);
