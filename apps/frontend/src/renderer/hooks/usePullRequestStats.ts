@@ -23,10 +23,15 @@ export function usePullRequestStats(
 		if (!prUrl || !taskId) {
 			setPRData(null);
 			setError(null);
+			setIsLoading(false);
 			return;
 		}
+		// Another PR or task while this one was out: its answer is not theirs.
+		let stale = false;
 
 		const fetchPRData = async () => {
+			// The last PR's stats are not this one's, even while it loads.
+			setPRData(null);
 			setIsLoading(true);
 			setError(null);
 
@@ -56,6 +61,7 @@ export function usePullRequestStats(
 					prNumber,
 					taskId,
 				);
+				if (stale) return;
 
 				if (result.success && result.data?.data) {
 					setPRData(result.data.data);
@@ -63,16 +69,20 @@ export function usePullRequestStats(
 					setError(result.data?.error || result.error || "Failed to fetch PR details");
 				}
 			} catch (err) {
+				if (stale) return;
 				console.error("Error fetching PR stats:", err);
 				setError(
 					err instanceof Error ? err.message : "Unknown error occurred",
 				);
 			} finally {
-				setIsLoading(false);
+				if (!stale) setIsLoading(false);
 			}
 		};
 
-		fetchPRData();
+		void fetchPRData();
+		return () => {
+			stale = true;
+		};
 	}, [prUrl, taskId]);
 
 	return { prData, isLoading, error };

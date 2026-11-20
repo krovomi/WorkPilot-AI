@@ -52,7 +52,9 @@ function passwordScore(pw: string): number {
 
 export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 	const { t } = useTranslation();
-	const { serverUrl, lookupInvite, acceptInvite } = useServerSessionStore();
+	const serverUrl = useServerSessionStore((s) => s.serverUrl);
+	const lookupInvite = useServerSessionStore((s) => s.lookupInvite);
+	const acceptInvite = useServerSessionStore((s) => s.acceptInvite);
 
 	const [url, setUrl] = useState(
 		serverUrl || localStorage.getItem(LAST_SERVER_URL_KEY) || "",
@@ -76,7 +78,14 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 		if (!url.trim() || token.length < 16) return;
 		let cancelled = false;
 		const handle = setTimeout(async () => {
-			const result = await lookupInvite(url.trim(), token);
+			// A server that cannot be reached reads as an invitation it cannot find.
+			const result = await lookupInvite(url.trim(), token).catch(
+				(err: unknown) => ({
+					ok: false,
+					email: undefined,
+					error: err instanceof Error ? err.message : undefined,
+				}),
+			);
 			if (cancelled) return;
 			if (result.ok && result.email) {
 				setEmail(result.email);
@@ -85,7 +94,7 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 				setEmail(null);
 				setInfo(
 					result.error ||
-						t("acceptInvite.invalidToken", "Invitation introuvable ou expirée"),
+						t("acceptInvite.invalidToken"),
 				);
 			}
 		}, 500);
@@ -114,23 +123,20 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 				displayName.trim(),
 				password,
 			);
-			if (!result.ok) {
-				setError(
-					result.error ||
-						t("acceptInvite.failed", "Impossible de créer le compte"),
-				);
-			}
+			if (!result.ok) setError(result.error || t("acceptInvite.failed"));
+		} catch (err) {
+			setError(err instanceof Error ? err.message : t("acceptInvite.failed"));
 		} finally {
 			setBusy(false);
 		}
 	}, [url, token, displayName, password, acceptInvite, t]);
 
 	const strengthLabels = [
-		t("acceptInvite.strength0", "Très faible"),
-		t("acceptInvite.strength1", "Faible"),
-		t("acceptInvite.strength2", "Moyen"),
-		t("acceptInvite.strength3", "Bon"),
-		t("acceptInvite.strength4", "Fort"),
+		t("acceptInvite.strength0"),
+		t("acceptInvite.strength1"),
+		t("acceptInvite.strength2"),
+		t("acceptInvite.strength3"),
+		t("acceptInvite.strength4"),
 	];
 	const strengthColors = [
 		"bg-destructive",
@@ -146,19 +152,16 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<UserPlus className="h-5 w-5" />
-						{t("acceptInvite.title", "Créer votre compte")}
+						{t("acceptInvite.title")}
 					</CardTitle>
 					<CardDescription>
-						{t(
-							"acceptInvite.description",
-							"Utilisez le lien d'invitation reçu pour définir votre mot de passe.",
-						)}
+						{t("acceptInvite.description")}
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<div className="space-y-2">
 						<Label htmlFor="invite-server-url">
-							{t("serverLogin.serverUrl", "URL du serveur")}
+							{t("serverLogin.serverUrl")}
 						</Label>
 						<Input
 							id="invite-server-url"
@@ -170,7 +173,7 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 
 					<div className="space-y-2">
 						<Label htmlFor="invite-token">
-							{t("acceptInvite.tokenLabel", "Lien ou code d'invitation")}
+							{t("acceptInvite.tokenLabel")}
 						</Label>
 						<Input
 							id="invite-token"
@@ -186,14 +189,14 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 						<>
 							<div className="space-y-2">
 								<Label htmlFor="invite-email">
-									{t("serverLogin.email", "Email")}
+									{t("serverLogin.email")}
 								</Label>
 								<Input id="invite-email" value={email} readOnly disabled />
 							</div>
 
 							<div className="space-y-2">
 								<Label htmlFor="invite-name">
-									{t("acceptInvite.displayName", "Nom affiché")}
+									{t("acceptInvite.displayName")}
 								</Label>
 								<Input
 									id="invite-name"
@@ -204,7 +207,7 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 
 							<div className="space-y-2">
 								<Label htmlFor="invite-password">
-									{t("serverLogin.password", "Mot de passe")}
+									{t("serverLogin.password")}
 								</Label>
 								<Input
 									id="invite-password"
@@ -224,16 +227,13 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 									</span>
 								</div>
 								<p className="text-xs text-muted-foreground">
-									{t(
-										"acceptInvite.passwordHint",
-										"Au moins 12 caractères. Évitez un mot de passe déjà utilisé ailleurs.",
-									)}
+									{t("acceptInvite.passwordHint")}
 								</p>
 							</div>
 
 							<div className="space-y-2">
 								<Label htmlFor="invite-confirm">
-									{t("acceptInvite.confirm", "Confirmer le mot de passe")}
+									{t("acceptInvite.confirm")}
 								</Label>
 								<Input
 									id="invite-confirm"
@@ -246,10 +246,7 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 								/>
 								{confirm.length > 0 && confirm !== password && (
 									<p className="text-xs text-destructive">
-										{t(
-											"acceptInvite.mismatch",
-											"Les mots de passe ne correspondent pas",
-										)}
+										{t("acceptInvite.mismatch")}
 									</p>
 								)}
 							</div>
@@ -270,11 +267,11 @@ export function AcceptInviteForm({ onBack }: { onBack: () => void }) {
 							onClick={handleAccept}
 						>
 							{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-							{t("acceptInvite.submit", "Créer mon compte")}
+							{t("acceptInvite.submit")}
 						</Button>
 						<Button variant="outline" disabled={busy} onClick={onBack}>
 							<ArrowLeft className="mr-2 h-4 w-4" />
-							{t("acceptInvite.back", "Retour")}
+							{t("acceptInvite.back")}
 						</Button>
 					</div>
 				</CardContent>
