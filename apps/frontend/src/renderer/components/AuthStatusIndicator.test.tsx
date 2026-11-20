@@ -153,7 +153,9 @@ describe("AuthStatusIndicator", () => {
 		it("should display Anthropic badge with Lock icon for OAuth", () => {
 			renderWithProviders(<AuthStatusIndicator />);
 
-			expect(screen.getByText("Anthropic")).toBeInTheDocument();
+			// The lens beside it names the provider: the badge is an icon only.
+			expect(screen.queryByText("Anthropic")).toBeNull();
+			expect(screen.getByRole("button")).toHaveAttribute("data-auth-type", "oauth");
 			expect(
 				screen.getByRole("button", { name: /authentication: anthropic/i }),
 			).toBeInTheDocument();
@@ -179,8 +181,8 @@ describe("AuthStatusIndicator", () => {
 		it("should display provider name badge with Key icon for API profile", () => {
 			renderWithProviders(<AuthStatusIndicator />);
 
-			// Badge shows the provider name detected from baseUrl, not "API Key"
-			expect(screen.getByText("Anthropic")).toBeInTheDocument();
+			// The provider detected from baseUrl is named in the aria-label, not "API Key"
+			expect(screen.getByRole("button")).toHaveAttribute("data-auth-type", "profile");
 			expect(
 				screen.getByRole("button", { name: /authentication: anthropic/i }),
 			).toBeInTheDocument();
@@ -207,7 +209,10 @@ describe("AuthStatusIndicator", () => {
 			renderWithProviders(<AuthStatusIndicator />);
 
 			// Falls back to Anthropic provider label
-			expect(screen.getByText("Anthropic")).toBeInTheDocument();
+			expect(screen.getByRole("button")).toHaveAttribute(
+				"aria-label",
+				"Authentication: Anthropic",
+			);
 		});
 	});
 
@@ -219,7 +224,6 @@ describe("AuthStatusIndicator", () => {
 
 			renderWithProviders(<AuthStatusIndicator />);
 
-			expect(screen.getByText("Ollama")).toBeInTheDocument();
 			expect(screen.getByRole("button")).toHaveAttribute(
 				"aria-label",
 				"Authentication: Ollama",
@@ -233,7 +237,6 @@ describe("AuthStatusIndicator", () => {
 
 			renderWithProviders(<AuthStatusIndicator />);
 
-			expect(screen.getByText("Ollama (Local)")).toBeInTheDocument();
 			expect(screen.getByRole("button")).toHaveAttribute(
 				"aria-label",
 				"Authentication: Ollama (Local)",
