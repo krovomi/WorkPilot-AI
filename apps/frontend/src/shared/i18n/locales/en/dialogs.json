@@ -391,6 +391,7 @@
 		"originPage": "This page overrides the global choice.",
 		"originSettings": "This page follows the global choice.",
 		"reset": "Reset",
+		"saveFailed": "This page's choice could not be saved.",
 		"effort": {
 			"none": "None",
 			"low": "Low",

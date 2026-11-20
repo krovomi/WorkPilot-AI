@@ -80,8 +80,8 @@ function SetupView({ onStart }: { readonly onStart: (params: StartSessionParams)
 	const [aiScope, setAiScope] = useState("");
 	const ready = Boolean(goal.trim() && devScope.trim() && aiScope.trim());
 
+	// The button is disabled until all three fields are filled.
 	const start = () => {
-		if (!ready) return;
 		onStart({ projectId: "", goal: goal.trim(), devScope: devScope.trim(), aiScope: aiScope.trim() });
 	};
 
@@ -232,7 +232,7 @@ function MessageBubble({ message }: { message: PairMessage }) {
 export function PairProgramming({ projectId }: PairProgrammingProps) {
 	const { t } = useTranslation(["pairProgramming", "navigation"]);
 
-	const session = usePairProgrammingStore((s) => s.session);
+	const storedSession = usePairProgrammingStore((s) => s.session);
 	const status = usePairProgrammingStore((s) => s.status);
 	const statusMessage = usePairProgrammingStore((s) => s.statusMessage);
 	const messages = usePairProgrammingStore((s) => s.messages);
@@ -246,15 +246,20 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 	const chatEndRef = useRef<HTMLDivElement>(null);
 	const streamEndRef = useRef<HTMLDivElement>(null);
 
-	// Auto-scroll chat
-	useEffect(() => {
-		chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, []);
+	// The store holds one session at a time: a session started in another
+	// project is not this project's, and its Stop or messages must not be sent here.
+	const foreignSession = storedSession !== null && storedSession.projectId !== projectId;
+	const session = foreignSession ? null : storedSession;
 
-	// Auto-scroll AI stream
+	// Follow the chat as messages arrive
 	useEffect(() => {
-		streamEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, []);
+		if (messages.length > 0) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+	}, [messages.length]);
+
+	// Follow the AI stream as it grows
+	useEffect(() => {
+		if (streamingContent) streamEndRef.current?.scrollIntoView({ behavior: "smooth" });
+	}, [streamingContent]);
 
 	const handleStart = (params: StartSessionParams) => {
 		startPairSession({ ...params, projectId });
@@ -278,7 +283,7 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 
 	const isRunning = status === "planning" || status === "active";
 
-	if (status === "idle" && !session) {
+	if (foreignSession || (status === "idle" && !session)) {
 		return <SetupView onStart={handleStart} />;
 	}
 

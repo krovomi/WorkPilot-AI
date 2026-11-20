@@ -9,6 +9,7 @@
  * - Conflict warnings
  */
 
+import i18n from "i18next";
 import { create } from "zustand";
 import {
 	type GeneratedReview,
@@ -187,23 +188,46 @@ export async function startPairSession(
 ): Promise<void> {
 	const store = usePairProgrammingStore.getState();
 	store.reset();
-	store.setStatus("planning", "Starting pair programming session...");
+	store.setStatus("planning", i18n.t("pairProgramming:statusMessages.starting"));
 
-	const result = await globalThis.electronAPI.startPairSession(params);
-	if (result.success && result.data) {
-		store.setSession(result.data);
-		store.setStatus("planning", "Analyzing project and planning AI scope...");
-	} else {
-		store.setStatus("error", result.error || "Failed to start session");
+	try {
+		const result = await globalThis.electronAPI.startPairSession(params);
+		if (result.success && result.data) {
+			store.setSession(result.data);
+			store.setStatus("planning", i18n.t("pairProgramming:statusMessages.planning"));
+		} else {
+			store.setStatus("error", result.error || i18n.t("pairProgramming:errors.startFailed"));
+		}
+	} catch (error) {
+		store.setStatus("error", errorText(error, "pairProgramming:errors.startFailed"));
 	}
+}
+
+function errorText(error: unknown, fallbackKey: string): string {
+	return error instanceof Error && error.message ? error.message : i18n.t(fallbackKey);
 }
 
 export async function stopPairSession(
 	projectId: string,
 	sessionId: string,
 ): Promise<void> {
-	await globalThis.electronAPI.stopPairSession(projectId, sessionId);
-	usePairProgrammingStore.getState().setStatus("completed", "Session stopped.");
+	try {
+		const result = await globalThis.electronAPI.stopPairSession(projectId, sessionId);
+		if (!result.success) {
+			usePairProgrammingStore
+				.getState()
+				.setStatus("error", result.error || i18n.t("pairProgramming:errors.stopFailed"));
+			return;
+		}
+	} catch (error) {
+		usePairProgrammingStore
+			.getState()
+			.setStatus("error", errorText(error, "pairProgramming:errors.stopFailed"));
+		return;
+	}
+	usePairProgrammingStore
+		.getState()
+		.setStatus("completed", i18n.t("pairProgramming:statusMessages.stopped"));
 }
 
 export function sendPairMessage(
