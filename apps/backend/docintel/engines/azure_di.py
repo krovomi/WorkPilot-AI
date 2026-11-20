@@ -132,9 +132,10 @@ class AzureDocumentIntelligenceEngine:
                     location, headers={"Ocp-Apim-Subscription-Key": key}
                 )
                 with opener.open(poll, timeout=_TIMEOUT_SECONDS) as response:
-                    payload = json.loads(
+                    answer = json.loads(
                         response.read().decode("utf-8", errors="replace")
                     )
+                payload = answer if isinstance(answer, dict) else {}
                 status = str(payload.get("status", "")).lower()
                 if status in ("succeeded", "failed"):
                     break

@@ -426,6 +426,7 @@ class WaveExecutor:
     async def cancel_all(self) -> None:
         """Kill all running subtask processes."""
         for subtask_id, process in list(self._running_processes.items()):
+            self._running_processes.pop(subtask_id, None)
             try:
                 process.kill()
                 logger.info(
@@ -436,8 +437,13 @@ class WaveExecutor:
         self._running_processes.clear()
 
     async def cancel_subtask(self, subtask_id: str) -> bool:
-        """Kill a specific subtask process."""
-        process = self._running_processes.get(subtask_id)
+        """Kill a specific subtask process.
+
+        Killed once: a second kill of a child that has died but is not yet
+        reaped makes `Popen.poll()` reap it under the event loop, which then
+        reports exit code 255 instead of the kill.
+        """
+        process = self._running_processes.pop(subtask_id, None)
         if process:
             try:
                 process.kill()

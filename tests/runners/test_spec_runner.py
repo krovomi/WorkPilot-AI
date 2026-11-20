@@ -86,11 +86,13 @@ def start(runner, project, monkeypatch, capsys):
         build.update(path=path, argv=argv, how="execv")
         raise SystemExit(0)
 
+    def run(argv, *_args, **_kwargs):
+        # Windows starts the build as a child (issue #609) instead of execv.
+        build.update(path=argv[0], argv=argv, how="subprocess")
+        return subprocess.CompletedProcess(argv, 0)
+
     monkeypatch.setattr(runner.os, "execv", execv)
-    # The hand-over by exec, whatever runs the tests: on Windows main() starts
-    # run.py with subprocess.run instead, which would run a real build. The
-    # Windows hand-over has its own tests, which set is_windows themselves.
-    monkeypatch.setattr(runner, "is_windows", lambda: False)
+    monkeypatch.setattr(runner.subprocess, "run", run)
     # main() writes the provider into os.environ: setting it first makes
     # monkeypatch restore the variable (or its absence) after the test.
     monkeypatch.setenv("SELECTED_LLM_PROVIDER", "")
@@ -109,10 +111,18 @@ def start(runner, project, monkeypatch, capsys):
 
 
 class TestASpecThenItsBuild:
-    def test_an_approved_spec_hands_over_to_the_build(self, start, project):
+    @pytest.mark.parametrize(
+        ("windows", "how"), [(False, "execv"), (True, "subprocess")]
+    )
+    def test_an_approved_spec_hands_over_to_the_build(
+        self, start, project, runner, monkeypatch, windows, how
+    ):
+        monkeypatch.setattr(runner, "is_windows", lambda: windows)
+
         code, _, build, pipeline = start("--task", "Add a cart", "--auto-approve")
 
         assert code == 0
+        assert build["how"] == how
         assert pipeline.made["task_description"] == "Add a cart"
         assert pipeline.made["project_dir"] == project
         assert pipeline.ran == {"interactive": False, "auto_approve": True}

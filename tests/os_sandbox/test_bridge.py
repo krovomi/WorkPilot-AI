@@ -9,9 +9,12 @@ tests run where it can.
 
 from __future__ import annotations
 
+import os
 import runpy
+import shutil
 import socket
 import sys
+import tempfile
 import threading
 from pathlib import Path
 
@@ -33,9 +36,15 @@ def _free_port() -> int:
 
 
 @pytest.fixture
-def proxy(socket_dir):
-    """A Unix socket that answers each connection with what it read, upper-cased."""
-    path = str(socket_dir / "proxy.sock")
+def proxy():
+    """A Unix socket that answers each connection with what it read, upper-cased.
+
+    In a short folder of its own: a Unix socket path is capped at 104 bytes on
+    macOS, and pytest's ``tmp_path`` there (``/private/var/folders/…``) is
+    longer than that.
+    """
+    folder = tempfile.mkdtemp(prefix="wp-bridge-", dir="/tmp")
+    path = os.path.join(folder, "proxy.sock")
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(path)
     server.listen(4)
@@ -58,6 +67,7 @@ def proxy(socket_dir):
     threading.Thread(target=serve, daemon=True).start()
     yield path
     server.close()
+    shutil.rmtree(folder, ignore_errors=True)
 
 
 @pytest.fixture

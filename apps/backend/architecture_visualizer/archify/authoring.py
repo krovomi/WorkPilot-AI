@@ -202,10 +202,8 @@ async def author(
                 say(f"stopping: {count} unresolved diagnostic(s), no longer improving")
                 break
 
-        if round_index == MAX_ROUNDS:
-            break
-
-        prompt = architecture_repair_prompt(spec_path, last.diagnostics)
+        if round_index < MAX_ROUNDS:
+            prompt = architecture_repair_prompt(spec_path, last.diagnostics)
 
     diagnostics = last.diagnostics if last else []
     return AuthoringResult(
