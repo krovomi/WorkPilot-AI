@@ -12,7 +12,9 @@ Answers are scripted by prompt: ``model.answer("Security", text(...))`` makes
 every session whose prompt contains "Security" stream those messages; an answer
 with no ``when`` is the default. An exception among the messages is raised
 where it stands in the stream. Every client made is kept, with the options it
-was made with and the prompt it got, in ``model.clients``.
+was made with and the prompt it got, in ``model.clients``. The exceptions put
+in ``model.fail_to_create`` / ``model.fail_to_query`` are raised, one per
+session, when a client is made / sent its prompt.
 
     model = StandInModel()
     monkeypatch.setattr(importlib.import_module("core.client"),
@@ -113,6 +115,8 @@ class _AgentSession(_Session, AgentClient):
 
     async def query(self, prompt: str) -> None:
         self.prompt = prompt
+        if self.model.fail_to_query:
+            raise self.model.fail_to_query.pop(0)
 
     async def receive_response(self):
         for item in self._reply():
@@ -141,6 +145,8 @@ class _SdkSession(_Session):
 
     async def query(self, prompt: str) -> None:
         self.prompt = prompt
+        if self.model.fail_to_query:
+            raise self.model.fail_to_query.pop(0)
 
     async def receive_response(self):
         for item in self._reply():
@@ -156,6 +162,7 @@ class StandInModel:
         self._answers: list[tuple[str | None, Callable[..., Iterable[Any]]]] = []
         self.clients: list[_Session] = []
         self.fail_to_create: list[BaseException] = []
+        self.fail_to_query: list[BaseException] = []
 
     def answer(self, *messages: Any, when: str | None = None) -> None:
         """Stream ``messages`` to a session whose prompt contains ``when``."""
