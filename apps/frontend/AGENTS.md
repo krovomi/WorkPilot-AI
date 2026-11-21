@@ -25,10 +25,9 @@ modules de handlers IPC. Ce fichier donne les points d'entrée.
 | `src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) ; colonnes dans `kanban/KanbanColumn.tsx` |
 | `src/renderer/stores/task-store.ts` | ~1 850 | — |
 
-Chercher le symbole (`grep -n`), lire le voisinage, éditer. Rien ne bloque une lecture complète :
-c'est une discipline, pas un garde-fou. Leur taille, elle, est plafonnée : un fichier de plus de
-2 000 lignes ne peut pas grossir (`tests/baselines/file-size.json`), donc une feature y ajoute un
-module voisin plutôt que des lignes. Les handlers de worktree sont répartis par groupe :
+Chercher le symbole (`grep -n`), lire le voisinage, éditer : une discipline, pas un garde-fou.
+Un fichier de plus de 2 000 lignes ne grossit plus (`tests/baselines/file-size.json`) : une
+feature y ajoute un module voisin. Les handlers de worktree sont répartis par groupe :
 `task/worktree-handlers.ts` (état, liste, abandon, IDE, terminal, impact, synchronisation)
 enregistre `worktree-diff-handlers.ts`, `worktree-merge-handlers.ts`, `worktree-file-handlers.ts`,
 `worktree-create-pr-handlers.ts` et `worktree-visual-proof-handlers.ts` ; fonctions partagées
@@ -64,7 +63,7 @@ remise à zéro de la conversation) et `execution-recovery-handlers.ts` (tâche 
 | URL externes, protocoles en liste fermée | `src/main/open-external.ts` (`openExternalUrl`) | `open-external.test.ts` |
 | Variables d'environnement venues d'un dépôt | `src/main/claude-code-settings/env-sanitizer.ts` ([SECURITY.md](src/main/claude-code-settings/SECURITY.md)) | `env-sanitizer.test.ts` |
 | Secrets au repos : `safeStorage`, `0600` et bannière sans trousseau | `src/main/secret-storage.ts`, via `src/main/settings-utils.ts`, `src/main/services/profile/profile-manager.ts`, `src/main/claude-profile/token-encryption.ts` | `secret-storage.test.ts`, `settings-utils-secrets.test.ts`, `profile-secrets.test.ts` |
-| Trousseau Linux sans bureau déclaré (WSL) : `--password-store=gnome-libsecret` si un Secret Service tourne | `src/main/linux-password-store.ts`, appelé avant `ready` par `src/main/index.ts` | `linux-password-store.test.ts` |
+| Trousseau Linux sans bureau déclaré (WSL) : `--password-store=gnome-libsecret` si un Secret Service tourne et que son trousseau par défaut est déverrouillé ; le démarrage n'attend jamais le trousseau (aucun appel synchrone avant la sonde, chaque appel async borné à 5 s) | `src/main/linux-password-store.ts`, appelé avant `ready` par `src/main/index.ts` ; `src/main/secret-storage.ts` (`initSecretStorage`, `guardedSafeStorage`) | `linux-password-store.test.ts`, `secret-storage-keyring-timeout.test.ts` |
 | `.workpilot/.env` de projet : jetons `enc:`, 0600, ignoré par git | `src/main/project-env-file.ts`, `src/shared/constants/project-env-secrets.json` | `project-env-file.test.ts`, `tests/test_project_env_secrets.py` |
 | Config de projet liée au projet pour lequel elle a été lue (une sauvegarde n'écrit jamais les réglages d'un autre projet) | `src/renderer/hooks/useProjectEnvConfig.ts`, ref de `project-settings/hooks/useProjectSettings.ts` | `hooks/__tests__/useProjectEnvConfig.test.ts` |
 | `.env` du backend : jeton `enc:` une fois packagé, lisible par Python depuis les sources (0600, signalé) | `src/main/source-env.ts` (`writeSourceEnvFile`, `loadBackendEnv`) | `source-env.test.ts`, `source-env-handlers.test.ts` |

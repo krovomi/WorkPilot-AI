@@ -614,6 +614,17 @@ describe("the history", () => {
 		expect(screen.getByText("Model A name")).not.toHaveAttribute("title");
 		expect(screen.getAllByText("Model B name").map((badge) => badge.getAttribute("title"))).toContain("model-B");
 
+		// Numbers follow the app's language, not the system's.
+		await act(async () => {
+			await i18n.changeLanguage("fr");
+		});
+		expect(
+			screen.getByText((_, el) => el?.tagName === "P" && el.textContent === "3\u202f400 tokens · $0.00100"),
+		).toBeInTheDocument();
+		await act(async () => {
+			await i18n.changeLanguage("en");
+		});
+
 		await user.click(row);
 		expect(screen.queryByText("~12 tokens")).toBeNull();
 	});
@@ -626,35 +637,55 @@ describe("the history", () => {
 		expect(screen.queryByText("Awaiting vote")).toBeNull();
 	});
 
-	it("clears every battle, and says so when it could not", async () => {
+	it("asks before clearing the history, and clears nothing when cancelled", async () => {
+		api.arenaGetBattles.mockResolvedValue({ success: true, data: [battle(), battle({ id: "old-2" })] });
+		const user = await openArena();
+		await user.click(screen.getByRole("button", { name: "History" }));
+		await user.click(await screen.findByRole("button", { name: "Clear All" }));
+		const confirm = await screen.findByRole("alertdialog", { name: "Clear the battle history?" });
+		expect(confirm).toHaveTextContent("2 battles and their votes will be deleted. This cannot be undone.");
+		await user.click(within(confirm).getByRole("button", { name: "Cancel" }));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		expect(api.arenaClearHistory).not.toHaveBeenCalled();
+		expect(screen.getByText("2 battles")).toBeInTheDocument();
+	});
+
+	it("clears every battle once confirmed, and says so when it could not", async () => {
 		api.arenaGetBattles.mockResolvedValue({ success: true, data: [battle()] });
 		const user = await openArena();
 		await user.click(screen.getByRole("button", { name: "History" }));
-		const clear = await screen.findByRole("button", { name: "Clear All" });
+		const clearButton = await screen.findByRole("button", { name: "Clear All" });
+		const clear = async () => {
+			await user.click(clearButton);
+			const confirm = await screen.findByRole("alertdialog");
+			expect(confirm).toHaveTextContent("1 battle and its votes will be deleted.");
+			await user.click(within(confirm).getByRole("button", { name: "Clear All" }));
+			await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		};
 
 		api.arenaClearHistory.mockResolvedValueOnce({ success: false, error: "disk full" });
-		await user.click(clear);
+		await clear();
 		expect(await screen.findByRole("alert")).toHaveTextContent("disk full");
 		expect(screen.getByText("1 battle")).toBeInTheDocument();
 
 		api.arenaClearHistory.mockResolvedValueOnce({ success: false });
-		await user.click(clear);
+		await clear();
 		await waitFor(() =>
 			expect(screen.getByRole("alert")).toHaveTextContent("Could not clear the battle history"),
 		);
 
 		api.arenaClearHistory.mockRejectedValueOnce(new Error("ipc closed"));
-		await user.click(clear);
+		await clear();
 		await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("ipc closed"));
 
 		api.arenaClearHistory.mockRejectedValueOnce("not an error");
-		await user.click(clear);
+		await clear();
 		await waitFor(() =>
 			expect(screen.getByRole("alert")).toHaveTextContent("Could not clear the battle history"),
 		);
 
 		api.arenaGetBattles.mockResolvedValue({ success: true, data: [] });
-		await user.click(clear);
+		await clear();
 		expect(await screen.findByText("No battles yet")).toBeInTheDocument();
 		expect(screen.queryByRole("alert")).toBeNull();
 		expect(api.arenaGetAnalytics).toHaveBeenCalled();

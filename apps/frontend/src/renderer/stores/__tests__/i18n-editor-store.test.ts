@@ -4,9 +4,10 @@ import { useI18nEditorStore } from "../i18n-editor-store";
 const listI18nNamespaces = vi.fn();
 const loadI18nNamespace = vi.fn();
 const mutateI18n = vi.fn();
+const detectI18nRoots = vi.fn();
 
 Object.defineProperty(globalThis, "electronAPI", {
-	value: { listI18nNamespaces, loadI18nNamespace, mutateI18n },
+	value: { listI18nNamespaces, loadI18nNamespace, mutateI18n, detectI18nRoots },
 	writable: true,
 	configurable: true,
 });
@@ -185,5 +186,124 @@ describe("reloadKeepingDraft", () => {
 		expect(s.stale).toBe(false);
 		expect(s.view?.fingerprints).toEqual({ en: "new-en", fr: "new-fr" });
 		expect(s.draft.edits["buttons.save"]).toEqual({ fr: "Sauver" });
+	});
+});
+
+describe("detection", () => {
+	it("lists the locale folders found in the project, and none when it cannot", async () => {
+		const roots = [
+			{ path: "/p/locales", relative: "locales", locales: ["en"], layout: "nested" as const, namespaces: 1 },
+		];
+		detectI18nRoots.mockResolvedValueOnce({ success: true, roots });
+		await useI18nEditorStore.getState().detectRoots("/p");
+		expect(useI18nEditorStore.getState()).toMatchObject({ detecting: false, detectedRoots: roots });
+
+		detectI18nRoots.mockResolvedValueOnce({ success: false, roots });
+		await useI18nEditorStore.getState().detectRoots("/p");
+		expect(useI18nEditorStore.getState().detectedRoots).toEqual([]);
+
+		detectI18nRoots.mockRejectedValueOnce(new Error("bridge down"));
+		useI18nEditorStore.setState({ detectedRoots: roots });
+		await useI18nEditorStore.getState().detectRoots("/p");
+		expect(useI18nEditorStore.getState()).toMatchObject({ detecting: false, detectedRoots: [] });
+
+		await useI18nEditorStore.getState().detectRoots("");
+		expect(detectI18nRoots).toHaveBeenCalledTimes(3);
+	});
+});
+
+describe("what the backend leaves out or refuses", () => {
+	it("reads an answer without folder, locales, layout or namespaces as empty", async () => {
+		listI18nNamespaces.mockResolvedValue({ success: true });
+		await useI18nEditorStore.getState().loadNamespaces("/p/picked", "en");
+		expect(useI18nEditorStore.getState()).toMatchObject({
+			phase: "ok",
+			localesDir: "/p/picked",
+			locales: [],
+			layout: "none",
+			namespaces: [],
+			referenceLocale: "en",
+		});
+	});
+
+	it("says a refusal without a reason, or a thrown value, as it can", async () => {
+		listI18nNamespaces.mockResolvedValueOnce({ success: false });
+		await useI18nEditorStore.getState().loadNamespaces("/p/locales");
+		expect(useI18nEditorStore.getState().error).toBe("Backend error");
+		listI18nNamespaces.mockRejectedValueOnce("plain");
+		await useI18nEditorStore.getState().loadNamespaces("/p/locales");
+		expect(useI18nEditorStore.getState().error).toBe("plain");
+	});
+
+	it("opens, saves or reloads nothing before a folder and a namespace are loaded", async () => {
+		await useI18nEditorStore.getState().selectNamespace("common");
+		await useI18nEditorStore.getState().save();
+		await useI18nEditorStore.getState().reloadKeepingDraft();
+		await useI18nEditorStore.getState().loadSummariesQuietly();
+		expect(loadI18nNamespace).not.toHaveBeenCalled();
+		expect(mutateI18n).not.toHaveBeenCalled();
+		expect(listI18nNamespaces).not.toHaveBeenCalled();
+		expect(useI18nEditorStore.getState().phase).toBe("idle");
+	});
+
+	it("shows why a namespace could not be opened", async () => {
+		const store = await loadedStore();
+		loadI18nNamespace.mockResolvedValueOnce({ success: false, error: "common.json is not JSON." });
+		await store.getState().selectNamespace("common");
+		expect(store.getState()).toMatchObject({ phase: "error", error: "common.json is not JSON.", view: null });
+		loadI18nNamespace.mockResolvedValueOnce({ success: false });
+		await store.getState().selectNamespace("common");
+		expect(store.getState().error).toBe("Backend error");
+		loadI18nNamespace.mockRejectedValueOnce(new Error("bridge down"));
+		await store.getState().selectNamespace("common");
+		expect(store.getState().error).toBe("bridge down");
+	});
+
+	it("keeps the draft and says why when a save fails or the re-read is refused", async () => {
+		const store = await loadedStore();
+		store.getState().setValue("buttons.save", "fr", "Sauver");
+		mutateI18n.mockResolvedValueOnce({ success: false });
+		await store.getState().save();
+		expect(store.getState()).toMatchObject({ phase: "error", error: "Backend error", stale: false });
+
+		mutateI18n.mockRejectedValueOnce(new Error("bridge down"));
+		await store.getState().save();
+		expect(store.getState().error).toBe("bridge down");
+		expect(store.getState().draft.edits["buttons.save"]).toEqual({ fr: "Sauver" });
+
+		// Saved, but the re-read is refused: the table keeps what it showed.
+		const shown = store.getState().view;
+		mutateI18n.mockResolvedValueOnce({ success: true, namespace: "common" });
+		loadI18nNamespace.mockResolvedValueOnce({ success: false });
+		listI18nNamespaces.mockResolvedValueOnce({ success: true });
+		await store.getState().save();
+		expect(store.getState().lastSave?.written).toEqual([]);
+		expect(store.getState().view).toBe(shown);
+		await vi.waitFor(() => expect(store.getState().namespaces).toEqual([]));
+	});
+
+	it("keeps the sidebar counts when they cannot be re-read", async () => {
+		const store = await loadedStore();
+		listI18nNamespaces.mockResolvedValueOnce({ success: false });
+		await store.getState().loadSummariesQuietly();
+		listI18nNamespaces.mockRejectedValueOnce(new Error("bridge down"));
+		await store.getState().loadSummariesQuietly();
+		expect(store.getState().namespaces).toEqual(NAMESPACES.namespaces);
+		expect(store.getState().phase).toBe("ok");
+	});
+
+	it("says why the file could not be re-read, keeping the draft", async () => {
+		const store = await loadedStore();
+		store.getState().setValue("buttons.save", "fr", "Sauver");
+		loadI18nNamespace.mockResolvedValueOnce({ success: false, error: "gone" });
+		await store.getState().reloadKeepingDraft();
+		expect(store.getState()).toMatchObject({ phase: "error", error: "gone" });
+		loadI18nNamespace.mockResolvedValueOnce({ success: false });
+		await store.getState().reloadKeepingDraft();
+		expect(store.getState().error).toBe("Backend error");
+		loadI18nNamespace.mockRejectedValueOnce(new Error("bridge down"));
+		await store.getState().reloadKeepingDraft();
+		expect(store.getState().error).toBe("bridge down");
+		expect(store.getState().draft.edits["buttons.save"]).toEqual({ fr: "Sauver" });
 	});
 });

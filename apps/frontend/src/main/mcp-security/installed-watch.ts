@@ -22,7 +22,10 @@ import * as path from "node:path";
 import { matchCatalogServer } from "../../shared/mcp-catalog/catalog-match";
 import { POLICY_SERVER_ID } from "../../shared/mcp-catalog/install-policy";
 import { scoreServer, securityLevel } from "../../shared/mcp-catalog/security-score";
-import type { McpMarketplaceServer } from "../../shared/types/mcp-marketplace";
+import type {
+	McpMarketplaceFailure,
+	McpMarketplaceServer,
+} from "../../shared/types/mcp-marketplace";
 import type {
 	McpInstalledServerWatch,
 	McpInstalledWatchView,
@@ -267,13 +270,18 @@ export function installedWatchView(
 	return { ...(data.lastRun ? { lastRun: data.lastRun } : {}), servers };
 }
 
-export class McpWatchRequestError extends Error {}
+/** A watch request refused for a reason the renderer words (`code`). */
+export class McpWatchRequestError extends Error {
+	constructor(readonly code: McpMarketplaceFailure) {
+		super(code);
+	}
+}
 
 /** The project id of a view request, checked (S6). */
 export function parseWatchRequest(raw: unknown): { projectId: string } {
 	const projectId = record(raw).projectId;
 	if (typeof projectId !== "string" || !projectId) {
-		throw new McpWatchRequestError("A project id is required");
+		throw new McpWatchRequestError("watchProjectRequired");
 	}
 	return { projectId };
 }
@@ -282,7 +290,7 @@ export function parseWatchRequest(raw: unknown): { projectId: string } {
 export function parseAcknowledgeRequest(raw: unknown): { serverId: string } {
 	const serverId = record(raw).serverId;
 	if (typeof serverId !== "string" || !POLICY_SERVER_ID.test(serverId)) {
-		throw new McpWatchRequestError("A catalog server id is required");
+		throw new McpWatchRequestError("watchServerRequired");
 	}
 	return { serverId };
 }

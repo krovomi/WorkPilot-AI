@@ -94,12 +94,12 @@ describe("builder projects", () => {
 			id: "b1",
 			name: "B",
 			description: "",
-			icon: "Wrench",
-			color: "#6366F1",
+			icon: "server",
+			color: "#000000",
 			envVars: [],
 			tools: [],
-			createdAt: "2026-11-21T08:00:00.000Z",
-			updatedAt: "2026-11-21T08:00:00.000Z",
+			createdAt: "2026-11-21T00:00:00Z",
+			updatedAt: "2026-11-21T00:00:00Z",
 		});
 		expect(
 			fs.existsSync(path.join(state.dir, "mcp-marketplace", "builder-projects.json")),
@@ -124,11 +124,11 @@ describe("mcpMarketplace:getPolicy", () => {
 	it("refuses a request without a registered project, and a path in its place", async () => {
 		expect(await call(IPC_CHANNELS.MCP_MARKETPLACE_GET_POLICY, { projectId: "nope" })).toEqual({
 			success: false,
-			error: "Project not found",
+			error: "watchUnknownProject",
 		});
 		expect(await call(IPC_CHANNELS.MCP_MARKETPLACE_GET_POLICY, { projectPath: project })).toEqual({
 			success: false,
-			error: "A project id is required",
+			error: "watchProjectRequired",
 		});
 	});
 
@@ -146,7 +146,7 @@ describe("mcpMarketplace:getPolicy", () => {
 		]);
 		expect(await call(IPC_CHANNELS.MCP_MARKETPLACE_GET_POLICY, { projectId: "p1" })).toEqual({
 			success: false,
-			error: "Failed to read the MCP policy",
+			error: "policyReadFailed",
 		});
 		expect(state.error).toHaveBeenCalled();
 	});
@@ -164,11 +164,11 @@ describe("mcpMarketplace:getInstalledWatch", () => {
 	it("refuses an unknown project and hides any other failure", async () => {
 		expect(
 			(await call(IPC_CHANNELS.MCP_MARKETPLACE_GET_INSTALLED_WATCH, { projectId: "x" })).error,
-		).toBe("Project not found");
+		).toBe("watchUnknownProject");
 		state.breakView = true;
 		expect(await call(IPC_CHANNELS.MCP_MARKETPLACE_GET_INSTALLED_WATCH, { projectId: "p1" })).toEqual({
 			success: false,
-			error: "Failed to read the installed servers' alerts",
+			error: "watchReadFailed",
 		});
 	});
 });
@@ -188,7 +188,7 @@ describe("mcpMarketplace:acknowledgeAlerts", () => {
 	it("refuses a server id that is not one, and hides a write failure", async () => {
 		expect(await call(IPC_CHANNELS.MCP_MARKETPLACE_ACKNOWLEDGE_ALERTS, { serverId: "../x" })).toEqual({
 			success: false,
-			error: "A catalog server id is required",
+			error: "watchServerRequired",
 		});
 		const store = installedWatchStore();
 		const write = vi.spyOn(store, "write").mockImplementation(() => {
@@ -199,7 +199,7 @@ describe("mcpMarketplace:acknowledgeAlerts", () => {
 		});
 		expect(await call(IPC_CHANNELS.MCP_MARKETPLACE_ACKNOWLEDGE_ALERTS, { serverId: "gitlab" })).toEqual({
 			success: false,
-			error: "Failed to acknowledge the alerts",
+			error: "acknowledgeFailed",
 		});
 		write.mockRestore();
 	});

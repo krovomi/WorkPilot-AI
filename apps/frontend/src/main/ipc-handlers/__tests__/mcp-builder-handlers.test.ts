@@ -99,7 +99,7 @@ describe("mcpMarketplace:saveBuilder", () => {
 		["too many tools", project({ tools: Array.from({ length: 101 }, () => project().tools[0]) })],
 		["headers that are not text", project({ defaultHeaders: { Accept: 1 } })],
 	])("refuses %s and writes nothing", async (_label, value) => {
-		expect(await save(value)).toEqual({ success: false, error: "Invalid builder project" });
+		expect(await save(value)).toEqual({ success: false, error: "invalidBuilderRequest" });
 		expect(fs.existsSync(file())).toBe(false);
 	});
 
@@ -108,7 +108,7 @@ describe("mcpMarketplace:saveBuilder", () => {
 		fs.writeFileSync(file(), JSON.stringify(full));
 		expect(await save(project({ id: "p200" }))).toEqual({
 			success: false,
-			error: "Too many builder projects",
+			error: "tooManyBuilderProjects",
 		});
 		expect(await save(project({ id: "p7", name: "Updated" }))).toEqual({ success: true });
 		expect((await list()).find((p) => p.id === "p7")?.name).toBe("Updated");
@@ -142,7 +142,7 @@ describe("mcpMarketplace:deleteBuilder", () => {
 		async (request) => {
 			expect(await call(IPC_CHANNELS.MCP_MARKETPLACE_DELETE_BUILDER, request)).toEqual({
 				success: false,
-				error: "Invalid builder project",
+				error: "invalidBuilderRequest",
 			});
 		},
 	);

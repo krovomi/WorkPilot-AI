@@ -109,9 +109,9 @@ describe("acknowledgeServerAlerts", () => {
 	});
 
 	it("says when the alerts could not be acknowledged", async () => {
-		api.acknowledgeMcpAlerts.mockResolvedValueOnce({ success: false, error: "A catalog server id is required" });
+		api.acknowledgeMcpAlerts.mockResolvedValueOnce({ success: false, error: "watchServerRequired" });
 		expect(await acknowledgeServerAlerts("p1", "git")).toBe(false);
-		expect(store().error).toEqual({ key: "acknowledge", detail: "A catalog server id is required" });
+		expect(store().error).toEqual({ key: "acknowledge", detail: "watchServerRequired" });
 		api.acknowledgeMcpAlerts.mockRejectedValueOnce(new Error("bridge"));
 		expect(await acknowledgeServerAlerts("p1", "git")).toBe(false);
 		expect(store().error).toEqual({ key: "acknowledge", detail: "bridge" });
