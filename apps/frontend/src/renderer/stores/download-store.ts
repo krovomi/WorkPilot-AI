@@ -12,7 +12,6 @@ export interface DownloadProgress {
 	status: DownloadStatus;
 	percentage: number;
 	speed?: string;
-	timeRemaining?: string;
 	/** Seconds left, for views that word the estimate in the app's language. */
 	secondsRemaining?: number;
 	error?: string;
@@ -36,8 +35,6 @@ interface DownloadState {
 	rehydrate: () => Promise<void>;
 
 	// Selectors
-	hasActiveDownloads: () => boolean;
-	getActiveDownloads: () => DownloadProgress[];
 	isDownloading: (modelName: string) => boolean;
 }
 
@@ -168,20 +165,6 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 			return { downloads: rest };
 		}),
 
-	hasActiveDownloads: () => {
-		const downloads = get().downloads;
-		return Object.values(downloads).some(
-			(d) => d.status === "starting" || d.status === "downloading",
-		);
-	},
-
-	getActiveDownloads: () => {
-		const downloads = get().downloads;
-		return Object.values(downloads).filter(
-			(d) => d.status === "starting" || d.status === "downloading",
-		);
-	},
-
 	isDownloading: (modelName: string) => {
 		const d = get().downloads[modelName];
 		return d?.status === "starting" || d?.status === "downloading";
@@ -260,31 +243,20 @@ export function initDownloadProgressListener(): () => void {
 
 		// Calculate speed only if we have meaningful time delta (> 100ms)
 		let speedStr = "";
-		let timeStr = "";
 		let secondsLeft = 0;
 
 		if (timeDelta > 100 && bytesDelta > 0) {
 			const speed = (bytesDelta / timeDelta) * 1000; // bytes per second
 			const remaining = data.total - data.completed;
-			const timeRemaining = speed > 0 ? Math.ceil(remaining / speed) : 0;
-			secondsLeft = Math.max(0, timeRemaining);
+			secondsLeft = Math.max(0, Math.ceil(remaining / speed));
 
 			// Format speed (MB/s or KB/s)
 			if (speed > 1024 * 1024) {
 				speedStr = `${(speed / (1024 * 1024)).toFixed(1)} MB/s`;
 			} else if (speed > 1024) {
 				speedStr = `${(speed / 1024).toFixed(1)} KB/s`;
-			} else if (speed > 0) {
+			} else {
 				speedStr = `${Math.round(speed)} B/s`;
-			}
-
-			// Format time remaining
-			if (timeRemaining > 3600) {
-				timeStr = `${Math.ceil(timeRemaining / 3600)}h remaining`;
-			} else if (timeRemaining > 60) {
-				timeStr = `${Math.ceil(timeRemaining / 60)}m remaining`;
-			} else if (timeRemaining > 0) {
-				timeStr = `${Math.ceil(timeRemaining)}s remaining`;
 			}
 		}
 
@@ -297,7 +269,6 @@ export function initDownloadProgressListener(): () => void {
 		store.updateProgress(data.modelName, {
 			percentage: data.percentage,
 			speed: speedStr || undefined,
-			timeRemaining: timeStr || undefined,
 			secondsRemaining: secondsLeft || undefined,
 		});
 	};

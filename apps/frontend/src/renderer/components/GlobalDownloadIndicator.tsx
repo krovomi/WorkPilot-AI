@@ -11,6 +11,7 @@ import {
 import { type ReactNode, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { formatDownloadRemaining } from "../lib/download-remaining";
 import { cn } from "../lib/utils";
 import { useOllamaModelDownload } from "../hooks/useOllamaModelDownload";
 import { useDownloadStore } from "../stores/download-store";
@@ -175,7 +176,7 @@ export function GlobalDownloadIndicator() {
 												<span>{download.speed}</span>
 												{download.secondsRemaining ? (
 													<span className="text-primary">
-														{formatRemaining(download.secondsRemaining, t)}
+														{formatDownloadRemaining(download.secondsRemaining, t)}
 													</span>
 												) : null}
 											</div>
@@ -234,13 +235,3 @@ function describeDownloads(
 	};
 }
 
-/** "3m remaining", in the app's language, from the store's seconds. */
-function formatRemaining(seconds: number, t: TFunction): string {
-	if (seconds > 3600) {
-		return t("downloads.hoursRemaining", { count: Math.ceil(seconds / 3600) });
-	}
-	if (seconds > 60) {
-		return t("downloads.minutesRemaining", { count: Math.ceil(seconds / 60) });
-	}
-	return t("downloads.secondsRemaining", { count: seconds });
-}
