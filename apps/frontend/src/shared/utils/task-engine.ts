@@ -36,6 +36,8 @@ export type EngineSeedSettings = Pick<
 	| "customPhaseModels"
 	| "customPhaseThinking"
 	| "globalOllamaModel"
+	| "globalOpenRouterModel"
+	| "globalHuggingFaceModel"
 >;
 
 export const DEFAULT_ENGINE_PROVIDER = "anthropic";

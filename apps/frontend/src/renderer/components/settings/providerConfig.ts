@@ -88,6 +88,7 @@ export const getProviderFields = (t: any): Record<string, ProviderConfig> => ({
 	},
 	...gatewayMap((gateway) => ({
 		apiKey: gateway.settingsKey,
+		model: gateway.modelSettingsKey,
 		description: t(`sections.accounts.providers.${gateway.id}`),
 		requiresApiKey: true,
 		placeholder: gateway.keyPlaceholder,

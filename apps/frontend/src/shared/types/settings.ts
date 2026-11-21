@@ -324,6 +324,9 @@ export interface AppSettings {
 	globalOpenRouterApiKey?: string;
 	/** Hugging Face token with "Make calls to Inference Providers". */
 	globalHuggingFaceApiKey?: string;
+	/** Default model of each gateway (an id of its catalogue, e.g. `org/model`). */
+	globalOpenRouterModel?: string;
+	globalHuggingFaceModel?: string;
 	globalMistralApiKey?: string;
 	globalDeepSeekApiKey?: string;
 	globalMetaLlamaApiKey?: string;

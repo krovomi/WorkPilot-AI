@@ -1235,4 +1235,22 @@ describe("model gateways (OpenRouter, Hugging Face)", () => {
 			OPENROUTER_API_KEY: "sk-or-test-0000",
 		});
 	});
+
+	it("hands the backend the model chosen on the gateway page", () => {
+		store.settings = {
+			selectedProvider: "huggingface",
+			globalHuggingFaceApiKey: "hf_test_0000",
+			globalHuggingFaceModel: " moonshotai/Kimi-K3.1-Pro ",
+			globalOllamaModel: "llama3.3",
+		};
+		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "huggingface",
+			HUGGINGFACE_API_KEY: "hf_test_0000",
+			HUGGINGFACE_MODEL: "moonshotai/Kimi-K3.1-Pro",
+		});
+		store.settings = { selectedProvider: "openrouter", globalOpenRouterModel: "  " };
+		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "openrouter",
+		});
+	});
 });

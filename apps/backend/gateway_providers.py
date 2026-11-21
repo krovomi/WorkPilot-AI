@@ -76,6 +76,15 @@ def env_key(provider: str) -> str | None:
     return None
 
 
+def env_model(provider: str) -> str | None:
+    """The model chosen on the gateway's provider page (`<NAME>_MODEL`), or None.
+
+    Read when asked, not at import, so the long-running API follows a choice
+    made after it started.
+    """
+    return (os.environ.get(f"{provider.upper()}_MODEL") or "").strip() or None
+
+
 def base_url(provider: str) -> str:
     """The gateway's endpoint, `<NAME>_BASE_URL` overriding the default."""
     return (
@@ -229,13 +238,14 @@ def fetch_models(
 def gateway_env_config(provider: str, default_model: Any) -> dict[str, Any] | None:
     """The gateway's configuration from the environment, or None without a key.
 
-    `default_model` is the registry's default entry (a `ModelEntry`), or None.
+    The model is the one chosen on the provider page, else `default_model`,
+    the registry's default entry (a `ModelEntry`), or None.
     """
     key = env_key(provider)
     if not key:
         return None
     return {
         "api_key": key,
-        "model": getattr(default_model, "model_id", "") or "",
+        "model": env_model(provider) or getattr(default_model, "model_id", "") or "",
         "base_url": base_url(provider),
     }
