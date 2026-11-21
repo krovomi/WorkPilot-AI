@@ -21,7 +21,7 @@ import type {
 } from "../../shared/types/mcp-security";
 
 export const CACHE_TTL_MS = 86_400_000;
-const TIMEOUT_MS = 8_000;
+export const TIMEOUT_MS = 8_000;
 const MAX_BODY_BYTES = 15 * 1024 * 1024;
 const MAX_VULNERABILITIES = 20;
 const MAX_TEXT = 200;
@@ -55,11 +55,11 @@ export function packageOf(entry: McpMarketplaceServer): PackageRef | null {
 	return { ecosystem, name, ...(pinned ? { version: pinned } : {}) };
 }
 
-function text(value: unknown, limit = MAX_TEXT): string {
+export function text(value: unknown, limit = MAX_TEXT): string {
 	return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, limit) : "";
 }
 
-async function readJson(fetcher: Fetcher, url: string, init?: RequestInit): Promise<unknown> {
+export async function readJson(fetcher: Fetcher, url: string, init?: RequestInit): Promise<unknown> {
 	const response = await fetcher(url, {
 		...init,
 		redirect: "error",
@@ -73,7 +73,7 @@ async function readJson(fetcher: Fetcher, url: string, init?: RequestInit): Prom
 	return JSON.parse(body);
 }
 
-function record(value: unknown): Record<string, unknown> {
+export function record(value: unknown): Record<string, unknown> {
 	return value && typeof value === "object" && !Array.isArray(value)
 		? (value as Record<string, unknown>)
 		: {};

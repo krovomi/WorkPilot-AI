@@ -4,7 +4,8 @@ its index and the views that follow, as their files on the server's clone and
 their runners as jobs; its Insights conversations (``insights``); its
 memories (``context``); its GitHub repository or GitLab project, with each
 person's own token (``forge``, ``forge_gitlab``), and the AI review of its
-pull or merge requests as a job on the clone (``forge_review``); its analyses
+pull or merge requests as a job on the clone (``forge_review``), with the
+feedback on their findings (``forge_review_feedback``); its analyses
 (accessibility, i18n, documentation drift, flaky tests, technical debt) as
 jobs whose reports every member reads (``analyses``), its changelog among
 them, with the branches, tags and commits it is chosen from (``changelog``);
@@ -37,6 +38,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.forge import router as forge
     from shared_features.forge_gitlab import router as forge_gitlab
     from shared_features.forge_review import GITHUB, GITLAB
+    from shared_features.forge_review_feedback import router as review_feedback
     from shared_features.ideation import router as ideation
     from shared_features.insights import router as insights
     from shared_features.registry import FEATURES
@@ -57,6 +59,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(forge, "forge")
     mount(forge_gitlab, "forge")
     mount(GITHUB.router, "forge")
+    mount(review_feedback, "forge")
     mount(GITLAB.router, "forge")
     mount(analyses, "analyses")
     mount(changelog, "analyses")

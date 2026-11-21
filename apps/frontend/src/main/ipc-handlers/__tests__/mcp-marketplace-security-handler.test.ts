@@ -34,6 +34,7 @@ vi.mock("../../mcp-security/server-security", async (importOriginal) => {
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import { RegistryFactsStore } from "../../mcp-security/registry-facts";
 import { McpSecurityRequestError } from "../../mcp-security/server-security";
+import { SourceScanStore } from "../../mcp-security/source-scan";
 import { registerMcpMarketplaceHandlers } from "../mcp-marketplace-handlers";
 import { offlineStrict } from "../task/split-merge-watch";
 
@@ -65,6 +66,8 @@ describe("mcpMarketplace:getSecurity", () => {
 		expect(request).toEqual({ serverId: "github" });
 		expect(deps.store).toBeInstanceOf(RegistryFactsStore);
 		expect(deps.offline).toBe(offlineStrict);
+		expect(deps.scan).toBeInstanceOf(SourceScanStore);
+		expect(typeof deps.accepted).toBe("function");
 		expect(deps.projectPath("p1")).toBe("/projects/p1");
 		getProject.mockReturnValueOnce(undefined);
 		expect(deps.projectPath("p2")).toBeUndefined();

@@ -42,7 +42,15 @@ export type ReviewFeedbackError =
 	| "write_failed";
 
 export type ReviewFeedbackResult =
-	| { success: true; feedback: ReviewFeedbackMap }
+	| {
+			success: true;
+			feedback: ReviewFeedbackMap;
+			/**
+			 * Server projects (lot 3): the findings whose rejection waits for a
+			 * maintainer; the reviewer does not learn from it until approved.
+			 */
+			held?: string[];
+	  }
 	| { success: false; error: ReviewFeedbackError };
 
 /** A finding the project's feedback removed from a review. */
@@ -79,10 +87,31 @@ export interface ReviewFeedbackRuleStats {
 	topReason: ReviewFeedbackReason | null;
 }
 
+/** A server project's rejection by a member, waiting for a maintainer (lot 3). */
+export interface HeldRejection {
+	prNumber: number;
+	findingId: string;
+	verdict: Exclude<ReviewFeedbackVerdict, "accepted">;
+	reason: ReviewFeedbackReason | null;
+	note: string;
+	category: string;
+	/** The finding's title, one bounded line. */
+	label: string;
+}
+
+/** What a server project adds to the view (lot 3). */
+export interface ReviewFeedbackServerStats {
+	/** The person may reset a rule and decide a held rejection. */
+	maintainer: boolean;
+	held: HeldRejection[];
+}
+
 export interface ReviewFeedbackStats {
 	threshold: number;
 	categories: ReviewFeedbackCategoryStats[];
 	rules: ReviewFeedbackRuleStats[];
+	/** Set for a server project, whose feedback the server keeps. */
+	server?: ReviewFeedbackServerStats;
 }
 
 export type ReviewFeedbackStatsResult =

@@ -4,8 +4,10 @@
 /**
  * The device matrix (#383): pick devices, capture them through the main,
  * see them side by side with what the reading found, and keep one for the
- * visual review. Throttling is picked from closed lists; the grid exports
- * through the main. The preview keeps its `<webview>` mounted behind it.
+ * visual review. Throttling and orientation are picked from closed lists, the
+ * preview's session is a yes or no; faulty elements are boxed on the capture;
+ * the grid exports through the main as a PNG or a PDF. The preview keeps its
+ * `<webview>` mounted behind it.
  */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -33,6 +35,10 @@ const done = (deviceId: string, report: ResponsiveReport | null, conditions: Par
 		network: "none" as const,
 		cpu: "1x" as const,
 		loadMs: 1234,
+		orientation: "portrait" as const,
+		width: 393,
+		height: 852,
+		previewSession: false,
 		...conditions,
 	},
 });
@@ -54,6 +60,10 @@ function reset(entries = {}) {
 		stopRequested: false,
 		network: "none",
 		cpu: "1x",
+		orientation: "portrait",
+		previewSession: false,
+		showMarkers: true,
+		autoCaptured: [],
 		exporting: false,
 		exportStatus: null,
 	});
@@ -89,7 +99,7 @@ describe("DeviceMatrix", () => {
 		await waitFor(() =>
 			expect(screen.getAllByText("The emulator's server is not running: start it, then capture again.")).toHaveLength(2),
 		);
-		const plain = { network: "none", cpu: "1x" };
+		const plain = { network: "none", cpu: "1x", orientation: "portrait", previewSession: false };
 		expect(captureEmulatorDevice).toHaveBeenCalledWith({ deviceId: "iphone-15", path: "/cart", ...plain });
 		expect(captureEmulatorDevice).toHaveBeenCalledWith({ deviceId: "pixel-8", path: "/cart", ...plain });
 	});
@@ -110,7 +120,33 @@ describe("DeviceMatrix", () => {
 		await waitFor(() =>
 			expect(screen.getByText("The network or CPU throttling could not be applied on this device.")).toBeInTheDocument(),
 		);
-		expect(captureEmulatorDevice).toHaveBeenCalledWith({ deviceId: "iphone-15", path: "/", network: "slow-3g", cpu: "6x" });
+		expect(captureEmulatorDevice).toHaveBeenCalledWith({
+			deviceId: "iphone-15",
+			path: "/",
+			network: "slow-3g",
+			cpu: "6x",
+			orientation: "portrait",
+			previewSession: false,
+		});
+	});
+
+	it("captures in the orientation picked, with the preview's session when asked", async () => {
+		captureEmulatorDevice.mockResolvedValue({ success: false, error: "session-failed" });
+		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
+		const orientation = screen.getByLabelText("Orientation");
+		expect([...orientation.querySelectorAll("option")].map((option) => option.textContent)).toEqual([
+			"Portrait",
+			"Landscape",
+		]);
+		fireEvent.change(orientation, { target: { value: "landscape" } });
+		fireEvent.click(screen.getByLabelText(/Use the preview's session/));
+		fireEvent.click(screen.getByRole("button", { name: "Capture 1 device" }));
+		await waitFor(() =>
+			expect(screen.getByText("The preview's session could not be read: capture again without it.")).toBeInTheDocument(),
+		);
+		expect(captureEmulatorDevice).toHaveBeenCalledWith(
+			expect.objectContaining({ orientation: "landscape", previewSession: true }),
+		);
 	});
 
 	it("shows under which conditions each device rendered, in the app's language", async () => {
@@ -125,6 +161,7 @@ describe("DeviceMatrix", () => {
 		);
 		const tiles = document.querySelectorAll("figure[data-device]");
 		expect(within(tiles[0] as HTMLElement).getByText("Slow 3G · CPU 4× slower · Loaded in 4.3 s")).toBeInTheDocument();
+		expect(within(tiles[0] as HTMLElement).getByText("393 × 852 @3x")).toBeInTheDocument();
 		expect(within(tiles[1] as HTMLElement).getByText("Loaded in 1.2 s")).toBeInTheDocument();
 		expect(within(tiles[2] as HTMLElement).getByText("Loaded in 1.2 s")).toBeInTheDocument();
 		unmount();
@@ -137,25 +174,89 @@ describe("DeviceMatrix", () => {
 		}
 	});
 
+	it("says when a device was turned or rendered with the preview's session", () => {
+		reset({
+			"pixel-8": done("pixel-8", report({}), {
+				orientation: "landscape",
+				width: 915,
+				height: 412,
+				previewSession: true,
+			}),
+			"desktop-1080p": done("desktop-1080p", report({}), { orientation: "landscape", width: 1920, height: 1080 }),
+		});
+		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
+		const tiles = document.querySelectorAll("figure[data-device]");
+		const pixel = within(tiles[0] as HTMLElement);
+		expect(pixel.getByText("915 × 412 @2.625x")).toBeInTheDocument();
+		expect(pixel.getByText("Landscape · Preview's session · Loaded in 1.2 s")).toBeInTheDocument();
+		// A desktop is landscape by itself: nothing to say.
+		expect(within(tiles[1] as HTMLElement).getByText("Loaded in 1.2 s")).toBeInTheDocument();
+	});
+
+	it("boxes the faulty elements on the capture, and stops when asked", () => {
+		reset({
+			"iphone-15": done(
+				"iphone-15",
+				report({
+					issues: [
+						{
+							kind: "broken-navigation",
+							count: 1,
+							samples: [{ selector: "nav#main", x: 0, y: 426, width: 393, height: 85.2 }],
+						},
+					],
+				}),
+			),
+		});
+		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
+		expect(screen.getByText("1 navigation cannot be reached on mobile")).toBeInTheDocument();
+		const marker = document.querySelector("[data-marker]") as HTMLElement;
+		expect(marker).toHaveAttribute("data-marker", "broken-navigation");
+		expect(marker).toHaveAttribute("title", "1 navigation cannot be reached on mobile · nav#main");
+		expect(marker.style.left).toBe("0%");
+		expect(marker.style.top).toBe("50%");
+		expect(marker.style.width).toBe("100%");
+		expect(Number.parseFloat(marker.style.height)).toBeCloseTo(10);
+		fireEvent.click(screen.getByLabelText("Box the faulty elements"));
+		expect(document.querySelector("[data-marker]")).toBeNull();
+		expect(useDeviceMatrixStore.getState().showMarkers).toBe(false);
+	});
+
+	it("says when it was opened for the review of a task", () => {
+		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" auto />);
+		expect(screen.getByText("Shown for the review of this task: its changes touch the interface.")).toBeInTheDocument();
+	});
+
+	it("exports a PDF through the main, with the markers choice", async () => {
+		reset({ "iphone-15": done("iphone-15", report({})) });
+		exportEmulatorDeviceGrid.mockResolvedValueOnce({ success: true, data: { saved: true, fileName: "grid.pdf" } });
+		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
+		fireEvent.click(screen.getByLabelText("Box the faulty elements"));
+		fireEvent.click(screen.getByRole("button", { name: "Export PDF" }));
+		expect(await screen.findByRole("status")).toHaveTextContent("Grid saved as grid.pdf.");
+		expect(exportEmulatorDeviceGrid).toHaveBeenCalledWith({ deviceIds: ["iphone-15"], format: "pdf", markers: false });
+	});
+
 	it("exports the grid through the main and says how it went", async () => {
 		reset({ "iphone-15": done("iphone-15", report({})), "pixel-8": { status: "failed", error: "load-failed" } });
 		let finish: (value: unknown) => void = () => undefined;
 		exportEmulatorDeviceGrid.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
 		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
-		fireEvent.click(screen.getByRole("button", { name: "Export" }));
-		expect(await screen.findByRole("button", { name: "Exporting…" })).toBeDisabled();
-		expect(exportEmulatorDeviceGrid).toHaveBeenCalledWith({ deviceIds: ["iphone-15"] });
+		fireEvent.click(screen.getByRole("button", { name: "Export PNG" }));
+		expect(await screen.findAllByRole("button", { name: "Exporting…" })).toHaveLength(2);
+		expect(exportEmulatorDeviceGrid).toHaveBeenCalledWith({ deviceIds: ["iphone-15"], format: "png", markers: true });
 		finish({ success: true, data: { saved: true, fileName: "grid.png" } });
 		expect(await screen.findByRole("status")).toHaveTextContent("Grid saved as grid.png.");
 		exportEmulatorDeviceGrid.mockResolvedValueOnce({ success: false, error: "nothing-to-export" });
-		fireEvent.click(screen.getByRole("button", { name: "Export" }));
+		fireEvent.click(screen.getByRole("button", { name: "Export PNG" }));
 		expect(await screen.findByText("No capture to export: capture devices first.")).toHaveAttribute("role", "alert");
 	});
 
 	it("offers no export before a device has rendered", () => {
 		reset({ "iphone-15": { status: "failed", error: "load-failed" } });
 		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
-		expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
+		expect(screen.getByRole("button", { name: "Export PNG" })).toBeDisabled();
+		expect(screen.getByRole("button", { name: "Export PDF" })).toBeDisabled();
 	});
 
 	it("selects all, none, and says when the shown page is elsewhere", () => {
@@ -253,5 +354,12 @@ describe("ResponsivePreview with the device matrix", () => {
 		fireEvent.click(toggle);
 		expect(screen.queryByRole("button", { name: "Capture 1 device" })).not.toBeInTheDocument();
 		expect(webview?.parentElement?.parentElement).not.toHaveClass("invisible");
+	});
+
+	it("does not reopen the matrix for a review key already captured", () => {
+		useDeviceMatrixStore.setState({ autoCaptured: ["task-1"] });
+		render(<ResponsivePreview url="http://localhost:5173" refreshKey={0} autoMatrixKey="task-1" />);
+		expect(screen.getByRole("button", { name: "Device matrix" })).toHaveAttribute("aria-pressed", "false");
+		expect(captureEmulatorDevice).not.toHaveBeenCalled();
 	});
 });

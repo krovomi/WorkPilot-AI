@@ -1,6 +1,7 @@
 /**
- * L'export de la matrice d'appareils (#383) : une seule image PNG, les
- * captures en grille, chacune sous le nom de son appareil.
+ * L'export de la matrice d'appareils (#383) : une seule image PNG, ou un PDF
+ * d'une page qui la contient, les captures en grille, chacune sous le nom de
+ * son appareil et, sur demande, les éléments fautifs encadrés.
  *
  * Les images sont celles que le main a lui-même capturées : le renderer ne
  * fournit aucun pixel. Chaque capture est d'abord réduite à sa case par
@@ -8,9 +9,13 @@
  * cachée en bac à sable, sur une page vide (`about:blank`) d'une session en
  * mémoire qui ne navigue nulle part. Les légendes sont écrites par
  * `fillText` : du texte dessiné, jamais du HTML interprété. Ce que la page
- * rend n'est gardé que si c'est un PNG borné.
+ * rend n'est gardé que si c'est un PNG borné. Le PDF est imprimé
+ * (`printToPDF`) par la même fenêtre, qui n'affiche que ce PNG, sur une page
+ * de sa taille ; il n'est gardé que s'il commence par `%PDF-` et reste borné.
  */
 import { BrowserWindow, nativeImage } from "electron";
+import type { DeviceGridExportFormat } from "../../shared/types/device-matrix";
+import type { IssueMarker } from "../../shared/utils/issue-markers";
 import { guardedSession, withTimeout } from "./device-capture";
 
 /** Largeur d'une case, en pixels de l'image exportée. */
@@ -24,6 +29,10 @@ export const CAPTION_HEIGHT = 64;
 export const COMPOSE_TIMEOUT_MS = 30_000;
 /** Au-delà, la réponse de la page n'est pas une grille de dix cases. */
 export const MAX_EXPORT_CHARS = 64 * 1024 * 1024;
+/** Au-delà, l'impression n'est pas celle d'une image de la grille. */
+export const MAX_PDF_BYTES = 96 * 1024 * 1024;
+/** Pixels CSS par pouce : la page du PDF a la taille de l'image. */
+const CSS_PX_PER_INCH = 96;
 const PARTITION = "device-matrix-export";
 
 /** Une case : la capture et ses deux lignes de légende. */
@@ -34,6 +43,8 @@ export interface GridTile {
 	readonly image: string;
 	/** Hauteur / largeur de la fenêtre de l'appareil. */
 	readonly aspect: number;
+	/** Les éléments fautifs à encadrer, en parts de la fenêtre ; vide sans repère. */
+	readonly markers: readonly IssueMarker[];
 }
 
 export interface GridCell {
@@ -116,6 +127,13 @@ export const GRID_COMPOSER = `(async function (input) {
 		ctx.drawImage(img, cell.x, cell.y, cell.width, cell.height);
 		ctx.strokeStyle = "#d4d4d8";
 		ctx.strokeRect(cell.x - 0.5, cell.y - 0.5, cell.width + 1, cell.height + 1);
+		ctx.strokeStyle = "#ea580c";
+		ctx.lineWidth = 2;
+		for (var m = 0; m < tile.markers.length; m += 1) {
+			var mark = tile.markers[m];
+			ctx.strokeRect(cell.x + mark.x * cell.width, cell.y + mark.y * cell.height, mark.width * cell.width, mark.height * cell.height);
+		}
+		ctx.lineWidth = 1;
 	}
 	return canvas.toDataURL("image/png");
 })`;
@@ -133,6 +151,28 @@ export function exportedPng(raw: unknown): Buffer | null {
 	return bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE) ? bytes : null;
 }
 
+/**
+ * L'affichage de la grille seule, pour l'impression : une image à sa taille,
+ * sans marge. La source est le PNG que la page vient de rendre, relu par le main.
+ */
+export const PDF_PAGE = `(function (src, width, height) {
+	var style = document.createElement("style");
+	style.textContent = "@page { margin: 0 } html, body { margin: 0; padding: 0 } img { display: block }";
+	document.head.appendChild(style);
+	var img = new Image();
+	img.width = width;
+	img.height = height;
+	img.src = src;
+	document.body.appendChild(img);
+	return img.decode().then(function () { return true; });
+})`;
+
+/** Les octets du PDF imprimé, seulement si c'en est un, et borné. */
+export function exportedPdf(raw: unknown): Buffer | null {
+	if (!Buffer.isBuffer(raw) || raw.length > MAX_PDF_BYTES) return null;
+	return raw.subarray(0, 5).toString("latin1") === "%PDF-" ? raw : null;
+}
+
 /** Une capture réduite à la taille de sa case, ou un échec si ce n'est pas une image. */
 function shrink(image: string, cell: GridCell): string {
 	const source = nativeImage.createFromDataURL(image);
@@ -140,14 +180,18 @@ function shrink(image: string, cell: GridCell): string {
 	return source.resize({ width: cell.width, height: cell.height, quality: "best" }).toDataURL();
 }
 
-/** La grille des captures, en PNG. */
-export async function composeGrid(tiles: readonly GridTile[]): Promise<Buffer> {
+/** La grille des captures, en PNG ou en PDF. */
+export async function composeGrid(
+	tiles: readonly GridTile[],
+	format: DeviceGridExportFormat = "png",
+): Promise<Buffer> {
 	if (tiles.length === 0) throw new GridExportFailure();
 	const layout = layoutGrid(tiles.map((tile) => tile.aspect));
 	const prepared = tiles.map((tile, index) => ({
 		label: tile.label,
 		detail: tile.detail,
 		image: shrink(tile.image, layout.cells[index]),
+		markers: tile.markers.map(({ x, y, width, height }) => ({ x, y, width, height })),
 	}));
 	const win = new BrowserWindow({
 		show: false,
@@ -172,7 +216,21 @@ export async function composeGrid(tiles: readonly GridTile[]): Promise<Buffer> {
 		const raw = await withTimeout(wc.executeJavaScript(`${GRID_COMPOSER}(${input})`), COMPOSE_TIMEOUT_MS);
 		const png = exportedPng(raw);
 		if (!png) throw new GridExportFailure();
-		return png;
+		if (format === "png") return png;
+		const page = JSON.stringify([`data:image/png;base64,${png.toString("base64")}`, layout.width, layout.height]);
+		await withTimeout(wc.executeJavaScript(`${PDF_PAGE}(...${page})`), COMPOSE_TIMEOUT_MS);
+		const printed = await withTimeout(
+			wc.printToPDF({
+				printBackground: true,
+				margins: { top: 0, bottom: 0, left: 0, right: 0 },
+				pageSize: { width: layout.width / CSS_PX_PER_INCH, height: layout.height / CSS_PX_PER_INCH },
+				pageRanges: "1",
+			}),
+			COMPOSE_TIMEOUT_MS,
+		);
+		const pdf = exportedPdf(printed);
+		if (!pdf) throw new GridExportFailure();
+		return pdf;
 	} finally {
 		win.destroy();
 	}
