@@ -2363,7 +2363,7 @@ export function KanbanBoard({
 															column:
 																getColumnLabel(getVisualColumn(task.status)) ??
 																"",
-															duration: formatAgingDuration(hours),
+															duration: formatAgingDuration(hours, t),
 														})}
 													</span>
 												</span>
