@@ -47,11 +47,14 @@ export function LoopOptions({ disabled }: { disabled: boolean }) {
 		return () => document.removeEventListener("mousedown", close);
 	}, [open]);
 
-	const toggle = (key: "responsive" | "states") => (
+	// The fix sends the passes' findings back: without a pass it has none.
+	const noPass = !options.responsive && !options.states;
+	const toggle = (key: "responsive" | "states" | "fixPasses", off = false) => (
 		<label className="di-pick">
 			<input
 				type="checkbox"
-				checked={options[key]}
+				checked={options[key] && !off}
+				disabled={off}
 				data-testid={`design-loop-${key}`}
 				onChange={(event) => setLoopOptions({ [key]: event.target.checked } as Partial<RenderLoopOptions>)}
 			/>
@@ -100,6 +103,7 @@ export function LoopOptions({ disabled }: { disabled: boolean }) {
 					<div className="di-muted text-2xs">{t("loopOptions.budgetHint")}</div>
 					{toggle("responsive")}
 					{toggle("states")}
+					{toggle("fixPasses", noPass)}
 				</div>
 			)}
 		</div>

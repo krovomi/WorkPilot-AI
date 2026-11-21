@@ -66,6 +66,8 @@ class DesignToCodeRunner:
         loop_max_cost_usd: float = 2.0,
         loop_responsive: bool = False,
         loop_states: bool = False,
+        loop_fix_passes: bool = False,
+        loop_masks: tuple[tuple[float, float, float, float], ...] = (),
     ):
         self.project_dir = Path(project_dir)
         self.image_path = image_path
@@ -91,6 +93,8 @@ class DesignToCodeRunner:
         self.loop_max_cost_usd = loop_max_cost_usd
         self.loop_responsive = loop_responsive
         self.loop_states = loop_states
+        self.loop_fix_passes = loop_fix_passes
+        self.loop_masks = loop_masks
 
     async def run(self) -> dict:
         """Run the complete design-to-code pipeline."""
@@ -194,6 +198,8 @@ class DesignToCodeRunner:
             max_cost_usd=self.loop_max_cost_usd,
             responsive=self.loop_responsive,
             states=self.loop_states,
+            fix_passes=self.loop_fix_passes,
+            masks=self.loop_masks,
         )
         return await run_render_loop(
             service,
@@ -351,6 +357,22 @@ def _bounded_float(low: float, high: float):
     return parse
 
 
+#: Zones the person may draw on the design for the render loop, at most.
+MAX_LOOP_MASKS = 12
+
+
+def _mask(value: str) -> tuple[float, float, float, float]:
+    """``x,y,w,h`` as fractions of the design, inside it and not empty."""
+    try:
+        x, y, w, h = (float(part) for part in value.split(","))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected x,y,w,h") from exc
+    finite = all(0.0 <= v <= 1.0 for v in (x, y, w, h))
+    if not finite or w <= 0 or h <= 0 or x + w > 1.0001 or y + h > 1.0001:
+        raise argparse.ArgumentTypeError("expected fractions inside the design")
+    return x, y, w, h
+
+
 async def main():
     """CLI entry point for the Design-to-Code runner."""
     parser = argparse.ArgumentParser(
@@ -452,9 +474,24 @@ async def main():
         action="store_true",
         help="Capture hover and focus of the first interactive elements",
     )
+    parser.add_argument(
+        "--loop-fix-passes",
+        action="store_true",
+        help="Send what the passes found back to the model once, kept if it helps",
+    )
+    parser.add_argument(
+        "--loop-mask",
+        type=_mask,
+        action="append",
+        default=[],
+        help=f"A zone of the design left out of the score, x,y,w,h as fractions "
+        f"(repeatable, at most {MAX_LOOP_MASKS})",
+    )
     parser.add_argument("--json", action="store_true", help="Output result as JSON")
 
     args = parser.parse_args()
+    if len(args.loop_mask) > MAX_LOOP_MASKS:
+        parser.error(f"--loop-mask: at most {MAX_LOOP_MASKS}")
 
     runner = DesignToCodeRunner(
         project_dir=args.project_dir,
@@ -478,6 +515,8 @@ async def main():
         loop_max_cost_usd=args.loop_max_cost,
         loop_responsive=args.loop_responsive,
         loop_states=args.loop_states,
+        loop_fix_passes=args.loop_fix_passes,
+        loop_masks=tuple(args.loop_mask),
     )
 
     try:

@@ -157,7 +157,7 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 <td valign="top">
 
 **Import Design**: a mockup, screenshot or Figma export becomes components of the project's stack, in six visible steps.
-The code is then rendered, compared with the mockup and corrected until it matches, within the iterations, threshold and token or cost budget you pick, with each iteration's score and the remaining differences shown; on request, the version kept is also checked at mobile, tablet and desktop widths and in its hover and focus states ([render loop](docs/architecture/design-render-loop.md)).
+The code is then rendered, compared with the mockup and corrected until it matches, within the iterations, threshold and token or cost budget you pick, with each iteration's score and the remaining differences shown; on request, the version kept is also checked at mobile, tablet and desktop widths and in its hover and focus states, and what those checks find can be sent back for one more correction; zones you draw on the mockup are left out of the score ([render loop](docs/architecture/design-render-loop.md)).
 
 ![Import Design: the six steps from an image to the project's components](.github/assets/showcase/import-design.png)
 
