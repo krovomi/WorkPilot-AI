@@ -6,7 +6,7 @@ import {
 import type { Task } from "../../../shared/types";
 import { undoLast, useBoardUndoStore } from "../../stores/board-undo-store";
 import { useTaskStore } from "../../stores/task-store";
-import { applyCardChoice, isLightCard, recordMoves } from "../card-edits";
+import { applyCardChoice, isLightCard, recordMoves, renameCard } from "../card-edits";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
 	return {
@@ -138,5 +138,47 @@ describe("recordMoves", () => {
 		expect(await undoLast()).toEqual({ label: "move", undone: false });
 		expect(api.fn("updateTaskStatus")).toHaveBeenCalledTimes(1);
 		expect(api.fn("updateTaskStatus").mock.calls[0].slice(0, 2)).toEqual(["a", "backlog"]);
+	});
+});
+
+describe("renameCard", () => {
+	beforeEach(() => {
+		api.restore();
+		api = installRendererApi({
+			updateTask: vi.fn(async (id: string, updates: { title?: string }) => {
+				if (updates.title === "refused") return { success: false, error: "locked" };
+				const task = useTaskStore.getState().tasks.find((t) => t.id === id);
+				return { success: true, data: { ...task, ...updates } };
+			}),
+		});
+	});
+	const titleOf = (id: string) => useTaskStore.getState().tasks.find((t) => t.id === id)?.title;
+
+	it("saves the title and undoes it while the card keeps it", async () => {
+		const task = makeTask({ title: "Old" });
+		useTaskStore.setState({ tasks: [task] });
+		expect(await renameCard(task, "New", "rename")).toBe(true);
+		expect(titleOf("t1")).toBe("New");
+		expect(await undoLast()).toEqual({ label: "rename", undone: true });
+		expect(titleOf("t1")).toBe("Old");
+	});
+
+	it("does not undo a title changed since, nor a deleted card", async () => {
+		const task = makeTask({ title: "Old" });
+		useTaskStore.setState({ tasks: [task] });
+		await renameCard(task, "New", "rename");
+		await renameCard({ ...task, title: "New" }, "Newer", "rename");
+		useBoardUndoStore.setState((s) => ({ entries: s.entries.slice(0, 1) }));
+		expect((await undoLast())?.undone).toBe(false);
+		await renameCard(task, "Again", "rename");
+		useTaskStore.setState({ tasks: [] });
+		expect((await undoLast())?.undone).toBe(false);
+	});
+
+	it("records nothing when the title is not saved", async () => {
+		const task = makeTask();
+		useTaskStore.setState({ tasks: [task] });
+		expect(await renameCard(task, "refused", "rename")).toBe(false);
+		expect(useBoardUndoStore.getState().entries).toHaveLength(0);
 	});
 });

@@ -116,3 +116,18 @@ export function recordMoves(moves: readonly CardMove[], label: string): void {
 		},
 	});
 }
+
+/**
+ * Writes a card's new title and records it for Ctrl+Z (undone only while
+ * the card still has that title). Resolves false when it was not saved.
+ */
+export async function renameCard(task: Task, title: string, label: string): Promise<boolean> {
+	if (!(await persistUpdateTask(task.id, { title }))) return false;
+	recordUndo({
+		label,
+		undo: async () =>
+			currentTask(task.id)?.title === title &&
+			(await persistUpdateTask(task.id, { title: task.title })),
+	});
+	return true;
+}
