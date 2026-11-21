@@ -219,14 +219,44 @@ class Breakpoint:
 
 
 @dataclass
+class BookmarkReply:
+    """An answer to a bookmark's note: the bookmark becomes a discussion that
+    travels with the session (Markdown, shown as text)."""
+
+    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    note: str = ""
+    author: str = ""
+    created_at: float = field(default_factory=time.time)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "note": self.note,
+            "author": self.author,
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "BookmarkReply":
+        return cls(
+            id=data["id"],
+            note=data.get("note", ""),
+            author=data.get("author", ""),
+            created_at=data.get("created_at", 0.0),
+        )
+
+
+@dataclass
 class Bookmark:
-    """A marker a person leaves on a step, with a note (Markdown, shown as text)."""
+    """A marker a person leaves on a step, with a note (Markdown, shown as text)
+    and the replies of whoever read it since."""
 
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     step_index: int = 0
     note: str = ""
     author: str = ""
     created_at: float = field(default_factory=time.time)
+    replies: list[BookmarkReply] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -235,6 +265,7 @@ class Bookmark:
             "note": self.note,
             "author": self.author,
             "created_at": self.created_at,
+            "replies": [r.to_dict() for r in self.replies],
         }
 
     @classmethod
@@ -245,6 +276,7 @@ class Bookmark:
             note=data.get("note", ""),
             author=data.get("author", ""),
             created_at=data.get("created_at", 0.0),
+            replies=[BookmarkReply.from_dict(r) for r in data.get("replies", [])],
         )
 
 

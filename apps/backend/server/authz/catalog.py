@@ -300,6 +300,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # A server project's dashboard, analytics, sessions and costs, read
         # from its runs, jobs and the ledgers in its clone.
         "workspace": "analytics",
+        # A recorded agent session left with a server project's team, behind
+        # a link that expires and can be revoked (replay is lab, like it).
+        "replay_shares": "lab",
         # What a task's attachments and the project's ADRs say. Read-only and
         # addressed like spec_traceability, so it answers to the same domain.
         "docintel": "task",
@@ -358,6 +361,7 @@ SERVER_FEATURES: frozenset[str] = frozenset(
         "forge",
         "analyses",
         "workspace",
+        "replay_shares",
     }
 )
 

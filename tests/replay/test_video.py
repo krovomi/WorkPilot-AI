@@ -49,6 +49,13 @@ class FakeLocator:
         self.name = name
 
     async def count(self) -> int:
+        # A comparison page has columns, each with its own steps.
+        columns = self.page.columns
+        if self.name == "main.pair > section.side":
+            return len(columns)
+        for position, steps in enumerate(columns):
+            if self.name == f"main.pair > section.side[{position}] .steps > details":
+                return steps
         return self.page.steps
 
     def nth(self, position: int) -> FakeLocator:
@@ -76,6 +83,7 @@ class FakePage:
     def __init__(self, context: FakeContext, steps: int) -> None:
         self.calls: list[tuple] = []
         self.steps = steps
+        self.columns: list[int] = list(context.browser.columns)
         folder = Path(context.options["record_video_dir"])
         self.video: FakeVideo | None = FakeVideo(folder / "page@1.webm")
         self.context = context
@@ -128,6 +136,7 @@ class FakeBrowser:
         self.content = content
         self.page_error = ""
         self.no_video = False
+        self.columns: list[int] = []
         self.routes: list = []
         self.contexts: list[FakeContext] = []
         self.closed = False

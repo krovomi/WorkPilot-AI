@@ -21,10 +21,18 @@ export interface ReplayVideoOptions {
 	stripReasoning: boolean;
 	stripTokens: boolean;
 	language: "en" | "fr";
+	/** WebM by default; MP4 is encoded again by the machine's ffmpeg. */
+	format?: ReplayVideoFormat;
 }
 
+export type ReplayVideoFormat = "webm" | "mp4";
+
 /** What this machine lacks to record a video: an answer, not an error. */
-export type ReplayVideoRefusal = "no_playwright" | "no_browser" | "no_encoder";
+export type ReplayVideoRefusal =
+	| "no_playwright"
+	| "no_browser"
+	| "no_encoder"
+	| "no_mp4_encoder";
 
 export type ReplayVideoResult =
 	| { success: true; canceled: true }
@@ -53,6 +61,15 @@ export interface ReplaySummaryRequest {
 	language: "en" | "fr";
 }
 
+/** An answer to a bookmark's note: bookmarks are discussed this way. */
+export interface ReplayBookmarkReply {
+	id: string;
+	/** Markdown, shown as text. */
+	note: string;
+	author: string;
+	created_at: number;
+}
+
 export interface ReplayBookmark {
 	id: string;
 	step_index: number;
@@ -60,6 +77,13 @@ export interface ReplayBookmark {
 	note: string;
 	author: string;
 	created_at: number;
+	/** Absent in a session saved before replies existed. */
+	replies?: ReplayBookmarkReply[];
+}
+
+export interface ReplayBookmarkReplyRequest {
+	note: string;
+	author?: string;
 }
 
 export interface ReplayBookmarkRequest {
@@ -81,4 +105,39 @@ export type ReplayImportResult =
 			canceled?: false;
 			session: { session_id: string; agent_name: string };
 	  }
+	| { success: false; error: string; unreachable?: true };
+
+/** How long a team link lasts, in days (the server allows 1 to 30). */
+export const REPLAY_SHARE_TTL_DAYS = [1, 7, 30] as const;
+
+/** A session left with a server project's team, as its list shows it (#347). */
+export interface ReplayTeamShare {
+	id: string;
+	title: string;
+	steps: number;
+	createdBy: string;
+	createdAt: string;
+	expiresAt: string;
+	state: "active" | "expired" | "revoked";
+	openCount: number;
+	lastOpenedAt?: string;
+	canRevoke: boolean;
+}
+
+export interface ReplayTeamShareRequest {
+	/** A server project the app listed, where the person is a member. */
+	projectId: string;
+	ttlDays: number;
+	stripReasoning: boolean;
+	stripTokens: boolean;
+	includeFileContents: boolean;
+}
+
+/** The link holds its token: the server never shows it again. */
+export type ReplayTeamShareResult =
+	| { success: true; link: string; share: ReplayTeamShare }
+	| { success: false; error: string; unreachable?: true };
+
+export type ReplayTeamShareListResult =
+	| { success: true; shares: ReplayTeamShare[] }
 	| { success: false; error: string; unreachable?: true };

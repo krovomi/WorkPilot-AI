@@ -1,7 +1,9 @@
 """A replay as a WebM video (#347): the standalone page, played step by step.
 
 The page is the one `viewer.render_viewer` writes from a bundle already
-masked, so the video shows nothing the page would not. It is played in a
+masked, so the video shows nothing the page would not; or the page of two
+sessions side by side (`compare_page.render_comparison`), whose two columns
+play at once. It is played in a
 headless Chromium (the one ``foundation.platform.browser.chrome_executable``
 finds, Playwright's own otherwise) under Playwright's video recording:
 
@@ -115,19 +117,32 @@ async def _refuse(route: Any) -> None:
     await route.abort()
 
 
+async def _lanes(page: Any) -> list[Any]:
+    """The timelines of the page: one, or the two columns of a comparison."""
+    columns = page.locator("main.pair > section.side")
+    count = await columns.count()
+    if not count:
+        return [page.locator("main > details")]
+    return [columns.nth(i).locator(".steps > details") for i in range(count)]
+
+
 async def _play(page: Any, html: str) -> tuple[int, int]:
-    """Open the steps one after the other; (steps played, steps on the page)."""
+    """Open the steps one after the other, in every timeline of the page at
+    once; (steps played, steps of the longest timeline)."""
     await page.set_content(html, wait_until="load", timeout=LOAD_TIMEOUT_MS)
-    steps = page.locator("main > details")
-    total = await steps.count()
+    lanes = [(lane, await lane.count()) for lane in await _lanes(page)]
+    total = max(count for _lane, count in lanes)
     played, dwell = step_plan(total)
     await page.wait_for_timeout(HOLD_MS)
     for position in range(played):
-        if position:
-            await steps.nth(position - 1).locator("summary").click()
-        summary = steps.nth(position).locator("summary")
-        await summary.scroll_into_view_if_needed()
-        await summary.click()
+        for steps, count in lanes:
+            # A timeline that has run out keeps its last step open.
+            if 0 < position < count:
+                await steps.nth(position - 1).locator("summary").click()
+            if position < count:
+                summary = steps.nth(position).locator("summary")
+                await summary.scroll_into_view_if_needed()
+                await summary.click()
         await page.wait_for_timeout(dwell)
     await page.wait_for_timeout(HOLD_MS)
     return played, total

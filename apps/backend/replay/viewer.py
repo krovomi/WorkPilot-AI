@@ -99,13 +99,13 @@ STYLE = (
     "pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,"
     "SFMono-Regular,Menlo,monospace;margin:4px 0}"
     ".add{color:var(--add)}.del{color:var(--del)}"
-    "ol.marks{padding-left:20px}a{color:inherit}"
+    "ol.marks{padding-left:20px}ul.replies{padding-left:16px;opacity:.85}a{color:inherit}"
     "footer{color:var(--muted);font-size:12px;margin-top:32px}"
 )
 
 
-def _csp() -> str:
-    digest = base64.b64encode(hashlib.sha256(STYLE.encode("utf-8")).digest())
+def _csp(style: str = STYLE) -> str:
+    digest = base64.b64encode(hashlib.sha256(style.encode("utf-8")).digest())
     return f"default-src 'none'; style-src 'sha256-{digest.decode('ascii')}'"
 
 
@@ -176,6 +176,20 @@ def _step(step: dict[str, Any], marked: set[int], t: dict[str, str]) -> str:
     )
 
 
+def _replies(replies: Any) -> str:
+    """The discussion under a bookmark: who answered, and what."""
+    if not isinstance(replies, list) or not replies:
+        return ""
+    items = "".join(
+        "<li>"
+        + (f"{_e(r['author'])}" if r.get("author") else "")
+        + f"<pre>{_e(r.get('note', ''))}</pre></li>"
+        for r in replies
+        if isinstance(r, dict)
+    )
+    return f"<ul class=replies>{items}</ul>"
+
+
 def _bookmarks(bookmarks: list[dict[str, Any]], t: dict[str, str]) -> str:
     if not bookmarks:
         return ""
@@ -183,7 +197,7 @@ def _bookmarks(bookmarks: list[dict[str, Any]], t: dict[str, str]) -> str:
         f'<li><a href="#step-{_e(b.get("step_index", 0))}">{_e(t["step"])} '
         f"{_e(b.get('step_index', 0))}</a>"
         + (f" · {_e(b['author'])}" if b.get("author") else "")
-        + f"<pre>{_e(b.get('note', ''))}</pre></li>"
+        + f"<pre>{_e(b.get('note', ''))}</pre>{_replies(b.get('replies'))}</li>"
         for b in bookmarks
     )
     return f"<h2>{_e(t['bookmarks'])}</h2><ol class=marks>{items}</ol>"
