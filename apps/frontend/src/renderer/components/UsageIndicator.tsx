@@ -33,6 +33,7 @@ import { useTranslation } from "react-i18next";
 import type { AppSection } from "@/components/settings/AppSettings";
 import { getBadgeColorClasses, getColorClass } from "../utils/usageColors";
 import { useEffectiveUsageProvider } from "../hooks/useEffectiveUsageProvider";
+import { useUsagePlanStore } from "../stores/usage-plan-store";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
 	Tooltip,
@@ -78,6 +79,12 @@ export function UsageIndicator() {
 	// person picked one (UsageLensSelector). Not the default provider, except
 	// when nothing chose any yet (first start), where it was stuck loading.
 	const selectedProvider = useEffectiveUsageProvider();
+
+	// The authentication details show the plan this snapshot reports.
+	const publishPlan = useUsagePlanStore((s) => s.setPlan);
+	useEffect(() => {
+		if (usage) publishPlan(usage.providerName || selectedProvider, usage.plan);
+	}, [usage, selectedProvider, publishPlan]);
 
 	/**
 	 * Helper function to get initials from a profile name
