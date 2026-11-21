@@ -463,7 +463,8 @@ export interface TaskMetadata {
 		| "tech-debt"
 		| "flaky-tests"
 		| "automation"
-		| "generated";
+		| "generated"
+		| "self-healing";
 	/**
 	 * The page whose generated code this card holds for review
 	 * (`sourceType: "generated"`, main/generated-review/).

@@ -666,7 +666,8 @@
 			"visual-canvas": "Canvas visuel",
 			"tech-debt": "Dette technique",
 			"automation": "Automatisation",
-			"generated": "Code généré"
+			"generated": "Code généré",
+			"self-healing": "Self-Healing"
 		},
 		"cicdRun": {
 			"triggered_pr": "Pipeline {{provider}} lancé à l'ouverture de la PR, {{when}}",
