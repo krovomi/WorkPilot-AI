@@ -313,6 +313,10 @@ const FRAME_TITLES = {
 	"import-design": "WorkPilot AI — Import Design",
 	"test-generation": "WorkPilot AI — Test generation",
 	settings: "WorkPilot AI — Settings",
+	"ai-accounts": "WorkPilot AI — AI accounts",
+	sandbox: "WorkPilot AI — Sandbox",
+	"code-migration": "WorkPilot AI — Code migration",
+	"menu-customize": "WorkPilot AI — Customize the menu",
 };
 
 async function shoot(browser, html, file, scale) {

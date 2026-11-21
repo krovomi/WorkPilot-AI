@@ -9,6 +9,7 @@
 
 import { Globe, Power, Terminal, Trash2, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { agentsUsingServer } from "../../../shared/mcp-catalog/install";
 import {
 	uninstallMarketplaceServer,
@@ -20,11 +21,23 @@ import { Button } from "../ui/button";
 export function McpInstalledList() {
 	const { t } = useTranslation(["common"]);
 	const { installed, agentOverrides, projectId, isInstalledLoading, catalog } =
-		useMcpMarketplaceStore();
+		useMcpMarketplaceStore(
+			useShallow((s) => ({
+				installed: s.installed,
+				agentOverrides: s.agentOverrides,
+				projectId: s.projectId,
+				isInstalledLoading: s.isInstalledLoading,
+				catalog: s.catalog,
+			})),
+		);
 
 	if (isInstalledLoading) {
 		return (
-			<div className="relative z-[1] flex flex-1 items-center justify-center">
+			<div
+				className="relative z-[1] flex flex-1 items-center justify-center"
+				role="status"
+				aria-label={t("common:loading")}
+			>
 				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
 			</div>
 		);
@@ -69,6 +82,7 @@ export function McpInstalledList() {
 							<div
 								className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg text-white text-sm font-bold"
 								style={{ backgroundColor: color }}
+								aria-hidden="true"
 							>
 								{server.name.charAt(0)}
 							</div>
