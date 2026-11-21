@@ -37,6 +37,8 @@ describe("server project views", () => {
 			"github-prs",
 			"gitlab-issues",
 			"gitlab-merge-requests",
+			// Its governance, read and run by the server.
+			"guardrails",
 			"i18n-agent",
 			"ideation",
 			"insights",

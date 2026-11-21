@@ -623,3 +623,27 @@ class TestTheRunner:
             monkeypatch, capsys, "audit", "--project-path", str(project), "--limit", "2"
         )
         assert [e["decision"] for e in report["events"]] == ["warn", "review"]
+
+
+def test_files_reviewers_name_server_roles_and_nothing_else():
+    """``files.reviewers`` (lot 4): role names only, checked like every key."""
+    governance, errors = parse_governance(
+        {
+            "files": {
+                "requires_review": ["infra/**"],
+                "reviewers": ["security", "security", "lead_2"],
+            }
+        },
+        "p",
+    )
+    assert errors == []
+    assert governance.reviewers == ["security", "lead_2"]
+    assert governance.to_dict()["files"]["reviewers"] == ["security", "lead_2"]
+
+    _, errors = parse_governance({"files": {"reviewers": "security"}}, "p")
+    assert errors == ["p: 'files.reviewers' must be a list of at most 20 role names"]
+    _, errors = parse_governance({"files": {"reviewers": ["x"] * 21}}, "p")
+    assert len(errors) == 1
+    _, errors = parse_governance({"files": {"reviewers": ["Admin", "../x", 3]}}, "p")
+    assert len(errors) == 3
+    assert "is not a role name" in errors[0]

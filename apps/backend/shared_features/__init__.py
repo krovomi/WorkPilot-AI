@@ -13,7 +13,9 @@ its dashboard, analytics, sessions and costs, computed from its runs, its jobs a
 ledgers its agents keep in the clone (``workspace``, ``usage_ledger``); its
 automation rules, run by the server process (``automations``); the agent
 sessions its members share with it, behind links that expire
-(``replay_shares``).
+(``replay_shares``); its agents' governance: the policy, the audit trail its
+agents write in the clone, the approvals they wait on and its kill switch
+(``governance``).
 
 See ``docs/architecture/server-mode.md``.
 """
@@ -41,6 +43,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.forge_gitlab import router as forge_gitlab
     from shared_features.forge_review import GITHUB, GITLAB
     from shared_features.forge_review_feedback import router as review_feedback
+    from shared_features.governance import router as governance
     from shared_features.ideation import router as ideation
     from shared_features.insights import router as insights
     from shared_features.registry import FEATURES
@@ -68,3 +71,4 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(changelog, "analyses")
     mount(workspace, "workspace")
     mount(replay_shares, "replay_shares")
+    mount(governance, "governance")
