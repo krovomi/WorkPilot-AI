@@ -124,3 +124,74 @@ def test_the_replay_shares_table_comes_and_goes_with_its_revision(alembic_config
         engine.dispose()
     command.downgrade(config, "0016_spec_approvals")
     assert "replay_shares" not in _tables(db)
+
+
+def test_the_escalations_table_comes_and_goes_with_its_revision(alembic_config):
+    config, db = alembic_config
+    command.upgrade(config, "head")
+    assert "approval_escalations" in _tables(db)
+    command.downgrade(config, "0017_replay_shares")
+    assert "approval_escalations" not in _tables(db)
+    # A table already there (``create_all`` of a newer build) is kept.
+    command.upgrade(config, "0018_approval_escalations")
+    command.downgrade(config, "0017_replay_shares")
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text("CREATE TABLE approval_escalations (run_id VARCHAR(36))")
+            )
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    assert "approval_escalations" in _tables(db)
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(sa.text("DROP TABLE approval_escalations"))
+    finally:
+        engine.dispose()
+    command.downgrade(config, "0017_replay_shares")
+    assert "approval_escalations" not in _tables(db)
+
+
+def _columns(db: Path, table: str) -> set[str]:
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        return {c["name"] for c in sa.inspect(engine).get_columns(table)}
+    finally:
+        engine.dispose()
+
+
+def test_the_sign_in_columns_come_and_go_with_their_revision(alembic_config):
+    config, db = alembic_config
+    command.upgrade(config, "head")
+    login = {"login_id", "login_method"}
+    for table in ("auth_sessions", "audit_log"):
+        assert login <= _columns(db, table)
+    command.downgrade(config, "0018_approval_escalations")
+    for table in ("auth_sessions", "audit_log"):
+        assert not login & _columns(db, table)
+    # A database that has one of them already gets the other one only.
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text("ALTER TABLE audit_log ADD COLUMN login_id VARCHAR(36)")
+            )
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    assert login <= _columns(db, "audit_log")
+    # A table that lost them both is left as it is on the way down.
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(sa.text("ALTER TABLE audit_log DROP COLUMN login_id"))
+            connection.execute(
+                sa.text("ALTER TABLE audit_log DROP COLUMN login_method")
+            )
+    finally:
+        engine.dispose()
+    command.downgrade(config, "0018_approval_escalations")
+    assert not login & _columns(db, "auth_sessions")

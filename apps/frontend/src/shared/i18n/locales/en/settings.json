@@ -2104,7 +2104,8 @@
 		"events": {
 			"plan_review": "A plan waits for approval",
 			"review_ready": "Work is ready for my review",
-			"failed": "A run stopped on an error"
+			"failed": "A run stopped on an error",
+			"approval_escalated": "A plan waited too long for its approvers"
 		},
 		"language": "Language of the messages",
 		"enabled": "{{channel}} on",

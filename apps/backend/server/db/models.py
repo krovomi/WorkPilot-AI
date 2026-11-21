@@ -256,6 +256,10 @@ class AuthSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # The sign-in this session comes from, kept across refreshes: what the
+    # audit log names an action's session by (``jwt_tokens.LOGIN_METHODS``).
+    login_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    login_method: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class AccessToken(Base):
@@ -548,6 +552,29 @@ class ApprovalDelegation(Base):
     )
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+
+class ApprovalEscalation(Base):
+    """A card whose plan waited too long, and when the second group heard of it.
+
+    One row per spec run whose plan waited: a later spec run starts a new
+    wait, which may escalate again (``services/approval_escalation.py``).
+    """
+
+    __tablename__ = "approval_escalations"
+
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), primary_key=True
+    )
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    spec_name: Mapped[str] = mapped_column(String(300))
+    criticality: Mapped[str] = mapped_column(String(10))
+    notified: Mapped[int] = mapped_column(Integer, default=0)
+    escalated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
     )
 
 
@@ -856,6 +883,10 @@ class AuditLog(Base):
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    # The sign-in the actor acted under, and how they signed in (None for an
+    # entry written without a signed-in session).
+    login_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    login_method: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

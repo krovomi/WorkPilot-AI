@@ -11,6 +11,12 @@ reaches only the two answers to a card's review (``DELEGATED_ROUTES`` of
 ``server/authz/mounting.py``). A delegate never lends it on, never sets a
 card's criticality, and approving a card the approver created is the
 approver approving their own card.
+
+A person who leaves (an account deactivated, a member removed from the
+organization or the project) ends every open delegation they lent or hold
+there (:func:`end_delegations_of`). Nothing else is waiting on them: a
+card's quorum counts places any approver fills, never named people, and the
+approvals they already gave stay as the record of who approved what.
 """
 
 from __future__ import annotations
@@ -19,7 +25,7 @@ from datetime import UTC, datetime, timedelta
 
 from server.authz.self_approval import holds_approval
 from server.db.models import ApprovalDelegation
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 #: The longest one delegation lasts, and how far ahead it may start.
@@ -64,3 +70,36 @@ async def delegations_to(
         ):
             lent[row.project_id] = row.from_user_id
     return tuple(lent.items())
+
+
+async def end_delegations_of(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    org_id: str | None = None,
+    project_id: str | None = None,
+    now: datetime | None = None,
+) -> int:
+    """End now every open delegation ``user_id`` lent or holds; how many.
+
+    Within ``org_id`` or ``project_id`` when given (a person leaving one
+    organization or project), everywhere otherwise (an account deactivated).
+    The caller commits, with its own audit entry.
+    """
+    now = now or datetime.now(UTC)
+    query = select(ApprovalDelegation).where(
+        or_(
+            ApprovalDelegation.from_user_id == user_id,
+            ApprovalDelegation.to_user_id == user_id,
+        ),
+        ApprovalDelegation.revoked_at.is_(None),
+        ApprovalDelegation.ends_at > now,
+    )
+    if org_id is not None:
+        query = query.where(ApprovalDelegation.org_id == org_id)
+    if project_id is not None:
+        query = query.where(ApprovalDelegation.project_id == project_id)
+    rows = list(await db.scalars(query))
+    for row in rows:
+        row.revoked_at = now
+    return len(rows)

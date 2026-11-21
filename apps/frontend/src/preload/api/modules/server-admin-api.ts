@@ -85,6 +85,9 @@ export interface AuditEntry {
 	payload: Record<string, unknown> | null;
 	ip: string | null;
 	created_at: string;
+	/** The sign-in the action was made under, and how the person signed in. */
+	login_id?: string | null;
+	login_method?: string | null;
 }
 
 export interface SessionSummary {

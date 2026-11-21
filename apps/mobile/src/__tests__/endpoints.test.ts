@@ -24,6 +24,28 @@ describe("server routes", () => {
 		]);
 	});
 
+	it("reads and sets a card's criticality, and lends and ends an approval", async () => {
+		const { calls, routes } = recorder();
+		await routes.approvals("p1", "004-x");
+		await routes.setCriticality("p1", "004-x", "high");
+		await routes.delegations("p 1");
+		await routes.lendApproval("p1", "u2", "2026-12-01T00:00:00.000Z");
+		await routes.endDelegation("p1", "d/1");
+		await routes.members("p1");
+		expect(calls).toEqual([
+			{ method: "GET", path: "/api/board/cards/004-x/approvals?project_id=p1", body: undefined },
+			{ method: "PUT", path: "/api/board/cards/004-x/criticality?project_id=p1", body: { criticality: "high" } },
+			{ method: "GET", path: "/api/board/delegations?project_id=p%201", body: undefined },
+			{
+				method: "POST",
+				path: "/api/board/delegations?project_id=p1",
+				body: { to_user_id: "u2", ends_at: "2026-12-01T00:00:00.000Z" },
+			},
+			{ method: "DELETE", path: "/api/board/delegations/d%2F1?project_id=p1", body: undefined },
+			{ method: "GET", path: "/projects/p1/members", body: undefined },
+		]);
+	});
+
 	it("steers a card from the phone and reads back its messages", async () => {
 		const client = {
 			request: jest.fn(async () => ({ messages: [{ id: "m1" }] })),

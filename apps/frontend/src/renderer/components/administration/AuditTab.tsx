@@ -13,6 +13,9 @@ import { useAdminStore } from "@/stores/admin-store";
 import { usePermission } from "@/stores/permissions-store";
 import { formatAppDateTime } from "@/lib/date-format";
 
+/** How a person signs in to the server (`jwt_tokens.LOGIN_METHODS`). */
+const LOGIN_METHODS = new Set(["local", "entra", "oidc", "invite"]);
+
 export function AuditTab() {
 	const { t } = useTranslation("administration");
 	const audit = useAdminStore((s) => s.audit);
@@ -28,7 +31,8 @@ export function AuditTab() {
 		? audit.filter(
 				(entry) =>
 					entry.action.includes(filter) ||
-					(entry.user_email ?? "").includes(filter),
+					(entry.user_email ?? "").includes(filter) ||
+					(entry.login_id ?? "").startsWith(filter),
 			)
 		: audit;
 
@@ -70,6 +74,7 @@ export function AuditTab() {
 							<tr className="border-b border-border text-left">
 								<th className="p-3 font-medium">{t("audit.columns.when")}</th>
 								<th className="p-3 font-medium">{t("audit.columns.who")}</th>
+								<th className="p-3 font-medium">{t("audit.columns.signIn")}</th>
 								<th className="p-3 font-medium">{t("audit.columns.action")}</th>
 								<th className="p-3 font-medium">{t("audit.columns.details")}</th>
 							</tr>
@@ -81,6 +86,16 @@ export function AuditTab() {
 										{formatAppDateTime(entry.created_at)}
 									</td>
 									<td className="p-3">{entry.user_email ?? "—"}</td>
+									<td className="p-3 text-xs whitespace-nowrap" title={entry.login_id ?? undefined}>
+										{entry.login_id
+											? t("audit.signIn", {
+													method: t(
+														`audit.methods.${LOGIN_METHODS.has(entry.login_method ?? "") ? entry.login_method : "unknown"}`,
+													),
+													id: entry.login_id.slice(0, 8),
+												})
+											: "—"}
+									</td>
 									<td className="p-3 font-mono text-xs">{entry.action}</td>
 									<td className="p-3 text-xs text-muted-foreground break-all">
 										{entry.payload ? JSON.stringify(entry.payload) : ""}

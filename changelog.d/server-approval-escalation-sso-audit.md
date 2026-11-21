@@ -1,0 +1,6 @@
+---
+section: ✨ Nouveautés
+---
+
+- **Mode serveur, approbation des specs** (#363) : un plan qui attend ses approbations plus longtemps que l'équipe ne le permet prévient un second groupe d'approbateurs sur ses canaux « Besoin de toi » (`WORKPILOT_APPROVAL_ESCALATION_HOURS`, par criticité, et `WORKPILOT_APPROVAL_ESCALATION_ROLES`, `owner` et `admin` par défaut), une fois par run de spec, et l'entrée va au journal. L'app de bureau (Spec Approval) et l'app mobile (la carte, et la page « Approbations prêtées » du tableau) règlent la criticité d'une carte, montrent ses approbations et les rôles qui manquent, et prêtent son approbation à un collègue ou la reprennent. Le téléphone ne lance plus le build après une approbation partielle : il dit combien d'approbations la carte a.
+- **Mode serveur, connexion** (#363) : l'app mobile se connecte par le fournisseur OpenID Connect du serveur (« Se connecter par authentification unique ») ; Entra et lui y partagent le même flux, avec un `nonce` vérifié avant d'envoyer l'`id_token`. Chaque connexion a un identifiant que portent ses jetons : le journal de l'organisation dit qui s'est connecté, comment et d'où, et chaque action nomme la connexion sous laquelle elle a été faite (`GET /admin/audit?login_id=`). Une personne désactivée, ou retirée de l'organisation ou d'un projet, voit ses délégations d'approbation se terminer.

@@ -3,6 +3,7 @@ import fr from "../i18n/fr.json";
 import i18n, { describeError, pickLanguage } from "../i18n";
 import { orgRoleLabel, phaseLabel, projectRoleLabel, statusLabel } from "../i18n/labels";
 import { ApiError } from "../api/client";
+import { ApprovalWaiting } from "../board/actions";
 
 function keys(value: unknown, prefix = ""): string[] {
 	if (!value || typeof value !== "object") return [prefix];
@@ -37,6 +38,9 @@ describe("i18n", () => {
 		expect(describeError(new ApiError(429, "HTTP 429"))).toBe(en.errors.too_many);
 		expect(describeError(new ApiError(409, "Busy"))).toBe("Something went wrong: Busy");
 		expect(describeError(new Error("feedback_required"))).toBe(en.errors.feedback_required);
+		expect(describeError(new ApprovalWaiting(1, 2))).toBe(
+			"Your approval is recorded: 1 of 2. The build starts once the card has every approval it needs.",
+		);
 	});
 });
 

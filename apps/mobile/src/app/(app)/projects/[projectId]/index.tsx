@@ -25,6 +25,7 @@ export default function Board() {
 		...(can("insight.read") ? (["insights", "roadmap", "ideas", "context"] as const) : []),
 		...(forge && can("vcs.read") ? (["forge"] as const) : []),
 		...(can("analytics.read") ? (["dashboard"] as const) : []),
+		...(can("review.approve") ? (["delegations"] as const) : []),
 		...(can("audit.read") ? (["governance"] as const) : []),
 	];
 	// One split group shown alone, from a tap on a part's mark.
@@ -73,8 +74,8 @@ export default function Board() {
 							<Text style={{ color: theme.accent, fontWeight: "600" }} numberOfLines={1}>
 								{target === "forge" && forge
 									? t(`forge.${forge}`)
-									: target === "dashboard"
-										? t("dashboard.title")
+									: target === "dashboard" || target === "delegations"
+										? t(`${target}.title`)
 										: t(`features.${target}`)}
 							</Text>
 						</Pressable>
