@@ -26,5 +26,9 @@ describe("taskMock execution wave run", () => {
 		expect(await taskMock.loadExecutionWaveRun()).toEqual({ success: true, data: { run: null, ignored: false } });
 		expect(await taskMock.saveExecutionWaveRun()).toEqual({ success: true });
 		expect(await taskMock.clearExecutionWaveRun()).toEqual({ success: true });
+		expect(await taskMock.loadExecutionWaveHistory()).toEqual({
+			success: true,
+			data: { records: [], ignored: false },
+		});
 	});
 });

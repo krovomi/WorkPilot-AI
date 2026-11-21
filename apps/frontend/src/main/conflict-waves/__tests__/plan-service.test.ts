@@ -5,6 +5,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Project } from "../../../shared/types/project";
 import type { Task } from "../../../shared/types/task";
+import { buildSpecCode } from "../code-links";
 import {
 	buildExecutionWavePlan,
 	MAX_PLAN_TASKS,
@@ -42,6 +43,8 @@ function makeDeps(tasks: Task[], settings: Partial<Project["settings"]> = { maxP
 		worktreeHead: vi.fn(async () => null),
 		testMerge: vi.fn(async () => null),
 		readCoChanges: vi.fn(async () => null),
+		readCodeSource: vi.fn(async () => ({ worktree: null, diff: null })),
+		readSpecCode: vi.fn(async () => ({ imports: new Map(), symbols: new Map(), removed: [] })),
 		now: () => new Date("2026-11-14T08:00:00Z"),
 	};
 }
@@ -69,6 +72,7 @@ describe("validateWavePlanRequest refuses hostile input", () => {
 		["a huge drift threshold", { projectId: PROJECT_ID, options: { driftThreshold: 1e9 } }],
 		["options not an object", { projectId: PROJECT_ID, options: ["x"] }],
 		["a fragile zones option that is not a boolean", { projectId: PROJECT_ID, options: { fragileZones: "yes" } }],
+		["a code links option that is not a boolean", { projectId: PROJECT_ID, options: { codeLinks: 1 } }],
 	])("refuses %s", (_name, raw) => {
 		expect(validateWavePlanRequest(raw).ok).toBe(false);
 	});
@@ -87,6 +91,7 @@ describe("validateWavePlanRequest refuses hostile input", () => {
 				unplannedPolicy: "isolate",
 				driftThreshold: 3,
 				fragileZones: true,
+				codeLinks: true,
 			},
 		});
 	});
@@ -252,5 +257,54 @@ describe("buildExecutionWavePlan", () => {
 		expect(off.value.fragileZones).toEqual({ enabled: false, commits: null });
 		expect(off.value.pairs).toEqual([]);
 		expect(off.value.waves).toHaveLength(1);
+	});
+
+	it("adds code links from each spec's code to the score, unless turned off", async () => {
+		const tasks = [
+			makeTask("040-auth", "backlog", ["src/auth/session_store.py"]),
+			makeTask("041-billing", "backlog", ["src/billing/invoice.py"]),
+			makeTask("042-empty", "backlog", []),
+			makeTask("043-run", "in_progress", ["src/report/monthly.py"]),
+		];
+		const deps = makeDeps(tasks, { maxParallelTasks: 5, mainBranch: "trunk" });
+		deps.readCodeSource = vi.fn(async (_path: string, specId: string) => ({
+			worktree: null,
+			diff: specId === "040-auth" ? "@@ -1 +1 @@\n-def make_invoice_token():\n" : null,
+		}));
+		const texts: Record<string, string> = {
+			"src/auth/session_store.py": "def open_session(): pass\n",
+			"src/billing/invoice.py": "from auth.session_store import open_session\nmake_invoice_token()\n",
+			"src/report/monthly.py": "import invoice\n",
+		};
+		deps.readSpecCode = vi.fn(async (source, _path, footprint, budget) => {
+			budget.read += footprint.size;
+			budget.capped = true;
+			return buildSpecCode(
+				[...footprint.keys()].map((file) => ({ path: file, text: texts[file] })),
+				source.diff,
+			);
+		});
+
+		const on = await buildExecutionWavePlan({ projectId: PROJECT_ID }, deps);
+		if (!on.ok) throw new Error(on.error);
+		expect(deps.readCodeSource).toHaveBeenCalledWith("/projects/shop", "040-auth", "trunk");
+		expect(deps.readCodeSource).toHaveBeenCalledWith("/projects/shop", "043-run", "trunk");
+		expect(deps.readCodeSource).not.toHaveBeenCalledWith("/projects/shop", "042-empty", "trunk");
+		expect(on.value.codeLinks).toEqual({ enabled: true, files: 3, capped: true });
+		expect(on.value.pairs.find((p) => p.a === "040-auth" && p.b === "041-billing")).toMatchObject({
+			score: 2,
+			sharedFiles: [],
+			importLinks: ["src/billing/invoice.py → src/auth/session_store.py"],
+			symbolLinks: ["src/billing/invoice.py → make_invoice_token"],
+			blocking: true,
+		});
+		expect(on.value.runningConflicts).toEqual([{ taskId: "041-billing", runningTaskId: "043-run", score: 1 }]);
+
+		(deps.readCodeSource as ReturnType<typeof vi.fn>).mockClear();
+		const off = await buildExecutionWavePlan({ projectId: PROJECT_ID, options: { codeLinks: false } }, deps);
+		if (!off.ok) throw new Error(off.error);
+		expect(deps.readCodeSource).not.toHaveBeenCalled();
+		expect(off.value.codeLinks).toEqual({ enabled: false, files: 0, capped: false });
+		expect(off.value.pairs.some((p) => p.importLinks || p.symbolLinks)).toBe(false);
 	});
 });
