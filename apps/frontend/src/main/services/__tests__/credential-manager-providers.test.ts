@@ -1248,6 +1248,17 @@ describe("model gateways (OpenRouter, Hugging Face)", () => {
 			HUGGINGFACE_API_KEY: "hf_test_0000",
 			HUGGINGFACE_MODEL: "moonshotai/Kimi-K3.1-Pro",
 		});
+		store.settings = {
+			selectedProvider: "openrouter",
+			openRouterSort: "price",
+			openRouterDenyDataCollection: true,
+			huggingFaceRoutingPolicy: "cheapest",
+		};
+		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "openrouter",
+			OPENROUTER_PROVIDER_SORT: "price",
+			OPENROUTER_DATA_COLLECTION: "deny",
+		});
 		store.settings = { selectedProvider: "openrouter", globalOpenRouterModel: "  " };
 		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
 			SELECTED_LLM_PROVIDER: "openrouter",

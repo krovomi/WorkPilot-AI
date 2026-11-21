@@ -26,7 +26,7 @@ import {
 	PROVIDER_BASE_URL_ENV_VARS,
 	PROVIDER_KEY_ENV_VARS,
 	PROVIDER_SETTINGS_KEYS,
-	providerModelEnv,
+	providerPageEnv,
 } from "./provider-settings-keys";
 import { loadBetterSqlite } from "./windsurf-sqlite";
 
@@ -1542,8 +1542,8 @@ export class CredentialManager extends EventEmitter {
 					if (ollamaUrl?.trim()) env.OLLAMA_BASE_URL = ollamaUrl.trim();
 				}
 				// The provider page's model (an Ollama tag, `hf.co/org/model`, a
-				// gateway id): without it the backend falls back to the registry's.
-				Object.assign(env, providerModelEnv(selectedProvider, settings));
+				// gateway id; else the registry's) and a gateway's routing options.
+				Object.assign(env, providerPageEnv(selectedProvider, settings));
 
 				return Object.fromEntries(
 					Object.entries(env).filter(([_, value]) => value.trim() !== ""),
