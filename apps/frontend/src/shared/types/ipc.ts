@@ -140,6 +140,35 @@ export interface SecureStorageStatus {
 	secretsAtRisk: boolean;
 }
 
+// ============================================
+// Windsurf key installed by the local IDE
+// ============================================
+
+/**
+ * What `credential:detectWindsurfToken` returns: whether the local Windsurf
+ * IDE holds a key, and for which account. The key itself stays in the main
+ * process; `credential:saveDetectedWindsurfToken` saves it there.
+ */
+export interface WindsurfDetection {
+	success: boolean;
+	userName?: string;
+	planName?: string;
+	usageInfo?: {
+		usedMessages: number;
+		totalMessages: number;
+		usedFlowActions: number;
+		totalFlowActions: number;
+	};
+	error?: string;
+}
+
+/** What `credential:saveDetectedWindsurfToken` returns. */
+export interface WindsurfTokenSave {
+	success: boolean;
+	credentialsSetAt?: import("../utils/secret-age").SecretDates;
+	error?: string;
+}
+
 /** Platform information exposed via contextBridge for platform-specific behavior */
 export interface PlatformInfo {
 	isWindows: boolean;

@@ -33,6 +33,7 @@ import type {
 } from "../shared/types";
 import { calculateOverallProgress, isSubtaskDone } from "../shared/progress";
 import { stripAcceptanceCriteriaSection } from "../shared/utils/acceptance-criteria";
+import { qaSignoffOf } from "../shared/utils/qa-signoff";
 import { extractSubtaskFiles } from "../shared/utils/subtask-files";
 import { subtaskBlockFields } from "../shared/utils/subtask-unblock";
 import { isMeaningfulFeatureTitle } from "../shared/utils/task-title";
@@ -789,6 +790,7 @@ export class ProjectStore {
 			const title = this.extractTitle(dir.name, plan, hasJsonError, specPath);
 			const executionProgress = this.calculateExecutionProgress(plan);
 			const { stagedInMainProject, stagedAt } = this.extractStagedInfo(plan);
+			const qaSignoff = qaSignoffOf(plan);
 
 			return {
 				id: dir.name,
@@ -827,6 +829,7 @@ export class ProjectStore {
 					typeof plan.crossReview.verdict === "string" && {
 						crossReview: plan.crossReview,
 					}),
+				...(qaSignoff && { qaSignoff }),
 				...(executionProgress && { executionProgress }),
 				stagedInMainProject,
 				stagedAt,

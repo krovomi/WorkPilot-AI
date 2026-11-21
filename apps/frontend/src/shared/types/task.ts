@@ -37,6 +37,14 @@ export interface StopAllResult {
 	failedTasks: string[];
 }
 
+/** The voice assistant's spoken « stop » (`AGENTS_STOP_AFTER_STEP`). */
+export interface StopAfterStepResult {
+	/** Tasks that stop after the tool call in flight, then wait to be resumed. */
+	stoppingTasks: string[];
+	/** Tasks whose pause could not be written: they keep running. */
+	failedTasks: string[];
+}
+
 /** One phase's engine: provider × model × effort (see shared/utils/task-engine.ts). */
 export interface EngineTrio {
 	provider: string;
@@ -671,9 +679,10 @@ export interface TaskMetadata {
 		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
 		 * "tool_loop" when the circuit breaker stopped an agent repeating the
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
-		 * when the person stopped every agent at once. "anomaly" / "sandbox"
-		 * when the session watch stopped an agent (`agents/safety_watch.py`),
-		 * with `anomaly` / `sandbox`.
+		 * when the person stopped every agent at once, "voice_stop" when they
+		 * said « stop » to the voice assistant (after the current step).
+		 * "anomaly" / "sandbox" when the session watch stopped an agent
+		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;
@@ -720,6 +729,8 @@ export interface Task {
 	goal?: TaskGoalSummary;
 	/** The second engine's verdict (`apps/backend/cross_review/`), from the plan. */
 	crossReview?: TaskCrossReviewSummary;
+	/** The QA reviewer's last sign-off and the QA session it came from. */
+	qaSignoff?: TaskQaSignoff;
 	subtasks: Subtask[];
 	qaReport?: QAReport;
 	logs: string[];
@@ -747,6 +758,16 @@ export interface TaskCrossReviewSummary {
 	blockers: number;
 	summary?: string;
 	at?: string;
+}
+
+/**
+ * The QA reviewer's last sign-off (`qa_signoff` in the plan). `session` is the
+ * QA session that wrote it, counted from 1: an approval on session 1 passed QA
+ * on its first try.
+ */
+export interface TaskQaSignoff {
+	status: "approved" | "rejected";
+	session: number;
 }
 
 /** What the card needs to know about the task's last verification. */
@@ -780,6 +801,8 @@ export interface ImplementationPlan {
 	goal?: TaskGoalSummary;
 	/** Written by the cross review (`cross_review/review.py::write_verdict`). */
 	crossReview?: TaskCrossReviewSummary;
+	/** Written by the QA reviewer (`qa/reviewer.py`); read, never trusted as typed. */
+	qa_signoff?: { status?: unknown; qa_session?: unknown };
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
 	lastEvent?: {
 		eventId: string;
@@ -815,9 +838,10 @@ export interface ImplementationPlan {
 		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
 		 * "tool_loop" when the circuit breaker stopped an agent repeating the
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
-		 * when the person stopped every agent at once. "anomaly" / "sandbox"
-		 * when the session watch stopped an agent (`agents/safety_watch.py`),
-		 * with `anomaly` / `sandbox`.
+		 * when the person stopped every agent at once, "voice_stop" when they
+		 * said « stop » to the voice assistant (after the current step).
+		 * "anomaly" / "sandbox" when the session watch stopped an agent
+		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;

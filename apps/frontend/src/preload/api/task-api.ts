@@ -9,6 +9,7 @@ import type {
 	ImageAttachment,
 	ImplementationPlan,
 	IPCResult,
+	StopAfterStepResult,
 	StopAllResult,
 	MergeProgress,
 	PRDetailsResult,
@@ -70,6 +71,8 @@ export interface TaskAPI {
 	stopTask: (taskId: string) => void;
 	/** "Stop all agents": every running task paused, every other agent process stopped. */
 	stopAllAgents: () => Promise<IPCResult<StopAllResult>>;
+	/** The spoken « stop »: every running task paused after the tool call in flight. */
+	stopAgentsAfterStep: () => Promise<IPCResult<StopAfterStepResult>>;
 	submitReview: (
 		taskId: string,
 		approved: boolean,
@@ -501,6 +504,9 @@ export const createTaskAPI = (): TaskAPI => ({
 
 	stopAllAgents: (): Promise<IPCResult<StopAllResult>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.AGENTS_STOP_ALL),
+
+	stopAgentsAfterStep: (): Promise<IPCResult<StopAfterStepResult>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.AGENTS_STOP_AFTER_STEP),
 
 	submitReview: (
 		taskId: string,
