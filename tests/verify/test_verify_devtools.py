@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import glob
 import http.server
 import json
 import os
@@ -51,9 +52,9 @@ def no_chrome(tmp_path, monkeypatch):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("PATH", str(tmp_path / "empty-bin"))
     monkeypatch.setattr(devtools_module.Path, "home", lambda: tmp_path / "home")
-    real_glob = devtools_module.glob.glob
+    real_glob = glob.glob
     monkeypatch.setattr(
-        devtools_module.glob,
+        glob,
         "glob",
         lambda pattern: [] if pattern.startswith("/opt/") else real_glob(pattern),
     )

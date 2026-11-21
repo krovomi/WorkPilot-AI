@@ -20,3 +20,11 @@ describe("taskMock.planExecutionWaves", () => {
 		});
 	});
 });
+
+describe("taskMock execution wave run", () => {
+	it("has no saved run to resume and accepts saves in the browser preview", async () => {
+		expect(await taskMock.loadExecutionWaveRun()).toEqual({ success: true, data: { run: null, ignored: false } });
+		expect(await taskMock.saveExecutionWaveRun()).toEqual({ success: true });
+		expect(await taskMock.clearExecutionWaveRun()).toEqual({ success: true });
+	});
+});

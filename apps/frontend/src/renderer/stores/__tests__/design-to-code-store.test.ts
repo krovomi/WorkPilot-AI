@@ -176,6 +176,29 @@ describe("design-to-code store", () => {
 		});
 	});
 
+	it("sends the loop's options only with the loop", async () => {
+		useDesignToCodeStore.setState({ imageData: "data:image/png;base64,AAAA" });
+		api.runDesignToCodePipeline.mockResolvedValue(result());
+		useDesignToCodeStore.getState().setLoopOptions({ maxIterations: 3, states: true });
+		expect(useDesignToCodeStore.getState().loopOptions).toMatchObject({
+			maxIterations: 3,
+			threshold: 0.95,
+			states: true,
+			responsive: false,
+		});
+		await runDesignToCodePipeline();
+		expect(api.runDesignToCodePipeline).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				renderLoopOptions: expect.objectContaining({ maxIterations: 3, states: true }),
+			}),
+		);
+		useDesignToCodeStore.getState().setRenderLoop(false);
+		await runDesignToCodePipeline();
+		expect(api.runDesignToCodePipeline).toHaveBeenLastCalledWith(
+			expect.objectContaining({ renderLoop: false, renderLoopOptions: undefined }),
+		);
+	});
+
 	it("records the failed step when the run fails", async () => {
 		useDesignToCodeStore.setState({ imageData: "data:image/png;base64,AAAA" });
 		api.runDesignToCodePipeline.mockImplementation(async () => {

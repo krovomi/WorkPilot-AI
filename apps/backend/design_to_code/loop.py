@@ -6,7 +6,9 @@ compares it with the target again. The loop stops on the first of:
 
 * ``converged``: the score reaches the threshold;
 * ``max_iterations``: the number of corrections allowed (5 by default);
-* ``budget``: the time allowed is spent before the next correction;
+* ``budget``: before the next correction, the time allowed is spent, or the
+  tokens or the cost allowed would be by a correction as large as the last one
+  (``budget_kind`` says which: ``time``, ``tokens``, ``cost``; ``budget``);
 * ``stalled``: the best score has not improved for ``patience`` corrections;
 * ``failed``: a capture or the model call failed (the best version so far stays).
 
@@ -26,6 +28,7 @@ from dataclasses import dataclass, field
 
 from PIL import Image
 
+from .budget import Pricing, Spend, Usage, estimate_usage
 from .diff import (
     DEFAULT_TOLERANCE,
     Box,
@@ -39,12 +42,23 @@ from .feedback import apply_edits, build_feedback, build_prompt, parse_answer
 from .render import RenderError
 
 Render = Callable[[dict[str, str]], Awaitable[Image.Image]]
-Correct = Callable[[str, bytes], Awaitable[str]]
 Progress = Callable[[dict], None]
 
 
 class CorrectionError(RuntimeError):
     """The correcting model could not be asked or did not answer."""
+
+
+@dataclass(frozen=True)
+class Reply:
+    """A correction's answer, and the tokens its provider reported (if any)."""
+
+    text: str
+    usage: Usage | None = None
+
+
+#: A correction: the prompt and the composite picture to an answer.
+Correct = Callable[[str, bytes], Awaitable[str | Reply]]
 
 
 @dataclass
@@ -55,6 +69,12 @@ class LoopConfig:
     tolerance: int = DEFAULT_TOLERANCE
     min_gain: float = 0.005
     patience: int = 2
+    #: Tokens and US dollars the corrections may spend (0: no such budget).
+    max_tokens: int = 400_000
+    max_cost_usd: float = 2.0
+    #: Passes the runner makes on the version kept, once the loop has stopped.
+    responsive: bool = False
+    states: bool = False
 
 
 @dataclass
@@ -70,6 +90,8 @@ class Iteration:
     refused_edits: list[dict] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
+    tokens: int = 0
+    cost_usd: float | None = None
 
 
 @dataclass
@@ -80,6 +102,8 @@ class LoopOutcome:
     files: dict[str, str]
     issues: list[dict]
     detail: str = ""
+    budget_kind: str = ""
+    spend: dict = field(default_factory=dict)
 
 
 def _data_url(png: bytes) -> str:
@@ -136,10 +160,13 @@ async def run_loop(
     config: LoopConfig | None = None,
     on_progress: Progress | None = None,
     clock: Callable[[], float] = time.monotonic,
+    pricing: Pricing | None = None,
 ) -> LoopOutcome:
-    """Run the loop from ``files``; ``render`` and ``correct`` are the runner's."""
+    """Run the loop from ``files``; ``render``, ``correct`` and ``pricing``
+    (unknown when not given) are the runner's."""
     cfg = config or LoopConfig()
     started = clock()
+    spend = Spend(pricing or Pricing())
     tracker = _Tracker()
     iterations: list[Iteration] = []
     best = 0
@@ -167,7 +194,7 @@ async def run_loop(
             threshold=cfg.threshold,
         )
 
-    def finish(status: str, detail: str = "") -> LoopOutcome:
+    def finish(status: str, detail: str = "", budget_kind: str = "") -> LoopOutcome:
         return LoopOutcome(
             status=status,
             iterations=iterations,
@@ -175,6 +202,8 @@ async def run_loop(
             files=versions[best],
             issues=tracker.final(status == "converged"),
             detail=detail,
+            budget_kind=budget_kind,
+            spend=spend.as_dict(cfg.max_tokens, cfg.max_cost_usd),
         )
 
     notify("render", 0)
@@ -203,17 +232,27 @@ async def run_loop(
         if report.score >= cfg.threshold:
             return finish("converged")
         if clock() - started > cfg.budget_seconds:
-            return finish("budget")
+            return finish("budget", budget_kind="time")
+        spent = spend.exhausted(cfg.max_tokens, cfg.max_cost_usd)
+        if spent:
+            return finish("budget", budget_kind=spent)
         step_start = clock()
         notify("correct", index)
         feedback = build_feedback(report, iteration=index, threshold=cfg.threshold)
         prompt = build_prompt(feedback, current, stack_label=stack_label, mirror=mirror)
         diff_image = Image.open(io.BytesIO(report.diff_png)).convert("RGB")
+        composite = side_by_side([target, rendered, diff_image])
         try:
-            raw = await correct(prompt, side_by_side([target, rendered, diff_image]))
+            raw = await correct(prompt, composite)
         except CorrectionError as exc:
             return finish("failed", str(exc)[:300])
-        answer = parse_answer(raw)
+        reply = raw if isinstance(raw, Reply) else Reply(str(raw))
+        with Image.open(io.BytesIO(composite)) as shown:
+            size = shown.size
+        tokens, cost = spend.add(
+            reply.usage or estimate_usage(prompt, size, reply.text)
+        )
+        answer = parse_answer(reply.text)
         edits = answer.edits if answer else []
         candidate, applied, refused = apply_edits(current, edits)
         if applied:
@@ -241,6 +280,8 @@ async def run_loop(
                 else [{"path": "", "reason": "unreadable_answer"}],
                 notes=answer.notes if answer else [],
                 duration_seconds=round(clock() - step_start, 2),
+                tokens=tokens,
+                cost_usd=cost,
             )
         )
         previous_best = iterations[best].score
@@ -262,6 +303,8 @@ def serialize(
     return {
         "status": outcome.status,
         "detail": outcome.detail,
+        "budget_kind": outcome.budget_kind,
+        "spend": outcome.spend,
         "threshold": threshold,
         "mirror": mirror,
         "best_iteration": outcome.best_index,
@@ -278,6 +321,8 @@ def serialize(
                 "refused_edits": it.refused_edits,
                 "notes": it.notes,
                 "duration_seconds": it.duration_seconds,
+                "tokens": it.tokens,
+                "cost_usd": it.cost_usd,
             }
             for it in outcome.iterations
         ],

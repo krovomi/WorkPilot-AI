@@ -207,6 +207,7 @@ PHASE_ALIASES: dict[str, str] = {
     # one request in the prompt, one answer out as text, no tool.
     "git_command": "solo",
     "code_playground": "solo",
+    "replay_summary": "solo",
     "linear_updater": "solo",
     "pr_followup_reviewer": "solo",
     # Writes one archify model from evidence already in its prompt; Python

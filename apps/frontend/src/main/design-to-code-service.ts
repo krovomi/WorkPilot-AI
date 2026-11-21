@@ -25,6 +25,7 @@ import {
 	type DesignWriteOutcome,
 } from "../shared/types/design-to-code";
 import { getAppLanguage } from "./app-language";
+import { renderLoopArgs } from "./design-render-loop-args";
 import { findOpenReviewCard } from "./generated-review/review-card";
 import { findLocalProject, openReviewRun, type ReviewRun } from "./generated-review/review-run";
 import { projectStore } from "./project-store";
@@ -216,7 +217,9 @@ export class DesignToCodeService {
 		if (req.generateTests === false) args.push("--no-tests");
 		if (req.useDesignTokens === false) args.push("--no-tokens");
 		// Strictly a boolean: the loop renders and calls a vision model again.
-		if (req.renderLoop === true) args.push("--render-loop");
+		if (req.renderLoop === true) {
+			args.push("--render-loop", ...renderLoopArgs(req.renderLoopOptions));
+		}
 		const instructions = shortText(req.customInstructions);
 		if (instructions) args.push("--instructions", instructions);
 

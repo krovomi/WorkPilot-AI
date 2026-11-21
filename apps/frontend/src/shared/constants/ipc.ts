@@ -663,6 +663,9 @@ export const IPC_CHANNELS = {
 	MCP_MARKETPLACE_GET_CATALOG: "mcpMarketplace:getCatalog", // Get full server catalog
 	MCP_MARKETPLACE_GET_SERVER: "mcpMarketplace:getServer", // Get single server details
 	MCP_MARKETPLACE_GET_SECURITY: "mcpMarketplace:getSecurity", // Security score of a catalog server (#369)
+	MCP_MARKETPLACE_GET_POLICY: "mcpMarketplace:getPolicy", // The project's MCP install policy (#369)
+	MCP_MARKETPLACE_GET_INSTALLED_WATCH: "mcpMarketplace:getInstalledWatch", // Alerts on installed servers (#369)
+	MCP_MARKETPLACE_ACKNOWLEDGE_ALERTS: "mcpMarketplace:acknowledgeAlerts", // Acknowledge a server's alerts (#369)
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project
@@ -855,6 +858,10 @@ export const IPC_CHANNELS = {
 
 	// Execution waves across specs (Conflict Predictor, #358): plan by task id
 	CONFLICT_WAVES_PLAN: "conflictWaves:plan",
+	// The run, kept in <project>/.workpilot/ to survive a restart: by project id
+	CONFLICT_WAVES_RUN_LOAD: "conflictWaves:loadRun",
+	CONFLICT_WAVES_RUN_SAVE: "conflictWaves:saveRun",
+	CONFLICT_WAVES_RUN_CLEAR: "conflictWaves:clearRun",
 
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",
@@ -908,6 +915,8 @@ export const IPC_CHANNELS = {
 	REPLAY_IMPORT_SESSION: "replay:importSession",
 	REPLAY_ADD_BOOKMARK: "replay:addBookmark",
 	REPLAY_REMOVE_BOOKMARK: "replay:removeBookmark",
+	REPLAY_EXPORT_VIDEO: "replay:exportVideo",
+	REPLAY_SUMMARIZE_SESSION: "replay:summarizeSession",
 	// Session History — the same records, as history cards
 	SESSION_HISTORY_LIST: "sessionHistory:list",
 

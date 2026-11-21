@@ -16,7 +16,8 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
@@ -184,10 +185,19 @@ class Renderer:
         if self._dir is not None:
             shutil.rmtree(self._dir, ignore_errors=True)
 
-    async def capture(
-        self, files: dict[str, str], page: str, fonts: list[str] | None = None
-    ) -> bytes:
-        """PNG of ``page`` (one of ``files``) at the target's size."""
+    @asynccontextmanager
+    async def open_page(
+        self,
+        files: dict[str, str],
+        page: str,
+        viewport: tuple[int, int, int] | None = None,
+    ) -> AsyncIterator[Any]:
+        """``page`` (one of ``files``) loaded in a fresh offline context, without
+        JavaScript, at ``viewport`` (the target's by default).
+
+        Every capture and every probe of the passes goes through here, so each
+        one has the same guard: only ``file:`` URLs under this version's folder.
+        """
         from playwright.async_api import Error as PlaywrightError
 
         if self._dir is None:
@@ -200,7 +210,7 @@ class Renderer:
         if entry is None or not entry.is_file():
             raise RenderError("load_failed", "no page to render")
 
-        width, height, scale = self.viewport
+        width, height, scale = viewport or self.viewport
         context = await self._browser.new_context(
             viewport={"width": width, "height": height},
             device_scale_factor=scale,
@@ -223,12 +233,19 @@ class Renderer:
                     wait_until="load",
                     timeout=_LOAD_TIMEOUT_MS,
                 )
+                yield tab
             except PlaywrightError as exc:
                 raise RenderError(
                     "load_failed", str(exc).splitlines()[0][:200]
                 ) from exc
+        finally:
+            await context.close()
+
+    async def capture(
+        self, files: dict[str, str], page: str, fonts: list[str] | None = None
+    ) -> bytes:
+        """PNG of ``page`` (one of ``files``) at the target's size."""
+        async with self.open_page(files, page) as tab:
             if fonts:
                 self.missing_fonts = list(await tab.evaluate(_FONT_PROBE, fonts))
             return await tab.screenshot(type="png")
-        finally:
-            await context.close()

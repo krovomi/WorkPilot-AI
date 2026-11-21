@@ -51,6 +51,7 @@ import {
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { McpErrorNotice } from "./McpErrorNotice";
+import { McpPolicyRefusalText, useCatalogPolicyRefusal } from "./McpPolicyNotice";
 import { McpSecurityBadge, McpSecurityDetails, useMcpServerSecurity } from "./McpSecurityScore";
 
 interface McpServerCardProps {
@@ -67,6 +68,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 	);
 	const projectId = useProjectStore((state) => state.selectedProjectId);
 	const security = useMcpServerSecurity(server, projectId);
+	const refusal = useCatalogPolicyRefusal(server, projectId, security.score);
 	const language = i18n.language;
 
 	const [showInstallDialog, setShowInstallDialog] = useState(false);
@@ -237,10 +239,16 @@ export function McpServerCard({ server }: McpServerCardProps) {
 								</Button>
 							</div>
 						) : (
+							<>
+							{refusal && (
+								<p className="mb-1.5 text-3xs text-muted-foreground" data-testid="mcp-policy-refusal">
+									<McpPolicyRefusalText refusal={refusal} />
+								</p>
+							)}
 							<Button
 								className="w-full h-8 text-xs"
 								onClick={handleInstallClick}
-								disabled={installing || !projectId}
+								disabled={installing || !projectId || refusal !== null}
 								title={projectId ? undefined : t("mcpMarketplace.noProject")}
 							>
 								{installing ? (
@@ -255,6 +263,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 									</>
 								)}
 							</Button>
+							</>
 						)}
 					</div>
 				</div>

@@ -1,10 +1,12 @@
 import { AlertCircle, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { ScrollArea } from "../../ui/scroll-area";
 import type { IssueListProps } from "../types";
 import { EmptyState } from "./EmptyStates";
 import { IssueListItem } from "./IssueListItem";
 
 export function IssueList(props: Readonly<IssueListProps>) {
+	const { t } = useTranslation("gitlab");
 	const {
 		issues,
 		selectedIssueIid,
@@ -33,7 +35,7 @@ export function IssueList(props: Readonly<IssueListProps>) {
 	}
 
 	if (issues.length === 0) {
-		return <EmptyState message="No issues found" />;
+		return <EmptyState message={t("empty.noIssues")} />;
 	}
 
 	return (

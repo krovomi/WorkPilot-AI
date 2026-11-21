@@ -2,7 +2,7 @@
  * The wave planner (#358), table-tested: pure, deterministic, any language.
  */
 import { describe, expect, it } from "vitest";
-import { type PlannerOptions, type PlannerTask, planExecutionWaves } from "../planner";
+import { type PlannerOptions, type PlannerTask, pairKey, planExecutionWaves } from "../planner";
 import { buildFootprint, fileWeight, riskLevel } from "../scorer";
 
 const OPTIONS: PlannerOptions = {
@@ -298,5 +298,20 @@ describe("planExecutionWaves", () => {
 		const result = planExecutionWaves([], [], OPTIONS);
 		expect(result.waves).toEqual([]);
 		expect(result.totalRisk).toBe(0);
+	});
+
+	it("splits a pair whose test merge conflicted, even with no shared file in the plans", () => {
+		const checks = new Map([
+			[pairKey("b", "a"), { verdict: "conflict" as const, files: Array.from({ length: 25 }, (_, i) => `f${i}`) }],
+		]);
+		const result = planExecutionWaves([task("a", ["x.kt"]), task("b", ["y.kt"])], [], {
+			...OPTIONS,
+			mergeChecks: checks,
+		});
+		expect(waves(result)).toEqual([["a"], ["b"]]);
+		expect(result.pairs).toEqual([
+			expect.objectContaining({ score: 0, blocking: true, mergeCheck: "conflict" }),
+		]);
+		expect(result.pairs[0].conflictFiles).toHaveLength(20);
 	});
 });

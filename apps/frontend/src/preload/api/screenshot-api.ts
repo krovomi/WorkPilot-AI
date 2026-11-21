@@ -9,25 +9,17 @@ import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import type {
 	ScreenshotCaptureOptions,
+	ScreenshotCaptureResult,
 	ScreenshotSource,
+	ScreenshotSourcesResult,
 } from "../../shared/types/screenshot";
 
 // Re-export types for convenience
 export type { ScreenshotSource, ScreenshotCaptureOptions };
 
 export interface ScreenshotAPI {
-	getSources: () => Promise<{
-		success: boolean;
-		data?: ScreenshotSource[];
-		error?: string;
-		/** Indicates the app is running in development mode (screenshot capture unavailable) */
-		devMode?: boolean;
-	}>;
-	capture: (options: ScreenshotCaptureOptions) => Promise<{
-		success: boolean;
-		data?: string; // base64 encoded PNG
-		error?: string;
-	}>;
+	getSources: () => Promise<ScreenshotSourcesResult>;
+	capture: (options: ScreenshotCaptureOptions) => Promise<ScreenshotCaptureResult>;
 }
 
 export const createScreenshotAPI = (): ScreenshotAPI => ({
