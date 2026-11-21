@@ -1782,7 +1782,7 @@
 		"done": "Done",
 		"cancel": "Cancel",
 		"importing": "Importing...",
-		"importButton_one": "Import Work Items from Azure DevOps",
+		"importButton_one": "Import {{count}} item",
 		"importButton_other": "Import {{count}} items",
 		"moreItems": "+{{count}} more item(s)",
 		"sidePanelTitle": "Import from Azure DevOps",
@@ -1797,11 +1797,11 @@
 		"importConfirmDescription": "The following items will be imported into the {{column}} column.",
 		"importConfirmButton": "Import {{count}} item(s)",
 		"selectedItems": "{{count}} item(s) selected",
-		"toggleSelection": "Toggle selection for work item {{id}}",
 		"importError": "Azure DevOps import failed",
 		"repositoryLabel": "Repository:",
 		"sidePanelAriaLabel": "Azure DevOps import panel",
-		"resizeHandleAriaLabel": "Resize the panel"
+		"resizeHandleAriaLabel": "Resize the panel",
+		"priorityBadge": "P{{priority}}"
 	},
 	"azureDevOps": {
 		"enableSyncLabel": "Enable Azure DevOps Sync",
@@ -2157,7 +2157,8 @@
 		"statusLabel": "Status",
 		"allStatuses": "All Statuses",
 		"dragHint": "Drag selected issues to a Kanban column to import",
-		"resize": "Resize"
+		"resize": "Resize",
+		"sidePanelAriaLabel": "Jira import panel"
 	},
 	"instructions": {
 		"title": "GitHub Copilot Instructions",
