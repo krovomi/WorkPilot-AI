@@ -105,14 +105,15 @@ describe("McpBuilder", () => {
 		expect(useMcpMarketplaceStore.getState().builderProjects).toEqual([saved]);
 	});
 
-	it("says when the server could not be saved", async () => {
-		api.invoke.mockResolvedValue({ success: false, error: "disk full" });
+	it("says when the server could not be saved, and why in the app's language", async () => {
+		api.invoke.mockResolvedValue({ success: false, error: "builderSaveFailed" });
 		view();
 		fireEvent.click(screen.getAllByRole("button", { name: "New Server" })[0]);
 		fireEvent.click(screen.getByRole("button", { name: "Save" }));
 		const alert = await screen.findByRole("alert");
 		expect(alert).toHaveTextContent("The server could not be saved.");
-		expect(alert).toHaveTextContent("disk full");
+		expect(alert).toHaveTextContent("The builder file could not be written.");
+		expect(alert).not.toHaveTextContent("builderSaveFailed");
 		expect(screen.getByRole("heading", { name: "Untitled Server" })).toBeInTheDocument();
 	});
 
@@ -133,11 +134,13 @@ describe("McpBuilder", () => {
 
 	it("deletes a server, or says why it could not", async () => {
 		useMcpMarketplaceStore.setState({ builderProjects: [project()] });
-		api.invoke.mockResolvedValueOnce({ success: false, error: "locked" });
+		api.invoke.mockResolvedValueOnce({ success: false, error: "builderDeleteFailed" });
 		view();
 		fireEvent.click(screen.getByRole("button", { name: /Weather$/ }));
 		fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-		expect(await screen.findByRole("alert")).toHaveTextContent("The server could not be deleted.");
+		const alert = await screen.findByRole("alert");
+		expect(alert).toHaveTextContent("The server could not be deleted.");
+		expect(alert).toHaveTextContent("The builder file could not be written.");
 		expect(screen.getByLabelText("Server Name")).toHaveValue("Weather");
 
 		api.invoke.mockResolvedValueOnce({ success: true });

@@ -1,12 +1,13 @@
 /**
  * What the marketplace store could not do (load, install, remove, save),
- * worded in the app's language, with the main process's own message under it.
+ * worded in the app's language, with the main process's reason under it.
  */
 
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useMcpMarketplaceStore } from "../../stores/mcp-marketplace-store";
 import { Notice } from "../charter";
+import { mainFailureText } from "./main-failure";
 import { McpPolicyRefusalText } from "./McpPolicyNotice";
 
 export function McpErrorNotice({ className }: { readonly className?: string }) {
@@ -22,7 +23,7 @@ export function McpErrorNotice({ className }: { readonly className?: string }) {
 					t(`mcpMarketplace.errors.${error.key}`, { name: error.name })
 				)}
 			</p>
-			{error.detail && <p className="text-xs opacity-80">{error.detail}</p>}
+			{error.detail && <p className="text-xs opacity-80">{mainFailureText(t, error.detail)}</p>}
 		</Notice>
 	);
 }

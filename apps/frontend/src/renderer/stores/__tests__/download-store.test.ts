@@ -100,7 +100,7 @@ describe("download store", () => {
 		const entry = useDownloadStore.getState().downloads["llama3.3"];
 		expect(entry?.status).toBe("completed");
 		expect(entry?.percentage).toBe(100);
-		expect(useDownloadStore.getState().hasActiveDownloads()).toBe(false);
+		expect(useDownloadStore.getState().isDownloading("llama3.3")).toBe(false);
 		cleanup();
 	});
 
@@ -189,5 +189,129 @@ describe("download store", () => {
 
 		act(() => useDownloadStore.getState().completeDownload("gemma3"));
 		expect(useDownloadStore.getState().isDownloading("gemma3")).toBe(false);
+	});
+
+	it("measures speed and time left between two progress events", () => {
+		const { emit } = installFakeBridge();
+		const cleanup = initDownloadProgressListener();
+		const now = vi.spyOn(Date, "now");
+		const mb = 1024 * 1024;
+		const at = (ms: number, completed: number, total: number, name: string) => {
+			now.mockReturnValue(ms);
+			act(() =>
+				emit({
+					modelName: name,
+					status: "downloading",
+					completed,
+					total,
+					percentage: Math.round((completed / total) * 100),
+				}),
+			);
+			return useDownloadStore.getState().downloads[name];
+		};
+
+		// The first event only starts the clock.
+		expect(at(1_000, mb, 100 * mb, "big")).toMatchObject({
+			speed: undefined,
+			secondsRemaining: undefined,
+		});
+		expect(at(2_000, 11 * mb, 100 * mb, "big")).toMatchObject({
+			speed: "10.0 MB/s",
+			secondsRemaining: 9,
+		});
+
+		at(1_000, 0, 10_000, "mid");
+		expect(at(2_000, 2048, 10_000, "mid")?.speed).toBe("2.0 KB/s");
+
+		at(1_000, 0, 1_000, "slow");
+		expect(at(2_000, 500, 1_000, "slow")).toMatchObject({
+			speed: "500 B/s",
+			secondsRemaining: 1,
+		});
+		// The last byte: a speed, and no time left to show.
+		expect(at(3_000, 1_000, 1_000, "slow")).toMatchObject({
+			speed: "500 B/s",
+			secondsRemaining: undefined,
+		});
+
+		now.mockRestore();
+		cleanup();
+	});
+
+	it("keeps a download queued while no byte has arrived", () => {
+		act(() => {
+			useDownloadStore.getState().startDownload("gemma3");
+			useDownloadStore.getState().updateProgress("gemma3", { percentage: 0 });
+		});
+		expect(useDownloadStore.getState().downloads.gemma3?.status).toBe(
+			"starting",
+		);
+	});
+
+	it("settles a download this window never saw start", () => {
+		const { emit } = installFakeBridge();
+		const cleanup = initDownloadProgressListener();
+		act(() => {
+			emit({ modelName: "done", status: "completed", completed: 0, total: 0, percentage: 100 });
+			emit({ modelName: "broken", status: "failed", completed: 0, total: 0, percentage: 0 });
+			emit({
+				modelName: "ghost",
+				status: "failed",
+				completed: 0,
+				total: 0,
+				percentage: 0,
+				error: "PULL_CANCELLED",
+			});
+		});
+		const { downloads } = useDownloadStore.getState();
+		expect(downloads.done).toMatchObject({ status: "completed", percentage: 100 });
+		expect(downloads.broken).toMatchObject({ status: "failed", error: "" });
+		// Nothing to cancel: no row appears for a pull this window never showed.
+		expect(downloads.ghost).toBeUndefined();
+		cleanup();
+	});
+
+	it("forgets a dismissed download", () => {
+		act(() => {
+			useDownloadStore.getState().startDownload("gemma3");
+			useDownloadStore.getState().completeDownload("gemma3");
+			useDownloadStore.getState().clearDownload("gemma3");
+		});
+		expect(useDownloadStore.getState().downloads).toEqual({});
+	});
+
+	it.each([
+		["no bridge", undefined],
+		["a refused answer", { success: false, error: "boom" }],
+		["an answer without models", { success: true, data: {} }],
+	])("starts empty on %s", async (_label, answer) => {
+		if (answer) {
+			Object.assign(window, {
+				electronAPI: { getActiveOllamaPulls: vi.fn(async () => answer) },
+			});
+		}
+		await act(async () => {
+			await useDownloadStore.getState().rehydrate();
+		});
+		expect(useDownloadStore.getState().downloads).toEqual({});
+	});
+
+	it("starts empty when the main process cannot be reached", async () => {
+		Object.assign(window, {
+			electronAPI: {
+				getActiveOllamaPulls: vi.fn(async () => {
+					throw new Error("IPC closed");
+				}),
+			},
+		});
+		await act(async () => {
+			await useDownloadStore.getState().rehydrate();
+		});
+		expect(useDownloadStore.getState().downloads).toEqual({});
+	});
+
+	it("listens to nothing without a bridge, and cleans up all the same", () => {
+		const cleanup = initDownloadProgressListener();
+		expect(() => cleanup()).not.toThrow();
 	});
 });

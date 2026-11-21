@@ -1,5 +1,5 @@
 import path from "node:path";
-import { app, ipcMain, net, safeStorage } from "electron";
+import { app, ipcMain, net } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import { detectDotnet } from "../api-explorer/dotnet";
 import { detectGo } from "../api-explorer/go";
@@ -27,6 +27,7 @@ import {
 	readSecretValues,
 } from "../api-explorer/ipc-args";
 import { ApiExplorerSecretStore } from "../api-explorer-secret-store";
+import { guardedSafeStorage } from "../secret-storage";
 
 // ── OpenAPI spec builder ──────────────────────────────────────────────────────
 
@@ -211,7 +212,7 @@ interface ProxyResponse {
 export function registerApiExplorerHandlers(): void {
 	const secretStore = new ApiExplorerSecretStore(
 		path.join(app.getPath("userData"), "api-explorer-secrets.json"),
-		safeStorage,
+		guardedSafeStorage,
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.API_EXPLORER_LOAD_SECRETS,
