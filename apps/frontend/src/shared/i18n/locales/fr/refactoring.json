@@ -20,7 +20,8 @@
 	},
 	"errors": {
 		"detectionFailed": "La détection a échoué",
-		"proposalFailed": "La génération de proposition a échoué"
+		"proposalFailed": "La génération de proposition a échoué",
+		"pasteFailed": "Le presse-papiers n'a pas pu être lu. Collez le code dans le champ."
 	},
 	"smells": {
 		"title": "Code Smells ({{count}})",

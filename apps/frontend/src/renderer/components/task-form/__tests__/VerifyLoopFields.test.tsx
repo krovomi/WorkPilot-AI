@@ -86,4 +86,19 @@ describe("VerifyLoopFields", () => {
 		fireEvent.click(screen.getByRole("checkbox"));
 		expect(onVerifyLoopChange).toHaveBeenCalledWith(false);
 	});
+
+	it("starts empty and names its fields after the form's prefix", () => {
+		render(
+			<VerifyLoopFields
+				onVerifyLoopChange={vi.fn()}
+				onVerifyWindowChange={vi.fn()}
+				onVerifyScenarioChange={vi.fn()}
+				idPrefix="edit"
+			/>,
+		);
+		expect(screen.getByRole("checkbox")).toHaveAttribute("id", "edit-verify-loop");
+		expect(screen.getByRole("checkbox")).toBeChecked();
+		expect(screen.getByLabelText("tasks:verify.form.windowLabel")).toHaveValue("");
+		expect(screen.getByLabelText("tasks:verify.form.scenarioLabel")).toHaveValue("");
+	});
 });
