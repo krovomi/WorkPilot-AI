@@ -14,11 +14,11 @@ import { useTranslation } from "react-i18next";
 import {
 	IDEATION_EFFORT_COLORS,
 	IDEATION_IMPACT_COLORS,
-	PERFORMANCE_CATEGORY_LABELS,
 } from "../../../../shared/constants";
 import type { PerformanceOptimizationIdea } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
 import { Card } from "../../ui/card";
+import { useIdeaLabels } from "../hooks/useIdeaLabels";
 
 interface PerformanceOptimizationDetailsProps {
 	readonly idea: PerformanceOptimizationIdea;
@@ -44,6 +44,7 @@ export function PerformanceOptimizationDetails({
 	idea,
 }: PerformanceOptimizationDetailsProps) {
 	const { t } = useTranslation("ideation");
+	const labels = useIdeaLabels();
 
 	return (
 		<>
@@ -53,7 +54,7 @@ export function PerformanceOptimizationDetails({
 					<div
 						className={`text-lg font-semibold ${IDEATION_IMPACT_COLORS[idea.impact]}`}
 					>
-						{idea.impact}
+						{labels.level(idea.impact)}
 					</div>
 					<div className="text-xs text-muted-foreground">
 						{t("performanceDetails.impact")}
@@ -63,7 +64,7 @@ export function PerformanceOptimizationDetails({
 					<div
 						className={`text-lg font-semibold ${IDEATION_EFFORT_COLORS[idea.estimatedEffort]}`}
 					>
-						{idea.estimatedEffort}
+						{labels.level(idea.estimatedEffort)}
 					</div>
 					<div className="text-xs text-muted-foreground">
 						{t("performanceDetails.effort")}
@@ -78,7 +79,7 @@ export function PerformanceOptimizationDetails({
 					{t("performanceDetails.category")}
 				</h3>
 				<Badge variant="outline">
-					{PERFORMANCE_CATEGORY_LABELS[idea.category]}
+					{labels.category(idea.type, idea.category)}
 				</Badge>
 			</div>
 
@@ -116,7 +117,7 @@ export function PerformanceOptimizationDetails({
 			</div>
 
 			{/* Affected Areas */}
-			{idea.affectedAreas && idea.affectedAreas.length > 0 && (
+			{idea.affectedAreas.length > 0 && (
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<FileCode className="h-4 w-4" />

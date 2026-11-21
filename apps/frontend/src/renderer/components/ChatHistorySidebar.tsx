@@ -60,18 +60,12 @@ export function ChatHistorySidebar({
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [editTitle, setEditTitle] = useState("");
 	const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
+	const [failure, setFailure] = useState<string | null>(null);
 
 	const handleStartEdit = (session: InsightsSessionSummary) => {
+		setFailure(null);
 		setEditingId(session.id);
 		setEditTitle(session.title);
-	};
-
-	const handleSaveEdit = async () => {
-		if (editingId && editTitle.trim()) {
-			await onRenameSession(editingId, editTitle.trim());
-		}
-		setEditingId(null);
-		setEditTitle("");
 	};
 
 	const handleCancelEdit = () => {
@@ -79,20 +73,33 @@ export function ChatHistorySidebar({
 		setEditTitle("");
 	};
 
-	const handleDelete = async () => {
-		if (deleteSessionId) {
-			await onDeleteSession(deleteSessionId);
-			setDeleteSessionId(null);
+	const handleSaveEdit = async (sessionId: string) => {
+		const title = editTitle.trim();
+		handleCancelEdit();
+		if (title && !(await onRenameSession(sessionId, title))) {
+			setFailure(t("chatHistory.renameFailed"));
 		}
 	};
 
-	const formatDate = (date: Date) => {
-		const now = new Date();
-		const d = new Date(date);
-		const diffMs = now.getTime() - d.getTime();
-		const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+	const handleDelete = async (sessionId: string) => {
+		setFailure(null);
+		if (!(await onDeleteSession(sessionId))) {
+			setFailure(t("chatHistory.deleteFailed"));
+		}
+	};
 
-		if (diffDays === 0) {
+	const startOfDay = (d: Date) =>
+		new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+	const formatDate = (date: Date) => {
+		const d = new Date(date);
+		// Calendar days, not 24-hour spans: last night is "Yesterday" this morning.
+		// A clock slightly ahead (a teammate's server) still reads as today.
+		const diffDays = Math.round(
+			(startOfDay(new Date()) - startOfDay(d)) / (1000 * 60 * 60 * 24),
+		);
+
+		if (diffDays <= 0) {
 			return t("chatHistory.today");
 		} else if (diffDays === 1) {
 			return t("chatHistory.yesterday");
@@ -118,18 +125,6 @@ export function ChatHistorySidebar({
 		},
 		{} as Record<string, InsightsSessionSummary[]>,
 	);
-
-	const handleSelectSession = (sessionId: string) => {
-		onSelectSession(sessionId);
-	};
-
-	const handleStartEditSession = (session: InsightsSessionSummary) => {
-		handleStartEdit(session);
-	};
-
-	const handleDeleteSession = (sessionId: string) => {
-		setDeleteSessionId(sessionId);
-	};
 
 	const renderSessionList = () => {
 		if (isLoading) {
@@ -162,12 +157,15 @@ export function ChatHistorySidebar({
 								isActive={session.id === currentSessionId}
 								isEditing={editingId === session.id}
 								editTitle={editTitle}
-								onSelect={() => handleSelectSession(session.id)}
-								onStartEdit={() => handleStartEditSession(session)}
-								onSaveEdit={handleSaveEdit}
+								onSelect={() => onSelectSession(session.id)}
+								onStartEdit={() => handleStartEdit(session)}
+								onSaveEdit={() => handleSaveEdit(session.id)}
 								onCancelEdit={handleCancelEdit}
 								onEditTitleChange={setEditTitle}
-								onDelete={() => handleDeleteSession(session.id)}
+								onDelete={() => {
+									setFailure(null);
+									setDeleteSessionId(session.id);
+								}}
 							/>
 						))}
 					</div>
@@ -201,33 +199,38 @@ export function ChatHistorySidebar({
 				</Tooltip>
 			</div>
 
+			{failure && (
+				<p role="alert" className="border-b border-border px-3 py-2 text-xs text-destructive">
+					{failure}
+				</p>
+			)}
+
 			{/* Session list */}
 			<ScrollArea className="flex-1">{renderSessionList()}</ScrollArea>
 
 			{/* Delete confirmation dialog */}
-			<AlertDialog
-				open={!!deleteSessionId}
-				onOpenChange={() => setDeleteSessionId(null)}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>
-							{t("chatHistory.deleteDialog.title")}
-						</AlertDialogTitle>
-						<AlertDialogDescription>
-							{t("chatHistory.deleteDialog.description")}
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>
-							{t("chatHistory.deleteDialog.cancel")}
-						</AlertDialogCancel>
-						<AlertDialogAction onClick={handleDelete}>
-							{t("chatHistory.deleteDialog.confirm")}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+			{deleteSessionId && (
+				<AlertDialog open onOpenChange={() => setDeleteSessionId(null)}>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>
+								{t("chatHistory.deleteDialog.title")}
+							</AlertDialogTitle>
+							<AlertDialogDescription>
+								{t("chatHistory.deleteDialog.description")}
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>
+								{t("chatHistory.deleteDialog.cancel")}
+							</AlertDialogCancel>
+							<AlertDialogAction onClick={() => handleDelete(deleteSessionId)}>
+								{t("chatHistory.deleteDialog.confirm")}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
+			)}
 		</div>
 	);
 }
@@ -274,6 +277,7 @@ function SessionItem({
 					value={editTitle}
 					onChange={(e) => onEditTitleChange(e.target.value)}
 					onKeyDown={handleKeyDown}
+					aria-label={t("chatHistory.titleInputLabel")}
 					className="h-7 text-sm"
 					autoFocus
 				/>
@@ -300,70 +304,73 @@ function SessionItem({
 	}
 
 	return (
-		// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
-		// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled elsewhere
-		// biome-ignore lint/a11y/noNoninteractiveElementInteractions: Electron desktop app — clickable div is intentional
 		<div
 			className={cn(
-				"group relative cursor-pointer px-2 py-2 transition-colors hover:bg-muted",
+				"group relative transition-colors hover:bg-muted",
 				isActive && "bg-primary/10 hover:bg-primary/15",
 			)}
-			onClick={onSelect}
 		>
-			{/* Content with reserved space for the menu button */}
-			<div className="flex items-center gap-1.5 pr-7">
+			{/* The row is a button; the menu button sits beside it, not inside */}
+			<button
+				type="button"
+				onClick={onSelect}
+				aria-current={isActive ? "true" : undefined}
+				className="flex w-full items-center gap-1.5 px-2 py-2 pr-9 text-left"
+			>
 				<MessageSquare
 					className={cn(
 						"h-4 w-4 shrink-0",
 						isActive ? "text-primary" : "text-muted-foreground",
 					)}
 				/>
-				<div className="min-w-0 flex-1">
-					<p
+				<span className="block min-w-0 flex-1">
+					<span
 						className={cn(
 							"line-clamp-2 text-sm leading-tight wrap-break-word",
 							isActive ? "font-medium text-foreground" : "text-foreground/80",
 						)}
 					>
 						{session.title}
-					</p>
-					<p className="text-2xs text-muted-foreground mt-0.5">
+					</span>
+					<span className="block text-2xs text-muted-foreground mt-0.5">
 						{t("chatHistory.messageCount", { count: session.messageCount })}
-					</p>
+					</span>
 					{session.readOnly && session.ownerName && (
-						<p className="text-2xs text-muted-foreground">
+						<span className="block text-2xs text-muted-foreground">
 							{t("chatHistory.byTeammate", { name: session.ownerName })}
-						</p>
+						</span>
 					)}
-				</div>
-			</div>
+				</span>
+			</button>
 
-			{/* Absolutely positioned menu button - always visible */}
-			<DropdownMenu modal={false}>
-				<DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-					<Button
-						variant="ghost"
-						size="icon"
-						className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 hover:bg-muted-foreground/20 transition-opacity"
-						aria-label={t("accessibility.moreOptionsAriaLabel")}
-					>
-						<MoreVertical className="h-3.5 w-3.5" />
-					</Button>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent align="end" sideOffset={5} className="w-36 z-100">
-					<DropdownMenuItem onSelect={onStartEdit}>
-						<Pencil className="mr-2 h-3.5 w-3.5" />
-						{t("chatHistory.rename")}
-					</DropdownMenuItem>
-					<DropdownMenuItem
-						onSelect={onDelete}
-						className="text-destructive focus:text-destructive"
-					>
-						<Trash2 className="mr-2 h-3.5 w-3.5" />
-						{t("chatHistory.delete")}
-					</DropdownMenuItem>
-				</DropdownMenuContent>
-			</DropdownMenu>
+			{/* A teammate's conversation is read only: nothing to rename or delete */}
+			{!session.readOnly && (
+				<DropdownMenu modal={false}>
+					<DropdownMenuTrigger asChild>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 hover:bg-muted-foreground/20 transition-opacity"
+							aria-label={t("accessibility.moreOptionsAriaLabel")}
+						>
+							<MoreVertical className="h-3.5 w-3.5" />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" sideOffset={5} className="w-36 z-100">
+						<DropdownMenuItem onSelect={onStartEdit}>
+							<Pencil className="mr-2 h-3.5 w-3.5" />
+							{t("chatHistory.rename")}
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							onSelect={onDelete}
+							className="text-destructive focus:text-destructive"
+						>
+							<Trash2 className="mr-2 h-3.5 w-3.5" />
+							{t("chatHistory.delete")}
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+			)}
 		</div>
 	);
 }

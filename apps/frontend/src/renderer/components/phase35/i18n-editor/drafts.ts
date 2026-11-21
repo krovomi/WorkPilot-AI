@@ -65,10 +65,6 @@ export function countChanges(draft: Draft): number {
 	);
 }
 
-export function isDirty(draft: Draft): boolean {
-	return countChanges(draft) > 0;
-}
-
 // ---------------------------------------------------------------------------
 // Keys
 
@@ -354,8 +350,8 @@ export function buildOperations(draft: Draft): I18nOperation[] {
 	for (const [key, values] of Object.entries(draft.added)) {
 		operations.push({ op: "add", key, values });
 	}
+	// Never empty: reverting a key's last cell drops the key from `edits`.
 	for (const [key, values] of Object.entries(draft.edits)) {
-		if (!Object.keys(values).length) continue;
 		operations.push({ op: "set", key: draft.renames[key] ?? key, values });
 	}
 	return operations;

@@ -94,13 +94,19 @@ export function getGitLabMRSettings(): { model: string; thinkingLevel: string } 
 }
 
 /**
- * The project's GitLab token and instance, from its settings (or glab), for
- * the review runner: the runner env carries no credential the main process
- * env happens to hold (github/utils/runner-env.ts).
+ * The project's GitLab token, instance and project, from its settings (or
+ * glab), for the review runner: the runner env carries no credential the main
+ * process env happens to hold (github/utils/runner-env.ts).
  */
 async function gitlabRunnerEnv(project: Project): Promise<Record<string, string>> {
 	const config = await getGitLabConfig(project);
-	return config ? { GITLAB_TOKEN: config.token, GITLAB_INSTANCE_URL: config.instanceUrl } : {};
+	return config
+		? {
+				GITLAB_TOKEN: config.token,
+				GITLAB_INSTANCE_URL: config.instanceUrl,
+				GITLAB_PROJECT: config.project,
+			}
+		: {};
 }
 
 function reviewSenders(mainWindow: BrowserWindow, projectId: string) {
@@ -129,9 +135,11 @@ async function runMRReview(
 	const { command, failed, missing } = KINDS[kind];
 	const { sendProgress } = reviewSenders(mainWindow, project.id);
 	const { model, thinkingLevel } = getGitLabMRSettings();
+	// The GitLab runner's `--project` is the GitLab project: the folder goes in `--project-dir`.
 	const args = buildRunnerArgs(path.join(backendPath, RUNNER), project.path, command, [String(mrIid)], {
 		model,
 		thinkingLevel,
+		projectFlag: "--project-dir",
 	});
 	const env = await getRunnerEnv(await gitlabRunnerEnv(project), {
 		jevWorkflow: "gitlab-review",
