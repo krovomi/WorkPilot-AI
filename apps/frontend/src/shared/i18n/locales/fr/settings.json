@@ -3114,5 +3114,42 @@
 		"useRemote": "Utiliser {{repo}}",
 		"detected": "Aucun dépôt enregistré : ce projet utilise celui de son remote git, {{repo}}.",
 		"saveDetected": "L'enregistrer dans les réglages"
+	},
+	"forgeAccounts": {
+		"navLabel": "Comptes des forges",
+		"title": "Comptes des forges",
+		"description": "Enregistrez une fois vos comptes GitHub, GitLab, Azure DevOps et Bitbucket (travail, perso, un client…). Chaque projet choisit ensuite celui qu'il utilise dans ses propres réglages. Les jetons restent chiffrés sur cet ordinateur et ne sont plus jamais affichés.",
+		"empty": "Aucun compte de forge enregistré.",
+		"add": "Ajouter un compte",
+		"forge": "Forge",
+		"label": "Nom",
+		"labelPlaceholder": "Travail, Perso, Client X…",
+		"gitlabHost": "Instance GitLab",
+		"azureHost": "Organisation Azure DevOps",
+		"bitbucketUsername": "Nom d'utilisateur ou e-mail (facultatif)",
+		"bitbucketUsernameHint": "Avec un jeton d'API ou un mot de passe d'application, le nom d'utilisateur ou l'e-mail Atlassian qui se connecte. Laisser vide pour un jeton d'accès d'espace de travail ou de dépôt.",
+		"token": "Jeton",
+		"tokenPlaceholder": "Jeton d'accès personnel",
+		"tokenKeep": "Laisser vide pour garder le jeton enregistré",
+		"save": "Enregistrer",
+		"cancel": "Annuler",
+		"tokenSet": "Jeton enregistré",
+		"noToken": "Aucun jeton",
+		"test": "Tester",
+		"testOk": "Connecté en tant que {{username}}",
+		"testFailed": "Échec de la connexion : {{error}}",
+		"edit": "Modifier {{label}}",
+		"delete": "Supprimer {{label}}",
+		"deleteTitle": "Supprimer le compte {{label}} ?",
+		"deleteDescription": "Les projets qui l'utilisent n'auront plus de jeton pour cette forge tant que vous n'aurez pas choisi un autre compte ou saisi un jeton propre au projet.",
+		"picker": {
+			"label": "Compte",
+			"ownToken": "Le jeton propre à ce projet",
+			"withUsername": "{{label}} ({{username}})",
+			"missing": "Compte supprimé",
+			"hint": "Un compte enregistré apporte son jeton et son adresse. Gérez les comptes dans Réglages, Comptes des forges.",
+			"noneHint": "Pour utiliser le même compte dans plusieurs projets, enregistrez-le une fois dans Réglages, Comptes des forges.",
+			"missingHint": "Le compte qu'utilisait ce projet a été supprimé : choisissez-en un autre ou saisissez un jeton pour ce projet."
+		}
 	}
 }

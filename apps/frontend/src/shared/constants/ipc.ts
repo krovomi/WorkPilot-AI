@@ -602,6 +602,11 @@ export const IPC_CHANNELS = {
 	GIT_CHECK_STATUS: "git:checkStatus",
 	GIT_DETECT_PROVIDER: "git:detectProvider",
 	GIT_FORGE_BINDINGS: "git:forgeBindings",
+	// Forge accounts saved for the whole app (main/forge/forge-accounts.ts)
+	FORGE_ACCOUNTS_LIST: "forgeAccounts:list",
+	FORGE_ACCOUNTS_SAVE: "forgeAccounts:save",
+	FORGE_ACCOUNTS_DELETE: "forgeAccounts:delete",
+	FORGE_ACCOUNTS_TEST: "forgeAccounts:test",
 	GIT_INITIALIZE: "git:initialize",
 	GIT_SET_REMOTE: "git:setRemote",
 	GIT_CHECKOUT_BRANCH: "git:checkoutBranch",

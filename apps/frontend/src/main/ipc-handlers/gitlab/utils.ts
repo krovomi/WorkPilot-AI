@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import type { Project } from "../../../shared/types";
 import { getToolPath } from "../../cli-tool-manager";
 import { getAugmentedEnv } from "../../env-utils";
+import { withForgeAccounts } from "../../forge/forge-credentials";
 import {
 	detectedGitLabProject,
 	listGitRemotes,
@@ -144,7 +145,7 @@ export async function getGitLabConfig(
 	if (!envPath || !(await fileExists(envPath))) return null;
 
 	try {
-		const vars = await readProjectEnvFileAsync(envPath);
+		const vars = withForgeAccounts(await readProjectEnvFileAsync(envPath));
 		if (vars[GITLAB_ENV_KEYS.ENABLED]?.toLowerCase() === "false") {
 			return null;
 		}
