@@ -20,7 +20,6 @@ it chooses nothing else — not a provider, not a model, not a role.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 
 from security.untrusted import quote_untrusted
@@ -46,8 +45,6 @@ _INSTRUCTIONS = (
     f'- "domains": a list drawn from {", ".join(DOMAINS)}\n'
     '- "needs_tests": true or false\n\n'
 )
-
-_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -75,12 +72,13 @@ def refinement_request(text: str, provider: str) -> dict[str, str]:
 
 def parse_hints(answer: str) -> Hints | None:
     """The hints in a model's answer, or None when it holds none usable."""
-    match = _OBJECT.search(answer or "")
-    if not match:
+    text = answer or ""
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end < start:
         return None
     try:
         # From a `{` to the last `}`: an object, or not JSON at all.
-        data = json.loads(match.group(0))
+        data = json.loads(text[start : end + 1])
     except ValueError:
         return None
     kind = data.get("kind") if data.get("kind") in KINDS else None

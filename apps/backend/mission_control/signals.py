@@ -107,7 +107,25 @@ DOMAINS: dict[str, tuple[str, ...]] = {
 
 _TESTS = (r"\btests?\b", r"\btesting\b", r"\bcoverage\b", r"\bcouverture\b")
 # A path or a file name with an extension: `src/app.ts`, `Program.cs`, `main.go`.
-_FILE = re.compile(r"(?<![\w/.-])(?:[\w-]+/)*[\w-]+\.[a-z0-9]{1,6}\b")
+#: A run of path characters, then its folder names and a file's stem and
+#: extension, each matched whole (no pattern that can retry a long run).
+_PATH_TOKEN = re.compile(r"[\w/.-]+")
+_SEGMENT = re.compile(r"[\w-]+")
+_EXTENSION = re.compile(r"[a-z0-9]{1,6}")
+
+
+def _file_named(token: str) -> str | None:
+    """The file a path-like token names (``src/app.ts``), or None."""
+    folders: list[str] = []
+    for segment in token.split("/"):
+        stem, dot, rest = segment.partition(".")
+        extension = re.split(r"[.-]", rest, maxsplit=1)[0]
+        if dot and _SEGMENT.fullmatch(stem) and _EXTENSION.fullmatch(extension):
+            return "/".join([*folders, f"{stem}.{extension}"])
+        if not _SEGMENT.fullmatch(segment):
+            return None
+        folders.append(segment)
+    return None
 
 
 @dataclass
@@ -209,7 +227,9 @@ def read_signals(
         mentions_tests=_any(norm, _TESTS),
     )
 
-    named_files = len(set(_FILE.findall(text)))
+    named_files = len(
+        {name for token in _PATH_TOKEN.findall(text) if (name := _file_named(token))}
+    )
     metadata: dict[str, object] = {}
     if spec_dir:
         footprint = extract_spec_footprint(spec_dir)

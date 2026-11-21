@@ -118,6 +118,8 @@ class TestRefinement:
             "",
             "no json here",
             "{not json}",
+            "} closed before it opens {",
+            "{" * 50_000,
             json.dumps({"kind": "deploy_to_prod", "complexity": 3, "domains": "all"}),
             json.dumps({"kind": "generic", "needs_tests": "yes"}),
         ],

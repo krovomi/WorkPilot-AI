@@ -43,6 +43,18 @@ class TestReadSignals:
         assert found.has_spec is False
         assert found.languages == [] and found.has_test_suite is False
 
+    @pytest.mark.parametrize(
+        ("text", "files"),
+        [
+            ("see src/lib/ and /etc/hosts.conf", 0),
+            ("a.b/c.py and docs/guide.md-old", 2),
+            ("App.TS, notes.markdown and x.b_c", 0),
+            ("-" * 100_000 + " app.py", 1),
+        ],
+    )
+    def test_named_files_are_whole_names_at_the_start_of_a_path(self, text, files):
+        assert read_signals(text).touched_files == files
+
     def test_french_words_count_too(self):
         found = read_signals("Corriger l'écran de connexion et la base de données")
         assert found.domains == ["frontend", "database"]
