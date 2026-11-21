@@ -7,35 +7,21 @@ interface UseTerminalEventsOptions {
 	// When true, skips auto-removal to allow proper recreation
 	isRecreatingRef?: RefObject<boolean>;
 	onExit?: (exitCode: number) => void;
-	onTitleChange?: (title: string) => void;
-	onClaudeSession?: (sessionId: string) => void;
 }
 
 export function useTerminalEvents({
 	terminalId,
 	isRecreatingRef,
 	onExit,
-	onTitleChange,
-	onClaudeSession,
 }: UseTerminalEventsOptions) {
-	// Use refs to always have the latest callbacks without re-registering listeners
-	// This prevents duplicate listener registration when callbacks change identity
+	// Use a ref to always have the latest callback without re-registering listeners
+	// This prevents duplicate listener registration when the callback changes identity
 	const onExitRef = useRef(onExit);
-	const onTitleChangeRef = useRef(onTitleChange);
-	const onClaudeSessionRef = useRef(onClaudeSession);
 
-	// Keep refs updated with latest callbacks
+	// Keep the ref updated with the latest callback
 	useEffect(() => {
 		onExitRef.current = onExit;
 	}, [onExit]);
-
-	useEffect(() => {
-		onTitleChangeRef.current = onTitleChange;
-	}, [onTitleChange]);
-
-	useEffect(() => {
-		onClaudeSessionRef.current = onClaudeSession;
-	}, [onClaudeSession]);
 
 	// Handle terminal exit
 	useEffect(() => {
@@ -86,7 +72,6 @@ export function useTerminalEvents({
 		const cleanup = window.electronAPI.onTerminalTitleChange((id, title) => {
 			if (id === terminalId) {
 				useTerminalStore.getState().updateTerminal(terminalId, { title });
-				onTitleChangeRef.current?.(title);
 			}
 		});
 
@@ -118,7 +103,6 @@ export function useTerminalEvents({
 					// This ensures the Claude badge shows up after auto-resume
 					store.setClaudeMode(terminalId, true);
 					console.warn("[Terminal] Captured Claude session ID:", sessionId);
-					onClaudeSessionRef.current?.(sessionId);
 				}
 			},
 		);

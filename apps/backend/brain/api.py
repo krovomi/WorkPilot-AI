@@ -174,7 +174,9 @@ def _checked_remote(value: str | None) -> tuple[str | None, str | None]:
         return None, "invalid-remote"
 
 
-_USERINFO = re.compile(r"(\b[a-z][a-z0-9+.-]*://)[^/@\s]+@", re.I)
+# Everything up to the last "@" before the host: a sign-in part may itself hold
+# an "@", and the part after the first one is still part of it.
+_USERINFO = re.compile(r"(\b[a-z][a-z0-9+.-]*://)[^/?#\s]+@", re.I)
 
 
 def _git_detail(text: str | None) -> str | None:

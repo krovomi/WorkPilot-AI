@@ -1,6 +1,7 @@
 import type { CatalogPluginType } from "@shared/types/plugin-marketplace";
 import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import {
 	installPlugin,
@@ -9,9 +10,9 @@ import {
 } from "@/stores/plugin-marketplace-store";
 import { useProjectStore } from "@/stores/project-store";
 import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
 import { PluginCard } from "./PluginCard";
 
-import { NativeSelect } from "../ui/native-select";
 const TYPE_FILTERS: Array<{
 	value: CatalogPluginType | "all";
 	labelKey: string;
@@ -37,11 +38,27 @@ export function PluginCatalogView() {
 		isCatalogLoading,
 		getFilteredCatalog,
 		isPluginInstalled,
-	} = usePluginMarketplaceStore();
+		installedProjectId,
+	} = usePluginMarketplaceStore(
+		useShallow((state) => ({
+			filters: state.filters,
+			setFilters: state.setFilters,
+			isInstalling: state.isInstalling,
+			isCatalogLoading: state.isCatalogLoading,
+			getFilteredCatalog: state.getFilteredCatalog,
+			isPluginInstalled: state.isPluginInstalled,
+			installedProjectId: state.projectId,
+			// The filtered list is derived from these: re-render when they change.
+			catalog: state.catalog,
+			installed: state.installed,
+		})),
+	);
 
 	const projectId = useProjectStore((state) => state.selectedProjectId);
 
 	const filteredPlugins = getFilteredCatalog();
+	// `installed` lists another project's skills until the selected one is read.
+	const installedHere = installedProjectId === projectId;
 
 	return (
 		<div className="flex flex-col h-full">
@@ -55,11 +72,13 @@ export function PluginCatalogView() {
 							placeholder={t("common:pluginMarketplace.searchPlaceholder")}
 							value={filters.search}
 							onChange={(e) => setFilters({ search: e.target.value })}
+							aria-label={t("common:pluginMarketplace.searchPlaceholder")}
 							className="pl-9 h-8 text-sm"
 						/>
 					</div>
 					<div className="flex items-center gap-2">
 						<NativeSelect
+							aria-label={t("common:pluginMarketplace.sortBy")}
 							value={filters.sortBy}
 							onChange={(e) =>
 								setFilters({ sortBy: e.target.value as typeof filters.sortBy })
@@ -83,6 +102,7 @@ export function PluginCatalogView() {
 							key={value}
 							type="button"
 							onClick={() => setFilters({ type: value })}
+							aria-pressed={filters.type === value}
 							className={cn(
 								"shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
 								filters.type === value
@@ -105,7 +125,11 @@ export function PluginCatalogView() {
 				)}
 				{isCatalogLoading ? (
 					<div className="flex items-center justify-center h-32">
-						<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+						<div
+							role="status"
+							aria-label={t("common:pluginMarketplace.loading")}
+							className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"
+						/>
 					</div>
 				) : filteredPlugins.length === 0 ? (
 					<div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-sm">
@@ -123,12 +147,16 @@ export function PluginCatalogView() {
 								<PluginCard
 									key={plugin.id}
 									plugin={plugin}
-									isInstalled={isPluginInstalled(plugin.id)}
+									isInstalled={installedHere && isPluginInstalled(plugin.id)}
 									isInstalling={isInstalling === plugin.id}
-									canInstall={Boolean(projectId)}
-									onInstall={() => projectId && installPlugin(projectId, plugin.id)}
-									onUninstall={() =>
-										projectId && uninstallPlugin(projectId, plugin.id)
+									actions={
+										projectId
+											? {
+													onInstall: () => installPlugin(projectId, plugin.id),
+													onUninstall: () =>
+														uninstallPlugin(projectId, plugin.id),
+												}
+											: null
 									}
 								/>
 							))}
