@@ -38,9 +38,17 @@ def credentials(token: object = TOKEN, key: str = "claudeAiOauth") -> str:
 @pytest.fixture(autouse=True)
 def machine(tmp_path, monkeypatch):
     """A machine with no token anywhere, on Linux, without a Secret Service."""
-    for var in (*auth.AUTH_TOKEN_ENV_VARS, *auth.SDK_ENV_VARS, "DEBUG"):
-        monkeypatch.delenv(var, raising=False)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    for var in (
+        *auth.AUTH_TOKEN_ENV_VARS,
+        *auth.SDK_ENV_VARS,
+        "DEBUG",
+        "ANTHROPIC_API_KEY",
+    ):
+        # `delenv` of an absent variable records nothing to undo, so a token
+        # the code under test then writes would outlive the test (and make a
+        # later test start the real CLI). Setting it first records its absence.
+        monkeypatch.setenv(var, "")
+        monkeypatch.delenv(var)
     home = tmp_path / "home"
     home.mkdir()
     for var in ("HOME", "USERPROFILE"):

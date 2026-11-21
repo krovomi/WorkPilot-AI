@@ -9,21 +9,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from phase_config import resolve_model_id
+
 try:
-    from ...phase_config import resolve_model_id
     from ..models import GitHubRunnerConfig, TriageCategory, TriageResult
     from .prompt_manager import PromptManager
     from .response_parsers import ResponseParser
 except (ImportError, ValueError, SystemError):
-    import sys
-    from pathlib import Path
-
-    # Add backend root to path for absolute imports
-    backend_root = Path(__file__).parent.parent.parent.parent
-    if str(backend_root) not in sys.path:
-        sys.path.insert(0, str(backend_root))
-
-    from phase_config import resolve_model_id
+    # Loaded as a top-level `services` package (the runner's flat layout).
     from runners.github.models import GitHubRunnerConfig, TriageCategory, TriageResult
     from runners.github.services.prompt_manager import PromptManager
     from runners.github.services.response_parsers import ResponseParser
@@ -46,31 +39,11 @@ class TriageEngine:
         self.prompt_manager = PromptManager()
         self.parser = ResponseParser()
 
-    def _report_progress(self, phase: str, progress: int, message: str, **kwargs):
-        """Report progress if callback is set."""
-        if self.progress_callback:
-            # Import at module level to avoid circular import issues
-            import sys
-
-            if "orchestrator" in sys.modules:
-                ProgressCallback = sys.modules["orchestrator"].ProgressCallback
-            else:
-                # Fallback: try relative import
-                try:
-                    from ..orchestrator import ProgressCallback
-                except ImportError:
-                    from orchestrator import ProgressCallback
-
-            self.progress_callback(
-                ProgressCallback(
-                    phase=phase, progress=progress, message=message, **kwargs
-                )
-            )
-
     async def triage_single_issue(
         self, issue: dict, all_issues: list[dict]
     ) -> TriageResult:
         """Triage a single issue using AI."""
+        from core.agent_client import ContentBlockType, MessageRole
         from core.client import create_agent_client
 
         # Build context with issue and potential duplicates
@@ -94,15 +67,15 @@ class TriageEngine:
             async with client:
                 await client.query(full_prompt)
 
+                # The agent client yields provider-neutral `AgentMessage`s: the
+                # SDK's own class names (AssistantMessage, TextBlock) are gone.
                 response_text = ""
                 async for msg in client.receive_response():
-                    msg_type = type(msg).__name__
-                    if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-                        for block in msg.content:
-                            # Must check block type - only TextBlock has .text attribute
-                            block_type = type(block).__name__
-                            if block_type == "TextBlock" and hasattr(block, "text"):
-                                response_text += block.text
+                    if msg.role != MessageRole.ASSISTANT:
+                        continue
+                    for block in msg.content:
+                        if block.type == ContentBlockType.TEXT and block.text:
+                            response_text += block.text
 
                 return self.parser.parse_triage_result(
                     issue, response_text, self.config.repo

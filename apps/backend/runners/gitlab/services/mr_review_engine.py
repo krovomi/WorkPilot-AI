@@ -14,36 +14,17 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-try:
-    from ..models import (
-        GitLabRunnerConfig,
-        MergeVerdict,
-        MRContext,
-        MRReviewFinding,
-        ReviewCategory,
-        ReviewSeverity,
-    )
-except ImportError:
-    # Fallback for direct script execution (not as a module)
-    from models import (
-        GitLabRunnerConfig,
-        MergeVerdict,
-        MRContext,
-        MRReviewFinding,
-        ReviewCategory,
-        ReviewSeverity,
-    )
+from core.io_utils import safe_print
 
-# Import safe_print for BrokenPipeError handling
-try:
-    from core.io_utils import safe_print
-except ImportError:
-    # Fallback for direct script execution
-    import sys
-    from pathlib import Path as PathLib
-
-    sys.path.insert(0, str(PathLib(__file__).parent.parent.parent.parent))
-    from core.io_utils import safe_print
+from ...github.services.deep_context_provider import DeepContext
+from ..models import (
+    GitLabRunnerConfig,
+    MergeVerdict,
+    MRContext,
+    MRReviewFinding,
+    ReviewCategory,
+    ReviewSeverity,
+)
 
 
 @dataclass
@@ -54,6 +35,13 @@ class ProgressCallback:
     progress: int
     message: str
     mr_iid: int | None = None
+
+
+# What the review says when the model's answer holds no readable review: the
+# MR is neither approved nor blocked on an answer nobody could read.
+_UNPARSED_SUMMARY = (
+    "Review completed but failed to parse structured output. Please re-run the review."
+)
 
 
 def sanitize_user_content(content: str, max_length: int = 100000) -> str:
@@ -167,6 +155,7 @@ Provide your review in the following JSON format:
         Returns:
             Tuple of (findings, verdict, summary, blockers)
         """
+        from core.agent_client import ContentBlockType, MessageRole
         from core.client import create_agent_client
 
         self._report_progress(
@@ -223,14 +212,9 @@ Provide your review in the following JSON format:
 
         # Inject deep codebase context if available
         deep_context_section = ""
-        if hasattr(context, "deep_context") and context.deep_context:
-            try:
-                from ..github.services.deep_context_provider import DeepContext
-
-                dc = DeepContext.from_dict(context.deep_context)
-                deep_context_section = dc.to_prompt_section()
-            except Exception:
-                pass
+        if context.deep_context:
+            dc = DeepContext.from_dict(context.deep_context)
+            deep_context_section = dc.to_prompt_section()
 
         prompt = self._get_review_prompt() + "\n\n---\n\n"
         if deep_context_section:
@@ -260,13 +244,11 @@ Provide your review in the following JSON format:
                 await client.query(prompt)
 
                 async for msg in client.receive_response():
-                    msg_type = type(msg).__name__
-                    if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-                        for block in msg.content:
-                            # Must check block type - only TextBlock has .text attribute
-                            block_type = type(block).__name__
-                            if block_type == "TextBlock" and hasattr(block, "text"):
-                                result_text += block.text
+                    if msg.role != MessageRole.ASSISTANT:
+                        continue
+                    for block in msg.content:
+                        if block.type == ContentBlockType.TEXT and block.text:
+                            result_text += block.text
 
             self._report_progress(
                 "analyzing", 70, "Parsing review results...", mr_iid=context.mr_iid
@@ -281,60 +263,59 @@ Provide your review in the following JSON format:
     def _parse_review_result(
         self, result_text: str
     ) -> tuple[list[MRReviewFinding], MergeVerdict, str, list[str]]:
-        """Parse the AI review result."""
-        findings = []
-        verdict = MergeVerdict.READY_TO_MERGE
-        summary = ""
-        blockers = []
+        """Parse the AI review result.
 
-        # Try to extract JSON from the response
+        An answer with no readable ```json review in it is not an approval:
+        the MR gets the cautious verdict and a summary asking for a re-run.
+        """
+        findings: list[MRReviewFinding] = []
+        blockers: list[str] = []
+
         json_match = re.search(r"```json\s*([\s\S]*?)\s*```", result_text)
-        if json_match:
+        try:
+            data = json.loads(json_match.group(1)) if json_match else None
+        except json.JSONDecodeError as e:
+            safe_print(f"[AI] Failed to parse JSON: {e}")
+            data = None
+        if not isinstance(data, dict):
+            safe_print("[AI] No structured review found in the response")
+            safe_print(f"[AI] Raw response (first 500 chars): {result_text[:500]}")
+            return findings, MergeVerdict.MERGE_WITH_CHANGES, _UNPARSED_SUMMARY, []
+
+        summary = data.get("summary", "")
+        try:
+            verdict = MergeVerdict(data.get("verdict", "ready_to_merge"))
+        except ValueError:
+            verdict = MergeVerdict.READY_TO_MERGE
+
+        for f in data.get("findings", []):
+            if not isinstance(f, dict):
+                safe_print(f"[AI] Skipping invalid finding: {f!r}")
+                continue
             try:
-                data = json.loads(json_match.group(1))
+                severity = ReviewSeverity(f.get("severity", "medium"))
+                category = ReviewCategory(f.get("category", "quality"))
+            except ValueError as e:
+                safe_print(f"[AI] Skipping invalid finding: {e}")
+                continue
 
-                summary = data.get("summary", "")
-                verdict_str = data.get("verdict", "ready_to_merge")
-                try:
-                    verdict = MergeVerdict(verdict_str)
-                except ValueError:
-                    verdict = MergeVerdict.READY_TO_MERGE
+            finding = MRReviewFinding(
+                id=f"finding-{uuid.uuid4().hex[:8]}",
+                severity=severity,
+                category=category,
+                title=f.get("title", "Untitled finding"),
+                description=f.get("description", ""),
+                file=f.get("file", "unknown"),
+                line=f.get("line", 1),
+                end_line=f.get("end_line"),
+                suggested_fix=f.get("suggested_fix"),
+                fixable=f.get("fixable", False),
+            )
+            findings.append(finding)
 
-                # Parse findings
-                for f in data.get("findings", []):
-                    try:
-                        severity = ReviewSeverity(f.get("severity", "medium"))
-                        category = ReviewCategory(f.get("category", "quality"))
-
-                        finding = MRReviewFinding(
-                            id=f"finding-{uuid.uuid4().hex[:8]}",
-                            severity=severity,
-                            category=category,
-                            title=f.get("title", "Untitled finding"),
-                            description=f.get("description", ""),
-                            file=f.get("file", "unknown"),
-                            line=f.get("line", 1),
-                            end_line=f.get("end_line"),
-                            suggested_fix=f.get("suggested_fix"),
-                            fixable=f.get("fixable", False),
-                        )
-                        findings.append(finding)
-
-                        # Track blockers
-                        if severity in (ReviewSeverity.CRITICAL, ReviewSeverity.HIGH):
-                            blockers.append(
-                                f"{finding.title} ({finding.file}:{finding.line})"
-                            )
-                    except (ValueError, KeyError) as e:
-                        safe_print(f"[AI] Skipping invalid finding: {e}")
-
-            except json.JSONDecodeError as e:
-                safe_print(f"[AI] Failed to parse JSON: {e}")
-                safe_print(f"[AI] Raw response (first 500 chars): {result_text[:500]}")
-                summary = "Review completed but failed to parse structured output. Please re-run the review."
-                # Return with empty findings but keep verdict as READY_TO_MERGE
-                # since we couldn't determine if there are actual issues
-                verdict = MergeVerdict.MERGE_WITH_CHANGES  # Indicate caution needed
+            # Track blockers
+            if severity in (ReviewSeverity.CRITICAL, ReviewSeverity.HIGH):
+                blockers.append(f"{finding.title} ({finding.file}:{finding.line})")
 
         return findings, verdict, summary, blockers
 
