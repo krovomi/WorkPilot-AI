@@ -15,6 +15,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { expect, type Page } from "@playwright/test";
+import { withoutCredentials } from "./app-harness";
 
 const REPO = path.resolve(import.meta.dirname, "..", "..", "..");
 
@@ -59,8 +60,11 @@ export async function startServer(): Promise<Server> {
 	if (!existsSync(python)) {
 		throw new Error(`the backend's Python is missing: ${python}`);
 	}
+	// The server gets the developer's environment without its credentials,
+	// as the app does: it needs none of them.
 	const child = spawn(python, ["-m", "tests.server_e2e.app_world"], {
 		cwd: REPO,
+		env: withoutCredentials(process.env),
 		stdio: ["pipe", "pipe", "inherit"],
 	});
 	const exited = new Promise<number | null>((resolve) =>

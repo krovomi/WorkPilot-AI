@@ -7,6 +7,7 @@ import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useMcpMarketplaceStore } from "../../stores/mcp-marketplace-store";
 import { Notice } from "../charter";
+import { McpPolicyRefusalText } from "./McpPolicyNotice";
 
 export function McpErrorNotice({ className }: { readonly className?: string }) {
 	const { t } = useTranslation(["common"]);
@@ -14,7 +15,13 @@ export function McpErrorNotice({ className }: { readonly className?: string }) {
 	if (!error) return null;
 	return (
 		<Notice tone="red" icon={AlertTriangle} role="alert" className={className}>
-			<p>{t(`mcpMarketplace.errors.${error.key}`, { name: error.name })}</p>
+			<p>
+				{error.policy ? (
+					<McpPolicyRefusalText refusal={error.policy} />
+				) : (
+					t(`mcpMarketplace.errors.${error.key}`, { name: error.name })
+				)}
+			</p>
 			{error.detail && <p className="text-xs opacity-80">{error.detail}</p>}
 		</Notice>
 	);

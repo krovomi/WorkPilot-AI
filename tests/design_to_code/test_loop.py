@@ -7,8 +7,9 @@ import json
 
 import numpy as np
 import pytest
+from design_to_code.budget import Pricing, Usage
 from design_to_code.diff import Box, Region
-from design_to_code.loop import CorrectionError, LoopConfig, run_loop, serialize
+from design_to_code.loop import CorrectionError, LoopConfig, Reply, run_loop, serialize
 from design_to_code.render import RenderError
 from PIL import Image
 
@@ -175,7 +176,8 @@ def test_the_time_budget_stops_before_the_next_correction() -> None:
             clock=lambda: next(ticks),
         )
 
-    assert asyncio.run(scenario()).status == "budget"
+    outcome = asyncio.run(scenario())
+    assert outcome.status == "budget" and outcome.budget_kind == "time"
 
 
 def test_a_failed_model_call_keeps_the_best_version() -> None:
@@ -244,3 +246,67 @@ def test_the_defaults_are_the_issues(field) -> None:
     assert {"max_iterations": 5, "threshold": 0.95}[field] == getattr(
         LoopConfig(), field
     )
+
+
+def _priced_corrector(*answers, usage=None):
+    """Answers as ``Reply`` objects carrying the provider's usage."""
+    queue = list(answers)
+
+    async def correct(prompt: str, png: bytes) -> Reply:
+        return Reply(queue.pop(0), usage)
+
+    return correct
+
+
+def test_the_token_budget_stops_before_a_correction_that_would_pass_it() -> None:
+    nothing = json.dumps({"edits": []})
+    outcome, _ = _run(
+        _files(header="#f08030"),
+        _priced_corrector(nothing, nothing, nothing, usage=Usage(6_000, 1_000)),
+        max_tokens=15_000,
+        patience=5,
+        min_gain=0,
+    )
+    # 7 000 tokens a correction: a third would reach 21 000.
+    assert outcome.status == "budget" and outcome.budget_kind == "tokens"
+    assert len(outcome.iterations) == 3 and outcome.iterations[1].tokens == 7_000
+    assert outcome.spend["tokens"] == 14_000 and not outcome.spend["estimated"]
+    assert outcome.iterations[1].cost_usd is None
+    assert outcome.spend["cost_status"] == "unknown"
+
+
+def test_the_cost_budget_stops_on_a_priced_route_only() -> None:
+    nothing = json.dumps({"edits": []})
+
+    async def scenario(pricing):
+        return await run_loop(
+            _draw(TARGET),
+            _files(header="#f08030"),
+            render=_render,
+            correct=_priced_corrector(nothing, nothing, nothing, usage=Usage(10, 10)),
+            regions=REGIONS,
+            masks=[],
+            stack_label="HTML",
+            mirror=False,
+            config=LoopConfig(
+                max_iterations=3, max_cost_usd=0.5, patience=5, min_gain=0
+            ),
+            pricing=pricing,
+        )
+
+    priced = asyncio.run(scenario(Pricing("priced", lambda u: 0.3)))
+    assert priced.status == "budget" and priced.budget_kind == "cost"
+    assert priced.spend["cost_usd"] == 0.3 and priced.iterations[1].cost_usd == 0.3
+    # Without a price, the same run is not stopped by a cost it cannot know.
+    unknown = asyncio.run(scenario(None))
+    assert unknown.status == "max_iterations"
+    assert unknown.spend["cost_budget_checked"] is False
+
+
+def test_a_reply_without_usage_is_estimated() -> None:
+    outcome, _ = _run(_files(header="#f08030"), _corrector(_edit("#f08030", "#e63946")))
+    assert outcome.spend["estimated"] and outcome.iterations[1].tokens > 0
+    data = serialize(outcome, threshold=0.95, mirror=False, extra={})
+    assert data["spend"]["tokens"] == outcome.iterations[1].tokens
+    assert data["iterations"][1]["tokens"] == outcome.iterations[1].tokens
+    assert data["budget_kind"] == ""
