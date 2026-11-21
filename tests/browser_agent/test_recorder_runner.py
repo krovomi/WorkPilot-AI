@@ -168,7 +168,7 @@ class Page:
         return None
 
     async def goto(self, url: str, wait_until: str, timeout: int) -> None:
-        self.binding(
+        await self.binding(
             {"frame": self.main_frame},
             {"kind": "click", "target": {"tag": "a", "role": "link", "name": "Docs"}},
         )
