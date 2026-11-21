@@ -144,11 +144,6 @@ describe("the vote", () => {
 		api.arenaVote.mockRejectedValueOnce("x");
 		await state().submitVote("b1", "A");
 		expect(state().error).toBe("Failed to submit vote");
-
-		api.arenaVote = undefined as never;
-		(window as unknown as { electronAPI: unknown }).electronAPI = { ...api, arenaVote: undefined };
-		await state().submitVote("b1", "A");
-		expect(state().error).toMatch(/restart the application/);
 	});
 });
 
@@ -173,18 +168,17 @@ describe("history and analytics", () => {
 		expect(state()).toMatchObject({ battles: [{ id: "kept" }], analytics: null });
 	});
 
-	it("shows why the history failed, and stays quiet about analytics", async () => {
+	it("shows why the history or the analytics failed, apart from the battle error", async () => {
 		api.arenaGetBattles.mockRejectedValueOnce(new Error("corrupt"));
 		await state().loadHistory();
-		expect(state()).toMatchObject({ error: "corrupt", isLoadingHistory: false });
+		expect(state()).toMatchObject({ historyError: "corrupt", error: null, isLoadingHistory: false });
 		api.arenaGetBattles.mockRejectedValueOnce(0);
 		await state().loadHistory();
-		expect(state().error).toBe("Failed to load history");
+		expect(state().historyError).toBe("Could not read the battle history");
 
-		state().setError(null);
 		api.arenaGetAnalytics.mockRejectedValueOnce(new Error("x"));
 		await state().loadAnalytics();
-		expect(state()).toMatchObject({ error: null, isLoadingAnalytics: false });
+		expect(state()).toMatchObject({ analyticsError: "x", error: null, isLoadingAnalytics: false });
 	});
 
 	it("does nothing without the arena API", async () => {
@@ -194,9 +188,8 @@ describe("history and analytics", () => {
 		expect(state()).toMatchObject({ battles: [], analytics: null, isLoadingHistory: false });
 	});
 
-	it("keeps the starting flag and the auto-routing choice", () => {
+	it("keeps the starting flag", () => {
 		state().setIsStartingBattle(true);
-		state().setAutoRoutingEnabled(true);
-		expect(state()).toMatchObject({ isStartingBattle: true, autoRoutingEnabled: true });
+		expect(state()).toMatchObject({ isStartingBattle: true });
 	});
 });

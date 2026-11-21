@@ -2,7 +2,6 @@ import {
 	BookOpen,
 	Code2,
 	Gauge,
-	Lightbulb,
 	type LucideIcon,
 	Palette,
 	Shield,
@@ -26,6 +25,6 @@ interface TypeIconProps {
 }
 
 export function TypeIcon({ type, className = "h-4 w-4" }: TypeIconProps) {
-	const Icon = IDEATION_TYPE_ICONS[type] ?? Lightbulb;
+	const Icon = IDEATION_TYPE_ICONS[type];
 	return <Icon className={className} aria-hidden="true" />;
 }
