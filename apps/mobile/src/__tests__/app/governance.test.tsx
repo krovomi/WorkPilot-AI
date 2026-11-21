@@ -125,7 +125,11 @@ describe("governance", () => {
 	});
 
 	it("says a refusal in the person's words when the policy names no role", async () => {
-		const report = { ...REPORT, governance: { ...REPORT.governance, files: { forbidden: [], requiresReview: ["infra/**"] } } };
+		const report = {
+			...REPORT,
+			tokensLastHour: undefined,
+			governance: { ...REPORT.governance, schedule: null, files: { forbidden: [], requiresReview: ["infra/**"] } },
+		};
 		fakeServer(
 			{ [ROUTE]: report, "POST /api/features/governance/approvals/0123456789ab": reply(403, { detail: "no" }) },
 			ALL,
@@ -133,6 +137,8 @@ describe("governance", () => {
 		await openApp("/projects/p1/governance");
 		expect(await screen.findByText(/^Approved by any member of the project/)).toBeTruthy();
 		expect(screen.getAllByText("None").length).toBe(1);
+		expect(screen.getByText("Any time")).toBeTruthy();
+		expect(screen.getByText("0 of 200,000 tokens in the last hour")).toBeTruthy();
 		await fireEvent.press(screen.getByRole("button", { name: "Approve" }));
 		expect(await screen.findByText("You don't have the rights for this action.")).toBeTruthy();
 	});
@@ -177,8 +183,11 @@ describe("governance", () => {
 						budget: null,
 					},
 					tokensLastHour: undefined,
-					pending: [{ id: "0123456789ab", target: { summary: "rm x" } }],
-					events: [],
+					pending: [
+						{ id: "0123456789ab", target: { summary: "rm x" } },
+						{ id: "0123456789ac", rules: ["schedule"] },
+					],
+					events: [{ id: "e9", decision: "outside_hours", rules: ["schedule"] }],
 					metrics: undefined,
 					may: { approve: false, stop: false, stopProject: false, export: false },
 				},
@@ -191,7 +200,8 @@ describe("governance", () => {
 		expect(screen.queryByTestId("governance-approver")).toBeNull();
 		expect(screen.getByText("No token limit")).toBeTruthy();
 		expect(screen.getByText("rm x")).toBeTruthy();
-		expect(screen.getByText("No decision yet.")).toBeTruthy();
+		expect(screen.getByText("Outside hours")).toBeTruthy();
+		expect(screen.getAllByText("schedule")).toHaveLength(2);
 		expect(screen.getByText("0 agent actions stopped in the last 24 h")).toBeTruthy();
 		for (const name of ["Approve", "Refuse", "Stop my agents", "Stop every agent of the project"]) {
 			expect(screen.queryByRole("button", { name })).toBeNull();
@@ -204,6 +214,7 @@ describe("governance", () => {
 		await openApp("/projects/p1/governance");
 		expect(await screen.findByText("workpilot.policy.yaml sets no hours, files or token budget.")).toBeTruthy();
 		expect(screen.getByText("No call is waiting for an approval.")).toBeTruthy();
+		expect(screen.getByText("No decision yet.")).toBeTruthy();
 		expect(screen.getByText("0 calls waiting for an approval")).toBeTruthy();
 		restoreFetch();
 

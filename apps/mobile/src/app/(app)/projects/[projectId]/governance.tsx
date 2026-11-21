@@ -9,7 +9,7 @@ import { useLoad } from "../../../../hooks/useLoad";
 import { describeError } from "../../../../i18n";
 import { Button, ErrorBanner, Loading, Section } from "../../../../ui/components";
 import { formatDate } from "../../../../ui/format";
-import { RADIUS, SPACE, type Theme, useTheme } from "../../../../ui/theme";
+import { RADIUS, SPACE, useTheme } from "../../../../ui/theme";
 
 /**
  * The governance of a server project, on the phone: what its
@@ -273,15 +273,16 @@ function Request({
 	);
 }
 
-const TONES: Record<PolicyDecision, (theme: Theme) => string> = {
-	deny: (theme) => theme.danger,
-	invalid_policy: (theme) => theme.danger,
-	approved: (theme) => theme.success,
-	review: (theme) => theme.accent,
-	warn: (theme) => theme.textMuted,
-	outside_hours: (theme) => theme.textMuted,
-	budget_exceeded: (theme) => theme.textMuted,
-	tool_loop: (theme) => theme.textMuted,
+/** The colour of a decision, by the theme's name for it. */
+const TONES: Record<PolicyDecision, "danger" | "success" | "accent" | "textMuted"> = {
+	deny: "danger",
+	invalid_policy: "danger",
+	approved: "success",
+	review: "accent",
+	warn: "textMuted",
+	outside_hours: "textMuted",
+	budget_exceeded: "textMuted",
+	tool_loop: "textMuted",
 };
 
 function Decisions({ report }: { report: GovernanceReport }) {
@@ -311,7 +312,7 @@ function Decision({ event }: { event: PolicyEvent }) {
 	const meta = [event.task, formatDate(event.at, i18n.language)].filter(Boolean).join(" · ");
 	return (
 		<View style={[styles.row, { borderColor: theme.border }]}>
-			<Text style={{ color: TONES[event.decision](theme), fontWeight: "600" }}>
+			<Text style={{ color: theme[TONES[event.decision]], fontWeight: "600" }}>
 				{t(`governance.decision.${event.decision}`)}
 			</Text>
 			{event.rules?.length ? <Text style={{ color: theme.text }}>{event.rules.join(", ")}</Text> : null}
