@@ -17,11 +17,12 @@ import type {
 	CredentialConfig,
 	UsageData,
 } from "../services/credential-manager";
+import { credentialManager } from "../services/credential-manager";
+import type { WindsurfDetection, WindsurfTokenSave } from "../../shared/types";
 import {
-	credentialManager,
-	detectWindsurfLocalToken,
-	readWindsurfCachedPlanInfo,
-} from "../services/credential-manager";
+	detectWindsurfAccount,
+	saveDetectedWindsurfToken,
+} from "../windsurf-detected-token";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import {
 	createLatestVersionSource,
@@ -484,53 +485,18 @@ export function registerCredentialHandlers(): void {
 	// directly when building Python subprocess envs.
 
 	/**
-	 * Détecter le token Windsurf depuis l'installation IDE locale
-	 * Lit le state.vscdb de Windsurf pour extraire la clé API sk-ws-...
-	 * Enrichit la réponse avec les infos du plan (planName, usage) si disponibles.
+	 * Détecter le token Windsurf depuis l'installation IDE locale, avec le compte
+	 * et le plan. La clé reste dans le main : le renderer apprend qu'elle existe
+	 * et demande au main de l'enregistrer (CREDENTIAL_SAVE_DETECTED_WINDSURF_TOKEN).
 	 */
 	ipcMain.handle(
 		IPC_CHANNELS.CREDENTIAL_DETECT_WINDSURF_TOKEN,
-		async (): Promise<{
-			success: boolean;
-			apiKey?: string;
-			userName?: string;
-			planName?: string;
-			usageInfo?: {
-				usedMessages: number;
-				totalMessages: number;
-				usedFlowActions: number;
-				totalFlowActions: number;
-			};
-			error?: string;
-		}> => {
-			const tokenResult = await detectWindsurfLocalToken();
-			if (!tokenResult.success) return tokenResult;
+		(): Promise<WindsurfDetection> => detectWindsurfAccount(),
+	);
 
-			// Enrich with plan info (planName, usage) from cached plan data
-			try {
-				const planResult = await readWindsurfCachedPlanInfo();
-				if (planResult.success && planResult.planInfo) {
-					return {
-						...tokenResult,
-						userName: planResult.userName || tokenResult.userName,
-						planName: planResult.planInfo.planName,
-						usageInfo: {
-							usedMessages: planResult.planInfo.usage.usedMessages,
-							totalMessages: planResult.planInfo.usage.messages,
-							usedFlowActions: planResult.planInfo.usage.usedFlowActions,
-							totalFlowActions: planResult.planInfo.usage.flowActions,
-						},
-					};
-				}
-			} catch (e) {
-				console.warn(
-					"[CredentialHandlers] Failed to enrich Windsurf token with plan info:",
-					e,
-				);
-			}
-
-			return tokenResult;
-		},
+	ipcMain.handle(
+		IPC_CHANNELS.CREDENTIAL_SAVE_DETECTED_WINDSURF_TOKEN,
+		(): Promise<WindsurfTokenSave> => saveDetectedWindsurfToken(),
 	);
 
 	/**
