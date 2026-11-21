@@ -5,7 +5,8 @@
  * A server project is asked by its id; its mirror is never read.
  */
 
-import type { CostSummary, DashboardSnapshot } from "@shared/types";
+import type { CostSummary, DashboardSnapshot, IPCResult } from "@shared/types";
+import type { BuildComparison } from "@shared/types/build-compare";
 
 type Answer<T> = { success: boolean; error?: string } & T;
 
@@ -32,4 +33,18 @@ export async function loadCostSummary(
 	}
 	const result = await globalThis.electronAPI.getServerCostSummary(serverProjectId);
 	return { success: result.success, error: result.error, summary: result.data };
+}
+
+/**
+ * How the project compares with its past and with other projects: the
+ * person's own on this computer, the organization's they may read on a
+ * server (medians only).
+ */
+export function loadBuildComparison(
+	projectPath: string,
+	serverProjectId?: string,
+): Promise<IPCResult<BuildComparison>> {
+	return serverProjectId
+		? globalThis.electronAPI.getServerBuildComparison(serverProjectId)
+		: globalThis.electronAPI.getBuildComparison(projectPath);
 }

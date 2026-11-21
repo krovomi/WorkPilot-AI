@@ -200,7 +200,9 @@ def ensure_ignored(root: Path) -> None:
     path = root / ".gitignore"
     try:
         current = path.read_text(encoding="utf-8") if path.is_file() else ""
-    except OSError:
+    except OSError as exc:
+        logger.debug("brain: ignore file not read: %s", exc)
+        _exclude_locally(root)
         return
     present = {line.strip() for line in current.splitlines()}
     missing = [line for line in _IGNORED if line not in present]
@@ -213,9 +215,32 @@ def ensure_ignored(root: Path) -> None:
             current + sep + block + "\n".join(missing) + "\n", encoding="utf-8"
         )
     except OSError as exc:
-        # A read-only share: the brain still opens and syncs, only without
-        # these lines; raising here failed every sync before it started.
+        # A read-only share: the brain still opens and syncs, and the lines go
+        # to the repository's own exclude file, so a sync never commits the
+        # machine-local files they keep out.
         logger.debug("brain: ignore file not written: %s", exc)
+        _exclude_locally(root)
+
+
+def _exclude_locally(root: Path) -> None:
+    """The brain's ignore lines in ``info/exclude``: never committed, always read."""
+    found = _git(root, "rev-parse", "--git-path", "info/exclude")
+    if found.returncode != 0 or not found.stdout.strip():
+        logger.warning("brain: no repository to keep machine-local files out of")
+        return
+    exclude = root / found.stdout.strip()
+    try:
+        current = exclude.read_text(encoding="utf-8") if exclude.is_file() else ""
+        present = {line.strip() for line in current.splitlines()}
+        missing = [line for line in _IGNORED if line not in present]
+        if missing:
+            sep = "" if not current or current.endswith("\n") else "\n"
+            exclude.parent.mkdir(parents=True, exist_ok=True)
+            exclude.write_text(
+                current + sep + "\n".join(missing) + "\n", encoding="utf-8"
+            )
+    except OSError as exc:
+        logger.warning("brain: machine-local files not excluded: %s", exc)
 
 
 def ensure_repo(root: Path) -> bool:

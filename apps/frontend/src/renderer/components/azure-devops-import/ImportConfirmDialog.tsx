@@ -21,6 +21,8 @@ import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
 import { ScrollArea } from "../ui/scroll-area";
+import type { PanelKind } from "../work-item-import/drag";
+import { azureTypeColor, jiraTypeColor } from "../work-item-import/tracker-colors";
 
 /**
  * Common work item shape accepted by the import dialog.
@@ -44,6 +46,8 @@ interface ImportConfirmDialogProps {
 	readonly onConfirm: (requireReviewBeforeCoding: boolean) => void;
 	/** Called when the user explicitly cancels (closes the side panel too) */
 	readonly onCancel?: () => void;
+	/** The tracker the items come from. */
+	readonly source: PanelKind | null;
 }
 
 export function ImportConfirmDialog({
@@ -54,27 +58,15 @@ export function ImportConfirmDialog({
 	isImporting,
 	onConfirm,
 	onCancel,
+	source,
 }: ImportConfirmDialogProps) {
 	const { t } = useTranslation(["settings", "tasks", "common"]);
 	const [requireReviewBeforeCoding, setRequireReviewBeforeCoding] =
 		useState(false);
 
-	const getTypeColor = (type: string): string => {
-		switch (type.toLowerCase()) {
-			case "bug":
-				return "bg-destructive/10 text-destructive border-destructive/20";
-			case "task":
-				return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-			case "user story":
-				return "bg-success/10 text-success border-success/20";
-			case "feature":
-				return "bg-purple-500/10 text-purple-500 border-purple-500/20";
-			case "epic":
-				return "bg-orange-500/10 text-orange-500 border-orange-500/20";
-			default:
-				return "bg-gray-500/10 text-gray-500 border-gray-500/20";
-		}
-	};
+	// Jira words its own dialog ("issues"); its keys read as Jira keys, Azure DevOps ids as numbers.
+	const section = source === "jira" ? "jiraImport" : "azureDevOpsImport";
+	const typeColor = source === "jira" ? jiraTypeColor : azureTypeColor;
 
 	return (
 		<AlertDialog
@@ -89,12 +81,12 @@ export function ImportConfirmDialog({
 				<AlertDialogHeader>
 					<AlertDialogTitle className="flex items-center gap-2">
 						<Download className="h-5 w-5" />
-						{t("settings:azureDevOpsImport.importConfirmTitle", {
+						{t(`settings:${section}.importConfirmTitle`, {
 							count: workItems.length,
 						})}
 					</AlertDialogTitle>
 					<AlertDialogDescription>
-						{t("settings:azureDevOpsImport.importConfirmDescription", {
+						{t(`settings:${section}.importConfirmDescription`, {
 							column: targetColumn ? t(`tasks:status.${targetColumn}`) : "",
 						})}
 					</AlertDialogDescription>
@@ -109,11 +101,11 @@ export function ImportConfirmDialog({
 								className="flex items-center gap-2 text-sm py-1.5 px-2 rounded hover:bg-muted/50"
 							>
 								<span className="font-mono text-xs text-muted-foreground shrink-0">
-									#{item.id}
+									{typeof item.id === "number" ? `#${item.id}` : item.id}
 								</span>
 								<Badge
 									variant="outline"
-									className={`${getTypeColor(item.workItemType)} shrink-0 text-xs`}
+									className={`${typeColor(item.workItemType)} shrink-0 text-xs`}
 								>
 									{item.workItemType}
 								</Badge>
@@ -165,12 +157,12 @@ export function ImportConfirmDialog({
 						{isImporting ? (
 							<>
 								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-								{t("settings:azureDevOpsImport.importing")}
+								{t(`settings:${section}.importing`)}
 							</>
 						) : (
 							<>
 								<Download className="h-4 w-4 mr-2" />
-								{t("settings:azureDevOpsImport.importConfirmButton", {
+								{t(`settings:${section}.importConfirmButton`, {
 									count: workItems.length,
 								})}
 							</>

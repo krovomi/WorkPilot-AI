@@ -24,8 +24,8 @@ from pathlib import Path
 BASE_READ_TOOLS = ["Read", "Glob", "Grep"]
 BASE_WRITE_TOOLS = ["Write", "Edit", "Bash"]
 
-# Web tools for documentation lookup and research
-# Always available to all agents for accessing external information
+# Web tools for documentation lookup and research, for the agent types that
+# declare them below
 WEB_TOOLS = ["WebFetch", "WebSearch"]
 
 # =============================================================================
@@ -439,8 +439,11 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "low",  # Fast utility task for structured fill-in
     },
+    # The forge reviewers below read a pull or merge request and the project
+    # it changes. They work offline from the repository's content: the
+    # project's files and the change are all a review needs, so no web tool.
     "pr_reviewer": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,  # Read-only
+        "tools": BASE_READ_TOOLS,  # Read-only
         "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
@@ -449,7 +452,7 @@ AGENT_CONFIGS = {
         # Read-only for parallel PR orchestrator
         # NOTE: Do NOT add "Task" here - the SDK auto-allows Task when agents are defined
         # via the --agents flag. Explicitly adding it interferes with agent registration.
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS,
         "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
@@ -457,7 +460,7 @@ AGENT_CONFIGS = {
     "pr_followup_parallel": {
         # Read-only for parallel followup reviewer
         # NOTE: Do NOT add "Task" here - same reason as pr_orchestrator_parallel
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS,
         "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
@@ -484,8 +487,17 @@ AGENT_CONFIGS = {
     # ═══════════════════════════════════════════════════════════════════════
     # ANALYSIS PHASES
     # ═══════════════════════════════════════════════════════════════════════
+    # Issue triage and batching read issues from the forge, like the
+    # reviewers above, and answer in text the caller parses.
+    "issue_triage": {
+        # runners/github/services/triage_engine.py: classifies one issue.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "low",
+    },
     "batch_analysis": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS,
         "mcp_servers": [],
         "auto_claude_tools": [],
         "thinking_default": "low",

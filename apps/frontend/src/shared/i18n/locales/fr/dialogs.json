@@ -289,7 +289,14 @@
 		"model": "Modèle",
 		"thinkingLevel": "Niveau de réflexion",
 		"cancel": "Annuler",
-		"apply": "Appliquer"
+		"apply": "Appliquer",
+		"thinkingHints": {
+			"none": "Pas de réflexion étendue",
+			"low": "Réflexion brève",
+			"medium": "Analyse modérée",
+			"high": "Réflexion approfondie",
+			"ultrathink": "Profondeur de raisonnement maximale"
+		}
 	},
 	"removeProject": {
 		"title": "Retirer le projet ?",

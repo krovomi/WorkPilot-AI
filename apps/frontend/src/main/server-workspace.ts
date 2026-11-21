@@ -21,6 +21,8 @@ import type {
 	WorkspaceSession,
 	WorkspaceSessionPhase,
 } from "../shared/types";
+import type { BuildComparison } from "../shared/types/build-compare";
+import { comparisonFrom } from "./build-compare-shape";
 import { authedFetch } from "./server-connection";
 
 const MAX_KEYS = 200;
@@ -210,4 +212,19 @@ export async function fetchServerSessions(
 			.map(toSession)
 			.filter((row): row is WorkspaceSession => row !== null),
 	};
+}
+
+/**
+ * How the project compares with its past and with the organization's other
+ * projects the person may read: medians only, never another project's name
+ * (`projects` stays empty, whatever the server sends).
+ */
+export async function fetchServerComparison(
+	project: Project,
+): Promise<IPCResult<BuildComparison>> {
+	const answer = await read(project, "compare");
+	if (!answer.success) return { success: false, error: answer.error };
+	// `read` answers success with an object only.
+	const data = comparisonFrom(answer.data as Record<string, unknown>);
+	return { success: true, data: { ...data, projects: [] } };
 }

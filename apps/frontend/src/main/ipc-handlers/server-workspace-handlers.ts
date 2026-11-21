@@ -10,6 +10,7 @@ import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import type { IPCResult, Project } from "../../shared/types";
 import { getServerProject } from "../server-projects";
 import {
+	fetchServerComparison,
 	fetchServerCostSummary,
 	fetchServerDashboard,
 	fetchServerSessions,
@@ -28,6 +29,10 @@ function onServerProject<T>(
 }
 
 export function registerServerWorkspaceHandlers(): void {
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_WORKSPACE_COMPARE,
+		onServerProject(fetchServerComparison),
+	);
 	ipcMain.handle(
 		IPC_CHANNELS.SERVER_WORKSPACE_COSTS,
 		onServerProject(fetchServerCostSummary),
