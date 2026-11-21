@@ -107,6 +107,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 		} else {
 			localStorage.removeItem(LAST_SELECTED_PROJECT_KEY);
 		}
+		// Selecting a project that has a tab brings that tab forward: the views
+		// read either id, and two different ids showed one project's tab over
+		// another project's data.
+		const state = get();
+		if (
+			projectId &&
+			projectId !== state.activeProjectId &&
+			state.openProjectIds.includes(projectId)
+		) {
+			set({ selectedProjectId: projectId, activeProjectId: projectId });
+			saveTabStateToMain();
+			return;
+		}
 		set({ selectedProjectId: projectId });
 	},
 
@@ -169,6 +182,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 				tabOrder: newTabOrder,
 				activeProjectId: projectId,
 			});
+			// The new tab is the project every view shows (see selectProject).
+			get().selectProject(projectId);
 
 			// Save to main process (debounced)
 			saveTabStateToMain();
@@ -197,6 +212,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 			tabOrder: newTabOrder,
 			activeProjectId: newActiveProjectId,
 		});
+		// Closing the shown tab hands the views to the tab now shown: views that
+		// read `selectedProjectId` kept showing the closed project (its pull
+		// requests under another project's tab).
+		if (newActiveProjectId !== state.activeProjectId) {
+			get().selectProject(newActiveProjectId);
+		}
 
 		// Save to main process (debounced)
 		saveTabStateToMain();
@@ -344,28 +365,22 @@ export async function loadProjects(): Promise<void> {
 		}
 		if (result.success && result.data) {
 			store.setProjects(result.data);
-			// Restore selected project from localStorage if available, fallback to activeProjectId from tab state
+			// The restored active tab is the selected project; the last selection
+			// saved on this machine only counts when no tab is active.
+			const restoredActiveId = useProjectStore.getState().activeProjectId;
 			const lastSelectedProjectId = localStorage.getItem(
 				LAST_SELECTED_PROJECT_KEY,
 			);
-			if (lastSelectedProjectId) {
-				const lastSelectedProject = result.data.find(
-					(p) => p.id === lastSelectedProjectId,
-				);
-				if (lastSelectedProject) {
-					store.selectProject(lastSelectedProjectId);
-				}
-			} else {
-				// localStorage is empty (e.g. fresh userData directory) — fall back to tab state activeProjectId
-				const activeProjectId = useProjectStore.getState().activeProjectId;
-				if (activeProjectId) {
-					const activeProject = result.data.find(
-						(p) => p.id === activeProjectId,
-					);
-					if (activeProject) {
-						store.selectProject(activeProjectId);
-					}
-				}
+			if (
+				restoredActiveId &&
+				result.data.some((p) => p.id === restoredActiveId)
+			) {
+				store.selectProject(restoredActiveId);
+			} else if (
+				lastSelectedProjectId &&
+				result.data.some((p) => p.id === lastSelectedProjectId)
+			) {
+				store.selectProject(lastSelectedProjectId);
 			}
 		} else if (!result.success) {
 			store.setError(result.error || "Erreur lors du chargement des projets.");

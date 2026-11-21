@@ -104,11 +104,19 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
  * @param state - Filter state (open/closed/all)
  * @param fetchAll - If true, fetches all issues (for search). Default: false (paginated)
  */
+/**
+ * The latest list request: an answer to an older one (another project, another
+ * filter) arrives late and must not replace what the view asked for since.
+ */
+let latestIssuesRequest = 0;
+
 export async function loadGitHubIssues(
 	projectId: string,
 	state?: IssueFilterState,
 	fetchAll: boolean = false,
 ): Promise<void> {
+	const request = ++latestIssuesRequest;
+	const isLatest = () => request === latestIssuesRequest;
 	const store = useIssuesStore.getState();
 	// setError also clears the loading flag, so it goes first.
 	store.setError(null);
@@ -122,6 +130,7 @@ export async function loadGitHubIssues(
 			1,
 			fetchAll,
 		);
+		if (!isLatest()) return;
 		if (result.success && result.data) {
 			store.setIssues(result.data.issues);
 			store.setHasMore(result.data.hasMore);
@@ -132,13 +141,14 @@ export async function loadGitHubIssues(
 			);
 		}
 	} catch (error) {
+		if (!isLatest()) return;
 		store.setError(
 			error instanceof Error
 				? error.message
 				: i18n.t("common:githubIssues.unknownError"),
 		);
 	} finally {
-		store.setLoading(false);
+		if (isLatest()) store.setLoading(false);
 	}
 }
 
@@ -158,6 +168,7 @@ export async function loadMoreGitHubIssues(
 
 	// Capture filter state at request start to detect if it changes during the async call
 	const originalFilterState = store.filterState;
+	const originalRequest = latestIssuesRequest;
 	const nextPage = store.currentPage + 1;
 
 	store.setLoadingMore(true);
@@ -173,7 +184,10 @@ export async function loadMoreGitHubIssues(
 		// Verify filter state hasn't changed during the async operation
 		// This prevents appending stale data from a different filter
 		const currentState = useIssuesStore.getState();
-		if (currentState.filterState !== originalFilterState) {
+		if (
+			currentState.filterState !== originalFilterState ||
+			originalRequest !== latestIssuesRequest
+		) {
 			// Filter changed while loading - discard results
 			return;
 		}

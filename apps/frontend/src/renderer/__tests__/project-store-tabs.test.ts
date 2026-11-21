@@ -220,6 +220,94 @@ describe("Project Store Tab Management", () => {
 		});
 	});
 
+	// Views read either `activeProjectId` or `selectedProjectId`: when the two
+	// differed, the PR view showed another project's pull requests under the
+	// tab of the project shown.
+	describe("the selected project is the active tab", () => {
+		const ids = () => {
+			const { activeProjectId, selectedProjectId } = useProjectStore.getState();
+			return { activeProjectId, selectedProjectId };
+		};
+
+		it("follows a newly opened tab", () => {
+			useProjectStore.setState({
+				openProjectIds: ["workpilot"],
+				activeProjectId: "workpilot",
+				selectedProjectId: "workpilot",
+				tabOrder: ["workpilot"],
+			});
+
+			useProjectStore.getState().openProjectTab("dotnet");
+
+			expect(ids()).toEqual({ activeProjectId: "dotnet", selectedProjectId: "dotnet" });
+		});
+
+		it("follows the tab shown after closing the active one", () => {
+			useProjectStore.setState({
+				openProjectIds: ["workpilot", "dotnet", "lettra"],
+				activeProjectId: "workpilot",
+				selectedProjectId: "workpilot",
+				tabOrder: ["workpilot", "dotnet", "lettra"],
+			});
+
+			useProjectStore.getState().closeProjectTab("workpilot");
+
+			expect(ids()).toEqual({ activeProjectId: "dotnet", selectedProjectId: "dotnet" });
+		});
+
+		it("is cleared with the last tab", () => {
+			useProjectStore.setState({
+				openProjectIds: ["dotnet"],
+				activeProjectId: "dotnet",
+				selectedProjectId: "dotnet",
+				tabOrder: ["dotnet"],
+			});
+
+			useProjectStore.getState().closeProjectTab("dotnet");
+
+			expect(ids()).toEqual({ activeProjectId: null, selectedProjectId: null });
+		});
+
+		it("keeps the shown tab when another tab closes", () => {
+			useProjectStore.setState({
+				openProjectIds: ["workpilot", "dotnet"],
+				activeProjectId: "dotnet",
+				selectedProjectId: "dotnet",
+				tabOrder: ["workpilot", "dotnet"],
+			});
+
+			useProjectStore.getState().closeProjectTab("workpilot");
+
+			expect(ids()).toEqual({ activeProjectId: "dotnet", selectedProjectId: "dotnet" });
+		});
+
+		it("brings forward the tab of a project selected elsewhere", () => {
+			useProjectStore.setState({
+				openProjectIds: ["workpilot", "dotnet"],
+				activeProjectId: "workpilot",
+				selectedProjectId: "workpilot",
+				tabOrder: ["workpilot", "dotnet"],
+			});
+
+			useProjectStore.getState().selectProject("dotnet");
+
+			expect(ids()).toEqual({ activeProjectId: "dotnet", selectedProjectId: "dotnet" });
+		});
+
+		it("leaves the tabs alone for a project that has none", () => {
+			useProjectStore.setState({
+				openProjectIds: ["workpilot"],
+				activeProjectId: "workpilot",
+				selectedProjectId: "workpilot",
+				tabOrder: ["workpilot"],
+			});
+
+			useProjectStore.getState().selectProject("lettra");
+
+			expect(ids()).toEqual({ activeProjectId: "workpilot", selectedProjectId: "lettra" });
+		});
+	});
+
 	describe("reorderTabs", () => {
 		it("should reorder tabs by moving from index to index", () => {
 			useProjectStore.setState({
