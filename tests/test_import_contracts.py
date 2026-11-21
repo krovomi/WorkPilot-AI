@@ -52,8 +52,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "dependency_guard": {"foundation"},
     # The watch after a deployment (docs/architecture/deploy-watch.md): git and
     # atomic writes through foundation, the strict offline policy. A leaf the
-    # deploy watch runner calls.
-    "deploy_watch": {"foundation", "offline_policy"},
+    # deploy watch runner calls. Its incident report asks the project's model
+    # through the agent_runtime port, with the metrics fenced by
+    # security.untrusted; the revert PR's forge is handed in by the runner.
+    "deploy_watch": {"agent_runtime", "foundation", "offline_policy", "security"},
     # The API contract watcher (docs/architecture/api-contract-watcher.md):
     # git through foundation; the consumer registry is read in the main
     # checkout (security.guardrail_policy.main_project). Its QA gate is in qa,

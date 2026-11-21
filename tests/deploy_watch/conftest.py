@@ -37,3 +37,11 @@ class FakeFetch:
 @pytest.fixture
 def fake_fetch():
     return FakeFetch
+
+
+@pytest.fixture(autouse=True)
+def no_model(monkeypatch):
+    """No test reaches a real provider: the incident report's model answers ""."""
+    import deploy_watch.incident as incident
+
+    monkeypatch.setattr(incident, "_port_ask", lambda *a: "")
