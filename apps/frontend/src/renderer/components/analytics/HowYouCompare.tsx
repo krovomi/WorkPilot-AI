@@ -60,11 +60,12 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 	const { t } = useTranslation("analytics");
 	const [comparison, setComparison] = useState<BuildComparison | null>(null);
 	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	// Set whenever loading ends without a comparison.
+	const [error, setError] = useState("");
 
 	const load = useCallback(async () => {
 		setLoading(true);
-		setError(null);
+		setError("");
 		try {
 			const result = await loadBuildComparison(projectPath, serverProjectId);
 			if (result.success && result.data) setComparison(result.data);
@@ -85,7 +86,7 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 		return (
 			<EmptyStage
 				icon={AlertTriangle}
-				title={error ?? t("compare.error")}
+				title={error}
 				tone="red"
 				action={
 					<CharterButton icon={RefreshCw} onClick={load}>
