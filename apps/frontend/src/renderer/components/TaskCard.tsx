@@ -81,6 +81,7 @@ import {
 	type MenuPoint,
 } from "./kanban/PointerMenu";
 import { TaskCardMenus } from "./kanban/TaskCardMenus";
+import { InlineTitleEditor } from "./kanban/InlineTitleEditor";
 import { TaskPermissionPrompt } from "./task-permission/TaskPermissionPrompt";
 import { SyncFromBranchDialog } from "./task-detail/task-review/SyncFromBranchDialog";
 import { Badge } from "./ui/badge";
@@ -94,6 +95,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { resolveCardType } from "../../shared/constants/card-types";
 import { installCardTypeStylesheet } from "../lib/card-type-tokens";
 import { useHoverPreview } from "../hooks/useHoverPreview";
+import { useInlineRename } from "../hooks/useInlineRename";
 import { useKanbanBlockerStore } from "../stores/kanban-blocker-store";
 import { useKanbanConflictStore } from "../stores/kanban-conflict-store";
 
@@ -1267,6 +1269,13 @@ export const TaskCard = memo(function TaskCard({
 		}
 		return stripped;
 	}, [task.title, t]);
+	const rename = useInlineRename({
+		task,
+		// An agent at work owns the title; an error title carries a suffix.
+		canRename: !(isRunning && !isStuck) && !task.title.endsWith(JSON_ERROR_TITLE_SUFFIX),
+		onOpen: onClick,
+		focusCard: () => (cardRef.current as HTMLDivElement).focus(),
+	});
 
 	// Memoize relative time (recalculates only when updatedAt changes)
 	const relativeTime = useMemo(
@@ -1378,6 +1387,8 @@ export const TaskCard = memo(function TaskCard({
 				return; // Don't open the task if clicking in the delete area
 			}
 		}
+		// A click on the title may be the first of a double-click (rename).
+		if (rename.onTitleClick(e)) return;
 		// Open task details on click
 		onClick();
 	};
@@ -1408,7 +1419,7 @@ export const TaskCard = memo(function TaskCard({
 		(s) => (s.blockers[task.id]?.pending.length ?? 0) > 0,
 	);
 	const isFaded = !!cardType && (cardType.proposed || task.status === "done");
-	const preview = useHoverPreview(!showSyncDialog && !menuAt && !isEditOpen);
+	const preview = useHoverPreview(!showSyncDialog && !menuAt && !isEditOpen && !rename.isRenaming);
 	useEffect(() => {
 		installCardTypeStylesheet();
 	}, []);
@@ -1433,7 +1444,10 @@ export const TaskCard = memo(function TaskCard({
 				// Only the card itself: a key typed in one of its buttons, menus
 				// or dialogs is theirs.
 				if (e.target !== e.currentTarget) return;
-				if (e.key === "Enter" || e.key === " ") {
+				if (e.key === "F2") {
+					e.preventDefault();
+					rename.start();
+				} else if (e.key === "Enter" || e.key === " ") {
 					e.preventDefault();
 					onClick();
 				}
@@ -1541,17 +1555,22 @@ export const TaskCard = memo(function TaskCard({
 						{/* Server card: whose claim holds it (server mode) */}
 						<TaskLockBadge taskId={task.id} className="ml-1" />
 
-						{/* Title - full width, no wrapper */}
-						<h3
-							className={cn(
-								"mt-1 font-semibold text-sm text-foreground line-clamp-2 leading-snug",
-								// Leave room for the hover-only delete cross.
-								onDelete && "pr-5",
-							)}
-							title={displayTitle}
-						>
-							{displayTitle}
-						</h3>
+						{/* Title - full width, no wrapper; double-click or F2 renames */}
+						{rename.isRenaming ? (
+							<InlineTitleEditor initial={displayTitle} onDone={rename.finish} />
+						) : (
+							<h3
+								data-card-title
+								className={cn(
+									"mt-1 font-semibold text-sm text-foreground line-clamp-2 leading-snug",
+									// Leave room for the hover-only delete cross.
+									onDelete && "pr-5",
+								)}
+								title={displayTitle}
+							>
+								{displayTitle}
+							</h3>
+						)}
 
 						{/* Description - sanitized to handle markdown content (memoized) */}
 						{sanitizedDescription && (

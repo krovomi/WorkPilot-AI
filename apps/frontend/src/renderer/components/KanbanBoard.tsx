@@ -54,7 +54,6 @@ import { useToast } from "../hooks/use-toast";
 import { useVisibleKanbanColumns } from "../hooks/useVisibleKanbanColumns";
 import { useBoardBulkEdits } from "../hooks/useBoardBulkEdits";
 import { useBoardSelection } from "../hooks/useBoardSelection";
-import { useBoardShortcuts } from "../hooks/useBoardShortcuts";
 import { isLightCard, recordMoves } from "../lib/card-edits";
 import { usePendingDeleteStore } from "../stores/pending-delete-store";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
@@ -117,6 +116,7 @@ import { BulkPRDialog } from "./BulkPRDialog";
 import { formatCost } from "./formula-lab/formula-utils";
 import { JiraSidePanel } from "./jira-import/JiraSidePanel";
 import { KanbanToolbar } from "./kanban/KanbanToolbar";
+import { BoardKeyboard } from "./kanban/BoardKeyboard";
 import { BoardSelectionContext } from "./kanban/board-selection-context";
 import { BulkActionBar } from "./kanban/BulkActionBar";
 import { deleteCardsLater } from "./kanban/deleteCardsLater";
@@ -751,13 +751,6 @@ export function KanbanBoard({
 		}),
 		[selectedTaskIds, bulkEdits, deselectAllTasks],
 	);
-	useBoardShortcuts({
-		onSelectColumn: selectAllTasks,
-		hasSelection: selectedTaskIds.size > 0,
-		onClearSelection: deselectAllTasks,
-		onDeleteSelection: bulkEdits.deleteSelection,
-		onUndo: bulkEdits.undo,
-	});
 
 	// Open BulkPRDialog after user confirms "mark as done" for human_review tasks
 	const handleBulkMarkDoneConfirm = useCallback(() => {
@@ -2615,7 +2608,14 @@ export function KanbanBoard({
 					) : null}
 				</DragOverlay>
 			</DndContext>
-
+			<BoardKeyboard
+				onSelectColumn={selectAllTasks}
+				hasSelection={selectedTaskIds.size > 0}
+				onClearSelection={deselectAllTasks}
+				onDeleteSelection={bulkEdits.deleteSelection}
+				onUndo={bulkEdits.undo}
+				announce={announce}
+			/>
 			{selectedTaskIds.size > 0 && (
 				<BulkActionBar
 					count={selectedTaskIds.size}

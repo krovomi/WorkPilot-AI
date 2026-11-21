@@ -167,7 +167,8 @@ describe("SortableTaskCard — card", () => {
 		const onClick = vi.fn();
 		const task = makeTask();
 		const { rerender } = render(board([task], {}, onClick));
-		fireEvent.click(screen.getByRole("heading", { name: "Add login page" }));
+		// The card, not its title: a click on a title waits for a double-click.
+		fireEvent.click(screen.getByRole("option", { name: "Add login page" }));
 		expect(onClick).toHaveBeenCalledTimes(1);
 
 		// The same props again: the card stays as it is.
@@ -178,7 +179,7 @@ describe("SortableTaskCard — card", () => {
 		expect(
 			screen.getByRole("heading", { name: "Add sign-in page" }),
 		).toBeInTheDocument();
-		fireEvent.click(screen.getByRole("heading", { name: "Add sign-in page" }));
+		fireEvent.click(screen.getByRole("option", { name: "Add sign-in page" }));
 		expect(onClick).toHaveBeenCalledTimes(2);
 	});
 

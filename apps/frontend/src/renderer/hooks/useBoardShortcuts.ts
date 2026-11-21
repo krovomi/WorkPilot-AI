@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { ARROW_DIRECTIONS, type CardFocus, moveCardFocus } from "../lib/card-focus";
 import { isTypingTarget, keyboardIsOwned } from "./useQuickAddShortcut";
 
 interface BoardShortcuts {
@@ -11,12 +12,16 @@ interface BoardShortcuts {
 	onDeleteSelection: () => void;
 	/** Ctrl/Cmd+Z. */
 	onUndo: () => void;
+	/** Ctrl/Cmd+/ or ?: the list of the board's keys. */
+	onShowShortcuts: () => void;
+	/** An arrow key moved the focus to another card. */
+	onCardFocus: (focus: CardFocus) => void;
 }
 
 const COLUMN = "[data-column-status]";
 
 /**
- * The board's selection and undo keys. Never while typing, nor while a
+ * The board's keys: arrows between cards, selection, undo, help. Never while typing, nor while a
  * dialog or a menu owns the keyboard; Ctrl and Cmd both count, so the keys
  * read the same on every platform.
  */
@@ -37,7 +42,17 @@ export function useBoardShortcuts(shortcuts: BoardShortcuts): void {
 			const current = latest.current;
 			const command = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey;
 			const key = e.key.toLowerCase();
-			if (command && key === "a") {
+			const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
+			const direction = ARROW_DIRECTIONS[e.key];
+			if (direction && plain && !e.shiftKey) {
+				const focus = moveCardFocus(e.target, direction);
+				if (!focus) return;
+				e.preventDefault();
+				current.onCardFocus(focus);
+			} else if ((key === "/" && (e.ctrlKey || e.metaKey)) || (key === "?" && plain)) {
+				e.preventDefault();
+				current.onShowShortcuts();
+			} else if (command && key === "a") {
 				const focused = (e.target as Element | null)?.closest?.(COLUMN);
 				const status =
 					focused?.getAttribute("data-column-status") ?? pointerColumn.current;

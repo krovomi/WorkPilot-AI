@@ -8,6 +8,8 @@ function Board({ hasSelection = false, ...handlers }: Partial<Parameters<typeof 
 		onClearSelection: vi.fn(),
 		onDeleteSelection: vi.fn(),
 		onUndo: vi.fn(),
+		onShowShortcuts: vi.fn(),
+		onCardFocus: vi.fn(),
 		...handlers,
 		hasSelection,
 	};
@@ -19,6 +21,12 @@ function Board({ hasSelection = false, ...handlers }: Partial<Parameters<typeof 
 			</div>
 			<div data-column-status="queue">
 				<span>in queue</span>
+				<div data-task-id="q1">
+					<div role="option" aria-selected={false} className="kanban-card" tabIndex={0} aria-label="First" />
+				</div>
+				<div data-task-id="q2">
+					<div role="option" aria-selected={false} className="kanban-card" tabIndex={0} aria-label="Second" />
+				</div>
 			</div>
 			<input aria-label="search" />
 		</div>
@@ -31,6 +39,8 @@ function setup(props: Partial<Parameters<typeof useBoardShortcuts>[0]> = {}) {
 		onClearSelection: vi.fn(),
 		onDeleteSelection: vi.fn(),
 		onUndo: vi.fn(),
+		onShowShortcuts: vi.fn(),
+		onCardFocus: vi.fn(),
 	};
 	render(<Board {...handlers} {...props} />);
 	return handlers;
@@ -94,5 +104,35 @@ describe("useBoardShortcuts", () => {
 		expect(handlers.onDeleteSelection).not.toHaveBeenCalled();
 		expect(handlers.onUndo).not.toHaveBeenCalled();
 		expect(handlers.onClearSelection).not.toHaveBeenCalled();
+	});
+
+	it("opens the help on Ctrl/Cmd+/ and on ?, not on / or Ctrl+?", () => {
+		const handlers = setup();
+		fireEvent.keyDown(document.body, { key: "/", ctrlKey: true });
+		fireEvent.keyDown(document.body, { key: "/", metaKey: true, shiftKey: true });
+		fireEvent.keyDown(document.body, { key: "?", shiftKey: true });
+		fireEvent.keyDown(document.body, { key: "/" });
+		fireEvent.keyDown(document.body, { key: "?", ctrlKey: true });
+		expect(handlers.onShowShortcuts).toHaveBeenCalledTimes(3);
+	});
+
+	it("moves the focus between cards with the plain arrows", () => {
+		const handlers = setup();
+		const [first, second] = document.querySelectorAll<HTMLElement>(".kanban-card");
+		fireEvent.keyDown(first, { key: "ArrowDown", shiftKey: true });
+		fireEvent.keyDown(first, { key: "ArrowDown", altKey: true });
+		expect(handlers.onCardFocus).not.toHaveBeenCalled();
+		const down = fireEvent.keyDown(first, { key: "ArrowDown" });
+		expect(down).toBe(false);
+		expect(document.activeElement).toBe(second);
+		expect(handlers.onCardFocus).toHaveBeenCalledWith({
+			title: "Second",
+			position: 2,
+			count: 2,
+			status: "queue",
+		});
+		// At the edge: nothing moves and the key is left alone.
+		expect(fireEvent.keyDown(second, { key: "ArrowDown" })).toBe(true);
+		expect(handlers.onCardFocus).toHaveBeenCalledTimes(1);
 	});
 });
