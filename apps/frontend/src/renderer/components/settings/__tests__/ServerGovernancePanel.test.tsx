@@ -148,6 +148,27 @@ describe("ServerGovernancePanel", () => {
 		}
 	});
 
+	it("says why an action failed even when the server gave no reason", async () => {
+		api.getServerGovernance.mockResolvedValue({
+			success: true,
+			data: { ...report, pending: [{ ...report.pending[0], tool: null }] },
+		});
+		api.answerServerGovernanceRequest.mockResolvedValue({ success: false });
+		api.stopServerProjectAgents.mockResolvedValue({ success: false });
+		api.exportServerPolicyAudit.mockResolvedValue({ success: false });
+		render(<ServerGovernancePanel projectId="p-1" />);
+		expect(await screen.findByTestId("governance-request")).toHaveTextContent("infra/net.tf");
+		expect(screen.getByTestId("governance-request")).not.toHaveTextContent("Write ·");
+
+		fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+		expect(await screen.findByRole("alert")).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "Stop my agents" }));
+		await waitFor(() => expect(api.stopServerProjectAgents).toHaveBeenCalledTimes(1));
+		fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
+		await waitFor(() => expect(api.exportServerPolicyAudit).toHaveBeenCalledWith("p-1", "json"));
+		expect(screen.getByRole("alert")).toBeInTheDocument();
+	});
+
 	it("says when the server cannot be read", async () => {
 		api.getServerGovernance.mockResolvedValue({ success: false, error: "Missing permission: audit.read" });
 		render(<ServerGovernancePanel projectId="p-1" />);
@@ -180,5 +201,44 @@ describe("the Guardrails page of a server project", () => {
 	it("does the same inside the settings dialog", async () => {
 		render(<GuardrailsSettings />);
 		expect(await screen.findByTestId("server-governance-panel")).toBeInTheDocument();
+	});
+});
+
+describe("the Guardrails page of a project of this computer", () => {
+	const localProject = { id: "l-1", name: "Mine", path: "/home/me/mine" } as unknown as Project;
+	const local = {
+		loadGuardrails: vi.fn(async () => ({ version: 1, rules: [] })),
+		validateGuardrails: vi.fn(async () => null),
+		getGuardrailActivity: vi.fn(async () => null),
+		getGovernanceReport: vi.fn(async () => ({
+			governance: null,
+			errors: [],
+			sources: [],
+			tokensLastHour: 0,
+			events: [],
+			metrics: { blocked24h: 0, breakerTrips7d: 0 },
+		})),
+	};
+
+	beforeEach(() => {
+		Object.assign(window, { electronAPI: { ...api, ...local } });
+	});
+
+	it("keeps the rules editor, and asks the server nothing", async () => {
+		useProjectStore.setState({ projects: [localProject], activeProjectId: "l-1" } as never);
+		render(<GuardrailsView />);
+		await waitFor(() => expect(local.loadGuardrails).toHaveBeenCalledWith("/home/me/mine"));
+		expect(screen.getAllByRole("button", { name: "Add rule" }).length).toBeGreaterThan(0);
+		expect(screen.queryByTestId("server-governance-panel")).not.toBeInTheDocument();
+		expect(api.getServerGovernance).not.toHaveBeenCalled();
+	});
+
+	it("asks for a project when none is open", () => {
+		useProjectStore.setState({ projects: [], activeProjectId: null } as never);
+		render(<GuardrailsView />);
+		render(<GuardrailsSettings />);
+		expect(screen.getAllByText("Select a project to manage its guardrails.").length).toBe(2);
+		expect(screen.queryByTestId("server-governance-panel")).not.toBeInTheDocument();
+		expect(api.getServerGovernance).not.toHaveBeenCalled();
 	});
 });

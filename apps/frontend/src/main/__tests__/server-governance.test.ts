@@ -90,7 +90,7 @@ describe("the report of a server project", () => {
 				loopDetection: { maxSameToolCall: 5 },
 			},
 			errors: ["x".repeat(900)],
-			sources: [{ layer: "repository", path: "workpilot.policy.yaml", rules: 2 }, "junk"],
+			sources: [{ layer: "repository", path: "workpilot.policy.yaml", rules: 2 }, "junk", { rules: "2" }],
 			tokensLastHour: 1234,
 			events: [{ id: "e", at: "t", decision: "approved", rules: [], approvedBy: "Ada <u-1>" }],
 			metrics: { blocked24h: 2, breakerTrips7d: 1 },
@@ -106,7 +106,10 @@ describe("the report of a server project", () => {
 		expect(report?.governance?.budget).toEqual({ maxTokensPerHour: 500000, maxTokensPerTask: null });
 		expect(report?.governance?.loopDetection).toEqual({ maxSameToolCall: 5 });
 		expect(report?.errors[0]).toHaveLength(500);
-		expect(report?.sources).toEqual([{ layer: "repository", path: "workpilot.policy.yaml", rules: 2 }]);
+		expect(report?.sources).toEqual([
+			{ layer: "repository", path: "workpilot.policy.yaml", rules: 2 },
+			{ layer: "", path: "", rules: 0 },
+		]);
 		expect(report?.events[0].approvedBy).toBe("Ada <u-1>");
 		expect(report?.pending.map((r) => r.id)).toEqual(["0123456789ab"]);
 		expect(report?.pending[0]).toMatchObject({ targetKind: "file", target: "infra/main.tf" });
