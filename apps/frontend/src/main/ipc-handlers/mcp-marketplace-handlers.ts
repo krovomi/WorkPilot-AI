@@ -18,6 +18,12 @@ import type {
 	McpBuilderProject,
 } from "../../shared/types/mcp-marketplace";
 import { appLog } from "../app-logger";
+import {
+	hasRoomForProject,
+	parseBuilderId,
+	parseBuilderProject,
+	validBuilderProjects,
+} from "./mcp-builder-args";
 import { RegistryFactsStore } from "../mcp-security/registry-facts";
 import {
 	McpSecurityRequestError,
@@ -53,7 +59,7 @@ function loadBuilderFromDisk(): McpBuilderProject[] {
 		const filePath = getBuilderProjectsPath();
 		if (fs.existsSync(filePath)) {
 			const data = fs.readFileSync(filePath, "utf-8");
-			return JSON.parse(data);
+			return validBuilderProjects(JSON.parse(data));
 		}
 	} catch (err) {
 		appLog.error("[MCP Marketplace] Failed to load builder projects:", err);
@@ -117,14 +123,20 @@ export function registerMcpMarketplaceHandlers(): void {
 	// Save builder project
 	ipcMain.handle(
 		IPC_CHANNELS.MCP_MARKETPLACE_SAVE_BUILDER,
-		async (_event, project: McpBuilderProject) => {
+		async (_event, request: unknown) => {
 			try {
+				const project = parseBuilderProject(request);
+				if (!project) {
+					return { success: false, error: "Invalid builder project" };
+				}
 				const projects = loadBuilderFromDisk();
 				const idx = projects.findIndex((p) => p.id === project.id);
 				if (idx >= 0) {
 					projects[idx] = project;
-				} else {
+				} else if (hasRoomForProject(projects.length)) {
 					projects.push(project);
+				} else {
+					return { success: false, error: "Too many builder projects" };
 				}
 				saveBuilderToDisk(projects);
 				return { success: true };
@@ -152,8 +164,12 @@ export function registerMcpMarketplaceHandlers(): void {
 	// Delete builder project
 	ipcMain.handle(
 		IPC_CHANNELS.MCP_MARKETPLACE_DELETE_BUILDER,
-		async (_event, { projectId }: { projectId: string }) => {
+		async (_event, request: unknown) => {
 			try {
+				const projectId = parseBuilderId(request);
+				if (!projectId) {
+					return { success: false, error: "Invalid builder project" };
+				}
 				let projects = loadBuilderFromDisk();
 				projects = projects.filter((p) => p.id !== projectId);
 				saveBuilderToDisk(projects);
