@@ -6,6 +6,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { isGatewayProvider } from "../../../shared/constants/gateway-providers";
 import { GatewayModelCatalog } from "./GatewayModelCatalog";
+import { GatewayRoutingOptions } from "./GatewayRoutingOptions";
 import { HubDiscoveryWithCloud } from "./HubDiscoveryWithCloud";
 import { OllamaInstalledModels } from "./OllamaInstalledModels";
 import type { ProviderConfig } from "./providerConfig";
@@ -101,6 +102,12 @@ export function ApiKeyConfigContent({
 					provider={providerId}
 					selectedModel={formData.model}
 					onSelectModel={(model) => onFormDataChange({ ...formData, model })}
+				/>
+			)}
+			{isGatewayProvider(providerId) && (
+				<GatewayRoutingOptions
+					className="pt-2 border-t border-border"
+					provider={providerId}
 				/>
 			)}
 

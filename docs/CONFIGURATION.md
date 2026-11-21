@@ -717,6 +717,11 @@ setting them by hand matters mainly for the CLI and headless runs.
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base. |
 | `HUGGINGFACE_API_KEY` | — | Hugging Face token of the `huggingface` provider, a fine-grained token with "Make calls to Inference Providers"; `HF_TOKEN` is read when it is unset. Secret. |
 | `HUGGINGFACE_BASE_URL` | `https://router.huggingface.co/v1` | Hugging Face Inference Providers router. |
+| `OPENROUTER_FALLBACK_MODELS` | — | Up to 3 OpenRouter model ids, comma-separated, tried in order when the default model fails (sent as `models`). Set from the OpenRouter page (Routing). |
+| `OPENROUTER_PROVIDER_SORT` | — | `price`, `throughput` or `latency`: order of the providers OpenRouter tries (`provider.sort`). |
+| `OPENROUTER_DATA_COLLECTION` | — | `deny`: only providers that do not store or train on prompts (`provider.data_collection`). |
+| `OPENROUTER_ZDR` | — | `1`: only zero-data-retention providers (`provider.zdr`). |
+| `HUGGINGFACE_ROUTING_POLICY` | — | `fastest` or `cheapest`: Hugging Face router policy, added to the request's model id unless it names a provider. |
 | `OPENROUTER_MODEL`, `HUGGINGFACE_MODEL` | registry default | Default model of the gateway, chosen on its provider page or with « Try in the cloud » in the Hub model search; the app sets it for the backend. |
 
 For these base URLs, agent sessions prefer the variable to the URL saved in

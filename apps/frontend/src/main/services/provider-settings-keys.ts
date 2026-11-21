@@ -6,6 +6,10 @@
  */
 import { GATEWAY_PROVIDERS, gatewayMap, gatewayProvider } from "../../shared/constants/gateway-providers";
 import {
+	type GatewayRoutingSettings,
+	gatewayRoutingEnv,
+} from "../../shared/constants/gateway-routing";
+import {
 	type ProviderDefaultModelSettings,
 	providerDefaultModel,
 } from "../../shared/utils/provider-default-model";
@@ -65,6 +69,14 @@ export function providerModelEnv(
 	const gateway = gatewayProvider(provider);
 	if (gateway) return { [gateway.modelEnvVar]: model };
 	return { OLLAMA_MODEL: model, LOCAL_LLM_MODEL: model };
+}
+
+/** What the provider page hands the backend: its model and, for a gateway, its routing. */
+export function providerPageEnv(
+	provider: string,
+	settings: (ProviderDefaultModelSettings & GatewayRoutingSettings) | undefined,
+): Record<string, string> {
+	return { ...providerModelEnv(provider, settings), ...gatewayRoutingEnv(provider, settings) };
 }
 
 /** Providers that run on an API key of their own, not on Claude's sign-in. */

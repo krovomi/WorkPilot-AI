@@ -264,6 +264,7 @@ from core.mcp_pinning import custom_servers as _custom_servers
 from core.mcp_pinning import pinned_servers
 from docintel.read_guard import make_read_guard_hook
 from gateway_providers import BASE_URLS as GATEWAY_BASE_URLS
+from gateway_routing import gateway_routing_params
 from harness.application.budget import session_budget_usd
 from harness.application.subagents import (
     SUBAGENT_TOOLS,
@@ -2788,10 +2789,7 @@ def _compatible_client(req: _ClientRequest):
     logger.info(
         "[create_agent_client] Using CompatibleProviderAgentClient "
         "(provider=%s, model=%s, agent_type=%s, effort=%s)",
-        provider,
-        req.model,
-        req.agent_type,
-        effort_params,
+        *(provider, req.model, req.agent_type, effort_params),
     )
     cache = compatible_cache_routing(provider, req.spec_dir, req.agent_type)
     return CompatibleProviderAgentClient(
@@ -2802,6 +2800,7 @@ def _compatible_client(req: _ClientRequest):
         effort_params=effort_params,
         prompt_cache_key=cache.body_key,
         cache_headers=cache.headers,
+        routing_params=gateway_routing_params(provider, req.model),
         system_prompt=req.prompt(tool_use_hint=True),
         project_dir=str(req.project_dir),
         agent_type=req.agent_type,
