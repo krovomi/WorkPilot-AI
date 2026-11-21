@@ -240,7 +240,9 @@
 			"checkTerminal": "Check the Agent Terminals section in the sidebar to complete OAuth login.",
 			"authStartFailed": "Failed to start authentication",
 			"addProfileFailed": "Failed to add profile",
-			"tryAgain": "Please try again."
+			"tryAgain": "Please try again.",
+			"autoSwitchFailed": "Failed to save the auto-switch setting",
+			"switchFailed": "Failed to switch account"
 		},
 		"sdk": {
 			"title": "AI Rate Limit",
@@ -917,7 +919,14 @@
 		"stopping": "Stopping...",
 		"progress": "Progress",
 		"lastActivityPrefix": "last activity",
-		"lastProgressUpdateTooltip": "Last progress update received"
+		"lastProgressUpdateTooltip": "Last progress update received",
+		"timeAgo": {
+			"justNow": "just now",
+			"seconds": "{{count}}s ago",
+			"minutes": "{{count}}m ago",
+			"hours": "{{count}}h ago",
+			"days": "{{count}}d ago"
+		}
 	},
 	"time": {
 		"justNow": "just now",
@@ -1302,6 +1311,9 @@
 		"title": "Chat History",
 		"byTeammate": "By {{name}}, read only",
 		"noConversations": "No conversations yet",
+		"titleInputLabel": "Conversation title",
+		"renameFailed": "The conversation could not be renamed.",
+		"deleteFailed": "The conversation could not be deleted.",
 		"today": "Today",
 		"yesterday": "Yesterday",
 		"daysAgo": "{{count}} days ago",

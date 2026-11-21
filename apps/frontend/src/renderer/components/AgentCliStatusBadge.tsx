@@ -15,7 +15,6 @@ import {
 	ACP_AGENT_ARGS,
 	type AcpAgentDeclaration,
 	AGENT_CLI_DOCS,
-	AGENT_CLI_EXECUTABLES,
 	AGENT_CLI_INSTALL,
 	type AgentCliInstallResult,
 	type AgentCliStatus,
@@ -62,18 +61,15 @@ function AcpDeclarationList({ tool }: { readonly tool: AgentCliTool }) {
 
 	useEffect(() => {
 		let cancelled = false;
-		const probe = globalThis.electronAPI?.probeAcpAgent;
-		if (!probe) {
-			setAnswer({ tool, error: "failed" });
-			return;
-		}
-		probe(tool)
-			.then((result) => {
-				if (!cancelled) setAnswer(result);
-			})
-			.catch(() => {
-				if (!cancelled) setAnswer({ tool, error: "failed" });
-			});
+		(async () => {
+			let declaration: AcpAgentDeclaration;
+			try {
+				declaration = await globalThis.electronAPI.probeAcpAgent(tool);
+			} catch {
+				declaration = { tool, error: "failed" };
+			}
+			if (!cancelled) setAnswer(declaration);
+		})();
 		return () => {
 			cancelled = true;
 		};
@@ -123,11 +119,11 @@ function installCommandHint(tool: AgentCliTool): string {
 	if (recipe.npmPackage) {
 		return ["npm install -g", ...(recipe.npmArgs ?? []), recipe.npmPackage].join(" ");
 	}
-	const isWindows = globalThis.navigator?.userAgent?.includes("Windows") ?? false;
+	const isWindows = globalThis.navigator.userAgent.includes("Windows");
 	if (isWindows && recipe.windowsScript) return `irm ${recipe.windowsScript} | iex`;
-	return recipe.unixScript
-		? `curl -fsSL ${recipe.unixScript.url} | ${recipe.unixScript.shell}`
-		: "";
+	// A recipe without an npm package always has a vendor script.
+	const script = recipe.unixScript as NonNullable<typeof recipe.unixScript>;
+	return `curl -fsSL ${script.url} | ${script.shell}`;
 }
 
 interface AgentCliStatusBadgeProps {
@@ -166,13 +162,8 @@ export function AgentCliStatusBadge({
 
 	const refresh = useCallback(async () => {
 		setResult(null);
-		const check = globalThis.electronAPI?.checkAgentCli;
-		if (!check) {
-			setResult({ tool, installed: false });
-			return;
-		}
 		try {
-			setResult(await check(tool));
+			setResult(await globalThis.electronAPI.checkAgentCli(tool));
 		} catch (err) {
 			setResult({
 				tool,
@@ -187,13 +178,11 @@ export function AgentCliStatusBadge({
 	}, [refresh]);
 
 	const install = useCallback(async () => {
-		const run = globalThis.electronAPI?.installAgentCli;
-		if (!run) return;
 		setIsInstalling(true);
 		setInstallError(null);
 		let answer: AgentCliInstallResult;
 		try {
-			answer = await run(tool);
+			answer = await globalThis.electronAPI.installAgentCli(tool);
 		} catch (err) {
 			answer = {
 				tool,
@@ -204,7 +193,9 @@ export function AgentCliStatusBadge({
 		} finally {
 			setIsInstalling(false);
 		}
+		// Without the check run after the install, the badge checks again itself.
 		if (answer.status) setResult(answer.status);
+		else void refresh();
 		if (answer.success) {
 			refreshProviderModelCatalog(tool);
 			return;
@@ -213,7 +204,6 @@ export function AgentCliStatusBadge({
 			name,
 		});
 		setInstallError(answer.detail ? `${message}\n${answer.detail}` : message);
-		if (!answer.status) void refresh();
 	}, [tool, name, t, refresh]);
 
 	const status = toBadgeStatus(result);
@@ -260,7 +250,6 @@ export function AgentCliStatusBadge({
 		onPresenceChange,
 		status === "loading" ? null : missing ? "missing" : "installed",
 	);
-	const canInstall = Boolean(globalThis.electronAPI?.installAgentCli);
 
 	return (
 		<Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -295,7 +284,7 @@ export function AgentCliStatusBadge({
 										{version ? ` (${version})` : ""}
 									</span>
 									{outdated && <CliUpdateChip isUpdating={updates.isUpdating} />}
-									{missing && canInstall && (
+									{missing && (
 										<span className="ml-auto text-3xs bg-primary/15 text-primary px-1.5 py-0.5 rounded flex items-center gap-1">
 											{isInstalling && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
 											{isInstalling
@@ -346,18 +335,14 @@ export function AgentCliStatusBadge({
 
 					{missing && (
 						<div className="text-xs p-2 bg-muted/50 rounded-md text-muted-foreground space-y-1">
-							<p>
-								{canInstall
-									? t("navigation:agentCli.install.description", { name })
-									: t("navigation:agentCli.notInstalledDescription", { name })}
-							</p>
+							<p>{t("navigation:agentCli.install.description", { name })}</p>
 							<p className="font-mono bg-muted px-1 rounded break-all">
-								{canInstall ? installCommandHint(tool) : AGENT_CLI_EXECUTABLES[tool]}
+								{installCommandHint(tool)}
 							</p>
 						</div>
 					)}
 
-					{missing && canInstall && (
+					{missing && (
 						<Button
 							size="sm"
 							className="w-full gap-1"
@@ -409,9 +394,9 @@ export function AgentCliStatusBadge({
 						variant="link"
 						size="sm"
 						className="w-full text-xs text-muted-foreground gap-1"
-						onClick={() =>
-							globalThis.electronAPI?.openExternal?.(AGENT_CLI_DOCS[tool])
-						}
+						onClick={() => {
+							void globalThis.electronAPI.openExternal(AGENT_CLI_DOCS[tool]);
+						}}
 					>
 						{t("navigation:agentCli.viewDocs", { name })}
 						<ExternalLink className="h-3 w-3" />

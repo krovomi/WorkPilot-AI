@@ -2,7 +2,7 @@
  * Tiny widget that turns a token count into a localized cost estimate
  * for the active provider/model.
  *
- * - USD ↔ EUR conversion uses the same `getEurRate` helper as `CostEstimator.tsx`.
+ * - USD ↔ EUR conversion uses the cached rate of `getEurRate` (`_use-eur-rate.ts`).
  * - When the model is on a flat-rate plan (Cursor / Windsurf / Copilot / Ollama),
  *   we explicitly say so instead of pretending the cost is $0.00.
  * - When pricing is unknown for the (provider, model) pair we surface that
@@ -10,17 +10,19 @@
  */
 
 import { Info } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useActiveModel } from "../../hooks/useActiveModel";
-import { formatCurrency, getEurRate } from "../../lib/currency";
+import { formatCurrency } from "../../lib/currency";
 import {
 	estimateUsdCost,
 	getModelPricing,
 	isPerTokenBilled,
 } from "../../lib/model-pricing";
+import { useEurRate } from "./_use-eur-rate";
 
 interface TokenCostEstimateProps {
+	/** A budget the caller has already checked: whole and positive. */
 	readonly totalTokens: number;
 	/** 0–1 fraction of the budget assumed to come back as output. */
 	readonly outputRatio?: number;
@@ -35,20 +37,8 @@ export function TokenCostEstimate({
 }: TokenCostEstimateProps) {
 	const { t, i18n } = useTranslation("phase35");
 	const { provider, model } = useActiveModel();
-	const [eurRate, setEurRate] = useState(0.92);
+	const eurRate = useEurRate(i18n.language);
 
-	const isFr = i18n.language.startsWith("fr");
-
-	useEffect(() => {
-		if (!isFr) return;
-		let cancelled = false;
-		void getEurRate().then((r) => {
-			if (!cancelled) setEurRate(r);
-		});
-		return () => {
-			cancelled = true;
-		};
-	}, [isFr]);
 
 	const pricing = useMemo(() => getModelPricing(provider, model), [provider, model]);
 	const flatRate = useMemo(
@@ -88,8 +78,7 @@ export function TokenCostEstimate({
 		);
 	}
 
-	const safeTokens = Number.isFinite(totalTokens) && totalTokens > 0 ? totalTokens : 0;
-	const cost = estimateUsdCost(pricing, safeTokens, outputRatio);
+	const cost = estimateUsdCost(pricing, totalTokens, outputRatio);
 	const formatted = formatCurrency(cost.total, i18n.language, eurRate, decimals);
 	const inputFmt = formatCurrency(cost.input, i18n.language, eurRate, decimals);
 	const outputFmt = formatCurrency(cost.output, i18n.language, eurRate, decimals);

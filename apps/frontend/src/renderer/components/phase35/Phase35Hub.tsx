@@ -5,9 +5,10 @@
  * the new features without us having to thread 12 separate routes.
  */
 
-import { useState } from "react";
+import { Fragment, useLayoutEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Sparkles } from "lucide-react";
+import { bindPhase35Project } from "../../stores/phase35-stores";
 import { ModuleHeader, ModuleStage, Page, Tabs } from "../charter";
 import { AgentHealthPanel } from "./AgentHealthPanel";
 import { ArchDriftPanel } from "./ArchDriftPanel";
@@ -44,6 +45,13 @@ export function Phase35Hub({ projectPath = "" }: Phase35HubProps) {
 	const { t } = useTranslation(["phase35", "navigation"]);
 	const [tab, setTab] = useState<TabId>("longevity");
 
+	// Before the panels' own effects run (a layout effect precedes them): the
+	// findings of the previous project go, and a panel that loads on mount
+	// loads for this one.
+	useLayoutEffect(() => {
+		bindPhase35Project(projectPath);
+	}, [projectPath]);
+
 	const tabs: { id: TabId; titleKey: string }[] = [
 		{ id: "longevity", titleKey: "longevity.title" },
 		{ id: "agentHealth", titleKey: "agentHealth.title" },
@@ -76,6 +84,8 @@ export function Phase35Hub({ projectPath = "" }: Phase35HubProps) {
 					className="flex-wrap"
 					tabs={tabs.map((item) => ({ id: item.id, label: t(`phase35:${item.titleKey}` as never) }))}
 				/>
+				{/* Keyed by project: what was typed for one project is not kept for another. */}
+				<Fragment key={projectPath}>
 				{tab === "longevity" && <LongevityPanel projectPath={projectPath} />}
 				{tab === "agentHealth" && <AgentHealthPanel projectPath={projectPath} />}
 				{tab === "modelRouter" && <ModelRouterPanel />}
@@ -88,6 +98,7 @@ export function Phase35Hub({ projectPath = "" }: Phase35HubProps) {
 				{tab === "cogContext" && <CogContextPanel projectPath={projectPath} />}
 				{tab === "audit" && <AuditTrailPanel projectPath={projectPath} />}
 				{tab === "pair" && <PairProgrammingPanel projectPath={projectPath} />}
+				</Fragment>
 			</Page>
 		</ModuleStage>
 	);

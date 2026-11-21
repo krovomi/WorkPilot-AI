@@ -240,7 +240,9 @@
 			"checkTerminal": "Vérifiez la section Terminaux d'agent dans la barre latérale pour compléter la connexion OAuth.",
 			"authStartFailed": "Échec du démarrage de l'authentification",
 			"addProfileFailed": "Échec de l'ajout du profil",
-			"tryAgain": "Veuillez réessayer."
+			"tryAgain": "Veuillez réessayer.",
+			"autoSwitchFailed": "Échec de l'enregistrement du basculement automatique",
+			"switchFailed": "Échec du changement de compte"
 		},
 		"sdk": {
 			"title": "Limite de taux IA",
@@ -917,7 +919,14 @@
 		"stopping": "Arrêt...",
 		"progress": "Progrès",
 		"lastActivityPrefix": "dernière activité",
-		"lastProgressUpdateTooltip": "Dernière mise à jour de progression reçue"
+		"lastProgressUpdateTooltip": "Dernière mise à jour de progression reçue",
+		"timeAgo": {
+			"justNow": "à l'instant",
+			"seconds": "il y a {{count}} s",
+			"minutes": "il y a {{count}} min",
+			"hours": "il y a {{count}} h",
+			"days": "il y a {{count}} j"
+		}
 	},
 	"time": {
 		"justNow": "à l'instant",
@@ -1302,6 +1311,9 @@
 		"title": "Historique des conversations",
 		"byTeammate": "Par {{name}}, en lecture seule",
 		"noConversations": "Aucune conversation pour le moment",
+		"titleInputLabel": "Titre de la conversation",
+		"renameFailed": "La conversation n'a pas pu être renommée.",
+		"deleteFailed": "La conversation n'a pas pu être supprimée.",
 		"today": "Aujourd'hui",
 		"yesterday": "Hier",
 		"daysAgo": "Il y a {{count}} jours",
