@@ -4,7 +4,7 @@
  * Unit tests for the StreamingSession React component.
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { MockedFunction } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom";
@@ -48,18 +48,6 @@ class MockWebSocket {
 		}
 	}
 
-	// Helper method to trigger connection immediately in tests
-	static triggerConnection(): void {
-		MockWebSocket.instances.forEach((ws) => {
-			if (ws.readyState === 0) {
-				// CONNECTING
-				ws.readyState = 1; // OPEN
-				if (ws.onopen) {
-					ws.onopen(new Event("open"));
-				}
-			}
-		});
-	}
 
 	// Helper method to simulate receiving a message
 	static receiveMessage(data: string): void {
@@ -142,11 +130,21 @@ describe("StreamingSession", () => {
 	beforeEach(() => {
 		MockWebSocket.clearInstances();
 		vi.clearAllMocks();
+		// The session opens its socket 500 ms after mounting: the clock is
+		// moved past it, so a loaded machine cannot outrun waitFor's second.
+		vi.useFakeTimers({ shouldAdvanceTime: true });
 	});
 
 	afterEach(() => {
 		MockWebSocket.clearInstances();
+		vi.useRealTimers();
 	});
+
+	/** Lets the delayed first connection happen and the mock socket open. */
+	const openSocket = () =>
+		act(async () => {
+			await vi.advanceTimersByTimeAsync(500);
+		});
 
 	it("renders the streaming session interface", () => {
 		render(<StreamingSession {...mockProps} />);
@@ -168,7 +166,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		// The connection should be established (we can't check instances due to afterEach cleanup)
 		await waitFor(
@@ -183,7 +181,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			const ws = MockWebSocket.instances[0];
@@ -207,7 +205,7 @@ describe("StreamingSession", () => {
 		expect(screen.getByText("Offline")).toBeInTheDocument();
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		// Wait for connection
 		await waitFor(
@@ -222,7 +220,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		// Wait for connection
 		await waitFor(
@@ -262,7 +260,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			expect(screen.getByText("Live")).toBeInTheDocument();
@@ -297,7 +295,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			expect(screen.getByText("Live")).toBeInTheDocument();
@@ -332,7 +330,7 @@ describe("StreamingSession", () => {
 	it("lists distinct changed files and dedupes repeated edits", async () => {
 		render(<StreamingSession {...mockProps} />);
 
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			expect(screen.getByText("Live")).toBeInTheDocument();
@@ -378,7 +376,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			expect(screen.getByText("Live")).toBeInTheDocument();
@@ -414,7 +412,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			expect(screen.getByText("Live")).toBeInTheDocument();
@@ -452,7 +450,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			expect(screen.getByText("Live")).toBeInTheDocument();
@@ -484,7 +482,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			expect(screen.getByText("Live")).toBeInTheDocument();
@@ -505,7 +503,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			expect(screen.getByText("Live")).toBeInTheDocument();
@@ -527,7 +525,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			expect(screen.getByText("Live")).toBeInTheDocument();
@@ -549,7 +547,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		await waitFor(() => {
 			expect(screen.getByText("Live")).toBeInTheDocument();
@@ -587,7 +585,7 @@ describe("StreamingSession", () => {
 		render(<StreamingSession {...mockProps} />);
 
 		// Force WebSocket connection
-		MockWebSocket.triggerConnection();
+		await openSocket();
 
 		// Wait for WebSocket connection and UI update
 		await waitFor(

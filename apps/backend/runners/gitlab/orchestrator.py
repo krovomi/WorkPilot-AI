@@ -11,54 +11,24 @@ from __future__ import annotations
 
 import json
 import traceback
-import urllib.error
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-try:
-    from ..github.services.deep_context_provider import (
-        DeepContextProvider,
-        store_review_learnings,
-    )
-    from .glab_client import GitLabClient, GitLabConfig
-    from .models import (
-        GitLabRunnerConfig,
-        MergeVerdict,
-        MRContext,
-        MRReviewResult,
-    )
-    from .services import MRReviewEngine
-except ImportError:
-    # Fallback for direct script execution (not as a module)
-    from glab_client import GitLabClient, GitLabConfig
-    from models import (
-        GitLabRunnerConfig,
-        MergeVerdict,
-        MRContext,
-        MRReviewResult,
-    )
-    from services import MRReviewEngine
+from core.io_utils import safe_print
 
-    try:
-        from services.deep_context_provider import (
-            DeepContextProvider,
-            store_review_learnings,
-        )
-    except ImportError:
-        DeepContextProvider = None
-        store_review_learnings = None
-
-# Import safe_print for BrokenPipeError handling
-try:
-    from core.io_utils import safe_print
-except ImportError:
-    # Fallback for direct script execution
-    import sys
-    from pathlib import Path
-
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    from core.io_utils import safe_print
+from ..github.services.deep_context_provider import (
+    DeepContextProvider,
+    store_review_learnings,
+)
+from .glab_client import GitLabAPIError, GitLabClient, GitLabConfig
+from .models import (
+    GitLabRunnerConfig,
+    MergeVerdict,
+    MRContext,
+    MRReviewResult,
+)
+from .services import MRReviewEngine
 
 
 @dataclass
@@ -69,6 +39,35 @@ class ProgressCallback:
     progress: int  # 0-100
     message: str
     mr_iid: int | None = None
+
+
+def _overall_status(verdict: MergeVerdict) -> str:
+    """The MR action a verdict calls for: approve, comment or request changes."""
+    if verdict in (MergeVerdict.BLOCKED, MergeVerdict.NEEDS_REVISION):
+        return "request_changes"
+    if verdict == MergeVerdict.MERGE_WITH_CHANGES:
+        return "comment"
+    return "approve"
+
+
+def _api_error_message(error: GitLabAPIError, mr_iid: int) -> str:
+    """What the user is told when a GitLab request fails."""
+    if error.status is None:
+        return str(error)
+    return {
+        401: "GitLab authentication failed. Check your token.",
+        403: "GitLab access forbidden. Check your permissions.",
+        404: f"MR !{mr_iid} not found in GitLab.",
+        429: "GitLab rate limit exceeded. Please try again later.",
+    }.get(error.status, f"GitLab API error {error.status}")
+
+
+def _changed_paths(context: MRContext) -> list[str]:
+    return [
+        f.get("new_path", f.get("old_path", ""))
+        for f in context.changed_files
+        if f.get("new_path") or f.get("old_path")
+    ]
 
 
 class GitLabOrchestrator:
@@ -119,11 +118,7 @@ class GitLabOrchestrator:
         )
 
         # Initialize deep context provider (shared with GitHub)
-        self.deep_context_provider = (
-            DeepContextProvider(project_dir=self.project_dir)
-            if DeepContextProvider
-            else None
-        )
+        self.deep_context_provider = DeepContextProvider(project_dir=self.project_dir)
 
         # Initialize review engine
         self.review_engine = MRReviewEngine(
@@ -155,6 +150,18 @@ class GitLabOrchestrator:
         """Forward progress from engine to orchestrator callback."""
         if self.progress_callback:
             self.progress_callback(callback)
+
+    def _failed(self, mr_iid: int, error: str, **extra) -> MRReviewResult:
+        """Record a review that could not be completed, and return it."""
+        result = MRReviewResult(
+            mr_iid=mr_iid,
+            project=self.config.project,
+            success=False,
+            error=error,
+            **extra,
+        )
+        result.save(self.gitlab_dir)
+        return result
 
     async def _gather_mr_context(self, mr_iid: int) -> MRContext:
         """Gather context for an MR."""
@@ -196,13 +203,15 @@ class GitLabOrchestrator:
             )
 
         # Get head SHA
-        head_sha = mr_data.get("sha") or mr_data.get("diff_refs", {}).get("head_sha")
+        head_sha = mr_data.get("sha") or (mr_data.get("diff_refs") or {}).get(
+            "head_sha"
+        )
 
         return MRContext(
             mr_iid=mr_iid,
             title=mr_data.get("title", ""),
-            description=mr_data.get("description", ""),
-            author=mr_data.get("author", {}).get("username", "unknown"),
+            description=mr_data.get("description") or "",
+            author=(mr_data.get("author") or {}).get("username", "unknown"),
             source_branch=mr_data.get("source_branch", ""),
             target_branch=mr_data.get("target_branch", ""),
             state=mr_data.get("state", "opened"),
@@ -242,29 +251,23 @@ class GitLabOrchestrator:
             )
 
             # Gather deep codebase context (non-blocking)
-            if self.deep_context_provider:
-                try:
-                    changed_paths = [
-                        f.get("new_path", f.get("old_path", ""))
-                        for f in context.changed_files
-                        if f.get("new_path") or f.get("old_path")
-                    ]
-                    deep_ctx = await self.deep_context_provider.gather_deep_context(
-                        pr_title=context.title,
-                        pr_description=context.description or "",
-                        changed_file_paths=changed_paths,
-                        timeout=20.0,
-                    )
-                    context.deep_context = deep_ctx.to_dict()
-                    safe_print(
-                        f"[GitLab] Deep context: patterns={len(deep_ctx.project_patterns)}, "
-                        f"insights={len(deep_ctx.historical_insights)}, "
-                        f"arch_violations={len(deep_ctx.architecture_violations)}"
-                    )
-                except Exception as e:
-                    safe_print(
-                        f"[GitLab] Deep context gathering failed (non-blocking): {e}"
-                    )
+            try:
+                deep_ctx = await self.deep_context_provider.gather_deep_context(
+                    pr_title=context.title,
+                    pr_description=context.description,
+                    changed_file_paths=_changed_paths(context),
+                    timeout=20.0,
+                )
+                context.deep_context = deep_ctx.to_dict()
+                safe_print(
+                    f"[GitLab] Deep context: patterns={len(deep_ctx.project_patterns)}, "
+                    f"insights={len(deep_ctx.historical_insights)}, "
+                    f"arch_violations={len(deep_ctx.architecture_violations)}"
+                )
+            except Exception as e:
+                safe_print(
+                    f"[GitLab] Deep context gathering failed (non-blocking): {e}"
+                )
 
             self._report_progress(
                 "analyzing", 30, "Running AI review...", mr_iid=mr_iid
@@ -278,16 +281,6 @@ class GitLabOrchestrator:
                 context
             )
             safe_print(f"[GitLab] Review complete: {len(findings)} findings")
-
-            # Map verdict to overall_status
-            if verdict == MergeVerdict.BLOCKED:
-                overall_status = "request_changes"
-            elif verdict == MergeVerdict.NEEDS_REVISION:
-                overall_status = "request_changes"
-            elif verdict == MergeVerdict.MERGE_WITH_CHANGES:
-                overall_status = "comment"
-            else:
-                overall_status = "approve"
 
             # Generate summary
             full_summary = self.review_engine.generate_summary(
@@ -305,7 +298,7 @@ class GitLabOrchestrator:
                 success=True,
                 findings=findings,
                 summary=full_summary,
-                overall_status=overall_status,
+                overall_status=_overall_status(verdict),
                 verdict=verdict,
                 verdict_reasoning=summary,
                 blockers=blockers,
@@ -317,19 +310,14 @@ class GitLabOrchestrator:
             result.save(self.gitlab_dir)
 
             # Store review learnings in the shared brain (non-blocking)
-            if store_review_learnings and findings:
+            if findings:
                 try:
-                    changed_paths = [
-                        f.get("new_path", f.get("old_path", ""))
-                        for f in context.changed_files
-                        if f.get("new_path") or f.get("old_path")
-                    ]
                     await store_review_learnings(
                         project_dir=self.project_dir,
                         pr_number=mr_iid,
                         findings=[f.to_dict() for f in findings],
                         pr_title=context.title,
-                        changed_files=changed_paths,
+                        changed_files=_changed_paths(context),
                     )
                 except Exception as e:
                     safe_print(
@@ -340,49 +328,15 @@ class GitLabOrchestrator:
 
             return result
 
-        except urllib.error.HTTPError as e:
-            error_msg = f"GitLab API error {e.code}"
-            if e.code == 401:
-                error_msg = "GitLab authentication failed. Check your token."
-            elif e.code == 403:
-                error_msg = "GitLab access forbidden. Check your permissions."
-            elif e.code == 404:
-                error_msg = f"MR !{mr_iid} not found in GitLab."
-            elif e.code == 429:
-                error_msg = "GitLab rate limit exceeded. Please try again later."
+        except GitLabAPIError as e:
+            error_msg = _api_error_message(e, mr_iid)
             safe_print(f"[GitLab] Review failed for !{mr_iid}: {error_msg}")
-            result = MRReviewResult(
-                mr_iid=mr_iid,
-                project=self.config.project,
-                success=False,
-                error=error_msg,
-            )
-            result.save(self.gitlab_dir)
-            return result
+            return self._failed(mr_iid, error_msg)
 
         except json.JSONDecodeError as e:
             error_msg = f"Invalid JSON response from GitLab: {e}"
             safe_print(f"[GitLab] Review failed for !{mr_iid}: {error_msg}")
-            result = MRReviewResult(
-                mr_iid=mr_iid,
-                project=self.config.project,
-                success=False,
-                error=error_msg,
-            )
-            result.save(self.gitlab_dir)
-            return result
-
-        except OSError as e:
-            error_msg = f"File system error: {e}"
-            safe_print(f"[GitLab] Review failed for !{mr_iid}: {error_msg}")
-            result = MRReviewResult(
-                mr_iid=mr_iid,
-                project=self.config.project,
-                success=False,
-                error=error_msg,
-            )
-            result.save(self.gitlab_dir)
-            return result
+            return self._failed(mr_iid, error_msg)
 
         except Exception as e:
             # Catch-all for unexpected errors, with full traceback for debugging
@@ -390,15 +344,9 @@ class GitLabOrchestrator:
             full_traceback = traceback.format_exc()
             safe_print(f"[GitLab] Review failed for !{mr_iid}: {error_details}")
             safe_print(f"[GitLab] Traceback:\n{full_traceback}")
-
-            result = MRReviewResult(
-                mr_iid=mr_iid,
-                project=self.config.project,
-                success=False,
-                error=f"{error_details}\n\nTraceback:\n{full_traceback}",
+            return self._failed(
+                mr_iid, f"{error_details}\n\nTraceback:\n{full_traceback}"
             )
-            result.save(self.gitlab_dir)
-            return result
 
     async def followup_review_mr(self, mr_iid: int) -> MRReviewResult:
         """
@@ -484,16 +432,6 @@ class GitLabOrchestrator:
             unresolved = previous_finding_titles & current_finding_titles
             new_findings = current_finding_titles - previous_finding_titles
 
-            # Map verdict to overall_status
-            if verdict == MergeVerdict.BLOCKED:
-                overall_status = "request_changes"
-            elif verdict == MergeVerdict.NEEDS_REVISION:
-                overall_status = "request_changes"
-            elif verdict == MergeVerdict.MERGE_WITH_CHANGES:
-                overall_status = "comment"
-            else:
-                overall_status = "approve"
-
             # Generate summary
             full_summary = self.review_engine.generate_summary(
                 findings=findings,
@@ -520,7 +458,7 @@ class GitLabOrchestrator:
                 success=True,
                 findings=findings,
                 summary=full_summary,
-                overall_status=overall_status,
+                overall_status=_overall_status(verdict),
                 verdict=verdict,
                 verdict_reasoning=summary,
                 blockers=blockers,
@@ -539,29 +477,13 @@ class GitLabOrchestrator:
 
             return result
 
-        except urllib.error.HTTPError as e:
-            error_msg = f"GitLab API error {e.code}"
-            if e.code == 401:
-                error_msg = "GitLab authentication failed. Check your token."
-            elif e.code == 403:
-                error_msg = "GitLab access forbidden. Check your permissions."
-            elif e.code == 404:
-                error_msg = f"MR !{mr_iid} not found in GitLab."
-            elif e.code == 429:
-                error_msg = "GitLab rate limit exceeded. Please try again later."
+        except GitLabAPIError as e:
+            error_msg = _api_error_message(e, mr_iid)
             print(
                 f"[GitLab] Follow-up review failed for !{mr_iid}: {error_msg}",
                 flush=True,
             )
-            result = MRReviewResult(
-                mr_iid=mr_iid,
-                project=self.config.project,
-                success=False,
-                error=error_msg,
-                is_followup_review=True,
-            )
-            result.save(self.gitlab_dir)
-            return result
+            return self._failed(mr_iid, error_msg, is_followup_review=True)
 
         except json.JSONDecodeError as e:
             error_msg = f"Invalid JSON response from GitLab: {e}"
@@ -569,15 +491,7 @@ class GitLabOrchestrator:
                 f"[GitLab] Follow-up review failed for !{mr_iid}: {error_msg}",
                 flush=True,
             )
-            result = MRReviewResult(
-                mr_iid=mr_iid,
-                project=self.config.project,
-                success=False,
-                error=error_msg,
-                is_followup_review=True,
-            )
-            result.save(self.gitlab_dir)
-            return result
+            return self._failed(mr_iid, error_msg, is_followup_review=True)
 
         except Exception as e:
             # Catch-all for unexpected errors
@@ -586,12 +500,4 @@ class GitLabOrchestrator:
                 f"[GitLab] Follow-up review failed for !{mr_iid}: {error_details}",
                 flush=True,
             )
-            result = MRReviewResult(
-                mr_iid=mr_iid,
-                project=self.config.project,
-                success=False,
-                error=error_details,
-                is_followup_review=True,
-            )
-            result.save(self.gitlab_dir)
-            return result
+            return self._failed(mr_iid, error_details, is_followup_review=True)
