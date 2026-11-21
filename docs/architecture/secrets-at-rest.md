@@ -86,7 +86,11 @@ main process wait on it, on Linux:
   are the ones that froze the app: a settings read during startup
   (`initAppLanguage`…) reached `decryptString`, which blocked the main thread
   on the unlock prompt.
-- `initSecretStorage` asks `isAsyncEncryptionAvailable`, then encrypts a probe
+- Under `basic_text` (no keyring to use, the WSL case above with a locked
+  keyring), `initSecretStorage` asks nothing: the async API still reaches the
+  Secret Service whatever `--password-store` says, and a locked one opened
+  its blank unlock prompt beside the app, for a key it would not use.
+- Otherwise `initSecretStorage` asks `isAsyncEncryptionAvailable`, then encrypts a probe
   value with `encryptStringAsync`, where libsecret and KWallet first hand the
   key over. Every async call is raced against `KEYRING_TIMEOUT_MS` (5 s); past
   it, the session goes on without the keyring and logs why. Values already
