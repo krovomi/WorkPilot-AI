@@ -365,7 +365,7 @@ describe("AuditTab", () => {
 	const ENTRIES = [
 		{ id: "a1", user_id: "u1", user_email: "ana@example.test", org_id: "o1", project_id: null, action: "role.update", payload: { role: "lead" }, ip: null, created_at: "2026-11-16T10:00:00Z", login_id: "1234567890ab", login_method: "oidc" },
 		{ id: "a2", user_id: null, user_email: null, org_id: "o1", project_id: null, action: "org.create", payload: null, ip: null, created_at: "2026-11-16T11:00:00Z" },
-		{ id: "a3", user_id: "u2", user_email: "bo@example.test", org_id: "o1", project_id: null, action: "group.create", payload: null, ip: null, created_at: "2026-11-16T12:00:00Z", login_id: "abcdefgh-0000", login_method: "magic" },
+		{ id: "a3", user_id: "u2", user_email: "bo@example.test", org_id: "o1", project_id: null, action: "group.create", payload: null, ip: null, created_at: "2026-11-16T12:00:00Z", login_id: "abcdefgh-0000", login_method: null },
 	];
 
 	it("filters by action or user, and hides export without the permission", async () => {
