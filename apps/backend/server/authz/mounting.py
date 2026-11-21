@@ -100,6 +100,9 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     # A question to Insights runs the insights agent on the clone.
     ("POST", "/api/features/insights/sessions/{session_id}/messages"): "agent.execute",
     ("POST", "/api/features/insights/jobs/{job_id}/cancel"): "agent.cancel",
+    # Opening a shared replay reads it; the POST carries its link's token in
+    # the body, out of the URL.
+    ("POST", "/api/features/replay-shares/{share_id}/open"): "lab.read",
     # Audit trail is append-only and its exports carry personal data.
     ("GET", "/api/audit-trail/export/soc2"): "audit.export",
     ("GET", "/api/audit-trail/export/gdpr"): "audit.export",

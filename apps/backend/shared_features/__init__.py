@@ -10,7 +10,9 @@ jobs whose reports every member reads (``analyses``), its changelog among
 them, with the branches, tags and commits it is chosen from (``changelog``);
 its dashboard, analytics, sessions and costs, computed from its runs, its jobs and the
 ledgers its agents keep in the clone (``workspace``, ``usage_ledger``); its
-automation rules, run by the server process (``automations``).
+automation rules, run by the server process (``automations``); the agent
+sessions its members share with it, behind links that expire
+(``replay_shares``).
 
 See ``docs/architecture/server-mode.md``.
 """
@@ -40,6 +42,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.ideation import router as ideation
     from shared_features.insights import router as insights
     from shared_features.registry import FEATURES
+    from shared_features.replay_shares import router as replay_shares
     from shared_features.roadmap import router as roadmap
     from shared_features.workspace import router as workspace
 
@@ -61,3 +64,4 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(analyses, "analyses")
     mount(changelog, "analyses")
     mount(workspace, "workspace")
+    mount(replay_shares, "replay_shares")

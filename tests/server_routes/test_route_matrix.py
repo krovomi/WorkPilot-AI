@@ -285,6 +285,10 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/api/features/workspace/costs"): scoped("analytics.read"),
     ("GET", "/api/features/workspace/dashboard"): scoped("analytics.read"),
     ("GET", "/api/features/workspace/compare"): scoped("analytics.read"),
+    ("POST", "/api/features/replay-shares"): scoped("lab.write"),
+    ("GET", "/api/features/replay-shares"): scoped("lab.read"),
+    ("POST", "/api/features/replay-shares/{share_id}/open"): scoped("lab.read"),
+    ("DELETE", "/api/features/replay-shares/{share_id}"): scoped("lab.write"),
 }
 
 #: Values for the path parameters: ids that exist nowhere, except the
