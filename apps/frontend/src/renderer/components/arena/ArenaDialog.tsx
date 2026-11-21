@@ -24,8 +24,9 @@ import {
 	X,
 } from "lucide-react";
 import type { TFunction } from "i18next";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { ScrollArea } from "@/components/ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -94,7 +95,20 @@ function participantName(
 ): string {
 	const name = participant.modelName?.trim();
 	if (name && !/^Model [A-D]$/.test(name)) return name;
-	return `${t("battle.model")} ${participant.label}`;
+	return t("arena:modelFallback", { label: participant.label });
+}
+
+/** A failure the person must see, wherever it happened. */
+function ErrorNote({ message }: { readonly message: string }) {
+	return (
+		<div
+			role="alert"
+			className="flex items-center gap-2 text-sm text-destructive p-2 rounded-lg bg-destructive/10"
+		>
+			<AlertCircle className="h-4 w-4 shrink-0" />
+			{message}
+		</div>
+	);
 }
 
 function ParticipantCard({
@@ -109,8 +123,9 @@ function ParticipantCard({
 	readonly canVote: boolean;
 }) {
 	const { t } = useTranslation("arena");
+	// A winner is only ever recorded with the identities revealed (the vote
+	// sets both), so being the winner is enough to be shown as one.
 	const isWinner = battle.winnerLabel === participant.label;
-	const isRevealed = battle.revealed;
 	// A failed contestant has no answer to judge: its error is shown as an
 	// error, and it cannot be voted for.
 	const isFailed = participant.status === "error";
@@ -127,36 +142,19 @@ function ParticipantCard({
 		return t("battle.noOutput");
 	};
 
+	// The vote is the button's alone: a click anywhere on the card used to
+	// cast it, so selecting a line of an answer to read it was a final vote.
 	return (
-		<>
-			{/* biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional */}
-			{/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: ARIA attributes are valid for this role */}
-			{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: votable arena card */}
-			<div
-				role={votable ? "button" : undefined}
-				tabIndex={votable ? 0 : undefined}
-				className={cn(
-					"flex flex-col rounded-xl border transition-all duration-300 text-left",
-					isWinner && isRevealed
-						? "border-warning/60 bg-warning/5 shadow-lg shadow-yellow-500/10"
-						: "border-border bg-card",
-					isFailed && "border-destructive/40",
-					votable &&
-						"cursor-pointer hover:border-primary/50 hover:bg-accent/30",
-					!votable && "cursor-default",
-				)}
-				onClick={() => votable && onVote(participant.label)}
-				onKeyDown={(e) =>
-					votable &&
-					(e.key === "Enter" || e.key === " ") &&
-					onVote(participant.label)
-				}
-				aria-label={
-					votable
-						? `${name}. ${isWinner && isRevealed ? t("battle.winner") : ""}`
-						: undefined
-				}
-			>
+		<div
+			className={cn(
+				"flex flex-col rounded-xl border transition-all duration-300 text-left",
+				isWinner
+					? "border-warning/60 bg-warning/5 shadow-lg shadow-yellow-500/10"
+					: "border-border bg-card",
+				isFailed && "border-destructive/40",
+				votable && "hover:border-primary/50",
+			)}
+		>
 				{/* Header */}
 				<div className="flex items-center justify-between p-3 border-b border-border">
 					<div className="flex items-center gap-2 min-w-0">
@@ -186,7 +184,7 @@ function ParticipantCard({
 						{participant.status === "error" && (
 							<AlertCircle className="h-3.5 w-3.5 text-destructive" />
 						)}
-						{isWinner && isRevealed && (
+						{isWinner && (
 							<Trophy className="h-4 w-4 text-warning" />
 						)}
 					</div>
@@ -221,7 +219,8 @@ function ParticipantCard({
 				<div className="flex items-center justify-between px-3 py-2 border-t border-border text-xs text-muted-foreground">
 					<span
 						title={
-							participant.usageEstimated
+							// The hint explains a number, so a card with none has none.
+							participant.usageEstimated && participant.tokensUsed > 0
 								? t("battle.tokensEstimatedHint")
 								: undefined
 						}
@@ -257,18 +256,15 @@ function ParticipantCard({
 							variant="outline"
 							size="sm"
 							className="w-full gap-2 hover:bg-primary hover:text-primary-foreground transition-colors"
-							onClick={(e) => {
-								e.stopPropagation();
-								onVote(participant.label);
-							}}
+							aria-label={t("battle.voteForModel", { name })}
+							onClick={() => onVote(participant.label)}
 						>
 							<Trophy className="h-3.5 w-3.5" />
 							{t("battle.voteForThis")}
 						</Button>
 					</div>
 				)}
-			</div>
-		</>
+		</div>
 	);
 }
 
@@ -316,13 +312,12 @@ function ContenderPicker({
 	return (
 		<div>
 			<div className="flex items-center justify-between mb-2">
-				{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-				<label className="text-sm font-medium text-foreground">
+				<h3 className="text-sm font-medium text-foreground">
 					{t("battle.selectModels")}
 					<span className="ml-1.5 text-xs text-muted-foreground">
 						({t("battle.selectModelHint")})
 					</span>
-				</label>
+				</h3>
 				<div className="flex items-center gap-2">
 					{roster.loaded && roster.contenders.length > 0 && (
 						<span className="text-xs text-muted-foreground">
@@ -391,6 +386,7 @@ function ContenderPicker({
 							value={query}
 							onChange={(e) => setQuery(e.target.value)}
 							placeholder={t("battle.searchModels")}
+							aria-label={t("battle.searchModels")}
 							className="pl-8 h-8 text-sm"
 						/>
 					</div>
@@ -421,6 +417,7 @@ function ContenderPicker({
 													key={contender.id}
 													onClick={() => onToggle(contender.id)}
 													disabled={isFull}
+													aria-pressed={isSelected}
 													title={
 														isFull ? t("battle.maxModelsReached") : contender.model
 													}
@@ -482,7 +479,19 @@ function BattleTab() {
 		setActiveBattle,
 		setError,
 		submitVote,
-	} = useArenaStore();
+	} = useArenaStore(
+		useShallow((s) => ({
+			activeBattle: s.activeBattle,
+			isStartingBattle: s.isStartingBattle,
+			error: s.error,
+			setIsStartingBattle: s.setIsStartingBattle,
+			setActiveBattle: s.setActiveBattle,
+			setError: s.setError,
+			submitVote: s.submitVote,
+		})),
+	);
+	const promptId = useId();
+	const taskTypeId = useId();
 	const selectedProject = useProjectStore((s) =>
 		s.projects.find((p) => p.id === s.selectedProjectId),
 	);
@@ -514,6 +523,9 @@ function BattleTab() {
 		});
 	}, [roster.loaded, roster.contenders]);
 
+	// Battle events are heard by `setupArenaListeners` (global-listeners.ts),
+	// for the life of the window: this tab only reads what the store knows.
+
 	const selectedContenders = useMemo(
 		() =>
 			selectedIds
@@ -522,17 +534,13 @@ function BattleTab() {
 		[selectedIds, roster.contenders],
 	);
 
+	// Only reachable through the Start button, which is disabled until the
+	// prompt and the contenders are there.
 	const handleStartBattle = useCallback(async () => {
-		if (!prompt.trim() || selectedContenders.length < MIN_CONTENDERS) return;
-
 		setIsStartingBattle(true);
 		setError(null);
 
 		try {
-			if (typeof globalThis.electronAPI?.arenaStartBattle !== "function") {
-				setError("Arena API not available — please restart the application.");
-				return;
-			}
 			const result = await globalThis.electronAPI.arenaStartBattle({
 				taskType,
 				prompt: prompt.trim(),
@@ -549,8 +557,10 @@ function BattleTab() {
 			if (result.success && result.data) {
 				setActiveBattle(result.data);
 			} else {
-				setError(result.error ?? t("errors.startFailed"));
+				setError(result.error || t("errors.startFailed"));
 			}
+		} catch (err) {
+			setError(err instanceof Error ? err.message : t("errors.startFailed"));
 		} finally {
 			setIsStartingBattle(false);
 		}
@@ -566,11 +576,10 @@ function BattleTab() {
 	]);
 
 	const toggleContender = useCallback((id: string) => {
-		setSelectedIds((prev) => {
-			if (prev.includes(id)) return prev.filter((entry) => entry !== id);
-			if (prev.length >= MAX_CONTENDERS) return prev;
-			return [...prev, id];
-		});
+		// A fifth model cannot be picked: its button is disabled once four are.
+		setSelectedIds((prev) =>
+			prev.includes(id) ? prev.filter((entry) => entry !== id) : [...prev, id],
+		);
 	}, []);
 
 	// A vote ranks one answer above another: it takes two that exist. A
@@ -580,6 +589,12 @@ function BattleTab() {
 	const canVote = activeBattle?.status === "voting" && answeredCount >= 2;
 	const cannotVote = activeBattle?.status === "voting" && answeredCount < 2;
 	const isRunning = activeBattle?.status === "running";
+	const winner =
+		activeBattle?.status === "completed"
+			? activeBattle.participants.find(
+					(p) => p.label === activeBattle.winnerLabel,
+				)
+			: undefined;
 
 	return (
 		<div className="flex flex-col gap-4 h-full">
@@ -587,16 +602,19 @@ function BattleTab() {
 			{!activeBattle && (
 				<div className="flex flex-col gap-4 p-4 rounded-xl border border-border bg-card">
 					{/* Task type */}
-					<div>
-						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-						<label className="text-sm font-medium mb-2 block text-foreground">
+					<fieldset aria-labelledby={taskTypeId}>
+						<legend
+							id={taskTypeId}
+							className="text-sm font-medium mb-2 block text-foreground"
+						>
 							{t("battle.taskType")}
-						</label>
+						</legend>
 						<div className="flex flex-wrap gap-2">
 							{TASK_TYPES.map((tt) => (
 								<button
 									type="button"
 									key={tt.value}
+									aria-pressed={taskType === tt.value}
 									onClick={() => setTaskType(tt.value)}
 									className={cn(
 										"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-all",
@@ -610,7 +628,7 @@ function BattleTab() {
 								</button>
 							))}
 						</div>
-					</div>
+					</fieldset>
 
 					{/* Model selection — the machine's real roster, all providers */}
 					<ContenderPicker
@@ -621,11 +639,14 @@ function BattleTab() {
 
 					{/* Prompt */}
 					<div>
-						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-						<label className="text-sm font-medium mb-2 block text-foreground">
+						<label
+							htmlFor={promptId}
+							className="text-sm font-medium mb-2 block text-foreground"
+						>
 							{t("battle.prompt")}
 						</label>
 						<Textarea
+							id={promptId}
 							value={prompt}
 							onChange={(e) => setPrompt(e.target.value)}
 							placeholder={t("battle.promptPlaceholder")}
@@ -633,12 +654,7 @@ function BattleTab() {
 						/>
 					</div>
 
-					{error && (
-						<div className="flex items-center gap-2 text-sm text-destructive p-2 rounded-lg bg-destructive/10">
-							<AlertCircle className="h-4 w-4 shrink-0" />
-							{error}
-						</div>
-					)}
+					{error && <ErrorNote message={error} />}
 
 					<Button
 						onClick={handleStartBattle}
@@ -714,6 +730,8 @@ function BattleTab() {
 						</Button>
 					</div>
 
+					{error && <ErrorNote message={error} />}
+
 					{/* Prompt display */}
 					<div className="text-xs text-muted-foreground p-2 rounded-lg bg-muted/50 font-mono line-clamp-2">
 						{activeBattle.prompt}
@@ -734,30 +752,21 @@ function BattleTab() {
 					)}
 
 					{/* Revealed winner */}
-					{activeBattle.status === "completed" &&
-						activeBattle.revealed &&
-						activeBattle.winnerLabel && (
-							<div className="flex items-center gap-2 p-3 rounded-xl border border-warning/40 bg-warning/5 text-sm">
-								<Trophy className="h-4 w-4 text-warning shrink-0" />
-								<span className="text-warning">
-									{t("battle.winner")}:{" "}
-									<strong>
-										{activeBattle.participants.find(
-											(p) => p.label === activeBattle.winnerLabel,
-										)?.modelName ??
-											t("arena:modelFallback", { label: activeBattle.winnerLabel })}
-									</strong>
+					{winner && (
+						<div className="flex items-center gap-2 p-3 rounded-xl border border-warning/40 bg-warning/5 text-sm">
+							<Trophy className="h-4 w-4 text-warning shrink-0" />
+							<span className="text-warning">
+								{t("battle.winner")}:{" "}
+								<strong>{participantName(winner, t)}</strong>
+								{winner.providerLabel && (
 									<span className="opacity-70">
 										{" · "}
-										{
-											activeBattle.participants.find(
-												(p) => p.label === activeBattle.winnerLabel,
-											)?.providerLabel
-										}
+										{winner.providerLabel}
 									</span>
-								</span>
-							</div>
-						)}
+								)}
+							</span>
+						</div>
+					)}
 
 					{/* Participant grid */}
 					<div className="grid gap-3 flex-1 grid-cols-2">
@@ -781,14 +790,16 @@ function BattleTab() {
 
 function HistoryTab() {
 	const { t } = useTranslation("arena");
-	const { battles, isLoadingHistory, loadHistory } = useArenaStore();
-
-	const arenaClearHistoryFn = useCallback(async () => {
-		if (typeof globalThis.electronAPI?.arenaClearHistory === "function") {
-			await globalThis.electronAPI.arenaClearHistory();
-		}
-		loadHistory();
-	}, [loadHistory]);
+	const { battles, isLoadingHistory, historyError, loadHistory, clearHistory } =
+		useArenaStore(
+			useShallow((s) => ({
+				battles: s.battles,
+				isLoadingHistory: s.isLoadingHistory,
+				historyError: s.historyError,
+				loadHistory: s.loadHistory,
+				clearHistory: s.clearHistory,
+			})),
+		);
 
 	useEffect(() => {
 		loadHistory();
@@ -805,23 +816,27 @@ function HistoryTab() {
 
 	if (battles.length === 0) {
 		return (
-			<div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
-				<History className="h-8 w-8 opacity-40" />
-				<p className="text-sm">{t("history.empty")}</p>
+			<div className="flex flex-col gap-3">
+				{historyError && <ErrorNote message={historyError} />}
+				<div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
+					<History className="h-8 w-8 opacity-40" />
+					<p className="text-sm">{t("history.empty")}</p>
+				</div>
 			</div>
 		);
 	}
 
 	return (
 		<div className="flex flex-col gap-3">
+			{historyError && <ErrorNote message={historyError} />}
 			<div className="flex items-center justify-between">
 				<span className="text-sm text-muted-foreground">
-					{battles.length} {t("history.battles")}
+					{t("history.battleCount", { count: battles.length })}
 				</span>
 				<Button
 					variant="ghost"
 					size="sm"
-					onClick={arenaClearHistoryFn}
+					onClick={() => void clearHistory()}
 					className="gap-1.5 text-muted-foreground hover:text-destructive"
 				>
 					<Trash2 className="h-3.5 w-3.5" />
@@ -851,6 +866,7 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 		<div className="rounded-xl border border-border overflow-hidden">
 			<button
 				type="button"
+				aria-expanded={expanded}
 				onClick={() => setExpanded(!expanded)}
 				className="w-full flex items-center justify-between p-3 hover:bg-accent/30 transition-colors"
 			>
@@ -871,7 +887,7 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 							className="gap-1 text-warning border-warning/40"
 						>
 							<Trophy className="h-3 w-3" />
-							{winner.modelName}
+							{participantName(winner, t)}
 						</Badge>
 					)}
 					{battle.status === "voting" && (
@@ -939,7 +955,15 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 
 function AnalyticsTab() {
 	const { t } = useTranslation("arena");
-	const { analytics, isLoadingAnalytics, loadAnalytics } = useArenaStore();
+	const { analytics, analyticsError, isLoadingAnalytics, loadAnalytics } =
+		useArenaStore(
+			useShallow((s) => ({
+				analytics: s.analytics,
+				analyticsError: s.analyticsError,
+				isLoadingAnalytics: s.isLoadingAnalytics,
+				loadAnalytics: s.loadAnalytics,
+			})),
+		);
 
 	const getRankingStyle = (rank: number) => {
 		if (rank === 0) {
@@ -963,6 +987,8 @@ function AnalyticsTab() {
 			</div>
 		);
 	}
+
+	if (analyticsError) return <ErrorNote message={analyticsError} />;
 
 	if (!analytics || analytics.totalVotes === 0) {
 		return (
@@ -1072,12 +1098,13 @@ function AnalyticsTab() {
 
 function RoutingTab() {
 	const { t } = useTranslation("arena");
-	const {
-		analytics,
-		autoRoutingEnabled,
-		setAutoRoutingEnabled,
-		loadAnalytics,
-	} = useArenaStore();
+	const { analytics, analyticsError, loadAnalytics } = useArenaStore(
+		useShallow((s) => ({
+			analytics: s.analytics,
+			analyticsError: s.analyticsError,
+			loadAnalytics: s.loadAnalytics,
+		})),
+	);
 
 	useEffect(() => {
 		loadAnalytics();
@@ -1088,47 +1115,22 @@ function RoutingTab() {
 
 	return (
 		<div className="flex flex-col gap-4">
-			{/* Toggle */}
-			<div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card">
-				<div className="flex items-center gap-3">
-					<div
-						className={cn(
-							"w-10 h-10 rounded-xl flex items-center justify-center",
-							autoRoutingEnabled ? "bg-primary/10" : "bg-muted",
-						)}
-					>
-						<Route
-							className={cn(
-								"h-5 w-5",
-								autoRoutingEnabled ? "text-primary" : "text-muted-foreground",
-							)}
-						/>
-					</div>
-					<div>
-						<p className="text-sm font-medium">{t("routing.autoRouting")}</p>
-						<p className="text-xs text-muted-foreground">
-							{t("routing.autoRoutingDesc")}
-						</p>
-					</div>
+			{/* What the recommendations are. There is no on/off switch: nothing
+			    routes tasks by them yet, and a switch that changes nothing is a
+			    promise the app does not keep. */}
+			<div className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card">
+				<div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10">
+					<Route className="h-5 w-5 text-primary" />
 				</div>
-				<button
-					type="button"
-					onClick={() => setAutoRoutingEnabled(!autoRoutingEnabled)}
-					className={cn(
-						"relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
-						autoRoutingEnabled ? "bg-primary" : "bg-muted",
-					)}
-					role="switch"
-					aria-checked={autoRoutingEnabled}
-				>
-					<span
-						className={cn(
-							"pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform",
-							autoRoutingEnabled ? "translate-x-5" : "translate-x-0",
-						)}
-					/>
-				</button>
+				<div>
+					<p className="text-sm font-medium">{t("routing.autoRouting")}</p>
+					<p className="text-xs text-muted-foreground">
+						{t("routing.autoRoutingDesc")}
+					</p>
+				</div>
 			</div>
+
+			{analyticsError && <ErrorNote message={analyticsError} />}
 
 			{hasRecommendations ? (
 				<div className="flex flex-col gap-2">
@@ -1164,7 +1166,7 @@ function RoutingTab() {
 								</div>
 							</div>
 						);
-					}).filter(Boolean)}
+					})}
 				</div>
 			) : (
 				<div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
@@ -1192,11 +1194,14 @@ function RoutingTab() {
 
 export function ArenaDialog() {
 	const { t } = useTranslation("arena");
-	const { isOpen, closeDialog } = useArenaStore();
+	const isOpen = useArenaStore((s) => s.isOpen);
+	const closeDialog = useArenaStore((s) => s.closeDialog);
 	const [activeTab, setActiveTab] = useState<ArenaTab>("battle");
 
+	// No trigger opens this dialog from inside (the sidebar calls
+	// `openArenaDialog`), so Radix only ever reports it closing.
 	return (
-		<Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
+		<Dialog open={isOpen} onOpenChange={closeDialog}>
 			<DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
 				<DialogHeader className="shrink-0 p-5 pb-0">
 					<DialogTitle className="flex items-center gap-2.5 text-xl">
@@ -1216,6 +1221,7 @@ export function ArenaDialog() {
 						<button
 							type="button"
 							key={id}
+							aria-current={activeTab === id ? "page" : undefined}
 							onClick={() => setActiveTab(id)}
 							className={cn(
 								"flex items-center gap-1.5 px-3 py-2 text-sm rounded-t-lg border-b-2 transition-all duration-200",
