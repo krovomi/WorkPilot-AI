@@ -119,6 +119,12 @@ def parse_url(url: str) -> tuple[str, list[str]] | None:
     return key, ids
 
 
+def _children(node: dict) -> list:
+    """A node's children; anything else under that key holds none."""
+    children = node.get("children")
+    return children if isinstance(children, list) else []
+
+
 def _texts(node: Any, out: list[str], seen: set[str]) -> None:
     """Every visible text layer under `node`, in document order, each once."""
     if not isinstance(node, dict) or node.get("visible") is False:
@@ -130,7 +136,7 @@ def _texts(node: Any, out: list[str], seen: set[str]) -> None:
         if text and text not in seen:
             seen.add(text)
             out.append(text[:MAX_TEXT_CHARS])
-    for child in node.get("children") or []:
+    for child in _children(node):
         _texts(child, out, seen)
 
 
@@ -151,7 +157,7 @@ def _screens(node: Any) -> list[dict]:
     kind = node.get("type")
     if kind in ("DOCUMENT", "CANVAS"):
         found: list[dict] = []
-        for child in node.get("children") or []:
+        for child in _children(node):
             found.extend(_screens(child))
         return found
     return [node]
@@ -328,7 +334,8 @@ def import_figma(
     except OSError:
         result.status = "unwritable"
         return result
-    result.path = target.relative_to(spec_dir).as_posix()
+    # `target` is `attachments/<name>` under the spec, by `_attachment_target`.
+    result.path = f"attachments/{target.name}"
     return result
 
 
@@ -365,9 +372,10 @@ def read_figma(text: str) -> dict | None:
     for frame in frames[:MAX_FRAMES]:
         if not isinstance(frame, dict):
             continue
+        listed = frame.get("texts")
         texts = [
             str(t)[:MAX_TEXT_CHARS]
-            for t in (frame.get("texts") or [])[:MAX_TEXTS]
+            for t in (listed if isinstance(listed, list) else [])[:MAX_TEXTS]
             if isinstance(t, (str, int, float)) and str(t).strip()
         ]
         out.append(

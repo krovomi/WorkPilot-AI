@@ -147,9 +147,10 @@ export const useBrowserAgentStore = create<BrowserAgentState>((set, get) => ({
 				await get().fetchDashboard(projectPath);
 				// Load the captured screenshot for preview
 				const imgResult = await get().loadScreenshotImage(result.data.path);
-				if (imgResult) {
-					set({ browserScreenshot: imgResult, browserStatus: "ready" });
-				}
+				// The capture is done either way: a preview that cannot be read
+				// must not leave the browser "navigating" for good.
+				// An unreadable preview clears the last one: it was not this capture.
+				set({ browserStatus: "ready", browserScreenshot: imgResult ?? null });
 			} else {
 				set({
 					error: result?.error || "Screenshot capture failed",
@@ -218,11 +219,15 @@ export const useBrowserAgentStore = create<BrowserAgentState>((set, get) => ({
 	deleteBaseline: async (projectPath, name) => {
 		set({ isLoading: true, error: null });
 		try {
-			await window.electronAPI.invoke(
+			const result = await window.electronAPI.invoke(
 				"browserAgent:deleteBaseline",
 				projectPath,
 				name,
 			);
+			if (!result?.success) {
+				set({ error: result?.error || "Failed to delete baseline" });
+				return;
+			}
 			await get().fetchDashboard(projectPath);
 		} catch (err) {
 			set({ error: String(err) });

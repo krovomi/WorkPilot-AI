@@ -120,7 +120,8 @@ describe("AuthStatusIndicator badge", () => {
 		});
 		renderBadge();
 		const badge = screen.getByRole("button", { name: "Authentication: Anthropic" });
-		expect(badge).toHaveTextContent("Anthropic");
+		// The usage lens beside it names the provider: the badge is an icon.
+		expect(badge.textContent).toBe("");
 		expect(badge.className).toContain("text-orange-500");
 		await openDetails();
 		expect(screen.getAllByText("OAuth")[0]).toBeInTheDocument();
@@ -178,7 +179,7 @@ describe("AuthStatusIndicator badge", () => {
 		unmount();
 		void i18n.changeLanguage("fr");
 		renderBadge();
-		expect(screen.getByRole("button")).toHaveTextContent("Inconnu");
+		expect(screen.getByRole("button").getAttribute("aria-label")).toContain("Inconnu");
 	});
 
 	it("uses the profile that matches the observed provider", async () => {
@@ -198,7 +199,6 @@ describe("AuthStatusIndicator badge", () => {
 
 		switchTo("lm-studio");
 		const badge = screen.getByRole("button", { name: "Authentication: lm-studio" });
-		expect(badge).toHaveTextContent("lm-studio");
 		expect(badge.className).not.toContain("undefined");
 	});
 });

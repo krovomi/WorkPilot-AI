@@ -1,9 +1,11 @@
 /**
  * AuthStatusIndicator - Dumb display component for authentication status
  *
- * Shows the active authentication method and provider:
- * - OAuth: Shows "Anthropic" with Lock icon (Claude Code subscription)
- * - API Profile: Shows provider name with Key icon and provider-specific colors
+ * Shows how the provider the usage lens observes is signed in, as an icon
+ * badge next to the lens (which already names the provider):
+ * - OAuth: Lock icon, Anthropic colors (Claude Code subscription)
+ * - API Profile: Key icon and provider-specific colors
+ * The provider's name is in the aria-label and the tooltip.
  *
  * This component does NOT perform any authentication detection.
  * Auth type is derived purely from selectedProvider + profiles data:
@@ -461,15 +463,18 @@ export function AuthStatusIndicator() {
 			<TooltipProvider delayDuration={200}>
 				<Tooltip>
 					<TooltipTrigger asChild>
+						{/* The provider's name is already in the usage lens on its left:
+						    this badge only says how it is signed in (lock: subscription,
+						    key: API key), the details are in the tooltip. */}
 						<button
 							type="button"
-							className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border transition-all hover:opacity-80 ${badgeColorOf(authStatus.provider)}`}
+							className={`flex h-8 w-8 items-center justify-center rounded-md border transition-all hover:opacity-80 ${badgeColorOf(authStatus.provider)}`}
 							aria-label={t("common:usage.authenticationAriaLabel", {
 								provider: badgeLabel,
 							})}
+							data-auth-type={authStatus.type}
 						>
-							<Icon className="h-3.5 w-3.5" />
-							<span className="text-xs font-semibold">{badgeLabel}</span>
+							<Icon className="h-3.5 w-3.5" aria-hidden="true" />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="bottom" className="text-xs max-w-xs p-0">
