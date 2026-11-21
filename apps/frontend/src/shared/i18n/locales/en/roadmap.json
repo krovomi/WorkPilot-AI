@@ -86,6 +86,7 @@
 		}
 	},
 	"competitorAnalysis": {
+		"recently": "recently",
 		"title": "Competitor Analysis",
 		"noAnalysis": "No competitor analysis available",
 		"lastUpdated": "Last updated: {{date}}",
@@ -264,5 +265,9 @@
 	"errors": {
 		"convertFailed": "The feature could not be turned into a task: {{error}}",
 		"unknown": "unknown error"
+	},
+	"providers": {
+		"canny": "Canny",
+		"github_issue": "GitHub Issues"
 	}
 }

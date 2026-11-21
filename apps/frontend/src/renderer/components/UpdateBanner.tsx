@@ -97,12 +97,13 @@ export function UpdateBanner({ className }: UpdateBannerProps) {
 	// Listen for push notifications about updates
 	useEffect(() => {
 		const cleanup = window.electronAPI.onAppUpdateAvailable((info) => {
-			// New update notification - reset dismiss state if new version
-			if (currentVersionRef.current !== info.version) {
-				setIsDismissed(false);
-				currentVersionRef.current = info.version;
-			}
 			setUpdateInfo(info);
+			// Every check repeats this for the version already found: its download
+			// (done or running) and its dismissal stand. This reset them, so a
+			// downloaded update had to be downloaded again after the next poll.
+			if (currentVersionRef.current === info.version) return;
+			currentVersionRef.current = info.version;
+			setIsDismissed(false);
 			setIsDownloading(false);
 			setIsDownloaded(false);
 			setDownloadProgress(null);
@@ -191,6 +192,8 @@ export function UpdateBanner({ className }: UpdateBannerProps) {
 		return null;
 	}
 
+	const percent = Math.min(100, Math.max(0, downloadProgress?.percent ?? 0));
+
 	return (
 		<div
 			className={cn(
@@ -226,14 +229,19 @@ export function UpdateBanner({ className }: UpdateBannerProps) {
 				<div className="mb-3">
 					<div className="flex items-center justify-between text-3xs text-muted-foreground mb-1">
 						<span>{t("navigation:updateBanner.downloading")}</span>
-						<span>{Math.round(downloadProgress.percent)}%</span>
+						<span>{Math.round(percent)}%</span>
 					</div>
-					<div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+					<div
+						role="progressbar"
+						aria-label={t("navigation:updateBanner.downloading")}
+						aria-valuemin={0}
+						aria-valuemax={100}
+						aria-valuenow={Math.round(percent)}
+						className="h-1 w-full bg-muted rounded-full overflow-hidden"
+					>
 						<div
 							className="h-full bg-info transition-all duration-300"
-							style={{
-								width: `${Math.min(100, Math.max(0, downloadProgress.percent))}%`,
-							}}
+							style={{ width: `${percent}%` }}
 						/>
 					</div>
 				</div>
@@ -249,10 +257,7 @@ export function UpdateBanner({ className }: UpdateBannerProps) {
 				<div className="flex items-start gap-2 text-3xs text-warning bg-warning/10 border border-warning/30 rounded p-2 mb-2">
 					<AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
 					<span>
-						{t(
-							"navigation:updateBanner.readOnlyVolumeWarning",
-							"Move to Applications folder to update",
-						)}
+						{t("navigation:updateBanner.readOnlyVolumeWarning")}
 					</span>
 				</div>
 			)}

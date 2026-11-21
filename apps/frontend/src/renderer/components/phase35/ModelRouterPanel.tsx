@@ -5,10 +5,12 @@
  * and (b) a "what would it cost on each tier" comparison table.
  */
 
+import type { TFunction } from "i18next";
 import { ChevronDown, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { formatCurrency, getEurRate } from "../../lib/currency";
+import { useShallow } from "zustand/react/shallow";
+import { formatCurrency } from "../../lib/currency";
 import type { ModelChoice } from "../../../preload/api/modules/phase35-features-api";
 import { useModelRouterStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
@@ -16,6 +18,7 @@ import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { PanelShell } from "./_panel-shell";
+import { useEurRate } from "./_use-eur-rate";
 
 import { NativeSelect } from "../ui/native-select";
 import { Textarea } from "../ui/textarea";
@@ -46,15 +49,17 @@ const TASK_CLASSES = [
 
 const PROMPT_MAX_LEN = 4000;
 
+/** A provider's name, or its id when the router answers with one the panel does not list. */
+function providerLabel(value: string, t: TFunction): string {
+	const opt = PROVIDER_OPTIONS.find((o) => o.value === value);
+	return opt ? t(opt.labelKey as never) : value;
+}
+
 /** Why the router chose this model, in the app language, from its reason code. */
 function RouteReason({ choice }: { choice: ModelChoice }) {
 	const { t } = useTranslation("phase35");
 	const params = choice.reason_params ?? {};
-	const providerLabel = (value: string) => {
-		const opt = PROVIDER_OPTIONS.find((o) => o.value === value);
-		return opt ? t(opt.labelKey as never) : value;
-	};
-	const provider = providerLabel(String(params.provider ?? choice.provider));
+	const provider = providerLabel(String(params.provider ?? choice.provider), t);
 	const tier = t(`modelRouter.tiers.${choice.tier}` as never, { defaultValue: choice.tier });
 	const task = t(`modelRouter.taskClasses.${choice.task_class}` as never, {
 		defaultValue: choice.task_class,
@@ -72,7 +77,7 @@ function RouteReason({ choice }: { choice: ModelChoice }) {
 			lines.push(
 				t("modelRouter.reasons.noModel", {
 					providers: Array.isArray(params.providers)
-						? params.providers.map((p) => providerLabel(String(p))).join(", ")
+						? params.providers.map((p) => providerLabel(String(p), t)).join(", ")
 						: provider,
 				}),
 			);
@@ -106,40 +111,29 @@ function RouteReason({ choice }: { choice: ModelChoice }) {
 
 export function ModelRouterPanel() {
 	const { t, i18n } = useTranslation("phase35");
-	const { phase, error, chosen, comparison, route, compare } = useModelRouterStore();
+	const { phase, error, chosen, comparison, route, compare } = useModelRouterStore(
+		useShallow((s) => ({
+			phase: s.phase,
+			error: s.error,
+			chosen: s.chosen,
+			comparison: s.comparison,
+			route: s.route,
+			compare: s.compare,
+		})),
+	);
 	const [prompt, setPrompt] = useState("");
 	const [hint, setHint] = useState("");
 	const [providers, setProviders] = useState<string[]>(["anthropic"]);
 	const [popoverOpen, setPopoverOpen] = useState(false);
-	const [eurRate, setEurRate] = useState(0.92);
+	const eurRate = useEurRate(i18n.language);
 
-	const isFr = i18n.language.startsWith("fr");
-
-	useEffect(() => {
-		if (!isFr) return;
-		let cancelled = false;
-		void getEurRate().then((r) => {
-			if (!cancelled) setEurRate(r);
-		});
-		return () => {
-			cancelled = true;
-		};
-	}, [isFr]);
 
 	const isRunning = phase === "running";
 
-	const promptError = useMemo(() => {
-		const trimmed = prompt.trim();
-		if (trimmed.length === 0) return t("modelRouter.validation.promptRequired");
-		if (prompt.length > PROMPT_MAX_LEN)
-			return t("common.tooLong", { max: PROMPT_MAX_LEN });
-		return null;
-	}, [prompt, t]);
-
-	const providersError = useMemo(() => {
-		if (providers.length === 0) return t("modelRouter.validation.providersRequired");
-		return null;
-	}, [providers, t]);
+	// The box cuts the prompt at PROMPT_MAX_LEN as it is typed: only an empty one is refused.
+	const promptError = prompt.trim().length === 0 ? t("modelRouter.validation.promptRequired") : null;
+	const providersError =
+		providers.length === 0 ? t("modelRouter.validation.providersRequired") : null;
 
 	const hasValidationError = Boolean(promptError) || Boolean(providersError);
 
@@ -305,19 +299,17 @@ export function ModelRouterPanel() {
 						{providers.length > 0 && (
 							<div className="mt-2 flex flex-wrap gap-1">
 								{providers.map((p) => {
-									const opt = PROVIDER_OPTIONS.find((o) => o.value === p);
+									const label = providerLabel(p, t);
 									return (
 										<Badge
 											key={p}
 											variant="outline"
 											className="gap-1 pr-1 text-xs"
 										>
-											{opt ? t(opt.labelKey as never) : p}
+											{label}
 											<button
 												type="button"
-												aria-label={t("modelRouter.removeProvider", {
-													provider: opt ? t(opt.labelKey as never) : p,
-												})}
+												aria-label={t("modelRouter.removeProvider", { provider: label })}
 												onClick={() => toggleProvider(p)}
 												className="rounded p-0.5 hover:bg-muted"
 											>
@@ -340,7 +332,7 @@ export function ModelRouterPanel() {
 					<div className="rounded border p-3 text-sm space-y-1">
 						<div>
 							<span className="font-medium">{t("modelRouter.chosen")}: </span>
-							<Badge variant="outline">{chosen.provider}</Badge>{" "}
+							<Badge variant="outline">{providerLabel(chosen.provider, t)}</Badge>{" "}
 							{chosen.model ? <code>{chosen.model}</code> : t("modelRouter.noModel")} (
 							{t(`modelRouter.tiers.${chosen.tier}` as never, { defaultValue: chosen.tier })} ·{" "}
 							{t(`modelRouter.taskClasses.${chosen.task_class}` as never, {
@@ -377,7 +369,9 @@ export function ModelRouterPanel() {
 										{t(`modelRouter.tiers.${tier}` as never, { defaultValue: tier })}
 									</td>
 									<td className="p-2 font-mono">
-										{c.model ? `${c.provider}/${c.model}` : t("modelRouter.noModel")}
+										{c.model
+											? `${providerLabel(c.provider, t)} · ${c.model}`
+											: t("modelRouter.noModel")}
 									</td>
 									<td className="p-2 text-right font-mono">
 										{formatCurrency(

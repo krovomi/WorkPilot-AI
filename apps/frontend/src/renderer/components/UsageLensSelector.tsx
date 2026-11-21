@@ -39,8 +39,12 @@ export function UsageLensSelector() {
 	const tooltipSuppressed = useRef(false);
 
 	// A provider the settings do not list (yet) still gets its proper name:
-	// the lens is the only place the header names it.
-	const fallbackLabel = (name: string) => getProviderLabel(name as ApiProvider) ?? name;
+	// the lens is the only place the header names it. "unknown" is a word,
+	// so it is translated rather than taken from the English label table.
+	const fallbackLabel = (name: string) =>
+		name === "unknown"
+			? t("common:usage.providerUnknown")
+			: (getProviderLabel(name as ApiProvider) ?? name);
 	const labelOf = (name: string) =>
 		providers.find((p) => p.name === name)?.label ?? fallbackLabel(name);
 	// Running providers first: they are the ones a person looks for here.

@@ -10,7 +10,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
-import { appendDictation, appendTranscript, undoDictation } from "./dictation";
+import { appendDictation, appendTranscript } from "./dictation";
 import { captureDictation } from "./dictation-audio";
 
 import { NativeSelect } from "../ui/native-select";
@@ -156,8 +156,9 @@ export function TaskDictation({
 		const timer = setInterval(() => setSeconds((value) => value + 1), 1000);
 		return () => clearInterval(timer);
 	}, [phase]);
+	// Called only from buttons disabled while busy or disabled: React applies a
+	// click's state before the next click, so a second start cannot slip in.
 	const start = async (download = false) => {
-		if (phaseRef.current !== "idle" || disabled) return;
 		const current = crypto.randomUUID();
 		session.current = current;
 		setError("");
@@ -389,8 +390,8 @@ export function TaskDictation({
 					size="sm"
 					disabled={disabled || busy}
 					onClick={() => {
-						const previous = undoDictation(description, insertion);
-						if (previous !== null) onChange(previous);
+						// Shown only while the description is still the inserted text.
+						onChange(insertion.before);
 						setInsertion(null);
 					}}
 				>

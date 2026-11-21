@@ -836,8 +836,8 @@
 		},
 		"errors": {
 			"descriptionRequired": "Veuillez fournir une description",
-			"maxImagesReached": "Maximum de 5 images autorisé",
-			"invalidImageType": "Type d'image non valide. Autorisés : PNG, JPEG, GIF, WebP",
+			"maxImagesReached": "{{max}} images au maximum",
+			"invalidImageType": "Type d'image non valide. Autorisés : {{types}}",
 			"processPasteFailed": "Échec du traitement de l'image collée",
 			"processDropFailed": "Échec du traitement de l'image déposée"
 		},

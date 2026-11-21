@@ -1,8 +1,6 @@
 import { CheckCircle2, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import {
-	IDEATION_TYPE_COLORS,
-} from "../../../shared/constants";
+import { IDEATION_TYPE_COLORS } from "../../../shared/constants";
 import type { IdeationConfig, IdeationType } from "../../../shared/types";
 import "../charter/charter.css";
 import { Button } from "../ui/button";
@@ -59,32 +57,31 @@ export function IdeationDialogs({
 						<div className="space-y-3">
 							<h4 className="text-sm font-medium">{t("config.typesLabel")}</h4>
 							{ALL_IDEATION_TYPES.map((type) => (
-								<>
-									<div
-										key={type}
-										className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-									>
-										<div className="flex items-center gap-3">
-											<div
-												className={`p-2 rounded-md ${IDEATION_TYPE_COLORS[type]}`}
-											>
-												<TypeIcon type={type} />
+								<div
+									key={type}
+									className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+								>
+									<div className="flex items-center gap-3">
+										<div
+											className={`p-2 rounded-md ${IDEATION_TYPE_COLORS[type]}`}
+										>
+											<TypeIcon type={type} />
+										</div>
+										<div>
+											<div className="font-medium text-sm">
+												{t(`types.${type}`)}
 											</div>
-											<div>
-												<div className="font-medium text-sm">
-													{t(`types.${type}`)}
-												</div>
-												<div className="text-xs text-muted-foreground">
-													{t(`typeDescriptions.${type}`)}
-												</div>
+											<div className="text-xs text-muted-foreground">
+												{t(`typeDescriptions.${type}`)}
 											</div>
 										</div>
-										<Switch
-											checked={config.enabledTypes.includes(type)}
-											onCheckedChange={() => onToggleIdeationType(type)}
-										/>
 									</div>
-								</>
+									<Switch
+										checked={config.enabledTypes.includes(type)}
+										onCheckedChange={() => onToggleIdeationType(type)}
+										aria-label={t(`types.${type}`)}
+									/>
+								</div>
 							))}
 						</div>
 
@@ -93,8 +90,11 @@ export function IdeationDialogs({
 								{t("config.contextSources")}
 							</h4>
 							<div className="flex items-center justify-between">
-								<span className="text-sm">{t("config.includeRoadmap")}</span>
+								<label htmlFor="ideation-include-roadmap" className="text-sm">
+									{t("config.includeRoadmap")}
+								</label>
 								<Switch
+									id="ideation-include-roadmap"
 									checked={config.includeRoadmapContext}
 									onCheckedChange={(checked) =>
 										onSetConfig({ includeRoadmapContext: checked })
@@ -102,8 +102,11 @@ export function IdeationDialogs({
 								/>
 							</div>
 							<div className="flex items-center justify-between">
-								<span className="text-sm">{t("config.includeKanban")}</span>
+								<label htmlFor="ideation-include-kanban" className="text-sm">
+									{t("config.includeKanban")}
+								</label>
 								<Switch
+									id="ideation-include-kanban"
 									checked={config.includeKanbanContext}
 									onCheckedChange={(checked) =>
 										onSetConfig({ includeKanbanContext: checked })
@@ -135,49 +138,49 @@ export function IdeationDialogs({
 								<p className="text-sm mt-1">{t("addMore.useRegenerate")}</p>
 							</div>
 						) : (
-							availableTypesToAdd.map((type) => (
-								<>
-									{/* biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional */}
-									{/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled elsewhere */}
-									{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: selectable type row */}
-									<div
+							availableTypesToAdd.map((type) => {
+								const picked = typesToAdd.includes(type);
+								return (
+									<button
+										type="button"
 										key={type}
-										className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
-											typesToAdd.includes(type)
+										aria-pressed={picked}
+										className={`flex w-full items-center justify-between p-3 rounded-lg text-left cursor-pointer transition-colors ${
+											picked
 												? "bg-primary/10 border border-primary"
 												: "bg-muted/50 hover:bg-muted"
 										}`}
 										onClick={() => onToggleTypeToAdd(type)}
 									>
-										<div className="flex items-center gap-3">
-											<div
+										<span className="flex items-center gap-3">
+											<span
 												className={`p-2 rounded-md ${IDEATION_TYPE_COLORS[type]}`}
 											>
 												<TypeIcon type={type} />
-											</div>
-											<div>
-												<div className="font-medium text-sm">
+											</span>
+											<span>
+												<span className="block font-medium text-sm">
 													{t(`types.${type}`)}
-												</div>
-												<div className="text-xs text-muted-foreground">
+												</span>
+												<span className="block text-xs text-muted-foreground">
 													{t(`typeDescriptions.${type}`)}
-												</div>
-											</div>
-										</div>
-										<div
+												</span>
+											</span>
+										</span>
+										<span
 											className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-												typesToAdd.includes(type)
+												picked
 													? "border-primary bg-primary"
 													: "border-muted-foreground"
 											}`}
 										>
-											{typesToAdd.includes(type) && (
+											{picked && (
 												<CheckCircle2 className="h-4 w-4 text-primary-foreground" />
 											)}
-										</div>
-									</div>
-								</>
-							))
+										</span>
+									</button>
+								);
+							})
 						)}
 					</div>
 					<DialogFooter className="flex items-center justify-between">

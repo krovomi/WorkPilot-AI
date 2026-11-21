@@ -312,6 +312,12 @@ export function useIdeation(
 
 	const activeIdeas = getFilteredIdeas();
 
+	// The panel shows the idea as the session holds it now (converted, dismissed),
+	// and closes when the idea is gone or the project changed.
+	const liveSelectedIdea = selectedIdea
+		? (session?.ideas.find((idea) => idea.id === selectedIdea.id) ?? null)
+		: null;
+
 	return {
 		// State
 		session,
@@ -321,7 +327,7 @@ export function useIdeation(
 		config,
 		logs,
 		typeStates,
-		selectedIdea,
+		selectedIdea: liveSelectedIdea,
 		activeTab,
 		showConfigDialog,
 		showDismissed,

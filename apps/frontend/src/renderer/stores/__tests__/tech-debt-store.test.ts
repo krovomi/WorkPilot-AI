@@ -167,6 +167,35 @@ describe("tech-debt-store", () => {
 		expect(store().items.map((i) => i.id)).toEqual(["/b-0"]);
 	});
 
+	it("drops an old scan of a project the view left and came back to", async () => {
+		const oldScan = deferred<{ result: DebtReport }>();
+		const newScan = deferred<{ result: DebtReport }>();
+		mockScan.mockReturnValueOnce(oldScan.promise).mockReturnValueOnce(newScan.promise);
+		mockList.mockResolvedValueOnce({ result: report("/b") });
+		const first = store().scan("/a");
+		await store().refresh("/b");
+		const second = store().scan("/a");
+
+		oldScan.resolve({ result: report("/a", 5) });
+		await first;
+		expect(store()).toMatchObject({ projectPath: "/a", scanning: true, items: [] });
+
+		newScan.resolve({ result: report("/a", 2) });
+		await second;
+		expect(store()).toMatchObject({ scanning: false });
+		expect(store().items).toHaveLength(2);
+	});
+
+	it("drops an answer that arrives after the view was cleared", async () => {
+		const answer = deferred<{ result: DebtReport }>();
+		mockScan.mockReturnValueOnce(answer.promise);
+		const scanning = store().scan("/a");
+		store().clear();
+		answer.resolve({ result: report("/a") });
+		await scanning;
+		expect(store()).toMatchObject({ projectPath: null, items: [], scanning: false });
+	});
+
 	it("turns a debt item into a backlog task", async () => {
 		const createdTask = { id: "task-42", title: "Tech debt : m", projectId: "proj-1" };
 		mockCreateTask.mockResolvedValueOnce({ success: true, data: createdTask });
