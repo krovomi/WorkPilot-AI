@@ -1482,7 +1482,8 @@
 		"parent": "⬆ Parent",
 		"noFolders": "No folder found.",
 		"checkPath": "Check the path or your access rights.",
-		"dragReferences": "Drag files to add as references"
+		"dragReferences": "Drag files to add as references",
+		"loadFailed": "Could not open this folder."
 	},
 	"shortcutsOverlay": {
 		"title": "Keyboard Shortcuts",

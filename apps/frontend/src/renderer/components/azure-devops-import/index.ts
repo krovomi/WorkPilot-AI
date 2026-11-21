@@ -1,2 +1,2 @@
 export { AzureDevOpsImportModal } from "./AzureDevOpsImportModal";
-export type { AzureDevOpsFilters, AzureDevOpsImportModalProps } from "./types";
+export type { AzureDevOpsImportModalProps } from "./types";
