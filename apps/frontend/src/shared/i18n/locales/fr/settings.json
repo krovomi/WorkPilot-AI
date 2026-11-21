@@ -248,6 +248,8 @@
 				"deepseek": "Modèles DeepSeek (DeepSeek-Coder, etc.)",
 				"google": "Accès API Google et Google DeepMind",
 				"grok": "Modèles Grok xAI",
+				"openrouter": "Des centaines de modèles de nombreux éditeurs (Kimi, GLM, DeepSeek, Claude, GPT…) avec une seule clé OpenRouter",
+				"huggingface": "Les modèles ouverts du Hub Hugging Face via Inference Providers, facturés sur votre compte Hugging Face",
 				"loadError": "Échec du chargement de la liste des fournisseurs",
 				"meta": "Modèles officiels Meta AI",
 				"mistral": "Modèles Mistral AI (Mistral, Codéal, etc.)",

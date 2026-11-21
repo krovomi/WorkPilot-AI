@@ -164,6 +164,8 @@
 				"aws": "AWS Bedrock and Amazon services",
 				"copilot": "GitHub Copilot",
 				"grok": "Grok xAI models",
+				"openrouter": "Hundreds of models from many vendors (Kimi, GLM, DeepSeek, Claude, GPT…) with one OpenRouter key",
+				"huggingface": "Open models of the Hugging Face Hub through Inference Providers, billed to your Hugging Face account",
 				"windsurf": "Windsurf AI Provider",
 				"cursor": "Cursor AI Provider",
 				"ollama": "Local open-source models with Ollama",

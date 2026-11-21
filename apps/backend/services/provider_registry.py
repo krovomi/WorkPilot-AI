@@ -669,6 +669,42 @@ class ProviderRegistry:
             ],
         )
 
+        # --- Gateways: OpenRouter, Hugging Face Inference Providers ---
+        # Their live lists come from gateway_providers; these are the
+        # registry's defaults, so the phone offers the same first choices.
+        from models_registry import list_provider
+
+        for name, label, description in (
+            (
+                "openrouter",
+                "OpenRouter",
+                "Hundreds of models from many vendors through one OpenRouter key",
+            ),
+            (
+                "huggingface",
+                "Hugging Face",
+                "Open models of the Hub through Hugging Face Inference Providers",
+            ),
+        ):
+            self._providers[name] = Provider(
+                name=name,
+                label=label,
+                description=description,
+                category="special",
+                requires_api_key=True,
+                requires_oauth=False,
+                requires_cli=False,
+                models=[
+                    {
+                        "value": entry.model_id,
+                        "label": entry.label,
+                        "tier": entry.tier,
+                        "supportsThinking": entry.supports_thinking,
+                    }
+                    for entry in list_provider(name)
+                ],
+            )
+
         # --- Windsurf AI (Codeium) ---
         # Source: docs.windsurf.com/windsurf/models
         self._providers["windsurf"] = Provider(
