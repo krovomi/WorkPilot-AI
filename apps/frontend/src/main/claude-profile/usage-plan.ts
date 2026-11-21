@@ -46,6 +46,7 @@ import { loadBetterSqlite } from "../services/windsurf-sqlite";
 import { readSettingsFile } from "../settings-utils";
 import { readClaudeAccountPlan } from "./claude-account-plan";
 import { getFullCredentialsFromKeychain } from "./credential-utils";
+import { gatewayMap } from "../../shared/constants/gateway-providers";
 
 /** A plan changes rarely; reading it once per account every 5 minutes is enough. */
 const PLAN_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -68,6 +69,7 @@ const GLOBAL_API_KEY_SETTING: Readonly<Record<string, readonly string[]>> = {
 	mistral: ["globalMistralApiKey"],
 	deepseek: ["globalDeepSeekApiKey"],
 	grok: ["globalGrokApiKey"],
+	...gatewayMap((gateway) => [gateway.settingsKey]),
 	meta: ["globalMetaApiKey", "globalMetaLlamaApiKey"],
 	aws: ["globalAWSApiKey"],
 };

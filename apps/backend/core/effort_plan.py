@@ -45,7 +45,7 @@ _ALIASES = {
 }
 
 _LOCAL = frozenset({"ollama", "local", "lmstudio", "llama-cpp"})
-_COMPATIBLE = frozenset({"grok", "deepseek", "mistral"})
+_COMPATIBLE = frozenset({"grok", "deepseek", "mistral", "openrouter", "huggingface"})
 # No effort setting reaches these models: Windsurf's gRPC/REST bridge takes
 # none, and `opencode run --variant` names variants per model that WorkPilot
 # cannot know in advance.
@@ -85,6 +85,9 @@ def _sent_from_params(params: dict | None) -> str | None:
         return None
     if "reasoning_effort" in params:
         return str(params["reasoning_effort"])
+    reasoning = params.get("reasoning")
+    if isinstance(reasoning, dict) and reasoning.get("effort"):
+        return str(reasoning["effort"])
     thinking = params.get("thinking")
     if isinstance(thinking, dict) and thinking.get("type") == "disabled":
         return "off"
