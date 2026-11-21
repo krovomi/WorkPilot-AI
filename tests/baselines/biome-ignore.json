@@ -182,7 +182,6 @@
   "apps/frontend/src/renderer/components/task-detail/task-review/WorkspaceStatus.tsx": 1,
   "apps/frontend/src/renderer/components/task-form/RichTextEditor.tsx": 1,
   "apps/frontend/src/renderer/components/task-form/TaskDictation.tsx": 1,
-  "apps/frontend/src/renderer/components/task-form/TaskFormFields.tsx": 2,
   "apps/frontend/src/renderer/components/task-permission/TaskPermissionPrompt.tsx": 1,
   "apps/frontend/src/renderer/components/terminal/TerminalTitle.tsx": 4,
   "apps/frontend/src/renderer/components/terminal/WorktreeSelector.tsx": 2,
