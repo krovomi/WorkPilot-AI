@@ -788,13 +788,18 @@ uses no network.
 
 ### Forges
 
-Project settings writes `GITHUB_REPO` and `GITLAB_PROJECT` into the project's
-`.workpilot/.env`.
+Project settings writes `GITHUB_REPO`, `GITLAB_PROJECT` and the `BITBUCKET_*` keys into the project's
+`.workpilot/.env` ([architecture/bitbucket.md](architecture/bitbucket.md)). `CICD_PROVIDER=bitbucket` picks Bitbucket Pipelines for the CI loop; `auto` picks it when the Bitbucket settings are complete and Azure DevOps, GitHub and GitLab are not.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `GITHUB_REPO` | detected | The project's `owner/repo`, for the GitHub views, the CI loop and the GitHub runner when it cannot detect it. |
 | `GITLAB_PROJECT` | — | The project's `group/project`, for the same uses on GitLab. |
+| `BITBUCKET_ENABLED` | off | `true` shows the project's Bitbucket Cloud views (local projects only). Without it, a stored token turns them on. |
+| `BITBUCKET_WORKSPACE`, `BITBUCKET_REPO` | from the remote | The repository's workspace and slug on bitbucket.org. Project settings fills them from a bitbucket.org remote when empty; `BITBUCKET_REPO` also takes `workspace/repo` or a clone URL. A value that is not a slug, or a URL on another host, gives no Bitbucket config. A task's pull request uses the pushed remote first. |
+| `BITBUCKET_USERNAME` | — | With an API token or an app password, the account's email or username (HTTP Basic). Empty: `BITBUCKET_TOKEN` is sent as a Bearer access token (repository or workspace access token). |
+| `BITBUCKET_TOKEN` | — | Reads issues, pull requests and pipelines; opening a task's pull request also needs pull request write access. Stored `enc:` in `.workpilot/.env` and given to the backend only in its environment; sent only to `https://api.bitbucket.org/2.0`. Secret. |
+| `BITBUCKET_AUTO_SYNC` | off | Stored like the GitHub and GitLab switches. |
 | `AZURE_DEVOPS_EXT_PAT` | — | Read when `AZURE_DEVOPS_PAT` is unset (it is the Azure DevOps CLI's name for it): pushes a task branch and opens its pull request. Secret. |
 | `GITHUB_BOT_TOKEN` | — | Token of the GitHub automation runner's bot account (PR review, auto-fix, triage) when `--bot-token` is not given. It only identifies that account, so the runner skips what the bot wrote itself; nothing is posted with it. Secret. |
 | `MAX_PR_WORKTREES` | 10 | PR-review worktrees kept in `.workpilot/github/pr/worktrees`; the oldest go beyond that. |
