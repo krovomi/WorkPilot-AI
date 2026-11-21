@@ -240,3 +240,60 @@ class TestApply:
         again = PRReviewResult.from_dict(result.to_dict())
         assert again.findings[0].learned_rejections == 3
         assert again.learned_suppressions == [{"id": "x", "rejections": 7}]
+
+
+_SIGNATURES = Path(__file__).parent / "fixtures" / "review_feedback" / "signatures.json"
+
+
+class TestSignatureParity:
+    def test_the_shared_cases_match(self):
+        # The desktop app computes the same signatures for its view
+        # (review-feedback-dataset.ts); both read this file.
+        cases = json.loads(_SIGNATURES.read_text(encoding="utf-8"))["cases"]
+        assert cases
+        for case in cases:
+            assert rf.normalize_title(case["title"]) == case["normalized"]
+            assert rf.signature(case["category"], case["title"]) == case["signature"]
+
+
+def _reset(sig: str) -> dict:
+    return {"v": 1, "at": "2026-11-15T10:00:00Z", "kind": "reset", "signature": sig}
+
+
+class TestReset:
+    def test_a_reset_forgets_the_votes_before_it(self, tmp_path):
+        sig = rf.signature("style", "Missing docstring on `foo`")
+        _write(tmp_path, _rejections(4) + [_reset(sig)])
+        assert rf.load_feedback(tmp_path) == []
+        assert rf.learned_rules(tmp_path) == []
+
+    def test_votes_after_a_reset_count_again(self, tmp_path):
+        sig = rf.signature("style", "Missing docstring on `foo`")
+        after = [_record(pr=50 + i, finding_id=f"a{i}") for i in range(3)]
+        _write(tmp_path, _rejections(4) + [_reset(sig)] + after)
+        rules = rf.learned_rules(tmp_path)
+        assert len(rules) == 1 and rules[0].rejections == 3
+
+    def test_a_reset_leaves_other_kinds_alone(self, tmp_path):
+        other = _rejections(3, title="Prefer an early return")
+        sig = rf.signature("style", "Missing docstring on `foo`")
+        _write(tmp_path, _rejections(3) + other + [_reset(sig)])
+        rules = rf.learned_rules(tmp_path)
+        assert [r.label for r in rules] == ["Prefer an early return"]
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            {"v": 2, "kind": "reset", "signature": "SIG"},
+            {"v": 1, "kind": "other", "signature": "SIG"},
+            {"v": 1, "kind": "reset", "signature": "SIGUP"},
+            {"v": 1, "kind": "reset", "signature": "../../etc"},
+            {"v": 1, "kind": "reset", "signature": 7},
+            ["not", "a", "record"],
+        ],
+    )
+    def test_a_malformed_reset_is_ignored(self, tmp_path, line):
+        sig = rf.signature("style", "Missing docstring on `foo`")
+        raw = json.dumps(line).replace("SIGUP", sig.upper()).replace("SIG", sig)
+        _write(tmp_path, _rejections(3), raw_lines=[raw])
+        assert len(rf.learned_rules(tmp_path)) == 1

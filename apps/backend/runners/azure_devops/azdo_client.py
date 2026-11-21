@@ -8,7 +8,6 @@ for PR review operations.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 from core.io_utils import safe_print
@@ -39,11 +38,11 @@ class AzDOClient:
     def _get_repos_client(self):
         """Lazily initialize the repos client."""
         if self._repos_client is None:
-            # Add connector paths
-            project_root = self.project_dir
-            src_path = project_root / "src"
-            if src_path.exists():
-                sys.path.insert(0, str(project_root))
+            # The connectors are WorkPilot's own `src` package. The project
+            # under review is only read through the API, never imported.
+            from foundation.connectors_path import ensure_connectors_on_path
+
+            ensure_connectors_on_path()
 
             from src.config.settings import Settings
             from src.connectors.azure_devops.client import AzureDevOpsClient

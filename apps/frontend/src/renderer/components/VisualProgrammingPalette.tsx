@@ -2,11 +2,7 @@ import { ChevronRight, Pencil, Plus, Search, X } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	BLOCK_CATEGORIES,
-	type BlockMeta,
-	filterBlocks,
-} from "../lib/architecture-blocks";
+import { type BlockMeta, filterBlocks } from "../lib/architecture-blocks";
 import {
 	BRICK_DRAG_PREFIX,
 	type CustomBrick,
@@ -15,8 +11,8 @@ import {
 import { useCustomBricksStore } from "../stores/custom-bricks-store";
 import { Input } from "./ui/input";
 import { BrickEditorDialog } from "./visual-to-code/BrickEditorDialog";
+
 interface PaletteProps {
-	compact?: boolean;
 	/**
 	 * Click-to-add. Dragging is the only way to place a block without this, and
 	 * a drag is the one gesture that fails silently — on a trackpad, across a
@@ -33,7 +29,6 @@ interface PaletteProps {
  * is only the list: search, collapsible groups, drag and click.
  */
 export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
-	compact = false,
 	onAddBlock,
 }) => {
 	const { t } = useTranslation("visualProgramming");
@@ -71,17 +66,6 @@ export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
 		e.dataTransfer.setData("application/block-type", type);
 		e.dataTransfer.effectAllowed = "copy";
 	};
-
-	if (compact) {
-		return (
-			<div
-				className="flex items-center justify-center w-14 h-14 text-2xl"
-				title={t("showPalette", "Afficher la palette")}
-			>
-				<Search className="h-6 w-6 text-muted-foreground" />
-			</div>
-		);
-	}
 
 	const renderBlock = (block: BlockMeta) => {
 		const Icon = block.icon;
@@ -292,5 +276,3 @@ export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
 		</div>
 	);
 };
-
-export { BLOCK_CATEGORIES };

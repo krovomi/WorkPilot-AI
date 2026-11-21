@@ -13,6 +13,8 @@ export interface DownloadProgress {
 	percentage: number;
 	speed?: string;
 	timeRemaining?: string;
+	/** Seconds left, for views that word the estimate in the app's language. */
+	secondsRemaining?: number;
 	error?: string;
 }
 
@@ -259,11 +261,13 @@ export function initDownloadProgressListener(): () => void {
 		// Calculate speed only if we have meaningful time delta (> 100ms)
 		let speedStr = "";
 		let timeStr = "";
+		let secondsLeft = 0;
 
 		if (timeDelta > 100 && bytesDelta > 0) {
 			const speed = (bytesDelta / timeDelta) * 1000; // bytes per second
 			const remaining = data.total - data.completed;
 			const timeRemaining = speed > 0 ? Math.ceil(remaining / speed) : 0;
+			secondsLeft = Math.max(0, timeRemaining);
 
 			// Format speed (MB/s or KB/s)
 			if (speed > 1024 * 1024) {
@@ -294,6 +298,7 @@ export function initDownloadProgressListener(): () => void {
 			percentage: data.percentage,
 			speed: speedStr || undefined,
 			timeRemaining: timeStr || undefined,
+			secondsRemaining: secondsLeft || undefined,
 		});
 	};
 

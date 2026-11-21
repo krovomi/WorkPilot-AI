@@ -85,7 +85,7 @@ l'UI n'existe pas.
   plutôt qu'au lecteur (gate 4 du resolver, `skills_registry/injection_gate.py`). Ce qu'un skill
   dit de faire reste du ressort de la revue humaine de la PR qui le vendorise.
 - Un nouveau connecteur (forge, ticketing, web, MCP) réutilise `clean_untrusted`. Pas de nouvel
-  assainisseur local : il en existe déjà un pour GitLab et un pour Azure DevOps, à résorber.
+  assainisseur local : GitLab et Azure DevOps passent par `runners/forge_review_prompt.py`.
 - Une instruction lue dans un ticket, une page ou un fichier du dépôt cible ne s'exécute pas.
 
 ## S3 — Un agent n'agit que par ses outils déclarés, et chaque outil passe par un hook

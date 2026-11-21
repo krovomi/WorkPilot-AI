@@ -35,7 +35,7 @@ providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les
 | nettoyage + scan d'injection + journal | `untrusted.py` (`clean_untrusted`, `quote_untrusted`, `record_untrusted`) ; `_FORGE_PATTERNS` : ce qu'un texte de forge demande à l'agent (script distant, secret, push sans revue, garde-fou, contrôle coupé), noté `suspect` ici seulement |
 | scanner d'injection | `injection_guard/` (`get_default_scanner`) ; `WORKPILOT_INJECTION_GUARD=block` durcit `quote_untrusted` |
 | nettoyage brut | `content_sanitizer.py` (utilisé par `untrusted.py`) |
-| appliqué aujourd'hui à | GitHub (`runners/github/context_gatherer.py`, `runners/github/batch_issues.py`) ; les corps de skills à l'émission (`skills_registry/injection_gate.py`, gate 4 du resolver) ; GitLab et Azure DevOps ont encore leur propre assainisseur |
+| appliqué aujourd'hui à | GitHub (`runners/github/context_gatherer.py`, `runners/github/batch_issues.py`) ; GitLab et Azure DevOps (`runners/forge_review_prompt.py`) ; les corps de skills à l'émission (`skills_registry/injection_gate.py`, gate 4 du resolver) |
 | refus plutôt que nettoyage, pour un corps de skill | `skills_registry/injection_gate.py` (liste fermée de verdicts ; `WORKPILOT_INJECTION_GUARD=report` rétrograde en avertissement) |
 
 Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middleware.py`,

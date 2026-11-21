@@ -5,6 +5,7 @@ import {
 	FolderOpen,
 	GitMerge,
 	RefreshCw,
+	Scale,
 	Target,
 	TrendingDown,
 	TrendingUp,
@@ -14,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useServerProjectId } from "../hooks/useServerProjectId";
 import { loadCostSummary, loadDashboardSnapshot } from "../lib/workspace-data";
+import { HowYouCompare } from "./analytics/HowYouCompare";
 import {
 	Bar,
 	CharterButton,
@@ -95,7 +97,7 @@ const STATUS_TONES: Record<string, Tone> = {
 
 const BREAKDOWN_TONES: Tone[] = ["accent", "blue", "green", "amber", "violet", "pink"];
 
-type AnalyticsTab = "overview" | "costs" | "performance";
+type AnalyticsTab = "overview" | "costs" | "performance" | "compare";
 
 /** A panel of the dashboard: kicker, title, then its figures. */
 function Card({
@@ -306,6 +308,7 @@ export function AnalyticsDashboard({ projectPath }: AnalyticsDashboardProps) {
 		{ id: "overview", label: t("analytics:tabs.overview"), icon: Target },
 		{ id: "costs", label: t("analytics:tabs.costs"), icon: Activity },
 		{ id: "performance", label: t("analytics:tabs.performance"), icon: Zap },
+		{ id: "compare", label: t("analytics:tabs.compare"), icon: Scale },
 	] as const;
 
 	return (
@@ -421,6 +424,10 @@ export function AnalyticsDashboard({ projectPath }: AnalyticsDashboardProps) {
 							</Card>
 						)}
 					</>
+				)}
+
+				{tab === "compare" && (
+					<HowYouCompare projectPath={projectPath} serverProjectId={serverProjectId} />
 				)}
 			</Page>
 		</ModuleStage>

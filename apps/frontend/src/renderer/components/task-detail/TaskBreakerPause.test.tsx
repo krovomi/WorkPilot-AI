@@ -36,4 +36,9 @@ describe("TaskBreakerPause", () => {
 		render(<TaskBreakerPause task={task("kill_switch")} />);
 		expect(screen.getByTestId("task-kill-switch-pause")).toHaveTextContent("Stopped by Stop all agents");
 	});
+
+	it("says a spoken stop stopped it after its step", () => {
+		render(<TaskBreakerPause task={task("voice_stop")} />);
+		expect(screen.getByTestId("task-voice-stop-pause")).toHaveTextContent("Stopped by voice after its step");
+	});
 });

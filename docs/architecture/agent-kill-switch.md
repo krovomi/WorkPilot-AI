@@ -57,6 +57,11 @@ fermeture de l'app (`app_shutdown`) : le prochain lancement ne la reprend pas.
 insights…) n'a rien à reprendre : il est arrêté. Une tâche dont la pause ne s'écrit pas est
 arrêtée quand même : arrêter est la raison d'être du bouton.
 
+**À la voix.** L'assistant vocal offre un arrêt plus doux : « stop », confirmé, écrit la même
+pause (`reason: "voice_stop"`) sans arrêter le processus, et la session se termine après
+l'appel d'outil en cours, que `tool_breaker.py` voit passer
+([voice-assistant.md](voice-assistant.md)).
+
 **Où.** Le bouton rouge apparaît dans le rail de la barre latérale tant qu'une tâche tourne ; le
 raccourci Ctrl+Maj+. (Cmd+Maj+. sur macOS) marche toujours, même dans un champ de saisie. Le
 canal `AGENTS_STOP_ALL` ne prend aucun argument : ce qui tourne est lu dans le main.

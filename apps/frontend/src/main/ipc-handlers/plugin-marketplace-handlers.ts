@@ -52,6 +52,17 @@ function pluginIdOf(payload: unknown): string {
 	return pluginId;
 }
 
+/** A plugin id the creator accepts: lowercase words joined by single hyphens. */
+const PLUGIN_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const PLUGIN_ID_MAX_LENGTH = 64;
+
+/** The id a create request names, or `null` when it is not a plain plugin id. */
+export function creatablePluginId(payload: unknown): string | null {
+	const id = (payload as { id?: unknown } | null)?.id;
+	if (typeof id !== "string" || id.length > PLUGIN_ID_MAX_LENGTH) return null;
+	return PLUGIN_ID_PATTERN.test(id) ? id : null;
+}
+
 /**
  * The directory `folderPath` names, when it is an existing folder strictly under
  * the creator's `local/` directory — symlinks resolved — and `null` otherwise.
@@ -181,6 +192,10 @@ export function registerPluginMarketplaceHandlers(): void {
 				templateContent?: string;
 			},
 		) => {
+			// The id becomes a folder name: only a plain id, checked here.
+			if (!creatablePluginId(data)) {
+				return { success: false, error: "Invalid plugin ID" };
+			}
 			try {
 				const pluginsDir = path.join(getPluginDataDir(), "local", data.id);
 				if (fs.existsSync(pluginsDir)) {

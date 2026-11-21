@@ -92,15 +92,6 @@ export function GitLabIssues({
 		[serverProject, createCard],
 	);
 
-	const handleStartInvestigation = useCallback(
-		(selectedNoteIds: number[]) => {
-			if (selectedIssueForInvestigation) {
-				startInvestigation(selectedIssueForInvestigation, selectedNoteIds);
-			}
-		},
-		[selectedIssueForInvestigation, startInvestigation],
-	);
-
 	const handleCloseDialog = useCallback(() => {
 		setShowInvestigateDialog(false);
 		resetInvestigationStatus();
@@ -164,16 +155,20 @@ export function GitLabIssues({
 				</div>
 			</div>
 
-			{/* Investigation Dialog */}
-			<InvestigationDialog
-				open={showInvestigateDialog}
-				onOpenChange={setShowInvestigateDialog}
-				selectedIssue={selectedIssueForInvestigation}
-				investigationStatus={investigationStatus}
-				onStartInvestigation={handleStartInvestigation}
-				onClose={handleCloseDialog}
-				projectId={selectedProject?.id}
-			/>
+			{/* Investigation Dialog, once an issue was chosen for it */}
+			{selectedIssueForInvestigation && (
+				<InvestigationDialog
+					open={showInvestigateDialog}
+					onOpenChange={setShowInvestigateDialog}
+					selectedIssue={selectedIssueForInvestigation}
+					investigationStatus={investigationStatus}
+					onStartInvestigation={(selectedNoteIds) =>
+						startInvestigation(selectedIssueForInvestigation, selectedNoteIds)
+					}
+					onClose={handleCloseDialog}
+					projectId={selectedProject?.id}
+				/>
+			)}
 		</div>
 	);
 }

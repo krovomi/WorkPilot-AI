@@ -80,6 +80,7 @@
 					"openWindsurfLogin": "windsurf.com/account",
 					"orManual": "Ou connectez-vous manuellement :",
 					"saveAndConnect": "Enregistrer et connecter",
+					"saveFailed": "Impossible d'enregistrer le jeton Windsurf détecté. Relancez la détection ou collez une clé dans l'onglet Clé API.",
 					"saveSuccess": "Connexion Windsurf enregistrée avec succès !",
 					"terminalInstructions": "Cela ouvrira un terminal où vous pourrez exécuter la commande `/login` pour vous authentifier.",
 					"tokenDetected": "Clé API détectée",
@@ -891,7 +892,7 @@
 		"filterStateLabel": "État",
 		"filterTypeAll": "Tous les types",
 		"filterTypeLabel": "Type d'élément de travail",
-		"importButton_one": "Importer les éléments depuis Azure DevOps",
+		"importButton_one": "Importer {{count}} élément",
 		"importButton_other": "Importer {{count}} éléments",
 		"importConfirmButton": "Importer {{count}} élément(s)",
 		"importConfirmDescription": "Les éléments suivants seront importés dans la colonne {{column}}.",
@@ -915,11 +916,11 @@
 		"successTitle": "Import réussi !",
 		"title": "Importer les éléments Azure DevOps",
 		"titleWithRepository": "Importer les éléments de {{repository}}",
-		"toggleSelection": "Basculer la sélection pour l'élément de travail {{id}}",
 		"importError": "Échec de l'import Azure DevOps",
 		"repositoryLabel": "Dépôt :",
 		"sidePanelAriaLabel": "Panneau d'import Azure DevOps",
-		"resizeHandleAriaLabel": "Redimensionner le panneau"
+		"resizeHandleAriaLabel": "Redimensionner le panneau",
+		"priorityBadge": "P{{priority}}"
 	},
 	"collaboration": {
 		"description": "Paramètres de collaboration multi-utilisateurs",
@@ -1574,7 +1575,8 @@
 		"statusLabel": "Statut",
 		"allStatuses": "Tous les statuts",
 		"dragHint": "Glissez les tickets sélectionnés dans une colonne du Kanban pour les importer",
-		"resize": "Redimensionner"
+		"resize": "Redimensionner",
+		"sidePanelAriaLabel": "Panneau d'import Jira"
 	},
 	"language": {
 		"description": "Sélectionnez la langue de l'interface de l'application",

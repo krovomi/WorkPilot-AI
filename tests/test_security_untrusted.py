@@ -178,3 +178,26 @@ class TestTheGithubIngestPointsAreWired:
 
         item = IssueBatchItem(issue_number=12, title="Bug", body=HIDDEN)
         assert IssueBatchItem.from_dict(item.to_dict()).body == item.body
+
+
+class TestCharactersAReaderDoesNotSee:
+    def test_control_zero_width_and_tag_characters_are_removed(self):
+        tagged = "".join(chr(0xE0000 + ord(c)) for c in "hidden")
+        text = f"a\x00b\x1b[0mc​d‍e⁠f﻿g{tagged}h\x85i\x7fj"
+
+        cleaned = clean_untrusted(text, kind="comment")
+
+        assert cleaned.text == "ab[0mcdefghij"
+        assert cleaned.changed
+        assert any("invisible" in item for item in cleaned.removed)
+
+    def test_line_breaks_tabs_and_visible_text_are_kept(self):
+        text = "line one\r\nline two\n\tindented é 😀 مرحبا"
+        assert clean_untrusted(text, kind="comment").text == text
+
+    def test_a_lone_carriage_return_is_removed(self):
+        assert clean_untrusted("shown\rhidden", kind="comment").text == "shownhidden"
+
+    def test_cleaning_twice_is_cleaning_once(self):
+        once = clean_untrusted("x​y\x00z", kind="comment").text
+        assert clean_untrusted(once, kind="comment").text == once == "xyz"

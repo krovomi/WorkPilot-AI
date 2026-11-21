@@ -8,8 +8,7 @@ import {
 } from "lucide-react";
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { EXECUTION_PHASE_LABELS } from "../../shared/constants";
-import type { Task } from "../../shared/types";
+import type { ExecutionPhase, Task } from "../../shared/types";
 import {
 	type CompactedStatus,
 	compactSessionHistory,
@@ -21,13 +20,18 @@ interface SessionCompactionBadgeProps {
 	task: Task;
 }
 
-const STATUS_DOT: Record<CompactedStatus, { className: string; pulse?: boolean }> =
-	{
-		completed: { className: "bg-success" },
-		failed: { className: "bg-destructive" },
-		in_progress: { className: "bg-info", pulse: true },
-		pending: { className: "bg-muted-foreground/40" },
-	};
+/** The current phase, in the app's language (`tasks:execution.phases`). */
+const PHASE_LABEL_KEYS: Record<ExecutionPhase, string> = {
+	idle: "execution.phases.idle",
+	planning: "execution.phases.planning",
+	coding: "execution.phases.coding",
+	rate_limit_paused: "execution.phases.rate_limit_paused",
+	auth_failure_paused: "execution.phases.auth_failure_paused",
+	qa_review: "execution.phases.reviewing",
+	qa_fixing: "execution.phases.fixing",
+	complete: "execution.phases.complete",
+	failed: "execution.phases.failed",
+};
 
 function StatusIcon({ status }: { status: CompactedStatus }) {
 	switch (status) {
@@ -109,7 +113,18 @@ export const SessionCompactionBadge = memo(
 							</span>
 						</div>
 						<p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-							{handoff.contextSummary}
+							{lastFailure
+								? t("labels.compactionSummaryFailed", {
+										completed: handoff.completedPhases,
+										total: totalPhases,
+										count: handoff.failedPhases,
+										index: lastFailure.index,
+										title: lastFailure.title,
+									})
+								: t("labels.compactionSummaryClean", {
+										completed: handoff.completedPhases,
+										total: totalPhases,
+									})}
 						</p>
 						{/* Progress bar */}
 						<div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -160,38 +175,28 @@ export const SessionCompactionBadge = memo(
 						</div>
 					</div>
 
-					{/* Footer: current phase / last failure */}
-					{(currentPhase || lastFailure) && (
+					{/* Footer: the last failure, else the current phase */}
+					{lastFailure ? (
 						<div className="border-t border-border/60 px-4 py-2 text-3xs">
-							{lastFailure ? (
-								<div className="flex items-center gap-1.5 text-destructive">
-									<AlertTriangle className="h-3 w-3" />
-									<span className="font-medium">
-										{t("labels.lastError")}:
-									</span>
-									<span className="truncate text-muted-foreground">
-										#{lastFailure.index} {lastFailure.title}
-									</span>
-								</div>
-							) : currentPhase ? (
-								<div className="flex items-center gap-1.5 text-muted-foreground">
-									<span
-										className={cn(
-											"h-1.5 w-1.5 rounded-full",
-											STATUS_DOT.in_progress.className,
-											"animate-pulse",
-										)}
-									/>
-									<span className="font-medium text-foreground">
-										{t("labels.currentPhase")}:
-									</span>
-									<span>
-										{EXECUTION_PHASE_LABELS[currentPhase] || currentPhase}
-									</span>
-								</div>
-							) : null}
+							<div className="flex items-center gap-1.5 text-destructive">
+								<AlertTriangle className="h-3 w-3" />
+								<span className="font-medium">{t("labels.lastError")}:</span>
+								<span className="truncate text-muted-foreground">
+									#{lastFailure.index} {lastFailure.title}
+								</span>
+							</div>
 						</div>
-					)}
+					) : currentPhase ? (
+						<div className="border-t border-border/60 px-4 py-2 text-3xs">
+							<div className="flex items-center gap-1.5 text-muted-foreground">
+								<span className="h-1.5 w-1.5 rounded-full bg-info animate-pulse" />
+								<span className="font-medium text-foreground">
+									{t("labels.currentPhase")}:
+								</span>
+								<span>{t(PHASE_LABEL_KEYS[currentPhase])}</span>
+							</div>
+						</div>
+					) : null}
 				</PopoverContent>
 			</Popover>
 		);

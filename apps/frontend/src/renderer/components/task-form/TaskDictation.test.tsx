@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskDictation } from "./TaskDictation";
-import { captureDictation } from "./dictation-audio";
+import { captureDictation, type DictationStop } from "./dictation-audio";
 
 vi.mock("./dictation-audio", () => ({ captureDictation: vi.fn() }));
 vi.mock("react-i18next", () => ({
@@ -31,7 +31,7 @@ describe("editable task dictation", () => {
 		});
 		vi.mocked(captureDictation).mockImplementation(async (callback) => {
 			chunk = callback;
-			return stop;
+			return Object.assign(stop, { flush: vi.fn() });
 		});
 	});
 	it("preserves manual corrections and concurrent ticket edits; inserts only once", async () => {
@@ -117,7 +117,7 @@ describe("editable task dictation", () => {
 	});
 
 	it("releases a microphone that opens after the user cancelled", async () => {
-		let opened!: (stop: (discard?: boolean) => void) => void;
+		let opened!: (stop: DictationStop) => void;
 		vi.mocked(captureDictation).mockImplementationOnce(
 			() =>
 				new Promise((resolve) => {
@@ -137,7 +137,7 @@ describe("editable task dictation", () => {
 		await waitFor(() => expect(captureDictation).toHaveBeenCalled());
 		expect(pending).toHaveBeenLastCalledWith(true);
 		fireEvent.click(screen.getByText("dictation.cancel"));
-		await act(async () => opened(stop));
+		await act(async () => opened(Object.assign(stop, { flush: vi.fn() })));
 		expect(stop).toHaveBeenCalledWith(true);
 		expect(pending).toHaveBeenLastCalledWith(false);
 	});
