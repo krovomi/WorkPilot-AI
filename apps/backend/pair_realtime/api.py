@@ -18,7 +18,6 @@ Mounted at `/api/pair-realtime`. Endpoints:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 
@@ -245,10 +244,8 @@ async def stream(
         )
 
     async def event_source():
-        try:
-            async for op in room.subscribe(since_sequence=since_sequence):
-                yield f"data: {json.dumps(op.to_dict())}\n\n"
-        except asyncio.CancelledError:
-            return
+        # `subscribe` ends quietly when the client goes away.
+        async for op in room.subscribe(since_sequence=since_sequence):
+            yield f"data: {json.dumps(op.to_dict())}\n\n"
 
     return StreamingResponse(event_source(), media_type="text/event-stream")

@@ -4,8 +4,8 @@ The whole authorization design rests on one FastAPI behaviour: dependencies
 passed to ``include_router`` apply to every path operation in that router. If
 that ever stopped holding, ~150 legacy endpoints would silently lose their
 guard while every other test kept passing — so it is pinned here directly,
-including for the seven routers that declare absolute paths with no ``prefix=``
-(``dashboard``, ``slash_commands``, ``system_status``…), which is the shape a
+including for the routers that declare absolute paths with no ``prefix=``
+(``dashboard``, ``slash_commands``…), which is the shape a
 policy table keyed on ``router.prefix`` would have missed.
 """
 

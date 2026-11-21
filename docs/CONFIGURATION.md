@@ -455,9 +455,6 @@ is taken so the user knows the output is not live data:
 - **Bounty board** — contestants fall back to a `[stub:...]` output string
   when the `llm_client` module is not importable. Logs a warning per
   contestant.
-- **Analytics API** ([apps/backend/analytics/api_minimal.py](../apps/backend/analytics/api_minimal.py))
-  currently returns empty/mock payloads for every endpoint. Treat it as a
-  scaffold until a real database-backed implementation lands.
 
 ## QA validation loop
 
