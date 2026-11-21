@@ -9,7 +9,7 @@
 		"backendUnreachable": "Backend inaccessible. Le backend tourne-t-il sur le port 9000 ?",
 		"noData": "Aucune donnée — lancez l'analyse pour voir les résultats.",
 		"required": "Champ requis",
-		"invalidNumber": "Nombre invalide",
+		"pickerFailed": "La boîte de dialogue des fichiers n’a pas pu s’ouvrir.",
 		"invalidPath": "Chemin invalide",
 		"selectAtLeastOne": "Sélectionnez au moins une option",
 		"tooLong": "Texte trop long (limite : {{max}} caractères)",
@@ -247,8 +247,7 @@
 		"recommendations": "Correctifs suggérés",
 		"hasCritical": "Problèmes critiques présents",
 		"validation": {
-			"logRequired": "Collez un log non vide",
-			"logTooLarge": "Log trop volumineux (limite : {{max}} caractères)"
+			"logRequired": "Collez un log non vide"
 		},
 		"kinds": {
 			"timeout": "Délai dépassé",
@@ -526,6 +525,7 @@
 		"sourceLocaleCustom": "Autre (saisie manuelle)…",
 		"sourceLocaleCustomPlaceholder": "ex : pt-BR",
 		"sourceLocaleCustomLabel": "Code locale personnalisé",
+		"sourceLocaleCustomCancel": "Revenir à la liste des langues",
 		"strategy": "Stratégie de placeholder",
 		"runReport": "Lancer le rapport",
 		"scannedDir": "Lu depuis {{dir}}",
@@ -654,8 +654,7 @@
 			"promptRequired": "Saisissez un prompt",
 			"budgetTooSmall": "Le budget doit être ≥ 100 tokens",
 			"budgetTooLarge": "Le budget doit être ≤ 200 000 tokens",
-			"duplicatePath": "Ce fichier est déjà dans la liste",
-			"pathTooLong": "Chemin trop long (limite : {{max}} caractères)"
+			"duplicatePath": "Ce fichier est déjà dans la liste"
 		},
 		"estimatedCost": "Coût estimé",
 		"costFor": "pour {{provider}} / {{model}}",
@@ -671,6 +670,7 @@
 		"keywords": "Mots-clés lus dans la tâche : {{list}}",
 		"copy": "Copier le contexte",
 		"copied": "Contexte copié",
+		"copyFailed": "Le presse-papiers a refusé la copie.",
 		"refusedTitle": "Fichiers non lus",
 		"refused": {
 			"outside": "hors du projet",
@@ -697,6 +697,9 @@
 		"tampered": "Chaîne falsifiée",
 		"eventsChecked": "événements vérifiés",
 		"replayLabel": "Rejeu",
+		"brokenAt": "La chaîne est rompue à l’événement n° {{sequence}}.",
+		"noEvents": "Cette piste ne contient encore aucun événement.",
+		"noReplayEvents": "Aucun événement ne porte cet identifiant de corrélation.",
 		"validation": {
 			"storageDirRequired": "Renseignez un répertoire de stockage",
 			"trailNameRequired": "Renseignez un nom de piste",
@@ -738,9 +741,7 @@
 		"validation": {
 			"roomIdRequired": "Saisissez un ID de salle",
 			"roomIdInvalid": "ID de salle invalide (lettres, chiffres, _ et -, 1–64 caractères)",
-			"nameRequired": "Saisissez votre nom",
-			"messageEmpty": "Le message est vide",
-			"messageTooLong": "Message trop long (limite : {{max}} caractères)"
+			"nameRequired": "Saisissez votre nom"
 		},
 		"opKinds": {
 			"edit": "modification",

@@ -9,14 +9,10 @@ import {
 	type DragEvent,
 	useCallback,
 	useEffect,
-	useMemo,
 	useRef,
 	useState,
 } from "react";
-import {
-	ALLOWED_IMAGE_TYPES_DISPLAY,
-	MAX_IMAGES_PER_TASK,
-} from "../../../shared/constants";
+import { MAX_IMAGES_PER_TASK } from "../../../shared/constants";
 import type { ImageAttachment } from "../../../shared/types";
 import {
 	blobToBase64,
@@ -34,12 +30,12 @@ export interface FileReferenceData {
 	isDirectory: boolean;
 }
 
-/** Error messages that can be customized/translated by callers */
+/** The error messages, translated by the caller. */
 interface ImageUploadErrorMessages {
-	maxImagesReached?: string;
-	invalidImageType?: string;
-	processPasteFailed?: string;
-	processDropFailed?: string;
+	maxImagesReached: string;
+	invalidImageType: string;
+	processPasteFailed: string;
+	processDropFailed: string;
 }
 
 interface UseImageUploadOptions {
@@ -51,8 +47,8 @@ interface UseImageUploadOptions {
 	disabled?: boolean;
 	/** Callback to set error message */
 	onError?: (error: string | null) => void;
-	/** Custom error messages for i18n support */
-	errorMessages?: ImageUploadErrorMessages;
+	/** The error messages shown to the person, in the app's language. */
+	errorMessages: ImageUploadErrorMessages;
 	/** Callback when a file reference is dropped (from FileTreeItem drag) */
 	onFileReferenceDrop?: (reference: string, data: FileReferenceData) => void;
 }
@@ -72,40 +68,30 @@ interface UseImageUploadReturn {
 	handleDrop: (e: DragEvent<HTMLElement>) => Promise<void>;
 	/** Remove an image by ID */
 	removeImage: (imageId: string) => void;
-	/** Whether more images can be added */
-	canAddMore: boolean;
-	/** Number of remaining image slots */
-	remainingSlots: number;
 }
 
-// Default error messages (English fallbacks)
-const DEFAULT_ERROR_MESSAGES: Required<ImageUploadErrorMessages> = {
-	maxImagesReached: `Maximum of ${MAX_IMAGES_PER_TASK} images allowed`,
-	invalidImageType: `Invalid image type. Allowed: ${ALLOWED_IMAGE_TYPES_DISPLAY}`,
-	processPasteFailed: "Failed to process pasted image",
-	processDropFailed: "Failed to process dropped image",
-};
+/** The extension a pasted image is saved with. */
+function pastedExtension(mimeType: string): string {
+	return mimeType === "image/svg+xml" ? "svg" : mimeType.split("/")[1];
+}
 
 export function useImageUpload({
 	images,
 	onImagesChange,
 	disabled = false,
 	onError,
-	errorMessages = {},
+	errorMessages: errors,
 	onFileReferenceDrop,
 }: UseImageUploadOptions): UseImageUploadReturn {
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [pasteSuccess, setPasteSuccess] = useState(false);
 	const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	// Merge custom error messages with defaults (memoized to prevent useCallback invalidation)
-	const errors = useMemo<Required<ImageUploadErrorMessages>>(
-		() => ({
-			...DEFAULT_ERROR_MESSAGES,
-			...errorMessages,
-		}),
-		[errorMessages],
-	);
+	// The images as they are now: reading an image takes a while, and the list
+	// may change meanwhile (another paste, a thumbnail loaded from disk).
+	const imagesRef = useRef(images);
+	useEffect(() => {
+		imagesRef.current = images;
+	}, [images]);
 
 	// Cleanup timeout on unmount
 	useEffect(() => {
@@ -117,7 +103,6 @@ export function useImageUpload({
 	}, []);
 
 	const remainingSlots = MAX_IMAGES_PER_TASK - images.length;
-	const canAddMore = remainingSlots > 0;
 
 	/**
 	 * Process image items and add them to the images array
@@ -143,14 +128,7 @@ export function useImageUpload({
 			const itemsToProcess = items.slice(0, remainingSlots);
 
 			for (const item of itemsToProcess) {
-				let file: File | null = null;
-
-				if (item instanceof File) {
-					file = item;
-				} else if ("getAsFile" in item) {
-					file = item.getAsFile();
-				}
-
+				const file = item instanceof File ? item : item.getAsFile();
 				if (!file) continue;
 
 				// Validate image type
@@ -166,8 +144,7 @@ export function useImageUpload({
 					// Generate filename based on source
 					let baseFilename: string;
 					if (options.isFromPaste || !file.name || file.name === "image.png") {
-						const extension = file.type.split("/")[1] || "png";
-						baseFilename = `screenshot-${Date.now()}.${extension}`;
+						baseFilename = `screenshot-${Date.now()}.${pastedExtension(file.type)}`;
 					} else {
 						baseFilename = file.name;
 					}
@@ -195,8 +172,17 @@ export function useImageUpload({
 				}
 			}
 
-			if (newImages.length > 0) {
-				onImagesChange([...images, ...newImages]);
+			const latest = imagesRef.current;
+			const added = newImages.slice(
+				0,
+				Math.max(0, MAX_IMAGES_PER_TASK - latest.length),
+			);
+			if (added.length < newImages.length) {
+				onError?.(errors.maxImagesReached);
+			}
+			if (added.length > 0) {
+				imagesRef.current = [...latest, ...added];
+				onImagesChange(imagesRef.current);
 				// Show success feedback (clear any existing timeout first)
 				if (successTimeoutRef.current) {
 					clearTimeout(successTimeoutRef.current);
@@ -216,8 +202,7 @@ export function useImageUpload({
 	 */
 	const handlePaste = useCallback(
 		async (e: ClipboardEvent<HTMLElement>) => {
-			const clipboardItems = e.clipboardData?.items;
-			if (!clipboardItems) return;
+			const clipboardItems = e.clipboardData.items;
 
 			// Find image items in clipboard
 			const imageItems: DataTransferItem[] = [];
@@ -329,16 +314,14 @@ export function useImageUpload({
 				return;
 			}
 
-			const files = e.dataTransfer?.files;
+			const files = e.dataTransfer.files;
 
 			// Filter for image files
 			const imageFiles: File[] = [];
-			if (files && files.length > 0) {
-				for (let i = 0; i < files.length; i++) {
-					const file = files[i];
-					if (file.type.startsWith("image/")) {
-						imageFiles.push(file);
-					}
+			for (let i = 0; i < files.length; i++) {
+				const file = files[i];
+				if (file.type.startsWith("image/")) {
+					imageFiles.push(file);
 				}
 			}
 
@@ -372,7 +355,5 @@ export function useImageUpload({
 		handleDragLeave,
 		handleDrop,
 		removeImage,
-		canAddMore,
-		remainingSlots,
 	};
 }

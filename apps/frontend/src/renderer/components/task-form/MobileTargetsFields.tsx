@@ -40,10 +40,12 @@ export function MobileTargetsFields({
 }: MobileTargetsFieldsProps) {
 	const { t } = useTranslation(["mobile"]);
 	const profile = setup?.profile;
-	const hasApp = Boolean(profile?.isMobile && profile.stack);
-	const noApp = Boolean(profile && !profile.isMobile && profile.frameworks?.length);
-	const available = hasApp ? (profile?.stack?.platforms ?? []) : MOBILE_PLATFORMS;
-	const plan = setup?.plan;
+	// The app the project has, or the project with none that a setup could add.
+	const stack = profile?.isMobile ? profile.stack : undefined;
+	const hasApp = Boolean(stack);
+	const noApp =
+		profile && !profile.isMobile && profile.frameworks?.length ? profile : null;
+	const available = stack ? stack.platforms : MOBILE_PLATFORMS;
 	const recommended = profile?.frameworks?.[0]?.id;
 
 	return (
@@ -62,13 +64,13 @@ export function MobileTargetsFields({
 						<p className="font-medium">{t("mobile:targets.noAppTitle")}</p>
 						<p className="text-muted-foreground">
 							{t("mobile:targets.noAppPreamble", {
-								dir: profile?.mobileDir ?? "mobile",
+								dir: noApp.mobileDir ?? "mobile",
 							})}
 						</p>
-						{profile?.hostStacks && profile.hostStacks.length > 0 && (
+						{noApp.hostStacks && noApp.hostStacks.length > 0 && (
 							<p className="text-muted-foreground">
 								{t("mobile:targets.hostStacks", {
-									stacks: profile.hostStacks
+									stacks: noApp.hostStacks
 										.map((stack) => t(`mobile:stacks.${stack}`, { defaultValue: stack }))
 										.join(", "),
 								})}
@@ -92,14 +94,14 @@ export function MobileTargetsFields({
 				</p>
 			)}
 
-			{hasApp && profile?.stack && (
+			{stack && (
 				<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
 					<Smartphone className="h-3.5 w-3.5" />
 					{t("mobile:targets.detected", {
-						framework: t(`mobile:frameworks.${profile.stack.framework}`, {
-							defaultValue: profile.stack.framework,
+						framework: t(`mobile:frameworks.${stack.framework}`, {
+							defaultValue: stack.framework,
 						}),
-						platforms: profile.stack.platforms
+						platforms: stack.platforms
 							.map((platform) => t(`mobile:targets.${platform}`))
 							.join(", "),
 					})}
@@ -135,12 +137,12 @@ export function MobileTargetsFields({
 				})}
 			</div>
 
-			{plan && setup && (
+			{setup?.plan && (
 				<div className="space-y-2 border-t border-border pt-3" data-testid="mobile-setup-plan">
 					{setup.locked ? (
 						<p className="text-xs text-muted-foreground">
 							{t("mobile:targets.frameworkLocked", {
-								framework: plan.framework.label,
+								framework: setup.plan.framework.label,
 							})}
 						</p>
 					) : (
@@ -153,7 +155,7 @@ export function MobileTargetsFields({
 							</Label>
 							<NativeSelect
 								id={`${idPrefix}mobile-framework`}
-								value={plan.framework.id}
+								value={setup.plan.framework.id}
 								disabled={disabled}
 								onChange={(event) => setup.setFramework(event.target.value)}
 							>
@@ -171,7 +173,7 @@ export function MobileTargetsFields({
 						{t("mobile:targets.tasksHeading")}
 					</p>
 					<ul className="list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
-						{[plan.install, ...plan.platforms].map((step) => (
+						{[setup.plan.install, ...setup.plan.platforms].map((step) => (
 							<li key={`${step.mark.step}-${step.mark.platform ?? ""}`}>
 								{step.existing
 									? t("mobile:targets.reused", { title: step.title })
