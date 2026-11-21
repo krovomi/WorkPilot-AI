@@ -1,4 +1,4 @@
-import { OctagonX, Repeat } from "lucide-react";
+import { Mic, OctagonX, Repeat } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { BreakerPauseDetail, Task } from "../../../shared/types";
 import { Button } from "../ui/button";
@@ -16,11 +16,23 @@ export function breakerPause(task: Task): BreakerPauseDetail | null {
 
 /**
  * Why a task the backend stopped is paused: the circuit breaker saw its agent
- * repeat a tool call (`agents/tool_breaker.py`), or the person stopped every
- * agent at once. Resuming is the Resume button beside it.
+ * repeat a tool call (`agents/tool_breaker.py`), the person stopped every
+ * agent at once, or said « stop » to the voice assistant. Resuming is the
+ * Resume button beside it.
  */
 export function TaskBreakerPause({ task }: { readonly task: Task }) {
 	const { t } = useTranslation(["tasks"]);
+	if (task.metadata?.paused?.enabled && task.metadata.paused.reason === "voice_stop") {
+		return (
+			<span
+				className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+				data-testid="task-voice-stop-pause"
+			>
+				<Mic className="h-3.5 w-3.5" aria-hidden="true" />
+				{t("tasks:breakerPause.voiceStop")}
+			</span>
+		);
+	}
 	if (task.metadata?.paused?.enabled && task.metadata.paused.reason === "kill_switch") {
 		return (
 			<span

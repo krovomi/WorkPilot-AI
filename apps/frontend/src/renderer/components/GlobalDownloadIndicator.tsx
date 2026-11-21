@@ -8,7 +8,8 @@ import {
 	RotateCw,
 	X,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { cn } from "../lib/utils";
 import { useOllamaModelDownload } from "../hooks/useOllamaModelDownload";
@@ -46,31 +47,14 @@ export function GlobalDownloadIndicator() {
 
 	const hasActive = activeDownloads.length > 0;
 
-	// Determine which icon to show based on download status
-	// biome-ignore lint/suspicious/noImplicitAnyLet: type inferred from assignment
-	let statusIcon;
-	if (hasActive) {
-		statusIcon = <Loader2 className="h-4 w-4 animate-spin text-primary" />;
-	} else if (completedDownloads.length > 0 && failedDownloads.length === 0) {
-		statusIcon = <Check className="h-4 w-4 text-success" />;
-	} else if (failedDownloads.length > 0) {
-		statusIcon = <AlertCircle className="h-4 w-4 text-destructive" />;
-	} else {
-		statusIcon = <Download className="h-4 w-4 text-muted-foreground" />;
-	}
-
-	// Determine status text based on download state
-	// biome-ignore lint/suspicious/noImplicitAnyLet: type inferred from assignment
-	let statusText;
-	if (hasActive) {
-		statusText = t("downloads.downloading", { count: activeDownloads.length });
-	} else if (completedDownloads.length > 0) {
-		statusText = t("downloads.complete", { count: completedDownloads.length });
-	} else if (failedDownloads.length > 0) {
-		statusText = t("downloads.failed", { count: failedDownloads.length });
-	} else {
-		statusText = t("downloads.cancelledLabel");
-	}
+	// One state drives both the icon and the words, so a failure is never
+	// announced as "complete" next to a red icon.
+	const { icon: statusIcon, text: statusText } = describeDownloads(
+		activeDownloads.length,
+		completedDownloads.length,
+		failedDownloads.length,
+		t,
+	);
 
 	// Determine button background color based on active state
 	const buttonBgClass = hasActive ? "bg-primary/10" : "bg-muted/50";
@@ -78,47 +62,39 @@ export function GlobalDownloadIndicator() {
 	return (
 		<div className="fixed bottom-4 right-4 z-50 max-w-sm">
 			<div className="rounded-lg border border-border bg-card shadow-lg overflow-hidden">
-				{/* Header */}
-				<button
-					type="button"
-					className={cn(
-						"flex items-center justify-between px-3 py-2 cursor-pointer w-full text-left",
-						buttonBgClass,
-					)}
-					onClick={() => setIsExpanded(!isExpanded)}
-					aria-expanded={isExpanded}
-					aria-label={t("downloads.toggleExpand")}
-				>
-					<div className="flex items-center gap-2">
-						{statusIcon}
-						<span className="text-sm font-medium">{statusText}</span>
-					</div>
-					<div className="flex items-center gap-1">
-						{!hasActive && (
-							<button
-								type="button"
-								onClick={(e) => {
-									e.stopPropagation();
-									// Clear all completed/failed downloads
-									allDownloads.forEach((d) => {
-										if (d.status !== "starting" && d.status !== "downloading") {
-											clearDownload(d.modelName);
-										}
-									});
-								}}
-								className="p-1 hover:bg-muted rounded"
-								aria-label={t("downloads.clearAll")}
-							>
-								<X className="h-3.5 w-3.5 text-muted-foreground" />
-							</button>
-						)}
+				{/* Header: the toggle and "clear all" are siblings, never nested buttons */}
+				<div className={cn("flex items-center", buttonBgClass)}>
+					<button
+						type="button"
+						className="flex flex-1 items-center justify-between gap-2 px-3 py-2 cursor-pointer text-left"
+						onClick={() => setIsExpanded(!isExpanded)}
+						aria-expanded={isExpanded}
+						aria-label={t("downloads.toggleExpand")}
+					>
+						<span className="flex items-center gap-2">
+							{statusIcon}
+							<span className="text-sm font-medium">{statusText}</span>
+						</span>
 						{isExpanded ? (
 							<ChevronDown className="h-4 w-4 text-muted-foreground" />
 						) : (
 							<ChevronUp className="h-4 w-4 text-muted-foreground" />
 						)}
-					</div>
-				</button>
+					</button>
+					{!hasActive && (
+						<button
+							type="button"
+							onClick={() => {
+								// Clear all completed/failed/cancelled downloads
+								for (const d of allDownloads) clearDownload(d.modelName);
+							}}
+							className="mr-2 p-1 hover:bg-muted rounded"
+							aria-label={t("downloads.clearAll")}
+						>
+							<X className="h-3.5 w-3.5 text-muted-foreground" />
+						</button>
+					)}
+				</div>
 
 				{/* Download list (expanded) */}
 				{isExpanded && (
@@ -162,12 +138,9 @@ export function GlobalDownloadIndicator() {
 											download.status === "downloading") && (
 											<>
 												<span className="text-xs text-muted-foreground">
-													{(() => {
-														if (download.percentage > 0) {
-															return `${Math.round(download.percentage)}%`;
-														}
-														return t("downloads.starting");
-													})()}
+													{download.percentage > 0
+														? `${Math.round(download.percentage)}%`
+														: t("downloads.starting")}
 												</span>
 												<button
 													type="button"
@@ -197,12 +170,14 @@ export function GlobalDownloadIndicator() {
 												<div className="h-full w-1/4 rounded-full bg-primary animate-indeterminate" />
 											)}
 										</div>
-										{(download.speed || download.timeRemaining) && (
+										{(download.speed || download.secondsRemaining) && (
 											<div className="flex items-center justify-between text-3xs text-muted-foreground">
-												<span>{download.speed || ""}</span>
-												<span className="text-primary">
-													{download.timeRemaining || ""}
-												</span>
+												<span>{download.speed}</span>
+												{download.secondsRemaining ? (
+													<span className="text-primary">
+														{formatRemaining(download.secondsRemaining, t)}
+													</span>
+												) : null}
 											</div>
 										)}
 									</>
@@ -226,4 +201,46 @@ export function GlobalDownloadIndicator() {
 			</div>
 		</div>
 	);
+}
+
+/** Icon and header words for the whole set of downloads. */
+function describeDownloads(
+	active: number,
+	completed: number,
+	failed: number,
+	t: TFunction,
+): { icon: ReactNode; text: string } {
+	if (active > 0) {
+		return {
+			icon: <Loader2 className="h-4 w-4 animate-spin text-primary" />,
+			text: t("downloads.downloading", { count: active }),
+		};
+	}
+	if (failed > 0) {
+		return {
+			icon: <AlertCircle className="h-4 w-4 text-destructive" />,
+			text: t("downloads.failed", { count: failed }),
+		};
+	}
+	if (completed > 0) {
+		return {
+			icon: <Check className="h-4 w-4 text-success" />,
+			text: t("downloads.complete", { count: completed }),
+		};
+	}
+	return {
+		icon: <Download className="h-4 w-4 text-muted-foreground" />,
+		text: t("downloads.cancelledLabel"),
+	};
+}
+
+/** "3m remaining", in the app's language, from the store's seconds. */
+function formatRemaining(seconds: number, t: TFunction): string {
+	if (seconds > 3600) {
+		return t("downloads.hoursRemaining", { count: Math.ceil(seconds / 3600) });
+	}
+	if (seconds > 60) {
+		return t("downloads.minutesRemaining", { count: Math.ceil(seconds / 60) });
+	}
+	return t("downloads.secondsRemaining", { count: seconds });
 }

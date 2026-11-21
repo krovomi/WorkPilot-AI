@@ -1,4 +1,9 @@
-import type { IPCResult, UsageSnapshot } from "../../shared/types";
+import type {
+	IPCResult,
+	UsageSnapshot,
+	WindsurfDetection,
+	WindsurfTokenSave,
+} from "../../shared/types";
 import {
 	type AgentAPI,
 	type AzureDevOpsAPI,
@@ -403,20 +408,10 @@ export interface ElectronAPI
 		repo: string;
 		token: string;
 	}) => Promise<{ success: boolean; status?: number; error?: string }>;
-	/** Detect Windsurf API key from local IDE installation (state.vscdb) + account info */
-	detectWindsurfToken: () => Promise<{
-		success: boolean;
-		apiKey?: string;
-		userName?: string;
-		planName?: string;
-		usageInfo?: {
-			usedMessages: number;
-			totalMessages: number;
-			usedFlowActions: number;
-			totalFlowActions: number;
-		};
-		error?: string;
-	}>;
+	/** Whether the local Windsurf IDE holds a key, and its account; the key stays in main */
+	detectWindsurfToken: () => Promise<WindsurfDetection>;
+	/** Save the key the local Windsurf IDE holds as the global Windsurf key (main reads it) */
+	saveDetectedWindsurfToken: () => Promise<WindsurfTokenSave>;
 	/** Check Claude OAuth status from CLI config files on disk */
 	checkClaudeOAuth: () => Promise<{
 		isAuthenticated: boolean;
@@ -567,12 +562,13 @@ export const createElectronAPI = (): ElectronAPI => {
 				config,
 			),
 		detectWindsurfToken: () =>
-			invokeIpc<{
-				success: boolean;
-				apiKey?: string;
-				userName?: string;
-				error?: string;
-			}>(IPC_CHANNELS.CREDENTIAL_DETECT_WINDSURF_TOKEN),
+			invokeIpc<WindsurfDetection>(
+				IPC_CHANNELS.CREDENTIAL_DETECT_WINDSURF_TOKEN,
+			),
+		saveDetectedWindsurfToken: () =>
+			invokeIpc<WindsurfTokenSave>(
+				IPC_CHANNELS.CREDENTIAL_SAVE_DETECTED_WINDSURF_TOKEN,
+			),
 		checkClaudeOAuth: () =>
 			invokeIpc<{ isAuthenticated: boolean; profileName?: string }>(
 				IPC_CHANNELS.CREDENTIAL_CHECK_CLAUDE_OAUTH,

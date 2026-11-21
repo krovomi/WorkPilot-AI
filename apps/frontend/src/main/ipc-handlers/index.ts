@@ -130,6 +130,7 @@ import { registerSelfHealingBisectHandlers } from "./self-healing-bisect-handler
 import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
+import { registerServerSsoHandlers } from "./server-sso-handlers";
 import { registerServerProjectHandlers } from "./server-project-handlers";
 import { registerServerWorkspaceHandlers } from "./server-workspace-handlers";
 import { registerBuildCompareHandlers } from "./build-compare-handlers";
@@ -345,8 +346,9 @@ export function setupIpcHandlers(
 	registerJevHandlers();
 	registerSecureStorageHandlers();
 
-	// Multi-user server mode: connection + login (local / Entra ID)
+	// Multi-user server mode: connection + login (local / Entra ID / any OIDC)
 	registerServerAuthHandlers(getMainWindow);
+	registerServerSsoHandlers(getMainWindow);
 	// Multi-tenant administration console (orgs, roles, members, quotas, audit)
 	registerServerAdminHandlers();
 	registerServerProjectHandlers();

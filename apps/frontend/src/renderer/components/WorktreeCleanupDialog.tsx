@@ -16,6 +16,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { cn } from "../lib/utils";
 
 interface WorktreeCleanupDialogProps {
 	readonly open: boolean;
@@ -41,29 +42,14 @@ export function WorktreeCleanupDialog({
 }: WorktreeCleanupDialogProps) {
 	const { t } = useTranslation(["dialogs", "common"]);
 
-	// biome-ignore lint/suspicious/noImplicitAnyLet: type inferred from assignment
-	let buttonContent;
+	let ButtonIcon = FolderX;
+	let buttonLabel = t("dialogs:worktreeCleanup.confirm");
 	if (isProcessing) {
-		buttonContent = (
-			<>
-				<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-				{t("dialogs:worktreeCleanup.completing")}
-			</>
-		);
+		ButtonIcon = Loader2;
+		buttonLabel = t("dialogs:worktreeCleanup.completing");
 	} else if (error) {
-		buttonContent = (
-			<>
-				<RefreshCw className="mr-2 h-4 w-4" />
-				{t("dialogs:worktreeCleanup.retry")}
-			</>
-		);
-	} else {
-		buttonContent = (
-			<>
-				<FolderX className="mr-2 h-4 w-4" />
-				{t("dialogs:worktreeCleanup.confirm")}
-			</>
-		);
+		ButtonIcon = RefreshCw;
+		buttonLabel = t("dialogs:worktreeCleanup.retry");
 	}
 
 	return (
@@ -127,7 +113,10 @@ export function WorktreeCleanupDialog({
 								: "bg-success text-success-foreground hover:bg-success/90"
 						}
 					>
-						{buttonContent}
+						<ButtonIcon
+							className={cn("mr-2 h-4 w-4", isProcessing && "animate-spin")}
+						/>
+						{buttonLabel}
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>

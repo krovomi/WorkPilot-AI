@@ -112,5 +112,5 @@ nouveau canal n'y entre jamais.
 |---|---|---|
 | Unitaires | `src/**/__tests__/`, `*.test.ts(x)` | `pnpm test` (Vitest) |
 | Intégration | `src/__tests__/integration/` | `pnpm test` |
-| E2E | `e2e/`, l'app lancée par `e2e/app-harness.ts` ; un projet local ouvert par `e2e/local-project.ts` ; `menu-pages.e2e.ts` ouvre chaque entrée du menu (repère `data-nav-item`), `kanban-flow.e2e.ts` mène une carte jusqu'à Done avec l'agent factice `e2e/fake-backend/` (il lui faut `apps/backend/.venv`) | `pnpm run build && pnpm run test:e2e` (Playwright, xvfb sous Linux) |
+| E2E | `e2e/`, l'app lancée par `e2e/app-harness.ts` ; un projet local ouvert par `e2e/local-project.ts` ; `menu-pages.e2e.ts` ouvre chaque entrée du menu (repère `data-nav-item`), `kanban-flow.e2e.ts` mène une carte jusqu'à Done avec l'agent factice `e2e/fake-backend/` (il lui faut `apps/backend/.venv`) ; parcours multi-features : `e2e/journeys/` | `pnpm run build && pnpm run test:e2e` (Playwright, xvfb sous Linux) |
 | E2E contre un serveur | `e2e/*.server-e2e.ts` : un vrai serveur démarré par `tests/server_e2e/app_world.py` (Python du backend), GitHub et GitLab simulés par `tests/server_e2e/fake_forge.py` ; démarrage, connexion, menu et appels vus par la forge dans `e2e/server-harness.ts` | `pnpm run build && pnpm run test:e2e:server` |

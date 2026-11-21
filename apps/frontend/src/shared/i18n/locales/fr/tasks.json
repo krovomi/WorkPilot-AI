@@ -106,6 +106,9 @@
 		"sessionCompaction": "Compaction de session",
 		"criticalPhases": "Étapes clés",
 		"lastError": "Dernière erreur",
+		"compactionSummaryClean": "{{completed}}/{{total}} phases terminées, aucun échec.",
+		"compactionSummaryFailed_one": "{{completed}}/{{total}} phases terminées, {{count}} à revoir. Dernier problème à la phase {{index}} : {{title}}",
+		"compactionSummaryFailed_other": "{{completed}}/{{total}} phases terminées, {{count}} à revoir. Dernier problème à la phase {{index}} : {{title}}",
 		"automation": "Automations",
 		"automationTooltip": "Créée par la règle d'automatisation « {{rule}} »"
 	},
@@ -273,7 +276,10 @@
 		"bulkRestoreSuccess": "{{count}} tâche(s) restaurée(s)",
 		"sortActiveDragHint": "Réorganisation manuelle désactivée tant qu'un tri est actif. Repassez en « Ordre manuel » pour glisser-déposer.",
 		"aging": {
-			"idleFor": "Inactive depuis {{duration}}"
+			"idleFor": "Inactive depuis {{duration}}",
+			"days": "{{count}}j",
+			"hours": "{{count}}h",
+			"minutes": "{{count}}min"
 		},
 		"stale": {
 			"chip": "{{count}} inactive(s)",
@@ -1066,6 +1072,10 @@
 		"capture": "Capturer",
 		"capturing": "Capture...",
 		"noSources": "Aucun écran ou fenêtre trouvé",
+		"kind": {
+			"screen": "Écran",
+			"window": "Fenêtre"
+		},
 		"errors": {
 			"getSources": "Échec de l'obtention des sources de capture d'écran",
 			"fetchSources": "Échec de la récupération des sources de capture d'écran",
@@ -2614,7 +2624,8 @@
 		"chip": "Coupe-circuit : {{tool}}",
 		"body": "L'agent a appelé {{tool}} {{repeats}} fois avec les mêmes arguments et a reçu chaque fois le même résultat, sans modifier de fichier entre-temps. La tâche s'est mise en pause plutôt que de payer une boucle.",
 		"hint": "Lisez ses journaux. Reprendre relance la phase avec la même conversation ; si elle boucle encore, changez de modèle ou précisez la tâche.",
-		"killSwitch": "Arrêtée par « Arrêter tous les agents »"
+		"killSwitch": "Arrêtée par « Arrêter tous les agents »",
+		"voiceStop": "Arrêtée à la voix après son étape"
 	},
 	"safetyPause": {
 		"anomalyChip": "Score de confiance : {{score}}/100",
