@@ -106,6 +106,9 @@
 		"sessionCompaction": "Compaction de session",
 		"criticalPhases": "Étapes clés",
 		"lastError": "Dernière erreur",
+		"compactionSummaryClean": "{{completed}}/{{total}} phases terminées, aucun échec.",
+		"compactionSummaryFailed_one": "{{completed}}/{{total}} phases terminées, {{count}} à revoir. Dernier problème à la phase {{index}} : {{title}}",
+		"compactionSummaryFailed_other": "{{completed}}/{{total}} phases terminées, {{count}} à revoir. Dernier problème à la phase {{index}} : {{title}}",
 		"automation": "Automations",
 		"automationTooltip": "Créée par la règle d'automatisation « {{rule}} »"
 	},

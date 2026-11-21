@@ -534,7 +534,10 @@
 		"cancel": "Cancel this download",
 		"retry": "Retry",
 		"cancelledLabel": "Cancelled",
-		"hint": "Downloads keep running in the background, even if you close this task."
+		"hint": "Downloads keep running in the background, even if you close this task.",
+		"hoursRemaining": "{{count}}h remaining",
+		"minutesRemaining": "{{count}}m remaining",
+		"secondsRemaining": "{{count}}s remaining"
 	},
 	"ideation": {
 		"converting": "Converting...",
