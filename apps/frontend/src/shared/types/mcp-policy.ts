@@ -8,6 +8,8 @@
  * `.workpilot/.env` is written; the renderer only hides and explains.
  */
 
+import type { McpAcceptedFinding } from "./mcp-code-scan";
+
 /** What the file asks, once checked. */
 export interface McpInstallPolicy {
 	/** Catalog ids that may be installed; absent: any catalog server. */
@@ -16,6 +18,8 @@ export interface McpInstallPolicy {
 	minScore?: number;
 	/** A server that is not a catalog server, as the catalog defines it, is refused. */
 	blockCustomServers: boolean;
+	/** Findings of the code scan the team has reviewed, each with its reason (lot 3). */
+	acceptedFindings?: McpAcceptedFinding[];
 }
 
 /** Why the file is not a policy; i18n key under `mcpMarketplace.policy.invalid`. */
