@@ -34,6 +34,7 @@ __all__ = [
     "body_tags",
     "now_iso",
     "inside",
+    "listed",
 ]
 
 _WIKILINK = re.compile(r"\[\[([^\]\|#]+)(?:#[^\]\|]*)?(?:\|[^\]]*)?\]\]")
@@ -43,6 +44,18 @@ _FENCE = re.compile(r"```.*?```", re.DOTALL)
 # Never part of the brain's content: Obsidian's own state, git, and the
 # generated graph.
 _SKIP_DIRS = {".git", ".obsidian", ".trash", "graphify-out", ".brain"}
+
+
+def listed(value: Any) -> list[Any]:
+    """A frontmatter list field as a list.
+
+    A person editing a note in Obsidian writes ``agents: coder`` as readily as
+    ``agents: [coder]``. Read as ``list(value)``, the first is five letters —
+    and written back, it stays five letters.
+    """
+    if isinstance(value, list):
+        return list(value)
+    return [value] if value not in (None, "") else []
 
 
 def now_iso() -> str:

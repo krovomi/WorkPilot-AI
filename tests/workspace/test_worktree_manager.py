@@ -49,6 +49,17 @@ def hook(repo: Path, name: str, body: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
+def break_git_file(worktree: Path) -> None:
+    """Point a worktree's `.git` file nowhere.
+
+    Rewritten in place: Git for Windows hides `.git`, and Windows refuses to
+    open a hidden file for a fresh write ("w"), so "r+" keeps its attributes.
+    """
+    with (worktree / ".git").open("r+", encoding="utf-8") as handle:
+        handle.truncate(0)
+        handle.write("gitdir: /nowhere\n")
+
+
 @pytest.fixture
 def repo(isolated_repo, tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -142,7 +153,7 @@ class TestCreateWorktree:
     def test_a_broken_worktree_is_recreated(self, manager, task):
         # Regression: git refuses `worktree remove --force` on a `.git` file it
         # cannot validate, and the task could never get a worktree again.
-        (task.path / ".git").write_text("gitdir: /nowhere\n", encoding="utf-8")
+        break_git_file(task.path)
         assert manager.get_worktree_info(SPEC) is None
 
         info = manager.create_worktree(SPEC)
@@ -154,7 +165,7 @@ class TestCreateWorktree:
         self, manager, task, monkeypatch
     ):
         # On Windows a file held open by another process survives the delete.
-        (task.path / ".git").write_text("gitdir: /nowhere\n", encoding="utf-8")
+        break_git_file(task.path)
         monkeypatch.setattr(
             worktree_module.shutil, "rmtree", lambda *_a, **_k: None, raising=True
         )

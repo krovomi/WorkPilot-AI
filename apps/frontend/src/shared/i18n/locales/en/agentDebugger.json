@@ -18,6 +18,7 @@
 	"noFrames": "No paused frames.",
 	"continue": "Continue",
 	"skip": "Skip",
+	"refused": "The debugger refused this change: the paused call may have ended already.",
 	"description": "Pause an agent before a tool call that matches a breakpoint, inspect its input, then let it continue or skip it. Works with every provider and stack.",
 	"kickers": {
 		"sessions": "Sessions",
