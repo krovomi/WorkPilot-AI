@@ -149,6 +149,8 @@ interface FormulaMatrixState {
 	/** Cost ↔ Confidence preference, 0-1. Persisted across opens. */
 	weight: number;
 	selectedKey: string | null;
+	/** Key of the formula the task runs on, as opposed to the one selected. */
+	appliedKey: string | null;
 	applying: boolean;
 	/** AI refine pass in flight. */
 	refining: boolean;
@@ -198,6 +200,7 @@ export const useFormulaMatrixStore = create<FormulaMatrixState>((set, get) => ({
 	error: null,
 	weight: 0.5,
 	selectedKey: null,
+	appliedKey: null,
 	applying: false,
 	refining: false,
 	refineError: null,
@@ -211,6 +214,9 @@ export const useFormulaMatrixStore = create<FormulaMatrixState>((set, get) => ({
 			matrix: null,
 			error: null,
 			selectedKey: args.appliedKey ?? null,
+			appliedKey: args.appliedKey ?? null,
+			refining: false,
+			refineError: null,
 		});
 		void get().fetchMatrix();
 	},
@@ -223,6 +229,7 @@ export const useFormulaMatrixStore = create<FormulaMatrixState>((set, get) => ({
 			matrix: null,
 			error: null,
 			selectedKey: null,
+			appliedKey: null,
 			refining: false,
 			refineError: null,
 		}),
@@ -243,8 +250,11 @@ export const useFormulaMatrixStore = create<FormulaMatrixState>((set, get) => ({
 				specDir: args.specDir,
 				providers: args.providers,
 			});
+			// The lab was closed or opened on another ticket meanwhile.
+			if (get().openArgs !== args) return;
 			set({ matrix, loading: false });
 		} catch (err) {
+			if (get().openArgs !== args) return;
 			set({
 				loading: false,
 				error: err instanceof Error ? err.message : String(err),
@@ -260,7 +270,10 @@ export const useFormulaMatrixStore = create<FormulaMatrixState>((set, get) => ({
 			const ok = await persistUpdateTask(ticketId, {
 				metadata: buildAppliedFormulaMetadata(formula),
 			});
-			if (ok) set({ selectedKey: formulaKey(formula) });
+			if (ok && get().ticketId === ticketId) {
+				const key = formulaKey(formula);
+				set({ selectedKey: key, appliedKey: key });
+			}
 			return ok;
 		} finally {
 			set({ applying: false });
@@ -283,37 +296,41 @@ export const useFormulaMatrixStore = create<FormulaMatrixState>((set, get) => ({
 		}));
 
 		set({ refining: true, refineError: null });
+		let refined: RefinedFormula[];
 		try {
-			const { refined } = (await globalThis.electronAPI.refineFormulas({
+			({ refined } = (await globalThis.electronAPI.refineFormulas({
 				description: openArgs?.description,
 				candidates,
-			})) as { refined: RefinedFormula[] };
-			if (refined.length === 0) {
-				set({ refineError: "no_assessment" });
-				return;
-			}
-			const byKey = new Map(refined.map((r) => [r.key, r]));
-			const merged = matrix.formulas.map((f) => {
-				const r = byKey.get(formulaKey(f));
-				if (!r) return f;
-				return {
-					...f,
-					success_probability: r.success_probability,
-					value_score: _defaultValueScore(
-						r.success_probability,
-						f.expected_cost_usd,
-					),
-					ai_refined: true,
-					refine_reason: r.reason,
-				};
-			});
-			set({ matrix: { ...matrix, formulas: merged } });
+			})) as { refined: RefinedFormula[] });
 		} catch (err) {
+			// Another matrix (other ticket, or none) is shown now: drop the answer.
+			if (get().matrix !== matrix) return;
 			set({
+				refining: false,
 				refineError: err instanceof Error ? err.message : String(err),
 			});
-		} finally {
-			set({ refining: false });
+			return;
 		}
+		if (get().matrix !== matrix) return;
+		if (refined.length === 0) {
+			set({ refining: false, refineError: "no_assessment" });
+			return;
+		}
+		const byKey = new Map(refined.map((r) => [r.key, r]));
+		const merged = matrix.formulas.map((f) => {
+			const r = byKey.get(formulaKey(f));
+			if (!r) return f;
+			return {
+				...f,
+				success_probability: r.success_probability,
+				value_score: _defaultValueScore(
+					r.success_probability,
+					f.expected_cost_usd,
+				),
+				ai_refined: true,
+				refine_reason: r.reason,
+			};
+		});
+		set({ refining: false, matrix: { ...matrix, formulas: merged } });
 	},
 }));

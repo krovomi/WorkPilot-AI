@@ -6,6 +6,7 @@
  * Drawn by the shared ui/progress-ring.
  */
 
+import { useTranslation } from "react-i18next";
 import { ProgressRing } from "../ui/progress-ring";
 
 export interface SuccessRingProps {
@@ -35,6 +36,7 @@ export function SuccessRing({
 	showLabel = true,
 	className,
 }: SuccessRingProps) {
+	const { t } = useTranslation(["formulaLab"]);
 	const clamped = Math.max(0, Math.min(1, value));
 	const color = ringColor(clamped);
 	const percent = Math.round(clamped * 100);
@@ -46,7 +48,7 @@ export function SuccessRing({
 			stroke={stroke}
 			color={color}
 			className={className}
-			ariaLabel={`${percent}% success`}
+			ariaLabel={t("formulaLab:ring.aria", { percent })}
 			label={showLabel ? percent : undefined}
 			labelStyle={{ fontSize: size * 0.28, color }}
 		/>
