@@ -194,7 +194,15 @@ describe("GITHUB_AUTOFIX_CHECK_NEW", () => {
 		state.run.stdout = 'progress\n[{"number": 8}]';
 
 		await expect(invoke(IPC_CHANNELS.GITHUB_AUTOFIX_CHECK_NEW)).resolves.toEqual([{ number: 8 }]);
-		expect(state.runs[0].args).toEqual([path.join("/backend", "runners", "github", "runner.py"), "--project", projectDir, "check-new"]);
+		// The project's repository, not whatever `gh repo view` answers in its folder.
+		expect(state.runs[0].args).toEqual([
+			path.join("/backend", "runners", "github", "runner.py"),
+			"--project",
+			projectDir,
+			"--repo",
+			"acme/shop",
+			"check-new",
+		]);
 		expect(state.runs[0].env).toEqual({ RUNNER_ENV: "1" });
 	});
 
@@ -460,7 +468,7 @@ describe("GITHUB_AUTOFIX_APPROVE_BATCHES", () => {
 		const result = await invoke(IPC_CHANNELS.GITHUB_AUTOFIX_APPROVE_BATCHES, approved);
 
 		expect(result).toEqual({ success: true, batches: [] });
-		expect(state.runs[0].args.slice(1, 4)).toEqual(["--project", projectDir, "approve-batches"]);
+		expect(state.runs[0].args.slice(1, 6)).toEqual(["--project", projectDir, "--repo", "acme/shop", "approve-batches"]);
 		expect(state.runs[0].env).toEqual({ RUNNER_ENV: "1" });
 		expect(handed).toEqual([
 			{

@@ -22,6 +22,7 @@ import {
 	updateImplementationPlanStatus,
 } from "./spec-utils";
 import { autofixIpcMain as ipcMain } from "./autofix-ipc-guard";
+import { githubRunnerTarget } from "./runner-target";
 import { getGitHubConfig, githubFetch } from "./utils";
 import { createIPCCommunicators } from "./utils/ipc-communicator";
 import { createContextLogger } from "./utils/logger";
@@ -334,12 +335,15 @@ async function checkNewIssues(
 
 	// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 	const backendPath = validation.backendPath!;
+	const target = githubRunnerTarget(project);
 	const args = buildRunnerArgs(
 		getRunnerPath(backendPath),
 		project.path,
 		"check-new",
+		[],
+		{ repo: target.repo },
 	);
-	const subprocessEnv = await getRunnerEnv();
+	const subprocessEnv = await getRunnerEnv(target.env);
 
 	const { promise } = runPythonSubprocess<Array<{ number: number }>>({
 		pythonPath: getPythonPath(backendPath),
@@ -763,13 +767,15 @@ export function registerAutoFixHandlers(
 						issueNumbers && issueNumbers.length > 0
 							? issueNumbers.map((n) => n.toString())
 							: [];
+					const target = githubRunnerTarget(project);
 					const args = buildRunnerArgs(
 						getRunnerPath(backendPath),
 						project.path,
 						"batch-issues",
 						additionalArgs,
+						{ repo: target.repo },
 					);
-					const subprocessEnv = await getRunnerEnv();
+					const subprocessEnv = await getRunnerEnv(target.env);
 
 					debugLog("Spawning batch process", { args });
 
@@ -919,13 +925,15 @@ export function registerAutoFixHandlers(
 						additionalArgs.push(...issueNumbers.map((n) => n.toString()));
 					}
 
+					const target = githubRunnerTarget(project);
 					const args = buildRunnerArgs(
 						getRunnerPath(backendPath),
 						project.path,
 						"analyze-preview",
 						additionalArgs,
+						{ repo: target.repo },
 					);
-					const subprocessEnv = await getRunnerEnv();
+					const subprocessEnv = await getRunnerEnv(target.env);
 					debugLog("Spawning analyze-preview process", { args });
 
 					const { promise } = runPythonSubprocess<AnalyzePreviewResult>({
@@ -1053,11 +1061,14 @@ export function registerAutoFixHandlers(
 					const backendPath = validation.backendPath!;
 					// Like every other auto-fix command: the runner's environment
 					// (provider, GitHub token), off the main thread.
+					const target = githubRunnerTarget(project);
 					const { promise } = runPythonSubprocess({
 						pythonPath: getPythonPath(backendPath),
-						args: buildRunnerArgs(getRunnerPath(backendPath), project.path, "approve-batches", [tempFile]),
+						args: buildRunnerArgs(getRunnerPath(backendPath), project.path, "approve-batches", [tempFile], {
+							repo: target.repo,
+						}),
 						cwd: backendPath,
-						env: await getRunnerEnv(),
+						env: await getRunnerEnv(target.env),
 						onAuthFailure: createAuthFailureCallback(getMainWindow(), "approve batches"),
 					});
 					const run = await promise;

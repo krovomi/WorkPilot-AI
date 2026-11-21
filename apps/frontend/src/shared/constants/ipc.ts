@@ -601,6 +601,7 @@ export const IPC_CHANNELS = {
 	GIT_DETECT_MAIN_BRANCH: "git:detectMainBranch",
 	GIT_CHECK_STATUS: "git:checkStatus",
 	GIT_DETECT_PROVIDER: "git:detectProvider",
+	GIT_FORGE_BINDINGS: "git:forgeBindings",
 	GIT_INITIALIZE: "git:initialize",
 	GIT_SET_REMOTE: "git:setRemote",
 	GIT_CHECKOUT_BRANCH: "git:checkoutBranch",

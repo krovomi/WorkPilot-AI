@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
 	ghToken: null as string | null,
 	ghCalls: [] as string[][],
+	/** What `git remote -v` prints in the project; null: not a checkout. */
+	remotes: null as string | null,
 	relay: vi.fn(async () => ({ relayed: true })),
 	serverConfig: vi.fn(() => ({ token: "server:p", repo: "acme/shop" })),
 }));
@@ -22,6 +24,10 @@ const state = vi.hoisted(() => ({
 vi.mock("node:child_process", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("node:child_process")>();
 	const answer = (args: string[]) => {
+		if (args[0] === "remote") {
+			if (state.remotes === null) throw new Error("not a git repository");
+			return state.remotes;
+		}
 		// Only `gh auth token` is the stand-in's to answer; the environment
 		// setup may ask other tools, which find nothing here.
 		if (args[0] !== "auth") throw new Error("not available in this test");
@@ -61,6 +67,8 @@ import {
 	isRepoFullName,
 	normalizeRepoReference,
 } from "../utils";
+import { forgetGitRemotes } from "../../../forge/project-forge-binding";
+import { githubRunnerTarget } from "../runner-target";
 
 let root: string;
 let project: Project;
@@ -76,6 +84,8 @@ beforeEach(() => {
 	project = { id: "p", name: "P", path: root, autoBuildPath: ".workpilot" } as Project;
 	state.ghToken = null;
 	state.ghCalls = [];
+	state.remotes = null;
+	forgetGitRemotes();
 	fetchMock.mockReset();
 	vi.stubGlobal("fetch", fetchMock);
 });
@@ -131,6 +141,48 @@ describe("getGitHubConfig", () => {
 
 		expect(getGitHubConfig(remote)).toEqual({ token: "server:p", repo: "acme/shop" });
 		expect(state.serverConfig).toHaveBeenCalledWith(remote);
+	});
+
+	it("uses the project's own github.com remote when no repository is saved", () => {
+		writeEnv("GITHUB_TOKEN=pat-test-0000\n");
+		state.remotes =
+			"upstream\thttps://github.com/up/shop.git (fetch)\n" +
+			"origin\tgit@github.com:me/shop.git (fetch)\n" +
+			"origin\tgit@github.com:me/shop.git (push)\n";
+
+		expect(getGitHubConfig(project)).toEqual({ token: "pat-test-0000", repo: "me/shop" });
+	});
+
+	it("keeps a saved repository over the remote, and detects nothing off github.com", () => {
+		state.remotes = "origin\thttps://github.com/me/shop.git (fetch)\n";
+		writeEnv("GITHUB_TOKEN=pat-test-0000\nGITHUB_REPO=acme/other\n");
+		expect(getGitHubConfig(project)?.repo).toBe("acme/other");
+
+		forgetGitRemotes(root);
+		state.remotes = "origin\thttps://gitlab.com/me/shop.git (fetch)\n";
+		writeEnv("GITHUB_TOKEN=pat-test-0000\n");
+		expect(getGitHubConfig(project)).toBeNull();
+	});
+});
+
+describe("githubRunnerTarget", () => {
+	it("gives the runner the project's token and repository", () => {
+		writeEnv("GITHUB_TOKEN=pat-test-0000\nGITHUB_REPO=acme/shop\n");
+
+		expect(githubRunnerTarget(project)).toEqual({
+			env: { GITHUB_TOKEN: "pat-test-0000", GITHUB_REPO: "acme/shop" },
+			repo: "acme/shop",
+		});
+	});
+
+	it("gives nothing without a configuration, for a server handle or a malformed repository", () => {
+		expect(githubRunnerTarget(project)).toEqual({ env: {} });
+
+		const remote = { ...project, remote: { serverUrl: "https://s.invalid" } } as unknown as Project;
+		expect(githubRunnerTarget(remote)).toEqual({ env: {} });
+
+		writeEnv("GITHUB_TOKEN=pat-test-0000\nGITHUB_REPO=--upload-pack=x/y/z\n");
+		expect(githubRunnerTarget(project)).toEqual({ env: {} });
 	});
 });
 

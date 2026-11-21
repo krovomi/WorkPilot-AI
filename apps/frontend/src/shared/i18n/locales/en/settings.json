@@ -3106,5 +3106,13 @@
 			"invalid_policy": "Invalid policy",
 			"tool_loop": "Circuit breaker"
 		}
+	},
+	"forgeBinding": {
+		"mismatchTitle": "This project points at {{saved}}, which is not one of its remotes",
+		"mismatchDescription": "The repository may come from another project. Use the repository of this project's own remote:",
+		"mismatchNoRemote": "None of this project's remotes is on this forge: this repository probably belongs to another project. Check it, or turn this integration off for this project.",
+		"useRemote": "Use {{repo}}",
+		"detected": "No repository saved: this project uses the one of its git remote, {{repo}}.",
+		"saveDetected": "Save it in the settings"
 	}
 }
