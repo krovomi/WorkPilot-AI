@@ -112,13 +112,9 @@ class HookScheduler:
 
     def _due(self, moment: datetime) -> list[tuple[Hook, Trigger]]:
         """Active hooks whose cron expression matches ``moment``."""
-        from .hook_service import HookService
+        from scheduling.scheduler import CronExpression
 
-        try:
-            from scheduling.scheduler import CronExpression
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("cron parser unavailable, no schedules run: %s", exc)
-            return []
+        from .hook_service import HookService
 
         due: list[tuple[Hook, Trigger]] = []
         for hook in HookService.get_instance().active_hooks():

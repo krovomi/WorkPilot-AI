@@ -178,7 +178,8 @@
 			"load-failed": "La page ne s’est pas chargée à temps sur cet appareil.",
 			"capture-failed": "La page n’a pas pu être capturée sur cet appareil.",
 			"unknown-throttling": "Ce profil de bridage n'est pas dans la liste.",
-			"throttling-failed": "Le bridage réseau ou processeur n'a pas pu être appliqué sur cet appareil."
+			"throttling-failed": "Le bridage réseau ou processeur n'a pas pu être appliqué sur cet appareil.",
+			"session-failed": "La session de l’aperçu n’a pas pu être lue : capturez de nouveau sans elle."
 		},
 		"report": {
 			"unavailable": "La page n’a pas pu être lue pour y chercher les bugs responsive.",
@@ -198,7 +199,9 @@
 			"overlappingElements_one": "{{count}} paire d'éléments se chevauche",
 			"overlappingElements_other": "{{count}} paires d'éléments se chevauchent",
 			"truncatedText_one": "{{count}} texte est coupé ou déborde de sa boîte",
-			"truncatedText_other": "{{count}} textes sont coupés ou débordent de leur boîte"
+			"truncatedText_other": "{{count}} textes sont coupés ou débordent de leur boîte",
+			"brokenNavigation_one": "{{count}} navigation est inaccessible sur mobile",
+			"brokenNavigation_other": "{{count}} navigations sont inaccessibles sur mobile"
 		},
 		"throttling": {
 			"network": "Réseau",
@@ -219,7 +222,6 @@
 		},
 		"cpuSlowdown": "Processeur {{rate}}× plus lent",
 		"loadTime": "Chargée en {{seconds}} s",
-		"export": "Exporter",
 		"exporting": "Export en cours…",
 		"exported": "Grille enregistrée sous {{name}}.",
 		"exportErrors": {
@@ -228,6 +230,18 @@
 			"busy": "Une capture ou un autre export est en cours : attendez qu'il se termine.",
 			"export-failed": "L'image de la grille n'a pas pu être construite.",
 			"write-failed": "L'image n'a pas pu être écrite à l'endroit choisi."
-		}
+		},
+		"orientation": {
+			"label": "Orientation",
+			"portrait": "Portrait",
+			"landscape": "Paysage"
+		},
+		"previewSession": "Utiliser la session de l’aperçu (cookies)",
+		"previewSessionHint": "Les cookies que l’aperçu envoie à ce serveur sont prêtés à chaque capture : une page derrière une connexion s’affiche comme vous la voyez. Le stockage local n’est pas partagé.",
+		"withPreviewSession": "Session de l’aperçu",
+		"markers": "Encadrer les éléments fautifs",
+		"exportPng": "Exporter en PNG",
+		"exportPdf": "Exporter en PDF",
+		"auto": "Affichée pour la revue de cette tâche : ses changements touchent l’interface."
 	}
 }

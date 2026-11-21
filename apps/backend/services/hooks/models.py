@@ -43,24 +43,60 @@ class TriggerType(str, Enum):
 
 
 class ActionType(str, Enum):
-    RUN_AGENT = "run_agent"
+    """What a hook can do. Each one does it: `hook_service._execute_action`."""
+
     SEND_NOTIFICATION = "send_notification"
-    CREATE_SPEC = "create_spec"
-    TRIGGER_PIPELINE = "trigger_pipeline"
     RUN_COMMAND = "run_command"
-    RUN_LINT = "run_lint"
-    RUN_TESTS = "run_tests"
-    GENERATE_TESTS = "generate_tests"
-    UPDATE_DOCS = "update_docs"
-    CREATE_PR = "create_pr"
     SEND_SLACK = "send_slack"
     SEND_TEAMS = "send_teams"
     SEND_DISCORD = "send_discord"
     SEND_GOOGLE_CHAT = "send_google_chat"
     SEND_WEBHOOK = "send_webhook"
     LOG_EVENT = "log_event"
-    CHAIN_HOOK = "chain_hook"
-    CUSTOM = "custom"
+
+
+# Types that were offered and only answered "executed" without doing anything.
+# A hook saved with one still loads, without that action
+# (`without_retired_actions`); a new hook that names one is refused.
+RETIRED_ACTION_TYPES = frozenset(
+    {
+        "run_agent",
+        "create_spec",
+        "trigger_pipeline",
+        "run_lint",
+        "run_tests",
+        "generate_tests",
+        "update_docs",
+        "create_pr",
+        "chain_hook",
+        "custom",
+    }
+)
+
+
+def without_retired_actions(data: dict) -> tuple[dict, list[str]]:
+    """A stored hook without its retired actions, and the types it lost.
+
+    The connections to and from a dropped action go with it: what followed
+    one ran only because it claimed a success it never had.
+    """
+    kept, dropped, dropped_ids = [], [], set()
+    for action in data.get("actions", []):
+        kind = action.get("type", ActionType.LOG_EVENT.value)
+        if kind in RETIRED_ACTION_TYPES:
+            dropped.append(kind)
+            dropped_ids.add(action.get("id"))
+        else:
+            kept.append(action)
+    if not dropped:
+        return data, []
+    connections = [
+        c
+        for c in data.get("connections", [])
+        if c.get("source_id") not in dropped_ids
+        and c.get("target_id") not in dropped_ids
+    ]
+    return {**data, "actions": kept, "connections": connections}, dropped
 
 
 class HookStatus(str, Enum):

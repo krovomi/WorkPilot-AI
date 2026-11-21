@@ -7,36 +7,76 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BuildComparison } from "@shared/types/build-compare";
-import { formatMetric, HowYouCompare, trendTone } from "../HowYouCompare";
+import { formatMetric, trendTone } from "../compare-format";
+import { sparklinePoints } from "../CompareSparkline";
+import { HowYouCompare } from "../HowYouCompare";
 
 const getBuildComparison = vi.fn();
 const getServerBuildComparison = vi.fn();
+const exportBuildComparison = vi.fn();
+
+const week = (specs: number, minutes: number | null) => ({
+	specs,
+	minutes,
+	cost: minutes === null ? null : minutes / 10,
+	qa_iterations: null,
+	agents: null,
+});
 
 const comparison: BuildComparison = {
 	window_days: 30,
 	min_group: 2,
-	segment: { stack: "csharp", size: "medium" },
+	min_top: 10,
+	segment: { stack: "csharp", size: "medium", team: "small" },
 	recent: { specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3 },
 	previous: { specs: 1, minutes: 80, cost: 3, qa_iterations: null, agents: 3 },
 	trend: { minutes: -50, cost: -50, qa_iterations: null, agents: 10 },
+	weeks: [week(0, null), week(1, 30), week(0, null), week(1, 50)],
 	groups: {
-		segment: { projects: 1, medians: null },
-		stack: { projects: 2, medians: { minutes: 90, cost: 1, qa_iterations: null, agents: 2 } },
-		all: { projects: 3, medians: { minutes: 35, cost: 1.2, qa_iterations: 2, agents: 2 } },
+		segment: { projects: 1, medians: null, top: null },
+		stack: { projects: 2, medians: { minutes: 90, cost: 1, qa_iterations: null, agents: 2 }, top: null },
+		team: { projects: 2, medians: { minutes: 25, cost: 0.9, qa_iterations: null, agents: 2 }, top: null },
+		all: {
+			projects: 12,
+			medians: { minutes: 35, cost: 1.2, qa_iterations: 2, agents: 2 },
+			top: { minutes: 12, cost: 0.4, qa_iterations: null, agents: 1 },
+		},
 	},
+	kinds: [
+		{
+			kind: "bug_fix",
+			specs: 2,
+			minutes: 20,
+			cost: 0.5,
+			qa_iterations: 1,
+			agents: 2,
+			group: { projects: 3, medians: { minutes: 45, cost: 0.75, qa_iterations: null, agents: 2 }, top: null },
+		},
+		{
+			kind: "upgrade",
+			specs: 1,
+			minutes: 70,
+			cost: 2,
+			qa_iterations: null,
+			agents: 3,
+			group: { projects: 1, medians: null, top: null },
+		},
+	],
 	projects: [
-		{ name: "Shop", stack: "csharp", size: "medium", specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3, current: true },
-		{ name: "Side project", stack: "other", size: "unknown", specs: 1, minutes: 10, cost: 0.2, qa_iterations: null, agents: 1, current: false },
+		{ name: "Shop", stack: "csharp", size: "medium", team: "small", specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3, current: true },
+		{ name: "Side project", stack: "other", size: "unknown", team: "solo", specs: 1, minutes: 10, cost: 0.2, qa_iterations: null, agents: 1, current: false },
 	],
 };
 
 beforeEach(() => {
 	getBuildComparison.mockReset();
 	getServerBuildComparison.mockReset();
+	exportBuildComparison.mockReset();
 	(globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI = {
 		...(globalThis as unknown as { electronAPI?: Record<string, unknown> }).electronAPI,
 		getBuildComparison,
 		getServerBuildComparison,
+		exportBuildComparison,
 	};
 });
 
@@ -55,8 +95,91 @@ describe("HowYouCompare", () => {
 		// One group is too small for a median.
 		expect(screen.getByText(/A group's median shows from 2 active projects/)).toBeInTheDocument();
 		const own = screen.getByText("Side project").closest("tr") as HTMLElement;
-		expect(within(own).getByText(/Other stack · Size unknown/)).toBeInTheDocument();
+		expect(within(own).getByText(/Other stack · Size unknown · Solo/)).toBeInTheDocument();
 		expect(screen.queryByText("Shop")).toBeNull();
+	});
+
+	it("adds the team, the top tenth, the weeks and the kinds of work", async () => {
+		getBuildComparison.mockResolvedValue({ success: true, data: comparison });
+		render(<HowYouCompare projectPath="/work/shop" />);
+		expect(await screen.findByText("Team of 2-5")).toBeInTheDocument();
+		expect(screen.getByText("Same team size")).toBeInTheDocument();
+		expect(screen.getByText("top 10%: 12 min")).toBeInTheDocument();
+		expect(screen.getByText("top 10%: $0.40")).toBeInTheDocument();
+		expect(screen.getByText(/shows from 10 active projects/)).toBeInTheDocument();
+		expect(screen.getByText("Last 4 weeks")).toBeInTheDocument();
+		expect(screen.getByRole("img", { name: "Build time, week by week" })).toBeInTheDocument();
+		const kinds = screen.getByTestId("compare-kinds");
+		const bug = within(kinds).getByText("Bug fix").closest("tr") as HTMLElement;
+		expect(within(bug).getByText("45 min")).toBeInTheDocument();
+		const upgrade = within(kinds).getByText("Version upgrade").closest("tr") as HTMLElement;
+		expect(within(upgrade).getByText("1 project")).toBeInTheDocument();
+	});
+
+	it("says when no spec has a kind and no group has a top tenth", async () => {
+		getBuildComparison.mockResolvedValue({
+			success: true,
+			data: {
+				...comparison,
+				segment: { stack: "other", size: "large", team: "unknown" },
+				kinds: [],
+				min_top: null,
+				weeks: [week(1, 10)],
+			},
+		});
+		exportBuildComparison.mockResolvedValue({ success: true, data: null });
+		render(<HowYouCompare projectPath="/work/shop" />);
+		expect(await screen.findByText(/No spec of this period has a kind/)).toBeInTheDocument();
+		expect(screen.queryByText(/Top 10% is the figure/)).toBeNull();
+		expect(screen.queryByRole("img", { name: /week by week/ })).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: /Generate team report/ }));
+		await waitFor(() => expect(exportBuildComparison).toHaveBeenCalledTimes(1));
+		const [document] = exportBuildComparison.mock.calls[0];
+		expect(document.summary).toContain("Segment: Other stack, Large repo, Team unknown.");
+		expect(document.tables.map((table: { title: string }) => table.title)).toEqual([
+			"How you compare",
+			"Your other projects",
+		]);
+	});
+
+	it("generates the team report and says where it went", async () => {
+		getBuildComparison.mockResolvedValue({ success: true, data: comparison });
+		exportBuildComparison
+			.mockResolvedValueOnce({ success: true, data: "/reports/compare.pdf" })
+			.mockResolvedValueOnce({ success: true, data: null })
+			.mockResolvedValueOnce({ success: false, error: "Disk full" })
+			.mockResolvedValueOnce({ success: false })
+			.mockRejectedValueOnce(new Error("gone"))
+			.mockRejectedValueOnce("odd");
+		render(<HowYouCompare projectPath="/work/shop" />);
+		const button = await screen.findByRole("button", { name: /Generate team report/ });
+		fireEvent.click(button);
+		expect(await screen.findByTestId("compare-report-saved")).toHaveTextContent("/reports/compare.pdf");
+		const [document] = exportBuildComparison.mock.calls[0];
+		expect(document.title).toBe("How you compare: team report");
+		expect(document.summary).toContain("Segment: csharp, Medium repo, Team of 2-5.");
+		expect(document.tables.map((table: { title: string }) => table.title)).toEqual([
+			"How you compare",
+			"By kind of work",
+			"Your other projects",
+		]);
+		expect(document.tables[0].rows[0]).toContain("35 min · top 10%: 12 min");
+		expect(document.tables[1].rows[0]).toEqual(["Bug fix", "2", "20 min / 45 min", "$0.50 / $0.75", "1 / —", "2 / 2"]);
+		expect(document.tables[1].rows[1][2]).toBe("1.2 h / —");
+		expect(document.tables[2].rows).toEqual([["Side project", "1", "10 min", "$0.20", "—", "1"]]);
+		// Cancelled: nothing said.
+		fireEvent.click(button);
+		await waitFor(() => expect(exportBuildComparison).toHaveBeenCalledTimes(2));
+		await waitFor(() => expect(screen.queryByTestId("compare-report-saved")).toBeNull());
+		fireEvent.click(button);
+		expect(await screen.findByText("Disk full")).toBeInTheDocument();
+		fireEvent.click(button);
+		expect(await screen.findByText("Could not save the team report")).toBeInTheDocument();
+		fireEvent.click(button);
+		expect(await screen.findByText("gone")).toBeInTheDocument();
+		fireEvent.click(button);
+		await waitFor(() => expect(exportBuildComparison).toHaveBeenCalledTimes(6));
+		expect(await screen.findByText("Could not save the team report")).toBeInTheDocument();
 	});
 
 	it("says so when no other project built a spec", async () => {
@@ -78,8 +201,15 @@ describe("HowYouCompare", () => {
 			success: true,
 			data: { ...comparison, min_group: 5, projects: [] },
 		});
+		exportBuildComparison.mockResolvedValue({ success: true, data: "/r.pdf" });
 		render(<HowYouCompare projectPath="/mirror" serverProjectId="p1" />);
 		expect(await screen.findByText(/groups of 5 projects or more/)).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: /Generate team report/ }));
+		await waitFor(() => expect(exportBuildComparison).toHaveBeenCalledTimes(1));
+		const [document] = exportBuildComparison.mock.calls[0];
+		// The server's report names no project, and says how it was compared.
+		expect(document.tables.map((table: { title: string }) => table.title)).not.toContain("Your other projects");
+		expect(document.summary.join(" ")).toMatch(/groups of 5 projects or more/);
 		expect(getServerBuildComparison).toHaveBeenCalledWith("p1");
 		expect(getBuildComparison).not.toHaveBeenCalled();
 		expect(screen.queryByText("Your other projects")).toBeNull();
@@ -114,6 +244,12 @@ describe("the figures", () => {
 		expect(formatMetric("minutes", 90)).toBe("1.5 h");
 		expect(formatMetric("agents", 2)).toBe("2");
 		expect(formatMetric("qa_iterations", 1.5)).toBe("1.5");
+	});
+
+	it("draw a sparkline through the weeks that built a spec", () => {
+		expect(sparklinePoints([null, 5])).toBeNull();
+		expect(sparklinePoints([2, 2])).toBe("0.0,16.0 72.0,16.0");
+		expect(sparklinePoints([0, null, 10])).toBe("0.0,16.0 72.0,2.0");
 	});
 
 	it("count a fall as good news", () => {

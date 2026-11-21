@@ -19,8 +19,12 @@
  *
  * No model, no network here: the registry facts are read by the main
  * process, and without them each of their dimensions counts half.
+ *
+ * A seventh dimension, the static scan of the code it runs (`code-score.ts`,
+ * lot 3), counts once the main has read that code.
  */
 
+import type { McpAcceptedFinding, McpCodeScan } from "../types/mcp-code-scan";
 import type { McpMarketplaceServer } from "../types/mcp-marketplace";
 import type {
 	McpRegistryFacts,
@@ -29,6 +33,7 @@ import type {
 	McpSecurityLevel,
 	McpSecurityScore,
 } from "../types/mcp-security";
+import { acceptedFor, CODE_MAX, codeDimension, codeReport } from "./code-score";
 
 const MAX = {
 	publisher: 20,
@@ -37,6 +42,7 @@ const MAX = {
 	freshness: 15,
 	supplyChain: 20,
 	maintainers: 10,
+	code: CODE_MAX,
 } as const;
 
 /** More than this without a release: possibly abandoned. */
@@ -179,6 +185,13 @@ export interface ScoreOptions {
 	facts?: McpRegistryFacts;
 	unchecked?: McpSecurityScore["unchecked"];
 	now?: number;
+	/**
+	 * The scan of the code it runs; "unknown": tried and not read. Absent:
+	 * not part of this score (the renderer's estimate).
+	 */
+	code?: McpCodeScan | "unknown";
+	/** The findings the project's MCP policy accepts. */
+	accepted?: readonly McpAcceptedFinding[];
 }
 
 /** The score of a catalog server, with or without its registry facts. */
@@ -197,6 +210,12 @@ export function scoreServer(
 			maintainers(facts, alerts),
 		);
 	}
+	const { code } = options;
+	const accepted = acceptedFor(entry.id, options.accepted);
+	if (!remote && code) {
+		const powers = new Set(entry.tools.map((tool) => toolPower(tool.name)));
+		dimensions.push(codeDimension(powers, code, accepted, alerts));
+	}
 	const earned = dimensions.reduce((sum, d) => sum + d.points, 0);
 	const max = dimensions.reduce((sum, d) => sum + d.max, 0);
 	const score = Math.round((100 * earned) / max);
@@ -208,6 +227,7 @@ export function scoreServer(
 		alerts,
 		checked: Boolean(facts),
 		...(facts ? { checkedAt: facts.checkedAt } : {}),
+		...(!remote && code && code !== "unknown" ? { code: codeReport(code, accepted) } : {}),
 		...(remote ? { unchecked: "remote" as const } : options.unchecked ? { unchecked: options.unchecked } : {}),
 	};
 }

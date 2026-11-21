@@ -9,13 +9,18 @@
  * user agent) avant le premier octet, pour que les media queries et le
  * serveur voient le même appareil que la capture. Le bridage réseau et
  * processeur, quand un profil en demande, est posé de même, avant le
- * chargement, et le temps de chargement mesuré sous ce bridage.
+ * chargement, et le temps de chargement mesuré sous ce bridage. Un appareil
+ * tourné (paysage d'un téléphone, écran pivoté) arrive avec sa fenêtre déjà
+ * échangée ; l'écran émulé annonce alors ce sens (`screen.orientation`).
+ * Sur demande, les cookies que l'aperçu envoie à ce serveur sont copiés dans
+ * la session de la capture (`preview-session.ts`).
  *
  * Même architecture que le scan d'accessibilité dynamique
  * (`accessibility/dynamic-scan.ts`) ; le script de lecture tourne dans un
  * monde isolé et sa réponse est remise en forme par `sanitizeReport`.
  */
 import { BrowserWindow, session } from "electron";
+import { isRotated, orientationOf } from "../../shared/constants/device-presets";
 import {
 	CPU_PROFILES,
 	NETWORK_PROFILES,
@@ -28,6 +33,7 @@ import type {
 	NetworkProfile,
 	ResponsiveReport,
 } from "../../shared/types/device-matrix";
+import { sharePreviewCookies } from "./preview-session";
 import { buildProbe, sanitizeReport } from "./responsive-probe";
 
 /** Le temps laissé à une application monopage pour se dessiner après `load`, multiplié par le ralentissement du processeur. */
@@ -57,6 +63,12 @@ export interface DeviceShot {
 export interface Throttling {
 	readonly network: NetworkProfile;
 	readonly cpu: CpuProfile;
+}
+
+/** Ce que la capture emprunte à l'aperçu. */
+export interface CaptureOptions {
+	/** Copier les cookies de l'aperçu pour l'origine rendue. */
+	readonly previewSession: boolean;
 }
 
 /** Sans bridage : ni le réseau ni le processeur ne sont touchés. */
@@ -102,6 +114,11 @@ async function emulate(send: Send, device: DevicePreset): Promise<void> {
 		mobile: device.mobile,
 		screenWidth: device.width,
 		screenHeight: device.height,
+		screenOrientation: {
+			type: orientationOf(device) === "landscape" ? "landscapePrimary" : "portraitPrimary",
+			// Tourné depuis son sens naturel : un quart de tour.
+			angle: isRotated(device) ? 90 : 0,
+		},
 	});
 	await send("Emulation.setTouchEmulationEnabled", {
 		enabled: device.touch,
@@ -140,6 +157,7 @@ export async function captureDevice(
 	device: DevicePreset,
 	url: string,
 	throttling: Throttling = NO_THROTTLING,
+	options: CaptureOptions = { previewSession: false },
 ): Promise<DeviceShot> {
 	const origin = new URL(url).origin;
 	const win = new BrowserWindow({
@@ -170,6 +188,13 @@ export async function captureDevice(
 		wc.setUserAgent(device.userAgent);
 		await emulate(send, device);
 		await throttle(send, throttling);
+		if (options.previewSession) {
+			try {
+				await sharePreviewCookies(captureSession(), origin);
+			} catch {
+				throw new DeviceCaptureFailure("session-failed");
+			}
+		}
 		const started = Date.now();
 		try {
 			await withTimeout(wc.loadURL(url), loadTimeoutFor(throttling.network, throttling.cpu));

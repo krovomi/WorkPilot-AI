@@ -272,6 +272,15 @@ RULES: dict[tuple[str, str], Rule] = {
             ),
         )
     },
+    # Feedback on a GitHub review's findings; resetting a rule and deciding a
+    # held rejection are also the project owner's, checked in the route.
+    ("GET", "/api/features/forge/github/reviews/{number}/feedback"): scoped("vcs.read"),
+    ("POST", "/api/features/forge/github/reviews/{number}/feedback"): scoped(
+        "vcs.write"
+    ),
+    ("GET", "/api/features/forge/github/reviews/feedback"): scoped("vcs.read"),
+    ("POST", "/api/features/forge/github/reviews/feedback/reset"): scoped("vcs.write"),
+    ("POST", "/api/features/forge/github/reviews/feedback/held"): scoped("vcs.write"),
     ("POST", "/api/features/analyses/{kind}/jobs"): scoped("agent.execute"),
     ("GET", "/api/features/analyses/{kind}/jobs/{job_id}"): scoped("insight.read"),
     ("POST", "/api/features/analyses/{kind}/jobs/{job_id}/cancel"): scoped(

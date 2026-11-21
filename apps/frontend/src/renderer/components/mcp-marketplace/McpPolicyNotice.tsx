@@ -55,6 +55,26 @@ export function McpPolicyRefusalText({ refusal }: { readonly refusal: McpPolicyR
 	);
 }
 
+/**
+ * A save the policy refused, outside the marketplace (Agent Tools): the
+ * main wrote nothing, the view put the previous list back, this says why.
+ */
+export function McpPolicyRefusalNotice({
+	refusal,
+	className,
+}: {
+	readonly refusal: McpPolicyRefusal;
+	readonly className?: string;
+}) {
+	return (
+		<Notice tone="red" icon={ShieldAlert} role="alert" className={className}>
+			<p>
+				<McpPolicyRefusalText refusal={refusal} />
+			</p>
+		</Notice>
+	);
+}
+
 /** The policy of the selected project, above the catalog and the installed list. */
 export function McpPolicyBanner({
 	projectId,
@@ -80,7 +100,7 @@ export function McpPolicyBanner({
 		);
 	}
 
-	const { allowedServers, minScore, blockCustomServers } = policy.policy;
+	const { allowedServers, minScore, blockCustomServers, acceptedFindings } = policy.policy;
 	return (
 		<Notice tone="blue" icon={ShieldCheck} className={className}>
 			<p>{t("mcpMarketplace.policy.active")}</p>
@@ -96,6 +116,11 @@ export function McpPolicyBanner({
 			)}
 			{blockCustomServers && (
 				<p className="text-xs opacity-80">{t("mcpMarketplace.policy.customBlocked")}</p>
+			)}
+			{acceptedFindings && acceptedFindings.length > 0 && (
+				<p className="text-xs opacity-80">
+					{t("mcpMarketplace.policy.acceptedFindings", { count: acceptedFindings.length })}
+				</p>
 			)}
 		</Notice>
 	);

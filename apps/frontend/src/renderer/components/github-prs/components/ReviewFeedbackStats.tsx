@@ -1,7 +1,9 @@
 /**
  * The project's feedback on PR review findings, as a whole (#361, lot 2):
  * acceptance rate per category, the kinds of finding the reviewer now
- * downgrades or hides, a reset for each, and the conventions file. Folded by
+ * downgrades or hides, a reset for each, and the conventions file. On a
+ * server project (lot 3), the rejections held for a maintainer; a reset is a
+ * maintainer's, and the conventions file is a local project's only. Folded by
  * default and loaded when opened: a PR view does not read the dataset for it.
  */
 
@@ -18,6 +20,7 @@ import {
 	type ReviewFeedbackStatsState,
 	useReviewFeedbackStats,
 } from "../hooks/useReviewFeedbackStats";
+import { ReviewFeedbackHeld } from "./ReviewFeedbackHeld";
 
 function rated(row: ReviewFeedbackCategoryStats): number {
 	return row.accepted + row.rejected + row.notApplicable;
@@ -108,7 +111,8 @@ function RuleItem({
 					)}
 				</p>
 			</div>
-			<Button
+			{canReset(state) && (
+				<Button
 				type="button"
 				variant="outline"
 				size="sm"
@@ -119,9 +123,16 @@ function RuleItem({
 			>
 				<RotateCcw className="h-3 w-3 mr-1" />
 				{t("reviewFeedback:reset")}
-			</Button>
+				</Button>
+			)}
 		</li>
 	);
+}
+
+/** A server project's rule is reset by a maintainer only (the server checks it). */
+function canReset(state: ReviewFeedbackStatsState): boolean {
+	const server = state.stats?.server;
+	return !server || server.maintainer;
 }
 
 function StatsBody({ state }: { state: ReviewFeedbackStatsState }) {
@@ -146,7 +157,7 @@ function StatsBody({ state }: { state: ReviewFeedbackStatsState }) {
 					<p>{t("noRules")}</p>
 				) : (
 					<>
-						<p>{t("resetHint")}</p>
+						<p>{t(canReset(state) ? "resetHint" : "maintainerOnly")}</p>
 						<ul className="space-y-2">
 							{stats.rules.map((rule) => (
 								<RuleItem key={rule.signature} rule={rule} state={state} />
@@ -211,6 +222,8 @@ export function ReviewFeedbackStats({ projectId }: { projectId: string }) {
 						</p>
 					)}
 					<StatsBody state={state} />
+					<ReviewFeedbackHeld state={state} />
+					{!state.stats?.server && (
 					<div className="space-y-1 border-t border-border/50 pt-2">
 						<Button
 							type="button"
@@ -233,6 +246,7 @@ export function ReviewFeedbackStats({ projectId }: { projectId: string }) {
 							</p>
 						)}
 					</div>
+					)}
 				</>
 			)}
 		</section>

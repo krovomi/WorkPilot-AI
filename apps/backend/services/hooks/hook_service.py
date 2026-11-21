@@ -7,6 +7,7 @@ Manages hooks CRUD, event bus, trigger matching, action execution, and persisten
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import fnmatch
 import json
 import logging
@@ -16,7 +17,6 @@ import shlex
 import threading
 import time
 import uuid
-from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -34,6 +34,7 @@ from .models import (
     Trigger,
     TriggerCondition,
     TriggerType,
+    without_retired_actions,
 )
 from .templates import get_hook_templates, get_template_by_id
 
@@ -248,10 +249,7 @@ async def _execute_action(
                 )
             except TimeoutError:
                 proc.kill()
-                try:
-                    await proc.wait()
-                except Exception:
-                    pass
+                await proc.wait()
                 raise
             result["output"] = {
                 "stdout": stdout.decode(errors="replace")[:5000],
@@ -262,92 +260,12 @@ async def _execute_action(
                 result["status"] = "failed"
                 result["error"] = f"Command exited with code {proc.returncode}"
 
-        elif action.type == ActionType.RUN_LINT:
-            logger.info(
-                "[HookEngine] Running lint action (auto_fix=%s)",
-                action.config.get("auto_fix", False),
-            )
-            result["output"] = {
-                "action": "lint",
-                "auto_fix": action.config.get("auto_fix", False),
-                "status": "executed",
-            }
-
-        elif action.type == ActionType.RUN_TESTS:
-            scope = action.config.get("scope", "related")
-            logger.info("[HookEngine] Running tests (scope=%s)", scope)
-            result["output"] = {
-                "action": "run_tests",
-                "scope": scope,
-                "status": "executed",
-            }
-
-        elif action.type == ActionType.GENERATE_TESTS:
-            logger.info(
-                "[HookEngine] Generating tests (type=%s)",
-                action.config.get("test_type", "unit"),
-            )
-            result["output"] = {
-                "action": "generate_tests",
-                "test_type": action.config.get("test_type", "unit"),
-                "status": "executed",
-            }
-
-        elif action.type == ActionType.RUN_AGENT:
-            agent_type = action.config.get("agent_type", "coder")
-            instructions = _interpolate(
-                action.config.get("instructions", ""), event.data
-            )
-            logger.info(
-                "[HookEngine] Running agent '%s': %s", agent_type, instructions[:100]
-            )
-            result["output"] = {
-                "action": "run_agent",
-                "agent_type": agent_type,
-                "instructions": instructions,
-                "status": "queued",
-            }
-
-        elif action.type == ActionType.CREATE_SPEC:
-            logger.info(
-                "[HookEngine] Creating spec: %s", action.config.get("title", "New Spec")
-            )
-            result["output"] = {
-                "action": "create_spec",
-                "title": action.config.get("title", ""),
-                "status": "created",
-            }
-
-        elif action.type == ActionType.TRIGGER_PIPELINE:
-            pipeline = action.config.get("pipeline", "default")
-            logger.info("[HookEngine] Triggering pipeline: %s", pipeline)
-            result["output"] = {
-                "action": "trigger_pipeline",
-                "pipeline": pipeline,
-                "status": "triggered",
-            }
-
-        elif action.type == ActionType.UPDATE_DOCS:
-            logger.info(
-                "[HookEngine] Updating docs (type=%s)",
-                action.config.get("doc_type", "general"),
-            )
-            result["output"] = {
-                "action": "update_docs",
-                "doc_type": action.config.get("doc_type", "general"),
-                "status": "executed",
-            }
-
-        elif action.type == ActionType.CREATE_PR:
-            logger.info("[HookEngine] Creating PR")
-            result["output"] = {"action": "create_pr", "status": "created"}
-
         elif action.type in _CHANNEL_ACTION_MAP:
             # send_slack / send_teams / send_discord / send_google_chat
             logger.info("[HookEngine] %s → sending", action.type.value)
             await _execute_channel_send(action, event, result)
 
-        elif action.type == ActionType.SEND_WEBHOOK:
+        else:  # ActionType.SEND_WEBHOOK, the last one
             url = str(action.config.get("url", "")).strip()
             if not url:
                 raise ValueError("SEND_WEBHOOK requires config['url']")
@@ -373,27 +291,6 @@ async def _execute_action(
             if not success:
                 result["status"] = "failed"
                 result["error"] = error
-
-        elif action.type == ActionType.CHAIN_HOOK:
-            target_hook_id = action.config.get("hook_id", "")
-            logger.info("[HookEngine] Chaining to hook: %s", target_hook_id)
-            result["output"] = {
-                "action": "chain_hook",
-                "target_hook_id": target_hook_id,
-                "status": "chained",
-            }
-
-        elif action.type == ActionType.CUSTOM:
-            logger.info("[HookEngine] Custom action: %s", action.config)
-            result["output"] = {
-                "action": "custom",
-                "config": action.config,
-                "status": "executed",
-            }
-
-        else:
-            result["status"] = "skipped"
-            result["output"] = {"reason": f"Unknown action type: {action.type}"}
 
     except TimeoutError:
         result["status"] = "timeout"
@@ -473,7 +370,6 @@ class HookService:
     def __init__(self):
         self._hooks: dict[str, Hook] = {}
         self._executions: list[HookExecution] = []
-        self._listeners: list[Callable] = []
         self._max_executions = 500
         self._load()
 
@@ -495,7 +391,15 @@ class HookService:
             try:
                 data = json.loads(hooks_file.read_text(encoding="utf-8"))
                 for h in data.get("hooks", []):
-                    hook = Hook.from_dict(h)
+                    stored, retired = without_retired_actions(h)
+                    if retired:
+                        logger.warning(
+                            "[HookService] Hook '%s' lost the actions %s, which "
+                            "did nothing",
+                            stored.get("name", ""),
+                            ", ".join(retired),
+                        )
+                    hook = Hook.from_dict(stored)
                     self._hooks[hook.id] = hook
                 logger.info("[HookService] Loaded %d hooks", len(self._hooks))
             except Exception as e:
@@ -673,17 +577,13 @@ class HookService:
     def emit_event_sync(self, event: HookEvent) -> list[dict]:
         """Synchronous wrapper for emit_event."""
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, self.emit_event(event))
-                    return future.result(timeout=60)
-            else:
-                return loop.run_until_complete(self.emit_event(event))
+            asyncio.get_running_loop()
         except RuntimeError:
             return asyncio.run(self.emit_event(event))
+        # Called from inside a running loop: that loop cannot be re-entered,
+        # so the event runs on a loop of its own, in a worker thread.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, self.emit_event(event)).result(timeout=60)
 
     async def _execute_hook(self, hook: Hook, event: HookEvent) -> HookExecution:
         """Execute all actions of a hook for a given event."""
@@ -698,60 +598,56 @@ class HookService:
         start_time = time.monotonic()
         action_results = []
 
-        try:
-            # Build execution graph from connections
-            action_map = {a.id: a for a in hook.actions}
-            executed: set[str] = set()
+        # Build execution graph from connections
+        action_map = {a.id: a for a in hook.actions}
+        executed: set[str] = set()
 
-            # Find root actions (targeted by triggers)
-            trigger_ids = {t.id for t in hook.triggers}
-            root_action_ids = set()
+        # Find root actions (targeted by triggers)
+        trigger_ids = {t.id for t in hook.triggers}
+        root_action_ids = set()
+        for conn in hook.connections:
+            if conn.source_id in trigger_ids:
+                root_action_ids.add(conn.target_id)
+
+        # If no connections, execute all actions sequentially
+        if not hook.connections and hook.actions:
+            root_action_ids = {a.id for a in hook.actions}
+
+        # Execute actions following connection graph
+        queue = list(root_action_ids)
+        while queue:
+            action_id = queue.pop(0)
+            if action_id in executed or action_id not in action_map:
+                continue
+
+            action = action_map[action_id]
+            result = await _execute_action(action, event, hook)
+            action_results.append(result)
+            executed.add(action_id)
+
+            # Find next actions based on connections and conditions
             for conn in hook.connections:
-                if conn.source_id in trigger_ids:
-                    root_action_ids.add(conn.target_id)
-
-            # If no connections, execute all actions sequentially
-            if not hook.connections and hook.actions:
-                root_action_ids = {a.id for a in hook.actions}
-
-            # Execute actions following connection graph
-            queue = list(root_action_ids)
-            while queue:
-                action_id = queue.pop(0)
-                if action_id in executed or action_id not in action_map:
-                    continue
-
-                action = action_map[action_id]
-                result = await _execute_action(action, event, hook)
-                action_results.append(result)
-                executed.add(action_id)
-
-                # Find next actions based on connections and conditions
-                for conn in hook.connections:
-                    if conn.source_id == action_id and conn.target_id not in executed:
-                        should_execute = (
-                            conn.condition is None
-                            or conn.condition == "always"
-                            or (
-                                conn.condition == "on_success"
-                                and result["status"] == "success"
-                            )
-                            or (
-                                conn.condition == "on_failure"
-                                and result["status"] in ("failed", "timeout")
-                            )
+                if conn.source_id == action_id and conn.target_id not in executed:
+                    should_execute = (
+                        conn.condition is None
+                        or conn.condition == "always"
+                        or (
+                            conn.condition == "on_success"
+                            and result["status"] == "success"
                         )
-                        if should_execute:
-                            queue.append(conn.target_id)
+                        or (
+                            conn.condition == "on_failure"
+                            and result["status"] in ("failed", "timeout")
+                        )
+                    )
+                    if should_execute:
+                        queue.append(conn.target_id)
 
-            execution.status = ExecutionStatus.SUCCESS
-            if any(r["status"] == "failed" for r in action_results):
-                execution.status = ExecutionStatus.FAILED
-
-        except Exception as e:
+        # `_execute_action` turns every failure into a result, so nothing here
+        # raises: a hook failed when one of its actions failed or timed out.
+        execution.status = ExecutionStatus.SUCCESS
+        if any(r["status"] in ("failed", "timeout") for r in action_results):
             execution.status = ExecutionStatus.FAILED
-            execution.error = str(e)
-            logger.error("[HookEngine] Hook '%s' execution failed: %s", hook.name, e)
 
         elapsed = time.monotonic() - start_time
         execution.completed_at = datetime.now(UTC).isoformat()
@@ -770,13 +666,6 @@ class HookService:
         if len(self._executions) > self._max_executions:
             self._executions = self._executions[-self._max_executions :]
         self._save_executions()
-
-        # Notify listeners
-        for listener in self._listeners:
-            try:
-                listener(execution.to_dict())
-            except Exception:
-                pass
 
         return execution
 
@@ -808,15 +697,3 @@ class HookService:
             ),
             "recent_executions": len(self._executions),
         }
-
-    # ── Listeners ─────────────────────────────────────────────────────────
-
-    def add_listener(self, callback: Callable):
-        """Add a listener for hook executions."""
-        self._listeners.append(callback)
-
-    def remove_listener(self, callback: Callable):
-        """Remove a listener."""
-        self._listeners = [
-            listener for listener in self._listeners if listener is not callback
-        ]

@@ -13,6 +13,9 @@
 import { describe, expect, it } from "vitest";
 import {
 	MAX_ELEMENTS,
+	MAX_MENU_TOGGLES,
+	MAX_NAVIGATIONS,
+	MAX_NAV_LINKS,
 	MAX_OVERLAP_CANDIDATES,
 	MAX_SAMPLES,
 	MIN_OVERLAP_RATIO,
@@ -65,12 +68,16 @@ describe("RESPONSIVE_PROBE", () => {
 		expect(options).toEqual({
 			touch: true,
 			text: false,
+			nav: false,
 			minTouch: MIN_TOUCH_TARGET_PX,
 			minText: MIN_TEXT_PX,
 			maxSamples: MAX_SAMPLES,
 			maxElements: MAX_ELEMENTS,
 			maxCandidates: MAX_OVERLAP_CANDIDATES,
 			minOverlap: MIN_OVERLAP_RATIO,
+			maxNavs: MAX_NAVIGATIONS,
+			maxLinks: MAX_NAV_LINKS,
+			maxToggles: MAX_MENU_TOGGLES,
 		});
 	});
 
@@ -194,6 +201,53 @@ describe("RESPONSIVE_PROBE", () => {
 		const truncated = kind(output, "truncated-text");
 		expect(truncated?.count).toBe(2);
 		expect(truncated?.samples.map((sample) => sample.selector)).toEqual(["p.name", "p"]);
+	});
+
+	it("flags a mobile navigation whose links are all hidden and that no menu button opens", () => {
+		const hidden =
+			'<nav id="main"><a href="/a" style="display:none">a</a><a href="/b" data-box="-300,0,200,20">b</a></nav>';
+		expect(kind(probe(hidden), "broken-navigation")?.samples[0].selector).toBe("nav#main");
+		// Desktop pages are not read for it.
+		expect(kind(probe(hidden, { mobile: false, touch: false }), "broken-navigation")?.count).toBe(0);
+	});
+
+	it.each([
+		["a link still shows", '<nav><a href="/a">a</a><a href="/b" style="display:none">b</a></nav>'],
+		["a navigation without links", '<div role="navigation"><span>logo</span></div>'],
+		[
+			"a button that announces what it opens",
+			'<button aria-expanded="false">menu</button><nav><a href="/a" style="display:none">a</a></nav>',
+		],
+		["a disclosure summary", '<details><summary>menu</summary><nav><a href="/a" style="display:none">a</a></nav></details>'],
+		[
+			"the label of a checkbox (CSS-only menu)",
+			'<input type="checkbox" id="burger"><label for="burger">menu</label><nav><a href="/a" style="display:none">a</a></nav>',
+		],
+	])("leaves a navigation alone when %s", (_label, body) => {
+		expect(kind(probe(body), "broken-navigation")?.count).toBe(0);
+	});
+
+	it("does not take a hidden button, nor a label of something else, for a menu button", () => {
+		const body =
+			'<button aria-expanded="false" style="display:none">menu</button>' +
+			'<input type="text" id="q"><label for="q">search</label><label for="nowhere">x</label>' +
+			'<nav><a href="/a" style="display:none">a</a></nav>';
+		expect(kind(probe(body), "broken-navigation")?.count).toBe(1);
+	});
+
+	it("flags a menu button that controls nothing on the page", () => {
+		const body =
+			'<button id="burger" aria-controls="menu drawer">menu</button>' +
+			'<button aria-controls="ghost real">ok</button><ul id="real"><li>x</li></ul>' +
+			'<button aria-expanded="true">no target named</button>';
+		const issue = kind(probe(body), "broken-navigation");
+		expect(issue?.count).toBe(1);
+		expect(issue?.samples[0].selector).toBe("button#burger");
+	});
+
+	it("reads no more than MAX_NAVIGATIONS navigations", () => {
+		const navs = '<nav><a href="/a" style="display:none">a</a></nav>'.repeat(MAX_NAVIGATIONS + 3);
+		expect(kind(probe(navs), "broken-navigation")?.count).toBe(MAX_NAVIGATIONS);
 	});
 
 	it("keeps at most MAX_SAMPLES examples but the full count", () => {

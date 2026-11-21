@@ -116,12 +116,15 @@
 			"trend": "Trend",
 			"project": "Project",
 			"segment": "Stack and size",
-			"specs": "Specs"
+			"specs": "Specs",
+			"weeks_one": "Last {{count}} week",
+			"weeks_other": "Last {{count}} weeks"
 		},
 		"groups": {
 			"segment": "Same stack and size",
 			"stack": "Same stack",
-			"all": "All projects"
+			"all": "All projects",
+			"team": "Same team size"
 		},
 		"projectCount_one": "{{count}} project",
 		"projectCount_other": "{{count}} projects",
@@ -144,6 +147,33 @@
 		"lowerIsBetter": "Lower is better for every figure. A spec's build time runs from its first agent session to its last.",
 		"yourProjects": "Your other projects",
 		"noOtherProjects": "None of your other projects built a spec in this period.",
+		"teams": {
+			"solo": "Solo",
+			"small": "Team of 2-5",
+			"medium": "Team of 6-20",
+			"large": "Team of 20+",
+			"unknown": "Team unknown"
+		},
+		"top": "top 10%: {{value}}",
+		"topNote_one": "Top 10% is the figure the best tenth of a group reach; it shows from {{count}} active project.",
+		"topNote_other": "Top 10% is the figure the best tenth of a group reach; it shows from {{count}} active projects with that figure.",
+		"sparkline": "{{metric}}, week by week",
+		"report": {
+			"button": "Generate team report",
+			"title": "How you compare: team report",
+			"generated": "Generated on {{date}}.",
+			"segment": "Segment: {{stack}}, {{size}}, {{team}}.",
+			"saved": "Team report saved to {{path}}",
+			"error": "Could not save the team report"
+		},
+		"kinds": {
+			"title": "By kind of work",
+			"kind": "Kind",
+			"others": "Other projects",
+			"none": "No spec of this period has a kind recorded on its card.",
+			"note_one": "Each cell: this project, then the median of the other projects for the same kind, from {{count}} project.",
+			"note_other": "Each cell: this project, then the median of the other projects for the same kind, from {{count}} projects."
+		},
 		"ciPending": "First-run CI pass rate is not recorded yet, so it is not compared."
 	}
 }
