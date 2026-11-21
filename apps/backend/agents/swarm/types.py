@@ -23,6 +23,8 @@ class SwarmPhase(str, Enum):
     MERGING_WAVE = "merging_wave"
     COMPLETE = "complete"
     FAILED = "failed"
+    #: Stopped before a wave or a retry: the task paused, or its policy said stop.
+    PAUSED = "paused"
 
 
 class SubtaskState(str, Enum):

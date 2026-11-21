@@ -1,7 +1,8 @@
 /**
- * The governance panel of Settings > Guardrails (#353, lot 2): what
- * `workpilot.policy.yaml` says about hours, files and the token budget, its
- * errors, the policy's last decisions, and the export of its audit trail.
+ * The governance panel of Settings > Guardrails (#353, lots 2-3): what
+ * `workpilot.policy.yaml` says about hours, files, token budgets and the
+ * circuit breaker, its errors, the policy's last decisions and their counts,
+ * and the export of its audit trail.
  *
  * Channels:
  *   governance:report       → { projectPath } → GovernanceReport
@@ -17,7 +18,7 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import type { AuditExportResult, GovernanceReport } from "../../shared/types/governance";
 import { showSaveDialog } from "../electron-utils";
-import { auditEvents, auditFormat, serializeAudit } from "../governance/audit-export";
+import { auditEvents, auditFormat, auditMetrics, serializeAudit } from "../governance/audit-export";
 import { resolveKnownProject } from "../security/renderer-path";
 import { runGuardrails } from "./guardrails-handlers";
 
@@ -32,7 +33,7 @@ function knownProject(request: Request): string {
 export async function governanceReport(request: Request): Promise<GovernanceReport> {
 	const root = knownProject(request);
 	const answer = (await runGuardrails("governance", { projectPath: root })) as GovernanceReport;
-	return { ...answer, events: auditEvents(answer) };
+	return { ...answer, events: auditEvents(answer), metrics: auditMetrics(answer) };
 }
 
 export async function exportAudit(request: Request, today = new Date()): Promise<AuditExportResult> {

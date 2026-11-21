@@ -168,6 +168,8 @@ async def run_swarm(
     )
     print(f"  Failed:    {status.failed_subtasks}", flush=True)
     print(f"  Duration:  {duration:.1f}s", flush=True)
+    if status.phase == SwarmPhase.PAUSED:
+        print(f"  Stopped:   {status.error}", flush=True)
     print(f"{'=' * 60}\n", flush=True)
 
     return {

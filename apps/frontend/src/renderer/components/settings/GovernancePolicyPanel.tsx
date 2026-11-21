@@ -1,4 +1,4 @@
-import { Clock, Download, FileLock2, Gauge, RefreshCw, ShieldAlert } from "lucide-react";
+import { Clock, Download, FileLock2, Gauge, RefreshCw, Repeat, ShieldAlert } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,6 +19,7 @@ const DECISION_TONES: Record<PolicyDecision, Tone> = {
 	outside_hours: "blue",
 	budget_exceeded: "amber",
 	invalid_policy: "red",
+	tool_loop: "amber",
 };
 
 function DecisionLine({ event }: { readonly event: PolicyAuditEvent }): React.ReactElement {
@@ -57,8 +58,9 @@ function GlobList({ globs, empty }: { readonly globs: readonly string[]; readonl
 
 /**
  * The governance sections of `workpilot.policy.yaml`, read only: the hours, the
- * files and the token budget every agent is held to, why the file is refused
- * when it is, the policy's last decisions, and the export of its audit trail.
+ * files, the token budgets and the circuit-breaker limit every agent is held
+ * to, why the file is refused when it is, the policy's last decisions and
+ * their counts, and the export of its audit trail.
  */
 export function GovernancePolicyPanel({ projectPath }: { readonly projectPath: string }): React.ReactElement {
 	const { t, i18n } = useTranslation("settings");
@@ -98,7 +100,9 @@ export function GovernancePolicyPanel({ projectPath }: { readonly projectPath: s
 	const governance = report?.governance ?? null;
 	const schedule = governance?.schedule ?? null;
 	const budget = governance?.budget ?? null;
+	const loop = governance?.loopDetection ?? null;
 	const events = report?.events ?? [];
+	const metrics = report?.metrics ?? null;
 	const tokensLastHour = report?.tokensLastHour ?? 0;
 
 	return (
@@ -134,7 +138,7 @@ export function GovernancePolicyPanel({ projectPath }: { readonly projectPath: s
 					<p className="wp-muted text-sm">{t("governance.none")}</p>
 				)}
 				{governance && (
-					<div className="grid gap-3 md:grid-cols-3">
+					<div className="grid gap-3 md:grid-cols-4">
 						<div className="space-y-1" data-testid="governance-schedule">
 							<p className="wp-kicker flex items-center gap-1">
 								<Clock className="h-3 w-3" aria-hidden="true" /> {t("governance.scheduleTitle")}
@@ -169,18 +173,48 @@ export function GovernancePolicyPanel({ projectPath }: { readonly projectPath: s
 							<p className="wp-kicker flex items-center gap-1">
 								<Gauge className="h-3 w-3" aria-hidden="true" /> {t("governance.budgetTitle")}
 							</p>
+							{budget?.maxTokensPerHour ? (
+								<p className="text-xs">
+									{t("governance.budgetLine", {
+										spent: tokensLastHour.toLocaleString(i18n.language),
+										limit: budget.maxTokensPerHour.toLocaleString(i18n.language),
+									})}
+								</p>
+							) : null}
+							{budget?.maxTokensPerTask ? (
+								<p className="text-xs">
+									{t("governance.taskBudgetLine", {
+										limit: budget.maxTokensPerTask.toLocaleString(i18n.language),
+									})}
+								</p>
+							) : null}
+							{!budget && <p className="text-xs">{t("governance.noBudget")}</p>}
+						</div>
+						<div className="space-y-1" data-testid="governance-loop">
+							<p className="wp-kicker flex items-center gap-1">
+								<Repeat className="h-3 w-3" aria-hidden="true" /> {t("governance.loopTitle")}
+							</p>
 							<p className="text-xs">
-								{budget
-									? t("governance.budgetLine", {
-											spent: tokensLastHour.toLocaleString(i18n.language),
-											limit: budget.maxTokensPerHour.toLocaleString(i18n.language),
-										})
-									: t("governance.noBudget")}
+								{loop
+									? t("governance.loopLine", { count: loop.maxSameToolCall })
+									: t("governance.noLoop")}
 							</p>
 						</div>
 					</div>
 				)}
 				<div className="space-y-2">
+					{metrics && (
+						<div data-testid="governance-metrics">
+							<Chips>
+								<Chip tone={metrics.blocked24h > 0 ? "red" : "muted"}>
+									{t("governance.metricsBlocked", { count: metrics.blocked24h })}
+								</Chip>
+								<Chip tone={metrics.breakerTrips7d > 0 ? "amber" : "muted"}>
+									{t("governance.metricsTrips", { count: metrics.breakerTrips7d })}
+								</Chip>
+							</Chips>
+						</div>
+					)}
 					<div className="flex flex-wrap items-center gap-2">
 						<p className="wp-kicker mr-auto">{t("governance.decisionsTitle")}</p>
 						<CharterButton variant="ghost" size="sm" icon={Download} onClick={() => void exportAs("csv")}>

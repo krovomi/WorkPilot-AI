@@ -5,8 +5,8 @@
  * (`apps/backend/agents/tool_breaker.py`), or because the session watch saw
  * its trust score fall or a sandbox limit crossed
  * (`apps/backend/agents/safety_watch.py`), or because `workpilot.policy.yaml`
- * says agents must stop: outside its hours or past its token budget
- * (`apps/backend/agents/policy_watch.py`). The pause keeps the card in its
+ * says agents must stop: outside its hours, past a token budget, or the policy
+ * itself invalid (`apps/backend/agents/policy_watch.py`). The pause keeps the card in its
  * column, so without this nobody would know the task stopped until they opened
  * it. Read from the task's `pause_state.json`, written by the backend.
  */
@@ -44,6 +44,11 @@ const STRINGS = {
 		policyBudgetTitle: "Task paused: token budget reached",
 		policyBudget:
 			'"{title}" paused: the project\'s agents spent {spent} tokens in the last hour, past the {limit} workpilot.policy.yaml allows.',
+		policyTaskBudget:
+			'"{title}" paused: its agents spent {spent} tokens, past the {limit} per task workpilot.policy.yaml allows.',
+		invalidTitle: "Task paused: invalid policy",
+		invalid:
+			'"{title}" paused: the guardrails policy has {count} error(s). Fix them (Settings > Guardrails lists them), then resume it.',
 	},
 	fr: {
 		title: "Tâche en pause : budget atteint",
@@ -67,6 +72,11 @@ const STRINGS = {
 		policyBudgetTitle: "Tâche en pause : budget de jetons atteint",
 		policyBudget:
 			"« {title} » en pause : les agents du projet ont dépensé {spent} jetons dans la dernière heure, au-delà des {limit} permis par workpilot.policy.yaml.",
+		policyTaskBudget:
+			"« {title} » en pause : ses agents ont dépensé {spent} jetons, au-delà des {limit} par tâche permis par workpilot.policy.yaml.",
+		invalidTitle: "Tâche en pause : politique invalide",
+		invalid:
+			"« {title} » en pause : la politique de garde-fous a {count} erreur(s). Corrigez-les (Réglages > Garde-fous les liste), puis reprenez-la.",
 	},
 };
 
@@ -136,6 +146,21 @@ function policyMessage(detail: PolicyPauseDetail | undefined, title: string, wor
 			.replace("{limit}", String(Math.trunc(detail.maxTokensPerHour)));
 		return { title: words.policyBudgetTitle, body };
 	}
+	if (
+		detail?.reason === "policy_budget" &&
+		typeof detail.tokensThisTask === "number" &&
+		typeof detail.maxTokensPerTask === "number"
+	) {
+		const body = words.policyTaskBudget
+			.replace("{title}", title)
+			.replace("{spent}", String(Math.trunc(detail.tokensThisTask)))
+			.replace("{limit}", String(Math.trunc(detail.maxTokensPerTask)));
+		return { title: words.policyBudgetTitle, body };
+	}
+	if (detail?.reason === "policy_invalid" && typeof detail.errorCount === "number") {
+		const count = String(Math.max(1, Math.trunc(detail.errorCount)));
+		return { title: words.invalidTitle, body: words.invalid.replace("{title}", title).replace("{count}", count) };
+	}
 	return null;
 }
 
@@ -155,7 +180,7 @@ export function backendPauseMessage(
 	if (record.reason === "anomaly" || record.reason === "sandbox") {
 		return safetyMessage(record, title, words);
 	}
-	if (record.reason === "policy_hours" || record.reason === "policy_budget") {
+	if (record.reason === "policy_hours" || record.reason === "policy_budget" || record.reason === "policy_invalid") {
 		return policyMessage(record.policy, title, words);
 	}
 	return null;

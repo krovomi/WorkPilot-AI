@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { AUDIT_COLUMNS, auditEvents, auditFormat, serializeAudit, toCsv } from "../audit-export";
+import { AUDIT_COLUMNS, auditEvents, auditFormat, auditMetrics, serializeAudit, toCsv } from "../audit-export";
 
 const event = {
 	id: "abc",
@@ -59,6 +59,22 @@ describe("auditEvents", () => {
 
 	it("keeps command targets", () => {
 		expect(auditEvents({ events: [{ ...event, targetKind: "command" }] })[0].targetKind).toBe("command");
+	});
+});
+
+describe("auditMetrics", () => {
+	it("keeps whole, positive, bounded counts and reads garbage as zero", () => {
+		expect(auditMetrics({ metrics: { blocked24h: 3, breakerTrips7d: 2 } })).toEqual({ blocked24h: 3, breakerTrips7d: 2 });
+		expect(auditMetrics({ metrics: { blocked24h: -1, breakerTrips7d: "9" } })).toEqual({
+			blocked24h: 0,
+			breakerTrips7d: 0,
+		});
+		expect(auditMetrics({ metrics: { blocked24h: Number.NaN } })).toEqual({ blocked24h: 0, breakerTrips7d: 0 });
+		expect(auditMetrics(null)).toEqual({ blocked24h: 0, breakerTrips7d: 0 });
+	});
+
+	it("keeps a breaker trip in the trail", () => {
+		expect(auditEvents({ events: [{ ...event, decision: "tool_loop" }] })[0].decision).toBe("tool_loop");
 	});
 });
 
