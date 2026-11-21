@@ -7,17 +7,22 @@ Provides endpoints for:
 - File heatmap data
 - Breakpoint management
 - A/B session comparison
+- Sharing (#347): export, import, bookmarks, a video, a model's summary
 """
 
+import asyncio
 import base64
 import binascii
 import logging
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
+from foundation.platform.browser import chrome_executable
 from pydantic import BaseModel, Field
 
 from . import bookmarks as bookmark_store
+from . import summary as summary_module
+from . import video as video_module
 from .bundle import (
     MAX_BUNDLE_BYTES,
     BundleError,
@@ -78,6 +83,20 @@ class AddBookmarkRequest(BaseModel):
     step_index: int = Field(ge=0)
     note: str = Field(default="", max_length=4000)
     author: str = Field(default="", max_length=100)
+
+
+class ExportVideoRequest(BaseModel):
+    strip_reasoning: bool = False
+    strip_tokens: bool = False
+    language: Literal["en", "fr"] = "en"
+
+
+class SummarizeRequest(BaseModel):
+    # A provider name as the clients know it; create_agent_client routes it.
+    provider: str = Field(
+        min_length=1, max_length=40, pattern=r"^[a-z0-9][a-z0-9_.-]*$"
+    )
+    language: Literal["en", "fr"] = "en"
 
 
 class AddCheckpointRequest(BaseModel):
@@ -418,6 +437,79 @@ async def remove_bookmark(session_id: str, bookmark_id: str):
     ):
         raise HTTPException(status_code=404, detail="Bookmark not found")
     return {"success": True}
+
+
+_VIDEO_LOCK = asyncio.Lock()
+
+_SUMMARY_REFUSALS = {
+    "recording": (409, "recording"),
+    "not_found": (404, SESSION_NOT_FOUND),
+    "has_thinking": (409, "has_thinking"),
+    "no_steps": (422, "no_steps"),
+    "no_runtime": (503, "summary_failed"),
+    "failed": (502, "summary_failed"),
+    "empty": (502, "summary_empty"),
+}
+
+
+@router.post(
+    "/sessions/{session_id}/video",
+    responses={
+        404: {"description": SESSION_NOT_FOUND},
+        409: {"description": "A video is already being recorded"},
+        422: {"description": "The recording failed"},
+    },
+)
+async def export_video(session_id: str, req: ExportVideoRequest):
+    """The session's page, masked, played step by step as a WebM video.
+
+    No Playwright, browser or encoder here is an answer (``available`` false,
+    with the ``refusal``), not an error.
+    """
+    session = get_replay_recorder().load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=SESSION_NOT_FOUND)
+    if _VIDEO_LOCK.locked():
+        raise HTTPException(status_code=409, detail="video_busy")
+    async with _VIDEO_LOCK:
+        options = ExportOptions(
+            strip_reasoning=req.strip_reasoning, strip_tokens=req.strip_tokens
+        )
+        page = render_viewer(build_bundle(session, options), req.language)
+        try:
+            content, played, total = await video_module.record_video(
+                page, executable=chrome_executable()
+            )
+        except video_module.VideoUnavailable as refusal:
+            return {"success": True, "available": False, "refusal": refusal.code}
+        except video_module.VideoError as error:
+            raise HTTPException(
+                status_code=422, detail=f"video_{error.code}"
+            ) from error
+    return {
+        "success": True,
+        "available": True,
+        "file_name": file_name(session, video_module.EXTENSION),
+        "content_base64": base64.b64encode(content).decode("ascii"),
+        "steps_played": played,
+        "steps_total": total,
+    }
+
+
+@router.post(
+    "/sessions/{session_id}/summary",
+    responses={404: {"description": SESSION_NOT_FOUND}},
+)
+async def summarize_session(session_id: str, req: SummarizeRequest):
+    """A model's summary of the steps of a session that has no thinking trace."""
+    try:
+        summary = await summary_module.summarize(
+            get_replay_recorder(), session_id, req.provider, req.language
+        )
+    except summary_module.SummaryError as error:
+        status, detail = _SUMMARY_REFUSALS[error.code]
+        raise HTTPException(status_code=status, detail=detail) from error
+    return {"success": True, "summary": summary.to_dict()}
 
 
 # ---------------------------------------------------------------------------

@@ -565,6 +565,15 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "none",
     },
+    "replay_summary": {
+        # replay/summary.py — a recorded session, masked and quoted as data,
+        # in the prompt; a few lines of summary out as text, in one turn. It
+        # reads text other runs wrote, so it gets no tool to act on it with.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
     "code_playground": {
         # runners/code_playground_runner.py — an idea in, one JSON object with
         # the playground's files out, which the runner hands to the UI as

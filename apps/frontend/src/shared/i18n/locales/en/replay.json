@@ -217,7 +217,29 @@
 			"unsupported_version": "This bundle was made by a newer version of WorkPilot.",
 			"not_a_file": "Choose a file, not a folder.",
 			"bad_export": "The backend built an unexpected file, so nothing was written.",
-			"generic": "The replay could not be shared: {{error}}"
+			"generic": "The replay could not be shared: {{error}}",
+			"bad_target": "That file cannot be written there: choose another name or folder.",
+			"video_busy": "A video is already being recorded. Wait for it to finish.",
+			"video_timeout": "The video took too long to record and was stopped.",
+			"video_too_large": "The video came out too large to save.",
+			"video_failed": "The browser could not record the video.",
+			"recording": "This session is still recording.",
+			"has_thinking": "This session has its own reasoning, so it needs no summary.",
+			"no_steps": "This session has no steps to summarize.",
+			"summary_failed": "The model could not be reached for a summary. Check the provider's sign-in, then try again.",
+			"summary_empty": "The model gave an empty summary. Try again."
+		},
+		"video": {
+			"export": "Export a video (WebM)",
+			"recording": "Recording the video…",
+			"hint": "The video is the same masked page, played step by step in a headless browser on this machine. It lasts two minutes at most.",
+			"saved": "Video saved to {{path}}",
+			"savedPart": "Video saved to {{path}}: it plays {{played}} of {{total}} steps, the page shows them all.",
+			"refused": {
+				"no_playwright": "A video needs Playwright, which this machine's backend does not have. Install it with the backend's requirements, then try again.",
+				"no_browser": "A video needs Chromium or Chrome, and none was found on this machine. Install one (for instance with “playwright install chromium”), then try again.",
+				"no_encoder": "A video needs Playwright's video encoder, which is not installed. Run “playwright install ffmpeg”, then try again."
+			}
 		}
 	},
 	"bookmarks": {
@@ -229,5 +251,15 @@
 		"remove": "Remove the bookmark",
 		"empty": "No bookmark yet.",
 		"recording": "Bookmarks can be added once the session has finished recording."
+	},
+	"summary": {
+		"title": "Summary of the steps",
+		"none": "The model of this session left no reasoning. A model can summarize the steps in a few lines.",
+		"ask": "Summarize with {{provider}}",
+		"again": "Summarize again with {{provider}}",
+		"working": "Summarizing…",
+		"writtenBy": "Written by a model ({{model}}) from the recorded steps, masked like an export.",
+		"recording": "A summary can be asked once the session has finished recording.",
+		"noProvider": "Choose a default provider in Settings to summarize the steps."
 	}
 }
