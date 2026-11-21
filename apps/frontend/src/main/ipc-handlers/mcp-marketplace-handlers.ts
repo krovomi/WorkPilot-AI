@@ -10,7 +10,7 @@
 import { debugLog } from "../../shared/utils/debug-logger";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { app, ipcMain } from "electron";
+import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { loadMcpCatalog } from "../../shared/mcp-catalog/install";
 import type {
@@ -18,7 +18,20 @@ import type {
 	McpBuilderProject,
 } from "../../shared/types/mcp-marketplace";
 import { appLog } from "../app-logger";
-import { RegistryFactsStore } from "../mcp-security/registry-facts";
+import {
+	installedWatchView,
+	McpWatchRequestError,
+	parseAcknowledgeRequest,
+	parseWatchRequest,
+} from "../mcp-security/installed-watch";
+import { readMcpPolicy } from "../mcp-security/policy-file";
+import {
+	installedWatchStore,
+	marketplaceDataDir,
+	securityStore,
+	startMcpInstalledWatch,
+	watchDeps,
+} from "../mcp-security/runtime";
 import {
 	McpSecurityRequestError,
 	serverSecurity,
@@ -27,21 +40,8 @@ import { projectStore } from "../project-store";
 import { searchHuggingFaceModels } from "../services/hf-mcp-client";
 import { offlineStrict } from "./task/split-merge-watch";
 
-// ============================================
-// Storage paths
-// ============================================
-
-function getMarketplaceDataDir(): string {
-	const userDataPath = app.getPath("userData");
-	const dir = path.join(userDataPath, "mcp-marketplace");
-	if (!fs.existsSync(dir)) {
-		fs.mkdirSync(dir, { recursive: true });
-	}
-	return dir;
-}
-
 function getBuilderProjectsPath(): string {
-	return path.join(getMarketplaceDataDir(), "builder-projects.json");
+	return path.join(marketplaceDataDir(), "builder-projects.json");
 }
 
 // ============================================
@@ -70,14 +70,18 @@ function saveBuilderToDisk(projects: McpBuilderProject[]): void {
 	}
 }
 
-let securityStore: RegistryFactsStore | null = null;
+/** The registered project `raw` names, checked (S6). */
+function requestedProject(raw: unknown) {
+	const { projectId } = parseWatchRequest(raw);
+	const project = projectStore.getProject(projectId);
+	if (!project) throw new McpWatchRequestError("Project not found");
+	return project;
+}
 
-/** The registry facts of the catalog's packages, cached in the app's data. */
-function getSecurityStore(): RegistryFactsStore {
-	securityStore ??= new RegistryFactsStore(
-		path.join(getMarketplaceDataDir(), "security-facts.json"),
-	);
-	return securityStore;
+function watchFailure(error: unknown, message: string) {
+	if (error instanceof McpWatchRequestError) return { success: false, error: error.message };
+	appLog.error(`[MCP Marketplace] ${message}:`, error);
+	return { success: false, error: message };
 }
 
 // ============================================
@@ -172,7 +176,7 @@ export function registerMcpMarketplaceHandlers(): void {
 		async (_event, request: unknown) => {
 			try {
 				const data = await serverSecurity(request, {
-					store: getSecurityStore(),
+					store: securityStore(),
 					projectPath: (id) => projectStore.getProject(id)?.path,
 					offline: offlineStrict,
 				});
@@ -186,6 +190,46 @@ export function registerMcpMarketplaceHandlers(): void {
 			}
 		},
 	);
+
+	// The project's MCP install policy (#369): read by the main from the
+	// project's own folder, applied by env:update; the renderer only explains.
+	ipcMain.handle(IPC_CHANNELS.MCP_MARKETPLACE_GET_POLICY, async (_event, request: unknown) => {
+		try {
+			return { success: true, data: readMcpPolicy(requestedProject(request).path) };
+		} catch (error) {
+			return watchFailure(error, "Failed to read the MCP policy");
+		}
+	});
+
+	// Alerts of the daily check on the project's installed servers (#369).
+	ipcMain.handle(
+		IPC_CHANNELS.MCP_MARKETPLACE_GET_INSTALLED_WATCH,
+		async (_event, request: unknown) => {
+			try {
+				const project = requestedProject(request);
+				return {
+					success: true,
+					data: installedWatchView({ id: project.id, path: project.path }, watchDeps()),
+				};
+			} catch (error) {
+				return watchFailure(error, "Failed to read the installed servers' alerts");
+			}
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.MCP_MARKETPLACE_ACKNOWLEDGE_ALERTS,
+		async (_event, request: unknown) => {
+			try {
+				const { serverId } = parseAcknowledgeRequest(request);
+				return { success: true, data: installedWatchStore().acknowledge(serverId, Date.now()) };
+			} catch (error) {
+				return watchFailure(error, "Failed to acknowledge the alerts");
+			}
+		},
+	);
+
+	startMcpInstalledWatch();
 
 	// Live Hugging Face Hub model search (via the official HF MCP server).
 	// Powers the "Discover models" settings panel.

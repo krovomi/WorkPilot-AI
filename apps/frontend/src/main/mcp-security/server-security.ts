@@ -38,18 +38,21 @@ function parseRequest(raw: unknown): McpSecurityRequest {
 	return { serverId, projectId: projectId ?? null, refresh: refresh === true };
 }
 
-export async function serverSecurity(
-	raw: unknown,
-	deps: ServerSecurityDeps,
-): Promise<McpSecurityScore> {
-	const request = parseRequest(raw);
-	const entry = (deps.catalog ?? loadMcpCatalog)().find((s) => s.id === request.serverId);
-	if (!entry) throw new McpSecurityRequestError("Unknown catalog server");
+export type ScoreDeps = Pick<ServerSecurityDeps, "store" | "offline">;
 
+/**
+ * The score of catalog entry `entry` for a project at `projectPath` (none: no
+ * offline mode to honour): its registry facts read or taken from the cache
+ * of a day, never read for a project in strict offline mode.
+ */
+export async function scoreCatalogEntry(
+	entry: McpMarketplaceServer,
+	projectPath: string | undefined,
+	deps: ScoreDeps,
+	refresh = false,
+): Promise<McpSecurityScore> {
 	const ref = packageOf(entry);
 	if (!ref) return scoreServer(entry);
-
-	const projectPath = request.projectId ? deps.projectPath(request.projectId) : undefined;
 	if (projectPath && deps.offline(projectPath)) {
 		return scoreServer(entry, {
 			facts: deps.store.cached(entry.id),
@@ -57,7 +60,7 @@ export async function serverSecurity(
 		});
 	}
 	try {
-		const facts = await deps.store.facts(entry.id, ref, request.refresh);
+		const facts = await deps.store.facts(entry.id, ref, refresh);
 		return scoreServer(entry, { facts });
 	} catch {
 		return scoreServer(entry, {
@@ -65,4 +68,15 @@ export async function serverSecurity(
 			unchecked: "unreachable",
 		});
 	}
+}
+
+export async function serverSecurity(
+	raw: unknown,
+	deps: ServerSecurityDeps,
+): Promise<McpSecurityScore> {
+	const request = parseRequest(raw);
+	const entry = (deps.catalog ?? loadMcpCatalog)().find((s) => s.id === request.serverId);
+	if (!entry) throw new McpSecurityRequestError("Unknown catalog server");
+	const projectPath = request.projectId ? deps.projectPath(request.projectId) : undefined;
+	return scoreCatalogEntry(entry, projectPath, deps, request.refresh);
 }

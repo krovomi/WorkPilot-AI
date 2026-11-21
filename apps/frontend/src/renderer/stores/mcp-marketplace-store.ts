@@ -24,6 +24,12 @@ import type {
 	McpMarketplaceTab,
 } from "../../shared/types/mcp-marketplace";
 import type {
+	McpPolicyRefusal,
+	McpPolicyRefusalData,
+	McpPolicyState,
+} from "../../shared/types/mcp-policy";
+import type { McpInstalledWatchView } from "../../shared/types/mcp-security";
+import type {
 	AgentMcpOverrides,
 	CustomMcpServer,
 } from "../../shared/types/project";
@@ -40,7 +46,9 @@ export type McpMarketplaceErrorKey =
 	| "install"
 	| "uninstall"
 	| "saveBuilder"
-	| "deleteBuilder";
+	| "deleteBuilder"
+	| "policyRefused"
+	| "acknowledge";
 
 export interface McpMarketplaceError {
 	key: McpMarketplaceErrorKey;
@@ -48,6 +56,8 @@ export interface McpMarketplaceError {
 	name?: string;
 	/** The main process's or the exception's own message, when there is one */
 	detail?: string;
+	/** Why the project's MCP policy refused the install (`policyRefused`) */
+	policy?: McpPolicyRefusal;
 }
 
 function failure(
@@ -72,6 +82,12 @@ interface McpMarketplaceState {
 	installed: CustomMcpServer[];
 	agentOverrides: AgentMcpOverrides;
 	builderProjects: McpBuilderProject[];
+	/** The install policy of `policyProjectId`, as the main read it */
+	policy: McpPolicyState | null;
+	policyProjectId: string | null;
+	/** The daily check's alerts on `watchProjectId`'s installed servers */
+	installedWatch: McpInstalledWatchView | null;
+	watchProjectId: string | null;
 
 	isCatalogLoading: boolean;
 	isInstalledLoading: boolean;
@@ -122,6 +138,10 @@ export const useMcpMarketplaceStore = create<McpMarketplaceState>(
 		installed: [],
 		agentOverrides: {},
 		builderProjects: [],
+		policy: null,
+		policyProjectId: null,
+		installedWatch: null,
+		watchProjectId: null,
 		isCatalogLoading: false,
 		isInstalledLoading: false,
 		isBuilderLoading: false,
@@ -281,10 +301,17 @@ async function saveProjectServers(
 		agentMcpOverrides: overrides,
 	});
 	if (!result?.success) {
-		store.setError(failure("saveSettings", result?.error));
+		const refusal = (result?.data as McpPolicyRefusalData | undefined)?.mcpPolicyRefusal;
+		store.setError(
+			refusal
+				? { key: "policyRefused", name: refusal.name, policy: refusal }
+				: failure("saveSettings", result?.error),
+		);
 		return false;
 	}
 	store.setProjectServers(projectId, servers, overrides);
+	// What the daily check says of each server follows the list.
+	void loadInstalledWatch(projectId);
 	return true;
 }
 
@@ -359,6 +386,71 @@ export async function uninstallMarketplaceServer(
 		);
 	} catch (err) {
 		store.setError(failure("uninstall", err));
+		return false;
+	}
+}
+
+/** The latest read of a project's policy and of its alerts; older answers are dropped. */
+let policyRead = 0;
+let watchRead = 0;
+
+/**
+ * Reads the project's MCP install policy from the main process. It is only
+ * shown here: the main applies it when the project's settings are written.
+ * A read that fails leaves no policy shown (the main still applies it).
+ */
+export async function loadMcpPolicy(projectId: string | null | undefined): Promise<void> {
+	const read = ++policyRead;
+	const set = (policy: McpPolicyState | null) => {
+		if (read === policyRead) {
+			useMcpMarketplaceStore.setState({ policy, policyProjectId: projectId ?? null });
+		}
+	};
+	if (!projectId) return set(null);
+	try {
+		const result = await globalThis.electronAPI.getMcpInstallPolicy({ projectId });
+		set(result?.success && result.data ? result.data : null);
+	} catch (err) {
+		console.error("[MCP Marketplace] Failed to read the MCP policy:", err);
+		set(null);
+	}
+}
+
+/** Reads what the daily check found on the project's installed servers. */
+export async function loadInstalledWatch(projectId: string | null | undefined): Promise<void> {
+	const read = ++watchRead;
+	const set = (installedWatch: McpInstalledWatchView | null) => {
+		if (read === watchRead) {
+			useMcpMarketplaceStore.setState({ installedWatch, watchProjectId: projectId ?? null });
+		}
+	};
+	if (!projectId) return set(null);
+	try {
+		const result = await globalThis.electronAPI.getMcpInstalledWatch({ projectId });
+		set(result?.success && result.data ? result.data : null);
+	} catch (err) {
+		console.error("[MCP Marketplace] Failed to read the installed servers' alerts:", err);
+		set(null);
+	}
+}
+
+/** Acknowledges the alerts of `serverId`, then reads the project's alerts again. */
+export async function acknowledgeServerAlerts(
+	projectId: string,
+	serverId: string,
+): Promise<boolean> {
+	const store = useMcpMarketplaceStore.getState();
+	store.setError(null);
+	try {
+		const result = await globalThis.electronAPI.acknowledgeMcpAlerts({ serverId });
+		if (!result?.success) {
+			store.setError(failure("acknowledge", result?.error));
+			return false;
+		}
+		await loadInstalledWatch(projectId);
+		return true;
+	} catch (err) {
+		store.setError(failure("acknowledge", err));
 		return false;
 	}
 }

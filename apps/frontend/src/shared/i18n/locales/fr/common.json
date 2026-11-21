@@ -1082,7 +1082,9 @@
 			"install": "Le serveur n'a pas pu être installé.",
 			"uninstall": "Le serveur n'a pas pu être retiré.",
 			"saveBuilder": "Le serveur n'a pas pu être enregistré.",
-			"deleteBuilder": "Le serveur n'a pas pu être supprimé."
+			"deleteBuilder": "Le serveur n'a pas pu être supprimé.",
+			"policyRefused": "La politique MCP du projet a refusé {{name}}.",
+			"acknowledge": "Les alertes n'ont pas pu être acquittées."
 		},
 		"requires": {
 			"uv": "Nécessite uv (uvx) sur cette machine.",
@@ -1150,6 +1152,50 @@
 				"noSource": "Code source indisponible : impossible de l'auditer.",
 				"unpinned": "Version non figée : chaque démarrage lance la dernière version, quoi qu'elle contienne.",
 				"executesCommands": "Il peut lancer des commandes ({{tools}}) : ne le donnez qu'aux agents qui en ont besoin."
+			}
+		},
+		"policy": {
+			"active": "Ce projet a une politique MCP (.workpilot/mcp-policy.json) : seul ce qu'elle autorise peut être installé.",
+			"allowed": "Serveurs du catalogue autorisés : {{ids}}.",
+			"allowedNone": "Aucun serveur du catalogue n'est autorisé.",
+			"minScore": "Score de sécurité minimum : {{min}}.",
+			"customBlocked": "Les serveurs hors catalogue sont refusés.",
+			"invalidTitle": "La politique MCP du projet (.workpilot/mcp-policy.json) est invalide : aucun serveur ne peut être installé tant qu'elle n'est pas corrigée.",
+			"invalid": {
+				"unreadable": "Le fichier n'a pas pu être lu.",
+				"notJson": "Le fichier n'est pas du JSON valide.",
+				"schema": "Un champ est inconnu ou a une valeur incorrecte.",
+				"schemaField": "Champ inconnu ou incorrect : {{field}}.",
+				"outsideProject": "Le fichier, ou son dossier, pointe hors du projet.",
+				"notAFile": "Ce n'est pas un fichier ordinaire.",
+				"tooLarge": "Le fichier dépasse 64 Ko."
+			},
+			"refusals": {
+				"policyInvalid": "{{name}} ne peut pas être installé : la politique MCP du projet est invalide.",
+				"notAllowed": "La politique MCP du projet n'autorise pas {{name}}.",
+				"scoreTooLow": "{{name}} a un score de sécurité de {{score}} ; la politique MCP du projet exige {{minScore}} ou plus.",
+				"customBlocked": "La politique MCP du projet refuse les serveurs hors catalogue ({{name}})."
+			}
+		},
+		"watch": {
+			"title": "Alertes de sécurité",
+			"alertCount_one": "{{count}} alerte",
+			"alertCount_other": "{{count}} alertes",
+			"unverifiable": "Non vérifiable",
+			"unverifiableHint": "Ce n'est pas un serveur du catalogue : il n'est jamais vérifié sur le réseau.",
+			"status": {
+				"watched": "Vérifié chaque jour ; dernière lecture {{date}}.",
+				"pending": "Sera lu par la prochaine vérification quotidienne.",
+				"remote": "Tourne chez son éditeur : aucun paquet à vérifier.",
+				"offline": "Hors-ligne strict : les serveurs de ce projet ne sont pas vérifiés."
+			},
+			"acknowledge": "Acquitter",
+			"detectedAt": "Détectée {{date}}",
+			"alerts": {
+				"newVulnerability": "Nouvel avis pour la version {{version}} : {{id}}, {{summary}}",
+				"maintainerAdded": "Nouveau mainteneur : {{names}}. Un nouveau mainteneur peut publier n'importe quoi sous ce nom ; vérifiez sa dernière version.",
+				"deprecated": "L'éditeur a déprécié ou retiré ce paquet.",
+				"lowScore": "Le score de sécurité est tombé à {{score}} (il était de {{previous}})."
 			}
 		}
 	},
