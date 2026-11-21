@@ -5,6 +5,7 @@
 
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import type { BuildComparison } from "../../../shared/types/build-compare";
 import type { CostBudgetConfig, CostBudgetStatus } from "../../../shared/types/cost-budget";
 import type {
 	CostSummary,
@@ -66,6 +67,12 @@ export interface CostAPI {
 		projectId: string,
 	): Promise<IPCResult<DashboardSnapshot>>;
 	getServerSessions(projectId: string): Promise<IPCResult<WorkspaceSession[]>>;
+	/** "How you compare": a project of this computer, by its folder. */
+	getBuildComparison(projectPath: string): Promise<IPCResult<BuildComparison>>;
+	/** "How you compare" for a server project, by id: medians only. */
+	getServerBuildComparison(
+		projectId: string,
+	): Promise<IPCResult<BuildComparison>>;
 }
 
 export const createCostAPI = (): CostAPI => ({
@@ -95,6 +102,12 @@ export const createCostAPI = (): CostAPI => ({
 
 	getServerSessions: (projectId: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.SERVER_WORKSPACE_SESSIONS, projectId),
+
+	getBuildComparison: (projectPath: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DASHBOARD_COMPARE, projectPath),
+
+	getServerBuildComparison: (projectId: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_WORKSPACE_COMPARE, projectId),
 
 	onCostsUpdated: (callback: (projectPath: string) => void) => {
 		const handler = (_event: Electron.IpcRendererEvent, projectPath: string) =>

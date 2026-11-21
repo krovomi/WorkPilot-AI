@@ -133,6 +133,7 @@ import { registerServerAuthHandlers } from "./server-auth-handlers";
 import { registerServerSsoHandlers } from "./server-sso-handlers";
 import { registerServerProjectHandlers } from "./server-project-handlers";
 import { registerServerWorkspaceHandlers } from "./server-workspace-handlers";
+import { registerBuildCompareHandlers } from "./build-compare-handlers";
 import { registerTeamRoomHandlers } from "./team-room-handlers";
 import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
@@ -352,6 +353,8 @@ export function setupIpcHandlers(
 	registerServerAdminHandlers();
 	registerServerProjectHandlers();
 	registerServerWorkspaceHandlers();
+	// Build Analytics, "How you compare": a project of this computer
+	registerBuildCompareHandlers();
 	registerTeamRoomHandlers();
 
 	// File explorer handlers

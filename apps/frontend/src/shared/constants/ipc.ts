@@ -1167,6 +1167,9 @@ export const IPC_CHANNELS = {
 	CROSS_LANG_TRANSLATION_GET_SUPPORTED_LANGUAGES: "crossLangTranslation:getSupportedLanguages",
 	CROSS_LANG_TRANSLATION_STREAM_CHUNK: "crossLangTranslation:streamChunk",
 	CROSS_LANG_TRANSLATION_TRANSLATE: "crossLangTranslation:translate",
+	// "How you compare": a project's specs against its past and the person's
+	// other projects, read from their folders (main/build-compare.ts)
+	DASHBOARD_COMPARE: "dashboard:compare",
 	DASHBOARD_GET_SNAPSHOT: "dashboard:getSnapshot",
 	DESIGN_TO_CODE_DETECT_STACK: "designToCode:detectStack",
 	DESIGN_TO_CODE_PROGRESS: "designToCode:progress",
@@ -1385,6 +1388,7 @@ export const IPC_CHANNELS = {
 	SERVER_VIEW_CHANGED: "server-view:changed",
 	// Server mode: a server project's dashboard, analytics, costs and session
 	// history, computed by the server (main/server-workspace.ts)
+	SERVER_WORKSPACE_COMPARE: "server-workspace:compare",
 	SERVER_WORKSPACE_COSTS: "server-workspace:costs",
 	SERVER_WORKSPACE_DASHBOARD: "server-workspace:dashboard",
 	SERVER_WORKSPACE_SESSIONS: "server-workspace:sessions",

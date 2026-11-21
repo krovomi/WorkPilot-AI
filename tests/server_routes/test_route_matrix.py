@@ -279,6 +279,7 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/api/features/workspace/sessions"): scoped("analytics.read"),
     ("GET", "/api/features/workspace/costs"): scoped("analytics.read"),
     ("GET", "/api/features/workspace/dashboard"): scoped("analytics.read"),
+    ("GET", "/api/features/workspace/compare"): scoped("analytics.read"),
 }
 
 #: Values for the path parameters: ids that exist nowhere, except the
