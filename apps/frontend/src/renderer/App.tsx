@@ -1721,11 +1721,7 @@ export function App() {
 													)}
 												{activeView === "refactoring" &&
 													(activeProjectId || selectedProjectId) && (
-														<RefactoringView
-															projectId={
-																(activeProjectId || selectedProjectId) as string
-															}
-														/>
+														<RefactoringView />
 													)}
 												{activeView === "documentation" &&
 													(activeProjectId || selectedProjectId) && (

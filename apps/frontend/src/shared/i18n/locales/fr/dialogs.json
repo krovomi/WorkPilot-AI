@@ -383,6 +383,7 @@
 		"originPage": "Cette page surcharge le choix global.",
 		"originSettings": "Cette page suit le choix global.",
 		"reset": "Réinitialiser",
+		"saveFailed": "Le choix de cette page n'a pas pu être enregistré.",
 		"effort": {
 			"none": "Aucun",
 			"low": "Faible",
