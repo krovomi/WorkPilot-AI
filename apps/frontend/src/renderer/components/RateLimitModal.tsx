@@ -10,8 +10,9 @@ import {
 	User,
 	Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { debugError } from "../../shared/utils/debug-logger";
 import { useToast } from "../hooks/use-toast";
 import {
@@ -19,7 +20,7 @@ import {
 	switchTerminalToProfile,
 	useClaudeProfileStore,
 } from "../stores/claude-profile-store";
-import { useRateLimitStore } from "../stores/rate-limit-store";
+import { useAuthStore } from "../stores/auth-store";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -44,13 +45,22 @@ const CLAUDE_UPGRADE_URL = "https://claude.ai/upgrade";
 
 export function RateLimitModal() {
 	const { t } = useTranslation("common");
-	const {
-		isModalOpen,
-		rateLimitInfo,
-		hideRateLimitModal,
-		clearPendingRateLimit,
-	} = useRateLimitStore();
-	const { profiles, activeProfileId, isSwitching } = useClaudeProfileStore();
+	const { isModalOpen, rateLimitInfo, hideRateLimitModal, clearPendingRateLimit } =
+		useAuthStore(
+			useShallow((s) => ({
+				isModalOpen: s.rateLimit_isModalOpen,
+				rateLimitInfo: s.rateLimit_info,
+				hideRateLimitModal: s.rateLimit_hideModal,
+				clearPendingRateLimit: s.rateLimit_clearPending,
+			})),
+		);
+	const { profiles, activeProfileId, isSwitching } = useClaudeProfileStore(
+		useShallow((s) => ({
+			profiles: s.profiles,
+			activeProfileId: s.activeProfileId,
+			isSwitching: s.isSwitching,
+		})),
+	);
 	const { toast } = useToast();
 	const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
 		null,
@@ -59,32 +69,33 @@ export function RateLimitModal() {
 	const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 	const [isAddingProfile, setIsAddingProfile] = useState(false);
 	const [newProfileName, setNewProfileName] = useState("");
+	const newProfileInputRef = useRef<HTMLInputElement>(null);
+	// Set by "Add new account": the menu then gives the focus to the name field
+	// instead of back to its trigger.
+	const focusNewProfileRef = useRef(false);
+	const suggestedProfileId = rateLimitInfo?.suggestedProfileId;
 
-	const loadAutoSwitchSettings = async () => {
-		try {
-			const result = await globalThis.electronAPI.getAutoSwitchSettings();
-			if (result.success && result.data) {
-				setAutoSwitchEnabled(result.data.autoSwitchOnRateLimit);
-			}
-		} catch (err) {
-			debugError("[RateLimitModal] Failed to load auto-switch settings:", err);
-		}
-	};
-
-	// Load profiles and auto-switch settings when modal opens
+	// Load profiles and auto-switch settings when the modal opens, and pre-select
+	// the suggested profile. Only then: this effect depended on a function made
+	// anew each render, so it ran again on every render, reloaded the profiles
+	// in a loop and put the suggestion back over the account the user picked.
 	useEffect(() => {
-		if (isModalOpen) {
-			loadClaudeProfiles();
-			loadAutoSwitchSettings();
-
-			// Pre-select the suggested profile if available
-			if (rateLimitInfo?.suggestedProfileId) {
-				setSelectedProfileId(rateLimitInfo.suggestedProfileId);
-			}
+		if (!isModalOpen) return;
+		loadClaudeProfiles();
+		globalThis.electronAPI
+			.getAutoSwitchSettings()
+			.then((result) => {
+				if (result.success && result.data) {
+					setAutoSwitchEnabled(result.data.autoSwitchOnRateLimit);
+				}
+			})
+			.catch((err: unknown) => {
+				debugError("[RateLimitModal] Failed to load auto-switch settings:", err);
+			});
+		if (suggestedProfileId) {
+			setSelectedProfileId(suggestedProfileId);
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [isModalOpen, rateLimitInfo?.suggestedProfileId, loadAutoSwitchSettings]);
+	}, [isModalOpen, suggestedProfileId]);
 
 	// Reset selection when modal closes
 	useEffect(() => {
@@ -98,16 +109,25 @@ export function RateLimitModal() {
 	const handleAutoSwitchToggle = async (enabled: boolean) => {
 		setIsLoadingSettings(true);
 		try {
-			await globalThis.electronAPI.updateAutoSwitchSettings({
+			const result = await globalThis.electronAPI.updateAutoSwitchSettings({
 				enabled: enabled,
 				autoSwitchOnRateLimit: enabled,
 			});
+			// A refused save is reported like a failed one; the switch stays as saved.
+			if (!result.success) {
+				throw new Error(result.error || "updateAutoSwitchSettings failed");
+			}
 			setAutoSwitchEnabled(enabled);
 		} catch (err) {
 			debugError(
 				"[RateLimitModal] Failed to update auto-switch settings:",
 				err,
 			);
+			toast({
+				variant: "destructive",
+				title: t("rateLimit.toast.autoSwitchFailed"),
+				description: t("rateLimit.toast.tryAgain"),
+			});
 		} finally {
 			setIsLoadingSettings(false);
 		}
@@ -117,9 +137,8 @@ export function RateLimitModal() {
 		globalThis.open(CLAUDE_UPGRADE_URL, "_blank");
 	};
 
+	// Reachable only with a name typed: the button and Enter both need one.
 	const handleAddProfile = async () => {
-		if (!newProfileName.trim()) return;
-
 		setIsAddingProfile(true);
 		try {
 			// Create a new profile - the backend will set the proper configDir
@@ -135,29 +154,31 @@ export function RateLimitModal() {
 				createdAt: new Date(),
 			});
 
-			if (result.success && result.data) {
-				// Reload profiles
-				loadClaudeProfiles();
-				setNewProfileName("");
-				// Close the modal
-				hideRateLimitModal();
-
-				// Direct user to Settings to complete authentication
-				toast({
-					variant: "success",
-					title: t("profileCreated.title", { profileName }),
-					description: (
-						<span className="whitespace-pre-line">
-							{`${t("profileCreated.instructions")}\n` +
-								`1. ${t("profileCreated.step1")}\n` +
-								`2. ${t("profileCreated.step2")}\n` +
-								`3. ${t("profileCreated.step3")}\n\n` +
-								t("profileCreated.footer")}
-						</span>
-					),
-					duration: 15000,
-				});
+			// A refused save used to be dropped without a word.
+			if (!result.success || !result.data) {
+				throw new Error(result.error || "saveClaudeProfile failed");
 			}
+			// Reload profiles
+			loadClaudeProfiles();
+			setNewProfileName("");
+			// Close the modal
+			hideRateLimitModal();
+
+			// Direct user to Settings to complete authentication
+			toast({
+				variant: "success",
+				title: t("profileCreated.title", { profileName }),
+				description: (
+					<span className="whitespace-pre-line">
+						{`${t("profileCreated.instructions")}\n` +
+							`1. ${t("profileCreated.step1")}\n` +
+							`2. ${t("profileCreated.step2")}\n` +
+							`3. ${t("profileCreated.step3")}\n\n` +
+							t("profileCreated.footer")}
+					</span>
+				),
+				duration: 15000,
+			});
 		} catch (err) {
 			debugError("[RateLimitModal] Failed to add profile:", err);
 			toast({
@@ -170,36 +191,41 @@ export function RateLimitModal() {
 		}
 	};
 
-	const handleSwitchProfile = async () => {
-		if (!selectedProfileId || !rateLimitInfo?.terminalId) return;
+	// The store opens the modal only with a rate limit to show.
+	if (!rateLimitInfo) return null;
 
+	const handleSwitchProfile = async (profileId: string) => {
 		const success = await switchTerminalToProfile(
 			rateLimitInfo.terminalId,
-			selectedProfileId,
+			profileId,
 		);
 		if (success) {
-			// Clear the pending rate limit since we successfully switched
+			// Clear the pending rate limit since we successfully switched, and
+			// close: the modal was left open with nothing left to show.
 			clearPendingRateLimit();
+			hideRateLimitModal();
+		} else {
+			toast({
+				variant: "destructive",
+				title: t("rateLimit.toast.switchFailed"),
+				description: t("rateLimit.toast.tryAgain"),
+			});
 		}
 	};
 
 	// Get profiles that are not the current rate-limited one
-	const currentProfileId = rateLimitInfo?.profileId || activeProfileId;
+	const currentProfileId = rateLimitInfo.profileId || activeProfileId;
 	const availableProfiles = profiles.filter((p) => p.id !== currentProfileId);
 	const hasMultipleProfiles = profiles.length > 1;
 
-	const selectedProfile = selectedProfileId
-		? profiles.find((p) => p.id === selectedProfileId)
-		: null;
+	const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
 
 	const currentProfile = profiles.find((p) => p.id === currentProfileId);
-	const suggestedProfile = rateLimitInfo?.suggestedProfileId
-		? profiles.find((p) => p.id === rateLimitInfo.suggestedProfileId)
-		: null;
+	const suggestedProfile = profiles.find((p) => p.id === suggestedProfileId);
 
-	// Check if auto-switch already happened
+	// The account auto-switch already moved to, if it did
 	const autoSwitchHappened =
-		rateLimitInfo?.autoSwitchEnabled && suggestedProfile;
+		(rateLimitInfo.autoSwitchEnabled && suggestedProfile) || null;
 
 	// Determine the appropriate button text based on the current state
 	const getButtonText = () => {
@@ -242,7 +268,7 @@ export function RateLimitModal() {
 							<div>
 								<p className="text-sm font-medium text-foreground">
 									{t("rateLimit.autoSwitching", {
-										name: suggestedProfile?.name,
+										name: autoSwitchHappened.name,
 									})}
 								</p>
 								<p className="text-xs text-muted-foreground mt-0.5">
@@ -253,7 +279,7 @@ export function RateLimitModal() {
 					)}
 
 					{/* Reset time info */}
-					{rateLimitInfo?.resetTime && !autoSwitchHappened && (
+					{rateLimitInfo.resetTime && !autoSwitchHappened && (
 						<div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 p-4">
 							<Clock className="h-5 w-5 text-muted-foreground shrink-0" />
 							<div>
@@ -298,7 +324,7 @@ export function RateLimitModal() {
 														{selectedProfile?.name ||
 															t("rateLimit.selectAccount")}
 														{selectedProfileId ===
-															rateLimitInfo?.suggestedProfileId && (
+															suggestedProfileId && (
 															<Star className="h-3 w-3 text-warning" />
 														)}
 													</span>
@@ -308,6 +334,12 @@ export function RateLimitModal() {
 											<DropdownMenuContent
 												align="start"
 												className="w-[220px] bg-popover border border-border shadow-lg"
+												onCloseAutoFocus={(event) => {
+													if (!focusNewProfileRef.current) return;
+													focusNewProfileRef.current = false;
+													event.preventDefault();
+													newProfileInputRef.current?.focus();
+												}}
 											>
 												{availableProfiles.map((profile) => (
 													<DropdownMenuItem
@@ -318,7 +350,7 @@ export function RateLimitModal() {
 														<span className="truncate flex items-center gap-2">
 															{profile.name}
 															{profile.id ===
-																rateLimitInfo?.suggestedProfileId && (
+																suggestedProfileId && (
 																<Star
 																	className="h-3 w-3 text-warning"
 																	aria-label={t("common:rateLimit.recommendedAria")}
@@ -332,12 +364,10 @@ export function RateLimitModal() {
 												))}
 												<DropdownMenuSeparator />
 												<DropdownMenuItem
+													// The field was found by its English placeholder, so
+													// this did nothing in French.
 													onClick={() => {
-														// Focus the add account input
-														const input = document.querySelector(
-															'input[placeholder*="Account name"]',
-														) as HTMLInputElement;
-														if (input) input.focus();
+														focusNewProfileRef.current = true;
 													}}
 													className="flex items-center gap-2 text-muted-foreground"
 												>
@@ -350,7 +380,12 @@ export function RateLimitModal() {
 										<Button
 											variant="default"
 											size="sm"
-											onClick={handleSwitchProfile}
+											// No switch without an account picked.
+											onClick={
+												selectedProfileId
+													? () => handleSwitchProfile(selectedProfileId)
+													: undefined
+											}
 											disabled={!selectedProfileId || isSwitching}
 											className="gap-2 shrink-0"
 										>
@@ -413,6 +448,7 @@ export function RateLimitModal() {
 								</p>
 								<div className="flex items-center gap-2">
 									<Input
+										ref={newProfileInputRef}
 										placeholder={t("rateLimit.accountNamePlaceholder")}
 										value={newProfileName}
 										onChange={(e) => setNewProfileName(e.target.value)}

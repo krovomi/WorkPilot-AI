@@ -240,7 +240,9 @@
 			"checkTerminal": "Check the Agent Terminals section in the sidebar to complete OAuth login.",
 			"authStartFailed": "Failed to start authentication",
 			"addProfileFailed": "Failed to add profile",
-			"tryAgain": "Please try again."
+			"tryAgain": "Please try again.",
+			"autoSwitchFailed": "Failed to save the auto-switch setting",
+			"switchFailed": "Failed to switch account"
 		},
 		"sdk": {
 			"title": "AI Rate Limit",
