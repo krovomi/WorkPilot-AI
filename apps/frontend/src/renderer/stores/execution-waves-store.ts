@@ -15,6 +15,8 @@ import type {
 	SavedWaveRun,
 	UnplannedPolicy,
 	WaveAdvanceWhen,
+	WaveRunAvoided,
+	WaveRunHistory,
 	WaveRunState,
 } from "../../shared/types/conflict-waves";
 import { stepWaveExecution, type WaveExecution } from "../lib/wave-execution";
@@ -27,6 +29,8 @@ export interface WaveOptions {
 	advanceWhen: WaveAdvanceWhen;
 	/** Count files the history changes together (fragile zones). */
 	fragileZones: boolean;
+	/** Count imports of what the other spec edits and uses of what it removes. */
+	codeLinks: boolean;
 }
 
 interface ExecutionWavesState {
@@ -43,6 +47,8 @@ interface ExecutionWavesState {
 	savedRun: SavedWaveRun | null;
 	/** Project whose saved run could not be read or was incoherent. */
 	savedRunIgnoredFor: string | null;
+	/** The selected project's run history (sprint metrics). */
+	history: (WaveRunHistory & { projectId: string }) | null;
 	setOptions: (patch: Partial<WaveOptions>) => void;
 	computePlan: (projectId: string) => Promise<void>;
 	execute: () => Promise<void>;
@@ -51,6 +57,7 @@ interface ExecutionWavesState {
 	loadSavedRun: (projectId: string) => Promise<void>;
 	resumeSavedRun: () => Promise<void>;
 	abandonSavedRun: () => Promise<void>;
+	loadHistory: (projectId: string) => Promise<void>;
 }
 
 const DEFAULT_OPTIONS: WaveOptions = {
@@ -58,6 +65,7 @@ const DEFAULT_OPTIONS: WaveOptions = {
 	unplannedPolicy: "isolate",
 	advanceWhen: "merged",
 	fragileZones: true,
+	codeLinks: true,
 };
 
 const NOT_STARTED = new Set(["backlog", "queue"]);
@@ -75,16 +83,17 @@ export const useExecutionWavesStore = create<ExecutionWavesState>((set, get) => 
 	startFailures: {},
 	savedRun: null,
 	savedRunIgnoredFor: null,
+	history: null,
 
 	setOptions: (patch) => set((s) => ({ options: { ...s.options, ...patch } })),
 
 	computePlan: async (projectId) => {
-		const { tolerance, unplannedPolicy, fragileZones } = get().options;
+		const { tolerance, unplannedPolicy, fragileZones, codeLinks } = get().options;
 		set({ isPlanning: true, error: null });
 		try {
 			const result = await globalThis.electronAPI.planExecutionWaves({
 				projectId,
-				options: { tolerance, unplannedPolicy, fragileZones },
+				options: { tolerance, unplannedPolicy, fragileZones, codeLinks },
 			});
 			if (result.data) {
 				set({ plan: result.data, isPlanning: false });
@@ -108,6 +117,7 @@ export const useExecutionWavesStore = create<ExecutionWavesState>((set, get) => 
 				maxParallel: plan.maxParallel,
 				status: "running",
 				started: [],
+				avoided: avoidedBy(plan),
 			},
 			blocked: [],
 			startFailures: {},
@@ -166,6 +176,17 @@ export const useExecutionWavesStore = create<ExecutionWavesState>((set, get) => 
 		await persist(() => globalThis.electronAPI.clearExecutionWaveRun(savedRun.projectId));
 	},
 
+	loadHistory: async (projectId) => {
+		try {
+			const result = await globalThis.electronAPI.loadExecutionWaveHistory(projectId);
+			// Another project selected meanwhile: drop the answer.
+			if (!result.data || useProjectStore.getState().selectedProjectId !== projectId) return;
+			set({ history: { ...result.data, projectId } });
+		} catch {
+			// No history shown: the waves still plan and run.
+		}
+	},
+
 	tick: async () => {
 		if (ticking) {
 			tickAgain = true;
@@ -182,6 +203,19 @@ export const useExecutionWavesStore = create<ExecutionWavesState>((set, get) => 
 		}
 	},
 }));
+
+/**
+ * What a plan avoids, for the run history: the pairs of planned specs it
+ * keeps in different waves (over the tolerance, or split by a test merge),
+ * and the risk it takes out. Unknown footprints are not counted.
+ */
+export function avoidedBy(plan: ExecutionWavePlan): WaveRunAvoided {
+	const planned = new Set(plan.order);
+	const conflicts = plan.pairs.filter(
+		(p) => p.blocking && !p.unknown && planned.has(p.a) && planned.has(p.b),
+	).length;
+	return { conflicts, risk: Math.max(0, plan.totalRisk - plan.residualRisk) };
+}
 
 type Get = () => ExecutionWavesState;
 type Set = (partial: Partial<ExecutionWavesState>) => void;
@@ -238,12 +272,12 @@ async function replanRemaining(get: Get, execution: WaveExecution): Promise<Wave
 	if (remaining.length === 0) {
 		return { ...execution, current: next };
 	}
-	const { tolerance, unplannedPolicy, fragileZones } = get().options;
+	const { tolerance, unplannedPolicy, fragileZones, codeLinks } = get().options;
 	try {
 		const result = await globalThis.electronAPI.planExecutionWaves({
 			projectId: execution.projectId,
 			taskIds: remaining,
-			options: { tolerance, unplannedPolicy, fragileZones },
+			options: { tolerance, unplannedPolicy, fragileZones, codeLinks },
 		});
 		if (result.data) {
 			const replanned = result.data.waves.map((w) => [...w.taskIds]);
@@ -300,11 +334,17 @@ export function setupExecutionWavesListeners(): () => void {
 			const saved = runState(execution);
 			void persist(() => globalThis.electronAPI.saveExecutionWaveRun(saved));
 		} else if (previous.execution?.status === "running") {
-			void persist(() => globalThis.electronAPI.clearExecutionWaveRun(execution.projectId));
+			// The main process records the run it saved, then forgets it.
+			const { projectId, status } = execution;
+			void persist(() => globalThis.electronAPI.clearExecutionWaveRun(projectId, status)).then(() =>
+				useExecutionWavesStore.getState().loadHistory(projectId),
+			);
 		}
 	});
 	const load = (projectId: string | null) => {
-		if (projectId) void useExecutionWavesStore.getState().loadSavedRun(projectId);
+		if (!projectId) return;
+		void useExecutionWavesStore.getState().loadSavedRun(projectId);
+		void useExecutionWavesStore.getState().loadHistory(projectId);
 	};
 	const offProject = useProjectStore.subscribe((state, previous) => {
 		if (state.selectedProjectId !== previous.selectedProjectId) load(state.selectedProjectId);

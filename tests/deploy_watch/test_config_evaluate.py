@@ -86,7 +86,11 @@ class TestLoadSettings:
             },
         )
         assert settings.health_url == "https://app.example/health"
-        assert settings.prometheus_url == "https://prom.example"
+        assert settings.source is not None
+        assert (settings.source.kind, settings.source.url) == (
+            "prometheus",
+            "https://prom.example",
+        )
         assert settings.auto_rollback is True
         assert "tok-0000" not in repr(settings)
         assert settings.configured
@@ -99,7 +103,8 @@ class TestLoadSettings:
                 "CICD_MONITOR_PROMETHEUS_URL": "javascript:x",
             },
         )
-        assert settings.health_url == settings.prometheus_url == ""
+        assert settings.health_url == ""
+        assert settings.source is None
         assert len(settings.problems) == 2
 
     def test_metrics_and_durations(self, tmp_path):

@@ -1,15 +1,15 @@
 ---
 feature: Execution waves (Conflict Predictor)
 summary: >-
-  Groupe les specs en attente en vagues sans fichier commun (plan ∪ changements du worktree, zones
-  fragiles de l'historique git, toutes langues, zéro LLM), merge de test des paires sous la
-  tolérance, ordre de merge, cycles signalés ; « Exécuter dans l'ordre optimal » lance vague après
-  vague par le chemin de démarrage habituel, replanifie à chaque vague, survit à un redémarrage.
+  Groupe les specs en attente en vagues sans fichier commun (plan ∪ worktree, zones fragiles,
+  imports croisés, symboles supprimés ; toutes langues, zéro LLM), merge de test des paires sous la
+  tolérance, cycles signalés ; « Exécuter dans l'ordre optimal » lance vague après vague,
+  replanifie, survit à un redémarrage et compte les conflits évités par sprint.
 ---
 
 # Execution waves (Conflict Predictor)
 
-Issue #358 (lots 1 and 2). The Conflict Predictor already scored pairs of live worktrees
+Issue #358 (lots 1 to 3). The Conflict Predictor already scored pairs of live worktrees
 (`apps/backend/services/conflict_predictor_service.py`) and the swarm groups the subtasks of
 **one** spec into waves (`apps/backend/agents/swarm/dependency_analyzer.py`). This feature
 plans **across specs**: which of the specs waiting in the backlog or the queue may run side by
@@ -26,11 +26,14 @@ Shown in Mission Control (a "Execution waves" section, with or without a Mission
 | Worktree changes (git by argument list) | `apps/frontend/src/main/conflict-waves/worktree-files.ts` |
 | Preventive merge check (`git merge-tree`) | `apps/frontend/src/main/conflict-waves/merge-check.ts` |
 | Fragile zones (`git log`, co-changes) | `apps/frontend/src/main/conflict-waves/fragile-zones.ts` |
+| Code links (imports, removed symbols; pure) | `apps/frontend/src/main/conflict-waves/code-links.ts` |
+| Code read for code links (files, worktree diff) | `apps/frontend/src/main/conflict-waves/code-reader.ts`, `worktree-files.ts` (`readWorktreeDiff`) |
 | Request validation, project resolution | `apps/frontend/src/main/conflict-waves/plan-service.ts` |
 | Saved run (`.workpilot/execution-waves-run.json`) | `apps/frontend/src/main/conflict-waves/run-store.ts` |
-| IPC `conflictWaves:plan`, `:loadRun`, `:saveRun`, `:clearRun` | `apps/frontend/src/main/ipc-handlers/conflict-waves-handlers.ts`, `preload/api/modules/conflict-waves-api.ts` |
+| Run history (`.workpilot/execution-waves-history.json`) | `apps/frontend/src/main/conflict-waves/run-history.ts` |
+| IPC `conflictWaves:plan`, `:loadRun`, `:saveRun`, `:clearRun`, `:history` | `apps/frontend/src/main/ipc-handlers/conflict-waves-handlers.ts`, `preload/api/modules/conflict-waves-api.ts` |
 | Run, wave after wave, saved at every step | `apps/frontend/src/renderer/lib/wave-execution.ts`, `stores/execution-waves-store.ts` |
-| View | `apps/frontend/src/renderer/components/conflict-predictor/WavesView.tsx`, `WavesNotices.tsx` |
+| View, sprint metrics | `apps/frontend/src/renderer/components/conflict-predictor/WavesView.tsx`, `WavesNotices.tsx` |
 | Types | `apps/frontend/src/shared/types/conflict-waves.ts` |
 
 ## Why in the main process, in TypeScript
@@ -57,7 +60,7 @@ A shared file weighs by its role in the build, never by its language:
 | 2 | shared configuration: `.env*`, `*.config.*`, `tsconfig*`, Dockerfile, compose, Makefile, CI pipelines, `appsettings*.json`, YAML/TOML/INI |
 | 1 | every other file |
 
-A pair's score is the sum, plus its fragile zones (below); level `low` < 2 ≤ `medium` < 4 ≤
+A pair's score is the sum, plus its fragile zones and code links (below); level `low` < 2 ≤ `medium` < 4 ≤
 `high` < 8 ≤ `critical`.
 
 ### Fragile zones
@@ -72,6 +75,31 @@ scored), adds 1 to the pair's score, at most 3: the history hints, shared files 
 lists them (`a/x ↔ b/y`), and the view says how many commits were read. On by default, off with
 the "Fragile zones" option (`options.fragileZones`, a boolean, validated); paths only, so any
 language.
+
+### Code links
+
+Two specs can also meet without a shared file or a history: one edits a module the other imports,
+or removes (renames) a symbol the other still uses. Both are read from the code, the same way in
+every language, with no parser per language and no model:
+
+- **Cross imports.** An import line is one that opens with a keyword from a closed list many
+  languages share (`import`, `from`, `export … from`, `require`, `include`, `#include`, `#import`,
+  `@import`/`@use`, `use`, `using`, `open`, `mod`, `extern crate`, `library`, `source`, `load`,
+  `alias`…), or holds `require(` / `import(`; Go's `import ( … )` block counts. A file is named by
+  its stem (`user_service`), its folder for an index file (`index`, `__init__`, `mod`, `main`…),
+  `parent/stem` for a name many folders have (`utils`, `types`, `config`…). A file of one spec whose
+  import lines name a file the other spec edits makes a link (`y → x`).
+- **Removed symbols.** From the worktree's diff since its merge-base (`git diff --unified=0
+  --no-ext-diff --no-textconv`, so no driver a repository's attributes name ever runs): an
+  identifier on removed lines, on no added line and in none of the spec's files as they are now,
+  is removed. Only identifiers shaped like chosen names count (`camelCase`, `snake_case`, a digit
+  after letters, at least 4 characters), not plain words a comment holds. A file of the other spec
+  that still uses one makes a link (`y → symbol`).
+
+Each link, one file in each spec and neither shared, adds 1, at most 3 per pair, like fragile
+zones. A spec's files are read from its worktree (the code as the spec leaves it), from the project
+when it has none (the code as it is). On by default, off with the "Code links" option
+(`options.codeLinks`, a boolean, validated); the view says how many files were read.
 
 ## Plan
 
@@ -159,6 +187,20 @@ waits for its tasks as before, and the view lists the run's waves until a plan i
 Abandon removes the file. A file that is unreadable or incoherent is ignored, left as it is, and
 the view says so.
 
+## Run history and sprint metrics
+
+When a run ends (every wave ran, or Stop), the renderer clears the saved run with how it ended
+(`done` or `stopped`, a closed list). The main process then builds the record itself from the run
+it saved (already checked against the project's tasks) and its own clock, and adds it in front of
+`<project>/.workpilot/execution-waves-history.json` (at most 100 runs). A record holds the date,
+the outcome, the waves, the tasks, the tasks started, and what the run's plan avoided: the pairs of
+planned specs it kept in different waves (over the tolerance, or split by a test merge; unknown
+footprints not counted) and the risk it took out (total minus residual). The run state carries
+those two counters from the start, so a resumed run keeps them.
+
+The view sums the last 14 days: runs ended (and stopped), conflicts avoided, risk taken out, specs
+started, and when the last run ended. Counts only: no duration is estimated (project rule).
+
 ## Boundary
 
 `conflictWaves:plan` takes `{ projectId, taskIds?, options? }`. The handler checks every field:
@@ -182,9 +224,25 @@ the same project and only tasks the project still has. Refusals are tested (`run
 `conflict-waves-handlers.test.ts`), and the git calls against real repositories
 (`merge-check.test.ts`, `fragile-zones.test.ts`).
 
+Code links read files whose paths come from a plan an agent wrote and from git: each is resolved
+(links included) and must stay inside the worktree or the project; the file opened must be the one
+resolved (device and inode); only regular text files of at most 256 KB are read, at most 300 per
+spec and 3 000 per plan, 16 at a time. Dependency manifests and shared configuration (`.env`
+among them) are never read, their diff sections are dropped, and a removed symbol the secret
+redaction would mask is dropped: a value never becomes a link shown in the view. Only paths and
+identifiers taken from the diff reach the renderer (`code-reader.test.ts`).
+
+`clearRun` takes a project id and, optionally, an outcome from a closed list; anything else is
+refused before the disk is touched. `history` takes a project id. The history file goes through
+the same folder checks, bounded read (128 KB) and atomic write as the saved run, and each record is
+rebuilt field by field when read (`run-history.test.ts`).
+
 ## Still to do
 
-- Symbols and cross imports in the score (renamed symbols, a spec importing what another edits).
-- Server mode: a backend route over the same planner (and merge check) for server projects and
-  the mobile app; the saved run would then live with the server's project.
-- The sprint metrics of the issue (conflicts avoided, resolution time of residual conflicts).
+- Server mode: a backend route over the same planner (and merge check, code links) for server
+  projects and the mobile app; the saved run and its history would then live with the server's
+  project. Not done in lot 3: a port of the planner to the backend plus a mobile view, a lot of its
+  own.
+- Resolution time of residual conflicts (an issue metric): nothing records yet when a merge
+  conflict of a task appears and is resolved; it needs the merge flow to keep those two dates.
+  Time saved by parallelism is not shown: it would be an estimate (project rule).

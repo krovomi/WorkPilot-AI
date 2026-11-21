@@ -12,7 +12,8 @@ export type PolicyDecision =
 	| "warn"
 	| "outside_hours"
 	| "budget_exceeded"
-	| "invalid_policy";
+	| "invalid_policy"
+	| "tool_loop";
 
 export const POLICY_DECISIONS: readonly PolicyDecision[] = [
 	"deny",
@@ -22,6 +23,7 @@ export const POLICY_DECISIONS: readonly PolicyDecision[] = [
 	"outside_hours",
 	"budget_exceeded",
 	"invalid_policy",
+	"tool_loop",
 ];
 
 /** One decision of the policy (`.workpilot/policy-audit.jsonl`). */
@@ -52,7 +54,15 @@ export interface GovernanceSections {
 	source: string;
 	schedule: GovernanceSchedule | null;
 	files: { forbidden: string[]; requiresReview: string[] };
-	budget: { maxTokensPerHour: number } | null;
+	budget: { maxTokensPerHour: number | null; maxTokensPerTask: number | null } | null;
+	/** `loop_detection`: identical tool calls before the circuit breaker trips. */
+	loopDetection?: { maxSameToolCall: number } | null;
+}
+
+/** The audit trail's counts: agents stopped in the last day, breaker trips in the week. */
+export interface GovernanceMetrics {
+	blocked24h: number;
+	breakerTrips7d: number;
 }
 
 /** What the read-only governance panel shows. */
@@ -65,6 +75,7 @@ export interface GovernanceReport {
 	tokensLastHour: number;
 	/** The last decisions, newest first. */
 	events: PolicyAuditEvent[];
+	metrics: GovernanceMetrics;
 }
 
 export type AuditExportFormat = "csv" | "json";
@@ -74,9 +85,14 @@ export type AuditExportResult = { filePath: string; count: number } | null;
 
 /** What the policy watch wrote in `pause_state.json` (`agents/policy_watch.py`). */
 export interface PolicyPauseDetail {
-	reason: "policy_hours" | "policy_budget";
+	reason: "policy_hours" | "policy_budget" | "policy_invalid";
 	timezone?: string;
 	allowedHours?: string[];
 	tokensLastHour?: number;
 	maxTokensPerHour?: number;
+	/** `budget.max_tokens_per_task`: what this task's sessions spent, all along. */
+	tokensThisTask?: number;
+	maxTokensPerTask?: number;
+	/** `policy_invalid`: how many errors the policy has (the panel lists them). */
+	errorCount?: number;
 }

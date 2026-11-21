@@ -217,3 +217,35 @@ def test_cancelling_the_swarm_marks_it_failed(
     assert swarm.status.phase is SwarmPhase.FAILED
     assert swarm.status.error == "Cancelled by user"
     assert [e["type"] for e in _events(capsys.readouterr().out)] == ["swarm_cancelled"]
+
+
+def test_a_pause_in_a_wave_stops_the_swarm_before_the_next(
+    world: dict[str, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_plan(world, CART_PLAN)
+    _steps(world, api=["pause_ok"], db=["ok"], ui=["ok"])
+
+    status = asyncio.run(_swarm(world).run())
+
+    assert status.phase is SwarmPhase.PAUSED
+    assert status.error == "paused before wave 2 (tool_loop)"
+    assert _attempts(world, "ui") == 0
+    cancelled = [
+        e for e in _events(capsys.readouterr().out) if e["type"] == "swarm_cancelled"
+    ]
+    assert cancelled == [
+        {"type": "swarm_cancelled", "reason": "tool_loop", "where": "before wave 2"}
+    ]
+
+
+def test_once_paused_no_failed_subtask_is_retried(world: dict[str, Path]) -> None:
+    _write_plan(world, CART_PLAN)
+    _steps(world, api=["pause"], db=["pause"], ui=["ok"])
+
+    status = asyncio.run(_swarm(world, max_retries_per_subtask=3).run())
+
+    assert status.phase is SwarmPhase.PAUSED
+    assert status.error == "paused before retrying api (tool_loop)"
+    assert (_attempts(world, "api"), _attempts(world, "db")) == (1, 1)
+    assert _attempts(world, "ui") == 0
+    assert status.failed_subtasks == 2

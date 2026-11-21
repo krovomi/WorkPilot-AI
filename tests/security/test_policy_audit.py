@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 from security import policy_audit
-from security.policy_audit import AUDIT_NAME, log_path, read_events, record, task_of
+from security.policy_audit import (
+    AUDIT_NAME,
+    log_path,
+    metrics,
+    read_events,
+    record,
+    task_of,
+)
 
 
 @pytest.fixture
@@ -168,3 +175,32 @@ def test_the_file_is_private(project: Path):
 )
 def test_the_task_comes_from_the_worktree(root, expected):
     assert task_of(root) == expected
+
+
+def test_the_counts_cover_the_day_and_the_week(project: Path):
+    now = datetime(2026, 11, 21, 12, 0, tzinfo=UTC)
+    for decision, hours in (
+        ("deny", 1),
+        ("outside_hours", 5),
+        ("invalid_policy", 23),
+        ("budget_exceeded", 30),  # older than a day
+        ("review", 1),  # not a stop
+        ("tool_loop", 2),
+        ("tool_loop", 24 * 6),
+        ("tool_loop", 24 * 8),  # older than a week
+    ):
+        record(project, decision=decision, now=now - timedelta(hours=hours))
+    assert metrics(project, now) == {"blocked24h": 3, "breakerTrips7d": 2}
+
+
+def test_a_line_without_a_date_is_not_counted(project: Path):
+    path = project / ".workpilot" / AUDIT_NAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        {"decision": "deny", "at": "yesterday"},
+        {"decision": "deny", "at": "2026-11-21T11:00:00"},
+    ]
+    path.write_text("".join(json.dumps(x) + "\n" for x in lines), encoding="utf-8")
+    now = datetime(2026, 11, 21, 12, 0, tzinfo=UTC)
+    assert metrics(project, now) == {"blocked24h": 1, "breakerTrips7d": 0}
+    assert metrics(project / "none") == {"blocked24h": 0, "breakerTrips7d": 0}
