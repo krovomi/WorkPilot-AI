@@ -6,7 +6,7 @@
  * (`apps/backend/replay/bundle.py`); the dialog only offers what may be taken
  * out on top. The video is that same masked page, played step by step by the
  * backend (`apps/backend/replay/video.py`). A bookmark note is Markdown and
- * is shown as text.
+ * is shown as text, and so are the replies under it.
  */
 
 import { Bookmark, Download, Film, Share2, Trash2, Upload } from "lucide-react";
@@ -29,6 +29,7 @@ import {
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
+import { ReplayBookmarkReplies } from "./ReplayBookmarkReplies";
 import { ReplayTeamShareSection } from "./ReplayTeamShare";
 
 const MAX_NOTE = 4000;
@@ -246,6 +247,11 @@ export const ReplayBookmarks: React.FC<{
 								<p className="text-xs text-muted-foreground">{bookmark.author}</p>
 							)}
 							<p className="whitespace-pre-wrap break-words">{bookmark.note}</p>
+							<ReplayBookmarkReplies
+								sessionId={session.session_id}
+								bookmark={bookmark}
+								readOnly={recording}
+							/>
 						</li>
 					))}
 				</ul>

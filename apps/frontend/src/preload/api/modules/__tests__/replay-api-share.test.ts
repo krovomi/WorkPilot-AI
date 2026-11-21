@@ -41,6 +41,16 @@ describe("createReplayAPI sharing", () => {
 			IPC_CHANNELS.REPLAY_SHARE_TO_TEAM,
 			["s1", TEAM],
 		],
+		[
+			() => api.addReplayBookmarkReply("s1", "b1", { note: "n" }),
+			IPC_CHANNELS.REPLAY_ADD_BOOKMARK_REPLY,
+			["s1", "b1", { note: "n" }],
+		],
+		[
+			() => api.removeReplayBookmarkReply("s1", "b1", "r1"),
+			IPC_CHANNELS.REPLAY_REMOVE_BOOKMARK_REPLY,
+			["s1", "b1", "r1"],
+		],
 		[() => api.listReplayTeamShares("p1"), IPC_CHANNELS.REPLAY_LIST_TEAM_SHARES, ["p1"]],
 		[
 			() => api.revokeReplayTeamShare("p1", "x"),

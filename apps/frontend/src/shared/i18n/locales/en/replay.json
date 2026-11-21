@@ -237,7 +237,9 @@
 			"share_not_found": "This link does not open anything: it may be mistyped, or for another project.",
 			"share_expired": "This link has expired. Ask for a new one.",
 			"share_revoked": "This link was revoked. Ask for a new one.",
-			"too_many_shares": "This project already has as many open links as it may keep. Revoke one first."
+			"too_many_shares": "This project already has as many open links as it may keep. Revoke one first.",
+			"empty_reply": "Write something before sending a reply.",
+			"too_many_replies": "This bookmark already has as many replies as it may keep."
 		},
 		"video": {
 			"export": "Export a video (WebM)",
@@ -297,7 +299,13 @@
 		"step": "Step {{step}}",
 		"remove": "Remove the bookmark",
 		"empty": "No bookmark yet.",
-		"recording": "Bookmarks can be added once the session has finished recording."
+		"recording": "Bookmarks can be added once the session has finished recording.",
+		"replies": "Replies",
+		"reply": "Reply",
+		"sendReply": "Send",
+		"cancelReply": "Cancel",
+		"removeReply": "Remove this reply",
+		"someone": "Someone"
 	},
 	"summary": {
 		"title": "Summary of the steps",

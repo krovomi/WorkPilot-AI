@@ -8,6 +8,8 @@
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import type {
 	ReplayBookmark,
+	ReplayBookmarkReply,
+	ReplayBookmarkReplyRequest,
 	ReplayBookmarkRequest,
 	ReplayExportOptions,
 	ReplayFileResult,
@@ -66,6 +68,17 @@ export interface ReplayAPI {
 		sessionId: string,
 		bookmarkId: string,
 	) => Promise<ReplayResult<object>>;
+	/** Answer a bookmark's note; the reply travels with the session. */
+	addReplayBookmarkReply: (
+		sessionId: string,
+		bookmarkId: string,
+		reply: ReplayBookmarkReplyRequest,
+	) => Promise<ReplayResult<{ reply: ReplayBookmarkReply }>>;
+	removeReplayBookmarkReply: (
+		sessionId: string,
+		bookmarkId: string,
+		replyId: string,
+	) => Promise<ReplayResult<object>>;
 	/** The masked page played step by step, as a WebM the person saves. */
 	exportReplayVideo: (
 		sessionId: string,
@@ -113,6 +126,10 @@ export const createReplayAPI = (): ReplayAPI => ({
 		invokeIpc(IPC_CHANNELS.REPLAY_ADD_BOOKMARK, sessionId, bookmark),
 	removeReplayBookmark: (sessionId, bookmarkId) =>
 		invokeIpc(IPC_CHANNELS.REPLAY_REMOVE_BOOKMARK, sessionId, bookmarkId),
+	addReplayBookmarkReply: (sessionId, bookmarkId, reply) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_ADD_BOOKMARK_REPLY, sessionId, bookmarkId, reply),
+	removeReplayBookmarkReply: (sessionId, bookmarkId, replyId) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_REMOVE_BOOKMARK_REPLY, sessionId, bookmarkId, replyId),
 	exportReplayVideo: (sessionId, options) =>
 		invokeIpc(IPC_CHANNELS.REPLAY_EXPORT_VIDEO, sessionId, options),
 	summarizeReplaySession: (sessionId, request) =>

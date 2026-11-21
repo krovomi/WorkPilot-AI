@@ -86,6 +86,11 @@ class AddBookmarkRequest(BaseModel):
     author: str = Field(default="", max_length=100)
 
 
+class AddReplyRequest(BaseModel):
+    note: str = Field(min_length=1, max_length=4000)
+    author: str = Field(default="", max_length=100)
+
+
 class ExportVideoRequest(BaseModel):
     strip_reasoning: bool = False
     strip_tokens: bool = False
@@ -366,6 +371,9 @@ _BOOKMARK_REFUSALS = {
     "not_found": (404, SESSION_NOT_FOUND),
     "no_such_step": (422, "The session has no such step"),
     "too_many": (422, "The session has too many bookmarks"),
+    "no_such_bookmark": (404, "Bookmark not found"),
+    "too_many_replies": (422, "too_many_replies"),
+    "empty_reply": (422, "empty_reply"),
 }
 
 
@@ -437,6 +445,35 @@ async def remove_bookmark(session_id: str, bookmark_id: str):
         get_replay_recorder(), session_id, bookmark_id
     ):
         raise HTTPException(status_code=404, detail="Bookmark not found")
+    return {"success": True}
+
+
+@router.post(
+    "/sessions/{session_id}/bookmarks/{bookmark_id}/replies",
+    responses={404: {"description": "Bookmark not found"}},
+)
+async def add_bookmark_reply(session_id: str, bookmark_id: str, req: AddReplyRequest):
+    """Answer a bookmark's note: the discussion travels with the session."""
+    try:
+        reply = bookmark_store.add_reply(
+            get_replay_recorder(), session_id, bookmark_id, req.note, req.author
+        )
+    except bookmark_store.BookmarkError as error:
+        status, detail = _BOOKMARK_REFUSALS[error.code]
+        raise HTTPException(status_code=status, detail=detail) from error
+    return {"success": True, "reply": reply.to_dict()}
+
+
+@router.delete(
+    "/sessions/{session_id}/bookmarks/{bookmark_id}/replies/{reply_id}",
+    responses={404: {"description": "Reply not found"}},
+)
+async def remove_bookmark_reply(session_id: str, bookmark_id: str, reply_id: str):
+    """Remove a reply from a bookmark of a saved session."""
+    if not bookmark_store.remove_reply(
+        get_replay_recorder(), session_id, bookmark_id, reply_id
+    ):
+        raise HTTPException(status_code=404, detail="Reply not found")
     return {"success": True}
 
 

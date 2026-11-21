@@ -1,6 +1,7 @@
 /**
  * Sharing a recorded agent session (#347): export it as a `.wpreplay` bundle
- * or a standalone page, import a bundle someone sent, mark steps.
+ * or a standalone page, import a bundle someone sent, mark steps and answer
+ * a mark.
  *
  * The local backend masks the session and builds the file; main asks where
  * to write it, or which bundle to read, in a native dialog. The renderer
@@ -82,6 +83,17 @@ export function bookmarkBody(
 	if (typeof note !== "string" || note.length > MAX_NOTE) return null;
 	if (typeof author !== "string" || author.length > MAX_AUTHOR) return null;
 	return { step_index: step as number, note, author };
+}
+
+/** A reply to a bookmark, or null when malformed. */
+export function replyBody(raw: unknown): { note: string; author: string } | null {
+	if (!raw || typeof raw !== "object") return null;
+	const source = raw as Record<string, unknown>;
+	const note = source.note;
+	const author = source.author ?? "";
+	if (typeof note !== "string" || !note.trim() || note.length > MAX_NOTE) return null;
+	if (typeof author !== "string" || author.length > MAX_AUTHOR) return null;
+	return { note, author };
 }
 
 const json = (body: unknown): RequestInit => ({
@@ -192,5 +204,29 @@ export function registerReplayShareHandlers(): void {
 						method: "DELETE",
 					})
 				: invalid("bookmark id"),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.REPLAY_ADD_BOOKMARK_REPLY,
+		(_e, sessionId: unknown, bookmarkId: unknown, reply: unknown) => {
+			if (!isReplayId(sessionId) || !isReplayId(bookmarkId)) return invalid("bookmark id");
+			const body = replyBody(reply);
+			if (!body) return invalid("reply");
+			return backendFetch(
+				`/replay/sessions/${sessionId}/bookmarks/${bookmarkId}/replies`,
+				json(body),
+			);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.REPLAY_REMOVE_BOOKMARK_REPLY,
+		(_e, sessionId: unknown, bookmarkId: unknown, replyId: unknown) =>
+			isReplayId(sessionId) && isReplayId(bookmarkId) && isReplayId(replyId)
+				? backendFetch(
+						`/replay/sessions/${sessionId}/bookmarks/${bookmarkId}/replies/${replyId}`,
+						{ method: "DELETE" },
+					)
+				: invalid("reply id"),
 	);
 }

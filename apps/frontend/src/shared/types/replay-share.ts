@@ -53,6 +53,15 @@ export interface ReplaySummaryRequest {
 	language: "en" | "fr";
 }
 
+/** An answer to a bookmark's note: bookmarks are discussed this way. */
+export interface ReplayBookmarkReply {
+	id: string;
+	/** Markdown, shown as text. */
+	note: string;
+	author: string;
+	created_at: number;
+}
+
 export interface ReplayBookmark {
 	id: string;
 	step_index: number;
@@ -60,6 +69,13 @@ export interface ReplayBookmark {
 	note: string;
 	author: string;
 	created_at: number;
+	/** Absent in a session saved before replies existed. */
+	replies?: ReplayBookmarkReply[];
+}
+
+export interface ReplayBookmarkReplyRequest {
+	note: string;
+	author?: string;
 }
 
 export interface ReplayBookmarkRequest {

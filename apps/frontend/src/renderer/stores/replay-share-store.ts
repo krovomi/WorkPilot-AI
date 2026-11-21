@@ -12,6 +12,8 @@ import i18n from "i18next";
 import { create } from "zustand";
 import type {
 	ReplayBookmark,
+	ReplayBookmarkReply,
+	ReplayBookmarkReplyRequest,
 	ReplayBookmarkRequest,
 	ReplayExportOptions,
 	ReplayVideoOptions,
@@ -36,6 +38,8 @@ const KNOWN_ERRORS = new Set([
 	"no_steps",
 	"summary_failed",
 	"summary_empty",
+	"empty_reply",
+	"too_many_replies",
 	// Team links (#347): main's and the server's refusals.
 	"not_a_link",
 	"not_signed_in",
@@ -73,6 +77,13 @@ interface ReplayShareState {
 	importSession: () => Promise<void>;
 	addBookmark: (sessionId: string, request: ReplayBookmarkRequest) => Promise<boolean>;
 	removeBookmark: (sessionId: string, bookmarkId: string) => Promise<void>;
+	/** Answers a bookmark; the reply lands under it on the open session. */
+	addReply: (
+		sessionId: string,
+		bookmarkId: string,
+		request: ReplayBookmarkReplyRequest,
+	) => Promise<boolean>;
+	removeReply: (sessionId: string, bookmarkId: string, replyId: string) => Promise<void>;
 	exportVideo: (
 		sessionId: string,
 		options: Omit<ReplayVideoOptions, "language">,
@@ -113,6 +124,18 @@ function withBookmarks(
 		if (!session || session.session_id !== sessionId) return {};
 		return { activeSession: { ...session, bookmarks: change(session.bookmarks ?? []) } };
 	});
+}
+
+function withReplies(
+	sessionId: string,
+	bookmarkId: string,
+	change: (replies: ReplayBookmarkReply[]) => ReplayBookmarkReply[],
+): void {
+	withBookmarks(sessionId, (marks) =>
+		marks.map((mark) =>
+			mark.id === bookmarkId ? { ...mark, replies: change(mark.replies ?? []) } : mark,
+		),
+	);
 }
 
 const byStep = (a: ReplayBookmark, b: ReplayBookmark) =>
@@ -186,6 +209,35 @@ export const useReplayShareStore = create<ReplayShareState>((set) => ({
 			return;
 		}
 		withBookmarks(sessionId, (marks) => marks.filter((b) => b.id !== bookmarkId));
+	},
+
+	addReply: async (sessionId, bookmarkId, request) => {
+		set({ savingBookmark: true, notice: null });
+		const result = await window.electronAPI.addReplayBookmarkReply(
+			sessionId,
+			bookmarkId,
+			request,
+		);
+		if (!result.success) {
+			set({ savingBookmark: false, notice: failure(result) });
+			return false;
+		}
+		withReplies(sessionId, bookmarkId, (replies) => [...replies, result.reply]);
+		set({ savingBookmark: false });
+		return true;
+	},
+
+	removeReply: async (sessionId, bookmarkId, replyId) => {
+		const result = await window.electronAPI.removeReplayBookmarkReply(
+			sessionId,
+			bookmarkId,
+			replyId,
+		);
+		if (!result.success) {
+			set({ notice: failure(result) });
+			return;
+		}
+		withReplies(sessionId, bookmarkId, (replies) => replies.filter((r) => r.id !== replyId));
 	},
 
 	exportVideo: async (sessionId, options) => {

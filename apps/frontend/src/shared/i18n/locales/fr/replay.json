@@ -237,7 +237,9 @@
 			"share_not_found": "Ce lien n'ouvre rien : il est peut-être mal copié, ou pour un autre projet.",
 			"share_expired": "Ce lien a expiré. Demandez-en un nouveau.",
 			"share_revoked": "Ce lien a été révoqué. Demandez-en un nouveau.",
-			"too_many_shares": "Ce projet a déjà autant de liens ouverts qu'il peut en garder. Révoquez-en un d'abord."
+			"too_many_shares": "Ce projet a déjà autant de liens ouverts qu'il peut en garder. Révoquez-en un d'abord.",
+			"empty_reply": "Écrivez quelque chose avant d'envoyer une réponse.",
+			"too_many_replies": "Ce signet a déjà autant de réponses qu'il peut en garder."
 		},
 		"video": {
 			"export": "Exporter une vidéo (WebM)",
@@ -297,7 +299,13 @@
 		"step": "Étape {{step}}",
 		"remove": "Retirer le signet",
 		"empty": "Aucun signet pour l'instant.",
-		"recording": "Les signets s'ajoutent une fois l'enregistrement de la session terminé."
+		"recording": "Les signets s'ajoutent une fois l'enregistrement de la session terminé.",
+		"replies": "Réponses",
+		"reply": "Répondre",
+		"sendReply": "Envoyer",
+		"cancelReply": "Annuler",
+		"removeReply": "Retirer cette réponse",
+		"someone": "Quelqu'un"
 	},
 	"summary": {
 		"title": "Résumé des étapes",
