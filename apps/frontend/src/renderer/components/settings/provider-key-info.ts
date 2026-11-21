@@ -8,6 +8,7 @@ import type { AuthMethod } from "@shared/types/agent";
 import type { APIProfile } from "@shared/types/profile";
 import { detectProvider } from "@shared/utils/provider-detection";
 import type { ProviderCardData } from "./CleanProviderCard";
+import { gatewayMap } from "@shared/constants/gateway-providers";
 
 type KeyInfo = NonNullable<ProviderCardData["realApiKeyInfo"]>;
 
@@ -21,6 +22,7 @@ const SETTINGS_KEY: Readonly<Record<string, string>> = {
 	mistral: "globalMistralApiKey",
 	deepseek: "globalDeepSeekApiKey",
 	grok: "globalGrokApiKey",
+	...gatewayMap((gateway) => gateway.settingsKey),
 	windsurf: "globalWindsurfApiKey",
 	cursor: "globalCursorApiKey",
 	aws: "globalAWSApiKey",

@@ -36,6 +36,16 @@
 			"description": "Modèles Grok via xAI, la société d’Elon Musk."
 		},
 		{
+			"name": "openrouter",
+			"label": "OpenRouter",
+			"description": "Des centaines de modèles de nombreux éditeurs avec une seule clé OpenRouter."
+		},
+		{
+			"name": "huggingface",
+			"label": "Hugging Face",
+			"description": "Les modèles ouverts du Hub via Hugging Face Inference Providers."
+		},
+		{
 			"name": "windsurf",
 			"label": "Windsurf AI",
 			"description": "Provider Windsurf pour l’utilisation des tokens Windsurf."
