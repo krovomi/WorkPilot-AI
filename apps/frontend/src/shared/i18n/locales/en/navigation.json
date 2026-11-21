@@ -416,7 +416,10 @@
 		"chip": "CLI {{installed}}/{{total}}",
 		"chipTooltip": "CLI tools: {{installed}} of {{total}} installed",
 		"checking": "CLI tools: checking…",
-		"title": "CLI tools"
+		"title": "CLI tools",
+		"updateAll": "Update all ({{count}})",
+		"updateAllTooltip": "Update {{names}}, one after the other",
+		"updatingAll": "Updating {{current}}/{{total}}…"
 	},
 	"rail": {
 		"label": "Menu spaces"
