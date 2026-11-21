@@ -87,6 +87,7 @@
 					"openWindsurfLogin": "windsurf.com/account",
 					"tokenDetected": "API key detected",
 					"saveAndConnect": "Save & Connect",
+					"saveFailed": "Could not save the detected Windsurf token. Detect it again, or paste a key in the API Key tab.",
 					"saveSuccess": "Windsurf connection saved successfully!",
 					"accountInfo": "Authenticated Account",
 					"accountName": "Name",
@@ -3058,6 +3059,43 @@
 			"dragHandle": "Move {{name}}",
 			"saveError": "The failover settings could not be saved.",
 			"orderError": "The chain order could not be saved."
+		}
+	},
+	"governance": {
+		"kicker": "Governance",
+		"title": "Hours, files and token budget",
+		"hint": "What workpilot.policy.yaml says to every agent on every provider. Read only: change the file in the repository and have it reviewed like code.",
+		"refresh": "Refresh",
+		"loadFailed": "The governance policy could not be read: {{error}}",
+		"invalid": "workpilot.policy.yaml is refused: no agent writes a file or runs a command until it is fixed.",
+		"none": "workpilot.policy.yaml sets no hours, files or token budget.",
+		"scheduleTitle": "Allowed hours",
+		"noSchedule": "Any time",
+		"openNow": "Open now",
+		"closedNow": "Closed now",
+		"scheduleLine": "{{hours}} ({{timezone}}), {{days}}",
+		"filesTitle": "Files",
+		"forbidden": "Forbidden",
+		"requiresReview": "Review required",
+		"noFiles": "No file rule",
+		"budgetTitle": "Token budget",
+		"noBudget": "No hourly limit",
+		"budgetLine": "{{spent}} of {{limit}} tokens in the last hour",
+		"decisionsTitle": "Last decisions",
+		"noDecisions": "The policy has not taken any decision yet.",
+		"exportCsv": "Export CSV",
+		"exportJson": "Export JSON",
+		"exported_one": "{{count}} decision exported to {{path}}",
+		"exported_other": "{{count}} decisions exported to {{path}}",
+		"exportFailed": "The export failed: {{error}}",
+		"decisions": {
+			"deny": "Refused",
+			"review": "Review",
+			"approved": "Approved",
+			"warn": "Warned",
+			"outside_hours": "Outside hours",
+			"budget_exceeded": "Budget reached",
+			"invalid_policy": "Invalid policy"
 		}
 	}
 }

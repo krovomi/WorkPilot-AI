@@ -2,8 +2,10 @@ import { IPC_CHANNELS } from "../../../shared/constants";
 import type { GitHubAPIComment } from "../../../main/ipc-handlers/github/types";
 import type {
 	LearnedSuppression,
+	ReviewConventionsResult,
 	ReviewFeedbackInput,
 	ReviewFeedbackResult,
+	ReviewFeedbackStatsResult,
 } from "../../../shared/types/review-feedback";
 import type {
 	GitHubImportResult,
@@ -439,6 +441,19 @@ export interface GitHubAPI {
 		projectId: string,
 		prNumber: number,
 	) => Promise<ReviewFeedbackResult>;
+	/** The project's acceptance rate per category and its learned rules (#361). */
+	getReviewFeedbackStats: (
+		projectId: string,
+	) => Promise<ReviewFeedbackStatsResult>;
+	/** Forget what the project said about one kind of remark. */
+	resetReviewFeedbackRule: (
+		projectId: string,
+		signature: string,
+	) => Promise<ReviewFeedbackStatsResult>;
+	/** Write `.workpilot/review-conventions.md` from the feedback. */
+	writeReviewConventions: (
+		projectId: string,
+	) => Promise<ReviewConventionsResult>;
 	getPRReview: (
 		projectId: string,
 		prNumber: number,
@@ -1066,6 +1081,22 @@ export const createGitHubAPI = (): GitHubAPI => ({
 		prNumber: number,
 	): Promise<ReviewFeedbackResult> =>
 		invokeIpc(IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_GET, projectId, prNumber),
+
+	getReviewFeedbackStats: (
+		projectId: string,
+	): Promise<ReviewFeedbackStatsResult> =>
+		invokeIpc(IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_STATS, projectId),
+
+	resetReviewFeedbackRule: (
+		projectId: string,
+		signature: string,
+	): Promise<ReviewFeedbackStatsResult> =>
+		invokeIpc(IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_RESET, projectId, signature),
+
+	writeReviewConventions: (
+		projectId: string,
+	): Promise<ReviewConventionsResult> =>
+		invokeIpc(IPC_CHANNELS.GITHUB_PR_REVIEW_CONVENTIONS_WRITE, projectId),
 
 	getPRReview: (
 		projectId: string,

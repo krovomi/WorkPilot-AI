@@ -61,7 +61,53 @@ describe("parseRecordedStep", () => {
 	});
 });
 
+describe("parseRecordedStep: where the element lives, what its action caused", () => {
+	const click = { id: "s3", kind: "click", selectors: [button] };
+
+	it("keeps the frames, shadow hosts and waits of a step", () => {
+		const step = {
+			...click,
+			frames: ['iframe[name="pay"]'],
+			shadow: ["x-card", "x-button"],
+			waitVisible: true,
+			waitUrl: "http://localhost/done",
+			waitRequest: { method: "POST", path: "/api/pay" },
+		};
+		expect(parseRecordedStep(step)).toEqual({
+			...step,
+			selectors: [{ strategy: "role", role: "button", value: "Save" }],
+		});
+	});
+
+	it("refuses a step whose place is malformed, drops a malformed wait", () => {
+		for (const chain of ["x", ["a", "b", "c", "d", "e"], [""], [3], ["a".repeat(301)]]) {
+			expect(parseRecordedStep({ ...click, frames: chain })).toBeNull();
+			expect(parseRecordedStep({ ...click, shadow: chain })).toBeNull();
+		}
+		expect(
+			parseRecordedStep({
+				...click,
+				frames: [],
+				waitVisible: "yes",
+				waitUrl: "javascript:alert(1)",
+				waitRequest: { method: "TRACE", path: "/a" },
+			}),
+		).toEqual({ id: "s3", kind: "click", selectors: [{ strategy: "role", role: "button", value: "Save" }] });
+		for (const waitRequest of [null, "POST /a", { method: "GET", path: "a" }, { method: "GET", path: "/a?b" }, { method: "GET" }]) {
+			expect(parseRecordedStep({ ...click, waitRequest })?.waitRequest).toBeUndefined();
+		}
+		expect(parseRecordedStep({ ...click, waitUrl: "http://a/b?c=1" })?.waitUrl).toBeUndefined();
+	});
+});
+
 describe("readExportRequest", () => {
+	it("accepts each format of the closed list", () => {
+		for (const format of ["selenium-python", "selenium-java", "webdriverio"]) {
+			expect(readExportRequest({ format, destination: "preview", stepIds: [] })?.format).toBe(format);
+		}
+		expect(readExportRequest({ format: "selenium-ruby", destination: "preview", stepIds: [] })).toBeNull();
+	});
+
 	it("keeps the step ids once, in order", () => {
 		expect(
 			readExportRequest({

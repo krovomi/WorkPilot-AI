@@ -6,6 +6,11 @@ deployment to land and settle, then samples the window. Its state is written
 after each step to `.workpilot/deploy_watches/<run id>.json`, which the app
 shows. A critical verdict ends the window early and plans the rollback.
 
+A warning or critical verdict then gets its incident report (`incident`):
+the numbers, and a few sentences by the project's model unless the YAML file
+says `explain_incident: false`. A critical one opens the revert PR of the
+deployed commit when the file says `revert_pr: true` (`revert`).
+
 Under a strict offline policy only endpoints on the machine or a private
 address are read, and no provider API is called: the rollback stays manual.
 """
@@ -26,7 +31,9 @@ from offline_policy import airgap_status
 from .collectors import Fetch, default_fetch, health_check, prometheus_value
 from .config import WatchSettings, is_local_host, load_settings
 from .evaluate import HealthResult, Level, compare, sample_level, verdict
+from .incident import Ask, explain, markdown, summarize
 from .migrations import changed_paths, migration_files
+from .revert import OpenRevertPR, open_revert
 from .rollback import RollbackPlan, execute_rollback, plan_rollback
 
 RUNS_FILE = Path(".workpilot") / "cicd_runs.json"
@@ -156,6 +163,35 @@ def _plan(
     return plan_rollback(env, run, fetch)
 
 
+def _report(
+    project_dir: Path,
+    state: dict,
+    run: dict,
+    settings: WatchSettings,
+    offline: bool,
+    revert_opener: OpenRevertPR | None,
+    ask: Ask | None,
+) -> None:
+    summary = summarize(state)
+    text = markdown(summary, state["run_id"])
+    if state["verdict"] == Level.CRITICAL.value and settings.revert_pr:
+        state["revert_pr"] = open_revert(
+            state["run_id"],
+            summary["deployed_sha"],
+            text,
+            target=str(run.get("branch") or ""),
+            offline=offline,
+            opener=revert_opener,
+        )
+    state["incident"] = {
+        "summary": summary,
+        "markdown": text,
+        "explanation": (
+            explain(summary, str(project_dir), ask) if settings.explain_incident else ""
+        ),
+    }
+
+
 def run_watch(
     project_dir: Path,
     run_id: str,
@@ -164,6 +200,8 @@ def run_watch(
     fetch: Fetch = default_fetch,
     sleep: Callable[[float], None] = time.sleep,
     now: Callable[[], datetime] = _now,
+    revert_opener: OpenRevertPR | None = None,
+    ask: Ask | None = None,
 ) -> dict:
     project_dir = Path(project_dir)
     run = find_run(project_dir, run_id)
@@ -231,6 +269,10 @@ def run_watch(
             state["rollback"] = "started" if started_ok else "failed"
         else:
             state["rollback"] = "proposed"
+    if state["verdict"] in (Level.WARNING.value, Level.CRITICAL.value):
+        # The verdict is on the page before the PR and the model are asked.
+        _save(project_dir, state, now())
+        _report(project_dir, state, run, settings, offline, revert_opener, ask)
     _save(project_dir, state, now())
     return state
 

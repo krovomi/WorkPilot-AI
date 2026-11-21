@@ -33,6 +33,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from server.authz.principal import get_principal
 from server.authz.scope import ProjectScope, resolve_project_scope
+from server.authz.self_approval import may_approve_own
 from server.db.engine import get_db
 from server.db.models import ProjectRole
 from server.services import push
@@ -196,12 +197,19 @@ async def create_card(
         raise HTTPException(status_code=422, detail=f"kind must be one of {KINDS}")
 
     title = " ".join(body.title.split())
+    # Going without a review is approving: the approval right's to choose,
+    # within the deployment's rule on approving one's own card.
+    may_skip_review = principal.has("review.approve") and await may_approve_own(
+        db,
+        project_id=scope.project_id,
+        org_id=scope.org_id,
+        user_id=principal.id,
+        author_id=principal.id,
+    )
     metadata: dict[str, Any] = {
         "sourceType": "server",
         "createdBy": principal.id,
-        # Going without a review is the approval right's to choose.
-        "requireReviewBeforeCoding": body.require_review
-        or not principal.has("review.approve"),
+        "requireReviewBeforeCoding": body.require_review or not may_skip_review,
     }
     if body.kind:
         metadata.update(kind=body.kind, kindSource="user", kindConfidence=1)
@@ -384,16 +392,23 @@ async def delete_card(
     return {"deleted": card_id}
 
 
+#: Why the author of a card may not approve it (``server/authz/self_approval``).
+OWN_CARD = "Someone else approves the spec of a card you created"
+
+
 @router.post("/cards/{card_id}/approve")
 async def approve_card(
     card_id: str,
     request: Request,
     scope: ProjectScope = Depends(resolve_project_scope),
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Approve the card's spec and plan, so a build may start on them.
 
     The approval is the one the build checks (``review_state.json``, with the
     hash of ``spec.md`` and the plan): editing either afterwards voids it.
+    The card's author approves it only as the deployment allows
+    (``WORKPILOT_SELF_APPROVAL``).
     """
     from review.state import ReviewState
 
@@ -402,6 +417,15 @@ async def approve_card(
     directory = _card_or_404(scope, card_id)
     if not (directory / "spec.md").is_file():
         raise HTTPException(status_code=409, detail="No spec to approve yet")
+    row = await _index_row(db, scope, card_id)
+    if not await may_approve_own(
+        db,
+        project_id=scope.project_id,
+        org_id=scope.org_id,
+        user_id=principal.id,
+        author_id=row.created_by if row is not None else None,
+    ):
+        raise HTTPException(status_code=403, detail=OWN_CARD)
 
     review = ReviewState.load(directory)
     review.approve(directory, approved_by=principal.email or principal.id)

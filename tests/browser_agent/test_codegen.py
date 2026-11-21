@@ -19,7 +19,7 @@ from browser_agent.codegen import (
     file_path,
     literal,
 )
-from browser_agent.recording import RecordedStep, Recording, Selector
+from browser_agent.recording import RecordedStep, Recording, RequestWait, Selector
 
 HOSTILE = (
     'x"); require("child_process").exec("rm -rf /"); ("${process.env.HOME}`\n{enter}'
@@ -176,3 +176,89 @@ def test_steps_without_selectors_and_empty_tests() -> None:
     ts = export_recording(lost, "playwright-ts").code
     assert "secret(" not in ts and ts.endswith("});\n")
     assert export_recording(lost, "cypress").to_dict()["skipped"] == 0
+
+
+def _transitions() -> Recording:
+    return Recording(
+        steps=[
+            RecordedStep(
+                "s2",
+                "click",
+                [ROLE],
+                wait_request=RequestWait("POST", "/api/login"),
+                wait_url="http://localhost:3000/home",
+            ),
+            RecordedStep(
+                "s3",
+                "fill",
+                [Selector("placeholder", "Card")],
+                value="4242",
+                frames=['iframe[name="pay"]', "#inner"],
+                shadow=["x-card"],
+                wait_visible=True,
+            ),
+        ]
+    )
+
+
+def test_playwright_waits_for_what_the_action_caused_inside_frames() -> None:
+    ts = export_recording(_transitions(), "playwright-ts").code.splitlines()
+    scope = 'page.frameLocator("iframe[name=\\"pay\\"]").frameLocator("#inner").locator("x-card")'
+    assert ts[3:-1] == [
+        '\tconst responseS2 = page.waitForResponse((r) => r.request().method() === "POST" '
+        '&& new URL(r.url()).pathname === "/api/login");',
+        '\tawait page.getByRole("button", { name: "Sign in", exact: true }).click();',
+        "\tawait responseS2;",
+        '\tawait page.waitForURL((url) => url.href.split(/[?#]/)[0] === "http://localhost:3000/home");',
+        f'\tawait expect({scope}.getByPlaceholder("Card", {{ exact: true }})).toBeVisible();',
+        f'\tawait {scope}.getByPlaceholder("Card", {{ exact: true }}).fill("4242");',
+    ]
+    py = export_recording(_transitions(), "playwright-python").code
+    ast.parse(py)
+    assert "from urllib.parse import urlsplit" in py.splitlines()
+    scope = 'page.frame_locator("iframe[name=\\"pay\\"]").frame_locator("#inner").locator("x-card")'
+    body = py.splitlines()[-5:]
+    assert body == [
+        '    with page.expect_response(lambda r: r.request.method == "POST" and '
+        'urlsplit(r.url).path == "/api/login"):',
+        '        page.get_by_role("button", name="Sign in", exact=True).click()',
+        '    page.wait_for_url(lambda url: url.split("#")[0].split("?")[0] == '
+        '"http://localhost:3000/home")',
+        f'    expect({scope}.get_by_placeholder("Card", exact=True)).to_be_visible()',
+        f'    {scope}.get_by_placeholder("Card", exact=True).fill("4242")',
+    ]
+
+
+def test_cypress_waits_for_what_the_action_caused_inside_frames() -> None:
+    lines = export_recording(_transitions(), "cypress").code.splitlines()
+    frame = (
+        'cy.get("iframe[name=\\"pay\\"]").its("0.contentDocument.body")'
+        '.should("not.be.empty").then(cy.wrap)'
+        '.find("#inner").its("0.contentDocument.body")'
+        '.should("not.be.empty").then(cy.wrap)'
+    )
+    assert lines[2:-2] == [
+        '\t\tcy.intercept({ method: "POST", pathname: "/api/login" }).as("s2");',
+        '\t\tcy.contains("button, [role=\\"button\\"], input[type=\\"submit\\"], '
+        'input[type=\\"button\\"]", "Sign in").click();',
+        '\t\tcy.wait("@s2");',
+        "\t\tcy.url().should((url) => expect(url.split(/[?#]/)[0]).to.equal("
+        '"http://localhost:3000/home"));',
+        f'\t\t{frame}.find("x-card").shadow().find("[placeholder=\\"Card\\"]")'
+        '.should("be.visible").clear().type("4242", { parseSpecialCharSequences: false });',
+    ]
+    shadow_only = Recording(
+        steps=[RecordedStep("s1", "click", [Selector("text", "Go")], shadow=["x-a"])]
+    )
+    assert (
+        '\t\tcy.get("x-a").shadow().contains("Go").click();'
+        in export_recording(shadow_only, "cypress").code.splitlines()
+    )
+
+
+def test_new_formats_have_their_own_paths(tmp_path: Path) -> None:
+    assert file_path("selenium-python", "Go") == "tests/e2e/test_go.py"
+    assert file_path("selenium-java", "go home") == "src/test/java/e2e/GoHomeTest.java"
+    assert file_path("webdriverio", "Go") == "test/specs/go.e2e.js"
+    (tmp_path / "e2e").mkdir()
+    assert file_path("webdriverio", "Go", tmp_path) == "e2e/go.e2e.js"

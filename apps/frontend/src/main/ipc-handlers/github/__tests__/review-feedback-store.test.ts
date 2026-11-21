@@ -23,11 +23,14 @@ vi.mock("../../../project-store", () => ({
 	projectStore: { getProjects: () => [] },
 }));
 
+import { signature } from "../review-feedback-dataset";
 import {
 	FEEDBACK_RELATIVE_PATH,
 	KEEP_LINES_ON_COMPACT,
 	readFeedback,
+	readRecords,
 	recordFeedback,
+	recordReset,
 	validateFeedback,
 } from "../review-feedback-store";
 
@@ -305,5 +308,100 @@ describe("readFeedback", () => {
 			].join("\n"),
 		);
 		expect(readFeedback(project, 3)).toEqual({ a: "accepted" });
+	});
+});
+
+describe("resetting a kind of remark (lot 2)", () => {
+	const SIG = signature("style", FINDING.title);
+
+	function rejectOn(prNumber: number): void {
+		writeReview(prNumber, [FINDING]);
+		const feedback = must(
+			validateFeedback(prNumber, { findingId: "f-1", verdict: "rejected" }),
+		);
+		expect(recordFeedback(project, feedback).success).toBe(true);
+	}
+
+	it("writes a reset line that forgets the votes before it", () => {
+		rejectOn(1);
+		rejectOn(2);
+		expect(readRecords(project)).toHaveLength(2);
+		const now = () => new Date("2026-11-16T10:00:00Z");
+		expect(recordReset(project, SIG, now)).toBe("reset");
+		expect(lines().at(-1)).toEqual({
+			v: 1,
+			at: "2026-11-16T10:00:00.000Z",
+			kind: "reset",
+			signature: SIG,
+		});
+		expect(readRecords(project)).toEqual([]);
+		expect(readFeedback(project, 1)).toEqual({});
+		rejectOn(3);
+		expect(readRecords(project).map((r) => r.pr)).toEqual([3]);
+		expect(readFeedback(project, 3)).toEqual({ "f-1": "rejected" });
+	});
+
+	it("uses the default clock", () => {
+		rejectOn(1);
+		expect(recordReset(project, SIG)).toBe("reset");
+		expect(typeof lines().at(-1)?.at).toBe("string");
+	});
+
+	it.each([
+		["not a string", 42],
+		["not a signature", "../../etc/passwd"],
+		["upper case", SIG.toUpperCase()],
+	])("refuses a signature that is %s", (_name, value) => {
+		rejectOn(1);
+		expect(recordReset(project, value)).toBe("invalid");
+		expect(lines()).toHaveLength(1);
+	});
+
+	it("refuses a signature the dataset does not hold", () => {
+		rejectOn(1);
+		expect(recordReset(project, "0123456789abcdef")).toBe("not_found");
+		expect(lines()).toHaveLength(1);
+	});
+
+	it("never writes through a dataset file that is a link", () => {
+		rejectOn(1);
+		const file = path.join(project, FEEDBACK_RELATIVE_PATH);
+		const target = path.join(root, "dataset-copy.jsonl");
+		writeFileSync(target, readFileSync(file, "utf-8"));
+		rmSync(file);
+		try {
+			symlinkSync(target, file);
+		} catch {
+			return;
+		}
+		// Through the link nothing is read nor written.
+		expect(readRecords(project)).toEqual([]);
+		expect(recordReset(project, SIG)).toBe("write_failed");
+		expect(readFileSync(target, "utf-8").split("\n").filter(Boolean)).toHaveLength(1);
+	});
+
+	it("reads a folder in the dataset's place as empty", () => {
+		rejectOn(1);
+		const file = path.join(project, FEEDBACK_RELATIVE_PATH);
+		rmSync(file);
+		mkdirSync(file);
+		expect(readRecords(project)).toEqual([]);
+		expect(recordReset(project, SIG)).toBe("not_found");
+	});
+
+	it("keeps a reset of another kind from touching a PR's verdicts", () => {
+		rejectOn(1);
+		expect(recordReset(project, SIG)).toBe("reset");
+		writeReview(1, [{ ...FINDING, id: "f-2", title: "Prefer an early return" }]);
+		const other = must(
+			validateFeedback(1, { findingId: "f-2", verdict: "accepted" }),
+		);
+		expect(recordFeedback(project, other).success).toBe(true);
+		const file = path.join(project, FEEDBACK_RELATIVE_PATH);
+		writeFileSync(
+			file,
+			`${readFileSync(file, "utf-8")}${JSON.stringify({ v: 1, pr: 1, finding_id: "legacy", verdict: "rejected" })}\n${JSON.stringify({ v: 1, kind: "reset", signature: SIG })}\n`,
+		);
+		expect(readFeedback(project, 1)).toEqual({ "f-2": "accepted", legacy: "rejected" });
 	});
 });

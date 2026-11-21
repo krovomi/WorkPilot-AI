@@ -534,7 +534,10 @@
 		"cancel": "Annuler ce téléchargement",
 		"retry": "Réessayer",
 		"cancelledLabel": "Annulé",
-		"hint": "Les téléchargements continuent en arrière-plan, même si vous fermez cette tâche."
+		"hint": "Les téléchargements continuent en arrière-plan, même si vous fermez cette tâche.",
+		"hoursRemaining": "encore {{count}} h",
+		"minutesRemaining": "encore {{count}} min",
+		"secondsRemaining": "encore {{count}} s"
 	},
 	"ideation": {
 		"converting": "Conversion...",
@@ -1450,6 +1453,7 @@
 		"description": "Connectez-vous à un serveur partagé, ou continuez en mode local.",
 		"serverUrl": "URL du serveur",
 		"entraButton": "Se connecter avec Microsoft",
+		"ssoButton": "Se connecter avec {{name}}",
 		"email": "Email",
 		"password": "Mot de passe",
 		"localAccountButton": "Connexion",

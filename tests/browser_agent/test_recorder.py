@@ -42,14 +42,18 @@ def test_the_first_step_opens_the_page_and_its_echo_is_not_a_step() -> None:
     assert Recorder().start("javascript:alert(1)") is None
 
 
-def test_a_navigation_an_action_caused_is_not_a_step() -> None:
+def test_a_navigation_an_action_caused_is_what_that_action_waits_for() -> None:
     clock = Clock()
     rec = Recorder(clock)
     rec.start("http://localhost:3000/")
     rec.on_navigation("http://localhost:3000/")
-    rec.on_page_event({"kind": "click", "target": SAVE})
+    click = rec.on_page_event({"kind": "click", "target": SAVE})
     clock.now += NAVIGATION_WINDOW_S - 0.5
-    assert rec.on_navigation("http://localhost:3000/saved") is None
+    caused = rec.on_navigation("http://localhost:3000/saved?id=4#top")
+    assert caused is click and len(rec.steps) == 2
+    assert caused.wait_url == "http://localhost:3000/saved"
+    # The same page again (another fragment): nothing new to wait for.
+    assert rec.on_navigation("http://localhost:3000/saved#end") is None
     clock.now += NAVIGATION_WINDOW_S + 1
     typed = rec.on_navigation("http://localhost:3000/settings")
     assert typed is not None and typed.kind == "navigate" and typed.id == "s3"
@@ -127,8 +131,9 @@ def test_a_url_with_a_key_loses_its_query() -> None:
 
 
 class Frame:
-    def __init__(self, url: str = "") -> None:
+    def __init__(self, url: str = "", parent: Frame | None = None) -> None:
         self.url = url
+        self.parent_frame = parent
 
 
 class Page:
@@ -155,15 +160,18 @@ class Page:
         self.handlers["framenavigated"](self.main_frame)
 
 
-async def test_a_session_records_main_frame_reports_until_stopped() -> None:
+async def test_a_session_records_the_page_reports_until_stopped() -> None:
     page = Page()
     stop = asyncio.get_running_loop().create_future()
     emitted = []
 
     async def drive() -> None:
         await asyncio.sleep(0)
-        page.binding({"frame": page.main_frame}, {"kind": "click", "target": SAVE})
-        page.binding({"frame": Frame()}, {"kind": "click", "target": SAVE})
+        await page.binding(
+            {"frame": page.main_frame}, {"kind": "click", "target": SAVE}
+        )
+        # A frame Playwright no longer attaches to the page: not recorded.
+        await page.binding({"frame": Frame()}, {"kind": "click", "target": SAVE})
         page.handlers["framenavigated"](Frame("https://ads.test/"))
         stop.set_result(None)
 

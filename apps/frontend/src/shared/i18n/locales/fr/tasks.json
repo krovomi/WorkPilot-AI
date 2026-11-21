@@ -106,6 +106,9 @@
 		"sessionCompaction": "Compaction de session",
 		"criticalPhases": "Étapes clés",
 		"lastError": "Dernière erreur",
+		"compactionSummaryClean": "{{completed}}/{{total}} phases terminées, aucun échec.",
+		"compactionSummaryFailed_one": "{{completed}}/{{total}} phases terminées, {{count}} à revoir. Dernier problème à la phase {{index}} : {{title}}",
+		"compactionSummaryFailed_other": "{{completed}}/{{total}} phases terminées, {{count}} à revoir. Dernier problème à la phase {{index}} : {{title}}",
 		"automation": "Automations",
 		"automationTooltip": "Créée par la règle d'automatisation « {{rule}} »"
 	},
@@ -2621,7 +2624,8 @@
 		"chip": "Coupe-circuit : {{tool}}",
 		"body": "L'agent a appelé {{tool}} {{repeats}} fois avec les mêmes arguments et a reçu chaque fois le même résultat, sans modifier de fichier entre-temps. La tâche s'est mise en pause plutôt que de payer une boucle.",
 		"hint": "Lisez ses journaux. Reprendre relance la phase avec la même conversation ; si elle boucle encore, changez de modèle ou précisez la tâche.",
-		"killSwitch": "Arrêtée par « Arrêter tous les agents »"
+		"killSwitch": "Arrêtée par « Arrêter tous les agents »",
+		"voiceStop": "Arrêtée à la voix après son étape"
 	},
 	"safetyPause": {
 		"anomalyChip": "Score de confiance : {{score}}/100",
@@ -2672,5 +2676,12 @@
 		},
 		"anomalyLine_one": "{{label}}",
 		"anomalyLine_other": "{{label}} (×{{count}})"
+	},
+	"policyPause": {
+		"hoursChip": "Hors des heures permises",
+		"hoursBody": "workpilot.policy.yaml permet aux agents de travailler {{hours}} ({{timezone}}). La tâche s'est mise en pause une fois son action en cours terminée.",
+		"budgetChip": "Budget de jetons atteint",
+		"budgetBody": "Les agents du projet ont dépensé {{spent}} jetons dans la dernière heure, autant ou plus que les {{limit}} permis par workpilot.policy.yaml.",
+		"hint": "Reprenez-la quand la politique le permet de nouveau ; la décision figure dans le journal d'audit de Réglages > Garde-fous."
 	}
 }
