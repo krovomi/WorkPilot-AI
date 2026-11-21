@@ -388,6 +388,46 @@ class TestTheLedger:
         assert ledger.consume_approval(tmp_path, self._decision(), target)
         assert not ledger.consume_approval(tmp_path, self._decision(), target)
 
+    @staticmethod
+    def _link(link: Path, to: Path) -> None:
+        try:
+            link.symlink_to(to, target_is_directory=to.is_dir())
+        except OSError:
+            pytest.skip("symlinks unavailable")
+
+    def test_the_ledger_stays_in_the_project_folder(self, tmp_path):
+        project, elsewhere = tmp_path / "project", tmp_path / "elsewhere"
+        project.mkdir()
+        elsewhere.mkdir()
+        self._link(project / ".workpilot", elsewhere)
+        target = ledger.target_of("Write", {"file_path": "db/1.sql"}, project)
+        ledger.record(project, self._decision(), "Write", target, outcome="pending")
+        assert list(elsewhere.iterdir()) == []
+        assert not ledger.consume_approval(project, self._decision(), target)
+        with pytest.raises(OSError):
+            ledger.activity(project)
+
+    def test_the_log_is_written_as_a_file_of_its_own(self, tmp_path):
+        (tmp_path / ".workpilot").mkdir()
+        other = tmp_path / "other.txt"
+        other.write_text("keep\n", encoding="utf-8")
+        self._link(tmp_path / ".workpilot" / ledger.LOG_NAME, other)
+        target = ledger.target_of("Write", {"file_path": "db/1.sql"}, tmp_path)
+        ledger.record(tmp_path, self._decision(), "Write", target)
+        assert other.read_text(encoding="utf-8") == "keep\n"
+        assert ledger.activity(tmp_path)["events"] == []
+
+    def test_approvals_are_read_from_a_file_of_their_own(self, tmp_path):
+        target = self._pending(tmp_path)
+        [request] = ledger.activity(tmp_path)["pending"]
+        ledger.answer(tmp_path, request["id"], approved=True)
+        path = tmp_path / ".workpilot" / ledger.APPROVALS_NAME
+        copy = tmp_path / "approvals-copy.json"
+        copy.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        path.unlink()
+        self._link(path, copy)
+        assert not ledger.consume_approval(tmp_path, self._decision(), target)
+
     def test_an_approval_with_a_broken_expiry_is_dead(self, tmp_path):
         target = self._pending(tmp_path)
         [request] = ledger.activity(tmp_path)["pending"]
