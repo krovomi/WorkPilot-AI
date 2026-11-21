@@ -153,7 +153,10 @@ class _ScratchIndex:
         if not real.is_absolute():
             real = self.worktree / real
         if real.is_file():
-            shutil.copyfile(real, self.path)
+            # The copy keeps the index's own time: git compares it with each
+            # entry's to tell a file changed in the same second as its entry,
+            # and a newer copy would hide that change from the snapshot.
+            shutil.copy2(real, self.path)
         return self.path
 
     def __exit__(self, *_exc: object) -> None:
