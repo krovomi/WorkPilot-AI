@@ -34,6 +34,11 @@ export interface ExecutionWaveOptions {
 	 * together, one in each spec (default true).
 	 */
 	fragileZones?: boolean;
+	/**
+	 * Add code links to the score: imports of what the other spec edits,
+	 * uses of what it removes (default true).
+	 */
+	codeLinks?: boolean;
 }
 
 /** What a test merge of two worktrees' commits said (`git merge-tree`). */
@@ -80,6 +85,13 @@ export interface WavePairRisk {
 	 * that the history changes together; at most 20.
 	 */
 	fragileLinks?: string[];
+	/**
+	 * Code links counted in the score (#358, lot 3): `y → x`, a file of one
+	 * spec importing a module the other edits; at most 20.
+	 */
+	importLinks?: string[];
+	/** `y → symbol`: a file of one spec using what the other removes; at most 20. */
+	symbolLinks?: string[];
 }
 
 /** Whether the history was read for fragile zones, and how far back. */
@@ -87,6 +99,15 @@ export interface WaveFragileZones {
 	enabled: boolean;
 	/** Commits read; null when off or when git could not read the history. */
 	commits: number | null;
+}
+
+/** Whether the code was read for code links, and how much of it. */
+export interface WaveCodeLinks {
+	enabled: boolean;
+	/** Files considered for reading across the plan. */
+	files: number;
+	/** True when a limit left files of a spec unread. */
+	capped: boolean;
 }
 
 /** The preventive merge checks behind a plan; nothing is written to a worktree. */
@@ -153,6 +174,7 @@ export interface ExecutionWavePlan {
 	residualRisk: number;
 	mergeChecks: WaveMergeChecks;
 	fragileZones: WaveFragileZones;
+	codeLinks: WaveCodeLinks;
 	computedAt: string;
 }
 
@@ -172,6 +194,43 @@ export interface WaveRunState {
 	maxParallel: number;
 	/** Tasks the run has already tried to start. */
 	started: string[];
+	/**
+	 * What the plan the run started from avoided (#358, lot 3), for the run
+	 * history: pairs split into different waves, and the risk taken out.
+	 */
+	avoided?: WaveRunAvoided;
+}
+
+export interface WaveRunAvoided {
+	/** Pairs of specs that would have run side by side and were split. */
+	conflicts: number;
+	/** Total risk minus residual risk. */
+	risk: number;
+}
+
+/** How a recorded run ended. */
+export type WaveRunOutcome = "done" | "stopped";
+
+/**
+ * A run once it ended, kept in the project's run history (#358, lot 3) for
+ * the sprint metrics: counted, never estimated.
+ */
+export interface WaveRunRecord {
+	/** When the main process recorded the end. */
+	finishedAt: string;
+	outcome: WaveRunOutcome;
+	waves: number;
+	tasks: number;
+	/** Tasks the run started. */
+	started: number;
+	conflictsAvoided: number;
+	riskAvoided: number;
+}
+
+/** The project's run history, newest first; `ignored` when the file could not be read. */
+export interface WaveRunHistory {
+	records: WaveRunRecord[];
+	ignored: boolean;
 }
 
 /** A run read back from the project: when it was saved, by the main process. */

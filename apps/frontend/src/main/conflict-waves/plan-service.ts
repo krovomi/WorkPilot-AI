@@ -14,9 +14,13 @@ import type {
 } from "../../shared/types/conflict-waves";
 import type { Project } from "../../shared/types/project";
 import type { Task, TaskPriority, TaskStatus } from "../../shared/types/task";
+import type { SpecCode } from "./code-links";
+import type { CodeReadBudget } from "./code-reader";
 import type { CoChanges } from "./fragile-zones";
 import { type MergeCheckDeps, planWithMergeChecks } from "./merge-check";
 import { type PlannerTask, planExecutionWaves } from "./planner";
+import { buildFootprint, type Footprint } from "./scorer";
+import type { SpecCodeSource } from "./worktree-files";
 
 /** A project id is a UUID the main process minted. */
 export const PROJECT_ID = /^[A-Za-z0-9-]{1,64}$/;
@@ -52,6 +56,7 @@ export interface ValidatedWaveRequest {
 	unplannedPolicy: UnplannedPolicy;
 	driftThreshold: number;
 	fragileZones: boolean;
+	codeLinks: boolean;
 }
 
 export type Validation<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -107,6 +112,8 @@ export function validateWavePlanRequest(raw: unknown): Validation<ValidatedWaveR
 	}
 	const fragileZones = opts.fragileZones ?? true;
 	if (typeof fragileZones !== "boolean") return { ok: false, error: "Invalid fragile zones option" };
+	const codeLinks = opts.codeLinks ?? true;
+	if (typeof codeLinks !== "boolean") return { ok: false, error: "Invalid code links option" };
 
 	return {
 		ok: true,
@@ -117,6 +124,7 @@ export function validateWavePlanRequest(raw: unknown): Validation<ValidatedWaveR
 			unplannedPolicy: policy,
 			driftThreshold,
 			fragileZones,
+			codeLinks,
 		},
 	};
 }
@@ -131,6 +139,19 @@ export interface WavePlanDeps extends MergeCheckDeps {
 	) => Promise<string[] | null>;
 	/** Files the project's history changes together, or null when git cannot say. */
 	readCoChanges: (projectPath: string) => Promise<CoChanges | null>;
+	/** A task's worktree and its diff, for code links. */
+	readCodeSource: (
+		projectPath: string,
+		specId: string,
+		mainBranch?: string,
+	) => Promise<SpecCodeSource>;
+	/** Reads and indexes a spec's files, within the plan's budget. */
+	readSpecCode: (
+		source: SpecCodeSource,
+		projectPath: string,
+		footprint: Footprint,
+		budget: CodeReadBudget,
+	) => Promise<SpecCode>;
 	now?: () => Date;
 }
 
@@ -199,6 +220,20 @@ export async function buildExecutionWavePlan(
 		Promise.all(running.map(toPlanner)),
 		request.fragileZones ? deps.readCoChanges(project.path) : Promise.resolve(null),
 	]);
+	// Code links: one spec after the other, so that the file budget is shared
+	// in a stable order and a large plan never reads everything at once.
+	const budget: CodeReadBudget = { read: 0, capped: false };
+	if (request.codeLinks) {
+		const all = [...plannerCandidates, ...plannerRunning];
+		const specOf = new Map([...candidates, ...running].map((t) => [t.id, t.specId]));
+		for (const task of all) {
+			const footprint = buildFootprint(task.plannedFiles, task.actualFiles ?? []);
+			if (footprint.size === 0) continue;
+			const specId = specOf.get(task.id) as string;
+			const source = await deps.readCodeSource(project.path, specId, project.settings?.mainBranch);
+			task.code = await deps.readSpecCode(source, project.path, footprint, budget);
+		}
+	}
 	const maxParallel = maxParallelOf(project);
 	// Task id -> spec id, for the candidates that have a worktree to test-merge.
 	const withWorktree = new Map<string, string>();
@@ -230,6 +265,7 @@ export async function buildExecutionWavePlan(
 			...result,
 			mergeChecks,
 			fragileZones: { enabled: request.fragileZones, commits: coChanges?.commits ?? null },
+			codeLinks: { enabled: request.codeLinks, files: budget.read, capped: budget.capped },
 			computedAt: (deps.now?.() ?? new Date()).toISOString(),
 		},
 	};

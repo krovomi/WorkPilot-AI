@@ -6,7 +6,9 @@
  * 1. Footprint of each spec = files its plan declares ∪ files its worktree
  *    already changed (any language: the scorer weighs files by role). With
  *    `coChanges`, files the history changes together (one in each spec) add
- *    to the pair's score: fragile zones.
+ *    to the pair's score: fragile zones. With each spec's `code`, a file of
+ *    one importing a module the other edits, or using a symbol the other
+ *    removes, adds too: code links (`code-links.ts`).
  * 2. Conflict graph: an edge between two specs whose score is above the
  *    tolerance, whose test merge conflicted (`mergeChecks`, run by the
  *    service on pairs a previous pass put in one wave), or one of which has
@@ -35,6 +37,7 @@ import type {
 	WaveRunningConflict,
 } from "../../shared/types/conflict-waves";
 import type { TaskStatus } from "../../shared/types/task";
+import { codeLinks, MAX_CODE_WEIGHT, type SpecCode } from "./code-links";
 import {
 	buildFootprint,
 	type CoChangeIndex,
@@ -57,6 +60,8 @@ export interface PlannerTask {
 	plannedFiles: readonly string[];
 	/** Files the worktree changed, or null when it has none. */
 	actualFiles: readonly string[] | null;
+	/** Its code, read for code links; absent when they are off or it was not read. */
+	code?: SpecCode | null;
 }
 
 export interface PlannerOptions {
@@ -180,11 +185,21 @@ export function planExecutionWaves(
 	const tolerance = Math.max(0, options.tolerance);
 	const isolateUnplanned = options.unplannedPolicy === "isolate";
 
-	/** Shared files by weight, plus the fragile links between the two, capped. */
-	const pairScore = (a: Footprint, b: Footprint) => {
-		const { score, shared } = scorePair(a, b);
-		const links = options.coChanges ? fragileLinks(a, b, options.coChanges) : [];
-		return { score: score + Math.min(links.length, MAX_FRAGILE_WEIGHT), shared, links };
+	/** Shared files by weight, plus the fragile and code links between the two, each capped. */
+	const pairScore = (a: Node, b: Node) => {
+		const { score, shared } = scorePair(a.footprint, b.footprint);
+		const links = options.coChanges ? fragileLinks(a.footprint, b.footprint, options.coChanges) : [];
+		const code = codeLinks(a.footprint, a.task.code, b.footprint, b.task.code);
+		const codeCount = code.imports.length + code.symbols.length;
+		return {
+			score:
+				score +
+				Math.min(links.length, MAX_FRAGILE_WEIGHT) +
+				Math.min(codeCount, MAX_CODE_WEIGHT),
+			shared,
+			links,
+			code,
+		};
 	};
 
 	const sorted = [...candidates].sort(compareBase);
@@ -201,7 +216,7 @@ export function planExecutionWaves(
 			const a = nodes.get(ids[i]) as Node;
 			const b = nodes.get(ids[j]) as Node;
 			const unknown = !a.planned || !b.planned;
-			const { score, shared, links } = pairScore(a.footprint, b.footprint);
+			const { score, shared, links, code } = pairScore(a, b);
 			const key = pairKey(a.task.id, b.task.id);
 			const merge = options.mergeChecks?.get(key);
 			const conflicted = merge?.verdict === "conflict";
@@ -222,6 +237,12 @@ export function planExecutionWaves(
 						conflictFiles: merge.files.slice(0, MAX_LISTED_FILES),
 					}),
 					...(links.length > 0 ? { fragileLinks: links.slice(0, MAX_LISTED_FILES) } : {}),
+					...(code.imports.length > 0
+						? { importLinks: code.imports.slice(0, MAX_LISTED_FILES) }
+						: {}),
+					...(code.symbols.length > 0
+						? { symbolLinks: code.symbols.slice(0, MAX_LISTED_FILES) }
+						: {}),
 				});
 				// An unknown pair weighs one: enough to order, not to dominate.
 				const weight = score > 0 ? score : 1;
@@ -346,7 +367,7 @@ export function planExecutionWaves(
 	for (const id of plannable) {
 		const node = nodes.get(id) as Node;
 		for (const other of runningNodes) {
-			const { score } = pairScore(node.footprint, other.footprint);
+			const { score } = pairScore(node, other);
 			if (score > tolerance) {
 				runningConflicts.push({ taskId: id, runningTaskId: other.task.id, score });
 			}
