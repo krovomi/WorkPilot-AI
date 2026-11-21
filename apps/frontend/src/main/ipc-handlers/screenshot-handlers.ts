@@ -12,8 +12,9 @@ import { debugLog } from "../../shared/utils/debug-logger";
 import { app, desktopCapturer, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import type {
-	ScreenshotCaptureOptions,
+	ScreenshotCaptureResult,
 	ScreenshotSource,
+	ScreenshotSourcesResult,
 } from "../../shared/types/screenshot";
 
 /**
@@ -27,7 +28,7 @@ export function registerScreenshotHandlers(): void {
 	 * instead of attempting to get sources, as screen recording permissions
 	 * typically aren't granted to unsigned development builds on macOS.
 	 */
-	ipcMain.handle(IPC_CHANNELS.SCREENSHOT_GET_SOURCES, async () => {
+	ipcMain.handle(IPC_CHANNELS.SCREENSHOT_GET_SOURCES, async (): Promise<ScreenshotSourcesResult> => {
 		// Check if running in development mode
 		// Dev builds don't have screen recording permissions on macOS
 		if (!app.isPackaged) {
@@ -57,14 +58,9 @@ export function registerScreenshotHandlers(): void {
 				),
 			};
 		} catch (error) {
+			// The OS's reason stays in the log; the renderer gets a code it translates.
 			console.error("Failed to get screenshot sources:", error);
-			return {
-				success: false,
-				error:
-					error instanceof Error
-						? error.message
-						: "Failed to get screenshot sources",
-			};
+			return { success: false, error: "sources_failed" };
 		}
 	});
 
@@ -74,13 +70,14 @@ export function registerScreenshotHandlers(): void {
 	 */
 	ipcMain.handle(
 		IPC_CHANNELS.SCREENSHOT_CAPTURE,
-		async (_event, options: ScreenshotCaptureOptions) => {
-			// Validate sourceId parameter
-			if (!options?.sourceId || typeof options.sourceId !== "string") {
-				return {
-					success: false,
-					error: "Invalid sourceId parameter",
-				};
+		async (_event, options: unknown): Promise<ScreenshotCaptureResult> => {
+			// The renderer is not trusted: the source id is checked here
+			const sourceId =
+				typeof options === "object" && options !== null
+					? (options as { sourceId?: unknown }).sourceId
+					: undefined;
+			if (typeof sourceId !== "string" || sourceId === "") {
+				return { success: false, error: "invalid_source" };
 			}
 
 			try {
@@ -93,12 +90,9 @@ export function registerScreenshotHandlers(): void {
 					},
 				});
 
-				const selectedSource = sources.find((s) => s.id === options.sourceId);
+				const selectedSource = sources.find((s) => s.id === sourceId);
 				if (!selectedSource) {
-					return {
-						success: false,
-						error: "Source not found",
-					};
+					return { success: false, error: "source_not_found" };
 				}
 
 				// Return the thumbnail which is our high-res capture
@@ -110,13 +104,7 @@ export function registerScreenshotHandlers(): void {
 				};
 			} catch (error) {
 				console.error("Failed to capture screenshot:", error);
-				return {
-					success: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to capture screenshot",
-				};
+				return { success: false, error: "capture_failed" };
 			}
 		},
 	);
