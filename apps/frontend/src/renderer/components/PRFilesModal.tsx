@@ -1,12 +1,12 @@
 import {
 	ChevronRight,
 	ExternalLink,
-	FileText,
 	GitPullRequest,
 	Loader2,
 	Minus,
 	Plus,
 } from "lucide-react";
+import type { PRData, PRFileData } from "@shared/types";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../lib/utils";
@@ -23,36 +23,42 @@ import { DiffViewer } from "./ui/diff-viewer";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
-interface PRFileData {
-	filename: string;
-	status: "added" | "removed" | "modified" | "renamed";
-	additions: number;
-	deletions: number;
-	changes: number;
-	patch?: string;
-	previous_filename?: string;
-}
+/** Why the PR could not be shown: the main process's own words, or one of ours. */
+type LoadFailure =
+	| { readonly reason: string }
+	| { readonly code: "invalidUrl" | "fetchFailed" | "noData" };
 
-interface PRData {
-	number: number;
-	title: string;
-	body: string;
-	author: string;
-	state: string;
-	source_branch: string;
-	target_branch: string;
-	additions: number;
-	deletions: number;
-	changed_files: number;
-	files: PRFileData[];
-	diff: string;
-	url: string;
-	created_at: string;
-	updated_at: string;
-	labels: string[];
-	reviewers: string[];
-	is_draft: boolean;
-	mergeable: boolean;
+type LoadOutcome = { readonly data: PRData } | { readonly failure: LoadFailure };
+
+// GitHub: https://github.com/owner/repo/pull/123
+// Azure DevOps: https://dev.azure.com/org/project/_git/repo/pullrequest/123
+const PR_NUMBER_REGEX = /\/(?:pull|pullrequest)\/(\d+)/;
+
+async function loadPR(prUrl: string, taskId?: string): Promise<LoadOutcome> {
+	const match = PR_NUMBER_REGEX.exec(prUrl);
+	if (!match) return { failure: { code: "invalidUrl" } };
+	try {
+		const result = await globalThis.electronAPI.getPRDetails(
+			Number.parseInt(match[1], 10),
+			taskId,
+		);
+		if (!result.success) {
+			return {
+				failure: result.error ? { reason: result.error } : { code: "fetchFailed" },
+			};
+		}
+		// A success without a PR used to leave the modal empty while open.
+		const data = result.data?.data;
+		return data ? { data } : { failure: { code: "noData" } };
+	} catch (err) {
+		console.error("[PRFilesModal] Failed to fetch PR data:", err);
+		return {
+			failure:
+				err instanceof Error && err.message
+					? { reason: err.message }
+					: { code: "fetchFailed" },
+		};
+	}
 }
 
 interface PRFilesModalProps {
@@ -70,117 +76,32 @@ export function PRFilesModal({
 }: PRFilesModalProps) {
 	const { t } = useTranslation(["taskReview", "common"]);
 	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const [error, setError] = useState<LoadFailure | null>(null);
 	const [prData, setPrData] = useState<PRData | null>(null);
 	const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
-	const fetchPRDetails = async () => {
-		if (!prUrl) return;
-
-		setLoading(true);
-		setError(null);
-
-		try {
-			// Extract PR number from URL (GitHub format: https://github.com/owner/repo/pull/123)
-			// or Azure DevOps format: https://dev.azure.com/org/project/_git/repo/pullrequest/123
-			const githubRegex = /\/pull\/(\d+)/;
-			const prMatch = githubRegex.exec(prUrl);
-			let prNumber: number;
-
-			if (prMatch) {
-				prNumber = Number.parseInt(prMatch[1], 10);
-			} else {
-				// Try Azure DevOps format
-				const adoRegex = /\/pullrequest\/(\d+)/;
-				const adoMatch = adoRegex.exec(prUrl);
-				if (!adoMatch) {
-					throw new Error(
-						"Invalid PR URL format - expected GitHub or Azure DevOps URL",
-					);
-				}
-				prNumber = Number.parseInt(adoMatch[1], 10);
-			}
-
-			// Call IPC to get PR details with files
-			const result = await globalThis.electronAPI?.getPRDetails?.(
-				prNumber,
-				taskId,
-			);
-
-			if (!result?.success) {
-				throw new Error(result?.error || "Failed to fetch PR details");
-			}
-
-			setPrData(result.data?.data ?? null);
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error occurred";
-			setError(errorMessage);
-			console.error("[PRFilesModal] Failed to fetch PR data:", err);
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	// Reset state when modal opens/closes
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
+	// Load when the modal opens; reset when it closes. The answer for a PR the
+	// user has left (modal closed, another PR opened) is dropped.
 	useEffect(() => {
-		if (open && prUrl) {
-			fetchPRDetails();
-		} else {
-			setPrData(null);
-			setError(null);
-			setExpandedFiles(new Set());
+		setPrData(null);
+		setError(null);
+		setExpandedFiles(new Set());
+		if (!open || !prUrl) {
+			setLoading(false);
+			return;
 		}
-	}, [open, prUrl]);
-
-	const getFilePatch = (file: PRFileData): string => {
-		// If file has its own patch, use it
-		if (file.patch) {
-			return file.patch;
-		}
-
-		// Otherwise, try to extract from the global diff
-		if (prData?.diff && file.filename) {
-			try {
-				// Simple extraction: look for the file in the global diff
-				const lines = prData.diff.split("\n");
-				let inFileSection = false;
-				let fileLines: string[] = [];
-
-				for (const line of lines) {
-					// Check if we're starting this file's section
-					if (
-						line.startsWith(
-							`diff --git a/${file.filename} b/${file.filename}`,
-						) ||
-						line.includes(` b/${file.filename}`)
-					) {
-						inFileSection = true;
-						fileLines = [line];
-						continue;
-					}
-
-					// If we're in a file section and hit the next file, stop
-					if (inFileSection && line.startsWith("diff --git")) {
-						break;
-					}
-
-					// Add lines if we're in this file's section
-					if (inFileSection) {
-						fileLines.push(line);
-					}
-				}
-
-				return fileLines.length > 0 ? fileLines.join("\n") : "";
-			} catch (err) {
-				console.warn(`Failed to extract patch for ${file.filename}:`, err);
-				return "";
-			}
-		}
-
-		return "";
-	};
+		let stale = false;
+		setLoading(true);
+		loadPR(prUrl, taskId).then((outcome) => {
+			if (stale) return;
+			if ("data" in outcome) setPrData(outcome.data);
+			else setError(outcome.failure);
+			setLoading(false);
+		});
+		return () => {
+			stale = true;
+		};
+	}, [open, prUrl, taskId]);
 
 	const toggleFileExpansion = (filename: string) => {
 		setExpandedFiles((prev) => {
@@ -194,7 +115,7 @@ export function PRFilesModal({
 		});
 	};
 
-	const getFileStatusIcon = (status: string) => {
+	const getFileStatusIcon = (status: PRFileData["status"]) => {
 		switch (status) {
 			case "added":
 				return <Plus className="h-4 w-4 text-success" />;
@@ -204,32 +125,11 @@ export function PRFilesModal({
 				return <ChevronRight className="h-4 w-4 text-warning" />;
 			case "renamed":
 				return <ChevronRight className="h-4 w-4 text-blue-500" />;
-			default:
-				return <FileText className="h-4 w-4 text-gray-500" />;
-		}
-	};
-
-	const _getFileStatusVariant = (
-		status: string,
-	): "default" | "secondary" | "destructive" | "outline" => {
-		switch (status) {
-			case "added":
-				return "default";
-			case "removed":
-				return "destructive";
-			case "modified":
-				return "outline";
-			case "renamed":
-				return "secondary";
-			default:
-				return "secondary";
 		}
 	};
 
 	const openPRInBrowser = () => {
-		if (prUrl && globalThis.electronAPI?.openExternal) {
-			globalThis.electronAPI.openExternal(prUrl);
-		}
+		globalThis.electronAPI.openExternal(prUrl);
 	};
 
 	if (loading) {
@@ -268,7 +168,9 @@ export function PRFilesModal({
 					</DialogHeader>
 					<div className="py-4 flex-1 overflow-auto">
 						<p className="text-sm text-destructive whitespace-pre-wrap">
-							{error}
+							{"reason" in error
+								? error.reason
+								: t(`taskReview:prFiles.errors.${error.code}`)}
 						</p>
 					</div>
 					<div className="flex justify-end gap-2">
@@ -306,7 +208,7 @@ export function PRFilesModal({
 							onClick={openPRInBrowser}
 						>
 							<ExternalLink className="h-3 w-3 mr-1" />
-							{t("taskReview:pr.files.openInGitHub")}
+							{t("taskReview:pr.files.openInBrowser")}
 						</Button>
 					</DialogDescription>
 				</DialogHeader>
@@ -393,7 +295,9 @@ export function PRFilesModal({
 												prData.state === "open" ? "default" : "secondary"
 											}
 										>
-											{prData.state}
+											{prData.state === "open"
+												? t("taskReview:prFiles.states.open")
+												: t("taskReview:prFiles.states.closed")}
 										</Badge>
 									</div>
 								</div>
@@ -422,16 +326,13 @@ export function PRFilesModal({
 										key={file.filename}
 										className="border rounded-lg overflow-hidden"
 									>
-										{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: collapsible file row */}
-										{/* biome-ignore lint/a11y/noStaticElementInteractions: collapsible file row */}
-										{/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard expand handled elsewhere */}
-										<div
-											className={cn(
-												"flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors",
-											)}
+										<button
+											type="button"
+											aria-expanded={expandedFiles.has(file.filename)}
+											className="flex w-full items-center justify-between p-3 text-left cursor-pointer hover:bg-muted/50 transition-colors"
 											onClick={() => toggleFileExpansion(file.filename)}
 										>
-											<div className="flex items-center gap-2">
+											<span className="flex items-center gap-2">
 												{getFileStatusIcon(file.status)}
 												<span className="font-mono text-sm">
 													{file.filename}
@@ -439,8 +340,8 @@ export function PRFilesModal({
 												{file.previous_filename && (
 													<span className="text-xs text-muted-foreground">
 														{t("taskReview:prFiles.renamedFrom", {
-													name: file.previous_filename,
-												})}
+															name: file.previous_filename,
+														})}
 													</span>
 												)}
 												<ChevronRight
@@ -449,19 +350,19 @@ export function PRFilesModal({
 														expandedFiles.has(file.filename) && "rotate-90",
 													)}
 												/>
-											</div>
-											<div className="flex items-center gap-2 text-sm text-muted-foreground">
+											</span>
+											<span className="flex items-center gap-2 text-sm text-muted-foreground">
 												<span className="text-success">
 													+{file.additions}
 												</span>
 												<span className="text-destructive">-{file.deletions}</span>
-											</div>
-										</div>
+											</span>
+										</button>
 										{expandedFiles.has(file.filename) && (
 											<div className="border-t">
 												<div className="p-3">
 													<DiffViewer
-														patch={getFilePatch(file)}
+														patch={file.patch}
 														filePath={file.filename}
 														className="max-h-[400px] overflow-auto border rounded"
 													/>

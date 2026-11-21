@@ -240,7 +240,9 @@
 			"checkTerminal": "Vérifiez la section Terminaux d'agent dans la barre latérale pour compléter la connexion OAuth.",
 			"authStartFailed": "Échec du démarrage de l'authentification",
 			"addProfileFailed": "Échec de l'ajout du profil",
-			"tryAgain": "Veuillez réessayer."
+			"tryAgain": "Veuillez réessayer.",
+			"autoSwitchFailed": "Échec de l'enregistrement du basculement automatique",
+			"switchFailed": "Échec du changement de compte"
 		},
 		"sdk": {
 			"title": "Limite de taux IA",
@@ -532,7 +534,10 @@
 		"cancel": "Annuler ce téléchargement",
 		"retry": "Réessayer",
 		"cancelledLabel": "Annulé",
-		"hint": "Les téléchargements continuent en arrière-plan, même si vous fermez cette tâche."
+		"hint": "Les téléchargements continuent en arrière-plan, même si vous fermez cette tâche.",
+		"hoursRemaining": "encore {{count}} h",
+		"minutesRemaining": "encore {{count}} min",
+		"secondsRemaining": "encore {{count}} s"
 	},
 	"ideation": {
 		"converting": "Conversion...",
@@ -917,7 +922,14 @@
 		"stopping": "Arrêt...",
 		"progress": "Progrès",
 		"lastActivityPrefix": "dernière activité",
-		"lastProgressUpdateTooltip": "Dernière mise à jour de progression reçue"
+		"lastProgressUpdateTooltip": "Dernière mise à jour de progression reçue",
+		"timeAgo": {
+			"justNow": "à l'instant",
+			"seconds": "il y a {{count}} s",
+			"minutes": "il y a {{count}} min",
+			"hours": "il y a {{count}} h",
+			"days": "il y a {{count}} j"
+		}
 	},
 	"time": {
 		"justNow": "à l'instant",
@@ -1302,6 +1314,9 @@
 		"title": "Historique des conversations",
 		"byTeammate": "Par {{name}}, en lecture seule",
 		"noConversations": "Aucune conversation pour le moment",
+		"titleInputLabel": "Titre de la conversation",
+		"renameFailed": "La conversation n'a pas pu être renommée.",
+		"deleteFailed": "La conversation n'a pas pu être supprimée.",
 		"today": "Aujourd'hui",
 		"yesterday": "Hier",
 		"daysAgo": "Il y a {{count}} jours",
@@ -1438,6 +1453,7 @@
 		"description": "Connectez-vous à un serveur partagé, ou continuez en mode local.",
 		"serverUrl": "URL du serveur",
 		"entraButton": "Se connecter avec Microsoft",
+		"ssoButton": "Se connecter avec {{name}}",
 		"email": "Email",
 		"password": "Mot de passe",
 		"localAccountButton": "Connexion",
@@ -1470,13 +1486,36 @@
 		"parent": "⬆ Dossier parent",
 		"noFolders": "Aucun dossier trouvé.",
 		"checkPath": "Vérifiez le chemin ou vos droits d'accès.",
-		"dragReferences": "Glissez des fichiers pour les ajouter en référence"
+		"dragReferences": "Glissez des fichiers pour les ajouter en référence",
+		"loadFailed": "Impossible d'ouvrir ce dossier."
 	},
 	"shortcutsOverlay": {
 		"title": "Raccourcis clavier",
 		"pressBefore": "Appuyez sur",
 		"escapeKey": "Échap",
-		"pressAfter": "pour fermer · Les raccourcis à une touche marchent hors d'un champ de saisie"
+		"pressAfter": "pour fermer · Les raccourcis du menu (deux lettres, tapées l'une après l'autre) marchent quand un projet est ouvert, hors d'un champ de saisie",
+		"groups": {
+			"navigation": "Navigation",
+			"general": "Général",
+			"terminal": "Terminaux",
+			"menu": "Menu"
+		},
+		"items": {
+			"goKanban": "Aller au Kanban",
+			"goTerminals": "Aller aux terminaux",
+			"goInsights": "Aller à Insights",
+			"goRoadmap": "Aller à la roadmap",
+			"openSettings": "Ouvrir les paramètres",
+			"commandPalette": "Palette de commandes",
+			"shortcuts": "Raccourcis clavier",
+			"newTask": "Nouvelle tâche",
+			"addProject": "Ajouter un projet (hors terminaux)",
+			"voiceAssistant": "Assistant vocal",
+			"stopAgents": "Arrêter tous les agents",
+			"closeDialog": "Fermer une boîte de dialogue ou un panneau",
+			"newTerminal": "Nouveau terminal (dans Terminaux)",
+			"closeTerminal": "Fermer le terminal (dans Terminaux)"
+		}
 	},
 	"learningMode": {
 		"level": "Niveau : {{level}}",

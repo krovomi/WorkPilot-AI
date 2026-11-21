@@ -1,9 +1,5 @@
 import { ExternalLink, Play, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import {
-	DOCUMENTATION_CATEGORY_LABELS,
-	UIUX_CATEGORY_LABELS,
-} from "../../../shared/constants";
 import type { Idea } from "../../../shared/types";
 import { cn } from "../../lib/utils";
 import { CharterButton, Chip, toneClass } from "../charter";
@@ -13,6 +9,7 @@ import {
 	IDEA_STATUS_TONES,
 	IDEATION_TYPE_TONES,
 } from "./constants";
+import { useIdeaLabels } from "./hooks/useIdeaLabels";
 import { TypeIcon } from "./TypeIcon";
 import {
 	isCodeImprovementIdea,
@@ -26,6 +23,7 @@ import {
 /** The chips of an idea: its type, status, then the level its type carries. */
 export function IdeaChips({ idea }: { readonly idea: Idea }) {
 	const { t } = useTranslation("ideation");
+	const labels = useIdeaLabels();
 	return (
 		<div className="wp-chips">
 			<Chip tone={IDEATION_TYPE_TONES[idea.type]} dot={false}>
@@ -33,33 +31,39 @@ export function IdeaChips({ idea }: { readonly idea: Idea }) {
 				{t(`types.${idea.type}`)}
 			</Chip>
 			{idea.status !== "draft" && (
-				<Chip tone={IDEA_STATUS_TONES[idea.status]}>{idea.status}</Chip>
+				<Chip tone={IDEA_STATUS_TONES[idea.status]}>
+					{labels.status(idea.status)}
+				</Chip>
 			)}
 			{isCodeImprovementIdea(idea) && (
 				<Chip tone={IDEA_LEVEL_TONES[idea.estimatedEffort]}>
-					{idea.estimatedEffort}
+					{labels.level(idea.estimatedEffort)}
 				</Chip>
 			)}
 			{isUIUXIdea(idea) && (
 				<Chip tone="muted" dot={false}>
-					{UIUX_CATEGORY_LABELS[idea.category]}
+					{labels.category(idea.type, idea.category)}
 				</Chip>
 			)}
 			{isDocumentationGapIdea(idea) && (
 				<Chip tone="muted" dot={false}>
-					{DOCUMENTATION_CATEGORY_LABELS[idea.category]}
+					{labels.category(idea.type, idea.category)}
 				</Chip>
 			)}
 			{isSecurityHardeningIdea(idea) && (
-				<Chip tone={IDEA_LEVEL_TONES[idea.severity]}>{idea.severity}</Chip>
+				<Chip tone={IDEA_LEVEL_TONES[idea.severity]}>
+					{labels.level(idea.severity)}
+				</Chip>
 			)}
 			{isPerformanceOptimizationIdea(idea) && (
 				<Chip tone={IDEA_LEVEL_TONES[idea.impact]}>
-					{t("details.impactLevel", { level: idea.impact })}
+					{t("details.impactLevel", { level: labels.level(idea.impact) })}
 				</Chip>
 			)}
 			{isCodeQualityIdea(idea) && (
-				<Chip tone={IDEA_LEVEL_TONES[idea.severity]}>{idea.severity}</Chip>
+				<Chip tone={IDEA_LEVEL_TONES[idea.severity]}>
+					{labels.level(idea.severity)}
+				</Chip>
 			)}
 		</div>
 	);

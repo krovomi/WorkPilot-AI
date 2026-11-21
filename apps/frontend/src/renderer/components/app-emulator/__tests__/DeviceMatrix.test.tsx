@@ -4,23 +4,37 @@
 /**
  * The device matrix (#383): pick devices, capture them through the main,
  * see them side by side with what the reading found, and keep one for the
- * visual review. The preview keeps its `<webview>` mounted behind it.
+ * visual review. Throttling is picked from closed lists; the grid exports
+ * through the main. The preview keeps its `<webview>` mounted behind it.
  */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import "../../../../shared/i18n";
-import type { ResponsiveReport } from "../../../../shared/types/device-matrix";
+import i18n from "../../../../shared/i18n";
+import type { DeviceCapture, ResponsiveReport } from "../../../../shared/types/device-matrix";
 import { useDeviceMatrixStore } from "../../../stores/device-matrix-store";
 import { DeviceMatrix, matrixPath } from "../DeviceMatrix";
 import { ResponsivePreview } from "../ResponsivePreview";
 
 const captureEmulatorDevice = vi.fn();
-Object.defineProperty(window, "electronAPI", { value: { captureEmulatorDevice }, writable: true });
+const exportEmulatorDeviceGrid = vi.fn();
+Object.defineProperty(window, "electronAPI", {
+	value: { captureEmulatorDevice, exportEmulatorDeviceGrid },
+	writable: true,
+});
 
-const done = (deviceId: string, report: ResponsiveReport | null) => ({
+const done = (deviceId: string, report: ResponsiveReport | null, conditions: Partial<DeviceCapture> = {}) => ({
 	status: "done" as const,
-	capture: { deviceId, url: `http://localhost:5173/cart#${deviceId}`, image: "data:image/png;base64,AA==", report },
+	capture: {
+		deviceId,
+		url: `http://localhost:5173/cart#${deviceId}`,
+		image: "data:image/png;base64,AA==",
+		report,
+		network: "none" as const,
+		cpu: "1x" as const,
+		loadMs: 1234,
+		...conditions,
+	},
 });
 
 const report = (overrides: Partial<ResponsiveReport>): ResponsiveReport => ({
@@ -33,7 +47,16 @@ const report = (overrides: Partial<ResponsiveReport>): ResponsiveReport => ({
 });
 
 function reset(entries = {}) {
-	useDeviceMatrixStore.setState({ selected: ["iphone-15"], entries, running: false, stopRequested: false });
+	useDeviceMatrixStore.setState({
+		selected: ["iphone-15"],
+		entries,
+		running: false,
+		stopRequested: false,
+		network: "none",
+		cpu: "1x",
+		exporting: false,
+		exportStatus: null,
+	});
 }
 
 describe("matrixPath", () => {
@@ -66,8 +89,73 @@ describe("DeviceMatrix", () => {
 		await waitFor(() =>
 			expect(screen.getAllByText("The emulator's server is not running: start it, then capture again.")).toHaveLength(2),
 		);
-		expect(captureEmulatorDevice).toHaveBeenCalledWith({ deviceId: "iphone-15", path: "/cart" });
-		expect(captureEmulatorDevice).toHaveBeenCalledWith({ deviceId: "pixel-8", path: "/cart" });
+		const plain = { network: "none", cpu: "1x" };
+		expect(captureEmulatorDevice).toHaveBeenCalledWith({ deviceId: "iphone-15", path: "/cart", ...plain });
+		expect(captureEmulatorDevice).toHaveBeenCalledWith({ deviceId: "pixel-8", path: "/cart", ...plain });
+	});
+
+	it("captures under the network and CPU profiles picked from their lists", async () => {
+		captureEmulatorDevice.mockResolvedValue({ success: false, error: "throttling-failed" });
+		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
+		const network = screen.getByLabelText("Network");
+		expect([...network.querySelectorAll("option")].map((option) => option.textContent)).toEqual([
+			"No throttling",
+			"4G",
+			"Fast 3G",
+			"Slow 3G",
+		]);
+		fireEvent.change(network, { target: { value: "slow-3g" } });
+		fireEvent.change(screen.getByLabelText("CPU"), { target: { value: "6x" } });
+		fireEvent.click(screen.getByRole("button", { name: "Capture 1 device" }));
+		await waitFor(() =>
+			expect(screen.getByText("The network or CPU throttling could not be applied on this device.")).toBeInTheDocument(),
+		);
+		expect(captureEmulatorDevice).toHaveBeenCalledWith({ deviceId: "iphone-15", path: "/", network: "slow-3g", cpu: "6x" });
+	});
+
+	it("shows under which conditions each device rendered, in the app's language", async () => {
+		reset({
+			"iphone-15": done("iphone-15", report({}), { network: "slow-3g", cpu: "4x", loadMs: 4250 }),
+			"pixel-8": done("pixel-8", report({})),
+			// An unknown CPU id from an older main: shown as unthrottled.
+			"ipad-mini": done("ipad-mini", report({}), { cpu: "9x" as never }),
+		});
+		const { unmount } = render(
+			<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />,
+		);
+		const tiles = document.querySelectorAll("figure[data-device]");
+		expect(within(tiles[0] as HTMLElement).getByText("Slow 3G · CPU 4× slower · Loaded in 4.3 s")).toBeInTheDocument();
+		expect(within(tiles[1] as HTMLElement).getByText("Loaded in 1.2 s")).toBeInTheDocument();
+		expect(within(tiles[2] as HTMLElement).getByText("Loaded in 1.2 s")).toBeInTheDocument();
+		unmount();
+		await i18n.changeLanguage("fr");
+		try {
+			render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
+			expect(screen.getByText("3G lente · Processeur 4× plus lent · Chargée en 4,3 s")).toBeInTheDocument();
+		} finally {
+			await i18n.changeLanguage("en");
+		}
+	});
+
+	it("exports the grid through the main and says how it went", async () => {
+		reset({ "iphone-15": done("iphone-15", report({})), "pixel-8": { status: "failed", error: "load-failed" } });
+		let finish: (value: unknown) => void = () => undefined;
+		exportEmulatorDeviceGrid.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
+		fireEvent.click(screen.getByRole("button", { name: "Export" }));
+		expect(await screen.findByRole("button", { name: "Exporting…" })).toBeDisabled();
+		expect(exportEmulatorDeviceGrid).toHaveBeenCalledWith({ deviceIds: ["iphone-15"] });
+		finish({ success: true, data: { saved: true, fileName: "grid.png" } });
+		expect(await screen.findByRole("status")).toHaveTextContent("Grid saved as grid.png.");
+		exportEmulatorDeviceGrid.mockResolvedValueOnce({ success: false, error: "nothing-to-export" });
+		fireEvent.click(screen.getByRole("button", { name: "Export" }));
+		expect(await screen.findByText("No capture to export: capture devices first.")).toHaveAttribute("role", "alert");
+	});
+
+	it("offers no export before a device has rendered", () => {
+		reset({ "iphone-15": { status: "failed", error: "load-failed" } });
+		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
+		expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
 	});
 
 	it("selects all, none, and says when the shown page is elsewhere", () => {
@@ -109,6 +197,12 @@ describe("DeviceMatrix", () => {
 							],
 						},
 						{ kind: "horizontal-overflow", count: 1, samples: [] },
+						{
+							kind: "overlapping-elements",
+							count: 2,
+							samples: [{ selector: "h1.title / button.cta", x: 0, y: 0, width: 40, height: 20 }],
+						},
+						{ kind: "truncated-text", count: 1, samples: [] },
 					],
 				}),
 			),
@@ -124,6 +218,9 @@ describe("DeviceMatrix", () => {
 		expect(iphone.getByText("5 touch targets smaller than 44 × 44 px")).toBeInTheDocument();
 		expect(iphone.getByText("1 element goes past the edge of the screen")).toBeInTheDocument();
 		expect(iphone.getByText("button.icon")).toBeInTheDocument();
+		expect(iphone.getByText("2 pairs of elements overlap")).toBeInTheDocument();
+		expect(iphone.getByText("h1.title / button.cta")).toBeInTheDocument();
+		expect(iphone.getByText("1 text is cut off or spills out of its box")).toBeInTheDocument();
 		expect(iphone.getByText("Partial reading: the first 4000 elements only.")).toBeInTheDocument();
 		expect(within(tiles[1] as HTMLElement).getByText("No responsive bug detected.")).toBeInTheDocument();
 		expect(within(tiles[2] as HTMLElement).getByText("The page could not be read for responsive bugs.")).toBeInTheDocument();

@@ -12,6 +12,12 @@
  * Les seuils viennent des recommandations qu'on cite d'habitude : 44 × 44 px
  * pour une cible tactile (Apple HIG, WCAG 2.5.5), 12 px pour un texte lisible
  * sur mobile (Lighthouse « legible font sizes »).
+ *
+ * Deux lectures s'ajoutent sur tous les appareils : le texte coupé ou qui
+ * déborde de sa boîte (points de suspension, `overflow: hidden`, hauteur fixe
+ * trop petite : `scrollWidth > clientWidth` ou `scrollHeight > clientHeight`
+ * sans défilement possible), et les éléments qui se chevauchent (deux
+ * contenus du flux normal dont les boîtes se recouvrent nettement).
  */
 import type { DevicePreset, ResponsiveIssue, ResponsiveIssueKind, ResponsiveIssueSample, ResponsiveReport } from "../../shared/types/device-matrix";
 
@@ -19,6 +25,10 @@ export const MIN_TOUCH_TARGET_PX = 44;
 export const MIN_TEXT_PX = 12;
 export const MAX_SAMPLES = 10;
 export const MAX_ELEMENTS = 4000;
+/** Éléments comparés deux à deux pour les chevauchements : 500 font 125 000 paires. */
+export const MAX_OVERLAP_CANDIDATES = 500;
+/** Part de la plus petite des deux boîtes recouverte pour parler de chevauchement. */
+export const MIN_OVERLAP_RATIO = 0.25;
 const MAX_SELECTOR = 120;
 const MAX_COORDINATE = 100_000;
 
@@ -27,6 +37,8 @@ export const ISSUE_KINDS: readonly ResponsiveIssueKind[] = [
 	"overflowing-media",
 	"small-touch-target",
 	"small-text",
+	"overlapping-elements",
+	"truncated-text",
 ];
 
 /**
@@ -37,11 +49,18 @@ export const ISSUE_KINDS: readonly ResponsiveIssueKind[] = [
  * descendants ne sont plus examinés, ni ceux d'un conteneur qui coupe ou fait
  * défiler son contenu (un carrousel est un défilement voulu). Un lien en
  * ligne échappe à la règle des 44 px, comme le prévoit WCAG.
+ *
+ * Un chevauchement ne compte que deux éléments qui portent un contenu
+ * (texte, média, cible interactive), hors de toute position `fixed`,
+ * `sticky` ou `absolute` (un en-tête collant, un badge sur une icône sont
+ * voulus), dont aucun ne contient l'autre, et qui se recouvrent sur plus de
+ * 2 px dans chaque sens et sur au moins `minOverlap` de la plus petite boîte.
+ * L'exemple est leur intersection, nommée `a / b`.
  */
 export const RESPONSIVE_PROBE = `(function (o) {
 	var root = document.documentElement;
 	var vw = window.innerWidth || root.clientWidth;
-	var kinds = ["horizontal-overflow", "overflowing-media", "small-touch-target", "small-text"];
+	var kinds = ["horizontal-overflow", "overflowing-media", "small-touch-target", "small-text", "overlapping-elements", "truncated-text"];
 	var counts = {};
 	var samples = {};
 	kinds.forEach(function (k) { counts[k] = 0; samples[k] = []; });
@@ -49,18 +68,29 @@ export const RESPONSIVE_PROBE = `(function (o) {
 		var cls = typeof el.className === "string" ? el.className.trim().split(/\\s+/).filter(Boolean).slice(0, 2).join(".") : "";
 		return el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (cls ? "." + cls : "");
 	};
-	var add = function (kind, el, r) {
+	var push = function (kind, selector, x, y, width, height) {
 		counts[kind] += 1;
 		if (samples[kind].length < o.maxSamples) {
-			samples[kind].push({ selector: describe(el), x: r.left, y: r.top + window.scrollY, width: r.width, height: r.height });
+			samples[kind].push({ selector: selector, x: x, y: y + window.scrollY, width: width, height: height });
 		}
 	};
+	var add = function (kind, el, r) { push(kind, describe(el), r.left, r.top, r.width, r.height); };
+	var hasText = function (el) {
+		for (var c = el.firstChild; c; c = c.nextSibling) {
+			if (c.nodeType === 3 && c.textContent.trim()) return true;
+		}
+		return false;
+	};
+	var scrolls = /^(auto|scroll)$/;
+	var placed = /^(fixed|sticky|absolute)$/;
 	var media = /^(IMG|VIDEO|CANVAS|SVG|IFRAME|PICTURE|OBJECT|EMBED)$/;
 	var interactive = /^(A|BUTTON|INPUT|SELECT|TEXTAREA|SUMMARY)$/;
 	var roles = /^(button|link|checkbox|radio|switch|tab|menuitem|option)$/;
 	var all = document.body ? document.body.getElementsByTagName("*") : [];
 	var limit = Math.min(all.length, o.maxElements);
 	var settled = new Set();
+	var floating = new Set();
+	var candidates = [];
 	for (var i = 0; i < limit; i += 1) {
 		var el = all[i];
 		if (el.parentElement && settled.has(el.parentElement)) { settled.add(el); continue; }
@@ -74,15 +104,36 @@ export const RESPONSIVE_PROBE = `(function (o) {
 			continue;
 		}
 		if (cs.overflowX !== "visible") settled.add(el);
+		var text = hasText(el);
+		var role = el.getAttribute("role") || "";
+		var target = (interactive.test(tag) && !(tag === "A" && !el.hasAttribute("href"))) || roles.test(role);
 		if (o.touch && cs.display !== "inline") {
-			var role = el.getAttribute("role") || "";
-			var target = (interactive.test(tag) && !(tag === "A" && !el.hasAttribute("href"))) || roles.test(role);
 			if (target && (r.width < o.minTouch || r.height < o.minTouch)) add("small-touch-target", el, r);
 		}
-		if (o.text && parseFloat(cs.fontSize) < o.minText) {
-			for (var c = el.firstChild; c; c = c.nextSibling) {
-				if (c.nodeType === 3 && c.textContent.trim()) { add("small-text", el, r); break; }
-			}
+		if (o.text && text && parseFloat(cs.fontSize) < o.minText) add("small-text", el, r);
+		if (text && cs.display !== "inline") {
+			var cutX = !scrolls.test(cs.overflowX) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1;
+			var cutY = !scrolls.test(cs.overflowY) && el.clientHeight > 0 && el.scrollHeight > el.clientHeight + 1;
+			if (cutX || cutY) add("truncated-text", el, r);
+		}
+		if (placed.test(cs.position) || (el.parentElement && floating.has(el.parentElement))) floating.add(el);
+		else if ((text || target || media.test(tag)) && cs.opacity !== "0" && candidates.length < o.maxCandidates) {
+			candidates.push({ el: el, r: r });
+		}
+	}
+	for (var a = 0; a < candidates.length; a += 1) {
+		for (var b = a + 1; b < candidates.length; b += 1) {
+			var p = candidates[a];
+			var q = candidates[b];
+			if (p.el.contains(q.el) || q.el.contains(p.el)) continue;
+			var left = Math.max(p.r.left, q.r.left);
+			var top = Math.max(p.r.top, q.r.top);
+			var w = Math.min(p.r.right, q.r.right) - left;
+			var h = Math.min(p.r.bottom, q.r.bottom) - top;
+			if (w <= 2 || h <= 2) continue;
+			var smaller = Math.min(p.r.width * p.r.height, q.r.width * q.r.height);
+			if (w * h < smaller * o.minOverlap) continue;
+			push("overlapping-elements", describe(p.el) + " / " + describe(q.el), left, top, w, h);
 		}
 	}
 	return {
@@ -103,6 +154,8 @@ export function buildProbe(device: Pick<DevicePreset, "mobile" | "touch">): stri
 		minText: MIN_TEXT_PX,
 		maxSamples: MAX_SAMPLES,
 		maxElements: MAX_ELEMENTS,
+		maxCandidates: MAX_OVERLAP_CANDIDATES,
+		minOverlap: MIN_OVERLAP_RATIO,
 	};
 	return `${RESPONSIVE_PROBE}(${JSON.stringify(options)})`;
 }

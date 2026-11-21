@@ -78,7 +78,7 @@ export const IDEATION_IMPACT_COLORS: Record<string, string> = {
 };
 
 // ============================================
-// Category-Specific Labels
+// Severity Colors
 // ============================================
 
 // Security severity colors
@@ -87,63 +87,6 @@ export const SECURITY_SEVERITY_COLORS: Record<string, string> = {
 	medium: "bg-warning/10 text-warning",
 	high: "bg-orange-500/10 text-orange-500",
 	critical: "bg-destructive/10 text-destructive",
-};
-
-// UI/UX category labels
-export const UIUX_CATEGORY_LABELS: Record<string, string> = {
-	usability: "Usability",
-	accessibility: "Accessibility",
-	performance: "Performance",
-	visual: "Visual Design",
-	interaction: "Interaction",
-};
-
-// Documentation category labels
-export const DOCUMENTATION_CATEGORY_LABELS: Record<string, string> = {
-	readme: "README",
-	api_docs: "API Documentation",
-	inline_comments: "Inline Comments",
-	examples: "Examples & Tutorials",
-	architecture: "Architecture Docs",
-	troubleshooting: "Troubleshooting Guide",
-};
-
-// Security category labels
-export const SECURITY_CATEGORY_LABELS: Record<string, string> = {
-	authentication: "Authentication",
-	authorization: "Authorization",
-	input_validation: "Input Validation",
-	data_protection: "Data Protection",
-	dependencies: "Dependencies",
-	configuration: "Configuration",
-	secrets_management: "Secrets Management",
-};
-
-// Performance category labels
-export const PERFORMANCE_CATEGORY_LABELS: Record<string, string> = {
-	bundle_size: "Bundle Size",
-	runtime: "Runtime Performance",
-	memory: "Memory Usage",
-	database: "Database Queries",
-	network: "Network Requests",
-	rendering: "Rendering",
-	caching: "Caching",
-};
-
-// Code quality category labels
-export const CODE_QUALITY_CATEGORY_LABELS: Record<string, string> = {
-	large_files: "Large Files",
-	code_smells: "Code Smells",
-	complexity: "High Complexity",
-	duplication: "Code Duplication",
-	naming: "Naming Conventions",
-	structure: "File Structure",
-	linting: "Linting Issues",
-	testing: "Test Coverage",
-	types: "Type Safety",
-	dependencies: "Dependency Issues",
-	dead_code: "Dead Code",
-	git_hygiene: "Git Hygiene",
 };
 
 // Code quality severity colors

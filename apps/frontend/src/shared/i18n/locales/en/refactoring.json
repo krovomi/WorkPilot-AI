@@ -20,7 +20,8 @@
 	},
 	"errors": {
 		"detectionFailed": "Detection failed",
-		"proposalFailed": "Proposal generation failed"
+		"proposalFailed": "Proposal generation failed",
+		"pasteFailed": "The clipboard could not be read. Paste the code into the field instead."
 	},
 	"smells": {
 		"title": "Code Smells ({{count}})",

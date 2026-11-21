@@ -1,6 +1,18 @@
 import type { ExportDestination, RecordedStep, TestFormat } from "@shared/types/browser-recorder";
 import { TEST_FORMATS } from "@shared/types/browser-recorder";
-import { AlertTriangle, CircleDot, Eye, FileDown, GitPullRequest, KeyRound, ListX, Square, X } from "lucide-react";
+import {
+	AlertTriangle,
+	CircleDot,
+	Eye,
+	FileDown,
+	GitPullRequest,
+	Hourglass,
+	KeyRound,
+	Layers,
+	ListX,
+	Square,
+	X,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
@@ -37,6 +49,31 @@ function StepDetail({ step }: { readonly step: RecordedStep }) {
 	if (step.key) return <kbd className="wp-meta">{step.key}</kbd>;
 	const detail = step.kind === "navigate" ? "" : (step.value ?? step.text);
 	return detail ? <code className="wp-meta truncate">{detail}</code> : null;
+}
+
+/** Where the element lives and what the replay waits for, as short notes. */
+export function StepNotes({ step }: { readonly step: RecordedStep }) {
+	const { t } = useTranslation(["browserAgent"]);
+	const notes = [
+		...(step.frames?.length ? [{ icon: Layers, text: t("browserAgent:recorder.place.frame") }] : []),
+		...(step.shadow?.length ? [{ icon: Layers, text: t("browserAgent:recorder.place.shadow") }] : []),
+		...(step.waitVisible ? [{ icon: Hourglass, text: t("browserAgent:recorder.waits.visible") }] : []),
+		...(step.waitRequest
+			? [{ icon: Hourglass, text: t("browserAgent:recorder.waits.request", step.waitRequest) }]
+			: []),
+		...(step.waitUrl ? [{ icon: Hourglass, text: t("browserAgent:recorder.waits.url", { url: step.waitUrl }) }] : []),
+	];
+	if (!notes.length) return null;
+	return (
+		<span className="wp-meta inline-flex min-w-0 flex-wrap items-center gap-2" data-testid="step-notes">
+			{notes.map(({ icon: Icon, text }) => (
+				<span key={text} className="inline-flex min-w-0 items-center gap-1 truncate">
+					<Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
+					{text}
+				</span>
+			))}
+		</span>
+	);
 }
 
 /** Record what the person does in a browser window, then export it as a test (#387). */
@@ -141,6 +178,7 @@ export function RecorderTab({ projectPath }: RecorderTabProps) {
 								</Chip>
 								<code className="min-w-0 truncate font-mono text-xs">{selectorSummary(step)}</code>
 								<StepDetail step={step} />
+								<StepNotes step={step} />
 								<button
 									type="button"
 									className="wp-muted ml-auto rounded-md p-1 hover:text-foreground disabled:opacity-30"

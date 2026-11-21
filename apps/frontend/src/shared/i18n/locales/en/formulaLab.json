@@ -48,6 +48,7 @@
 	},
 	"filters": {
 		"allProviders": "All providers",
+		"provider": "Provider",
 		"perTokenOnly": "Per-token only",
 		"searchPlaceholder": "Search LLM…",
 		"count": "{{count}} formulas"
@@ -71,6 +72,18 @@
 		"failedTitle": "Could not apply formula",
 		"failedDesc": "The task configuration was not saved. Please try again."
 	},
+	"effort": {
+		"none": "None",
+		"low": "Low",
+		"medium": "Med",
+		"high": "High",
+		"ultrathink": "Ultra"
+	},
+	"ring": {
+		"aria": "{{percent}}% success"
+	},
+	"applyFormula": "Apply {{formula}}",
+	"selectFormula": "Select {{formula}}",
 	"frontier": {
 		"success": "success"
 	}

@@ -71,6 +71,8 @@ MAX_LABEL_CHARS = 120
 MAX_RULES_IN_PROMPT = 15
 MAX_PROMPT_CHARS = 2_500
 
+RESET_KIND = "reset"
+_SIGNATURE = re.compile(r"^[0-9a-f]{16}$")
 _FINDING_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 _CATEGORY = re.compile(r"^[a-z_]{1,32}$")
 _QUOTED = re.compile(r"`[^`]*`|\"[^\"]*\"|'[^']*'")
@@ -188,7 +190,8 @@ def load_feedback(project_dir: str | Path) -> list[dict[str, Any]]:
     """Every valid record, the latest per finding, oldest first.
 
     A person who clicks Reject then Accept on one finding counts once, as
-    accepted: a single finding never weighs more than one vote.
+    accepted: a single finding never weighs more than one vote. A reset line
+    forgets the votes before it on its signature.
     """
     path = feedback_file(project_dir)
     try:
@@ -199,20 +202,47 @@ def load_feedback(project_dir: str | Path) -> list[dict[str, Any]]:
         logger.warning("review feedback unreadable: %s", type(exc).__name__)
         return []
     latest: dict[tuple[int, str], dict[str, Any]] = {}
+    signatures: dict[tuple[int, str], str] = {}
     for line in text.splitlines():
         line = line.strip()
         if not line:
             continue
         try:
-            record = _valid(json.loads(line))
+            raw = json.loads(line)
         except ValueError:
             continue
+        reset = _reset_signature(raw)
+        if reset is not None:
+            # Everything said so far about this kind of remark is forgotten.
+            for key in [k for k, sig in signatures.items() if sig == reset]:
+                del latest[key]
+                del signatures[key]
+            continue
+        record = _valid(raw)
         if record is None:
             continue
         key = (record["pr"], record["finding_id"])
         latest.pop(key, None)
         latest[key] = record
+        signatures[key] = signature(record["category"], record["title"])
     return list(latest.values())
+
+
+def _reset_signature(record: Any) -> str | None:
+    """The signature a reset line forgets, or None when the line is not one.
+
+    The desktop app writes ``{"v": 1, "kind": "reset", "signature": …}`` when
+    someone resets a learned rule: the votes before it no longer count, the
+    votes after it do.
+    """
+    if not isinstance(record, dict) or record.get("v") != SCHEMA_VERSION:
+        return None
+    if record.get("kind") != RESET_KIND:
+        return None
+    value = record.get("signature")
+    if isinstance(value, str) and _SIGNATURE.match(value):
+        return value
+    return None
 
 
 @dataclass

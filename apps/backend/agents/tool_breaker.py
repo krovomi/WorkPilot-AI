@@ -18,6 +18,13 @@ At the limit the session ends and the build is paused (``reason: tool_loop``),
 in every copy of its spec directory. The card says which tool repeated itself,
 and the person resumes it, or changes the approach, when they choose. Pure apart
 from that pause; table-tested in ``tests/agents/test_tool_breaker.py``.
+
+Because every result passes here, it is also where a pause the person asked
+for mid-session takes effect: when ``pause_state.json`` says the task is
+paused (the voice assistant's spoken « stop » writes it without killing the
+process), the session ends after the result of the call in flight, so that
+call finishes and the next one never starts. The loop's own checkpoint then
+stops the build at the pause, as it would between two sessions.
 """
 
 from __future__ import annotations
@@ -30,7 +37,7 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
-from foundation.pause_state import pause_task
+from foundation.pause_state import is_paused, pause_task
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +104,8 @@ class ToolBreaker:
         self.phase = _PAUSE_PHASE.get(str(phase), "coding")
         self.limit = configured_limit() if limit is None else max(limit, 0)
         self.tripped = False
+        #: The session ends because the task was paused while it ran, not for a loop.
+        self.pause_requested = False
         self._pending: dict[str, tuple[str, Any]] = {}
         self._order: deque[tuple[str, Any]] = deque()
         self._counts: dict[str, int] = {}
@@ -122,7 +131,17 @@ class ToolBreaker:
     def result(self, content: Any, is_error: bool, call_id: str | None = None) -> bool:
         """The result of a call. True once, when this result trips the breaker."""
         entry = self._take(call_id)
-        if entry is None or self.tripped or not self.limit:
+        if self.tripped:
+            return False
+        if is_paused(self.spec_dir):
+            self.tripped = True
+            self.pause_requested = True
+            print(
+                "\n[Pause] The task was paused: the session ends after this tool call.",
+                flush=True,
+            )
+            return True
+        if entry is None or not self.limit:
             return False
         name, arguments = entry
         if _is_write(name) and not is_error:

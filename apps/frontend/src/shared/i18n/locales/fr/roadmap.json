@@ -86,6 +86,7 @@
 		}
 	},
 	"competitorAnalysis": {
+		"recently": "récemment",
 		"title": "Analyse Concurrentielle",
 		"noAnalysis": "Aucune analyse concurrentielle disponible",
 		"lastUpdated": "Dernière mise à jour: {{date}}",
@@ -196,7 +197,17 @@
 		"task": "Tâche",
 		"build": "Construire",
 		"competitorInsightTitle": "Info concurrentielle",
-		"external": "Externe"
+		"external": "Externe",
+		"complexityLevel": {
+			"low": "Complexité faible",
+			"medium": "Complexité moyenne",
+			"high": "Complexité élevée"
+		},
+		"impactLevel": {
+			"low": "Impact faible",
+			"medium": "Impact moyen",
+			"high": "Impact élevé"
+		}
 	},
 	"featureDetail": {
 		"deleteDescription": "« {{title}} » sera définitivement retirée de votre roadmap.",
@@ -254,5 +265,9 @@
 	"errors": {
 		"convertFailed": "La fonctionnalité n'a pas pu devenir une tâche : {{error}}",
 		"unknown": "erreur inconnue"
+	},
+	"providers": {
+		"canny": "Canny",
+		"github_issue": "GitHub Issues"
 	}
 }

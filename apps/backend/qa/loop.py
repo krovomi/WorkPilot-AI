@@ -15,6 +15,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from agents.policy_watch import policy_pause_before_session
 from core.client import create_agent_client
 from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
@@ -481,7 +482,9 @@ async def run_qa_validation_loop(
         ):
             return _stop_on_goal(scope, state, over)
         # The cost budget pauses the build before a pass, as in the coder loop.
-        if check_before_session(spec_dir, "qa_review") is not None:
+        if check_before_session(spec_dir, "qa_review") is not None or (
+            policy_pause_before_session(spec_dir, "qa_review")
+        ):
             raise BuildPaused("qa_review")
 
         state.qa_iteration += 1

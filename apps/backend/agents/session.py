@@ -1121,7 +1121,7 @@ async def run_agent_session(
         provider="claude",
         model=getattr(getattr(client, "options", None), "model", "") or "",
     )
-    breaker = SessionGuards(spec_dir, phase.value)
+    breaker = SessionGuards(spec_dir, phase.value, client)
 
     try:
         # Send the query
@@ -1742,7 +1742,7 @@ async def _run_agent_client_session(
     message_count = 0
     tool_count = 0
     recording = recording or SessionRecording(None, phase, provider="", model="")
-    breaker = SessionGuards(spec_dir, phase.value)
+    breaker = SessionGuards(spec_dir, phase.value, client)
 
     # Conversation log context: provider, model and subtask_id are persisted on
     # every message so a different provider can replay the transcript later.

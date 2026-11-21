@@ -240,7 +240,9 @@
 			"checkTerminal": "Check the Agent Terminals section in the sidebar to complete OAuth login.",
 			"authStartFailed": "Failed to start authentication",
 			"addProfileFailed": "Failed to add profile",
-			"tryAgain": "Please try again."
+			"tryAgain": "Please try again.",
+			"autoSwitchFailed": "Failed to save the auto-switch setting",
+			"switchFailed": "Failed to switch account"
 		},
 		"sdk": {
 			"title": "AI Rate Limit",
@@ -532,7 +534,10 @@
 		"cancel": "Cancel this download",
 		"retry": "Retry",
 		"cancelledLabel": "Cancelled",
-		"hint": "Downloads keep running in the background, even if you close this task."
+		"hint": "Downloads keep running in the background, even if you close this task.",
+		"hoursRemaining": "{{count}}h remaining",
+		"minutesRemaining": "{{count}}m remaining",
+		"secondsRemaining": "{{count}}s remaining"
 	},
 	"ideation": {
 		"converting": "Converting...",
@@ -917,7 +922,14 @@
 		"stopping": "Stopping...",
 		"progress": "Progress",
 		"lastActivityPrefix": "last activity",
-		"lastProgressUpdateTooltip": "Last progress update received"
+		"lastProgressUpdateTooltip": "Last progress update received",
+		"timeAgo": {
+			"justNow": "just now",
+			"seconds": "{{count}}s ago",
+			"minutes": "{{count}}m ago",
+			"hours": "{{count}}h ago",
+			"days": "{{count}}d ago"
+		}
 	},
 	"time": {
 		"justNow": "just now",
@@ -1302,6 +1314,9 @@
 		"title": "Chat History",
 		"byTeammate": "By {{name}}, read only",
 		"noConversations": "No conversations yet",
+		"titleInputLabel": "Conversation title",
+		"renameFailed": "The conversation could not be renamed.",
+		"deleteFailed": "The conversation could not be deleted.",
 		"today": "Today",
 		"yesterday": "Yesterday",
 		"daysAgo": "{{count}} days ago",
@@ -1438,6 +1453,7 @@
 		"description": "Sign in to a shared server, or continue in local mode.",
 		"serverUrl": "Server URL",
 		"entraButton": "Sign in with Microsoft",
+		"ssoButton": "Sign in with {{name}}",
 		"email": "Email",
 		"password": "Password",
 		"localAccountButton": "Sign in",
@@ -1470,13 +1486,36 @@
 		"parent": "⬆ Parent",
 		"noFolders": "No folder found.",
 		"checkPath": "Check the path or your access rights.",
-		"dragReferences": "Drag files to add as references"
+		"dragReferences": "Drag files to add as references",
+		"loadFailed": "Could not open this folder."
 	},
 	"shortcutsOverlay": {
 		"title": "Keyboard Shortcuts",
 		"pressBefore": "Press",
 		"escapeKey": "Escape",
-		"pressAfter": "to close · Single-key shortcuts work when not typing in an input"
+		"pressAfter": "to close · Menu shortcuts (two letters, typed one after the other) work when a project is open and you are not typing in a field",
+		"groups": {
+			"navigation": "Navigation",
+			"general": "General",
+			"terminal": "Terminals",
+			"menu": "Menu"
+		},
+		"items": {
+			"goKanban": "Go to Kanban",
+			"goTerminals": "Go to Terminals",
+			"goInsights": "Go to Insights",
+			"goRoadmap": "Go to Roadmap",
+			"openSettings": "Open Settings",
+			"commandPalette": "Command palette",
+			"shortcuts": "Keyboard shortcuts",
+			"newTask": "New task",
+			"addProject": "Add a project (outside Terminals)",
+			"voiceAssistant": "Voice assistant",
+			"stopAgents": "Stop all agents",
+			"closeDialog": "Close a dialog or overlay",
+			"newTerminal": "New terminal (in Terminals)",
+			"closeTerminal": "Close the terminal (in Terminals)"
+		}
 	},
 	"learningMode": {
 		"level": "Level: {{level}}",

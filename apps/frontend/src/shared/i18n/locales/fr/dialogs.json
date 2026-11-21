@@ -222,18 +222,10 @@
 		"selectComplexity": "Sélectionner la complexité",
 		"impact": "Impact",
 		"selectImpact": "Sélectionner l'impact",
-		"lowComplexity": "Faible",
-		"mediumComplexity": "Moyen",
-		"highComplexity": "Élevé",
-		"lowImpact": "Impact faible",
-		"mediumImpact": "Impact moyen",
-		"highImpact": "Impact élevé",
-		"titleRequired": "Le titre est requis",
-		"descriptionRequired": "La description est requise",
-		"phaseRequired": "Veuillez sélectionner une phase",
 		"cancel": "Annuler",
 		"adding": "Ajout en cours...",
 		"addFeature": "Ajouter la fonctionnalité",
+		"defaultRationale": "Ajoutée à la roadmap à la main.",
 		"failedToAdd": "Échec de l'ajout de la fonctionnalité. Veuillez réessayer."
 	},
 	"addProject": {
@@ -297,7 +289,14 @@
 		"model": "Modèle",
 		"thinkingLevel": "Niveau de réflexion",
 		"cancel": "Annuler",
-		"apply": "Appliquer"
+		"apply": "Appliquer",
+		"thinkingHints": {
+			"none": "Pas de réflexion étendue",
+			"low": "Réflexion brève",
+			"medium": "Analyse modérée",
+			"high": "Réflexion approfondie",
+			"ultrathink": "Profondeur de raisonnement maximale"
+		}
 	},
 	"removeProject": {
 		"title": "Retirer le projet ?",
@@ -391,6 +390,7 @@
 		"originPage": "Cette page surcharge le choix global.",
 		"originSettings": "Cette page suit le choix global.",
 		"reset": "Réinitialiser",
+		"saveFailed": "Le choix de cette page n'a pas pu être enregistré.",
 		"effort": {
 			"none": "Aucun",
 			"low": "Faible",
@@ -466,7 +466,6 @@
 		"orgUrlPlaceholder": "https://dev.azure.com/monorganisation",
 		"pat": "Token PAT",
 		"patPlaceholder": "Personal Access Token",
-		"required": "Tous les champs sont obligatoires.",
 		"invalidUrl": "URL Azure DevOps invalide.",
 		"save": "Valider"
 	}

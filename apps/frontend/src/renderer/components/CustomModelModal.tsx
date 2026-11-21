@@ -113,9 +113,11 @@ export function CustomModelModal({
 								{THINKING_LEVELS.map((level) => (
 									<SelectItem key={level.value} value={level.value}>
 										<div className="flex items-center gap-2">
-											<span className="font-medium">{level.label}</span>
+											<span className="font-medium">
+												{t(`settings:general.thinkingLevels.${level.value}`)}
+											</span>
 											<span className="text-xs text-muted-foreground">
-												{level.description}
+												{t(`customModel.thinkingHints.${level.value}`)}
 											</span>
 										</div>
 									</SelectItem>

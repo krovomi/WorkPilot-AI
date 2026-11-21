@@ -176,7 +176,9 @@
 			"invalid-path": "Cette adresse n’est pas une page du serveur de l’émulateur.",
 			"busy": "Une autre capture est en cours : attendez qu’elle se termine.",
 			"load-failed": "La page ne s’est pas chargée à temps sur cet appareil.",
-			"capture-failed": "La page n’a pas pu être capturée sur cet appareil."
+			"capture-failed": "La page n’a pas pu être capturée sur cet appareil.",
+			"unknown-throttling": "Ce profil de bridage n'est pas dans la liste.",
+			"throttling-failed": "Le bridage réseau ou processeur n'a pas pu être appliqué sur cet appareil."
 		},
 		"report": {
 			"unavailable": "La page n’a pas pu être lue pour y chercher les bugs responsive.",
@@ -192,7 +194,40 @@
 			"smallTouchTarget_one": "{{count}} cible tactile de moins de 44 × 44 px",
 			"smallTouchTarget_other": "{{count}} cibles tactiles de moins de 44 × 44 px",
 			"smallText_one": "{{count}} texte de moins de 12 px",
-			"smallText_other": "{{count}} textes de moins de 12 px"
+			"smallText_other": "{{count}} textes de moins de 12 px",
+			"overlappingElements_one": "{{count}} paire d'éléments se chevauche",
+			"overlappingElements_other": "{{count}} paires d'éléments se chevauchent",
+			"truncatedText_one": "{{count}} texte est coupé ou déborde de sa boîte",
+			"truncatedText_other": "{{count}} textes sont coupés ou débordent de leur boîte"
+		},
+		"throttling": {
+			"network": "Réseau",
+			"cpu": "Processeur",
+			"hint": "Appliqué à la prochaine capture : la page se charge comme sur cette connexion ou ce processeur plus lent."
+		},
+		"network": {
+			"none": "Sans bridage",
+			"4g": "4G",
+			"fast-3g": "3G rapide",
+			"slow-3g": "3G lente"
+		},
+		"cpu": {
+			"1x": "Pleine vitesse",
+			"2x": "2× plus lent",
+			"4x": "4× plus lent",
+			"6x": "6× plus lent"
+		},
+		"cpuSlowdown": "Processeur {{rate}}× plus lent",
+		"loadTime": "Chargée en {{seconds}} s",
+		"export": "Exporter",
+		"exporting": "Export en cours…",
+		"exported": "Grille enregistrée sous {{name}}.",
+		"exportErrors": {
+			"invalid-request": "L'export a été refusé.",
+			"nothing-to-export": "Aucune capture à exporter : capturez d'abord des appareils.",
+			"busy": "Une capture ou un autre export est en cours : attendez qu'il se termine.",
+			"export-failed": "L'image de la grille n'a pas pu être construite.",
+			"write-failed": "L'image n'a pas pu être écrite à l'endroit choisi."
 		}
 	}
 }

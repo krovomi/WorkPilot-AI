@@ -7,6 +7,7 @@ import type {
 	IdeationSession,
 	IdeationType,
 } from "../../../shared/types";
+import { toast } from "../../hooks/use-toast";
 import type { IdeationTypeState } from "../../stores/ideation-store";
 import {
 	Bar,
@@ -66,28 +67,38 @@ export function GenerationProgressScreen({
 	const [showLogs, setShowLogs] = useState(false);
 	const [isStopping, setIsStopping] = useState(false);
 
-	/**
-	 * Handle stop button click with error handling and double-click prevention
-	 */
+	/** Stop once: the button is disabled while the stop runs. */
 	const handleStopClick = async () => {
-		if (isStopping) return;
-
 		setIsStopping(true);
 		try {
 			await onStop();
 		} catch (err) {
-			console.error("Failed to stop generation:", err);
+			// A toast, not a notice: the screen is gone once the store stops generating.
+			toast({
+				variant: "destructive",
+				title: t("generation.stopFailed"),
+				description: err instanceof Error ? err.message : String(err),
+			});
 		} finally {
 			setIsStopping(false);
 		}
 	};
 
-	// Auto-scroll to bottom when logs update
+	// Auto-scroll to the last line when the logs open and when a line arrives
+	const logCount = logs.length;
 	useEffect(() => {
-		if (logsEndRef.current && showLogs) {
-			logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+		if (showLogs && logCount > 0) {
+			logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
 		}
-	}, [showLogs]);
+	}, [showLogs, logCount]);
+
+	// Lines repeat ("Process already stopped"): a key counts the copies of its line.
+	const seenLines = new Map<string, number>();
+	const logLines = logs.map((log) => {
+		const copy = (seenLines.get(log) ?? 0) + 1;
+		seenLines.set(log, copy);
+		return { log, key: `${copy}:${log}` };
+	});
 
 	const getStreamingIdeasByType = (type: IdeationType): Idea[] => {
 		if (!session) return [];
@@ -167,8 +178,8 @@ export function GenerationProgressScreen({
 
 				{showLogs && logs.length > 0 && (
 					<pre className="wp-code max-h-40 overflow-auto p-3 text-xs">
-						{logs.map((log, index) => (
-							<div key={log.slice(0, 50)} className="leading-relaxed">
+						{logLines.map(({ log, key }, index) => (
+							<div key={key} className="leading-relaxed">
 								<span className="wp-muted mr-2 select-none">
 									{String(index + 1).padStart(3, "0")}
 								</span>

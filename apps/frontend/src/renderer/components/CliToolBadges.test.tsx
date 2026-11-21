@@ -105,3 +105,26 @@ describe("CliToolBadges", () => {
 		expect(mounts.antigravity).toBe(1);
 	});
 });
+
+describe("CliToolBadges summary", () => {
+	it("tells the summary each new answer, and only when one changes", () => {
+		Object.assign(presence, { codex: "installed" });
+		const onPresenceMapChange = vi.fn();
+		render(
+			<CliToolBadges
+				isCollapsed={false}
+				onNavigateToTerminals={vi.fn()}
+				onPresenceMapChange={onPresenceMapChange}
+			/>,
+		);
+		expect(onPresenceMapChange).toHaveBeenLastCalledWith({ codex: "installed" });
+		const calls = onPresenceMapChange.mock.calls.length;
+
+		// A badge that checks again and finds the same answer changes nothing.
+		act(() => reporters.codex("installed"));
+		expect(onPresenceMapChange).toHaveBeenCalledTimes(calls);
+
+		act(() => reporters.pi("missing"));
+		expect(onPresenceMapChange).toHaveBeenLastCalledWith({ codex: "installed", pi: "missing" });
+	});
+});

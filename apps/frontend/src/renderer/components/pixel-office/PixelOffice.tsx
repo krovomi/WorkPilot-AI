@@ -10,6 +10,7 @@ import {
 	Building2,
 	Grid3X3,
 	Hourglass,
+	Tv,
 	Volume2,
 	VolumeX,
 	ZoomIn,
@@ -23,19 +24,23 @@ import {
 	usePixelOfficeStore,
 } from "../../stores/pixel-office-store";
 import { useSwarmStore } from "../../stores/swarm-store";
-import { useTaskStore } from "../../stores/task-store";
+import { loadTasks, useTaskStore } from "../../stores/task-store";
 import { useTerminalStore } from "../../stores/terminal-store";
 import { Button } from "../ui/button";
 import "../charter/charter.css";
 import { Chip, Chips } from "../charter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { AchievementsPanel } from "./AchievementsPanel";
+import { AchievementToast } from "./AchievementToast";
 import { AddAgentButton, AgentBubble } from "./AgentBubble";
+import { KioskOverlay } from "./KioskOverlay";
 import { closeChimes, playChime } from "./office-sounds";
+import { shippedToday } from "./office-stats";
 import { PixelOfficeCanvas } from "./PixelOfficeCanvas";
 import { getCharacterSprite } from "./pixel-sprites";
-
-/** Height of the toolbar, subtracted from the container to size the canvas. */
-const TOOLBAR_H = 52;
+import { useKioskMode } from "./use-kiosk-mode";
+import { useOfficeAchievements } from "./use-office-achievements";
+import { useOfficeCalm } from "./use-office-motion";
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
@@ -47,8 +52,10 @@ const MINI_FRAME_MS = 700;
 
 function MiniPixelChar({
 	characterIndex,
+	calm,
 }: {
 	readonly characterIndex: number;
+	readonly calm: boolean;
 }) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -68,6 +75,7 @@ function MiniPixelChar({
 		};
 
 		draw();
+		if (calm) return;
 		// A two-frame idle bob does not need requestAnimationFrame. The old loop
 		// woke sixty times a second to decide, fifty-nine of those times, that
 		// 700ms had not elapsed yet — once per queued task.
@@ -77,7 +85,7 @@ function MiniPixelChar({
 		}, MINI_FRAME_MS);
 
 		return () => clearInterval(timer);
-	}, [characterIndex]);
+	}, [characterIndex, calm]);
 
 	return (
 		<canvas
@@ -94,9 +102,10 @@ function MiniPixelChar({
 interface WaitingQueueProps {
 	readonly agents: PixelAgent[];
 	readonly onAgentClick: (agentId: string, x: number) => void;
+	readonly calm: boolean;
 }
 
-function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
+function WaitingQueue({ agents, onAgentClick, calm }: WaitingQueueProps) {
 	const { t } = useTranslation(["pixelOffice"]);
 	const stripRef = useRef<HTMLDivElement>(null);
 
@@ -124,7 +133,7 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 						style={{
 							background: "#8B5CF6",
 							boxShadow: "0 0 6px #8B5CF6",
-							animation: "pulse 2s ease-in-out infinite",
+							animation: calm ? "none" : "pulse 2s ease-in-out infinite",
 						}}
 					/>
 					<Hourglass
@@ -183,12 +192,12 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 							{/* Slow-bob wrapper */}
 							<div
 								style={{
-									animation: "waitBob 2.5s ease-in-out infinite",
+									animation: calm ? "none" : "waitBob 2.5s ease-in-out infinite",
 									// Staggered by place in the queue, so the bench does not bob in step.
 									animationDelay: `${place * 0.4}s`,
 								}}
 							>
-								<MiniPixelChar characterIndex={agent.characterIndex} />
+								<MiniPixelChar characterIndex={agent.characterIndex} calm={calm} />
 							</div>
 							{/* Violet glow dot */}
 							<div
@@ -246,6 +255,7 @@ export function PixelOffice({
 	onNavigateToKanban,
 }: PixelOfficeProps) {
 	const { t } = useTranslation(["pixelOffice", "common", "navigation"]);
+	const containerRef = useRef<HTMLDivElement>(null);
 	const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 	const [bubblePos, setBubblePos] = useState<{ x: number; y: number } | null>(
 		null,
@@ -260,6 +270,7 @@ export function PixelOffice({
 	const canAddTerminal = useTerminalStore((s) => s.canAddTerminal);
 
 	const tasks = useTaskStore((s) => s.tasks);
+	const tasksLoading = useTaskStore((s) => s.isLoading);
 	const selectTask = useTaskStore((s) => s.selectTask);
 	const jumpToTask = useTaskStore((s) => s.jumpToTask);
 
@@ -312,17 +323,42 @@ export function PixelOffice({
 		};
 	}, [soundEnabled]);
 
-	// ── Container resize ────────────────────────────────────────
+	// ── Achievements, TV mode, calm ─────────────────────────────
 
-	// A ref callback with a cleanup (React 19) observes the element it is given,
+	const achievements = useOfficeAchievements({
+		projectId,
+		projectPath,
+		tasks,
+		ready: !tasksLoading,
+	});
+	const refreshAchievements = achievements.refresh;
+	const kioskRefresh = useCallback(() => {
+		void loadTasks(projectId);
+		refreshAchievements();
+	}, [projectId, refreshAchievements]);
+	const kiosk = useKioskMode(containerRef, kioskRefresh);
+	const calm = useOfficeCalm(settings.calmMode);
+	const toggleCalm = useCallback(
+		() =>
+			updateSettings({
+				calmMode: !usePixelOfficeStore.getState().settings.calmMode,
+			}),
+		[updateSettings],
+	);
+
+	// ── Canvas area resize ──────────────────────────────────────
+
+	// The canvas area itself is measured, not the whole view minus a toolbar
+	// height: TV mode's header is taller than the toolbar it replaces. A ref
+	// callback with a cleanup (React 19) observes the element it is given,
 	// instead of an effect reading a ref that may not be attached yet.
-	const observeContainer = useCallback((el: HTMLDivElement) => {
+	const observeArea = useCallback((el: HTMLDivElement) => {
 		const ro = new ResizeObserver((entries) => {
 			for (const entry of entries) {
 				const { width, height } = entry.contentRect;
 				setDimensions({
 					width: Math.max(0, Math.floor(width)),
-					height: Math.max(0, Math.floor(height) - TOOLBAR_H),
+					height: Math.max(0, Math.floor(height)),
 				});
 			}
 		});
@@ -502,6 +538,16 @@ export function PixelOffice({
 			? terminals.find((t) => t.id === selectedAgentId)
 			: undefined;
 
+	const earnedCount = Object.keys(achievements.unlocked).length;
+	const shippedTodayCount = useMemo(
+		() =>
+			shippedToday(
+				tasks.filter((t) => t.projectId === projectId),
+				new Date(),
+			),
+		[tasks, projectId],
+	);
+
 	const { pendingAgents, seatedAgents, counts } = useMemo(() => {
 		const pending = agents.filter((a) => a.activity === "pending");
 		const seated = agents.filter((a) => a.activity !== "pending");
@@ -515,14 +561,31 @@ export function PixelOffice({
 				active: seated.filter(
 					(a) => a.activity !== "idle" && a.activity !== "exited",
 				).length,
+				waiting: seated.filter((a) => a.activity === "waiting").length,
 			},
 		};
 	}, [agents]);
 
 	return (
-		<div ref={observeContainer} className="wp-scope flex flex-col h-full overflow-hidden">
+		<div ref={containerRef} className="wp-scope flex flex-col h-full overflow-hidden">
+			{kiosk.active && (
+				<KioskOverlay
+					stats={{
+						active: counts.active,
+						waiting: counts.waiting,
+						shippedToday: shippedTodayCount,
+						achievements: earnedCount,
+					}}
+					calm={calm}
+					calmLocked={calm && !settings.calmMode}
+					onToggleCalm={toggleCalm}
+					onExit={kiosk.exit}
+				/>
+			)}
 			{/* Toolbar */}
-			<div className="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-dashed border-[var(--wp-border)] bg-background/80 backdrop-blur-sm shrink-0">
+			<div
+				className={`flex items-center justify-between gap-3 px-5 py-2.5 border-b border-dashed border-[var(--wp-border)] bg-background/80 backdrop-blur-sm shrink-0${kiosk.active ? " hidden" : ""}`}
+			>
 				<div className="flex min-w-0 items-center gap-3">
 					<span className="wp-empty-glyph h-8 w-8 shrink-0" aria-hidden="true">
 						<Building2 className="h-4 w-4" />
@@ -549,6 +612,22 @@ export function PixelOffice({
 						onClick={handleAddAgent}
 						disabled={!canAddTerminal(projectPath)}
 					/>
+					<div className="w-px h-5 bg-border mx-1" />
+					<AchievementsPanel unlocked={achievements.unlocked} />
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant="ghost"
+								size="icon"
+								className="h-8 w-8"
+								onClick={kiosk.enter}
+								aria-label={t("pixelOffice:kiosk.enter")}
+							>
+								<Tv className="h-4 w-4" />
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>{t("pixelOffice:kiosk.enter")}</TooltipContent>
+					</Tooltip>
 					<div className="w-px h-5 bg-border mx-1" />
 
 					<Tooltip>
@@ -639,11 +718,18 @@ export function PixelOffice({
 				</div>
 			</div>
 
+
 			{/* Canvas area */}
 			<div
+				ref={observeArea}
 				className="flex-1 bg-[#1A1A2E] overflow-hidden relative"
 				title={t("pixelOffice:toolbar.shortcuts")}
 			>
+				<AchievementToast
+					achievement={achievements.toast}
+					onDismiss={achievements.dismissToast}
+					calm={calm}
+				/>
 				{agents.length === 0 ? (
 					<div className="flex flex-col items-center justify-center h-full text-center gap-4 px-8">
 						<Building2 className="h-16 w-16 text-white/25" aria-hidden />
@@ -665,6 +751,7 @@ export function PixelOffice({
 								width={dimensions.width}
 								height={dimensions.height}
 								emptyDeskLabel={t("pixelOffice:canvas.emptyDesk")}
+								calm={calm}
 								onAgentClick={handleAgentClick}
 							/>
 						)}
@@ -683,6 +770,7 @@ export function PixelOffice({
 						<WaitingQueue
 							agents={pendingAgents}
 							onAgentClick={handlePendingAgentClick}
+							calm={calm}
 						/>
 
 						{/* Backdrop */}
