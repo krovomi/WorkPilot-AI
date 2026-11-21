@@ -193,11 +193,9 @@ export function AddProjectModal({
 		const gitResult =
 			await globalThis.electronAPI.detectRepoProvider(projectPath);
 
-		if (gitResult.success && gitResult.data) {
-			return gitResult.data.provider;
-		}
-
-		return "unknown";
+		// The form sets up GitHub or Azure DevOps; Bitbucket is set in its section.
+		const provider = gitResult.success ? gitResult.data?.provider : undefined;
+		return provider === "github" || provider === "azure_devops" ? provider : "unknown";
 	}, []);
 
 	// What a detection means for the form: the providers offered, and the one

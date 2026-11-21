@@ -6,9 +6,10 @@
  */
 
 import type { Project } from "@shared/types";
+import type { RemoteProvider } from "@shared/utils/git-remote-provider";
 
 export interface RepositoryDetectionResult {
-	provider: "github" | "azure_devops" | "unknown";
+	provider: RemoteProvider;
 	remoteUrl?: string;
 	detectedAt: Date;
 }
