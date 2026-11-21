@@ -27,6 +27,10 @@ secretstorage>=3.5.0; sys_platform == "linux"
 # Required on all Python versions on Windows (ACS-306) - MCP library unconditionally imports win32api
 pywin32>=312; sys_platform == "win32"
 
+# IANA time zone data (Europe/Paris...) for zoneinfo: Windows and the embedded
+# Python ship none, so a workpilot.policy.yaml naming a zone was refused there.
+tzdata>=2025.2
+
 # Pydantic for structured output schemas
 pydantic>=2.14.3
 
