@@ -112,7 +112,7 @@ it, inside its hub. The hubs are listed in
 | `bounty-board` | Bounty Board | Agents | [bounty-board.md](bounty-board.md) |  |
 | `consensus-arbiter` | Cross-Agent Consensus Arbiter | Agents › Arena | — |  |
 | `live-companion` | Live Companion | Agents | — |  |
-| `pixel-office` | Pixel Office | Agents | [frontend-architecture.md](frontend-architecture.md) |  |
+| `pixel-office` | Pixel Office | Agents | [pixel-office.md](pixel-office.md) |  |
 | `self-healing` | Self-Healing | Agents | — |  |
 | `terminals` | Agent Terminals | Agents | [frontend-architecture.md](frontend-architecture.md) |  |
 | `code-playground` | Code Playground | Development | — |  |

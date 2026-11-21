@@ -19,7 +19,7 @@ providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les
 | Bash | écriture de la configuration de sécurité (allowlist, profil, garde-fous, réglages SDK), quelle que soit la commande | `config_write_validators.py`, validateur de ligne (`LINE_VALIDATORS` de `validator_registry.py`) | `tests/security/test_config_write_validators.py` |
 | Write / Edit | écritures confinées au projet, à la spec et à `<tmp>/workpilot` ; la configuration de sécurité refusée même dans le projet, et l'objectif de la tâche (`.workpilot-goal.json`) | `path_guard.py` (`make_write_path_hook`, `protected_config_refusal`) ; hors SDK `_resolve_within_project(..., for_write=True)` | `tests/test_security_path_guard.py` |
 | write / edit (pi) | la même politique, jugée **dans le processus pi** : `core/agent_clients/pi_guard/workpilot-guard.js`, chargé par `--extension`, politique calculée depuis `path_guard` et passée par `WORKPILOT_PI_GUARD` ; le dossier de ressources de pi (.pi) et le garde-fou lui-même refusés en plus ; `bash` non jugé (comme OpenCode, Antigravity) | `tests/test_pi_cli_client.py`, fixtures réelles `tests/fixtures/pi/guard-*.jsonl` |
-| Bash / Write | garde-fous déclarés par le projet (`.workpilot/guardrails.*`) | `guardrails.py` | — |
+| Bash / Write | garde-fous (`.workpilot/guardrails.*`, `workpilot.policy.yaml` : heures, fichiers, jetons/h) | `guardrails.py`, `governance_policy.py` | — |
 | Write / Edit | caractères invisibles retirés | `watermarks/` | `tests/test_watermarks_hook.py` |
 | Read | fichiers retenus par la préparation des pièces jointes | `docintel/read_guard.py` | — |
 | Bash (hors SDK), CLI OpenCode et pi | le processus tourne dans le bac à sable de l'OS : écritures dans le worktree, identifiants masqués, réseau par proxy filtrant ; Claude Code et Codex gardent le leur, rapporté | `os_sandbox/` (`session_sandbox`, `bwrap_argv`, `seatbelt_profile`, `FilteringProxy`), appelé par `core/client.py` (`_sandbox_at_launch`), `tool_executor._run_command`, `CliSubprocessAgentClient._launch` | `tests/os_sandbox/` |
@@ -35,7 +35,7 @@ providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les
 | nettoyage + scan d'injection + journal | `untrusted.py` (`clean_untrusted`, `quote_untrusted`, `record_untrusted`) ; `_FORGE_PATTERNS` : ce qu'un texte de forge demande à l'agent (script distant, secret, push sans revue, garde-fou, contrôle coupé), noté `suspect` ici seulement |
 | scanner d'injection | `injection_guard/` (`get_default_scanner`) ; `WORKPILOT_INJECTION_GUARD=block` durcit `quote_untrusted` |
 | nettoyage brut | `content_sanitizer.py` (utilisé par `untrusted.py`) |
-| appliqué aujourd'hui à | GitHub (`runners/github/context_gatherer.py`, `runners/github/batch_issues.py`) ; les corps de skills à l'émission (`skills_registry/injection_gate.py`, gate 4 du resolver) ; GitLab et Azure DevOps ont encore leur propre assainisseur |
+| appliqué aujourd'hui à | GitHub (`runners/github/context_gatherer.py`, `runners/github/batch_issues.py`) ; GitLab et Azure DevOps (`runners/forge_review_prompt.py`) ; les corps de skills à l'émission (`skills_registry/injection_gate.py`, gate 4 du resolver) |
 | refus plutôt que nettoyage, pour un corps de skill | `skills_registry/injection_gate.py` (liste fermée de verdicts ; `WORKPILOT_INJECTION_GUARD=report` rétrograde en avertissement) |
 
 Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middleware.py`,

@@ -17,6 +17,9 @@
  *   guardrails:activity   → { projectPath } → Activity
  *   guardrails:answer     → { projectPath, requestId, approve } → Approval
  *   guardrails:checkDiff  → { projectPath, ref? } → DiffCheck
+ *
+ * The governance panel and its export (`governance-handlers.ts`) read the same
+ * runner: `governance` and `audit`.
  */
 
 import { spawn } from "node:child_process";
@@ -60,6 +63,8 @@ const ERROR_PREFIX = "GUARDRAILS_ERROR:";
 const REQUEST_ID = /^[0-9a-f]{12}$/;
 const SAFE_REF = /^[A-Za-z0-9][A-Za-z0-9._/@{}~^-]{0,199}$/;
 const RUNNER_TIMEOUT_MS = 120_000;
+/** The audit trail keeps at most this many decisions (`security/policy_audit.py`). */
+export const AUDIT_EXPORT_LIMIT = 10_000;
 
 /** A project path the renderer sent, checked before it reaches a file or a process. */
 export function checkedProjectPath(projectPath: unknown): string {
@@ -79,7 +84,10 @@ export function guardrailsRunnerArgs(command: string, request: Record<string, un
 	switch (command) {
 		case "validate":
 		case "activity":
+		case "governance":
 			return args;
+		case "audit":
+			return [...args, "--limit", String(AUDIT_EXPORT_LIMIT)];
 		case "test": {
 			const tool = request.toolName;
 			if (typeof tool !== "string" || !/^[A-Za-z]{1,40}$/.test(tool)) throw new Error("invalid tool name");
@@ -122,7 +130,7 @@ export function parseRunnerOutput(stdout: string): unknown {
 	throw new Error("the guardrails runner gave no answer");
 }
 
-async function runGuardrails(command: string, request: unknown): Promise<unknown> {
+export async function runGuardrails(command: string, request: unknown): Promise<unknown> {
 	const args = guardrailsRunnerArgs(command, (request ?? {}) as Record<string, unknown>);
 	const backendPath = app.isPackaged
 		? path.resolve(process.resourcesPath, "backend")

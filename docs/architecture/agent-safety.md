@@ -48,6 +48,8 @@ commit git caché, sous `refs/workpilot/snapshots/<tâche>/<horodatage>-<phase>`
   `.venv`, `target` ne le sont jamais, sans liste propre à un langage ;
 - **rien ne bouge** : l'instantané est construit dans une copie de l'index (`GIT_INDEX_FILE`),
   ni l'index, ni HEAD, ni la branche de la tâche ne changent ; signature GPG coupée, identité fixe ;
+  la copie garde l'heure de l'index, sans quoi git prendrait pour inchangé un fichier réécrit dans
+  la même seconde que son entrée, à taille égale ;
 - `.workpilot/` est exclu (la spec, les logs, l'état de la tâche ne reviennent pas en arrière) ;
 - un instantané identique au précédent (même arbre, même HEAD) n'est pas refait ; au-delà de
   `keep` (10 par défaut), les plus anciens sont supprimés.

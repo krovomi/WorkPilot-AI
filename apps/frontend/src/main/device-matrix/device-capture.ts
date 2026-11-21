@@ -7,18 +7,30 @@
  * ne peut ni changer d'origine ni ouvrir de fenêtre ni télécharger. L'appareil
  * est émulé par le protocole des DevTools (fenêtre CSS, densité, tactile,
  * user agent) avant le premier octet, pour que les media queries et le
- * serveur voient le même appareil que la capture.
+ * serveur voient le même appareil que la capture. Le bridage réseau et
+ * processeur, quand un profil en demande, est posé de même, avant le
+ * chargement, et le temps de chargement mesuré sous ce bridage.
  *
  * Même architecture que le scan d'accessibilité dynamique
  * (`accessibility/dynamic-scan.ts`) ; le script de lecture tourne dans un
  * monde isolé et sa réponse est remise en forme par `sanitizeReport`.
  */
 import { BrowserWindow, session } from "electron";
-import type { DeviceCaptureError, DevicePreset, ResponsiveReport } from "../../shared/types/device-matrix";
+import {
+	CPU_PROFILES,
+	NETWORK_PROFILES,
+	loadTimeoutFor,
+} from "../../shared/constants/emulation-throttling";
+import type {
+	CpuProfile,
+	DeviceCaptureError,
+	DevicePreset,
+	NetworkProfile,
+	ResponsiveReport,
+} from "../../shared/types/device-matrix";
 import { buildProbe, sanitizeReport } from "./responsive-probe";
 
-export const LOAD_TIMEOUT_MS = 30_000;
-/** Le temps laissé à une application monopage pour se dessiner après `load`. */
+/** Le temps laissé à une application monopage pour se dessiner après `load`, multiplié par le ralentissement du processeur. */
 export const SETTLE_MS = 800;
 /** Au-delà, l'image ne traverse pas l'IPC (une capture 4K pèse quelques Mo). */
 export const MAX_IMAGE_CHARS = 48 * 1024 * 1024;
@@ -37,17 +49,28 @@ export interface DeviceShot {
 	readonly url: string;
 	readonly image: string;
 	readonly report: ResponsiveReport | null;
+	/** Durée du chargement jusqu'à `load`, en millisecondes. */
+	readonly loadMs: number;
 }
+
+/** Les profils déjà relus par le handler dans leurs listes fermées. */
+export interface Throttling {
+	readonly network: NetworkProfile;
+	readonly cpu: CpuProfile;
+}
+
+/** Sans bridage : ni le réseau ni le processeur ne sont touchés. */
+export const NO_THROTTLING: Throttling = { network: NETWORK_PROFILES[0], cpu: CPU_PROFILES[0] };
 
 type Send = (method: string, params?: Record<string, unknown>) => Promise<unknown>;
 
-let sessionGuarded = false;
+const guardedPartitions = new Set<string>();
 
-/** La session de la matrice : en mémoire, sans permission ni téléchargement. Posée une fois. */
-function captureSession(): Electron.Session {
-	const target = session.fromPartition(PARTITION, { cache: false });
-	if (!sessionGuarded) {
-		sessionGuarded = true;
+/** Une session en mémoire, sans permission ni téléchargement. Les gardes sont posées une fois. */
+export function guardedSession(partition: string): Electron.Session {
+	const target = session.fromPartition(partition, { cache: false });
+	if (!guardedPartitions.has(partition)) {
+		guardedPartitions.add(partition);
 		target.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
 		target.setPermissionCheckHandler(() => false);
 		target.on("will-download", (event) => event.preventDefault());
@@ -55,7 +78,10 @@ function captureSession(): Electron.Session {
 	return target;
 }
 
-function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+/** La session de la matrice. */
+const captureSession = () => guardedSession(PARTITION);
+
+export function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	return Promise.race([
 		work,
@@ -85,10 +111,36 @@ async function emulate(send: Send, device: DevicePreset): Promise<void> {
 }
 
 /**
+ * Le bridage, posé avant le chargement. Sans profil, rien n'est envoyé. Un
+ * refus du protocole est un échec nommé : une capture « bridée » qui ne l'est
+ * pas tromperait plus qu'elle n'aiderait.
+ */
+async function throttle(send: Send, { network, cpu }: Throttling): Promise<void> {
+	try {
+		if (network.conditions) {
+			await send("Network.enable");
+			await send("Network.emulateNetworkConditions", {
+				offline: false,
+				latency: network.conditions.latencyMs,
+				downloadThroughput: network.conditions.downloadBytesPerSecond,
+				uploadThroughput: network.conditions.uploadBytesPerSecond,
+			});
+		}
+		if (cpu.rate > 1) await send("Emulation.setCPUThrottlingRate", { rate: cpu.rate });
+	} catch {
+		throw new DeviceCaptureFailure("throttling-failed");
+	}
+}
+
+/**
  * Rend `url` sur `device`. `url` est déjà résolue par le handler sur l'origine
  * du serveur lancé par l'émulateur ; la fenêtre n'en sort pas.
  */
-export async function captureDevice(device: DevicePreset, url: string): Promise<DeviceShot> {
+export async function captureDevice(
+	device: DevicePreset,
+	url: string,
+	throttling: Throttling = NO_THROTTLING,
+): Promise<DeviceShot> {
 	const origin = new URL(url).origin;
 	const win = new BrowserWindow({
 		show: false,
@@ -117,12 +169,15 @@ export async function captureDevice(device: DevicePreset, url: string): Promise<
 		const send: Send = (method, params) => wc.debugger.sendCommand(method, params);
 		wc.setUserAgent(device.userAgent);
 		await emulate(send, device);
+		await throttle(send, throttling);
+		const started = Date.now();
 		try {
-			await withTimeout(wc.loadURL(url), LOAD_TIMEOUT_MS);
+			await withTimeout(wc.loadURL(url), loadTimeoutFor(throttling.network, throttling.cpu));
 		} catch {
 			throw new DeviceCaptureFailure("load-failed");
 		}
-		await wait(SETTLE_MS);
+		const loadMs = Date.now() - started;
+		await wait(SETTLE_MS * throttling.cpu.rate);
 		const raw = await wc
 			.executeJavaScriptInIsolatedWorld(PROBE_WORLD_ID, [{ code: buildProbe(device) }])
 			.catch(() => null);
@@ -139,6 +194,7 @@ export async function captureDevice(device: DevicePreset, url: string): Promise<
 			url: sameOrigin(shown, origin) ? shown : url,
 			image: `data:image/png;base64,${data}`,
 			report: sanitizeReport(raw),
+			loadMs,
 		};
 	} finally {
 		try {

@@ -54,6 +54,9 @@ const EXTENSIONS: Record<TestFormat, string> = {
 	"playwright-ts": "ts",
 	"playwright-python": "py",
 	cypress: "js",
+	"selenium-python": "py",
+	"selenium-java": "java",
+	webdriverio: "js",
 };
 
 export async function chooseFileInDialog(defaultName: string): Promise<string | undefined> {

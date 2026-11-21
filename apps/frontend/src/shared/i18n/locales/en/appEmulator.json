@@ -176,7 +176,9 @@
 			"invalid-path": "This address is not a page of the emulator's server.",
 			"busy": "Another capture is in progress: wait for it to finish.",
 			"load-failed": "The page did not load on this device in time.",
-			"capture-failed": "The page could not be captured on this device."
+			"capture-failed": "The page could not be captured on this device.",
+			"unknown-throttling": "This throttling profile is not in the list.",
+			"throttling-failed": "The network or CPU throttling could not be applied on this device."
 		},
 		"report": {
 			"unavailable": "The page could not be read for responsive bugs.",
@@ -192,7 +194,40 @@
 			"smallTouchTarget_one": "{{count}} touch target smaller than 44 × 44 px",
 			"smallTouchTarget_other": "{{count}} touch targets smaller than 44 × 44 px",
 			"smallText_one": "{{count}} text smaller than 12 px",
-			"smallText_other": "{{count}} texts smaller than 12 px"
+			"smallText_other": "{{count}} texts smaller than 12 px",
+			"overlappingElements_one": "{{count}} pair of elements overlap",
+			"overlappingElements_other": "{{count}} pairs of elements overlap",
+			"truncatedText_one": "{{count}} text is cut off or spills out of its box",
+			"truncatedText_other": "{{count}} texts are cut off or spill out of their box"
+		},
+		"throttling": {
+			"network": "Network",
+			"cpu": "CPU",
+			"hint": "Applied to the next capture: a throttled page loads as it would on that connection or that slower processor."
+		},
+		"network": {
+			"none": "No throttling",
+			"4g": "4G",
+			"fast-3g": "Fast 3G",
+			"slow-3g": "Slow 3G"
+		},
+		"cpu": {
+			"1x": "Full speed",
+			"2x": "2× slower",
+			"4x": "4× slower",
+			"6x": "6× slower"
+		},
+		"cpuSlowdown": "CPU {{rate}}× slower",
+		"loadTime": "Loaded in {{seconds}} s",
+		"export": "Export",
+		"exporting": "Exporting…",
+		"exported": "Grid saved as {{name}}.",
+		"exportErrors": {
+			"invalid-request": "The export was refused.",
+			"nothing-to-export": "No capture to export: capture devices first.",
+			"busy": "A capture or another export is in progress: wait for it to finish.",
+			"export-failed": "The grid image could not be built.",
+			"write-failed": "The image could not be written where you chose."
 		}
 	}
 }

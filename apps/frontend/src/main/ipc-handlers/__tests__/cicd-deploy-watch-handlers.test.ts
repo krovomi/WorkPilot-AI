@@ -16,8 +16,10 @@ type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
 const state = vi.hoisted(() => ({
 	handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
-	projects: [] as Array<{ id: string; path: string; autoBuildPath: string }>,
+	projects: [] as Array<{ id: string; name?: string; path: string; autoBuildPath: string }>,
 	spawned: [] as string[][],
+	envs: [] as Array<Record<string, string>>,
+	announced: [] as Array<{ projectId: string; text: { title: string; body: string } }>,
 	answers: [] as Array<{ code: number; stdout?: string; stderr?: string; hold?: Promise<void> }>,
 	envThrows: false,
 	envReads: 0,
@@ -36,8 +38,9 @@ vi.mock("electron", async () => {
 
 vi.mock("node:child_process", async (importOriginal) => ({
 	...(await importOriginal<typeof import("node:child_process")>()),
-	spawn: (_cmd: string, args: string[]) => {
+	spawn: (_cmd: string, args: string[], options: { env: Record<string, string> }) => {
 		state.spawned.push(args);
+		state.envs.push(options.env);
 		const answer = state.answers.shift() ?? { code: 0, stdout: "{}" };
 		const proc = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
 		proc.stdout = new EventEmitter();
@@ -70,6 +73,19 @@ vi.mock("../../project-store", () => ({
 	projectStore: { getProjects: () => state.projects },
 }));
 vi.mock("../../python-env-manager", () => ({ getConfiguredPythonPath: () => "python3" }));
+vi.mock("../../utils/python-runner-env", () => ({
+	pythonRunnerEnv: async (_backend: string, options: { extra?: Record<string, string> }) => ({
+		PROVIDER_ENV: "from-runner-env",
+		...options.extra,
+	}),
+}));
+vi.mock("../../app-language", () => ({ getAppLanguage: () => "en" }));
+vi.mock("../../notification-service", () => ({
+	notificationService: {
+		announce: (projectId: string, text: { title: string; body: string }) =>
+			state.announced.push({ projectId, text }),
+	},
+}));
 
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import { registerCICDTriggersHandlers } from "../cicd-triggers-handlers";
@@ -105,8 +121,10 @@ describe("CI/CD deployment watch", () => {
 
 	beforeEach(() => {
 		projectDir = mkdtempSync(path.join(tmpdir(), "cicd-watch-"));
-		state.projects = [{ id: "p1", path: projectDir, autoBuildPath: ".workpilot" }];
+		state.projects = [{ id: "p1", name: "Shop", path: projectDir, autoBuildPath: ".workpilot" }];
 		state.spawned = [];
+		state.envs = [];
+		state.announced = [];
 		state.answers = [];
 		state.envThrows = false;
 		state.envReads = 0;
@@ -151,6 +169,54 @@ describe("CI/CD deployment watch", () => {
 			data: Array<{ watch?: { phase: string } }>;
 		};
 		expect(after.data[0].watch?.phase).toBe("interrupted");
+	});
+
+	it("runs the watch in the runner env and announces a bad verdict", async () => {
+		configure(["CICD_PROVIDER=github", "CICD_MONITOR_HEALTH_URL=https://app.example/health"]);
+		let runId = "";
+		let release: () => void = () => undefined;
+		const hold = new Promise<void>((r) => {
+			release = r;
+		});
+		state.answers = [{ code: 0, stdout: "{}" }, { code: 0, stdout: "{}", hold }];
+		await invoke(IPC_CHANNELS.CICD_TRIGGERS_TRIGGER, projectDir, { provider: "github" });
+		await tick();
+		const watchArgs = state.spawned[1];
+		runId = watchArgs[watchArgs.indexOf("--run-id") + 1];
+		expect(state.envs[1]).toMatchObject({
+			PROVIDER_ENV: "from-runner-env",
+			CICD_MONITOR_HEALTH_URL: "https://app.example/health",
+		});
+		// The trigger itself keeps the environment without credentials.
+		expect(state.envs[0].PROVIDER_ENV).toBeUndefined();
+		writeWatch(runId, {
+			run_id: runId,
+			phase: "done",
+			verdict: "critical",
+			revert_pr: { status: "opened", url: "https://github.com/acme/shop/pull/7" },
+		});
+		release();
+		await tick();
+		await tick();
+		expect(state.announced).toEqual([
+			{
+				projectId: "p1",
+				text: {
+					title: "Deployment critical: Shop",
+					body: `Run ${runId}: two critical samples in a row after the deployment. Revert PR: https://github.com/acme/shop/pull/7`,
+				},
+			},
+		]);
+	});
+
+	it("announces nothing for a healthy watch", async () => {
+		configure(["CICD_PROVIDER=github", "CICD_MONITOR_HEALTH_URL=https://app.example/health"]);
+		state.answers = [{ code: 0, stdout: "{}" }, { code: 0, stdout: "{}" }];
+		await invoke(IPC_CHANNELS.CICD_TRIGGERS_TRIGGER, projectDir, { provider: "github" });
+		await tick();
+		await tick();
+		expect(state.spawned).toHaveLength(2);
+		expect(state.announced).toEqual([]);
 	});
 
 	it("does not watch without anything to watch, or after a failed trigger", async () => {

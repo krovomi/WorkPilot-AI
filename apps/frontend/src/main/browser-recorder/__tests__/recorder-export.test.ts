@@ -141,6 +141,25 @@ describe("exportRecording", () => {
 		expect(outcome).toMatchObject({ success: true, path: "e2e/log-in.spec.ts", review });
 	});
 
+	it("writes a WebDriver test with its format's extension", async () => {
+		for (const [format, file] of [
+			["selenium-java", "src/test/java/e2e/LogInTest.java"],
+			["selenium-python", "tests/e2e/test_log_in.py"],
+			["webdriverio", "test/specs/log-in.e2e.js"],
+		] as const) {
+			const { spawnRunner, spawned } = runnerPrinting([`RECORDER_EXPORT:${JSON.stringify({ ...generated, path: file })}`]);
+			const d = deps(spawnRunner);
+			const outcome = await exportRecording("/projects/app", request({ format, destination: "review" }), d);
+			expect(spawned[0].args).toContain(`--format=${format}`);
+			expect(d.writeFile).toHaveBeenCalledWith(path.resolve("/worktrees/007", file), generated.code);
+			expect(outcome).toMatchObject({ success: true, path: file });
+		}
+		const { spawnRunner } = runnerPrinting([`RECORDER_EXPORT:${JSON.stringify({ ...generated, path: "e2e/x.py" })}`]);
+		await expect(
+			exportRecording("/projects/app", request({ format: "selenium-java", destination: "review" }), deps(spawnRunner)),
+		).rejects.toThrow("The generated test has no place in the project.");
+	});
+
 	it("takes the card away when the test has no place in the worktree or fails", async () => {
 		for (const bad of [
 			{ ...generated, path: "../../etc/x.spec.ts" },

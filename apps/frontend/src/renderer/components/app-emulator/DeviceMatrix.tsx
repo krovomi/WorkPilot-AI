@@ -1,8 +1,17 @@
-import { Camera, CheckCircle2, Loader2, Square } from "lucide-react";
+import { Camera, CheckCircle2, Download, Loader2, Square } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { DEVICE_PRESETS } from "../../../shared/constants/device-presets";
-import type { DeviceCategory, DevicePreset, ResponsiveIssueKind, ResponsiveReport } from "../../../shared/types/device-matrix";
+import { CPU_PROFILES, NETWORK_PROFILES, findCpuProfile } from "../../../shared/constants/emulation-throttling";
+import type {
+	CpuProfileId,
+	DeviceCapture,
+	DeviceCategory,
+	DevicePreset,
+	NetworkProfileId,
+	ResponsiveIssueKind,
+	ResponsiveReport,
+} from "../../../shared/types/device-matrix";
 import { type DeviceCaptureEntry, useDeviceMatrixStore } from "../../stores/device-matrix-store";
 import { Button } from "../ui/button";
 
@@ -13,6 +22,8 @@ const ISSUE_KEYS: Record<ResponsiveIssueKind, string> = {
 	"overflowing-media": "matrix.issues.overflowingMedia",
 	"small-touch-target": "matrix.issues.smallTouchTarget",
 	"small-text": "matrix.issues.smallText",
+	"overlapping-elements": "matrix.issues.overlappingElements",
+	"truncated-text": "matrix.issues.truncatedText",
 };
 
 /** Exemples affichés par sorte de bug : le rapport en garde plus. */
@@ -48,12 +59,16 @@ interface DeviceMatrixProps {
 /** Plusieurs appareils, capturés par le main et lus pour les bugs responsive, côte à côte. */
 export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixProps) {
 	const { t } = useTranslation("appEmulator");
-	const { selected, entries, running, stopRequested } = useDeviceMatrixStore(
+	const { selected, entries, running, stopRequested, network, cpu, exporting, exportStatus } = useDeviceMatrixStore(
 		useShallow((state) => ({
 			selected: state.selected,
 			entries: state.entries,
 			running: state.running,
 			stopRequested: state.stopRequested,
+			network: state.network,
+			cpu: state.cpu,
+			exporting: state.exporting,
+			exportStatus: state.exportStatus,
 		})),
 	);
 	const toggleDevice = useDeviceMatrixStore((state) => state.toggleDevice);
@@ -61,8 +76,12 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixP
 	const captureSelected = useDeviceMatrixStore((state) => state.captureSelected);
 	const stop = useDeviceMatrixStore((state) => state.stop);
 	const clear = useDeviceMatrixStore((state) => state.clear);
+	const setNetwork = useDeviceMatrixStore((state) => state.setNetwork);
+	const setCpu = useDeviceMatrixStore((state) => state.setCpu);
+	const exportGrid = useDeviceMatrixStore((state) => state.exportGrid);
 	const { path, sameServer } = matrixPath(serverUrl, currentUrl);
 	const tiles = DEVICE_PRESETS.filter((device) => entries[device.id]);
+	const exportable = tiles.some((device) => entries[device.id].status === "done");
 
 	return (
 		<div className="flex h-full min-h-0 flex-col">
@@ -87,6 +106,39 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixP
 							))}
 						</fieldset>
 					))}
+				</div>
+				<div className="flex flex-wrap items-end gap-3">
+					<label className="flex flex-col gap-1 text-xs font-medium">
+						{t("matrix.throttling.network")}
+						<select
+							className="rounded-md border border-border bg-background px-2 py-1 text-sm font-normal"
+							value={network}
+							disabled={running}
+							onChange={(event) => setNetwork(event.target.value as NetworkProfileId)}
+						>
+							{NETWORK_PROFILES.map((profile) => (
+								<option key={profile.id} value={profile.id}>
+									{t(`matrix.network.${profile.id}`)}
+								</option>
+							))}
+						</select>
+					</label>
+					<label className="flex flex-col gap-1 text-xs font-medium">
+						{t("matrix.throttling.cpu")}
+						<select
+							className="rounded-md border border-border bg-background px-2 py-1 text-sm font-normal"
+							value={cpu}
+							disabled={running}
+							onChange={(event) => setCpu(event.target.value as CpuProfileId)}
+						>
+							{CPU_PROFILES.map((profile) => (
+								<option key={profile.id} value={profile.id}>
+									{t(`matrix.cpu.${profile.id}`)}
+								</option>
+							))}
+						</select>
+					</label>
+					<p className="max-w-xs text-xs text-muted-foreground">{t("matrix.throttling.hint")}</p>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">
 					{running ? (
@@ -114,7 +166,30 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixP
 					<Button size="sm" variant="ghost" disabled={running || tiles.length === 0} onClick={clear}>
 						{t("matrix.clear")}
 					</Button>
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={running || exporting || !exportable}
+						onClick={() => void exportGrid()}
+					>
+						{exporting ? (
+							<Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+						) : (
+							<Download className="mr-1 h-3.5 w-3.5" />
+						)}
+						{exporting ? t("matrix.exporting") : t("matrix.export")}
+					</Button>
 				</div>
+				{exportStatus?.status === "saved" && (
+					<p role="status" className="text-xs text-success">
+						{t("matrix.exported", { name: exportStatus.fileName })}
+					</p>
+				)}
+				{exportStatus?.status === "failed" && (
+					<p role="alert" className="text-xs text-destructive">
+						{t(`matrix.exportErrors.${exportStatus.error}`)}
+					</p>
+				)}
 			</div>
 			<div className="min-h-0 flex-1 overflow-auto p-3">
 				{tiles.length === 0 ? (
@@ -146,6 +221,19 @@ function dimensions(t: Translate, device: DevicePreset): string {
 	});
 }
 
+/** Le bridage du rendu, s'il y en a eu un, puis le temps de chargement. */
+function conditions(t: Translate, language: string, capture: DeviceCapture): string {
+	const parts: string[] = [];
+	if (capture.network !== "none") parts.push(t(`matrix.network.${capture.network}`));
+	const rate = findCpuProfile(capture.cpu)?.rate ?? 1;
+	if (rate > 1) parts.push(t("matrix.cpuSlowdown", { rate }));
+	const seconds = new Intl.NumberFormat(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
+		capture.loadMs / 1000,
+	);
+	parts.push(t("matrix.loadTime", { seconds }));
+	return parts.join(" · ");
+}
+
 function DeviceTile({
 	device,
 	entry,
@@ -155,7 +243,7 @@ function DeviceTile({
 	entry: DeviceCaptureEntry;
 	onCapture?: (image: string, url: string) => void;
 }) {
-	const { t } = useTranslation("appEmulator");
+	const { t, i18n } = useTranslation("appEmulator");
 	const name = t(`devices.${device.id}`);
 	return (
 		<figure className="space-y-2 rounded-md border border-border bg-card p-2" data-device={device.id}>
@@ -177,6 +265,7 @@ function DeviceTile({
 			)}
 			{entry.status === "done" && (
 				<>
+					<p className="text-xs text-muted-foreground">{conditions(t, i18n.language, entry.capture)}</p>
 					<img
 						src={entry.capture.image}
 						alt={t("matrix.imageAlt", { device: name })}
