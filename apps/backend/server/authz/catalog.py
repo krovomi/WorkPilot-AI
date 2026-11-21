@@ -303,6 +303,10 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # A recorded agent session left with a server project's team, behind
         # a link that expires and can be revoked (replay is lab, like it).
         "replay_shares": "lab",
+        # A server project's workpilot.policy.yaml, the audit trail its agents
+        # write in the clone, the approvals they wait on and its kill switch
+        # (shared_features/governance.py): reading it is the audit domain.
+        "governance": "audit",
         # What a task's attachments and the project's ADRs say. Read-only and
         # addressed like spec_traceability, so it answers to the same domain.
         "docintel": "task",
@@ -362,6 +366,7 @@ SERVER_FEATURES: frozenset[str] = frozenset(
         "analyses",
         "workspace",
         "replay_shares",
+        "governance",
     }
 )
 

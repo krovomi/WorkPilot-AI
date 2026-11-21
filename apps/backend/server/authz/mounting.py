@@ -103,6 +103,12 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     # Opening a shared replay reads it; the POST carries its link's token in
     # the body, out of the URL.
     ("POST", "/api/features/replay-shares/{share_id}/open"): "lab.read",
+    # A server project's governance: the export of its policy trail names
+    # people; answering an agent's request is a review; its kill switch is
+    # the right to stop a run.
+    ("GET", "/api/features/governance/audit"): "audit.export",
+    ("POST", "/api/features/governance/approvals/{request_id}"): "review.approve",
+    ("POST", "/api/features/governance/stop"): "agent.cancel",
     # Audit trail is append-only and its exports carry personal data.
     ("GET", "/api/audit-trail/export/soc2"): "audit.export",
     ("GET", "/api/audit-trail/export/gdpr"): "audit.export",
