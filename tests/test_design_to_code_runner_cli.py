@@ -406,6 +406,11 @@ def test_the_render_loop_refines_the_files_and_reports_each_iteration(
         "0.5",
         "--loop-responsive",
         "--loop-states",
+        "--loop-fix-passes",
+        "--loop-mask",
+        "0,0.5,1,0.25",
+        "--loop-mask",
+        "0.1,0.1,0.2,0.2",
     )
     out = capsys.readouterr().out
     result = _line(out, RESULT)
@@ -418,6 +423,8 @@ def test_the_render_loop_refines_the_files_and_reports_each_iteration(
     assert seen["config"].budget_seconds == 120 and seen["framework"] == "react"
     assert (seen["config"].max_tokens, seen["config"].max_cost_usd) == (50_000, 0.5)
     assert seen["config"].responsive and seen["config"].states
+    assert seen["config"].fix_passes
+    assert seen["config"].masks == ((0, 0.5, 1, 0.25), (0.1, 0.1, 0.2, 0.2))
     loop_lines = [
         json.loads(line[len(PHASE) :])
         for line in out.splitlines()
@@ -465,6 +472,13 @@ def test_without_the_flag_no_loop_runs(
         ("--loop-max-cost", "0"),
         ("--loop-max-cost", "nan"),
         ("--loop-max-cost", "1000"),
+        ("--loop-mask", "0,0,1"),
+        ("--loop-mask", "a,b,c,d"),
+        ("--loop-mask", "0,0,0,0.5"),
+        ("--loop-mask", "0.5,0,0.6,0.5"),
+        ("--loop-mask", "0,0.9,0.5,0.2"),
+        ("--loop-mask", "-0.1,0,0.5,0.5"),
+        ("--loop-mask", "nan,0,0.5,0.5"),
     ],
 )
 def test_loop_bounds_are_refused_outside_their_range(
@@ -472,3 +486,9 @@ def test_loop_bounds_are_refused_outside_their_range(
 ) -> None:
     code = _main(runner, monkeypatch, "--project-dir", str(tmp_path), flag, value)
     assert code == 2 and "expected" in capsys.readouterr().err
+
+
+def test_more_masks_than_allowed_are_refused(runner, tmp_path, monkeypatch, capsys):
+    masks = [arg for _ in range(13) for arg in ("--loop-mask", "0,0,0.5,0.5")]
+    code = _main(runner, monkeypatch, "--project-dir", str(tmp_path), *masks)
+    assert code == 2 and "at most 12" in capsys.readouterr().err

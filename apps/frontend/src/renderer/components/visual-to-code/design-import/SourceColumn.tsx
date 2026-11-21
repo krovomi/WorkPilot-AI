@@ -10,6 +10,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { DesignBounds } from "../../../../shared/types/design-to-code";
 import { useDesignToCodeStore } from "../../../stores/design-to-code-store";
+import { MaskLayer } from "./MaskLayer";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"];
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -39,6 +40,7 @@ export function SourceColumn() {
 	const resultSpec = useDesignToCodeStore((s) => s.result?.design_spec ?? null);
 	const selectedFilePath = useDesignToCodeStore((s) => s.selectedFilePath);
 	const sourceType = useDesignToCodeStore((s) => s.sourceType);
+	const renderLoop = useDesignToCodeStore((s) => s.renderLoop);
 
 	const handleFile = useCallback(
 		(file: File) => {
@@ -161,6 +163,7 @@ export function SourceColumn() {
 								</div>
 							))}
 							{running && spec.length === 0 && <div className="di-scan" />}
+							{renderLoop && <MaskLayer disabled={running} />}
 						</div>
 					</div>
 				</div>

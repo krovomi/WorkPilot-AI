@@ -21,6 +21,7 @@ from design_to_code.render import RenderError
 from design_to_code.vision import VisionRoute
 from PIL import Image
 from services import design_to_code_render_loop as glue
+from services.design_to_code_edit_calls import EditAnswer
 from services.design_to_code_service import (
     ComponentSpec,
     DesignSpec,
@@ -91,15 +92,18 @@ def world(monkeypatch, tmp_path):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-0000")
     service = DesignToCodeService(str(tmp_path))
     asked: list[tuple[str, str]] = []
+    answers: list[str] = []
 
     async def claude(self, key, image, prompt):
         asked.append((key, image))
+        if answers:
+            return answers.pop(0)
         return json.dumps(
             {"edits": [{"path": "index.html", "find": ORANGE, "replace": RED}]}
         )
 
     monkeypatch.setattr(DesignToCodeService, "_call_claude_vision", claude)
-    return {"service": service, "asked": asked}
+    return {"service": service, "asked": asked, "answers": answers}
 
 
 def _result(files=None, components=None, simulated=False) -> PipelineResult:
@@ -170,8 +174,8 @@ def test_a_non_html_stack_renders_a_mirror_and_never_delivers_it(
         prompts.append(prompt)
         return f'```html\n<!DOCTYPE html><header style="background:{ORANGE}"></header>\n```'
 
-    async def claude(self, key, image, prompt):
-        return json.dumps(
+    world["answers"].append(
+        json.dumps(
             {
                 "edits": [
                     {"path": PREVIEW_PATH, "find": ORANGE, "replace": RED},
@@ -179,9 +183,8 @@ def test_a_non_html_stack_renders_a_mirror_and_never_delivers_it(
                 ]
             }
         )
-
+    )
     monkeypatch.setattr("core.oneshot.oneshot_completion", oneshot)
-    monkeypatch.setattr(DesignToCodeService, "_call_claude_vision", claude)
     result = _result([GeneratedFile("src/Header.tsx", f"const c = '{ORANGE}';", "tsx")])
     report = _loop(world, result, framework="react")
     assert report["status"] == "converged" and report["mirror"] is True
@@ -272,33 +275,61 @@ def _correct(service, route):
     return glue.make_corrector(service, VisionRoute("x", route=route, model="m"))
 
 
-def test_each_cloud_route_calls_its_own_vision_call(monkeypatch, tmp_path) -> None:
+def test_each_route_asks_its_own_call_and_the_subscription_its_schema(
+    monkeypatch, tmp_path
+) -> None:
+    from design_to_code.budget import Usage
+
     service = DesignToCodeService(str(tmp_path))
     calls: list[tuple] = []
 
     def record(name):
         async def call(self, *args):
-            calls.append((name, args[0] if len(args) == 3 else None))
+            calls.append((name, *args[:-2]))
+            self.last_usage = Usage(1, 2)
+            assert args[-2].startswith("data:image/png;base64,")
             return name
 
         return call
 
     for name in (
-        "_call_claude_subscription_vision",
+        "_call_claude_vision",
         "_call_openai_vision",
         "_call_gemini_vision",
+        "_call_local_vision",
     ):
         monkeypatch.setattr(DesignToCodeService, name, record(name))
+
+    async def schema(model, prompt, png, *, project_path):
+        calls.append(("schema", model, png, project_path == service.project_path))
+        return EditAnswer("structured", Usage(3, 4), True)
+
+    monkeypatch.setattr(glue, "ask_claude_for_edits", schema)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-0000")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-0001")
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_API_KEY", "gm-test-0000")
-    for route in ("claude_subscription", "openai", "google"):
+    replies = [
         asyncio.run(_correct(service, route)("p", b"png"))
+        for route in (
+            "claude_subscription",
+            "claude_api",
+            "openai",
+            "google",
+            "lm-studio",
+            "llama-cpp",
+        )
+    ]
     assert calls == [
-        ("_call_claude_subscription_vision", None),
+        ("schema", "m", b"png", True),
+        ("_call_claude_vision", "sk-ant-test-0000"),
         ("_call_openai_vision", "sk-test-0001"),
         ("_call_gemini_vision", "gm-test-0000"),
+        ("_call_local_vision", "lm-studio"),
+        ("_call_local_vision", "llama-cpp"),
     ]
+    assert (replies[0].text, replies[0].usage) == ("structured", Usage(3, 4))
+    assert (replies[1].text, replies[1].usage) == ("_call_claude_vision", Usage(1, 2))
 
 
 def test_a_provider_failure_names_its_kind_never_its_text(
@@ -308,7 +339,7 @@ def test_a_provider_failure_names_its_kind_never_its_text(
     monkeypatch.setenv("GOOGLE_API_KEY", "gm-test-0000")
     request = httpx.Request("POST", "https://example.invalid/?key=gm-test-0000")
 
-    async def status_error(self, *args):
+    async def status_error(*args, **kwargs):
         raise httpx.HTTPStatusError(
             "bad ?key=gm-test-0000",
             request=request,
@@ -320,7 +351,7 @@ def test_a_provider_failure_names_its_kind_never_its_text(
         asyncio.run(_correct(service, "google")("p", b"png"))
     assert str(error.value) == "provider answered HTTP 403"
 
-    async def broken(self, *args):
+    async def broken(*args, **kwargs):
         raise KeyError("content gm-test-0000")
 
     monkeypatch.setattr(DesignToCodeService, "_call_gemini_vision", broken)
@@ -542,16 +573,6 @@ def test_the_correction_carries_the_tokens_its_provider_reported(
     from design_to_code.budget import Usage
 
     service = DesignToCodeService(str(tmp_path))
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-0001")
-
-    async def openai(self, key, image, prompt):
-        self.last_usage = Usage(5, 6)
-        return "answer"
-
-    monkeypatch.setattr(DesignToCodeService, "_call_openai_vision", openai)
-    reply = asyncio.run(_correct(service, "openai")("p", b"png"))
-    assert (reply.text, reply.usage) == ("answer", Usage(5, 6))
-
     monkeypatch.setattr(
         "docintel.engines.ollama_vision.ask", lambda image, prompt, env: ("local", "")
     )
@@ -566,3 +587,178 @@ def test_the_openai_and_gemini_models_are_the_ones_called(
     monkeypatch.delenv("DESIGN_TO_CODE_VISION_MODEL_GOOGLE", raising=False)
     models = glue.route_models(DesignToCodeService(str(tmp_path)))
     assert (models["openai"], models["google"]) == ("gpt-4o", "gemini-1.5-flash")
+    assert models["lm-studio"] and models["llama-cpp"]
+
+
+def _states(files, page):
+    fixed = 'class="f"' in files[page]
+    return {
+        "status": "done",
+        "elements": [
+            {
+                "label": 'a "Buy"',
+                "hover": {"changed": True},
+                "focus": {"changed": fixed},
+            }
+        ],
+    }
+
+
+def test_the_passes_findings_go_back_to_the_model_and_a_fix_that_helps_is_kept(
+    world, monkeypatch
+) -> None:
+    async def states(renderer, files, page):
+        return _states(files, page)
+
+    monkeypatch.setattr(glue, "states_pass", states)
+    world["answers"].extend(
+        [
+            json.dumps(
+                {"edits": [{"path": "index.html", "find": ORANGE, "replace": RED}]}
+            ),
+            json.dumps(
+                {
+                    "edits": [
+                        {
+                            "path": "index.html",
+                            "find": "<header",
+                            "replace": '<header class="f"',
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+    result = _result()
+    events: list = []
+    report = asyncio.run(
+        glue.run_render_loop(
+            world["service"],
+            result,
+            image_data=_data_url(_draw(RED)),
+            framework="html",
+            config=LoopConfig(states=True, fix_passes=True),
+            on_progress=events.append,
+        )
+    )
+    assert report["pass_fix"]["status"] == "kept"
+    assert report["states"]["elements"][0]["focus"]["changed"] is True
+    assert 'class="f"' in result.generated_files[0].content
+    assert "fix_passes" in [e["stage"] for e in events]
+    assert len(world["asked"]) == 2
+    # The fix's tokens are in the spend.
+    assert report["spend"]["tokens"] > report["iterations"][-1]["tokens"]
+
+
+def test_a_pass_fix_that_does_not_help_leaves_the_version_kept(
+    world, monkeypatch
+) -> None:
+    async def states(renderer, files, page):
+        return _states({page: ""}, page)
+
+    monkeypatch.setattr(glue, "states_pass", states)
+    world["answers"].extend(
+        [
+            json.dumps(
+                {"edits": [{"path": "index.html", "find": ORANGE, "replace": RED}]}
+            ),
+            json.dumps(
+                {
+                    "edits": [
+                        {
+                            "path": "index.html",
+                            "find": "<header",
+                            "replace": "<header x",
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+    result = _result()
+    report = asyncio.run(
+        glue.run_render_loop(
+            world["service"],
+            result,
+            image_data=_data_url(_draw(RED)),
+            framework="html",
+            config=LoopConfig(states=True, fix_passes=True),
+        )
+    )
+    assert report["pass_fix"]["status"] == "no_gain"
+    assert (
+        result.generated_files[0].content
+        == f'<header style="background:{RED}"></header>'
+    )
+
+
+def test_no_pass_fix_without_passes_or_a_ledger() -> None:
+    outcome = types.SimpleNamespace(iterations=[object()], ledger=None, best_index=0)
+
+    async def scenario(passes, ledger):
+        outcome.ledger = ledger
+        return await glue.run_pass_fix(
+            outcome,
+            passes,
+            render=None,
+            rerun=None,
+            target=None,
+            regions=[],
+            masks=[],
+            correct=None,
+            config=LoopConfig(),
+            stack_label="HTML",
+            mirror=False,
+            on_progress=None,
+        )
+
+    from design_to_code.budget import Spend
+
+    assert asyncio.run(scenario({}, Spend())) == {}
+    assert asyncio.run(scenario({"states": {}}, None)) == {}
+
+
+def test_the_zones_drawn_on_the_design_are_left_out_of_the_score(world) -> None:
+    result = _result()
+    report = asyncio.run(
+        glue.run_render_loop(
+            world["service"],
+            result,
+            image_data=_data_url(_draw(RED)),
+            framework="html",
+            config=LoopConfig(masks=((0.0, 0.0, 1.0, 0.3), (0.99, 0.99, 0.01, 0.01))),
+        )
+    )
+    # The header, the only difference, is masked: version 0 already matches.
+    assert report["status"] == "converged" and report["drawn_masks"] == 1
+    assert len(report["iterations"]) == 1 and world["asked"] == []
+
+
+def test_drawn_masks_become_pixels_and_empty_ones_are_dropped() -> None:
+    boxes = glue.drawn_masks(((0.5, 0.5, 0.5, 0.5), (0, 0, 0.001, 0.5)), 200, 100)
+    assert [b.as_dict() for b in boxes] == [
+        {"x": 100, "y": 50, "width": 100, "height": 50}
+    ]
+
+
+@pytest.mark.parametrize("route", ["lm-studio", "llama-cpp"])
+def test_lm_studio_and_llama_cpp_are_local_and_flat_rate(monkeypatch, route) -> None:
+    decided = VisionRoute("x", route=route, model="qwen-vl")
+    assert glue.pricing_for(decided).status == "flat_rate"
+    assert glue.local_unavailable(decided) == ""
+    variable = "LMSTUDIO_BASE_URL" if route == "lm-studio" else "LLAMA_CPP_BASE_URL"
+    monkeypatch.setenv(variable, "http://192.0.2.10:1234")
+    assert glue.local_unavailable(decided) == "endpoint_not_loopback"
+    assert glue.local_unavailable(VisionRoute("x", route="openai")) == ""
+
+
+def test_a_local_runtime_outside_the_loopback_skips_the_loop(
+    world, monkeypatch
+) -> None:
+    monkeypatch.setattr(glue, "active_provider", lambda: "lm-studio")
+    monkeypatch.setenv("LMSTUDIO_BASE_URL", "http://192.0.2.10:1234")
+    report = _loop(world, _result())
+    assert (report["reason"], report["detail"]) == (
+        "local_unavailable",
+        "endpoint_not_loopback",
+    )
