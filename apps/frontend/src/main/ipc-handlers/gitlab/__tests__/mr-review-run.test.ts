@@ -44,13 +44,13 @@ const state = vi.hoisted(() => ({
 vi.mock("../../github/utils/subprocess-runner", () => ({
 	findAppBackendPath: () => state.backend,
 	getPythonPath: (backend: string) => `${backend}/.venv/bin/python`,
-	buildRunnerArgs: (runner: string, project: string, command: string, args: string[]) => [
-		runner,
-		"--project",
-		project,
-		command,
-		...args,
-	],
+	buildRunnerArgs: (
+		runner: string,
+		project: string,
+		command: string,
+		args: string[],
+		options?: { projectFlag?: string },
+	) => [runner, options?.projectFlag ?? "--project", project, command, ...args],
 	killProcessTree: (child: { pid: number }, signal: string) =>
 		state.kills.push({ pid: child.pid, signal }),
 	runPythonSubprocess: (options: RunOptions) => {
@@ -161,7 +161,7 @@ describe("the review the button starts", () => {
 		expect(options.cwd).toBe("/app/backend");
 		expect(options.args).toEqual([
 			path.join("/app/backend", "runners", "gitlab", "runner.py"),
-			"--project",
+			"--project-dir",
 			dir,
 			"review-mr",
 			"7",
@@ -169,6 +169,7 @@ describe("the review the button starts", () => {
 		expect(state.envOverrides[0]).toEqual({
 			GITLAB_TOKEN: "pat-test-0000",
 			GITLAB_INSTANCE_URL: "https://gitlab.acme.dev",
+			GITLAB_PROJECT: "acme/shop",
 		});
 
 		options.onProgress(40, "Analyzing");

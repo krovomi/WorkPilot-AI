@@ -710,5 +710,58 @@ class TestInProgressTracking:
         assert "789" not in mock_bot_detector.state.reviewed_commits
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+class TestWithoutABotAccount:
+    """Without a bot token nothing is the bot's, and bookkeeping still works."""
+
+    def test_nothing_is_bot_authored(self, temp_state_dir):
+        detector = BotDetector(state_dir=temp_state_dir, bot_token=None)
+        assert detector.is_bot_pr({"author": {"login": "anyone"}}) is False
+        assert detector.is_bot_commit({"author": {"login": "anyone"}}) is False
+
+    def test_finishing_or_clearing_an_unknown_pr_changes_nothing(
+        self, mock_bot_detector
+    ):
+        mock_bot_detector.mark_review_finished(41)
+        mock_bot_detector.clear_pr_state(41)
+        assert mock_bot_detector.get_stats()["total_prs_tracked"] == 0
+
+    def test_a_commit_reviewed_twice_is_counted_once(self, mock_bot_detector):
+        mock_bot_detector.mark_reviewed(5, "abc12345")
+        mock_bot_detector.mark_reviewed(5, "abc12345")
+        assert mock_bot_detector.state.reviewed_commits["5"] == ["abc12345"]
+
+
+class TestCleanupCountsEachPrOnce:
+    def test_stale_and_unreadable_entries_go_and_a_pr_is_counted_once(
+        self, mock_bot_detector, capsys
+    ):
+        state = mock_bot_detector.state
+        old = (datetime.now() - timedelta(days=40)).isoformat()
+        hour_ago = (datetime.now() - timedelta(hours=1)).isoformat()
+        state.reviewed_commits = {"1": ["a"], "3": ["c"]}
+        state.last_review_times = {
+            "1": old,
+            "2": "not a date",
+            "3": datetime.now().isoformat(),
+        }
+        state.in_progress_reviews = {"1": hour_ago, "4": "not a date"}
+
+        assert mock_bot_detector.cleanup_stale_prs(max_age_days=30) == 3
+        assert state.reviewed_commits == {"3": ["c"]}
+        assert list(state.last_review_times) == ["3"]
+        assert state.in_progress_reviews == {}
+        out = capsys.readouterr().out
+        assert "Cleaned up 2 stale PRs" in out
+        assert "Cleaned up 2 stale in-progress reviews" in out
+
+        assert mock_bot_detector.cleanup_stale_prs() == 0
+
+    def test_each_kind_of_staleness_is_reported_alone(self, mock_bot_detector, capsys):
+        state = mock_bot_detector.state
+        state.in_progress_reviews = {"7": "not a date"}
+        assert mock_bot_detector.cleanup_stale_prs() == 1
+        assert "stale PRs" not in capsys.readouterr().out
+
+        state.last_review_times = {"8": "not a date"}
+        assert mock_bot_detector.cleanup_stale_prs() == 1
+        assert "in-progress" not in capsys.readouterr().out

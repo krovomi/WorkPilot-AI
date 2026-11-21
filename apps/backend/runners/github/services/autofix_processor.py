@@ -35,24 +35,20 @@ class AutoFixProcessor:
 
     def _report_progress(self, phase: str, progress: int, message: str, **kwargs):
         """Report progress if callback is set."""
-        if self.progress_callback:
-            # Import at module level to avoid circular import issues
-            import sys
+        if not self.progress_callback:
+            return
+        # Imported here, not at the top: the orchestrator imports this module.
+        # The runner loads it by its bare name; reuse that copy when it is there.
+        import sys
 
-            if "orchestrator" in sys.modules:
-                ProgressCallback = sys.modules["orchestrator"].ProgressCallback
-            else:
-                # Fallback: try relative import
-                try:
-                    from ..orchestrator import ProgressCallback
-                except ImportError:
-                    from orchestrator import ProgressCallback
-
-            self.progress_callback(
-                ProgressCallback(
-                    phase=phase, progress=progress, message=message, **kwargs
-                )
+        orchestrator = sys.modules.get("orchestrator")
+        if orchestrator is None:
+            from .. import orchestrator
+        self.progress_callback(
+            orchestrator.ProgressCallback(
+                phase=phase, progress=progress, message=message, **kwargs
             )
+        )
 
     async def process_issue(
         self,
@@ -82,14 +78,17 @@ class AutoFixProcessor:
         )
 
         # Load or create state
-        state = AutoFixState.load(self.github_dir, issue_number)
-        if state and state.status not in [
+        previous = AutoFixState.load(self.github_dir, issue_number)
+        if previous and previous.status not in [
             AutoFixStatus.FAILED,
             AutoFixStatus.COMPLETED,
         ]:
             # Already in progress
-            return state
+            return previous
 
+        # Only the attempt started here is marked failed: a refused or broken
+        # retry leaves the record of the previous run (its PR, its outcome) alone.
+        state = None
         try:
             # PERMISSION CHECK: Verify who triggered the auto-fix
             if trigger_label:
