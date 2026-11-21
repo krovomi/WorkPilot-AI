@@ -15,6 +15,7 @@ import { InitializationGuard } from "../common/InitializationGuard";
 import { AutomationsIntegration } from "../integrations/AutomationsIntegration";
 import { BoardMcpIntegration } from "../integrations/BoardMcpIntegration";
 import { AzureDevOpsIntegration } from "../integrations/AzureDevOpsIntegration";
+import { BitbucketIntegration } from "../integrations/BitbucketIntegration";
 import { ChannelNotificationsIntegration } from "../integrations/ChannelNotificationsIntegration";
 import { CICDPipelineIntegration } from "../integrations/CICDPipelineIntegration";
 import { GitHubIntegration } from "../integrations/GitHubIntegration";
@@ -199,6 +200,27 @@ export function SectionRouter({
 							projectPath={project.path}
 							settings={settings}
 							setSettings={setSettings}
+						/>
+					</InitializationGuard>
+				</SettingsSection>
+			);
+
+		case "bitbucket":
+			return (
+				<SettingsSection
+					title={t("bitbucket:settings.title")}
+					description={t("bitbucket:settings.description")}
+				>
+					<InitializationGuard
+						initialized={!!project.autoBuildPath}
+						title={t("bitbucket:settings.title")}
+						description={t("bitbucket:settings.description")}
+					>
+						<BitbucketIntegration
+							projectId={project.id}
+							projectPath={project.path}
+							envConfig={envConfig}
+							updateEnvConfig={updateEnvConfig}
 						/>
 					</InitializationGuard>
 				</SettingsSection>

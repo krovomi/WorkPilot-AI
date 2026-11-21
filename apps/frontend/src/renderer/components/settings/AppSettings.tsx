@@ -115,6 +115,7 @@ export type ProjectSettingsSection =
 	| "board-mcp"
 	| "github"
 	| "gitlab"
+	| "bitbucket"
 	| "linear"
 	| "teams";
 
