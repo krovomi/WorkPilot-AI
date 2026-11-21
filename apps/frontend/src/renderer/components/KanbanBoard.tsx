@@ -60,6 +60,7 @@ import {
 	canMoveTaskTo,
 	emptyColumnGroups,
 	getVisualColumn,
+	isQuickAddColumn,
 	VALID_BULK_TRANSITIONS,
 } from "../lib/kanban-columns";
 import { computeBoardCostForecast } from "../lib/kanban-cost";
@@ -330,7 +331,6 @@ export function KanbanBoard({
 	// Track tasks manually moved to queue to prevent auto-promotion back
 	const manuallyQueuedTaskIdsRef = useRef<Set<string>>(new Set());
 
-	// Selection state for bulk actions (Human Review column)
 	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(
 		new Set(),
 	);
@@ -2555,7 +2555,7 @@ export function KanbanBoard({
 												status,
 											)))
 								}
-								onAddClick={status === "backlog" ? onNewTaskClick : undefined}
+								onAddClick={isQuickAddColumn(status) ? onNewTaskClick : undefined}
 								onQueueAll={status === "backlog" ? handleQueueAll : undefined}
 								onQueueSettings={
 									status === "queue"

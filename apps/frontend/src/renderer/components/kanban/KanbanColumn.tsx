@@ -33,11 +33,13 @@ import {
 	Unlock,
 	X,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TASK_STATUS_LABELS } from "../../../shared/constants";
 import type { Task, TaskStatus } from "../../../shared/types";
+import { isQuickAddColumn } from "../../lib/kanban-columns";
 import { cn } from "../../lib/utils";
+import { useQuickAddShortcut } from "../../hooks/useQuickAddShortcut";
 import {
 	COLLAPSED_COLUMN_WIDTH,
 	DEFAULT_COLUMN_WIDTH,
@@ -56,6 +58,7 @@ import {
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { ScrollArea } from "../ui/scroll-area";
+import { QuickAddComposer } from "./QuickAddComposer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 // Max cards a single column renders before collapsing the tail behind a
@@ -64,6 +67,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 // bounded while reusing the exact same (drag-enabled) render path for the
 // visible slice — no change to drag-and-drop behaviour.
 export const COLUMN_RENDER_CAP = 60;
+
+// A double-click on these is theirs (a card, a control, the quick-add box),
+// never a request for a new card.
+const QUICK_ADD_IGNORED_TARGETS =
+	'.kanban-card, button, a, input, textarea, [role="menu"], [data-quick-add]';
 
 export interface DroppableColumnProps {
 	status: TaskStatus;
@@ -430,6 +438,30 @@ export const DroppableColumn = memo(function DroppableColumn({
 		[tasks, showAllCards],
 	);
 	const hiddenCardCount = tasks.length - visibleTasks.length;
+
+	// Quick add (Planification and File d'attente only): the box at the top
+	// of the list, opened by "+", the row under the cards, a double-click on
+	// the column's empty space, or N for Planification.
+	const canQuickAdd = isQuickAddColumn(status) && !!onAddClick;
+	const [isQuickAdding, setIsQuickAdding] = useState(false);
+	const openQuickAdd = useCallback(() => {
+		if (isCollapsed) onToggleCollapsed?.();
+		setIsQuickAdding(true);
+	}, [isCollapsed, onToggleCollapsed]);
+	const closeQuickAdd = useCallback(() => setIsQuickAdding(false), []);
+	useQuickAddShortcut(canQuickAdd && status === "backlog", openQuickAdd);
+	const listAreaRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		const area = listAreaRef.current;
+		if (!area || !canQuickAdd) return;
+		const onDoubleClick = (e: MouseEvent) => {
+			const target = e.target as Element | null;
+			if (target?.closest(QUICK_ADD_IGNORED_TARGETS)) return;
+			openQuickAdd();
+		};
+		area.addEventListener("dblclick", onDoubleClick);
+		return () => area.removeEventListener("dblclick", onDoubleClick);
+	}, [canQuickAdd, openQuickAdd]);
 
 	// Memoize taskIds to prevent SortableContext from re-rendering unnecessarily
 	const taskIds = useMemo(() => visibleTasks.map((t) => t.id), [visibleTasks]);
@@ -839,21 +871,29 @@ export const DroppableColumn = memo(function DroppableColumn({
 								onSetWipLimit={onSetWipLimit}
 							/>
 						)}
-						{status === "backlog" && onAddClick && (
+						{canQuickAdd && (
 									<Tooltip delayDuration={200}>
 										<TooltipTrigger asChild>
 											<Button
 												variant="ghost"
 												size="icon"
 												className="h-6 w-6 hover:bg-primary/10 hover:text-primary transition-colors"
-												onClick={onAddClick}
-												aria-label={t("kanban.addTaskAriaLabel")}
+												onClick={openQuickAdd}
+												aria-label={t(
+													status === "queue"
+														? "kanban.quickAdd.addQueued"
+														: "kanban.addTaskAriaLabel",
+												)}
 											>
 												<Plus className="h-4 w-4" />
 											</Button>
 										</TooltipTrigger>
 										<TooltipContent side="left">
-											{t("kanban.addTaskAriaLabel")}
+											{t(
+												status === "queue"
+													? "kanban.quickAdd.addQueued"
+													: "kanban.quickAdd.addTooltip",
+											)}
 										</TooltipContent>
 									</Tooltip>
 						)}
@@ -980,14 +1020,23 @@ export const DroppableColumn = memo(function DroppableColumn({
 				</div>
 
 				{/* Task list */}
-				<div className="flex-1 min-h-0">
+				<div ref={listAreaRef} className="flex-1 min-h-0">
 					<ScrollArea className="h-full px-2.5 pb-2.5 pt-1">
+						{canQuickAdd && isQuickAdding && isQuickAddColumn(status) && (
+							<div className="mb-2">
+								<QuickAddComposer
+									status={status}
+									onClose={closeQuickAdd}
+									onOpenWizard={onAddClick}
+								/>
+							</div>
+						)}
 						<SortableContext
 							items={taskIds}
 							strategy={verticalListSortingStrategy}
 						>
 							<div className="space-y-2 min-h-0">
-								{tasks.length === 0 ? (
+								{tasks.length === 0 && isQuickAdding ? null : tasks.length === 0 ? (
 									<div
 										className={cn(
 											"empty-column-dropzone flex flex-col items-center justify-center py-6",
@@ -1024,6 +1073,20 @@ export const DroppableColumn = memo(function DroppableColumn({
 								)}
 							</div>
 						</SortableContext>
+						{canQuickAdd && !isQuickAdding && (
+							<button
+								type="button"
+								onClick={openQuickAdd}
+								className="kanban-quick-add-row mt-2"
+							>
+								<Plus className="h-3.5 w-3.5" aria-hidden="true" />
+								{t(
+									status === "queue"
+										? "kanban.quickAdd.addQueued"
+										: "kanban.quickAdd.addCard",
+								)}
+							</button>
+						)}
 					</ScrollArea>
 				</div>
 			</div>

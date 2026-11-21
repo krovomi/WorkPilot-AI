@@ -1398,6 +1398,63 @@ body {
   display: none;
 }
 
+/* Quick add (Planification, File d'attente): the row under the cards and the
+   pills of the box (type, priority, one card per line). Design:
+   docs/architecture/kanban-quick-edit.md. */
+.kanban-quick-add-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  text-align: left;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.kanban-quick-add-row:hover,
+.kanban-quick-add-row:focus-visible {
+  background-color: color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 10%, transparent);
+  color: var(--foreground);
+  outline: none;
+}
+
+.kanban-quick-add-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.0625rem 0.5rem;
+  font-size: 0.6875rem;
+  line-height: 1.25rem;
+  color: var(--foreground);
+  background: transparent;
+}
+
+.kanban-quick-add-pill:hover,
+.kanban-quick-add-pill[data-state="open"] {
+  background-color: var(--accent);
+}
+
+.kanban-quick-add-pill:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.kanban-quick-add-pill.is-on {
+  border-color: color-mix(in oklab, var(--primary) 60%, var(--border));
+  background-color: color-mix(in oklab, var(--primary) 16%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kanban-quick-add-row {
+    transition: none;
+  }
+}
+
 /* Card type colours (docs/architecture/kanban-card-colors.md). The left rail
    above stays the column's; the type owns the background: a glow from the
    top-right corner and a thin top edge. Every --ct-* value is written per
