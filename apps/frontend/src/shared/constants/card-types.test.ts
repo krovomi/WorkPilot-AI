@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { TaskMetadata } from "../types/task";
-import { CARD_TYPES, resolveCardType } from "./card-types";
+import {
+	CARD_TYPE_IDS,
+	CARD_TYPES,
+	cardTypeChoiceMetadata,
+	resolveCardType,
+} from "./card-types";
 
 const resolve = (m: Partial<TaskMetadata>) =>
 	resolveCardType(m as TaskMetadata);
@@ -76,5 +81,36 @@ describe("resolveCardType", () => {
 		expect(resolve({ jiraType: "Bug" })?.basis).toBe("import");
 		expect(resolve({ sourceType: "flaky-tests" })?.basis).toBe("origin");
 		expect(resolve({ kind: "test", kindSource: "category" })?.basis).toBe("category");
+	});
+});
+
+describe("cardTypeChoiceMetadata", () => {
+	it.each(CARD_TYPE_IDS.map((type) => [type]))(
+		"makes a card show %s once picked",
+		(type) => {
+			const resolved = resolve(cardTypeChoiceMetadata(type));
+			expect(resolved?.type).toBe(type);
+		},
+	);
+
+	it("records a work kind as the person's own choice", () => {
+		expect(cardTypeChoiceMetadata("bug")).toEqual({
+			kind: "bug_fix",
+			kindSource: "user",
+		});
+	});
+
+	it("wins over what the card said before", () => {
+		const before: Partial<TaskMetadata> = {
+			kind: "feature",
+			kindSource: "keywords",
+			category: "bug_fix",
+		};
+		expect(
+			resolve({ ...before, ...cardTypeChoiceMetadata("docs") })?.type,
+		).toBe("docs");
+		expect(
+			resolve({ ...before, ...cardTypeChoiceMetadata("perf") })?.type,
+		).toBe("perf");
 	});
 });

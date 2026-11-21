@@ -414,6 +414,29 @@
 			"viewer": "Lecteur",
 			"member": "Membre",
 			"owner": "Propriétaire"
+		},
+		"quickAdd": {
+			"addCard": "Ajouter une carte",
+			"addQueued": "Ajouter et mettre en file",
+			"addTooltip": "Ajouter une carte (N)",
+			"ariaLabel": "Décrire la nouvelle carte",
+			"placeholder": "Décrivez la tâche… Collez une liste pour créer une carte par ligne.",
+			"type": "Type",
+			"noType": "Sans type (déduit automatiquement)",
+			"priority": "Priorité",
+			"noPriority": "Sans priorité",
+			"splitLines_one": "Une carte par ligne ({{count}})",
+			"splitLines_other": "Une carte par ligne ({{count}})",
+			"create": "Créer",
+			"queue": "Mettre en file",
+			"createMany_one": "Créer {{count}} carte",
+			"createMany_other": "Créer {{count}} cartes",
+			"moreOptions": "Plus d'options…",
+			"close": "Fermer (Échap)",
+			"hint": "Entrée pour créer · Maj+Entrée pour aller à la ligne · Échap pour fermer",
+			"created_one": "Carte créée dans {{column}}",
+			"created_other": "{{count}} cartes créées dans {{column}}",
+			"createFailed": "La carte n'a pas pu être créée. Le texte est gardé : réessayez."
 		}
 	},
 	"queue": {
@@ -735,6 +758,13 @@
 			"field": "{{label}} : {{value}}",
 			"progress": "{{status}} · {{percent}} %",
 			"blockedBy": "Attend : {{titles}}"
+		},
+		"families": {
+			"build": "Construire",
+			"fix": "Corriger",
+			"quality": "Fiabiliser",
+			"know": "Comprendre",
+			"ops": "Exploiter"
 		}
 	},
 	"images": {

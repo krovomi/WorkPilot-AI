@@ -205,3 +205,34 @@ export function resolveCardType(
 	}
 	return { type: primary, proposed, secondary, basis };
 }
+
+const TYPE_TO_KIND: Partial<Record<CardType, TaskKind>> = Object.fromEntries(
+	Object.entries(KIND_TO_TYPE).map(([kind, type]) => [type, kind]),
+) as Partial<Record<CardType, TaskKind>>;
+
+const TYPE_TO_CATEGORY: Partial<Record<CardType, TaskCategory>> = {
+	ux: "ui_ux",
+	security: "security",
+	perf: "performance",
+	infra: "infrastructure",
+};
+
+/**
+ * The metadata that makes a card show `type` when a person picks it (quick
+ * add, context menu, bulk bar). A type that is a work kind is recorded as the
+ * person's own kind (`kindSource: "user"`, which the backend never
+ * overwrites). The four types that only exist as a category (UI / UX,
+ * security, performance, infra) set that category and a plain feature kind
+ * decided by it, so `resolveCardType` reaches the category.
+ */
+export function cardTypeChoiceMetadata(
+	type: CardType,
+): Pick<TaskMetadata, "kind" | "kindSource" | "category"> {
+	const kind = TYPE_TO_KIND[type];
+	if (kind) return { kind, kindSource: "user" };
+	return {
+		category: TYPE_TO_CATEGORY[type],
+		kind: "feature",
+		kindSource: "category",
+	};
+}
