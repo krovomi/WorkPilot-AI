@@ -39,6 +39,7 @@ import { useProjectStore } from "../../stores/project-store";
 import { useSmartEstimationStore } from "../../stores/smart-estimation-store";
 import { recordTaskActivity, useTaskStore } from "../../stores/task-store";
 import { TaskCard } from "../TaskCard";
+import { Toaster } from "../ui/toaster";
 import { TooltipProvider } from "../ui/tooltip";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
@@ -448,6 +449,37 @@ describe("TaskCard — status badges", () => {
 		});
 		expect(screen.queryByText("Running")).not.toBeInTheDocument();
 		expect(screen.getByText("Coding")).toBeInTheDocument();
+	});
+
+	it("names the running phase in the app's language", async () => {
+		const { rerender } = renderCard({
+			task: makeTask({
+				status: "ai_review",
+				executionProgress: { phase: "qa_review", phaseProgress: 10 } as never,
+			}),
+		});
+		expect(screen.getByText("Reviewing")).toBeInTheDocument();
+
+		await act(async () => {
+			await i18n.changeLanguage("fr");
+		});
+		try {
+			rerender(
+				<TooltipProvider>
+					<TaskCard
+						task={makeTask({
+							status: "in_progress",
+							executionProgress: { phase: "coding", phaseProgress: 40 } as never,
+						})}
+						onClick={vi.fn()}
+					/>
+				</TooltipProvider>,
+			);
+			expect(screen.getByText("Codage")).toBeInTheDocument();
+			expect(screen.queryByText("Coding")).not.toBeInTheDocument();
+		} finally {
+			await i18n.changeLanguage("en");
+		}
 	});
 });
 
@@ -862,6 +894,36 @@ describe("TaskCard — re-render rules", () => {
 		expect(screen.getByRole("checkbox")).toBeChecked();
 	});
 
+	it("calls the handlers of the latest render when the task did not change", () => {
+		const task = makeTask({ status: "backlog" });
+		const first = vi.fn();
+		const { rerender } = render(
+			<TooltipProvider>
+				<TaskCard task={task} onClick={first} />
+			</TooltipProvider>,
+		);
+		const latest = vi.fn();
+		rerender(
+			<TooltipProvider>
+				<TaskCard task={task} onClick={latest} />
+			</TooltipProvider>,
+		);
+		fireEvent.click(screen.getByRole("option"));
+
+		// A new task object with the same visible fields, and a new handler.
+		const newest = vi.fn();
+		rerender(
+			<TooltipProvider>
+				<TaskCard task={{ ...task, logs: ["noise"] }} onClick={newest} />
+			</TooltipProvider>,
+		);
+		fireEvent.click(screen.getByRole("option"));
+
+		expect(first).not.toHaveBeenCalled();
+		expect(latest).toHaveBeenCalledTimes(1);
+		expect(newest).toHaveBeenCalledTimes(1);
+	});
+
 	it("drops the stuck watch once the task stops running", async () => {
 		vi.useFakeTimers({ shouldAdvanceTime: true });
 		const task = makeTask({ id: "task-stop", status: "in_progress" });
@@ -926,5 +988,131 @@ describe("TaskCard — re-render rules", () => {
 		renderCard({ task: makeTask({ status: "ai_review" }), onPreviewApp });
 		fireEvent.click(screen.getByTitle("Preview application"));
 		expect(onPreviewApp).toHaveBeenCalled();
+	});
+});
+
+describe("TaskCard — fallbacks", () => {
+	it("names a pipeline that reported neither build number nor definition", () => {
+		useTaskStore.setState({
+			pipelineStatuses: {
+				"task-1": { taskId: "task-1", state: "running" } as never,
+			},
+		});
+		renderCard({ task: makeTask() });
+		expect(screen.getByText(/Pipeline CI/)).toHaveAttribute(
+			"title",
+			"Pipeline —  CI",
+		);
+	});
+
+	it("names the CI provider in the pipeline tip when it is known", () => {
+		useTaskStore.setState({
+			pipelineStatuses: {
+				"task-1": {
+					taskId: "task-1",
+					state: "succeeded",
+					buildNumber: "42",
+					definitionName: "Nightly",
+					providerLabel: "Azure Pipelines",
+				} as never,
+			},
+		});
+		renderCard({ task: makeTask() });
+		expect(screen.getByText(/Pipeline 42/)).toHaveAttribute(
+			"title",
+			"Azure Pipelines — Nightly 42",
+		);
+	});
+
+	it.each([
+		["agree", "Cross review OK"],
+		["inconclusive", "Cross review: no verdict"],
+	])("shows a %s cross review without a summary", (verdict, label) => {
+		renderCard({
+			task: makeTask({
+				crossReview: { verdict, provider: "openai", model: "gpt" } as never,
+			}),
+		});
+		expect(screen.getByText(label)).toHaveAttribute("title", "openai / gpt");
+	});
+
+	it("keeps a markup-only title rather than an empty heading", () => {
+		renderCard({ task: makeTask({ title: "<br>" }) });
+		expect(screen.getByRole("heading", { name: "<br>" })).toBeInTheDocument();
+	});
+
+	it("marks a card that came from the visual canvas", () => {
+		renderCard({
+			task: makeTask({ metadata: { sourceType: "visual-canvas" } as never }),
+		});
+		expect(screen.getByRole("option")).toHaveClass("visual-canvas-task");
+	});
+
+	it("shows the applied formula instead of the estimate call", () => {
+		renderCard({
+			task: makeTask({
+				metadata: {
+					appliedFormula: {
+						provider: "anthropic",
+						model: "claude-opus",
+						effort: "high",
+						expectedCostUsd: 0.4,
+						successProbability: 0.8,
+						perTokenBilled: true,
+						appliedAt: "2026-11-01T10:00:00Z",
+					},
+				} as never,
+			}),
+		});
+		expect(
+			screen.getByTitle("Applied formula — click to change"),
+		).toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "Estimate" })).not.toBeInTheDocument();
+	});
+
+	it("estimates from the title when the description has no text", async () => {
+		const user = userEvent.setup();
+		renderCard({
+			task: makeTask({ description: "<p></p>" }),
+			onDuplicate: vi.fn(),
+		});
+		await user.click(screen.getByRole("button", { name: "Task actions" }));
+		await user.click(
+			await screen.findByRole("menuitem", { name: "Estimate complexity" }),
+		);
+		expect(useSmartEstimationStore.getState()).toMatchObject({
+			initialTaskDescription: "Add login page",
+		});
+	});
+
+	it("says why a stuck task could not be recovered and keeps it stuck", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		api = installRendererApi({
+			checkTaskRunning: vi.fn(async () => ({ success: true, data: false })),
+			recoverStuckTask: vi.fn(async () => ({
+				success: false,
+				error: "The worktree is locked",
+			})),
+		});
+		render(
+			<TooltipProvider>
+				<TaskCard
+					task={makeTask({ id: "task-locked", status: "in_progress" })}
+					onClick={vi.fn()}
+				/>
+				<Toaster />
+			</TooltipProvider>,
+		);
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(61_000);
+		});
+		fireEvent.click(await screen.findByRole("button", { name: /Recover/ }));
+
+		expect(
+			await screen.findByText("Could not recover the task"),
+		).toBeInTheDocument();
+		expect(screen.getByText("The worktree is locked")).toBeInTheDocument();
+		expect(screen.getByText("Stuck")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /Recover/ })).toBeEnabled();
 	});
 });

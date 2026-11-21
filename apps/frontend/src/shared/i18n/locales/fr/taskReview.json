@@ -335,20 +335,12 @@
 		"done": "Terminé",
 		"less": "Moins",
 		"more": "Plus",
-		"subtaskLabel": "Sous-tâche : {{name}}",
-		"progress": "Avancement",
-		"phasePlanning": "Planification (0-20 %)",
-		"phaseCoding": "Code (20-80 %)",
-		"phaseReview": "Revue IA (80-95 %)",
-		"phaseComplete": "Terminé (95-100 %)",
 		"editFilesTitle": "Modifier les fichiers : {{name}}",
 		"moreFiles": "+{{count}} de plus",
 		"noSubtasks": "Aucune sous-tâche définie",
 		"noSubtasksHint": "Les sous-tâches d'implémentation apparaîtront ici après la planification",
 		"editFiles": "Modifier les fichiers",
-		"saveChanges": "Enregistrer les modifications",
-		"subtasksCompleted": "{{completed}}/{{total}} sous-tâches terminées",
-		"noSubtasksYet": "Aucune sous-tâche pour l'instant"
+		"saveChanges": "Enregistrer les modifications"
 	},
 	"conflicts": {
 		"detected_one": "{{count}} conflit potentiel détecté.",

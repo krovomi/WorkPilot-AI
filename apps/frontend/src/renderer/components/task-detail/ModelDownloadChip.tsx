@@ -16,6 +16,7 @@
 
 import { AlertCircle, Check, Download, Loader2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { formatDownloadRemaining } from "../../lib/download-remaining";
 import { cn } from "../../lib/utils";
 import type { DownloadProgress } from "../../stores/download-store";
 
@@ -49,8 +50,8 @@ export function ModelDownloadChip({
 	const { t } = useTranslation(["tasks"]);
 	const status = download?.status;
 
-	if (status === "starting" || status === "downloading") {
-		const pct = Math.round(download?.percentage ?? 0);
+	if (download?.status === "starting" || download?.status === "downloading") {
+		const pct = Math.round(download.percentage);
 		return (
 			<span
 				className={cn(
@@ -62,8 +63,10 @@ export function ModelDownloadChip({
 					t("tasks:logs.model.downloadingTip", "Téléchargement de « {{model}} »", {
 						model,
 					}),
-					download?.speed,
-					download?.timeRemaining,
+					download.speed,
+					download.secondsRemaining
+						? formatDownloadRemaining(download.secondsRemaining, t)
+						: undefined,
 				]
 					.filter(Boolean)
 					.join(" · ")}
