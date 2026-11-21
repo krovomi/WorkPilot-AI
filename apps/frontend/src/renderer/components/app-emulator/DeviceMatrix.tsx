@@ -1,30 +1,27 @@
 import { Camera, CheckCircle2, Download, Loader2, Square } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
-import { DEVICE_PRESETS } from "../../../shared/constants/device-presets";
+import { DEVICE_ORIENTATIONS, DEVICE_PRESETS, isRotated } from "../../../shared/constants/device-presets";
 import { CPU_PROFILES, NETWORK_PROFILES, findCpuProfile } from "../../../shared/constants/emulation-throttling";
 import type {
 	CpuProfileId,
 	DeviceCapture,
 	DeviceCategory,
+	DeviceGridExportFormat,
+	DeviceOrientation,
 	DevicePreset,
 	NetworkProfileId,
-	ResponsiveIssueKind,
 	ResponsiveReport,
 } from "../../../shared/types/device-matrix";
 import { type DeviceCaptureEntry, useDeviceMatrixStore } from "../../stores/device-matrix-store";
 import { Button } from "../ui/button";
+import { ISSUE_KEYS, MarkedCapture } from "./MarkedCapture";
 
 const CATEGORIES: readonly DeviceCategory[] = ["phone", "tablet", "desktop", "tv"];
 
-const ISSUE_KEYS: Record<ResponsiveIssueKind, string> = {
-	"horizontal-overflow": "matrix.issues.horizontalOverflow",
-	"overflowing-media": "matrix.issues.overflowingMedia",
-	"small-touch-target": "matrix.issues.smallTouchTarget",
-	"small-text": "matrix.issues.smallText",
-	"overlapping-elements": "matrix.issues.overlappingElements",
-	"truncated-text": "matrix.issues.truncatedText",
-};
+const EXPORT_FORMATS: readonly DeviceGridExportFormat[] = ["png", "pdf"];
+const EXPORT_KEYS: Record<DeviceGridExportFormat, string> = { png: "matrix.exportPng", pdf: "matrix.exportPdf" };
 
 /** Exemples affichés par sorte de bug : le rapport en garde plus. */
 const SHOWN_SAMPLES = 3;
@@ -54,12 +51,26 @@ interface DeviceMatrixProps {
 	currentUrl: string;
 	/** Garder une capture pour la revue visuelle ; sans lui, pas de bouton. */
 	onCapture?: (image: string, url: string) => void;
+	/** La matrice a été ouverte d'office pour la revue d'une tâche : elle le dit. */
+	auto?: boolean;
 }
 
 /** Plusieurs appareils, capturés par le main et lus pour les bugs responsive, côte à côte. */
-export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixProps) {
+export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }: DeviceMatrixProps) {
 	const { t } = useTranslation("appEmulator");
-	const { selected, entries, running, stopRequested, network, cpu, exporting, exportStatus } = useDeviceMatrixStore(
+	const {
+		selected,
+		entries,
+		running,
+		stopRequested,
+		network,
+		cpu,
+		orientation,
+		previewSession,
+		showMarkers,
+		exporting,
+		exportStatus,
+	} = useDeviceMatrixStore(
 		useShallow((state) => ({
 			selected: state.selected,
 			entries: state.entries,
@@ -67,6 +78,9 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixP
 			stopRequested: state.stopRequested,
 			network: state.network,
 			cpu: state.cpu,
+			orientation: state.orientation,
+			previewSession: state.previewSession,
+			showMarkers: state.showMarkers,
 			exporting: state.exporting,
 			exportStatus: state.exportStatus,
 		})),
@@ -78,6 +92,9 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixP
 	const clear = useDeviceMatrixStore((state) => state.clear);
 	const setNetwork = useDeviceMatrixStore((state) => state.setNetwork);
 	const setCpu = useDeviceMatrixStore((state) => state.setCpu);
+	const setOrientation = useDeviceMatrixStore((state) => state.setOrientation);
+	const setPreviewSession = useDeviceMatrixStore((state) => state.setPreviewSession);
+	const setShowMarkers = useDeviceMatrixStore((state) => state.setShowMarkers);
 	const exportGrid = useDeviceMatrixStore((state) => state.exportGrid);
 	const { path, sameServer } = matrixPath(serverUrl, currentUrl);
 	const tiles = DEVICE_PRESETS.filter((device) => entries[device.id]);
@@ -86,6 +103,11 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixP
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			<div className="shrink-0 space-y-2 border-b border-border p-2">
+				{auto && (
+					<p role="status" className="text-xs font-medium">
+						{t("matrix.auto")}
+					</p>
+				)}
 				<p className="text-xs text-muted-foreground">
 					{sameServer ? t("matrix.intro", { path }) : t("matrix.introRoot")}
 				</p>
@@ -108,37 +130,66 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixP
 					))}
 				</div>
 				<div className="flex flex-wrap items-end gap-3">
-					<label className="flex flex-col gap-1 text-xs font-medium">
-						{t("matrix.throttling.network")}
-						<select
-							className="rounded-md border border-border bg-background px-2 py-1 text-sm font-normal"
-							value={network}
-							disabled={running}
-							onChange={(event) => setNetwork(event.target.value as NetworkProfileId)}
-						>
-							{NETWORK_PROFILES.map((profile) => (
-								<option key={profile.id} value={profile.id}>
-									{t(`matrix.network.${profile.id}`)}
-								</option>
-							))}
-						</select>
-					</label>
-					<label className="flex flex-col gap-1 text-xs font-medium">
-						{t("matrix.throttling.cpu")}
-						<select
-							className="rounded-md border border-border bg-background px-2 py-1 text-sm font-normal"
-							value={cpu}
-							disabled={running}
-							onChange={(event) => setCpu(event.target.value as CpuProfileId)}
-						>
-							{CPU_PROFILES.map((profile) => (
-								<option key={profile.id} value={profile.id}>
-									{t(`matrix.cpu.${profile.id}`)}
-								</option>
-							))}
-						</select>
-					</label>
+					<Choice
+						label={t("matrix.orientation.label")}
+						value={orientation}
+						disabled={running}
+						onChange={(value) => setOrientation(value as DeviceOrientation)}
+					>
+						{DEVICE_ORIENTATIONS.map((id) => (
+							<option key={id} value={id}>
+								{t(`matrix.orientation.${id}`)}
+							</option>
+						))}
+					</Choice>
+					<Choice
+						label={t("matrix.throttling.network")}
+						value={network}
+						disabled={running}
+						onChange={(value) => setNetwork(value as NetworkProfileId)}
+					>
+						{NETWORK_PROFILES.map((profile) => (
+							<option key={profile.id} value={profile.id}>
+								{t(`matrix.network.${profile.id}`)}
+							</option>
+						))}
+					</Choice>
+					<Choice
+						label={t("matrix.throttling.cpu")}
+						value={cpu}
+						disabled={running}
+						onChange={(value) => setCpu(value as CpuProfileId)}
+					>
+						{CPU_PROFILES.map((profile) => (
+							<option key={profile.id} value={profile.id}>
+								{t(`matrix.cpu.${profile.id}`)}
+							</option>
+						))}
+					</Choice>
 					<p className="max-w-xs text-xs text-muted-foreground">{t("matrix.throttling.hint")}</p>
+				</div>
+				<div className="flex flex-wrap items-start gap-4 text-sm">
+					<label className="flex max-w-md items-start gap-2">
+						<input
+							type="checkbox"
+							className="mt-1"
+							checked={previewSession}
+							disabled={running}
+							onChange={(event) => setPreviewSession(event.target.checked)}
+						/>
+						<span>
+							{t("matrix.previewSession")}
+							<span className="block text-xs text-muted-foreground">{t("matrix.previewSessionHint")}</span>
+						</span>
+					</label>
+					<label className="flex items-center gap-2">
+						<input
+							type="checkbox"
+							checked={showMarkers}
+							onChange={(event) => setShowMarkers(event.target.checked)}
+						/>
+						{t("matrix.markers")}
+					</label>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">
 					{running ? (
@@ -166,19 +217,22 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixP
 					<Button size="sm" variant="ghost" disabled={running || tiles.length === 0} onClick={clear}>
 						{t("matrix.clear")}
 					</Button>
-					<Button
-						size="sm"
-						variant="outline"
-						disabled={running || exporting || !exportable}
-						onClick={() => void exportGrid()}
-					>
-						{exporting ? (
-							<Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-						) : (
-							<Download className="mr-1 h-3.5 w-3.5" />
-						)}
-						{exporting ? t("matrix.exporting") : t("matrix.export")}
-					</Button>
+					{EXPORT_FORMATS.map((format) => (
+						<Button
+							key={format}
+							size="sm"
+							variant="outline"
+							disabled={running || exporting || !exportable}
+							onClick={() => void exportGrid(format)}
+						>
+							{exporting ? (
+								<Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+							) : (
+								<Download className="mr-1 h-3.5 w-3.5" />
+							)}
+							{exporting ? t("matrix.exporting") : t(EXPORT_KEYS[format])}
+						</Button>
+					))}
 				</div>
 				{exportStatus?.status === "saved" && (
 					<p role="status" className="text-xs text-success">
@@ -201,6 +255,7 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixP
 								key={device.id}
 								device={device}
 								entry={entries[device.id]}
+								markers={showMarkers}
 								onCapture={onCapture}
 							/>
 						))}
@@ -213,7 +268,36 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture }: DeviceMatrixP
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-function dimensions(t: Translate, device: DevicePreset): string {
+/** Une liste déroulante sous son étiquette. */
+function Choice({
+	label,
+	value,
+	disabled,
+	onChange,
+	children,
+}: {
+	label: string;
+	value: string;
+	disabled: boolean;
+	onChange: (value: string) => void;
+	children: ReactNode;
+}) {
+	return (
+		<label className="flex flex-col gap-1 text-xs font-medium">
+			{label}
+			<select
+				className="rounded-md border border-border bg-background px-2 py-1 text-sm font-normal"
+				value={value}
+				disabled={disabled}
+				onChange={(event) => onChange(event.target.value)}
+			>
+				{children}
+			</select>
+		</label>
+	);
+}
+
+function dimensions(t: Translate, device: Pick<DevicePreset, "width" | "height" | "deviceScaleFactor">): string {
 	return t("matrix.dimensions", {
 		width: device.width,
 		height: device.height,
@@ -221,9 +305,16 @@ function dimensions(t: Translate, device: DevicePreset): string {
 	});
 }
 
-/** Le bridage du rendu, s'il y en a eu un, puis le temps de chargement. */
-function conditions(t: Translate, language: string, capture: DeviceCapture): string {
+/**
+ * Le sens si l'appareil a été tourné, la session prêtée, le bridage s'il y en
+ * a eu un, puis le temps de chargement.
+ */
+function conditions(t: Translate, language: string, device: DevicePreset, capture: DeviceCapture): string {
 	const parts: string[] = [];
+	if (isRotated({ ...device, width: capture.width, height: capture.height })) {
+		parts.push(t(`matrix.orientation.${capture.orientation}`));
+	}
+	if (capture.previewSession) parts.push(t("matrix.withPreviewSession"));
 	if (capture.network !== "none") parts.push(t(`matrix.network.${capture.network}`));
 	const rate = findCpuProfile(capture.cpu)?.rate ?? 1;
 	if (rate > 1) parts.push(t("matrix.cpuSlowdown", { rate }));
@@ -237,19 +328,23 @@ function conditions(t: Translate, language: string, capture: DeviceCapture): str
 function DeviceTile({
 	device,
 	entry,
+	markers,
 	onCapture,
 }: {
 	device: DevicePreset;
 	entry: DeviceCaptureEntry;
+	markers: boolean;
 	onCapture?: (image: string, url: string) => void;
 }) {
 	const { t, i18n } = useTranslation("appEmulator");
 	const name = t(`devices.${device.id}`);
+	// Une capture faite donne la fenêtre rendue (tournée ou non).
+	const shown = entry.status === "done" ? { ...device, width: entry.capture.width, height: entry.capture.height } : device;
 	return (
 		<figure className="space-y-2 rounded-md border border-border bg-card p-2" data-device={device.id}>
 			<figcaption className="flex items-baseline justify-between gap-2 text-sm">
 				<span className="font-medium">{name}</span>
-				<span className="text-xs text-muted-foreground">{dimensions(t, device)}</span>
+				<span className="text-xs text-muted-foreground">{dimensions(t, shown)}</span>
 			</figcaption>
 			{entry.status === "pending" && <p className="text-xs text-muted-foreground">{t("matrix.pending")}</p>}
 			{entry.status === "capturing" && (
@@ -265,12 +360,8 @@ function DeviceTile({
 			)}
 			{entry.status === "done" && (
 				<>
-					<p className="text-xs text-muted-foreground">{conditions(t, i18n.language, entry.capture)}</p>
-					<img
-						src={entry.capture.image}
-						alt={t("matrix.imageAlt", { device: name })}
-						className="block h-auto w-full border border-border bg-white"
-					/>
+					<p className="text-xs text-muted-foreground">{conditions(t, i18n.language, device, entry.capture)}</p>
+					<MarkedCapture capture={entry.capture} name={name} markers={markers} />
 					<ReportSummary report={entry.capture.report} />
 					{onCapture && (
 						<Button

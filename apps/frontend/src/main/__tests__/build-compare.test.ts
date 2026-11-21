@@ -71,18 +71,39 @@ async function spawned(times = 1) {
 const answer = {
 	window_days: 30,
 	min_group: 2,
-	segment: { stack: "csharp", size: "medium" },
+	min_top: 10,
+	segment: { stack: "csharp", size: "medium", team: "solo" },
 	recent: { specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3 },
 	previous: { specs: 1, minutes: 80, cost: 3, qa_iterations: null, agents: 2 },
 	trend: { minutes: -50, cost: -50, qa_iterations: null, agents: 50 },
+	weeks: [
+		{ specs: 0, minutes: null, cost: null, qa_iterations: null, agents: null },
+		{ specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3 },
+	],
 	groups: {
-		segment: { projects: 1, medians: null },
-		stack: { projects: 2, medians: { minutes: 30, cost: 1, qa_iterations: null, agents: 2 } },
-		all: { projects: 3, medians: { minutes: 35, cost: 1.2, qa_iterations: 2, agents: 2 } },
+		segment: { projects: 1, medians: null, top: null },
+		stack: { projects: 2, medians: { minutes: 30, cost: 1, qa_iterations: null, agents: 2 }, top: null },
+		team: { projects: 1, medians: null, top: null },
+		all: {
+			projects: 12,
+			medians: { minutes: 35, cost: 1.2, qa_iterations: 2, agents: 2 },
+			top: { minutes: 10, cost: 0.3, qa_iterations: null, agents: 1 },
+		},
 	},
+	kinds: [
+		{
+			kind: "bug_fix",
+			specs: 1,
+			minutes: 40,
+			cost: 1.5,
+			qa_iterations: 1,
+			agents: 3,
+			group: { projects: 1, medians: null, top: null },
+		},
+	],
 	projects: [
-		{ name: "Shop", stack: "csharp", size: "medium", specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3, current: true },
-		{ name: "Blog", stack: "php", size: "small", specs: 1, minutes: 10, cost: 0.2, qa_iterations: null, agents: 1, current: false },
+		{ name: "Shop", stack: "csharp", size: "medium", team: "solo", specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3, current: true },
+		{ name: "Blog", stack: "php", size: "small", team: "unknown", specs: 1, minutes: 10, cost: 0.2, qa_iterations: null, agents: 1, current: false },
 	],
 };
 
@@ -112,7 +133,16 @@ describe("toBuildComparison", () => {
 			recent: { specs: 1.5, minutes: Number.NaN, cost: -1, qa_iterations: "2", agents: Infinity },
 			previous: "none",
 			trend: { minutes: -20, cost: Number.POSITIVE_INFINITY },
-			groups: { segment: "x", stack: { projects: -1, medians: [] } },
+			groups: { segment: "x", stack: { projects: -1, medians: [], top: "best" } },
+			min_top: -4,
+			weeks: [...Array.from({ length: 30 }, () => ({ specs: 1, minutes: -5 }))],
+			kinds: [
+				"x",
+				{ kind: "<img src=x>", specs: 1 },
+				{ kind: 7 },
+				{ kind: "hotfix", specs: 2, minutes: 5, group: { projects: 3, medians: { cost: "free" }, top: { cost: 0.1 } } },
+				...Array.from({ length: 40 }, () => ({ kind: "feature" })),
+			],
 			projects: [
 				"x",
 				{ name: "", stack: "", size: null, current: "yes" },
@@ -121,14 +151,33 @@ describe("toBuildComparison", () => {
 		});
 		expect(hostile?.window_days).toBe(1);
 		expect(hostile?.min_group).toBe(1);
-		expect(hostile?.segment).toEqual({ stack: "x".repeat(40), size: "unknown" });
+		expect(hostile?.segment).toEqual({ stack: "x".repeat(40), size: "unknown", team: "unknown" });
+		expect(hostile?.min_top).toBeNull();
+		expect(hostile?.weeks).toHaveLength(12);
+		expect(hostile?.weeks[0]).toEqual({ specs: 1, minutes: null, cost: null, qa_iterations: null, agents: null });
+		// Only a short identifier names a kind; the lists are bounded.
+		expect(hostile?.kinds[0]).toEqual({
+			kind: "hotfix",
+			specs: 2,
+			minutes: 5,
+			cost: null,
+			qa_iterations: null,
+			agents: null,
+			group: {
+				projects: 3,
+				medians: { minutes: null, cost: null, qa_iterations: null, agents: null },
+				top: { minutes: null, cost: 0.1, qa_iterations: null, agents: null },
+			},
+		});
+		expect(hostile?.kinds).toHaveLength(13);
 		expect(hostile?.recent).toEqual({ specs: 0, minutes: null, cost: null, qa_iterations: null, agents: null });
 		expect(hostile?.previous.specs).toBe(0);
 		expect(hostile?.trend).toEqual({ minutes: -20, cost: null, qa_iterations: null, agents: null });
-		expect(hostile?.groups.segment).toEqual({ projects: 0, medians: null });
-		expect(hostile?.groups.stack).toEqual({ projects: 0, medians: null });
-		expect(hostile?.groups.all).toEqual({ projects: 0, medians: null });
-		expect(hostile?.projects[0]).toMatchObject({ name: "?", stack: "other", size: "unknown", current: false });
+		expect(hostile?.groups.segment).toEqual({ projects: 0, medians: null, top: null });
+		expect(hostile?.groups.stack).toEqual({ projects: 0, medians: null, top: null });
+		expect(hostile?.groups.team).toEqual({ projects: 0, medians: null, top: null });
+		expect(hostile?.groups.all).toEqual({ projects: 0, medians: null, top: null });
+		expect(hostile?.projects[0]).toMatchObject({ name: "?", stack: "other", size: "unknown", team: "unknown", current: false });
 		expect(hostile?.projects).toHaveLength(MAX_OTHERS);
 	});
 

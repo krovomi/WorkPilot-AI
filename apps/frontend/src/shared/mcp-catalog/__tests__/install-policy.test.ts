@@ -6,12 +6,20 @@ import { describe, expect, it } from "vitest";
 import type { McpMarketplaceServer } from "../../types/mcp-marketplace";
 import { loadMcpCatalog } from "../install";
 import {
+	acceptedFindings,
 	invalidPolicy,
 	parseMcpPolicy,
 	policyNeedsScore,
 	policyRefusal,
 	STRICTEST_POLICY,
 } from "../install-policy";
+
+/** A policy with one accepted finding, `over` replacing its fields. */
+function finding(over: Record<string, unknown> = {}): string {
+	return JSON.stringify({
+		acceptedFindings: [{ server: "github", rule: "dynamicCode", reason: "reviewed", ...over }],
+	});
+}
 
 const github = loadMcpCatalog().find((s) => s.id === "github") as McpMarketplaceServer;
 
@@ -55,6 +63,21 @@ describe("parseMcpPolicy", () => {
 			['{"minScore": 50.5}', "schema", "minScore"],
 			['{"minScore": "60"}', "schema", "minScore"],
 			['{"blockCustomServers": "yes"}', "schema", "blockCustomServers"],
+			['{"acceptedFindings": {}}', "schema", "acceptedFindings"],
+			['{"acceptedFindings": ["x"]}', "schema", "acceptedFindings"],
+			[finding({ extra: 1 }), "schema", "acceptedFindings"],
+			[finding({ server: "../x" }), "schema", "acceptedFindings"],
+			[finding({ server: 3 }), "schema", "acceptedFindings"],
+			[finding({ rule: "everything" }), "schema", "acceptedFindings"],
+			[finding({ rule: 1 }), "schema", "acceptedFindings"],
+			[finding({ reason: "   " }), "schema", "acceptedFindings"],
+			[finding({ reason: 2 }), "schema", "acceptedFindings"],
+			[finding({ reason: "x".repeat(301) }), "schema", "acceptedFindings"],
+			[
+				JSON.stringify({ acceptedFindings: Array(201).fill(JSON.parse(finding()).acceptedFindings[0]) }),
+				"schema",
+				"acceptedFindings",
+			],
 		];
 		for (const [text, reason, field] of cases) {
 			const state = parseMcpPolicy(text);
@@ -65,6 +88,21 @@ describe("parseMcpPolicy", () => {
 				policy: STRICTEST_POLICY,
 			});
 		}
+	});
+
+	it("reads accepted findings, each with its reason trimmed", () => {
+		const state = parseMcpPolicy(finding({ reason: "  loads its own plugins " }));
+		expect(state).toEqual({
+			state: "active",
+			policy: {
+				blockCustomServers: false,
+				acceptedFindings: [{ server: "github", rule: "dynamicCode", reason: "loads its own plugins" }],
+			},
+		});
+		expect(acceptedFindings(state)).toHaveLength(1);
+		expect(acceptedFindings(parseMcpPolicy("{}"))).toEqual([]);
+		expect(acceptedFindings(parseMcpPolicy("nope"))).toEqual([]);
+		expect(acceptedFindings({ state: "none" })).toEqual([]);
 	});
 
 	it("does not echo a field name that is not a plain name", () => {

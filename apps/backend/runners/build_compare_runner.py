@@ -35,6 +35,8 @@ NAME_MAX = 120
 #: On the desktop every project compared is the person's own: a median of two
 #: of them already says something, and none stands for someone else's work.
 LOCAL_MIN_GROUP = 2
+#: A group's top tenth means something from ten projects on.
+LOCAL_MIN_TOP = 10
 
 
 def _error(message: str) -> None:
@@ -73,7 +75,11 @@ def handle(request: dict[str, Any], now: datetime) -> dict[str, Any]:
     current = build_compare.project_facts(current_path)
     facts = [(name, build_compare.project_facts(path)) for path, name in peers]
     result = build_compare.compare(
-        current, [f for _n, f in facts], now, min_group=LOCAL_MIN_GROUP
+        current,
+        [f for _n, f in facts],
+        now,
+        min_group=LOCAL_MIN_GROUP,
+        min_top=LOCAL_MIN_TOP,
     )
     lines = [build_compare.peer_line(name, f, now) for name, f in facts]
     result["projects"] = [

@@ -1430,6 +1430,7 @@ function TaskDetailModalContent({
 										project={taskProject ?? activeProject}
 										worktreePath={state.worktreeStatus?.worktreePath}
 										specId={task.specId}
+										inReview={task.status === "human_review"}
 									/>
 								</TabsContent>
 

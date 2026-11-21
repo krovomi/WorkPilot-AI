@@ -32,7 +32,8 @@ inutiles est pris aussi. Un résultat se rattache à son appel par son identifia
 (`tool_use_id`), à défaut dans l'ordre.
 
 **Ce qui se passe à la limite.** Cinq appels identiques par défaut
-(`WORKPILOT_TOOL_BREAKER_LIMIT`, `0` l'éteint). La session s'arrête au message suivant et la
+(`WORKPILOT_TOOL_BREAKER_LIMIT`, `0` l'éteint), ou `loop_detection.max_same_tool_call` de
+`workpilot.policy.yaml`, que ce réglage ne peut que durcir ([governance-policy.md](governance-policy.md)). La session s'arrête au message suivant et la
 tâche est mise en pause (`reason: "tool_loop"`, `breaker: {tool, repeats, limit}`) dans chaque
 copie de son répertoire de spec (`foundation.pause_state.pause_task`, la même que celle des
 budgets). Le coder, la QA et la spec lisent déjà ce drapeau à leur prochain point de contrôle et

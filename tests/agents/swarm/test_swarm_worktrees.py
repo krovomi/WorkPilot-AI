@@ -33,6 +33,11 @@ spec = args[args.index("--spec") + 1]
 project = Path(args[args.index("--project-dir") + 1])
 steps = json.loads(Path(os.environ["SWARM_FAKE_STEPS"]).read_text(encoding="utf-8"))
 step = steps[subtask]
+if step.get("pause"):
+    # What a worker's breaker or policy watch writes in the card's copy.
+    Path(os.environ["SWARM_FAKE_PAUSE"]).write_text(
+        json.dumps({"enabled": True, "reason": "tool_loop"}), encoding="utf-8"
+    )
 if step.get("fail"):
     sys.stderr.write("could not build " + subtask)
     sys.exit(1)
@@ -82,6 +87,7 @@ def shop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     seen.mkdir()
     monkeypatch.setenv("SWARM_FAKE_STEPS", str(tmp_path / "steps.json"))
     monkeypatch.setenv("SWARM_FAKE_SEEN", str(seen))
+    monkeypatch.setenv("SWARM_FAKE_PAUSE", str(spec / "pause_state.json"))
     return {"project": project, "spec": spec, "source": source, "seen": seen}
 
 
@@ -586,3 +592,54 @@ def test_with_fail_fast_a_failed_wave_leaves_the_rest_to_the_coder(
     assert phase() is False
     assert "Wave 0 failed (fail_fast=true): bad" in capsys.readouterr().out
     assert statuses(shop)["later"][0] == "pending"
+
+
+# -- a stop reaches the orchestrator (#353, lot 3) -------------------------------
+
+
+def test_a_worker_s_pause_stops_the_retries_and_the_next_waves(
+    shop: dict[str, Path], capsys
+) -> None:
+    plan(shop, ["good", "bad"], ["later"])
+    steps(shop, good={}, bad={"fail": True, "pause": True}, later={})
+
+    status = asyncio.run(swarm(shop, max_retries_per_subtask=2).run())
+
+    assert status.phase is SwarmPhase.PAUSED
+    assert status.error == "paused before retrying bad (tool_loop)"
+    # What the wave finished is merged; nothing after the pause started.
+    assert statuses(shop)["good"][0] == "completed"
+    assert statuses(shop)["bad"] == ("pending", None)
+    assert not (shop["seen"] / "later.json").exists()
+    assert status.nodes["bad"].retry_count == 0
+    out = capsys.readouterr().out
+    assert "Swarm stopped before retrying bad: the task is paused (tool_loop)." in out
+    kinds = [e["type"] for e in events(out)]
+    assert "subtask_retrying" not in kinds and "swarm_cancelled" in kinds
+    assert leftovers(shop["project"]) == ([shop["project"].resolve()], [])
+
+
+def test_an_invalid_policy_stops_the_build_before_the_swarm_starts(
+    shop: dict[str, Path], phase, monkeypatch, tmp_path: Path, capsys
+) -> None:
+    from foundation.build_signals import BuildPaused
+    from foundation.pause_state import read_pause_state
+
+    monkeypatch.setenv("WORKPILOT_GUARDRAILS_GLOBAL", str(tmp_path / "none.yaml"))
+    (shop["project"] / "workpilot.policy.yaml").write_text(
+        "loop_detection:\n  max_same_tool_call: 1\n", encoding="utf-8"
+    )
+    git(shop["project"], "add", "workpilot.policy.yaml")
+    git(shop["project"], "commit", "-q", "-m", "policy")
+    plan(shop, ["a", "b"])
+    steps(shop, a={}, b={})
+
+    with pytest.raises(BuildPaused):
+        phase()
+
+    assert read_pause_state(shop["spec"])["reason"] == "policy_invalid"
+    assert not list(shop["seen"].iterdir())
+    out = capsys.readouterr().out
+    assert "The guardrails policy is invalid" in out
+    assert "Swarm stopped before wave 1" in out
+    assert leftovers(shop["project"]) == ([shop["project"].resolve()], [])

@@ -35,7 +35,7 @@ import { readMcpPolicy } from "../mcp-security/policy-file";
 import {
 	installedWatchStore,
 	marketplaceDataDir,
-	securityStore,
+	scoreDeps,
 	startMcpInstalledWatch,
 	watchDeps,
 } from "../mcp-security/runtime";
@@ -45,7 +45,6 @@ import {
 } from "../mcp-security/server-security";
 import { projectStore } from "../project-store";
 import { searchHuggingFaceModels } from "../services/hf-mcp-client";
-import { offlineStrict } from "./task/split-merge-watch";
 
 function getBuilderProjectsPath(): string {
 	return path.join(marketplaceDataDir(), "builder-projects.json");
@@ -165,9 +164,8 @@ export function registerMcpMarketplaceHandlers(): void {
 		async (_event, request: unknown) => {
 			try {
 				const data = await serverSecurity(request, {
-					store: securityStore(),
+					...scoreDeps(),
 					projectPath: (id) => projectStore.getProject(id)?.path,
-					offline: offlineStrict,
 				});
 				return { success: true, data };
 			} catch (error) {

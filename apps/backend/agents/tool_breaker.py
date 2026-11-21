@@ -14,8 +14,13 @@ forgets what was counted: reading a file again after editing it is how work
 goes. Only a call that keeps returning the same thing, with nothing changed in
 between, counts towards the limit.
 
+The limit is ``loop_detection.max_same_tool_call`` of ``workpilot.policy.yaml``
+when the repository sets one, the team's rule: the machine's own setting
+(``WORKPILOT_TOOL_BREAKER_LIMIT``) can only make it stricter, never turn it off.
+
 At the limit the session ends and the build is paused (``reason: tool_loop``),
-in every copy of its spec directory. The card says which tool repeated itself,
+in every copy of its spec directory, and the trip is written to the policy's
+audit trail. The card says which tool repeated itself,
 and the person resumes it, or changes the approach, when they choose. Pure apart
 from that pause; table-tested in ``tests/agents/test_tool_breaker.py``.
 
@@ -37,7 +42,10 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
+from cost_budget.spend import project_root
 from foundation.pause_state import is_paused, pause_task
+from security import policy_audit
+from security.guardrail_policy import load_policy
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +89,29 @@ def configured_limit() -> int:
     return max(value, 0)
 
 
+def policy_limit(spec_dir: Path) -> int | None:
+    """``loop_detection.max_same_tool_call`` of the task's project, if it sets one."""
+    project = project_root(Path(spec_dir))
+    if project is None:
+        return None
+    governance = load_policy(project).governance
+    return governance.max_same_tool_call if governance else None
+
+
+def effective_limit(spec_dir: Path) -> tuple[int, bool]:
+    """The breaker's limit for a session, and whether the repository's policy set it."""
+    own = configured_limit()
+    team = policy_limit(spec_dir)
+    if team is None:
+        return own, False
+    # The default gives way to the team's choice; a limit the person set may
+    # only be stricter.
+    chosen = (os.environ.get(LIMIT_ENV) or "").strip().lstrip("-").isdigit()
+    if chosen and own and own < team:
+        return own, False
+    return team, True
+
+
 def _digest(name: str, arguments: Any, result: Any) -> str:
     digest = hashlib.sha256()
     digest.update(name.encode("utf-8"))
@@ -102,7 +133,11 @@ class ToolBreaker:
     def __init__(self, spec_dir: Path, phase: str, limit: int | None = None) -> None:
         self.spec_dir = Path(spec_dir)
         self.phase = _PAUSE_PHASE.get(str(phase), "coding")
-        self.limit = configured_limit() if limit is None else max(limit, 0)
+        self.from_policy = False
+        if limit is None:
+            self.limit, self.from_policy = effective_limit(self.spec_dir)
+        else:
+            self.limit = max(limit, 0)
         self.tripped = False
         #: The session ends because the task was paused while it ran, not for a loop.
         self.pause_requested = False
@@ -174,6 +209,17 @@ class ToolBreaker:
             reason=PAUSE_REASON,
             detail={"breaker": {"tool": name, "repeats": count, "limit": self.limit}},
         )
+        project = project_root(self.spec_dir)
+        if project is not None:
+            policy_audit.record(
+                project,
+                decision="tool_loop",
+                tool=name,
+                rules=["loop_detection.max_same_tool_call"] if self.from_policy else [],
+                reason=f"{name} returned the same result {count} times with nothing "
+                "changed in between; the task is paused.",
+                task=self.spec_dir.name,
+            )
 
 
 __all__ = [
@@ -182,4 +228,6 @@ __all__ = [
     "PAUSE_REASON",
     "ToolBreaker",
     "configured_limit",
+    "effective_limit",
+    "policy_limit",
 ]

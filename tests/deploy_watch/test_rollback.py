@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
+from urllib.parse import unquote
 
 import pytest
 from deploy_watch.rollback import RollbackPlan, execute_rollback, plan_rollback
@@ -348,6 +350,38 @@ class TestJenkins:
             "https://ci.example/job/deploy/41/",
         )
         assert fetch.requests[0].get_header("Authorization").startswith("Basic ")
+
+    def test_commits_from_the_git_plugin(self, fake_fetch):
+        after_ms = int(datetime(2026, 11, 15, 10, 5, tzinfo=UTC).timestamp() * 1000)
+        builds = {
+            "builds": [
+                {
+                    "number": 42,
+                    "result": None,
+                    "timestamp": after_ms,
+                    "actions": [{}, {"lastBuiltRevision": {"SHA1": BAD_SHA}}],
+                },
+                {
+                    "number": 41,
+                    "result": "SUCCESS",
+                    "timestamp": BEFORE_MS,
+                    "actions": [
+                        "x",
+                        {"lastBuiltRevision": {"SHA1": "not-a-sha"}},
+                        {"lastBuiltRevision": {"SHA1": GOOD_SHA}},
+                    ],
+                },
+            ]
+        }
+        fetch = fake_fetch({JK: (200, builds)})
+        plan = plan_rollback(JENKINS_ENV, {**RUN, "provider": "jenkins"}, fetch)
+        assert (plan.target_sha, plan.current_sha) == (GOOD_SHA, BAD_SHA)
+        assert "lastBuiltRevision" in unquote(fetch.requests[0].full_url)
+        no_actions = fake_fetch(
+            {JK: (200, {"builds": [{**builds["builds"][1], "actions": None}]})}
+        )
+        plan = plan_rollback(JENKINS_ENV, {**RUN, "provider": "jenkins"}, no_actions)
+        assert (plan.target_sha, plan.current_sha) == ("", "")
 
     def test_bearer_and_no_token_over_http(self, fake_fetch):
         fetch = fake_fetch({JK: (200, {"builds": []})})

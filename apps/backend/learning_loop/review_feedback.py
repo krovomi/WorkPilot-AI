@@ -136,7 +136,7 @@ def resolve_threshold(value: int | str | None = None) -> int:
     return max(MIN_THRESHOLD, min(MAX_THRESHOLD, number))
 
 
-def _valid(record: Any) -> dict[str, Any] | None:
+def valid_record(record: Any) -> dict[str, Any] | None:
     """The record if it has the shape the writer gives it, else None."""
     if not isinstance(record, dict) or record.get("v") != SCHEMA_VERSION:
         return None
@@ -172,7 +172,7 @@ def _valid(record: Any) -> dict[str, Any] | None:
     }
 
 
-def _read_tail(path: Path) -> str:
+def read_tail(path: Path) -> str:
     with open(path, "rb") as handle:
         handle.seek(0, os.SEEK_END)
         size = handle.tell()
@@ -197,7 +197,7 @@ def load_feedback(project_dir: str | Path) -> list[dict[str, Any]]:
     try:
         if path.is_symlink() or not path.is_file():
             return []
-        text = _read_tail(path)
+        text = read_tail(path)
     except OSError as exc:
         logger.warning("review feedback unreadable: %s", type(exc).__name__)
         return []
@@ -218,7 +218,7 @@ def load_feedback(project_dir: str | Path) -> list[dict[str, Any]]:
                 del latest[key]
                 del signatures[key]
             continue
-        record = _valid(raw)
+        record = valid_record(raw)
         if record is None:
             continue
         key = (record["pr"], record["finding_id"])
