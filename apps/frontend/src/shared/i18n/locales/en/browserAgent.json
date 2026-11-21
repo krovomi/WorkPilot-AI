@@ -156,6 +156,32 @@
 		"answered": {
 			"accept": "{{kind}} answered OK",
 			"dismiss": "{{kind}} cancelled"
+		},
+		"check": {
+			"title": "Run and check",
+			"hint": "Run the test proposed on a review card in that card's worktree, without credentials, or replay the recording without a window to see which selectors still find their element."
+		},
+		"run": {
+			"start": "Run the test on its review card",
+			"passed": "The test passed.",
+			"failed": "The test failed (exit code {{code}}).",
+			"awaitingApproval": "The project's worktree recipe is waiting for approval: its dependencies may not be installed.",
+			"firstRun": "First run of this test.",
+			"rate": "{{passed}} of {{runs}} recorded tests passed on their first run."
+		},
+		"reshoot": {
+			"start": "Check the selectors again",
+			"empty": "Nothing to replay.",
+			"now": "now:",
+			"applied": "updated",
+			"apply": "Use the new selectors",
+			"status": {
+				"ok": "Found",
+				"changed": "Changed",
+				"missing": "Not found",
+				"failed": "Action failed",
+				"not-reached": "Not reached"
+			}
 		}
 	}
 }

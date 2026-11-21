@@ -10,6 +10,9 @@ const api = {
 	startBrowserRecording: vi.fn(),
 	stopBrowserRecording: vi.fn(),
 	answerBrowserRecorderDialog: vi.fn(async () => ({ success: true })),
+	runBrowserRecordedTest: vi.fn(),
+	reshootBrowserRecording: vi.fn(),
+	applyBrowserReshoot: vi.fn(),
 	exportBrowserRecording: vi.fn(),
 	onBrowserRecorderEvent: vi.fn(),
 };
@@ -98,6 +101,47 @@ describe("browser recorder store", () => {
 			store().handleEvent(end);
 			expect(store().pendingDialog).toBeNull();
 		}
+	});
+
+	it("runs the reviewed test, and says why it could not", async () => {
+		const run = { passed: true, exitCode: 0, durationMs: 1, output: "", setup: "", firstRun: true, firstRuns: 1, firstPassed: 1 };
+		api.runBrowserRecordedTest.mockResolvedValueOnce({ success: true, run });
+		await store().runTest("/p");
+		expect(store()).toMatchObject({ run, running: false, error: null });
+		api.runBrowserRecordedTest.mockResolvedValueOnce({ success: false, error: "no card" });
+		await store().runTest("/p");
+		expect(store()).toMatchObject({ run: null, error: "no card" });
+		api.runBrowserRecordedTest.mockResolvedValueOnce({ success: false });
+		await store().runTest("/p");
+		expect(store().error).toBeNull();
+		api.runBrowserRecordedTest.mockRejectedValueOnce(new Error("ipc"));
+		await store().runTest("/p");
+		expect(store()).toMatchObject({ error: "ipc", running: false });
+	});
+
+	it("reshoots the steps and applies the proposals picked", async () => {
+		const steps = [{ id: "s2", status: "changed", selectors: [{ strategy: "css", value: "#a" }] }] as const;
+		api.reshootBrowserRecording.mockResolvedValueOnce({ success: true, steps });
+		await store().reshootSteps("/p");
+		expect(store()).toMatchObject({ reshoot: steps, reshooting: false });
+		api.applyBrowserReshoot.mockResolvedValueOnce({ success: false, applied: 0 });
+		await store().applyReshoot("/p", ["s9"]);
+		expect(store().applied).toEqual([]);
+		api.applyBrowserReshoot.mockResolvedValueOnce({ success: true, applied: 1 });
+		await store().applyReshoot("/p", ["s2"]);
+		expect(store().applied).toEqual(["s2"]);
+		api.reshootBrowserRecording.mockResolvedValueOnce({ success: true });
+		await store().reshootSteps("/p");
+		expect(store()).toMatchObject({ reshoot: [], applied: [] });
+		api.reshootBrowserRecording.mockResolvedValueOnce({ success: false, error: "no browser" });
+		await store().reshootSteps("/p");
+		expect(store()).toMatchObject({ reshoot: null, error: "no browser" });
+		api.reshootBrowserRecording.mockResolvedValueOnce({ success: false });
+		await store().reshootSteps("/p");
+		expect(store().error).toBeNull();
+		api.reshootBrowserRecording.mockRejectedValueOnce("odd");
+		await store().reshootSteps("/p");
+		expect(store()).toMatchObject({ error: "odd", reshooting: false });
 	});
 
 	it("starts a fresh recording, or says why it could not", async () => {

@@ -10,6 +10,9 @@ const state = vi.hoisted(() => ({
 	start: vi.fn(async () => ({ success: true })),
 	stop: vi.fn(() => ({ success: true })),
 	answer: vi.fn(() => ({ success: true })),
+	runTest: vi.fn(async () => ({ success: true })),
+	reshoot: vi.fn(async () => ({ success: true, steps: [] })),
+	apply: vi.fn(() => ({ success: true, applied: 1 })),
 	exportRecording: vi.fn(async () => ({ success: true, code: "x" })),
 }));
 
@@ -22,6 +25,12 @@ vi.mock("../../browser-recorder/recorder-session", () => ({
 	answerDialog: state.answer,
 }));
 vi.mock("../../browser-recorder/recorder-export", () => ({ exportRecording: state.exportRecording }));
+vi.mock("../../browser-recorder/recorder-run", () => ({
+	runRecordedTest: state.runTest,
+	reshootRecording: state.reshoot,
+	applyReshoot: state.apply,
+	defaultRunDeps: { deps: true },
+}));
 
 import { registerBrowserRecorderHandlers } from "../browser-recorder-handlers";
 
@@ -45,6 +54,27 @@ describe("browser recorder handlers", () => {
 		const answer = { id: 1, accept: true, text: "Neo" };
 		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_DIALOG, answer)).toEqual({ success: true });
 		expect(state.answer).toHaveBeenCalledWith(answer);
+	});
+
+	it("runs, reshoots and applies for a project, with step ids read again", async () => {
+		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_RUN, "/p")).toEqual({ success: true });
+		expect(state.runTest).toHaveBeenCalledWith("/p", { deps: true });
+		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT, "/p")).toEqual({ success: true, steps: [] });
+		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT_APPLY, "/p", ["s2", "x", "s2"])).toEqual({
+			success: true,
+			applied: 1,
+		});
+		expect(state.apply).toHaveBeenCalledWith("/p", ["s2"], { deps: true });
+		for (const channel of [IPC_CHANNELS.BROWSER_AGENT_RECORD_RUN, IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT]) {
+			expect(await call(channel, "")).toEqual({ success: false, error: "No project" });
+		}
+		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT_APPLY, "/p", "s2")).toEqual({
+			success: false,
+			applied: 0,
+		});
+		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT_APPLY, 3, [])).toEqual({ success: false, applied: 0 });
+		expect(state.runTest).toHaveBeenCalledTimes(1);
+		expect(state.apply).toHaveBeenCalledTimes(1);
 	});
 
 	it("exports a well-formed request only", async () => {

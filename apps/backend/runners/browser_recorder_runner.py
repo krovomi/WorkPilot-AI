@@ -11,12 +11,20 @@ Subcommands:
   export --format F [--name N] [--root DIR]
                              read a recording (JSON) on stdin and print it as a
                              test file: Playwright (TypeScript, Python) or Cypress
+  run --project P --root DIR --file F --format F --spec S
+                             prepare the review card's worktree DIR, run the
+                             test F there with its format's runner, count its
+                             first run in the project
+  reshoot --project P        replay a recording (JSON, stdin) without a window
+                             and say, per step, whether its selectors still work
 
 Output lines (stdout), for the desktop app:
   RECORDER_STEP:<step JSON>       a step added or updated (``record``)
   RECORDER_DONE:<summary JSON>    the recording ended (``record``)
   RECORDER_DIALOG:<dialog JSON>   the page opened a dialog: type, message (``record``)
   RECORDER_EXPORT:<test JSON>     the generated test (``export``)
+  RECORDER_RUN:<result JSON>      passed, exit code, output, first-run counts (``run``)
+  RECORDER_RESHOOT:<steps JSON>   per step: ok, changed (new selectors), missing… (``reshoot``)
   RECORDER_ERROR:<message JSON>   what went wrong
 
 No model is called. A strict offline project only records a page of this
@@ -44,6 +52,8 @@ DIALOG_TIMEOUT_S = 300.0
 #: An answer line: ``dialog {"id": 1, "accept": true, "text": "..."}``.
 MAX_ANSWER = 4000
 EXPORT = "RECORDER_EXPORT:"
+RUN = "RECORDER_RUN:"
+RESHOOT = "RECORDER_RESHOOT:"
 ERROR = "RECORDER_ERROR:"
 #: A recording sent back by the app: 300 steps fit well under this.
 MAX_INPUT = 2_000_000
@@ -178,14 +188,54 @@ async def run_record(url: str, project: Path) -> dict:
 def run_export(raw: str, fmt: str, name: str | None, root: Path | None) -> dict:
     """The generated test for the recording in ``raw`` (JSON)."""
     from browser_agent.codegen import export_recording
+
+    return export_recording(_recording(raw, "export"), fmt, name, root).to_dict()
+
+
+def _recording(raw: str, action: str):
     from browser_agent.recording import Recording
 
     if len(raw) > MAX_INPUT:
-        raise ValueError("The recording is too large to export.")
+        raise ValueError(f"The recording is too large to {action}.")
     recording = Recording.from_dict(json.loads(raw))
     if not recording.steps:
-        raise ValueError("The recording has no step to export.")
-    return export_recording(recording, fmt, name, root).to_dict()
+        raise ValueError(f"The recording has no step to {action}.")
+    return recording
+
+
+def run_test(project: Path, root: Path, rel: str, fmt: str, spec: str) -> dict:
+    """Prepare the worktree ``root`` and run the recorded test ``rel`` there."""
+    from browser_agent.recorder_run import run_recorded_test
+    from core.workspace.recipe_run import prepare_worktree
+
+    if not root.is_dir():
+        raise ValueError(f"Worktree not found: {root}")
+    return run_recorded_test(
+        project,
+        root,
+        rel,
+        fmt,
+        lambda: prepare_worktree(project, root, spec).status,
+    ).to_dict()
+
+
+async def run_reshoot(raw: str, project: Path) -> dict:
+    """Replay the recording in ``raw`` without a window: what each step found."""
+    from browser_agent.browser_controller import BrowserController
+    from browser_agent.recorder_replay import reshoot
+
+    recording = _recording(raw, "replay")
+    start = next((s for s in recording.steps if s.kind == "navigate"), None)
+    if start is None:
+        raise ValueError("The recording opens no page.")
+    check_url(start.url, project)
+    controller = BrowserController(project_dir=project, headless=True)
+    try:
+        await controller.launch()
+        shots = await reshoot(controller.page, recording)
+    finally:
+        await controller.close()
+    return {"steps": [shot.to_dict() for shot in shots]}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -201,15 +251,29 @@ def main(argv: list[str] | None = None) -> int:
     export.add_argument("--format", required=True, choices=FORMATS)
     export.add_argument("--name", default=None)
     export.add_argument("--root", default=None, help="Folder the test goes into")
+    run = sub.add_parser("run", help="Run a recorded test in its worktree")
+    run.add_argument("--project", required=True)
+    run.add_argument("--root", required=True, help="The review card's worktree")
+    run.add_argument("--file", required=True, help="The test, relative to --root")
+    run.add_argument("--format", required=True, choices=FORMATS)
+    run.add_argument("--spec", required=True, help="The review card's spec")
+    shoot = sub.add_parser("reshoot", help="Replay a recording (stdin) headless")
+    shoot.add_argument("--project", required=True)
     args = parser.parse_args(argv)
 
     try:
+        project = Path(getattr(args, "project", None) or ".").resolve()
+        if args.command != "export" and not project.is_dir():
+            raise ValueError(f"Project directory not found: {project}")
         if args.command == "record":
-            project = Path(args.project).resolve()
-            if not project.is_dir():
-                raise ValueError(f"Project directory not found: {project}")
             url = check_url(args.url, project)
             _emit(DONE, asyncio.run(run_record(url, project)))
+        elif args.command == "run":
+            root = Path(args.root).resolve()
+            _emit(RUN, run_test(project, root, args.file, args.format, args.spec))
+        elif args.command == "reshoot":
+            raw = sys.stdin.read(MAX_INPUT + 1)
+            _emit(RESHOOT, asyncio.run(run_reshoot(raw, project)))
         else:
             root = Path(args.root).resolve() if args.root else None
             raw = sys.stdin.read(MAX_INPUT + 1)

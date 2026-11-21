@@ -38,6 +38,7 @@ import {
 	defaultExportDeps,
 	exportRecording,
 	generateTest,
+	lastReviewedTest,
 	writeTestFile,
 } from "../recorder-export";
 import { resetRecorderSessionForTests, startRecording } from "../recorder-session";
@@ -139,6 +140,14 @@ describe("exportRecording", () => {
 			summary: 'Browser Agent recording "recorded flow" as playwright-ts (2 steps): e2e/log-in.spec.ts',
 		});
 		expect(outcome).toMatchObject({ success: true, path: "e2e/log-in.spec.ts", review });
+		expect(lastReviewedTest("/projects/app")).toEqual({
+			root: "/worktrees/007",
+			path: "e2e/log-in.spec.ts",
+			format: "playwright-ts",
+			specId: review.specId,
+			envVars: ["E2E_PASSWORD"],
+		});
+		expect(lastReviewedTest("/elsewhere")).toBeUndefined();
 	});
 
 	it("writes a WebDriver test with its format's extension", async () => {

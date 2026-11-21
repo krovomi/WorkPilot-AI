@@ -156,6 +156,32 @@
 		"answered": {
 			"accept": "{{kind}} : réponse OK",
 			"dismiss": "{{kind}} : annulée"
+		},
+		"check": {
+			"title": "Lancer et vérifier",
+			"hint": "Lancez le test proposé sur une carte de revue dans le worktree de cette carte, sans identifiants, ou rejouez l'enregistrement sans fenêtre pour voir quels sélecteurs trouvent encore leur élément."
+		},
+		"run": {
+			"start": "Lancer le test sur sa carte de revue",
+			"passed": "Le test est passé.",
+			"failed": "Le test a échoué (code de sortie {{code}}).",
+			"awaitingApproval": "La recette du worktree du projet attend son approbation : ses dépendances ne sont peut-être pas installées.",
+			"firstRun": "Premier lancement de ce test.",
+			"rate": "{{passed}} test(s) enregistré(s) sur {{runs}} sont passés à leur premier lancement."
+		},
+		"reshoot": {
+			"start": "Revérifier les sélecteurs",
+			"empty": "Rien à rejouer.",
+			"now": "maintenant :",
+			"applied": "mis à jour",
+			"apply": "Utiliser les nouveaux sélecteurs",
+			"status": {
+				"ok": "Trouvé",
+				"changed": "Changé",
+				"missing": "Introuvable",
+				"failed": "Action en échec",
+				"not-reached": "Non atteint"
+			}
 		}
 	}
 }

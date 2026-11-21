@@ -194,7 +194,8 @@ function requestWait(value: unknown): RecordedStep["waitRequest"] {
 	return { method: r.method, path: r.path };
 }
 
-function parseSelectors(raw: unknown): RecordedSelector[] {
+/** The selectors of a step as the runner printed them: closed strategies, bounded. */
+export function parseSelectors(raw: unknown): RecordedSelector[] {
 	const selectors: RecordedSelector[] = [];
 	for (const item of Array.isArray(raw) ? raw.slice(0, 6) : []) {
 		const s = (item ?? {}) as Record<string, unknown>;

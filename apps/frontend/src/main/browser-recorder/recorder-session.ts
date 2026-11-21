@@ -60,13 +60,14 @@ export const spawnRecorderRunner: SpawnRunner = async (args) => {
 	return spawn(python, [runner, ...args], { cwd: backend, env: pythonStaticRunnerEnv(backend) });
 };
 
-function broadcastToWindows(event: RecorderEvent): void {
+/** Sends a recorder event to every window. */
+export function broadcastRecorderEvent(event: RecorderEvent): void {
 	for (const win of BrowserWindow.getAllWindows()) {
 		win.webContents.send(IPC_CHANNELS.BROWSER_AGENT_RECORD_EVENT, event);
 	}
 }
 
-const defaultDeps: RecorderDeps = { spawnRunner: spawnRecorderRunner, broadcast: broadcastToWindows };
+const defaultDeps: RecorderDeps = { spawnRunner: spawnRecorderRunner, broadcast: broadcastRecorderEvent };
 
 interface Session {
 	projectPath: string;
@@ -207,6 +208,26 @@ export function recordedSteps(projectPath: string, ids: readonly string[]): Reco
 	if (!session || session.projectPath !== projectPath) return [];
 	const byId = new Map([...session.steps, ...session.suggestions].map((step) => [step.id, step]));
 	return ids.map((id) => byId.get(id)).filter((step): step is RecordedStep => step !== undefined);
+}
+
+/** The steps of `projectPath`'s last recording, in order, once it has stopped (not its proposed checks). */
+export function sessionSteps(projectPath: string): RecordedStep[] {
+	if (!session || session.projectPath !== projectPath || session.child) return [];
+	return [...session.steps];
+}
+
+/** Gives a step of the stopped recording new selectors: the step updated, or null. */
+export function updateStepSelectors(
+	projectPath: string,
+	id: string,
+	selectors: RecordedStep["selectors"],
+): RecordedStep | null {
+	if (!session || session.projectPath !== projectPath || session.child) return null;
+	const index = session.steps.findIndex((step) => step.id === id);
+	if (index < 0) return null;
+	const step = { ...session.steps[index], selectors };
+	session.steps[index] = step;
+	return step;
 }
 
 /** For tests: forget the session. */

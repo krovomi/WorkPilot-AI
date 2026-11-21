@@ -44,9 +44,11 @@ import {
 	readRecordUrl,
 	recordedSteps,
 	resetRecorderSessionForTests,
+	sessionSteps,
 	spawnRecorderRunner,
 	startRecording,
 	stopRecording,
+	updateStepSelectors,
 } from "../recorder-session";
 
 function fakeChild() {
@@ -213,6 +215,27 @@ describe("stopRecording", () => {
 		expect(child.written).toEqual(["stop\n"]);
 		child.stdin.destroy();
 		expect(stopRecording()).toEqual({ success: false });
+	});
+});
+
+describe("the stopped recording's steps", () => {
+	it("are given out, and take new selectors, only once it has stopped", async () => {
+		expect(sessionSteps("/p")).toEqual([]);
+		expect(updateStepSelectors("/p", "s2", [])).toBeNull();
+		const child = fakeChild();
+		await startRecording("/p", "http://a.test", deps(child).deps);
+		child.stdout.write(`RECORDER_STEP:${JSON.stringify({ id: "s2", kind: "click", selectors: [button] })}\n`);
+		await tick();
+		expect(sessionSteps("/p")).toEqual([]);
+		expect(updateStepSelectors("/p", "s2", [])).toBeNull();
+		child.emit("close", 0);
+		expect(sessionSteps("/p").map((s) => s.id)).toEqual(["s2"]);
+		expect(sessionSteps("/other")).toEqual([]);
+		const css = [{ strategy: "css", value: "#go" }] as const;
+		expect(updateStepSelectors("/p", "s2", css)).toEqual({ id: "s2", kind: "click", selectors: css });
+		expect(recordedSteps("/p", ["s2"])[0].selectors).toEqual(css);
+		expect(updateStepSelectors("/p", "s7", css)).toBeNull();
+		expect(updateStepSelectors("/other", "s2", css)).toBeNull();
 	});
 });
 

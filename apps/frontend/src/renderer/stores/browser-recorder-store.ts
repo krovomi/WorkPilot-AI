@@ -9,7 +9,9 @@
  * waits in `suggestions` until the person keeps it, which puts it right after
  * its action, or sets it aside. A dialog the recorded page opens waits in
  * `pendingDialog` until the person answers it here. An export sends the ids
- * of the steps kept; the main owns their content.
+ * of the steps kept; the main owns their content. The test proposed on a
+ * review card can be run there (`run`), and the stopped recording replayed to
+ * check its selectors (`reshoot`), whose proposals are applied by step id.
  */
 import { create } from "zustand";
 import type {
@@ -21,6 +23,7 @@ import type {
 	RecorderStatus,
 	TestFormat,
 } from "../../shared/types/browser-recorder";
+import type { RecordedTestRun, ReshootStep } from "../../shared/types/browser-recorder-run";
 
 interface BrowserRecorderState {
 	status: RecorderStatus;
@@ -34,6 +37,12 @@ interface BrowserRecorderState {
 	exporting: ExportDestination | null;
 	outcome: RecorderExportOutcome | null;
 	pendingDialog: PendingDialog | null;
+	running: boolean;
+	run: RecordedTestRun | null;
+	reshooting: boolean;
+	reshoot: ReshootStep[] | null;
+	/** Steps that took the selectors the reshoot proposed. */
+	applied: string[];
 
 	setFormat: (format: TestFormat) => void;
 	setName: (name: string) => void;
@@ -42,6 +51,9 @@ interface BrowserRecorderState {
 	dismissSuggestion: (id: string) => void;
 	handleEvent: (event: RecorderEvent) => void;
 	answerDialog: (accept: boolean, text: string) => Promise<void>;
+	runTest: (projectPath: string) => Promise<void>;
+	reshootSteps: (projectPath: string) => Promise<void>;
+	applyReshoot: (projectPath: string, ids: string[]) => Promise<void>;
 	start: (projectPath: string, url: string) => Promise<void>;
 	stop: () => Promise<void>;
 	exportTo: (projectPath: string, destination: ExportDestination) => Promise<void>;
@@ -77,6 +89,11 @@ export const useBrowserRecorderStore = create<BrowserRecorderState>((set, get) =
 	exporting: null,
 	outcome: null,
 	pendingDialog: null,
+	running: false,
+	run: null,
+	reshooting: false,
+	reshoot: null,
+	applied: [],
 
 	setFormat: (format) => set({ format, outcome: null }),
 	setName: (name) => set({ name }),
@@ -140,6 +157,9 @@ export const useBrowserRecorderStore = create<BrowserRecorderState>((set, get) =
 			error: null,
 			outcome: null,
 			pendingDialog: null,
+			run: null,
+			reshoot: null,
+			applied: [],
 		});
 		try {
 			const result = await globalThis.electronAPI.startBrowserRecording(projectPath, url);
@@ -153,6 +173,35 @@ export const useBrowserRecorderStore = create<BrowserRecorderState>((set, get) =
 		set({ status: "stopping" });
 		const result = await globalThis.electronAPI.stopBrowserRecording();
 		if (!result.success) set({ status: "idle" });
+	},
+
+	runTest: async (projectPath) => {
+		set({ running: true, run: null, error: null });
+		try {
+			const outcome = await globalThis.electronAPI.runBrowserRecordedTest(projectPath);
+			set(outcome.success && outcome.run ? { run: outcome.run } : { error: outcome.error ?? null });
+		} catch (error) {
+			set({ error: message(error) });
+		} finally {
+			set({ running: false });
+		}
+	},
+
+	reshootSteps: async (projectPath) => {
+		set({ reshooting: true, reshoot: null, applied: [], error: null });
+		try {
+			const outcome = await globalThis.electronAPI.reshootBrowserRecording(projectPath);
+			set(outcome.success ? { reshoot: [...(outcome.steps ?? [])] } : { error: outcome.error ?? null });
+		} catch (error) {
+			set({ error: message(error) });
+		} finally {
+			set({ reshooting: false });
+		}
+	},
+
+	applyReshoot: async (projectPath, ids) => {
+		const result = await globalThis.electronAPI.applyBrowserReshoot(projectPath, ids);
+		if (result.success) set((state) => ({ applied: [...state.applied, ...ids], outcome: null }));
 	},
 
 	exportTo: async (projectPath, destination) => {
