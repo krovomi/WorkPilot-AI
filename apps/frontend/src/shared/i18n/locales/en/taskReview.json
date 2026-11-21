@@ -316,7 +316,16 @@
 	"prFiles": {
 		"renamedFrom": "(was: {{name}})",
 		"loadingTitle": "Loading PR files",
-		"loading": "Loading pull request files..."
+		"loading": "Loading pull request files...",
+		"states": {
+			"open": "Open",
+			"closed": "Closed"
+		},
+		"errors": {
+			"invalidUrl": "This link is not a GitHub or Azure DevOps pull request.",
+			"fetchFailed": "The pull request could not be loaded.",
+			"noData": "The pull request came back empty."
+		}
 	},
 	"taskPanel": {
 		"noFilesInSubtask": "No files in this subtask",

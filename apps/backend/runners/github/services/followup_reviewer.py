@@ -23,34 +23,20 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ..models import FollowupReviewContext, GitHubRunnerConfig
+    from runners.github.models import FollowupReviewContext, GitHubRunnerConfig
 
-try:
-    from ..gh_client import GHClient
-    from ..models import (
-        MergeVerdict,
-        PRReviewFinding,
-        PRReviewResult,
-        ReviewCategory,
-        ReviewSeverity,
-    )
-    from .category_utils import map_category
-    from .io_utils import safe_print
-    from .prompt_manager import PromptManager
-    from .pydantic_models import FollowupReviewResponse
-except (ImportError, ValueError, SystemError):
-    from gh_client import GHClient
-    from models import (
-        MergeVerdict,
-        PRReviewFinding,
-        PRReviewResult,
-        ReviewCategory,
-        ReviewSeverity,
-    )
-    from services.category_utils import map_category
-    from services.io_utils import safe_print
-    from services.prompt_manager import PromptManager
-    from services.pydantic_models import FollowupReviewResponse
+from runners.github.gh_client import GHClient
+from runners.github.models import (
+    MergeVerdict,
+    PRReviewFinding,
+    PRReviewResult,
+    ReviewCategory,
+    ReviewSeverity,
+)
+from runners.github.services.category_utils import map_category
+from runners.github.services.io_utils import safe_print
+from runners.github.services.prompt_manager import PromptManager
+from runners.github.services.pydantic_models import FollowupReviewResponse
 
 logger = logging.getLogger(__name__)
 
@@ -217,13 +203,10 @@ class FollowupReviewer:
             verdict_reasoning=verdict_reasoning,
         )
 
-        # Map verdict to overall_status
-        if verdict == MergeVerdict.BLOCKED:
+        # Map verdict to overall_status (the follow-up verdict is never
+        # MERGE_WITH_CHANGES: low findings alone are ready to merge)
+        if verdict in (MergeVerdict.BLOCKED, MergeVerdict.NEEDS_REVISION):
             overall_status = "request_changes"
-        elif verdict == MergeVerdict.NEEDS_REVISION:
-            overall_status = "request_changes"
-        elif verdict == MergeVerdict.MERGE_WITH_CHANGES:
-            overall_status = "comment"
         else:
             overall_status = "approve"
 
@@ -751,22 +734,20 @@ Analyze this follow-up review context and provide your structured response.
                                             result
                                         )
 
-                        # Also check for direct structured_output attribute (SDK validated JSON)
-                        if (
-                            hasattr(message, "structured_output")
-                            and message.structured_output
-                        ):
-                            logger.info(
-                                "[Followup] Found structured_output attribute on message"
-                            )
-                            safe_print(
-                                "[Followup] Using SDK structured output (direct attribute)",
-                                flush=True,
-                            )
-                            result = FollowupReviewResponse.model_validate(
-                                message.structured_output
-                            )
-                            return self._convert_structured_to_internal(result)
+                    # The SDK also hands the validated JSON over as an attribute
+                    # (the ResultMessage's `structured_output`).
+                    if getattr(message, "structured_output", None):
+                        logger.info(
+                            "[Followup] Found structured_output attribute on message"
+                        )
+                        safe_print(
+                            "[Followup] Using SDK structured output (direct attribute)",
+                            flush=True,
+                        )
+                        result = FollowupReviewResponse.model_validate(
+                            message.structured_output
+                        )
+                        return self._convert_structured_to_internal(result)
 
                     # Handle ResultMessage for errors
                     if msg_type == "ResultMessage":

@@ -8,7 +8,8 @@
 
 import { Info } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { ArchViolation } from "../../../preload/api/modules/phase35-features-api";
+import { useShallow } from "zustand/react/shallow";
+import type { ArchViolation, DriftReport } from "../../../preload/api/modules/phase35-features-api";
 import { useArchDriftStore } from "../../stores/phase35-stores";
 import { Notice } from "../charter";
 import { Badge } from "../ui/badge";
@@ -19,7 +20,7 @@ interface ArchDriftPanelProps {
 	projectPath: string;
 }
 
-const SEV_COLOR: Record<string, string> = {
+const SEV_COLOR: Record<DriftReport["severity"], string> = {
 	none: "bg-muted text-muted-foreground",
 	low: "bg-warning/20 text-warning border-warning/40",
 	medium: "bg-orange-500/20 text-orange-700 border-orange-500/40",
@@ -87,7 +88,19 @@ export function ArchDriftPanel({ projectPath }: ArchDriftPanelProps) {
 		scan,
 		saveBaseline,
 		compare,
-	} = useArchDriftStore();
+	} = useArchDriftStore(
+		useShallow((s) => ({
+			phase: s.phase,
+			error: s.error,
+			scanReport: s.scanReport,
+			driftReport: s.driftReport,
+			configSource: s.configSource,
+			baselineCount: s.baselineCount,
+			scan: s.scan,
+			saveBaseline: s.saveBaseline,
+			compare: s.compare,
+		})),
+	);
 	const isRunning = phase === "running";
 
 	return (
@@ -171,7 +184,7 @@ export function ArchDriftPanel({ projectPath }: ArchDriftPanelProps) {
 				<div className="space-y-3 text-sm">
 					<div className="flex items-center gap-3">
 						<span className="font-medium">{t("archDrift.severity")}:</span>
-						<Badge className={SEV_COLOR[driftReport.severity] ?? "bg-muted"}>
+						<Badge className={SEV_COLOR[driftReport.severity]}>
 							{t(`common.severity.${driftReport.severity}` as never, {
 								defaultValue: driftReport.severity,
 							})}

@@ -72,8 +72,8 @@ export function AddKeyDialog({
 		onOpenChange(false);
 	};
 
+	// Reached only with a valid key: Enter checks it and the button is disabled without one.
 	const submit = () => {
-		if (!canSubmit) return;
 		const filled = Object.fromEntries(
 			Object.entries(values).filter(([, v]) => v.trim().length > 0),
 		);
@@ -82,7 +82,8 @@ export function AddKeyDialog({
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
+		// No trigger opens it from inside: the only change Radix reports is a close.
+		<Dialog open={open} onOpenChange={close}>
 			<DialogContent className="sm:max-w-lg">
 				<DialogHeader>
 					<DialogTitle>{t("i18nEditor.addKeyTitle")}</DialogTitle>
