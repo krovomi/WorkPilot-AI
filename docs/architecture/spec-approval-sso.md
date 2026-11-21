@@ -237,7 +237,9 @@ du journal écrite avec la requête les nomme (colonnes `login_id` et `login_met
 
 La ligne de la connexion elle-même est écrite dans l'organisation où ses jetons agissent :
 `GET /admin/audit` dit qui s'est connecté, comment et d'où ; `?login_id=` liste ce qui a été fait
-sous une connexion, et `GET /admin/sessions` nomme la connexion de chaque session ouverte. Les
+sous une connexion, et `GET /admin/sessions` nomme la connexion de chaque session ouverte. L'onglet
+Journal de l'Administration du bureau montre la méthode et le début de l'identifiant de chaque
+entrée, et son filtre retrouve une connexion par le début de son identifiant. Les
 entrées et sessions d'avant n'ont pas d'identifiant ; une session d'avant en reçoit un à son
 prochain rafraîchissement. Un jeton personnel (`/mcp`) ne vient d'aucune connexion et n'en nomme pas.
 
@@ -261,5 +263,4 @@ Reste de l'issue #363 :
   par fournisseur, une surface publique nouvelle à concevoir et sécuriser à part ;
 - le bouton Entra de l'app de bureau mène encore son propre flux : le faire passer par celui du
   fournisseur générique (`src/main/oidc-pkce.ts`, `state` et `nonce` partagés), comme le téléphone ;
-- l'app de bureau ne montre pas encore la connexion d'une entrée du journal ni d'une session (l'API
-  la donne).
+- l'app de bureau ne montre pas encore la connexion d'une session ouverte (l'API la donne).
