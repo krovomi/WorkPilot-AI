@@ -283,6 +283,10 @@ async def test_the_chosen_provider_is_called_with_its_own_key(
 
     [request] = network["sent"]
     assert request.url.host == "generativelanguage.googleapis.com"
+    assert (
+        request.headers["x-goog-api-key"] == "gm-test-0000"
+    )  # pragma: allowlist secret
+    assert "gm-test-0000" not in str(request.url)
 
 
 async def test_a_failing_vision_call_is_reported(

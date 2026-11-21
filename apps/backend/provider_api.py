@@ -1241,7 +1241,7 @@ def get_effort_plan(provider: str = "", model: str = ""):
 # auth_style: how the API key is presented to the provider.
 #   "bearer"     → Authorization: Bearer <key>
 #   "x-api-key"  → x-api-key: <key>  (Anthropic-style)
-#   "query"      → appended as ?key=<key> (Google-style)
+#   "x-goog-api-key" → x-goog-api-key: <key>  (Google-style)
 # ok_statuses: status codes that count as a valid key (some providers return 403/404
 #   on the models endpoint even with a valid key — that still proves auth worked).
 _VALIDATION_SPECS: dict[str, dict[str, Any]] = {
@@ -1269,7 +1269,7 @@ _VALIDATION_SPECS: dict[str, dict[str, Any]] = {
     },
     "google": {
         "url": "https://generativelanguage.googleapis.com" + API_MODELS_ENDPOINT,
-        "auth_style": "query",
+        "auth_style": "x-goog-api-key",
         "ok_statuses": (200,),
     },
     "windsurf": {
@@ -1299,22 +1299,18 @@ async def _validate_key_http(provider: str, api_key: str, spec: dict[str, Any]) 
     auth_style = spec["auth_style"]
     ok_statuses = spec["ok_statuses"]
     headers: dict[str, str] = dict(spec.get("extra_headers", {}))
-    params: dict[str, str] = {}
 
     if auth_style == "bearer":
         headers["Authorization"] = f"Bearer {api_key}"
     elif auth_style == "x-api-key":
         headers["x-api-key"] = api_key
-    elif auth_style == "query":
-        # Pass the key as a real query parameter so httpx percent-encodes it.
-        # Interpolating it into the URL string lets a crafted key inject extra
-        # query/fragment components (CodeQL py/partial-ssrf); the host stays the
-        # provider's hardcoded endpoint either way.
-        params["key"] = api_key
+    elif auth_style == "x-goog-api-key":
+        # A header, not ``?key=``: a URL ends up in error messages and logs.
+        headers["x-goog-api-key"] = api_key
 
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-            resp = await client.get(url, headers=headers, params=params, timeout=10)
+            resp = await client.get(url, headers=headers, timeout=10)
         if resp.status_code not in ok_statuses:
             set_validated(provider, api_key, False)
             raise HTTPException(
