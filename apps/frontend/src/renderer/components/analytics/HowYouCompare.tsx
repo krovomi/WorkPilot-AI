@@ -6,55 +6,38 @@
  * person may read, as medians only, from groups of `min_group` projects.
  *
  * Every figure is per spec and lower is better: minutes, USD, QA iterations,
- * agents. Nothing is sent anywhere (`main/build-compare.ts`).
+ * agents. Nothing is sent anywhere (`main/build-compare.ts`). Groups are the
+ * same stack and size, the same stack, the same team size, and all; each
+ * gives its top tenth once it is large enough (`min_top`). The project's own
+ * last weeks draw a sparkline, its kinds of work have a table of their own
+ * (`CompareKinds`), and "Generate team report" prints all of it to a PDF.
  */
 
-import { AlertTriangle, RefreshCw, Scale, ShieldCheck } from "lucide-react";
+import { AlertTriangle, FileDown, RefreshCw, Scale, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	type BuildComparison,
+	COMPARE_GROUPS,
 	COMPARE_METRICS,
 	type CompareGroup,
 	type CompareMetric,
 } from "@shared/types/build-compare";
+import { formatAppDate } from "../../lib/date-format";
 import { loadBuildComparison } from "../../lib/workspace-data";
-import { CharterButton, Chip, Chips, EmptyStage, Notice, Panel, ScanLine, type Tone } from "../charter";
+import { CharterButton, Chip, Chips, EmptyStage, Notice, Panel, ScanLine } from "../charter";
+import { CompareKinds } from "./CompareKinds";
+import { CompareSparkline } from "./CompareSparkline";
+import { formatMetric, formatTrend, METRIC_KEYS, trendTone } from "./compare-format";
+import { compareReport } from "./compare-report";
 
 interface HowYouCompareProps {
 	readonly projectPath: string;
 	readonly serverProjectId?: string;
 }
 
-const GROUPS = ["segment", "stack", "all"] as const;
-
-const METRIC_KEYS: Record<CompareMetric, string> = {
-	minutes: "minutes",
-	cost: "cost",
-	qa_iterations: "qaIterations",
-	agents: "agents",
-};
-
-/** A metric's value as the person reads it; a dash when nothing recorded it. */
-export function formatMetric(metric: CompareMetric, value: number | null): string {
-	if (value === null) return "—";
-	if (metric === "cost") return `$${value.toFixed(2)}`;
-	if (metric === "minutes") {
-		return value < 60 ? `${value.toFixed(0)} min` : `${(value / 60).toFixed(1)} h`;
-	}
-	return value.toFixed(1).replace(/\.0$/, "");
-}
-
-/** Lower is better for every metric: a fall is good news. */
-export function trendTone(value: number | null): Tone {
-	if (value === null || Math.abs(value) < 5) return "muted";
-	return value < 0 ? "green" : "amber";
-}
-
-function formatTrend(value: number | null): string {
-	if (value === null) return "—";
-	return `${value > 0 ? "+" : ""}${value.toFixed(0)}%`;
-}
+/** What the last "Generate team report" did: saved where, or why it failed. */
+type ReportState = { saved: string } | { failed: string } | null;
 
 export function HowYouCompare({ projectPath, serverProjectId }: HowYouCompareProps) {
 	const { t } = useTranslation("analytics");
@@ -62,6 +45,8 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 	const [loading, setLoading] = useState(true);
 	// Set whenever loading ends without a comparison.
 	const [error, setError] = useState("");
+	const [exporting, setExporting] = useState(false);
+	const [report, setReport] = useState<ReportState>(null);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -81,6 +66,21 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 		load();
 	}, [load]);
 
+	const exportReport = async (data: BuildComparison) => {
+		setExporting(true);
+		setReport(null);
+		try {
+			const document = compareReport(data, t, !!serverProjectId, formatAppDate(new Date()));
+			const result = await globalThis.electronAPI.exportBuildComparison(document);
+			if (!result.success) setReport({ failed: result.error ?? t("compare.report.error") });
+			else if (result.data) setReport({ saved: result.data });
+		} catch (e) {
+			setReport({ failed: e instanceof Error ? e.message : t("compare.report.error") });
+		} finally {
+			setExporting(false);
+		}
+	};
+
 	if (loading) return <ScanLine label={t("compare.loading")} />;
 	if (!comparison) {
 		return (
@@ -98,9 +98,18 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 	}
 
 	const sizeLabel = (size: string) => t(`compare.sizes.${size}`, { defaultValue: size });
+	const teamLabel = (team: string) => t(`compare.teams.${team}`, { defaultValue: team });
 	const stackLabel = (stack: string) => (stack === "other" ? t("compare.otherStack") : stack);
-	const groupCell = (group: CompareGroup, metric: CompareMetric) =>
-		group.medians ? formatMetric(metric, group.medians[metric]) : "—";
+	const groupCell = (group: CompareGroup, metric: CompareMetric) => (
+		<>
+			{group.medians ? formatMetric(metric, group.medians[metric]) : "—"}
+			{group.top && group.top[metric] !== null && (
+				<span className="wp-meta block">
+					{t("compare.top", { value: formatMetric(metric, group.top[metric]) })}
+				</span>
+			)}
+		</>
+	);
 	const others = comparison.projects.filter((line) => !line.current);
 
 	return (
@@ -117,11 +126,33 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 						<Scale className="h-4 w-4" aria-hidden="true" />
 						{t("compare.title")}
 					</h3>
-					<Chips>
-						<Chip tone="blue">{stackLabel(comparison.segment.stack)}</Chip>
-						<Chip tone="violet">{sizeLabel(comparison.segment.size)}</Chip>
-					</Chips>
+					<div className="flex flex-wrap items-center gap-2">
+						<Chips>
+							<Chip tone="blue">{stackLabel(comparison.segment.stack)}</Chip>
+							<Chip tone="violet">{sizeLabel(comparison.segment.size)}</Chip>
+							<Chip tone="green">{teamLabel(comparison.segment.team)}</Chip>
+						</Chips>
+						<CharterButton
+							size="sm"
+							icon={FileDown}
+							busy={exporting}
+							disabled={exporting}
+							onClick={() => exportReport(comparison)}
+						>
+							{t("compare.report.button")}
+						</CharterButton>
+					</div>
 				</div>
+				{report && "saved" in report && (
+					<p className="wp-meta" data-testid="compare-report-saved">
+						{t("compare.report.saved", { path: report.saved })}
+					</p>
+				)}
+				{report && "failed" in report && (
+					<Notice tone="red" icon={AlertTriangle}>
+						{report.failed}
+					</Notice>
+				)}
 				<p className="wp-meta">
 					{t("compare.window", {
 						days: comparison.window_days,
@@ -135,9 +166,12 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 							<tr className="wp-muted text-left">
 								<th className="py-1 pr-3 font-medium">{t("compare.columns.metric")}</th>
 								<th className="py-1 pr-3 font-medium">{t("compare.columns.recent")}</th>
+								<th className="py-1 pr-3 font-medium">
+									{t("compare.columns.weeks", { count: comparison.weeks.length })}
+								</th>
 								<th className="py-1 pr-3 font-medium">{t("compare.columns.previous")}</th>
 								<th className="py-1 pr-3 font-medium">{t("compare.columns.trend")}</th>
-								{GROUPS.map((group) => (
+								{COMPARE_GROUPS.map((group) => (
 									<th key={group} className="py-1 pr-3 font-medium">
 										{t(`compare.groups.${group}`)}
 										<span className="wp-meta block font-normal">
@@ -154,6 +188,14 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 									<td className="py-1.5 pr-3 font-mono font-semibold">
 										{formatMetric(metric, comparison.recent[metric])}
 									</td>
+									<td className="py-1.5 pr-3">
+										<CompareSparkline
+											values={comparison.weeks.map((week) => week[metric])}
+											label={t("compare.sparkline", {
+												metric: t(`compare.metrics.${METRIC_KEYS[metric]}`),
+											})}
+										/>
+									</td>
 									<td className="wp-muted py-1.5 pr-3 font-mono">
 										{formatMetric(metric, comparison.previous[metric])}
 									</td>
@@ -162,7 +204,7 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 											{formatTrend(comparison.trend[metric])}
 										</Chip>
 									</td>
-									{GROUPS.map((group) => (
+									{COMPARE_GROUPS.map((group) => (
 										<td key={group} className="wp-muted py-1.5 pr-3 font-mono">
 											{groupCell(comparison.groups[group], metric)}
 										</td>
@@ -172,11 +214,16 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 						</tbody>
 					</table>
 				</div>
-				{GROUPS.some((group) => !comparison.groups[group].medians) && (
+				{COMPARE_GROUPS.some((group) => !comparison.groups[group].medians) && (
 					<p className="wp-meta">{t("compare.smallGroup", { count: comparison.min_group })}</p>
+				)}
+				{comparison.min_top !== null && (
+					<p className="wp-meta">{t("compare.topNote", { count: comparison.min_top })}</p>
 				)}
 				<p className="wp-meta">{t("compare.lowerIsBetter")}</p>
 			</Panel>
+
+			<CompareKinds kinds={comparison.kinds} minGroup={comparison.min_group} />
 
 			{!serverProjectId && (
 				<Panel className="space-y-3">
@@ -203,7 +250,7 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 										<tr key={`${line.name}|${line.stack}|${line.size}|${line.specs}|${line.cost}`} className="border-t border-border/50">
 											<td className="max-w-[16rem] truncate py-1.5 pr-3 font-medium">{line.name}</td>
 											<td className="wp-muted py-1.5 pr-3">
-												{stackLabel(line.stack)} · {sizeLabel(line.size)}
+												{stackLabel(line.stack)} · {sizeLabel(line.size)} · {teamLabel(line.team)}
 											</td>
 											<td className="py-1.5 pr-3 font-mono">{line.specs}</td>
 											{COMPARE_METRICS.map((metric) => (
