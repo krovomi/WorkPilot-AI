@@ -631,7 +631,8 @@ def test_the_workspace_is_read_with_the_analytics_permission():
         assert permission_for(method, path, domain) == "analytics.read"
 
 
-def test_the_desktop_dashboard_routes_answer_only_in_local_mode(monkeypatch):
+def test_the_desktop_session_history_answers_only_in_local_mode(monkeypatch, tmp_path):
+    import replay.recorder as recorder
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
@@ -639,22 +640,19 @@ def test_the_desktop_dashboard_routes_answer_only_in_local_mode(monkeypatch):
         if key.startswith("WORKPILOT_"):
             monkeypatch.delenv(key, raising=False)
     server_config.reset_settings_cache()
+    monkeypatch.setattr(
+        recorder, "_replay_recorder", recorder.ReplayRecorder(tmp_path / "replays")
+    )
     from dashboard.api import router
 
     app = FastAPI()
     app.include_router(router)
     with TestClient(app) as client:
-        assert client.get("/api/dashboard/stats").status_code == 200
+        assert client.get("/api/sessions/p-1").status_code == 200
         monkeypatch.setenv("WORKPILOT_SERVER_MODE", "1")
         monkeypatch.setenv("WORKPILOT_JWT_SECRET", _VALID_SECRET)
         server_config.reset_settings_cache()
-        for path in (
-            "/api/dashboard/stats",
-            "/api/sessions/p-1",
-            "/api/dashboard/snapshot/repos/p-1",
-            "/api/dashboard/export/p-1",
-        ):
-            assert client.get(path).status_code == 404, path
+        assert client.get("/api/sessions/p-1").status_code == 404
     server_config.reset_settings_cache()
 
 

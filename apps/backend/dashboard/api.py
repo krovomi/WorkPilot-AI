@@ -1,31 +1,26 @@
-"""Dashboard + Session History endpoints.
+"""Session History endpoint.
 
 Extracted from provider_api.py. Mounted via app.include_router(router).
 
-Frontend traffic: GET /api/sessions/{projectId} is called by
-SessionHistory.tsx. Path/method/response shape are preserved verbatim
-to avoid breaking that caller.
+Frontend traffic: GET /api/sessions/{projectId}, from the replay IPC handler
+for SessionHistory.tsx. Path/method/response shape are preserved verbatim to
+avoid breaking that caller. The dashboard itself is built by the desktop main
+process from the project's ledgers (``workspace-ledgers.ts``), not here.
 
-These routes read the computer's own files (a project folder, the replay
-store of the home directory): they answer only in local mode. A server
-project's workspace views are ``shared_features.workspace``, by project.
+This route reads the replay store of the home directory: it answers only in
+local mode. A server project's workspace views are
+``shared_features.workspace``, by project.
 """
 
 from __future__ import annotations
 
-import csv
-import io
-import json
+import logging
 from datetime import UTC, datetime
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
-from foundation.api_safety import server_mode_roots
+from foundation.api_safety import safe_error, server_mode_roots
 
-try:
-    from provider_api import _safe_error_message
-except ImportError:
-    from apps.backend.provider_api import _safe_error_message  # type: ignore[no-redef]
+logger = logging.getLogger(__name__)
 
 
 def _desktop_only() -> None:
@@ -34,83 +29,6 @@ def _desktop_only() -> None:
 
 
 router = APIRouter(dependencies=[Depends(_desktop_only)])
-
-
-def _load_dashboard_snapshot(project_id: str) -> dict:
-    """Load dashboard_snapshot.json written by core.usage_tracker.
-
-    project_id is the project path (URL-decoded by FastAPI).
-    """
-    base_dir = Path.cwd().resolve()
-    try:
-        project_path = (base_dir / project_id).resolve()
-        project_path.relative_to(base_dir)
-    except Exception:
-        return {}
-
-    if not project_path.is_dir():
-        return {}
-    snap_path = project_path / ".workpilot" / "dashboard_snapshot.json"
-    if snap_path.is_file() and str(snap_path.resolve()).startswith(str(project_path)):
-        try:
-            return json.loads(snap_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return {
-        "tasks_by_status": {},
-        "avg_completion_by_complexity": {},
-        "qa_first_pass_rate": 0.0,
-        "qa_avg_score": 0.0,
-        "total_tokens": 0,
-        "tokens_by_provider": {},
-        "total_cost": 0.0,
-        "cost_by_model": {},
-        "merge_auto_count": 0,
-        "merge_manual_count": 0,
-    }
-
-
-@router.get("/api/dashboard/snapshot/{project_id:path}")
-def get_dashboard_snapshot(project_id: str):
-    try:
-        snap = _load_dashboard_snapshot(project_id)
-        auto = snap.get("merge_auto_count", 0)
-        manual = snap.get("merge_manual_count", 0)
-        total_merges = auto + manual
-        merge_rate = (auto / total_merges * 100) if total_merges > 0 else 0.0
-        snap["merge_auto_rate"] = merge_rate
-        avg_compl = {}
-        for k, v in snap.get("avg_completion_by_complexity", {}).items():
-            if isinstance(v, list) and v:
-                avg_compl[k] = sum(v) / len(v)
-            else:
-                avg_compl[k] = v or 0.0
-        snap["avg_completion_by_complexity"] = avg_compl
-        return {"success": True, "snapshot": snap}
-    except Exception as e:
-        return {"success": False, "error": _safe_error_message(e)}
-
-
-@router.get("/api/dashboard/stats")
-def get_dashboard_stats():
-    return {"success": True, "stats": {}}
-
-
-@router.get("/api/dashboard/export/{project_id:path}")
-def export_dashboard(project_id: str, fmt: str = "json"):
-    try:
-        snap = _load_dashboard_snapshot(project_id)
-        if fmt == "csv":
-            buf = io.StringIO()
-            writer = csv.writer(buf)
-            writer.writerow(["metric", "value"])
-            for k, v in snap.items():
-                if not k.startswith("_"):
-                    writer.writerow([k, v])
-            return {"success": True, "report": buf.getvalue(), "format": "csv"}
-        return {"success": True, "report": snap, "format": "json"}
-    except Exception as e:
-        return {"success": False, "error": _safe_error_message(e)}
 
 
 # --- Session History ---
@@ -177,12 +95,7 @@ def get_sessions(project_id: str):
     on an incompatible key and showing nothing.
     """
     try:
-        try:
-            from replay.recorder import get_replay_recorder
-        except ImportError:
-            from apps.backend.replay.recorder import (  # type: ignore[no-redef]
-                get_replay_recorder,
-            )
+        from replay.recorder import get_replay_recorder
 
         summaries = get_replay_recorder().list_sessions()
         return {
@@ -190,4 +103,4 @@ def get_sessions(project_id: str):
             "sessions": [_replay_summary_to_session_entry(s) for s in summaries],
         }
     except Exception as e:
-        return {"success": False, "error": _safe_error_message(e)}
+        return {"success": False, "error": safe_error(e, logger, "Session history")}
