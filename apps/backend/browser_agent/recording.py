@@ -18,7 +18,15 @@ sits in (``shadow``), each a CSS selector; and the transition the action
 caused (``wait_url``: the page it led to, without query or fragment;
 ``wait_request``: the method and path of the first same-origin ``fetch`` or
 XHR it started; ``wait_visible``: the element itself appeared after the
-previous action). An export turns those into explicit waits, never a pause.
+previous action; ``wait_hidden``: a loading indicator it showed went away,
+named by a CSS selector this package builds from a closed set of patterns).
+An export turns those into explicit waits, never a pause.
+
+A selector that matches several elements on the page carries the element's
+place among them (``nth``, counted by the page in document order); a unique
+one never does. A check the recorder proposes after an action (a status, an
+alert or a heading that showed up) is an ``assert_text`` step with ``after``
+set to that action's id: it is only a suggestion until the person keeps it.
 
 ``Recording.from_dict`` is the one way back in from JSON (the desktop app
 sends the steps it kept to ``export``): every field is checked against the
@@ -41,6 +49,8 @@ MAX_SELECTOR_VALUE = 300
 MAX_FRAMES = 4
 MAX_SHADOW = 4
 MAX_PATH = 300
+#: A selector matching more elements than this is not kept, even with ``nth``.
+MAX_MATCHES = 20
 
 STEP_KINDS = ("navigate", "click", "fill", "select", "press", "assert_text")
 STRATEGIES = ("testid", "role", "label", "placeholder", "text", "css")
@@ -76,6 +86,11 @@ _STEP_ID = re.compile(r"^s[0-9]{1,6}$")
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _SPACES = re.compile(r"\s+")
 _REQUEST_PATH = re.compile(r"^/[^\s?#]*$")
+#: The selectors a loading indicator may be waited for by (``loader_selector``).
+_LOADER = re.compile(
+    r'^(?:\[data-testid="(?:[^"\\]|\\.)+"\]|#[A-Za-z][A-Za-z0-9_-]*'
+    r'|\[role="progressbar"\]|\[aria-busy="true"\]|\.[A-Za-z_-][A-Za-z0-9_-]*)$'
+)
 
 
 def clean_line(raw: object, limit: int = MAX_TEXT) -> str:
@@ -100,11 +115,15 @@ class Selector:
     value: str
     #: The ARIA role, for the ``role`` strategy (``value`` is then its name).
     role: str = ""
+    #: The element's place among those the selector matches, when not unique.
+    nth: int | None = None
 
-    def to_dict(self) -> dict[str, str]:
-        data = {"strategy": self.strategy, "value": self.value}
+    def to_dict(self) -> dict[str, object]:
+        data: dict[str, object] = {"strategy": self.strategy, "value": self.value}
         if self.role:
             data["role"] = self.role
+        if self.nth is not None:
+            data["nth"] = self.nth
         return data
 
     @classmethod
@@ -115,12 +134,26 @@ class Selector:
         value = clean_line(raw.get("value"), MAX_SELECTOR_VALUE)
         if strategy not in STRATEGIES or not value:
             return None
+        nth = raw.get("nth")
+        if nth is not None and not is_place(nth):
+            return None
         role = raw.get("role", "")
         if strategy == "role":
             if role not in ROLES:
                 return None
-            return cls(strategy, value, role)
-        return cls(strategy, value)
+            return cls(strategy, value, role, nth)
+        return cls(strategy, value, nth=nth)
+
+
+def is_place(raw: object) -> bool:
+    """A place among the matches of a selector: ``0`` to ``MAX_MATCHES - 1``."""
+    return type(raw) is int and 0 <= raw < MAX_MATCHES
+
+
+def loader_selector(raw: object) -> str:
+    """A loading indicator's selector, when it is one ``loader_selector`` builds."""
+    css = clean_line(raw, MAX_SELECTOR_VALUE + 1)
+    return css if len(css) <= MAX_SELECTOR_VALUE and _LOADER.match(css) else ""
 
 
 @dataclass(frozen=True)
@@ -190,6 +223,10 @@ class RecordedStep:
     #: The page the action led to (no query, no fragment).
     wait_url: str = ""
     wait_request: RequestWait | None = None
+    #: A loading indicator the action showed: wait until none is visible.
+    wait_hidden: str = ""
+    #: A proposed check: the id of the action it follows (``assert_text`` only).
+    after: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -207,6 +244,8 @@ class RecordedStep:
             ("shadow", self.shadow),
             ("waitVisible", self.wait_visible),
             ("waitUrl", self.wait_url),
+            ("waitHidden", self.wait_hidden),
+            ("after", self.after),
         ):
             if value:
                 data[name] = value
@@ -248,6 +287,7 @@ class RecordedStep:
         if kind in ACTION_KINDS:
             step.wait_url = page_url(raw.get("waitUrl"))
             step.wait_request = RequestWait.from_dict(raw.get("waitRequest"))
+            step.wait_hidden = loader_selector(raw.get("waitHidden"))
         if kind in ("fill", "select"):
             secret = raw.get("secretEnv", "")
             if isinstance(secret, str) and ENV_NAME.match(secret):
