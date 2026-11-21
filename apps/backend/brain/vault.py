@@ -153,9 +153,10 @@ class Brain:
             for folder in KINDS.values():
                 (self.root / folder).mkdir(exist_ok=True)
         if fresh:
+            # A fresh folder held nothing (or only the ``.git`` of a clone),
+            # and nothing above writes these two names: no note is overwritten.
             for name, text in (("README.md", _README), ("AGENTS.md", _AGENTS_MD)):
-                if not (self.root / name).exists():
-                    (self.root / name).write_text(text, encoding="utf-8")
+                (self.root / name).write_text(text, encoding="utf-8")
         marker = self.root / MARKER
         if not marker.exists():
             marker.parent.mkdir(parents=True, exist_ok=True)
