@@ -707,17 +707,23 @@ export function ProviderConfigDialog({
 										const result = await handleWindsurfDetect();
 										setTestResult(result);
 									}}
-									onWindsurfSave={() =>
-										handleWindsurfSave(
-											windsurfSsoToken,
-											providerConfig,
+									onWindsurfSave={async () => {
+										const saved = await handleWindsurfSave(
 											onSettingsChange,
 											settings,
 											onProviderActivated,
 											provider.id,
 											onOpenChange,
-										)
-									}
+										);
+										if (!saved) {
+											setTestResult({
+												success: false,
+												message: t(
+													"sections.accounts.providerConfig.windsurfAuth.saveFailed",
+												),
+											});
+										}
+									}}
 								/>
 
 								{testResult && (

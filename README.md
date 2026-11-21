@@ -253,7 +253,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 **Understand and plan**
 - **Insights**, **Ideation**, **Roadmap**, architecture visualizer with architecture drift for every major stack (layers inferred from .NET projects, Maven/Gradle modules, Go, Rust, PHP, Dart and Swift packages), code review rules and code smells for every major stack, risk classifier.
 - **Code migration** for frameworks, versions and languages: the plan (phases, steps, risk) is shown, then a Kanban task applies it.
-- **Visual to Code**, **Import Design**, **pipeline generator** (GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket, CircleCI) and a **voice assistant** (Ctrl+Shift+Space).
+- **Visual to Code**, **Import Design**, **pipeline generator** (GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket, CircleCI) and a **voice assistant** (Ctrl+Shift+Space) that can listen continuously and stop the running agents after their current step when you say “stop”.
 
 **Integrations**
 - GitHub, GitLab, Azure DevOps, Jira and Linear: import issues, investigate them, review pull requests.

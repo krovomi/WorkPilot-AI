@@ -28,6 +28,9 @@ export const APP_SHUTDOWN_PAUSE_REASON = "app_shutdown";
 /** The reason recorded on every task "Stop all agents" paused: resumed by hand only. */
 export const KILL_SWITCH_PAUSE_REASON = "kill_switch";
 
+/** The reason recorded when the person said « stop » to the voice assistant: resumed by hand only. */
+export const VOICE_STOP_PAUSE_REASON = "voice_stop";
+
 export interface PauseStateRecord {
 	enabled: boolean;
 	paused_at: string | null;
