@@ -124,3 +124,32 @@ def test_the_replay_shares_table_comes_and_goes_with_its_revision(alembic_config
         engine.dispose()
     command.downgrade(config, "0016_spec_approvals")
     assert "replay_shares" not in _tables(db)
+
+
+def test_the_bookmark_count_of_a_replay_share_comes_and_goes(alembic_config):
+    config, db = alembic_config
+
+    def columns() -> set[str]:
+        engine = sa.create_engine(f"sqlite:///{db}")
+        try:
+            return {c["name"] for c in sa.inspect(engine).get_columns("replay_shares")}
+        finally:
+            engine.dispose()
+
+    command.upgrade(config, "head")
+    assert "bookmarks" in columns()
+    command.downgrade(config, "0017_replay_shares")
+    assert "bookmarks" not in columns()
+    command.upgrade(config, "head")
+    assert "bookmarks" in columns()
+    # A column already gone (dropped by hand) does not stop the downgrade.
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text("ALTER TABLE replay_shares DROP COLUMN bookmarks")
+            )
+    finally:
+        engine.dispose()
+    command.downgrade(config, "0017_replay_shares")
+    assert "bookmarks" not in columns()
