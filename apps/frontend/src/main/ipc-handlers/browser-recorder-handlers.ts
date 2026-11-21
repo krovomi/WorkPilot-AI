@@ -4,20 +4,22 @@
  * Channels:
  *   invoke "browserAgent:recordStart"  → (projectPath, url): open the page in a window and record
  *   invoke "browserAgent:recordStop"   → (): stop the running recording
+ *   invoke "browserAgent:recordDialog" → ({id, accept, text}): answer the dialog the page opened
  *   invoke "browserAgent:recordExport" → (projectPath, request): steps → test, see recorder-export.ts
  *
  * Renderer event:
  *   "browserAgent:recordEvent" (a step, started, stopped, an error)
  *
  * The project folder is checked before each handler (`DIRECTORY_ARGS`); the
- * address and the export request are read again here (S6): an http(s) URL,
- * formats and destinations from closed lists, step ids only.
+ * address, the dialog answer and the export request are read again (S6): an
+ * http(s) URL, the id of the dialog waiting, formats and destinations from
+ * closed lists, step ids only.
  */
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { readExportRequest } from "../../shared/types/browser-recorder";
 import { exportRecording } from "../browser-recorder/recorder-export";
-import { startRecording, stopRecording } from "../browser-recorder/recorder-session";
+import { answerDialog, startRecording, stopRecording } from "../browser-recorder/recorder-session";
 
 export function registerBrowserRecorderHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.BROWSER_AGENT_RECORD_START, (_event, projectPath: unknown, url: unknown) =>
@@ -25,6 +27,8 @@ export function registerBrowserRecorderHandlers(): void {
 	);
 
 	ipcMain.handle(IPC_CHANNELS.BROWSER_AGENT_RECORD_STOP, () => stopRecording());
+
+	ipcMain.handle(IPC_CHANNELS.BROWSER_AGENT_RECORD_DIALOG, (_event, answer: unknown) => answerDialog(answer));
 
 	ipcMain.handle(
 		IPC_CHANNELS.BROWSER_AGENT_RECORD_EXPORT,

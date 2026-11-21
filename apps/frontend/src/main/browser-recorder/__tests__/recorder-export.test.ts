@@ -146,6 +146,10 @@ describe("exportRecording", () => {
 			["selenium-java", "src/test/java/e2e/LogInTest.java"],
 			["selenium-python", "tests/e2e/test_log_in.py"],
 			["webdriverio", "test/specs/log-in.e2e.js"],
+			["selenium-csharp", "tests/E2E/LogInTests.cs"],
+			["selenium-ruby", "spec/e2e/log_in_spec.rb"],
+			["selenium-js", "test/e2e/log-in.e2e.cjs"],
+			["webdriverio-ts", "test/specs/log-in.e2e.ts"],
 		] as const) {
 			const { spawnRunner, spawned } = runnerPrinting([`RECORDER_EXPORT:${JSON.stringify({ ...generated, path: file })}`]);
 			const d = deps(spawnRunner);

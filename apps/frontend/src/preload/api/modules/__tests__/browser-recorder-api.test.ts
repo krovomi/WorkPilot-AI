@@ -23,6 +23,12 @@ describe("createBrowserRecorderAPI", () => {
 		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_START, "/p", "http://a.test");
 		await api.stopBrowserRecording();
 		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_STOP);
+		await api.answerBrowserRecorderDialog({ id: 1, accept: false, text: "" });
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_DIALOG, {
+			id: 1,
+			accept: false,
+			text: "",
+		});
 		const request = { format: "cypress", destination: "preview", name: "", stepIds: ["s1"] } as const;
 		await api.exportBrowserRecording("/p", request);
 		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_EXPORT, "/p", request);

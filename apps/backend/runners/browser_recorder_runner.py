@@ -5,7 +5,9 @@ Browser Agent recorder: record a session, export it as a test.
 Subcommands:
   record --url URL           open URL in a browser window and record what the
                              person does there, until a ``stop`` line on stdin
-                             or the window is closed
+                             or the window is closed; a dialog the page opens is
+                             asked of the app (``RECORDER_DIALOG``) and answered
+                             by a ``dialog <JSON>`` line on stdin
   export --format F [--name N] [--root DIR]
                              read a recording (JSON) on stdin and print it as a
                              test file: Playwright (TypeScript, Python) or Cypress
@@ -13,6 +15,7 @@ Subcommands:
 Output lines (stdout), for the desktop app:
   RECORDER_STEP:<step JSON>       a step added or updated (``record``)
   RECORDER_DONE:<summary JSON>    the recording ended (``record``)
+  RECORDER_DIALOG:<dialog JSON>   the page opened a dialog: type, message (``record``)
   RECORDER_EXPORT:<test JSON>     the generated test (``export``)
   RECORDER_ERROR:<message JSON>   what went wrong
 
@@ -35,6 +38,11 @@ sys.path.insert(0, str(backend_path))
 
 STEP = "RECORDER_STEP:"
 DONE = "RECORDER_DONE:"
+DIALOG = "RECORDER_DIALOG:"
+#: A dialog nobody answers is dismissed after this long.
+DIALOG_TIMEOUT_S = 300.0
+#: An answer line: ``dialog {"id": 1, "accept": true, "text": "..."}``.
+MAX_ANSWER = 4000
 EXPORT = "RECORDER_EXPORT:"
 ERROR = "RECORDER_ERROR:"
 #: A recording sent back by the app: 300 steps fit well under this.
@@ -71,12 +79,68 @@ def check_url(url: str, project: Path) -> str:
     return url
 
 
-async def _stdin_stop() -> None:
-    """Resolves on a ``stop`` line, or when stdin closes (the app went away)."""
-    while True:
-        line = await asyncio.to_thread(sys.stdin.readline)
-        if not line or line.strip() == "stop":
-            return
+def read_answer(raw: str) -> tuple[int, bool, str] | None:
+    """A dialog answer the app sent (``{"id", "accept", "text"}``), or None."""
+    from browser_agent.recording import MAX_VALUE, clean_value
+
+    if len(raw) > MAX_ANSWER:
+        return None
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("accept"), bool):
+        return None
+    dialog_id = data.get("id")
+    if type(dialog_id) is not int:
+        return None
+    text = data.get("text", "")
+    text = clean_value(text if isinstance(text, str) else "", MAX_VALUE)
+    return dialog_id, data["accept"], text
+
+
+class Control:
+    """What the app says on stdin: ``stop``, and the answers to dialogs."""
+
+    def __init__(self, lines=None) -> None:
+        self._lines = lines or (lambda: asyncio.to_thread(sys.stdin.readline))
+        self.stopped = asyncio.Event()
+        self.answers: asyncio.Queue[tuple[int, bool, str]] = asyncio.Queue()
+        self._next = 0
+
+    async def listen(self) -> None:
+        """Until a ``stop`` line, or stdin closes (the app went away)."""
+        while True:
+            line = await self._lines()
+            command = line.strip() if line else "stop"
+            if command == "stop":
+                self.stopped.set()
+                return
+            if command.startswith("dialog "):
+                answer = read_answer(command[len("dialog ") :])
+                if answer is not None:
+                    await self.answers.put(answer)
+
+    async def ask_dialog(self, dialog: dict[str, str]) -> tuple[bool, str] | None:
+        """Shows the dialog in the app and waits for the person's answer to it.
+
+        Each dialog has an id; an answer to another one (a dialog that timed
+        out, a stray line) is dropped.
+        """
+        self._next += 1
+        wanted = self._next
+        _emit(DIALOG, {"id": wanted, **dialog})
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + DIALOG_TIMEOUT_S
+        while True:
+            try:
+                dialog_id, accept, text = await asyncio.wait_for(
+                    self.answers.get(), max(0.0, deadline - loop.time())
+                )
+            except TimeoutError:
+                return None
+            if dialog_id == wanted:
+                return accept, text
 
 
 def _controller(project: Path):
@@ -90,15 +154,19 @@ async def run_record(url: str, project: Path) -> dict:
     from browser_agent.recorder import record_session
 
     controller = _controller(project)
+    control = Control()
+    listening = asyncio.ensure_future(control.listen())
     try:
         await controller.launch()
         recording, reason = await record_session(
             controller.page,
             url,
-            _stdin_stop(),
+            control.stopped.wait(),
             lambda step: _emit(STEP, step.to_dict()),
+            ask_dialog=control.ask_dialog,
         )
     finally:
+        listening.cancel()
         await controller.close()
     return {
         "reason": reason,

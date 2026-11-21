@@ -56,7 +56,11 @@ const EXTENSIONS: Record<TestFormat, string> = {
 	cypress: "js",
 	"selenium-python": "py",
 	"selenium-java": "java",
+	"selenium-csharp": "cs",
+	"selenium-ruby": "rb",
+	"selenium-js": "cjs",
 	webdriverio: "js",
+	"webdriverio-ts": "ts",
 };
 
 export async function chooseFileInDialog(defaultName: string): Promise<string | undefined> {

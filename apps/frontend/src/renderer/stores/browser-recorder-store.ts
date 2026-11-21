@@ -7,12 +7,14 @@
  * removed even if the recorder updates it later (another character typed in
  * the same field). A check the recorder proposes (a step with `after`)
  * waits in `suggestions` until the person keeps it, which puts it right after
- * its action, or sets it aside. An export sends the ids of the steps kept;
- * the main owns their content.
+ * its action, or sets it aside. A dialog the recorded page opens waits in
+ * `pendingDialog` until the person answers it here. An export sends the ids
+ * of the steps kept; the main owns their content.
  */
 import { create } from "zustand";
 import type {
 	ExportDestination,
+	PendingDialog,
 	RecordedStep,
 	RecorderEvent,
 	RecorderExportOutcome,
@@ -31,6 +33,7 @@ interface BrowserRecorderState {
 	name: string;
 	exporting: ExportDestination | null;
 	outcome: RecorderExportOutcome | null;
+	pendingDialog: PendingDialog | null;
 
 	setFormat: (format: TestFormat) => void;
 	setName: (name: string) => void;
@@ -38,6 +41,7 @@ interface BrowserRecorderState {
 	acceptSuggestion: (id: string) => void;
 	dismissSuggestion: (id: string) => void;
 	handleEvent: (event: RecorderEvent) => void;
+	answerDialog: (accept: boolean, text: string) => Promise<void>;
 	start: (projectPath: string, url: string) => Promise<void>;
 	stop: () => Promise<void>;
 	exportTo: (projectPath: string, destination: ExportDestination) => Promise<void>;
@@ -72,6 +76,7 @@ export const useBrowserRecorderStore = create<BrowserRecorderState>((set, get) =
 	name: "",
 	exporting: null,
 	outcome: null,
+	pendingDialog: null,
 
 	setFormat: (format) => set({ format, outcome: null }),
 	setName: (name) => set({ name }),
@@ -107,13 +112,22 @@ export const useBrowserRecorderStore = create<BrowserRecorderState>((set, get) =
 				return;
 			}
 			set((state) => ({ steps: upsert(state.steps, event.step) }));
+		} else if (event.type === "dialog") {
+			set({ pendingDialog: event.dialog });
 		} else if (event.type === "started") {
 			set({ status: "recording", error: null });
 		} else if (event.type === "stopped") {
-			set({ status: "idle", truncated: event.truncated });
+			set({ status: "idle", truncated: event.truncated, pendingDialog: null });
 		} else {
-			set({ status: "idle", error: event.message });
+			set({ status: "idle", error: event.message, pendingDialog: null });
 		}
+	},
+
+	answerDialog: async (accept, text) => {
+		const dialog = get().pendingDialog;
+		if (!dialog) return;
+		set({ pendingDialog: null });
+		await globalThis.electronAPI.answerBrowserRecorderDialog({ id: dialog.id, accept, text });
 	},
 
 	start: async (projectPath, url) => {
@@ -125,6 +139,7 @@ export const useBrowserRecorderStore = create<BrowserRecorderState>((set, get) =
 			truncated: false,
 			error: null,
 			outcome: null,
+			pendingDialog: null,
 		});
 		try {
 			const result = await globalThis.electronAPI.startBrowserRecording(projectPath, url);

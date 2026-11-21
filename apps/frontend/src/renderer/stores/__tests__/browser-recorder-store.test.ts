@@ -9,6 +9,7 @@ import { setupBrowserRecorderListeners, useBrowserRecorderStore } from "../brows
 const api = {
 	startBrowserRecording: vi.fn(),
 	stopBrowserRecording: vi.fn(),
+	answerBrowserRecorderDialog: vi.fn(async () => ({ success: true })),
 	exportBrowserRecording: vi.fn(),
 	onBrowserRecorderEvent: vi.fn(),
 };
@@ -77,6 +78,26 @@ describe("browser recorder store", () => {
 		expect(store()).toMatchObject({ status: "idle", truncated: true });
 		store().handleEvent({ type: "error", message: "No display" });
 		expect(store().error).toBe("No display");
+	});
+
+	it("holds a dialog the page opened until the person answers it", async () => {
+		await store().answerDialog(true, "");
+		expect(api.answerBrowserRecorderDialog).not.toHaveBeenCalled();
+		const dialog = { id: 4, type: "prompt", message: "Name?", defaultValue: "" } as const;
+		store().handleEvent({ type: "dialog", dialog });
+		expect(store().pendingDialog).toEqual(dialog);
+		await store().answerDialog(true, "Neo");
+		expect(api.answerBrowserRecorderDialog).toHaveBeenCalledWith({ id: 4, accept: true, text: "Neo" });
+		expect(store().pendingDialog).toBeNull();
+		// A recording that ends takes its dialog with it.
+		for (const end of [
+			{ type: "stopped", reason: "closed", truncated: false },
+			{ type: "error", message: "gone" },
+		] as const) {
+			store().handleEvent({ type: "dialog", dialog });
+			store().handleEvent(end);
+			expect(store().pendingDialog).toBeNull();
+		}
 	});
 
 	it("starts a fresh recording, or says why it could not", async () => {

@@ -77,7 +77,7 @@
 	},
 	"recorder": {
 		"title": "Record a test",
-		"description": "Open a page in a browser window, do what the test should do, then export the steps as a Playwright, Cypress, Selenium or WebdriverIO test. Alt+click an element to check its visible text. Iframes and open shadow roots are recorded; the test waits for what each action caused (a page, a request, an element) instead of pausing.",
+		"description": "Open a page in a browser window, do what the test should do, then export the steps as a Playwright, Cypress, Selenium or WebdriverIO test. Alt+click an element to check its visible text. Hovers, scrolls, drags, editable text and lists with several choices are recorded, as are iframes and open shadow roots; a dialog the page opens is answered here. The test waits for what each action caused (a page, a request, an element) instead of pausing.",
 		"urlLabel": "Address to record from",
 		"start": "Record",
 		"stop": "Stop",
@@ -95,7 +95,10 @@
 			"fill": "Type",
 			"select": "Choose",
 			"press": "Press",
-			"assert_text": "Check text"
+			"assert_text": "Check text",
+			"hover": "Hover",
+			"scroll": "Scroll",
+			"drag": "Drag"
 		},
 		"place": {
 			"frame": "in a frame",
@@ -125,7 +128,11 @@
 			"cypress": "Cypress",
 			"selenium-python": "Selenium (Python)",
 			"selenium-java": "Selenium (Java)",
-			"webdriverio": "WebdriverIO"
+			"webdriverio": "WebdriverIO (JavaScript)",
+			"selenium-csharp": "Selenium (C#)",
+			"selenium-ruby": "Selenium (Ruby)",
+			"selenium-js": "Selenium (JavaScript)",
+			"webdriverio-ts": "WebdriverIO (TypeScript)"
 		},
 		"preview": "Preview",
 		"review": "Propose on a review card",
@@ -133,6 +140,22 @@
 		"reviewHint": "A review card puts the test on its own branch, never in the project folder; a file is saved outside the project.",
 		"savedTo": "Saved to {{path}}",
 		"envVars": "Set these environment variables before running the test: {{names}}",
-		"skipped": "{{count}} step(s) have no selector this framework can express and were left as comments."
+		"skipped": "{{count}} step(s) have no selector this framework can express and were left as comments.",
+		"window": "the page",
+		"dropOn": "onto {{target}}",
+		"dialog": {
+			"alert": "Alert",
+			"confirm": "Confirmation",
+			"prompt": "Question",
+			"beforeunload": "Leave the page?",
+			"hint": "The page opened a dialog and waits for your answer. The test will answer it the same way.",
+			"textLabel": "Your answer",
+			"accept": "OK",
+			"dismiss": "Cancel"
+		},
+		"answered": {
+			"accept": "{{kind}} answered OK",
+			"dismiss": "{{kind}} cancelled"
+		}
 	}
 }

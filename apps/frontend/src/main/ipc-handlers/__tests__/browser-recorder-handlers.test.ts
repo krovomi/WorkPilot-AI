@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
 	handlers: new Map<string, (...args: unknown[]) => unknown>(),
 	start: vi.fn(async () => ({ success: true })),
 	stop: vi.fn(() => ({ success: true })),
+	answer: vi.fn(() => ({ success: true })),
 	exportRecording: vi.fn(async () => ({ success: true, code: "x" })),
 }));
 
@@ -18,6 +19,7 @@ vi.mock("electron", () => ({
 vi.mock("../../browser-recorder/recorder-session", () => ({
 	startRecording: state.start,
 	stopRecording: state.stop,
+	answerDialog: state.answer,
 }));
 vi.mock("../../browser-recorder/recorder-export", () => ({ exportRecording: state.exportRecording }));
 
@@ -37,6 +39,12 @@ describe("browser recorder handlers", () => {
 		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_START, "/p", "http://a.test")).toEqual({ success: true });
 		expect(state.start).toHaveBeenCalledWith("/p", "http://a.test");
 		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_STOP)).toEqual({ success: true });
+	});
+
+	it("hands a dialog answer to the session, which reads it again", async () => {
+		const answer = { id: 1, accept: true, text: "Neo" };
+		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_DIALOG, answer)).toEqual({ success: true });
+		expect(state.answer).toHaveBeenCalledWith(answer);
 	});
 
 	it("exports a well-formed request only", async () => {

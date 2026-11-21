@@ -7,7 +7,9 @@
  * export later sends the runner only steps it made itself: the renderer only
  * picks which ones to keep, by id. A check the recorder proposes after an
  * action (a step with `after`) is kept apart, at most `MAX_SUGGESTIONS`, and
- * is exported only when the renderer names it. The runner gets the static environment
+ * is exported only when the renderer names it. A dialog the page opens
+ * (`RECORDER_DIALOG:`) waits for the person's answer in the app, which goes
+ * back to the runner on its stdin, for that dialog's id only. The runner gets the static environment
  * (no provider, no key, no Claude profile, S1): it calls no model, and the
  * page it opens is someone else's code.
  */
@@ -18,7 +20,9 @@ import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import {
 	MAX_RECORDED_STEPS,
 	MAX_SUGGESTIONS,
+	parsePendingDialog,
 	parseRecordedStep,
+	readDialogAnswer,
 	type RecordedStep,
 	type RecorderEvent,
 } from "../../shared/types/browser-recorder";
@@ -30,6 +34,7 @@ export const STEP_PREFIX = "RECORDER_STEP:";
 export const DONE_PREFIX = "RECORDER_DONE:";
 export const EXPORT_PREFIX = "RECORDER_EXPORT:";
 export const ERROR_PREFIX = "RECORDER_ERROR:";
+export const DIALOG_PREFIX = "RECORDER_DIALOG:";
 const MAX_URL = 2048;
 
 export type SpawnRunner = (args: string[]) => Promise<ChildProcess>;
@@ -68,6 +73,8 @@ interface Session {
 	steps: RecordedStep[];
 	suggestions: RecordedStep[];
 	child: ChildProcess | null;
+	/** The id of the dialog waiting for an answer. */
+	dialog: number | null;
 }
 
 let session: Session | null = null;
@@ -128,7 +135,7 @@ export async function startRecording(
 	if (!url) return { success: false, error: "Only an http:// or https:// address can be recorded." };
 	if (session?.child) return { success: false, error: "A recording is already running." };
 
-	const current: Session = { projectPath, steps: [], suggestions: [], child: null };
+	const current: Session = { projectPath, steps: [], suggestions: [], child: null, dialog: null };
 	session = current;
 	let child: ChildProcess;
 	try {
@@ -145,6 +152,11 @@ export async function startRecording(
 				? upsert(current.suggestions, step, MAX_SUGGESTIONS)
 				: step && upsert(current.steps, step, MAX_RECORDED_STEPS);
 			if (step && kept) deps.broadcast({ type: "step", step });
+		} else if (line.startsWith(DIALOG_PREFIX)) {
+			const dialog = parsePendingDialog(parseJson(line.slice(DIALOG_PREFIX.length)));
+			if (!dialog) return;
+			current.dialog = dialog.id;
+			deps.broadcast({ type: "dialog", dialog });
 		} else if (line.startsWith(DONE_PREFIX)) {
 			const done = (parseJson(line.slice(DONE_PREFIX.length)) ?? {}) as Record<string, unknown>;
 			ended = true;
@@ -175,6 +187,18 @@ export function stopRecording(): { success: boolean } {
 	const child = session?.child;
 	if (!child?.stdin || child.stdin.destroyed) return { success: false };
 	child.stdin.write("stop\n");
+	return { success: true };
+}
+
+/** Sends the person's answer to the dialog the running recorder is waiting on (S6: read again here). */
+export function answerDialog(raw: unknown): { success: boolean } {
+	const answer = readDialogAnswer(raw);
+	const child = session?.child;
+	if (!answer || !session || session.dialog !== answer.id || !child?.stdin || child.stdin.destroyed) {
+		return { success: false };
+	}
+	session.dialog = null;
+	child.stdin.write(`dialog ${JSON.stringify(answer)}\n`);
 	return { success: true };
 }
 
