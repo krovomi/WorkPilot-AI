@@ -346,6 +346,24 @@ def test_a_group_s_median_is_given_from_min_group_projects():
     assert answer["groups"]["all"]["medians"]["agents"] is None
 
 
+def test_a_group_s_figure_is_given_only_when_min_group_projects_have_it():
+    recent = NOW - timedelta(days=1)
+    current = _project("go", "small", _spec("001-a", recent, 10, 1.0, qa=1))
+    peers = [
+        _project("go", "small", _spec("001-x", recent, 30, 3.0, qa=4, agents=3)),
+        _project("go", "small", _spec("001-x", recent, 50, 5.0, qa=2)),
+        _project("go", "small", _spec("001-x", recent, 70, 7.0)),
+    ]
+    medians = build_compare.compare(current, peers, NOW, min_group=2)["groups"][
+        "segment"
+    ]["medians"]
+    assert medians["minutes"] == 50.0
+    # Two projects have a QA count: enough for a median.
+    assert medians["qa_iterations"] == 3.0
+    # One project names its agents: its own figure is not given as the group's.
+    assert medians["agents"] is None
+
+
 def test_the_comparison_adds_the_team_the_top_tenth_and_the_weeks():
     current = _project(
         "go",

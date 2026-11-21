@@ -24,8 +24,9 @@ the last eight weeks for its sparkline. Projects are grouped by segment,
 their main language and a size bucket of tracked files, so a side project is
 not set against a monorepo, and by the size of their team
 (``build_compare_segments``). A group's median is given only when it holds
-``min_group`` projects or more; below that only its size is, so a median
-never stands for one identifiable project. Its top tenth (the figure the best
+``min_group`` projects or more, and each of its figures only when that many
+of them have it; below that only its size is, so a median never stands for
+one identifiable project. Its top tenth (the figure the best
 tenth of its projects reach) needs ``min_top`` projects with that figure.
 Specs are also compared kind by kind (bug fix, feature, refactoring…), as
 their card recorded it, against the same kind in the other projects.
@@ -216,6 +217,12 @@ def _median(values: Iterable[float | int | None]) -> float | None:
     return float(statistics.median(present)) if present else None
 
 
+def _group_median(values: Iterable[float | int | None], min_group: int) -> float | None:
+    """A group's median of one figure, from `min_group` projects that have it."""
+    present = [v for v in values if v is not None]
+    return _median(present) if len(present) >= min_group else None
+
+
 def _top(values: Iterable[float | None], min_top: int | None) -> float | None:
     """The figure the best tenth reach (lower is better), from `min_top`
     values up; None below, or when no `min_top` is set."""
@@ -259,7 +266,9 @@ def _group(
     top = {m: _top((p[m] for p in members), min_top) for m in METRICS}
     return {
         "projects": len(members),
-        "medians": {m: _median(p[m] for p in members) for m in METRICS},
+        "medians": {
+            m: _group_median((p[m] for p in members), min_group) for m in METRICS
+        },
         "top": top if any(v is not None for v in top.values()) else None,
     }
 

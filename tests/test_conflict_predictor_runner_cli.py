@@ -1,7 +1,7 @@
 """The conflict predictor, run the way the desktop app runs it.
 
 `python runners/conflict_predictor_runner.py --project-path <repo>` compares
-every branch and worktree with `main` and streams what may conflict. These
+every branch and worktree with its base branch and streams what may conflict. These
 tests build a real repository whose branches touch the same files.
 """
 
