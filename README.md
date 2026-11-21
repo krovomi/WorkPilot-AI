@@ -240,6 +240,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 
 **Agents and orchestration**
 - **Execution waves** (Mission Control): the specs waiting in the backlog are grouped into waves that share no file, from their plans and worktrees, then run wave after wave in merge order with the project's parallelism; no model is called.
+- **Mission Control auto-compose**: a crew of agents suggested from a description, a task's spec or a session template (bug fix, new feature, refactor, incident), mixing the providers you pick, models filtered by their capabilities, priced by the Cost Intelligence catalog, and a cheaper crew under a budget.
 - **Mission Control** to run several agents on one goal, **agent terminals**, **Arena** and **Bounty Board** to compare engines, **Repo bench** to measure them on your own past tasks.
 - **Pixel Office** shows your agents as pixel-art characters at their desks, earns achievements from what the project delivers (tasks shipped, QA passed on the first review, incidents resolved, a second engine agreeing) on every provider, and has a **TV mode** for a team screen, with a calm mode that stops the animations.
 - **Agent Replay** shares a recorded session: a `.wpreplay` bundle a teammate imports, or one HTML page anyone opens without WorkPilot, with secrets and local folders masked and, on request, the reasoning, the token counts or the file contents left out; bookmarks with a note mark the steps that matter.
@@ -254,7 +255,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 **Understand and plan**
 - **Insights**, **Ideation**, **Roadmap**, architecture visualizer with architecture drift for every major stack (layers inferred from .NET projects, Maven/Gradle modules, Go, Rust, PHP, Dart and Swift packages), code review rules and code smells for every major stack, risk classifier.
 - **Code migration** for frameworks, versions and languages: the plan (phases, steps, risk) is shown, then a Kanban task applies it.
-- **Visual to Code**, **Import Design**, **pipeline generator** (GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket, CircleCI) and a **voice assistant** (Ctrl+Shift+Space).
+- **Visual to Code**, **Import Design**, **pipeline generator** (GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket, CircleCI) and a **voice assistant** (Ctrl+Shift+Space) that can listen continuously and stop the running agents after their current step when you say “stop”.
 
 **Integrations**
 - GitHub, GitLab, Azure DevOps, Jira and Linear: import issues, investigate them, review pull requests.
@@ -264,14 +265,14 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - Notifications on Slack, Teams, Discord, Google Chat, webhooks, ntfy and Telegram.
 
 **Team**
-- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT or Microsoft Entra sign-in ([operations guide](docs/server-operations.md)).
+- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT, Microsoft Entra or any OpenID Connect sign-in (Okta, Google, Keycloak...), spec approval by someone other than the card's author ([operations guide](docs/server-operations.md)).
 - **Mobile app** for iOS and Android, team chat, invitation-only sign-up.
 
 **Cost and monitoring**
 - Cost budgets enforced while tasks run: a project budget per period and a limit per task, checked before every agent session on every provider; the task pauses at its limit, can step down to a lighter model of the same provider, and a task that spends without progress is paused too.
 - Circuit breaker and kill switch: an agent that repeats the same tool call with the same result is paused on every provider, and "Stop all agents" (sidebar button, Ctrl+Shift+.) pauses every running task, each resumed from its card.
 - Smart Estimation that learns each repository: the estimate of a task is corrected by what its merged specs actually cost (cost, tokens, QA iterations, files changed), shown as a range with its confidence and a breakdown by dimension, with your own adjustment and a reset; every provider feeds the same history.
-- Analytics dashboard, cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler with a monthly budget and an ESG export, OpenTelemetry GenAI traces for every provider.
+- Analytics dashboard with "How you compare" (a project against its past and your other projects of the same stack and size, per spec, nothing sent anywhere), cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler with a monthly budget and an ESG export, OpenTelemetry GenAI traces for every provider.
 
 **Look and feel**
 - One UI charter across every module that follows the active theme: 7 colour themes in light and dark plus a theme editor, full English and French interface.

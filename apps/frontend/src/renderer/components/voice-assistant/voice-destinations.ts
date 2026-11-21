@@ -9,6 +9,8 @@
  * here is still reachable by its label.
  */
 
+import type { VoiceDestination } from "@shared/types/voice-assistant";
+
 export interface ViewHint {
 	hint: string;
 	words: readonly string[];
@@ -223,3 +225,12 @@ export const VIEW_HINTS: Readonly<Record<string, ViewHint>> = {
 	guardrails: { hint: "rules agents must follow", words: ["guardrails", "garde-fous", "regles des agents"] },
 	sandbox: { hint: "preview changes before applying them", words: ["apercu des changements", "change preview"] },
 };
+
+/** The views the assistant may open: the sidebar's, with what each is for, not itself. */
+export function offeredDestinations(
+	destinations: readonly VoiceDestination[],
+): VoiceDestination[] {
+	return destinations
+		.filter((d) => d.id !== "voice-control")
+		.map((d) => (VIEW_HINTS[d.id] ? { ...d, hint: VIEW_HINTS[d.id].hint } : d));
+}

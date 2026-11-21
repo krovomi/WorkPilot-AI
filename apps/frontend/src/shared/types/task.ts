@@ -37,6 +37,14 @@ export interface StopAllResult {
 	failedTasks: string[];
 }
 
+/** The voice assistant's spoken « stop » (`AGENTS_STOP_AFTER_STEP`). */
+export interface StopAfterStepResult {
+	/** Tasks that stop after the tool call in flight, then wait to be resumed. */
+	stoppingTasks: string[];
+	/** Tasks whose pause could not be written: they keep running. */
+	failedTasks: string[];
+}
+
 /** One phase's engine: provider × model × effort (see shared/utils/task-engine.ts). */
 export interface EngineTrio {
 	provider: string;
@@ -671,9 +679,10 @@ export interface TaskMetadata {
 		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
 		 * "tool_loop" when the circuit breaker stopped an agent repeating the
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
-		 * when the person stopped every agent at once. "anomaly" / "sandbox"
-		 * when the session watch stopped an agent (`agents/safety_watch.py`),
-		 * with `anomaly` / `sandbox`.
+		 * when the person stopped every agent at once, "voice_stop" when they
+		 * said « stop » to the voice assistant (after the current step).
+		 * "anomaly" / "sandbox" when the session watch stopped an agent
+		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;
@@ -829,9 +838,10 @@ export interface ImplementationPlan {
 		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
 		 * "tool_loop" when the circuit breaker stopped an agent repeating the
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
-		 * when the person stopped every agent at once. "anomaly" / "sandbox"
-		 * when the session watch stopped an agent (`agents/safety_watch.py`),
-		 * with `anomaly` / `sandbox`.
+		 * when the person stopped every agent at once, "voice_stop" when they
+		 * said « stop » to the voice assistant (after the current step).
+		 * "anomaly" / "sandbox" when the session watch stopped an agent
+		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;

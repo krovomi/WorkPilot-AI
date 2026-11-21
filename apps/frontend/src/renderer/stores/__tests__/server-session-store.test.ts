@@ -63,4 +63,41 @@ describe("server session store", () => {
 		expect(useServerSessionStore.getState().sessionResolved).toBe(true);
 		spy.mockRestore();
 	});
+
+	it("closes the gate after a Microsoft sign-in, and keeps it open on a refusal", async () => {
+		const loginEntra = vi
+			.fn()
+			.mockResolvedValueOnce({ ok: true, user: { id: "u1" } })
+			.mockResolvedValueOnce({ ok: false, error: "Login timed out" });
+		vi.stubGlobal("window", { electronAPI: { serverAuth: { loginEntra } } });
+		useServerSessionStore.setState({ isLoginScreenOpen: true });
+		const store = useServerSessionStore.getState();
+		expect(await store.loginEntra("https://wp.example.test")).toEqual({ ok: true });
+		expect(useServerSessionStore.getState().isLoginScreenOpen).toBe(false);
+		useServerSessionStore.setState({ isLoginScreenOpen: true });
+		expect(await store.loginEntra("https://wp.example.test")).toEqual({
+			ok: false,
+			error: "Login timed out",
+		});
+		expect(useServerSessionStore.getState().isLoginScreenOpen).toBe(true);
+	});
+
+	it("closes the gate after a single sign-on, and keeps it open on a refusal", async () => {
+		const loginSso = vi
+			.fn()
+			.mockResolvedValueOnce({ ok: true, user: { id: "u1" } })
+			.mockResolvedValueOnce({ ok: false, error: "Sign-in timed out" });
+		vi.stubGlobal("window", { electronAPI: { serverAuth: { loginSso } } });
+		useServerSessionStore.setState({ isLoginScreenOpen: true });
+		const store = useServerSessionStore.getState();
+		expect(await store.loginSso("https://wp.example.test")).toEqual({ ok: true });
+		expect(loginSso).toHaveBeenCalledWith("https://wp.example.test");
+		expect(useServerSessionStore.getState().isLoginScreenOpen).toBe(false);
+		useServerSessionStore.setState({ isLoginScreenOpen: true });
+		expect(await store.loginSso("https://wp.example.test")).toEqual({
+			ok: false,
+			error: "Sign-in timed out",
+		});
+		expect(useServerSessionStore.getState().isLoginScreenOpen).toBe(true);
+	});
 });

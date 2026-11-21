@@ -273,6 +273,23 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # the prompt section and its staged skills, nothing that runs an agent
     # (docs/architecture/windev.md). A leaf: the stack detection imports it.
     "windev": set(),
+    # Mission Control's composition (docs/architecture/mission-control-composition.md):
+    # the model registry, the price catalog, the context windows, the provider
+    # matrix, the stack and the card's kind, the untrusted-content fence and the
+    # API's path checks. It runs no agent (the main process calls the model),
+    # so nothing that reaches core or agents.
+    "mission_control": {
+        "context_mgmt",
+        "cost_intelligence",
+        "foundation",
+        "models_registry",
+        "phase_config",
+        "project",
+        "public_model_registry",
+        "security",
+        "skills_registry",
+        "tasks",
+    },
     # Smart Estimation's calibration loop (docs/architecture/smart-estimation.md):
     # its ledger through foundation's JSON lock, the merge diff through
     # foundation's git. A leaf the estimation runner and the merge event read.
