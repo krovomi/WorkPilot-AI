@@ -318,7 +318,7 @@
   "apps/backend/self_healing/debt_tracker.py": {"blind": 1, "silent": 0},
   "apps/backend/self_healing/health_checker.py": {"blind": 5, "silent": 4},
   "apps/backend/self_healing/incident_responder/cicd_mode.py": {"blind": 1, "silent": 0},
-  "apps/backend/self_healing/incident_responder/mcp_connector.py": {"blind": 2, "silent": 0},
+  "apps/backend/self_healing/incident_responder/mcp_connector.py": {"blind": 1, "silent": 0},
   "apps/backend/self_healing/incident_responder/orchestrator.py": {"blind": 3, "silent": 0},
   "apps/backend/self_healing/incident_responder/production_mode.py": {"blind": 1, "silent": 0},
   "apps/backend/self_healing/monitor.py": {"blind": 2, "silent": 0},
