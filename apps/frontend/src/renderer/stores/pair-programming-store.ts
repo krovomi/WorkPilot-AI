@@ -195,7 +195,12 @@ export async function startPairSession(
 	store.reset();
 	store.setStatus("planning", say("starting"));
 
-	const result = await globalThis.electronAPI.startPairSession(params);
+	let result: Awaited<ReturnType<typeof globalThis.electronAPI.startPairSession>>;
+	try {
+		result = await globalThis.electronAPI.startPairSession(params);
+	} catch (error) {
+		result = { success: false, error: errorText(error, "pairProgramming:errors.startFailed") };
+	}
 	// Another project was shown while this was out: its page loads its own.
 	if (!isShown(params.projectId)) return;
 	if (result.success && result.data) {
@@ -209,12 +214,26 @@ export async function startPairSession(
 	}
 }
 
+function errorText(error: unknown, fallbackKey: string): string {
+	return error instanceof Error && error.message ? error.message : i18n.t(fallbackKey);
+}
+
 export async function stopPairSession(
 	projectId: string,
 	sessionId: string,
 ): Promise<void> {
-	await globalThis.electronAPI.stopPairSession(projectId, sessionId);
-	usePairProgrammingStore.getState().setStatus("completed", say("stopped"));
+	let failure: string | null = null;
+	try {
+		const result = await globalThis.electronAPI.stopPairSession(projectId, sessionId);
+		if (!result.success) failure = result.error || i18n.t("pairProgramming:errors.stopFailed");
+	} catch (error) {
+		failure = errorText(error, "pairProgramming:errors.stopFailed");
+	}
+	// Another project was shown while this was out: its session is not on screen.
+	if (!isShown(projectId)) return;
+	const store = usePairProgrammingStore.getState();
+	if (failure === null) store.setStatus("completed", say("stopped"));
+	else store.setStatus("error", failure);
 }
 
 export function sendPairMessage(

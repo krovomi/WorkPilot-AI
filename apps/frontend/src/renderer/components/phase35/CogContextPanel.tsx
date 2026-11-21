@@ -14,12 +14,14 @@
 import { Check, Copy, FileText, FolderOpen, Plus, Scissors, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { useCogContextStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { PanelShell } from "./_panel-shell";
+import { relativeToProject } from "./_relative-to-project";
 import { TokenCostEstimate } from "./_token-cost-estimate";
 
 const PROMPT_MAX_LEN = 4000;
@@ -35,27 +37,28 @@ const basename = (p: string): string => {
 	return idx >= 0 ? cleaned.slice(idx + 1) : cleaned;
 };
 
-/** The path as the user reads it: relative to the project when inside it. */
-export const relativeToProject = (path: string, projectPath: string): string => {
-	const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
-	const root = norm(projectPath);
-	const file = norm(path);
-	return root && file.startsWith(`${root}/`) ? file.slice(root.length + 1) : path;
-};
-
 interface CogContextPanelProps {
 	readonly projectPath?: string;
 }
 
 export function CogContextPanel({ projectPath = "" }: CogContextPanelProps) {
 	const { t } = useTranslation("phase35");
-	const { phase, error, context, optimize } = useCogContextStore();
+	const { phase, error, context, optimize } = useCogContextStore(
+		useShallow((s) => ({
+			phase: s.phase,
+			error: s.error,
+			context: s.context,
+			optimize: s.optimize,
+		})),
+	);
 	const [prompt, setPrompt] = useState("");
 	const [files, setFiles] = useState<string[]>([]);
 	const [manualPath, setManualPath] = useState("");
 	const [manualError, setManualError] = useState<string | null>(null);
 	const [budget, setBudget] = useState(8000);
 	const [copied, setCopied] = useState(false);
+	const [copyFailed, setCopyFailed] = useState(false);
+	const [pickFailed, setPickFailed] = useState(false);
 
 	const isRunning = phase === "running";
 
@@ -63,8 +66,8 @@ export function CogContextPanel({ projectPath = "" }: CogContextPanelProps) {
 		() => (prompt.trim().length === 0 ? t("cogContext.validation.promptRequired") : null),
 		[prompt, t],
 	);
+	// The field keeps a whole number (0 when it does not parse): only the bounds can be wrong.
 	const budgetError = useMemo(() => {
-		if (!Number.isFinite(budget)) return t("common.invalidNumber");
 		if (budget < BUDGET_MIN) return t("cogContext.validation.budgetTooSmall");
 		if (budget > BUDGET_MAX) return t("cogContext.validation.budgetTooLarge");
 		return null;
@@ -83,15 +86,18 @@ export function CogContextPanel({ projectPath = "" }: CogContextPanelProps) {
 		});
 
 	const handlePickFiles = async () => {
+		setPickFailed(false);
 		try {
-			const picked = await globalThis.electronAPI.selectFiles({
-				multi: true,
-				title: t("cogContext.addFiles"),
-				defaultPath: projectPath || undefined,
-			});
-			if (picked && picked.length > 0) addPaths(picked);
+			// A cancelled dialog answers an empty list; only a failure throws.
+			addPaths(
+				await globalThis.electronAPI.selectFiles({
+					multi: true,
+					title: t("cogContext.addFiles"),
+					defaultPath: projectPath,
+				}),
+			);
 		} catch {
-			// Picker cancellation or unavailable — leave state unchanged.
+			setPickFailed(true);
 		}
 	};
 
@@ -99,10 +105,6 @@ export function CogContextPanel({ projectPath = "" }: CogContextPanelProps) {
 		const trimmed = manualPath.trim();
 		if (trimmed.length === 0) {
 			setManualError(t("common.required"));
-			return;
-		}
-		if (trimmed.length > PATH_MAX_LEN) {
-			setManualError(t("cogContext.validation.pathTooLong", { max: PATH_MAX_LEN }));
 			return;
 		}
 		if (files.includes(relativeToProject(trimmed, projectPath))) {
@@ -117,21 +119,23 @@ export function CogContextPanel({ projectPath = "" }: CogContextPanelProps) {
 	const handleRemove = (path: string) => setFiles((prev) => prev.filter((p) => p !== path));
 
 	const handleRun = () => {
-		if (hasError) return;
 		setCopied(false);
+		setCopyFailed(false);
 		optimize(projectPath, prompt.trim(), files, budget);
 	};
 
-	const handleCopy = async () => {
-		if (!context) return;
-		const text = context.slices
+	const handleCopy = async (slices: NonNullable<typeof context>["slices"]) => {
+		const text = slices
 			.map((s) => `### ${s.file_path}\n\`\`\`\n${s.content}\n\`\`\``)
 			.join("\n\n");
 		try {
 			await navigator.clipboard.writeText(text);
 			setCopied(true);
+			setCopyFailed(false);
 		} catch {
+			// The system refused the clipboard: say so rather than leave the click unanswered.
 			setCopied(false);
+			setCopyFailed(true);
 		}
 	};
 
@@ -204,6 +208,11 @@ export function CogContextPanel({ projectPath = "" }: CogContextPanelProps) {
 							</div>
 						</div>
 
+						{pickFailed && (
+							<p role="alert" className="text-xs text-destructive">
+								{t("common.pickerFailed")}
+							</p>
+						)}
 						<div className="rounded border bg-background">
 							{files.length === 0 ? (
 								<p className="px-3 py-4 text-xs text-muted-foreground text-center">
@@ -299,7 +308,7 @@ export function CogContextPanel({ projectPath = "" }: CogContextPanelProps) {
 								{budgetError}
 							</p>
 						)}
-						{!budgetError && budget > 0 && (
+						{!budgetError && (
 							<TokenCostEstimate totalTokens={budget} outputRatio={0.25} />
 						)}
 					</div>
@@ -325,7 +334,12 @@ export function CogContextPanel({ projectPath = "" }: CogContextPanelProps) {
 								{t("cogContext.fillRatio")} : {fillRatio} %
 							</Badge>
 							{context.slices.length > 0 && (
-								<Button type="button" size="sm" variant="outline" onClick={handleCopy}>
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									onClick={() => void handleCopy(context.slices)}
+								>
 									{copied ? (
 										<Check className="h-3.5 w-3.5 mr-1" />
 									) : (
@@ -335,6 +349,11 @@ export function CogContextPanel({ projectPath = "" }: CogContextPanelProps) {
 								</Button>
 							)}
 						</div>
+						{copyFailed && (
+							<p role="alert" className="text-xs text-destructive">
+								{t("cogContext.copyFailed")}
+							</p>
+						)}
 						{keywords.length > 0 && (
 							<p className="text-xs text-muted-foreground">
 								{t("cogContext.keywords", { list: keywords.join(", ") })}

@@ -80,7 +80,6 @@ export function CliToolBadges({
 				return (
 					<CodexCliStatusBadge
 						key={id}
-						onNavigateToTerminals={onNavigateToTerminals}
 						isCollapsed={isCollapsed}
 						onPresenceChange={onPresenceChange}
 					/>

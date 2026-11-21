@@ -1,6 +1,5 @@
 import { AlertCircle, CheckCircle2, FileCode, Users } from "lucide-react";
 import {
-	DOCUMENTATION_CATEGORY_LABELS,
 	IDEATION_EFFORT_COLORS,
 	IDEATION_IMPACT_COLORS,
 } from "../../../../shared/constants";
@@ -8,6 +7,7 @@ import type { DocumentationGapIdea } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
 import { Card } from "../../ui/card";
 import { useTranslation } from "react-i18next";
+import { useIdeaLabels } from "../hooks/useIdeaLabels";
 
 interface DocumentationGapDetailsProps {
 	readonly idea: DocumentationGapIdea;
@@ -17,13 +17,14 @@ export function DocumentationGapDetails({
 	idea,
 }: DocumentationGapDetailsProps) {
 	const { t } = useTranslation();
+	const labels = useIdeaLabels();
 	return (
 		<>
 			{/* Metrics */}
 			<div className="grid grid-cols-2 gap-2">
 				<Card className="p-3 text-center">
 					<div className="text-lg font-semibold">
-						{DOCUMENTATION_CATEGORY_LABELS[idea.category]}
+						{labels.category(idea.type, idea.category)}
 					</div>
 					<div className="text-xs text-muted-foreground">{t("ideation:performanceDetails.category")}</div>
 				</Card>
@@ -31,7 +32,7 @@ export function DocumentationGapDetails({
 					<div
 						className={`text-lg font-semibold ${IDEATION_EFFORT_COLORS[idea.estimatedEffort]}`}
 					>
-						{idea.estimatedEffort}
+						{labels.level(idea.estimatedEffort)}
 					</div>
 					<div className="text-xs text-muted-foreground">{t("ideation:performanceDetails.effort")}</div>
 				</Card>
@@ -43,8 +44,8 @@ export function DocumentationGapDetails({
 					<Users className="h-4 w-4" />
 					{t("ideation:details.targetAudience")}
 				</h3>
-				<Badge variant="outline" className="capitalize">
-					{idea.targetAudience}
+				<Badge variant="outline">
+					{labels.audience(idea.targetAudience)}
 				</Badge>
 			</div>
 
@@ -71,7 +72,7 @@ export function DocumentationGapDetails({
 			</div>
 
 			{/* Affected Areas */}
-			{idea.affectedAreas && idea.affectedAreas.length > 0 && (
+			{idea.affectedAreas.length > 0 && (
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<FileCode className="h-4 w-4" />
@@ -97,7 +98,7 @@ export function DocumentationGapDetails({
 					variant="outline"
 					className={IDEATION_IMPACT_COLORS[idea.priority]}
 				>
-					{idea.priority}
+					{labels.level(idea.priority)}
 				</Badge>
 			</div>
 		</>

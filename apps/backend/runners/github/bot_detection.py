@@ -603,8 +603,7 @@ class BotDetector:
         for pr_key in prs_to_remove:
             if pr_key in self.state.reviewed_commits:
                 del self.state.reviewed_commits[pr_key]
-            if pr_key in self.state.last_review_times:
-                del self.state.last_review_times[pr_key]
+            del self.state.last_review_times[pr_key]  # where it was found
             if pr_key in self.state.in_progress_reviews:
                 del self.state.in_progress_reviews[pr_key]
 
@@ -613,7 +612,8 @@ class BotDetector:
             if pr_key in self.state.in_progress_reviews:
                 del self.state.in_progress_reviews[pr_key]
 
-        total_cleaned = len(prs_to_remove) + len(stale_in_progress)
+        # A PR can be both: count it once.
+        total_cleaned = len(set(prs_to_remove) | set(stale_in_progress))
 
         if total_cleaned > 0:
             self.state.save(self.state_dir)
