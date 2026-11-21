@@ -158,5 +158,64 @@
 		"waiting": "Need you",
 		"shippedToday": "Delivered today",
 		"achievements": "Achievements"
+	},
+	"narratives": {
+		"title": "Office scenes",
+		"settings": "Scene settings",
+		"show": "Show scenes when a task changes hands",
+		"ai": "Have the page's model write them",
+		"aiHelp": "The model chosen for this page writes each scene. It only gets the kind of scene, the roles, their providers and the spec number, never the task's title or content. Without an answer, the scene keeps its template.",
+		"spec": "spec #{{number}}",
+		"task": "“{{title}}”",
+		"withEngine": "{{role}} ({{engine}})",
+		"roles": {
+			"planner": "Planner",
+			"coder": "Coder",
+			"reviewer": "QA Reviewer",
+			"fixer": "QA Fixer",
+			"you": "you"
+		},
+		"scenes": {
+			"plan-ready": "{{from}} slides the finished plan for {{spec}} across the desk to {{to}}.",
+			"handed-to-qa": "{{from}} hands in their copy for {{spec}} to {{to}}.",
+			"qa-sent-back": "{{from}} hands {{spec}} back to {{to}}, with a few notes in the margin.",
+			"qa-approved": "{{from}} signs off {{spec}}: it is waiting for {{to}}.",
+			"shipped": "{{spec}} ships. The whole office applauds.",
+			"stumbled": "{{from}} trips over an error on {{spec}} and stops."
+		}
+	},
+	"providers": {
+		"legend": "Providers at work",
+		"anthropic": "Anthropic",
+		"openai": "OpenAI",
+		"google": "Google",
+		"ollama": "Ollama",
+		"copilot": "Copilot",
+		"grok": "Grok",
+		"custom": "Other"
+	},
+	"seasons": {
+		"name": "Season Q{{quarter}} {{year}}",
+		"open": "Show the goals of {{name}}",
+		"count": "{{met}}/{{total}}",
+		"ends": "Ends on {{date}}",
+		"progress": "{{count}}/{{target}}",
+		"reward": "Reward: {{decor}}",
+		"earned": "In the office: {{list}}.",
+		"noDecor": "Meet a goal to decorate the office.",
+		"goals": {
+			"ship": "Deliver {{count}} tasks",
+			"qa-first-try": "Pass QA on the first review {{count}} times",
+			"debt": "Deliver {{count}} refactoring tasks",
+			"incidents": "Resolve {{count}} incidents",
+			"second-opinion": "Get a second engine to agree {{count}} times"
+		},
+		"decor": {
+			"trophy-shelf": "a trophy shelf",
+			"plants": "potted plants",
+			"whiteboard": "a whiteboard",
+			"neon-sign": "a neon sign",
+			"arcade": "an arcade cabinet"
+		}
 	}
 }

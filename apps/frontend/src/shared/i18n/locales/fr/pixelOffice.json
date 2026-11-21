@@ -158,5 +158,64 @@
 		"waiting": "Vous attendent",
 		"shippedToday": "Livrées aujourd'hui",
 		"achievements": "Succès"
+	},
+	"narratives": {
+		"title": "Scènes du bureau",
+		"settings": "Réglages des scènes",
+		"show": "Montrer une scène quand une tâche change de mains",
+		"ai": "Les faire écrire par le modèle de la page",
+		"aiHelp": "Le modèle choisi pour cette page écrit chaque scène. Il ne reçoit que le type de scène, les rôles, leurs fournisseurs et le numéro de spec, jamais le titre ni le contenu de la tâche. Sans réponse, la scène garde son modèle.",
+		"spec": "la spec n°{{number}}",
+		"task": "« {{title}} »",
+		"withEngine": "{{role}} ({{engine}})",
+		"roles": {
+			"planner": "Planner",
+			"coder": "Coder",
+			"reviewer": "Reviewer QA",
+			"fixer": "Fixer QA",
+			"you": "vous"
+		},
+		"scenes": {
+			"plan-ready": "{{from}} glisse le plan de {{spec}} sur le bureau de {{to}}.",
+			"handed-to-qa": "{{from}} vient de rendre sa copie pour {{spec}} à {{to}}.",
+			"qa-sent-back": "{{from}} rend {{spec}} à {{to}}, avec quelques notes dans la marge.",
+			"qa-approved": "{{from}} valide {{spec}} : à {{to}} de jouer.",
+			"shipped": "{{spec}} est livrée. Tout le bureau applaudit.",
+			"stumbled": "{{from}} trébuche sur une erreur dans {{spec}} et s'arrête."
+		}
+	},
+	"providers": {
+		"legend": "Fournisseurs au travail",
+		"anthropic": "Anthropic",
+		"openai": "OpenAI",
+		"google": "Google",
+		"ollama": "Ollama",
+		"copilot": "Copilot",
+		"grok": "Grok",
+		"custom": "Autre"
+	},
+	"seasons": {
+		"name": "Saison T{{quarter}} {{year}}",
+		"open": "Voir les objectifs : {{name}}",
+		"count": "{{met}}/{{total}}",
+		"ends": "Se termine le {{date}}",
+		"progress": "{{count}}/{{target}}",
+		"reward": "Récompense : {{decor}}",
+		"earned": "Dans le bureau : {{list}}.",
+		"noDecor": "Atteignez un objectif pour décorer le bureau.",
+		"goals": {
+			"ship": "Livrer {{count}} tâches",
+			"qa-first-try": "Passer la QA du premier coup {{count}} fois",
+			"debt": "Livrer {{count}} tâches de refactorisation",
+			"incidents": "Résoudre {{count}} incidents",
+			"second-opinion": "Obtenir {{count}} fois l'accord d'un second moteur"
+		},
+		"decor": {
+			"trophy-shelf": "une étagère à trophées",
+			"plants": "des plantes en pot",
+			"whiteboard": "un tableau blanc",
+			"neon-sign": "une enseigne néon",
+			"arcade": "une borne d'arcade"
+		}
 	}
 }

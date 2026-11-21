@@ -822,6 +822,9 @@ export const IPC_CHANNELS = {
 		"performanceProfiler:implementationComplete",
 
 	// Pipeline Generator (Feature 23) — AI-powered CI/CD pipeline generation
+	// Pixel Office: a mini-scene written by the page's model
+	PIXEL_OFFICE_NARRATE: "pixelOffice:narrate",
+
 	PIPELINE_GENERATOR_GENERATE: "pipelineGenerator:generate",
 	PIPELINE_GENERATOR_CANCEL: "pipelineGenerator:cancel",
 	// Pipeline Generator events (main -> renderer)

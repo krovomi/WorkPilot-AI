@@ -50,6 +50,20 @@ describe("incidentFactsOf", () => {
 		]);
 	});
 
+	it("keeps a resolution date that parses, and only that", () => {
+		expect(
+			incidentFactsOf([
+				{ status: "resolved", resolved_at: "2026-11-02T10:00:00Z" },
+				{ status: "resolved", resolved_at: "yesterday" },
+				{ status: "resolved", resolved_at: 1_700_000_000 },
+			]),
+		).toEqual([
+			{ status: "resolved", resolvedAt: Date.parse("2026-11-02T10:00:00Z") },
+			{ status: "resolved" },
+			{ status: "resolved" },
+		]);
+	});
+
 	it("drops what is not an incident", () => {
 		expect(incidentFactsOf(null)).toEqual([]);
 		expect(incidentFactsOf({ status: "resolved" })).toEqual([]);
