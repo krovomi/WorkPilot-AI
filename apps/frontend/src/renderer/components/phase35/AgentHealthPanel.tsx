@@ -7,14 +7,18 @@
  */
 
 import { useEffect } from "react";
-import type { ProjectAgentHealthPending } from "../../../preload/api/modules/phase35-features-api";
+import type {
+	ProjectAgentHealthPending,
+	ProjectAgentHealthScore,
+} from "../../../preload/api/modules/phase35-features-api";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { useAgentHealthStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
-const STATUS_COLOR: Record<string, string> = {
+const STATUS_COLOR: Record<ProjectAgentHealthScore["status"], string> = {
 	healthy: "bg-success/20 text-success border-success/40",
 	degraded: "bg-warning/20 text-warning border-warning/40",
 	failing: "bg-orange-500/20 text-orange-700 border-orange-500/40",
@@ -35,7 +39,15 @@ interface AgentHealthPanelProps {
 
 export function AgentHealthPanel({ projectPath = "" }: AgentHealthPanelProps) {
 	const { t } = useTranslation("phase35");
-	const { phase, error, health, refresh } = useAgentHealthStore();
+	const { phase, error, health, refresh } = useAgentHealthStore(
+		useShallow((s) => ({
+			phase: s.phase,
+			error: s.error,
+			// Scores of the project on screen only, never of the one opened before.
+			health: s.projectPath === projectPath ? s.health : null,
+			refresh: s.refresh,
+		})),
+	);
 
 	useEffect(() => {
 		if (projectPath) refresh(projectPath);
@@ -77,7 +89,7 @@ export function AgentHealthPanel({ projectPath = "" }: AgentHealthPanelProps) {
 							<div className="flex items-center gap-3">
 								<span className="font-medium">{t(`agentHealth.roles.${s.role}` as never)}</span>
 								<ModelName provider={s.provider} model={s.model} />
-								<Badge className={STATUS_COLOR[s.status] ?? "bg-muted"}>
+								<Badge className={STATUS_COLOR[s.status]}>
 									{t(`agentHealth.status${s.status[0].toUpperCase()}${s.status.slice(1).replace("_o", "O")}` as never)}
 								</Badge>
 								<span className="text-2xl font-bold">{s.score.toFixed(0)}</span>
@@ -105,10 +117,10 @@ export function AgentHealthPanel({ projectPath = "" }: AgentHealthPanelProps) {
 					</li>
 				))}
 			</ul>
-			{pending.length > 0 && (
+			{health && pending.length > 0 && (
 				<div className="mt-4">
 					<p className="text-xs font-medium text-muted-foreground">
-						{t("agentHealth.pendingTitle", { min: health?.min_runs ?? 3 })}
+						{t("agentHealth.pendingTitle", { min: health.min_runs })}
 					</p>
 					<ul className="mt-1 space-y-1 text-xs text-muted-foreground">
 						{pending.map((p) => (

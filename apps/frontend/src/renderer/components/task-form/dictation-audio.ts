@@ -44,7 +44,8 @@ export async function captureDictation(
 	let voiced = false;
 	let stopped = false;
 	const flush = () => {
-		if (voiced && samples) {
+		// Voiced audio always holds samples: the level of no sample is NaN.
+		if (voiced) {
 			const wav = new ArrayBuffer(44 + samples * 2);
 			const view = new DataView(wav);
 			const ascii = (offset: number, text: string) => {
@@ -80,8 +81,8 @@ export async function captureDictation(
 		quiet = 0;
 		voiced = false;
 	};
+	// Stopping removes this handler: no event reaches it afterwards.
 	processor.onaudioprocess = (event) => {
-		if (stopped) return;
 		const data = new Float32Array(event.inputBuffer.getChannelData(0));
 		const rms = Math.sqrt(
 			data.reduce((sum, value) => sum + value * value, 0) / data.length,

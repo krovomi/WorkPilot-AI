@@ -107,4 +107,75 @@ describe("microphone capture", () => {
 		expect(chunk).toHaveBeenCalledOnce();
 		expect(isVoice).toHaveBeenCalledWith(0.5);
 	});
+
+	const frame = (value: number, length = 1600) => ({
+		inputBuffer: { getChannelData: () => new Float32Array(length).fill(value) },
+	});
+
+	it("cuts a phrase at a pause after two seconds, and reports the level", async () => {
+		const chunk = vi.fn();
+		const level = vi.fn();
+		const stop = await captureDictation(chunk, level, vi.fn());
+		// 2 s of speech (20 frames of 0.1 s at 16 kHz), then a pause.
+		for (let i = 0; i < 20; i++) processor.onaudioprocess?.(frame(0.05));
+		expect(level.mock.lastCall?.[0]).toBeCloseTo(0.4, 5);
+		for (let i = 0; i < 6; i++) processor.onaudioprocess?.(frame(0));
+		expect(chunk).not.toHaveBeenCalled();
+		processor.onaudioprocess?.(frame(0));
+		expect(chunk).toHaveBeenCalledOnce();
+		expect(new DataView(chunk.mock.calls[0][0]).getUint32(40, true)).toBe(27 * 1600 * 2);
+		processor.onaudioprocess?.(frame(1));
+		expect(level).toHaveBeenLastCalledWith(1, true);
+		stop();
+		expect(chunk).toHaveBeenCalledTimes(2);
+	});
+
+	it("cuts a long phrase at twenty seconds", async () => {
+		const chunk = vi.fn();
+		await captureDictation(chunk, vi.fn(), vi.fn());
+		for (let i = 0; i < 199; i++) processor.onaudioprocess?.(frame(0.2));
+		expect(chunk).not.toHaveBeenCalled();
+		processor.onaudioprocess?.(frame(0.2));
+		expect(chunk).toHaveBeenCalledOnce();
+	});
+
+	it("sends nothing for silence alone", async () => {
+		const chunk = vi.fn();
+		const stop = await captureDictation(chunk, vi.fn(), vi.fn());
+		for (let i = 0; i < 30; i++) processor.onaudioprocess?.(frame(0.001));
+		stop();
+		expect(chunk).not.toHaveBeenCalled();
+	});
+
+	it("tells when the microphone goes away, and stops listening for it", async () => {
+		const ended = vi.fn();
+		const stop = await captureDictation(vi.fn(), vi.fn(), ended);
+		expect(track.addEventListener).toHaveBeenCalledWith("ended", ended);
+		stop();
+		expect(track.removeEventListener).toHaveBeenCalledWith("ended", ended);
+	});
+
+	it("survives a context the browser already closed", async () => {
+		close.mockRejectedValue(new Error("closed"));
+		const stop = await captureDictation(vi.fn(), vi.fn(), vi.fn());
+		stop();
+		await Promise.resolve();
+		resume.mockRejectedValueOnce(new Error("device lost"));
+		await expect(captureDictation(vi.fn(), vi.fn(), vi.fn())).rejects.toThrow("device lost");
+		expect(close).toHaveBeenCalledTimes(2);
+	});
+
+	it("releases the microphone when no audio context can be made", async () => {
+		vi.stubGlobal(
+			"AudioContext",
+			class {
+				constructor() {
+					throw new Error("no audio");
+				}
+			},
+		);
+		await expect(captureDictation(vi.fn(), vi.fn(), vi.fn())).rejects.toThrow("no audio");
+		expect(track.stop).toHaveBeenCalledOnce();
+		expect(close).not.toHaveBeenCalled();
+	});
 });

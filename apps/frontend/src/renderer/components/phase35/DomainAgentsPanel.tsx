@@ -252,7 +252,7 @@ export function DomainAgentsPanel({ projectPath = "" }: DomainAgentsPanelProps) 
 								</ul>
 							</details>
 						)}
-						{Object.keys(bundle.suggested_libraries ?? {}).length > 0 && (
+						{Object.keys(bundle.suggested_libraries).length > 0 && (
 							<details open>
 								<summary className="font-medium cursor-pointer">
 									{t("domainAgents.libraries")}

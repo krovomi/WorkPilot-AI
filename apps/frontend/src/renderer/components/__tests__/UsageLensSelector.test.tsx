@@ -71,4 +71,17 @@ describe("UsageLensSelector", () => {
 		renderLens();
 		expect(screen.getByRole("combobox").textContent).toContain("acme-llm");
 	});
+
+	it("names an unknown provider in the app's language", async () => {
+		lens.usageProvider = "unknown";
+		await i18n.changeLanguage("fr");
+		try {
+			renderLens();
+			const trigger = screen.getByRole("combobox");
+			expect(trigger.textContent).toContain("Inconnu");
+			expect(trigger.textContent).not.toContain("Unknown");
+		} finally {
+			await i18n.changeLanguage("en");
+		}
+	});
 });

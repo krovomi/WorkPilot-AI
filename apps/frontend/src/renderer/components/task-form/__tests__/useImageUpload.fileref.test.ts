@@ -17,6 +17,14 @@ type OnFileReferenceDropFn = (
 	data: FileReferenceData,
 ) => void;
 
+// The hook shows the messages its caller translated.
+const errorMessages = {
+	maxImagesReached: "Too many images",
+	invalidImageType: "Wrong image type",
+	processPasteFailed: "Paste failed",
+	processDropFailed: "Drop failed",
+};
+
 // Helper to create mock DragEvent with file reference data
 function createMockFileRefDragEvent(
 	fileRefData: FileReferenceData | null,
@@ -110,6 +118,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should detect valid file reference drops and call onFileReferenceDrop callback", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -137,6 +146,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should use @filename fallback when text/plain is not set", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -163,6 +173,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should not call onFileReferenceDrop when callback is not provided", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					// No onFileReferenceDrop callback
@@ -186,6 +197,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should handle directory references the same as file references", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -215,6 +227,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it('should not call onFileReferenceDrop when type is not "file-reference"', async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -241,6 +254,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should not call onFileReferenceDrop when path is missing", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -266,6 +280,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should not call onFileReferenceDrop when name is missing", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -291,6 +306,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should handle invalid JSON gracefully", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -325,6 +341,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should not call onFileReferenceDrop when application/json data is empty", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -345,6 +362,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should prioritize file reference over image drop", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -376,6 +394,7 @@ describe("useImageUpload - File Reference Handling", () => {
 			// more complex mocking of File objects and blobToBase64
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -398,6 +417,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should not process file reference drops when disabled", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -426,6 +446,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should set isDragOver to true on dragOver", () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 				}),
@@ -448,6 +469,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should set isDragOver to false on dragLeave", () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 				}),
@@ -474,6 +496,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should set isDragOver to false on drop", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -510,6 +533,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should handle files with spaces in the name", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -535,6 +559,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should handle files with special characters in the name", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -560,6 +585,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should handle files with unicode characters in the name", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -585,6 +611,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should handle very long file paths", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -609,6 +636,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should handle multiple rapid drops", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -661,6 +689,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should pass complete FileReferenceData to callback", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,
@@ -693,6 +722,7 @@ describe("useImageUpload - File Reference Handling", () => {
 		it("should pass reference string as first argument", async () => {
 			const { result } = renderHook(() =>
 				useImageUpload({
+					errorMessages,
 					images: [],
 					onImagesChange: mockOnImagesChange,
 					onFileReferenceDrop: mockOnFileReferenceDrop,

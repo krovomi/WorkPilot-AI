@@ -16,7 +16,7 @@ import {
 	sortableKeyboardCoordinates,
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Calendar, Check, Eye, Inbox, Play, Plus } from "lucide-react";
+import { Calendar, Check, Eye, Inbox, type LucideIcon, Play, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
 	ROADMAP_STATUS_COLUMNS,
@@ -53,21 +53,8 @@ interface DroppableStatusColumnProps {
 	readonly isOver: boolean;
 }
 
-// Get icon component for status
-function getStatusIcon(iconName: string) {
-	switch (iconName) {
-		case "Eye":
-			return <Eye className="h-3.5 w-3.5" />;
-		case "Calendar":
-			return <Calendar className="h-3.5 w-3.5" />;
-		case "Play":
-			return <Play className="h-3.5 w-3.5" />;
-		case "Check":
-			return <Check className="h-3.5 w-3.5" />;
-		default:
-			return null;
-	}
-}
+// The icon of each status column.
+const STATUS_ICONS: Record<RoadmapStatusColumn["icon"], LucideIcon> = { Eye, Calendar, Play, Check };
 
 // Get status color classes based on column ID
 function getStatusColorClasses(columnId: string): string {
@@ -93,6 +80,7 @@ function DroppableStatusColumn({
 	isOver,
 }: DroppableStatusColumnProps) {
 	const { t } = useTranslation();
+	const StatusIcon = STATUS_ICONS[column.icon];
 	const { setNodeRef } = useDroppable({
 		id: column.id,
 	});
@@ -118,7 +106,7 @@ function DroppableStatusColumn({
 							getStatusColorClasses(column.id),
 						)}
 					>
-						{getStatusIcon(column.icon)}
+						<StatusIcon className="h-3.5 w-3.5" />
 					</div>
 					<h2 className="wp-title text-sm">
 						{t(`roadmap:statusColumns.${column.id}`, { defaultValue: column.label })}
@@ -297,16 +285,6 @@ export function RoadmapKanbanView({
 		// Features are displayed in their natural order within each status
 	};
 
-	// Get status label for a feature (for display in drag overlay)
-	const getStatusLabelForFeature = (feature: RoadmapFeature) => {
-		const statusColumn = ROADMAP_STATUS_COLUMNS.find(
-			(c) => c.id === feature.status,
-		);
-		return statusColumn
-			? t(`roadmap:statusColumns.${statusColumn.id}`, { defaultValue: statusColumn.label })
-			: feature.status;
-	};
-
 	return (
 		<div className="flex h-full flex-col">
 			{/* Kanban columns */}
@@ -322,7 +300,7 @@ export function RoadmapKanbanView({
 						<DroppableStatusColumn
 							key={column.id}
 							column={column}
-							features={featuresByStatus[column.id] || []}
+							features={featuresByStatus[column.id]}
 							roadmap={roadmap}
 							onFeatureClick={onFeatureClick}
 							onConvertToSpec={onConvertToSpec}
@@ -339,7 +317,7 @@ export function RoadmapKanbanView({
 							<Card className="p-4 w-80 shadow-2xl">
 								<div className="flex items-center gap-2 mb-1">
 									<Badge variant="outline" className="text-3xs px-1.5 py-0">
-										{getStatusLabelForFeature(activeFeature)}
+										{t(`roadmap:statusColumns.${activeFeature.status}`)}
 									</Badge>
 								</div>
 								<div className="font-medium">{activeFeature.title}</div>
