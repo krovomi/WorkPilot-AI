@@ -160,3 +160,50 @@ def test_revert_in_server_mode_is_refused(client, monkeypatch):
         "/api/brain/memory/revert", json={"project_dir": PROJECT, "entry_id": "x"}
     ).json()
     assert got["reason"] == "server-mode"
+
+
+def test_scope_and_maintainers_through_the_api(client, monkeypatch):
+    from brain.lifecycle import identity
+
+    monkeypatch.setattr(identity, "person", lambda root: {"name": "Alice", "email": ""})
+    got = client.post(
+        "/api/brain/memory/scope",
+        json={"project_dir": PROJECT, "id": REL, "applies_to": "apps/api/"},
+    ).json()
+    assert got == {"success": True, "applies_to": "apps/api/"}
+    got = client.post(
+        "/api/brain/memory/scope",
+        json={"project_dir": PROJECT, "id": REL, "applies_to": "a\nb"},
+    ).json()
+    assert got["code"] == "invalid"
+    got = client.post(
+        "/api/brain/memory/scope",
+        json={"project_dir": PROJECT, "id": "../../x.md", "applies_to": "apps/"},
+    ).json()
+    assert got == {"success": False, "error": "invalid", "code": "invalid"}
+
+    got = client.post(
+        "/api/brain/memory/maintainers",
+        json={"project_dir": PROJECT, "names": ["Bob"]},
+    ).json()
+    assert got == {"success": True, "maintainers": ["Bob"]}
+    view = client.get(
+        "/api/brain/memory/lifecycle", params={"project_dir": PROJECT}
+    ).json()
+    assert view["maintainers"] == ["Bob"] and view["can_arbitrate"] is False
+    got = client.post(
+        "/api/brain/memory/maintainers",
+        json={"project_dir": PROJECT, "names": ["bad\nname"]},
+    ).json()
+    assert got["code"] == "invalid"
+
+
+def test_scope_and_maintainers_in_server_mode_are_refused(client, monkeypatch):
+    import brain.lifecycle.api as api
+
+    monkeypatch.setattr(api, "server_mode_roots", lambda: [Path("/srv")])
+    for route, body in (("scope", {"id": REL}), ("maintainers", {"names": []})):
+        got = client.post(
+            f"/api/brain/memory/{route}", json={"project_dir": PROJECT, **body}
+        ).json()
+        assert got["reason"] == "server-mode"

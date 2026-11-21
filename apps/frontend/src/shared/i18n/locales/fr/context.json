@@ -182,7 +182,9 @@
 				"a": "préfère la note déjà ici",
 				"b": "préfère la note reçue",
 				"none": "pas de préférence"
-			}
+			},
+			"escalated": "Tranché le {{date}} {{actor}}, et de nouveau contredit : un mainteneur tranche.",
+			"waitingMaintainer": "En attente d'un mainteneur : {{names}}."
 		},
 		"trash": {
 			"title": "Oubliées récemment",
@@ -206,7 +208,11 @@
 			"confirmForget": "L'oublier",
 			"forgetHint": "Une mémoire oubliée reste restaurable depuis l'onglet Cycle de vie pendant la durée de rétention.",
 			"history": "Historique",
-			"hideHistory": "Masquer l'historique"
+			"hideHistory": "Masquer l'historique",
+			"scope": "Portée",
+			"scopePlaceholder": "Où elle s'applique (ex. apps/billing/) ; vide : partout",
+			"saveScope": "Enregistrer",
+			"scopeBadge": "S'applique à {{scope}}"
 		},
 		"action": {
 			"create": "Créée",
@@ -220,7 +226,8 @@
 			"merge": "Fusionnée",
 			"archive": "Archivée",
 			"resolve": "Conflit tranché",
-			"conflict": "Conflit détecté"
+			"conflict": "Conflit détecté",
+			"designate": "Mainteneurs désignés"
 		},
 		"actor": {
 			"user": "par toi",
@@ -228,7 +235,8 @@
 			"agentType": "par l'agent {{type}}",
 			"sync": "par la synchronisation",
 			"learning-loop": "par le learning loop",
-			"lifecycle": "par la règle de rétention"
+			"lifecycle": "par la règle de rétention",
+			"person": "par {{name}}"
 		},
 		"reason": {
 			"recorded": "enregistrée",
@@ -251,7 +259,10 @@
 			"person-wrote": "une personne a écrit la note canonique",
 			"not-a-conflict": "une personne a dit que ce n'était pas un conflit",
 			"undone": "une décision automatique a été annulée",
-			"unmerged": "séparée de la note dans laquelle elle avait été fusionnée"
+			"unmerged": "séparée de la note dans laquelle elle avait été fusionnée",
+			"escalated": "contredite à nouveau peu après une décision",
+			"maintainers-changed": "les mainteneurs ont changé",
+			"scoped": "l'endroit où elle s'applique a changé"
 		},
 		"errors": {
 			"failed": "l'action a échoué",
@@ -269,7 +280,8 @@
 			"provider-refused": "le fournisseur a refusé (mode hors-ligne ?)",
 			"no-answer": "le modèle n'a rien donné d'exploitable",
 			"server-mode": "indisponible en mode serveur",
-			"not-revertible": "cette décision ne peut plus être annulée"
+			"not-revertible": "cette décision ne peut plus être annulée",
+			"maintainer-only": "seul un mainteneur tranche ce conflit"
 		},
 		"undo": {
 			"last": "Annuler la dernière décision automatique (dans l'heure)",
@@ -287,6 +299,17 @@
 			"resolution": "{{hours}} h en moyenne avant qu'une personne tranche",
 			"views": "{{count}} historiques ouverts sur cet ordinateur",
 			"tooAggressive": "Beaucoup de mémoires ont été restaurées cette semaine : les retraits automatiques sont peut-être trop agressifs."
+		},
+		"maintainers": {
+			"list": "Mainteneurs : {{names}}",
+			"none": "Aucun mainteneur : n'importe qui tranche un conflit qui oscille.",
+			"edit": "Modifier",
+			"placeholder": "Noms ou e-mails, séparés par des virgules",
+			"save": "Enregistrer",
+			"cancel": "Annuler"
+		},
+		"decisions": {
+			"title": "Décisions"
 		}
 	}
 }

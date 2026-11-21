@@ -184,6 +184,29 @@ machines qui signaleraient la même paire en même temps seraient en conflit sur
 La décision, elle, est dans le vault : la note canonique, les variantes archivées et le journal
 arrivent chez le coéquipier au prochain pull, et une paire réglée ailleurs sort de sa file.
 
+## Les règles d'une équipe : qui a tranché, l'oscillation, les mainteneurs, la portée
+
+- **Qui a tranché** (`identity.py`). Une décision d'une personne porte son nom (`by`), celui
+  de l'identité git du vault — celle que ses commits portent déjà. C'est l'« historique des
+  consensus » de l'issue : la carte **Décisions** de l'onglet liste les `resolve` avec leur
+  auteur. L'e-mail ne sert qu'à reconnaître un mainteneur, il n'est jamais écrit.
+- **Une paire qui oscille est escaladée** (`arbitration.earlier_decision`). Une paire tranchée
+  il y a moins de `BRAIN_CONFLICT_COOLDOWN_DAYS` (7) jours — par une personne ou par une règle,
+  les deux notes nommées par la même décision, une copie de conflit comptant pour sa note — qui
+  se contredit de nouveau n'est plus réglée par une règle : elle entre dans la file marquée
+  `escalated` (date, auteur et raison de la décision renversée), et le journal le dit
+  (`conflict`, `escalated`). Deux versions fusionnées parce qu'elles disaient la même chose ne
+  sont pas une décision qu'on renverse.
+- **Les mainteneurs** (`maintainers.py`) sont une liste du vault,
+  `.lifecycle/maintainers.md`, une ligne par nom ou e-mail (20 au plus), modifiée depuis
+  l'onglet et journalisée (`designate`). Une paire escaladée n'est tranchée que par l'un d'eux
+  (`maintainer-only` sinon, et l'UI désactive ses boutons) ; sans liste, par n'importe qui.
+  C'est une règle d'équipe, pas un contrôle d'accès : quiconque écrit dans le vault peut changer
+  la liste ou son nom git, et le journal le montre.
+- **La portée d'une mémoire** (`store.scope`) : **Portée** sur chaque mémoire écrit son
+  `applies_to` (une ligne, 200 caractères au plus ; vide = partout), que le détecteur respecte
+  déjà. C'est la « branche de mémoire » par module de l'issue.
+
 ## L'avis d'un modèle (`advisor.py`), demandé par une personne
 
 Sur une paire de la file, « Demander au modèle » envoie *cette paire seulement* au fournisseur
@@ -203,7 +226,7 @@ change pas.
 ## Surfaces
 
 - `GET /api/brain/memory/lifecycle` (avec les entrées reprenables et les chiffres),
-  `GET …/history`, `POST …/forget`, `…/restore`, `…/pin`, `…/revert`,
+  `GET …/history`, `POST …/forget`, `…/restore`, `…/pin`, `…/revert`, `…/scope`, `…/maintainers`,
   `…/conflicts/resolve`, `…/conflicts/suggest` (`brain/lifecycle/api.py`, inclus dans le routeur
   du cerveau : refusé en mode serveur comme lui, le projet est un nom lu dans `project_dir`).
 - Desktop : canaux `CONTEXT_MEMORY_*` (`main/ipc-handlers/context/memory-lifecycle-handlers.ts`,
@@ -217,8 +240,13 @@ change pas.
 - Dé-fusion d'un pattern que le learning loop a plié dans un autre : le pattern plié n'est pas
   gardé à part (seule son instruction est dans le journal) ; il faudrait que le learning loop le
   conserve avant de le fusionner.
-- Notifications d'équipe (Slack, Teams, e-mail) quand un conflit est détecté ; mainteneur désigné,
-  historique des votes, « cooldown » d'un arbitrage qui oscille.
-- Portées de mémoire au-delà d'`applies_to` (équipe, branche, module) et sélecteur dans l'UI.
-- Embeddings locaux pour rapprocher deux formulations équivalentes ; signature des instantanés et
-  liste blanche des sources (aujourd'hui, la confiance est celle du distant git choisi).
+- Notifications d'équipe (Slack, Teams, e-mail) quand un conflit est détecté : les canaux
+  existent (`services/notifications/`), mais la configuration d'un webhook est celle d'un projet
+  et le vault est commun à tous ; à brancher et à vérifier avec un compte Slack ou Teams réel,
+  qu'on n'a pas ici.
+- Mainteneurs par module (une liste par `applies_to`) pour une grande équipe ; portées par équipe
+  ou par branche git, que les notes ne portent pas encore.
+- Embeddings locaux pour rapprocher deux formulations équivalentes : une dépendance lourde
+  (modèle de phrases à télécharger) à justifier ; signature des instantanés et liste blanche des
+  sources : demande une clé par coéquipier et sa distribution (aujourd'hui, la confiance est
+  celle du distant git choisi).

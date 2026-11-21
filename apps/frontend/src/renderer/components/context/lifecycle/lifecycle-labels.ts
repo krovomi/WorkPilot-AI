@@ -1,8 +1,9 @@
 import type { TFunction } from "i18next";
 import type { MemoryJournalEntry } from "../../../../shared/types";
 
-/** "by the coder agent", "by the sync"…: the actor of a journal entry. */
-export function actorLabel(t: TFunction, actor: string): string {
+/** "by the coder agent", "by the sync", "by Alice"…: the actor of a journal entry. */
+export function actorLabel(t: TFunction, actor: string, by = ""): string {
+	if (by) return t("context:lifecycle.actor.person", { name: by });
 	if (actor.startsWith("agent:")) {
 		return t("context:lifecycle.actor.agentType", { type: actor.slice(6) });
 	}
@@ -15,7 +16,7 @@ export function actorLabel(t: TFunction, actor: string): string {
 export function entryLabel(t: TFunction, entry: MemoryJournalEntry): string {
 	return t("context:lifecycle.entry", {
 		action: t(`context:lifecycle.action.${entry.action}`),
-		actor: actorLabel(t, entry.actor),
+		actor: actorLabel(t, entry.actor, entry.by),
 		reason: t(`context:lifecycle.reason.${entry.reason_code}`, {
 			defaultValue: entry.reason_code,
 		}),

@@ -24,6 +24,17 @@ const CHOICES: readonly MemoryConflictChoice[] = ["a", "b", "custom", "dismiss"]
 export const MAX_ID_LENGTH = 400;
 export const MAX_REASON_LENGTH = 300;
 export const MAX_CANONICAL_LENGTH = 4_000;
+export const MAX_SCOPE_LENGTH = 200;
+export const MAX_MAINTAINERS = 20;
+const MAX_MAINTAINER_LENGTH = 120;
+
+/** A control character (a newline, a NUL, DEL…): a name or a place is one line of text. */
+function hasControl(text: string): boolean {
+	return [...text].some((char) => {
+		const code = char.charCodeAt(0);
+		return code < 32 || code === 127;
+	});
+}
 
 function hasDotSegment(value: string): boolean {
 	return value.split("/").some((part) => part === ".." || part === ".");
@@ -61,4 +72,23 @@ export function boundedText(value: unknown, max: number): string | null {
 	if (value === undefined || value === null) return "";
 	if (typeof value !== "string" || value.length > max) return null;
 	return value;
+}
+
+/** Where a memory applies: one line under its cap, or `null`. */
+export function scopeText(value: unknown): string | null {
+	const text = boundedText(value, MAX_SCOPE_LENGTH);
+	return text === null || hasControl(text) ? null : text;
+}
+
+/** The maintainers' names: at most 20, each one line under its cap, or `null`. */
+export function maintainerNames(value: unknown): string[] | null {
+	if (!Array.isArray(value) || value.length > MAX_MAINTAINERS) return null;
+	const ok = value.every(
+		(name) =>
+			typeof name === "string" &&
+			name.trim().length > 0 &&
+			name.length <= MAX_MAINTAINER_LENGTH &&
+			!hasControl(name),
+	);
+	return ok ? value.map((name: string) => name.trim()) : null;
 }

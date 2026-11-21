@@ -63,6 +63,8 @@ function view(over: Partial<MemoryLifecycleView> = {}): MemoryLifecycleView {
 		],
 		revertible: { aaaaaaaaaaaa: "undo", bbbbbbbbbbbb: "unmerge" },
 		lastUndo: "aaaaaaaaaaaa",
+		maintainers: [],
+		canArbitrate: true,
 		metrics: METRICS,
 		...over,
 	};

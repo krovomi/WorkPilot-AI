@@ -14,6 +14,8 @@ describe("the memory lifecycle browser mock", () => {
 				revertible: {},
 				lastUndo: null,
 				metrics: null,
+				maintainers: [],
+				canArbitrate: true,
 				trash: [],
 				conflicts: [],
 				pinned: 0,
@@ -32,6 +34,8 @@ describe("the memory lifecycle browser mock", () => {
 			memoryLifecycleMock.resolveMemoryConflict,
 			memoryLifecycleMock.suggestMemoryResolution,
 			memoryLifecycleMock.revertMemoryDecision,
+			memoryLifecycleMock.setMemoryScope,
+			memoryLifecycleMock.setMemoryMaintainers,
 		]) {
 			expect(await change()).toEqual({ success: false, error: "Not available in browser mock" });
 		}

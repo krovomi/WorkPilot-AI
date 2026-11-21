@@ -182,7 +182,9 @@
 				"a": "prefers the note already here",
 				"b": "prefers the received note",
 				"none": "no preference"
-			}
+			},
+			"escalated": "Decided {{date}} {{actor}}, and contradicted again: a maintainer settles it.",
+			"waitingMaintainer": "Waiting for a maintainer: {{names}}."
 		},
 		"trash": {
 			"title": "Recently forgotten",
@@ -206,7 +208,11 @@
 			"confirmForget": "Forget it",
 			"forgetHint": "A forgotten memory stays restorable from the Lifecycle tab during the retention period.",
 			"history": "History",
-			"hideHistory": "Hide history"
+			"hideHistory": "Hide history",
+			"scope": "Scope",
+			"scopePlaceholder": "Where it applies (e.g. apps/billing/); empty: everywhere",
+			"saveScope": "Save",
+			"scopeBadge": "Applies to {{scope}}"
 		},
 		"action": {
 			"create": "Created",
@@ -220,7 +226,8 @@
 			"merge": "Merged",
 			"archive": "Archived",
 			"resolve": "Conflict resolved",
-			"conflict": "Conflict detected"
+			"conflict": "Conflict detected",
+			"designate": "Maintainers designated"
 		},
 		"actor": {
 			"user": "by you",
@@ -228,7 +235,8 @@
 			"agentType": "by the {{type}} agent",
 			"sync": "by the sync",
 			"learning-loop": "by the learning loop",
-			"lifecycle": "by the retention rule"
+			"lifecycle": "by the retention rule",
+			"person": "by {{name}}"
 		},
 		"reason": {
 			"recorded": "recorded",
@@ -251,7 +259,10 @@
 			"person-wrote": "a person wrote the canonical note",
 			"not-a-conflict": "a person said it is not a conflict",
 			"undone": "an automatic decision was undone",
-			"unmerged": "separated from the note it was merged into"
+			"unmerged": "separated from the note it was merged into",
+			"escalated": "contradicted again soon after a decision",
+			"maintainers-changed": "the maintainers changed",
+			"scoped": "where it applies changed"
 		},
 		"errors": {
 			"failed": "the action failed",
@@ -269,7 +280,8 @@
 			"provider-refused": "the provider refused (offline mode?)",
 			"no-answer": "the model gave no usable answer",
 			"server-mode": "not available in server mode",
-			"not-revertible": "this decision can no longer be taken back"
+			"not-revertible": "this decision can no longer be taken back",
+			"maintainer-only": "only a maintainer settles this conflict"
 		},
 		"undo": {
 			"last": "Undo the last automatic decision (within the hour)",
@@ -287,6 +299,17 @@
 			"resolution": "{{hours}} h on average before a person decides",
 			"views": "{{count}} histories opened on this computer",
 			"tooAggressive": "Many memories were restored this week: the automatic removals may be too aggressive."
+		},
+		"maintainers": {
+			"list": "Maintainers: {{names}}",
+			"none": "No maintainer: anyone settles a conflict that flip-flops.",
+			"edit": "Edit",
+			"placeholder": "Names or e-mails, separated by commas",
+			"save": "Save",
+			"cancel": "Cancel"
+		},
+		"decisions": {
+			"title": "Decisions"
 		}
 	}
 }

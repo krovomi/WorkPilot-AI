@@ -20,6 +20,8 @@ function view(): MemoryLifecycleView {
 		retentionDays: 30,
 		revertible: {},
 		lastUndo: null,
+		maintainers: [],
+		canArbitrate: true,
 		metrics: null,
 		journal: [
 			{

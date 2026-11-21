@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
 import { ScrollArea } from "../../ui/scroll-area";
 import { ConflictResolver } from "./ConflictResolver";
 import { LifecycleMetrics } from "./LifecycleMetrics";
+import { MaintainersEditor } from "./MaintainersEditor";
 import { entryLabel, errorLabel, shortPath } from "./lifecycle-labels";
 import { MemoryTimeline } from "./MemoryTimeline";
 import { useMemoryLifecycle } from "./useMemoryLifecycle";
@@ -63,6 +64,7 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 
 	const expiring = view?.trash.filter((item) => item.expiring_soon).length ?? 0;
 	const lastUndo = view?.journal.find((entry) => entry.id === view.lastUndo);
+	const decisions = view?.journal.filter((entry) => entry.action === "resolve") ?? [];
 
 	return (
 		<ScrollArea className="h-full">
@@ -113,6 +115,9 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 						<GitMerge className="h-4 w-4" />
 						{t("context:lifecycle.conflicts.title")}
 					</h3>
+					{view && (
+						<MaintainersEditor projectId={projectId} maintainers={view.maintainers} onSaved={reload} />
+					)}
 					{view && view.conflicts.length === 0 && (
 						<p className="text-xs text-muted-foreground">{t("context:lifecycle.conflicts.empty")}</p>
 					)}
@@ -122,9 +127,25 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 							projectId={projectId}
 							conflict={conflict}
 							onResolved={reload}
+							canArbitrate={view.canArbitrate}
+							maintainers={view.maintainers}
 						/>
 					))}
 				</section>
+
+				{decisions.length > 0 && (
+					<Card data-testid="memory-decisions">
+						<CardHeader className="pb-3">
+							<CardTitle className="flex items-center gap-2 text-base">
+								<GitMerge className="h-4 w-4" />
+								{t("context:lifecycle.decisions.title")}
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<MemoryTimeline entries={decisions} showNote />
+						</CardContent>
+					</Card>
+				)}
 
 				<Card>
 					<CardHeader className="pb-3">

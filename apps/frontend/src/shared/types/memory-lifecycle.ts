@@ -17,7 +17,8 @@ export type MemoryLifecycleAction =
 	| "merge"
 	| "archive"
 	| "resolve"
-	| "conflict";
+	| "conflict"
+	| "designate";
 
 export interface MemoryJournalEntry {
 	id: string;
@@ -34,6 +35,8 @@ export interface MemoryJournalEntry {
 	related: string[];
 	/** The id of the entry this one takes back (an undo, a separation). */
 	undoes?: string;
+	/** For a person's decision: their name, as the vault's git identity says. */
+	by?: string;
 }
 
 export interface TrashedMemory {
@@ -74,8 +77,18 @@ export type MemoryConflictSignal =
 	/** A pair whose earlier decision a person took back. */
 	| "reopened";
 
+/** The decision a flip-flopping pair overturns: settled by a maintainer. */
+export interface MemoryConflictEscalation {
+	at: string;
+	by: string;
+	actor: string;
+	reason_code: string;
+}
+
 export interface MemoryConflict {
 	id: string;
+	/** Decided less than the cooldown ago and contradicted again. */
+	escalated?: MemoryConflictEscalation;
 	kind: string;
 	signal: MemoryConflictSignal;
 	detail: string;
@@ -112,6 +125,10 @@ export interface MemoryLifecycleView {
 	/** The newest automatic decision of the last hour still undoable. */
 	lastUndo: string | null;
 	metrics: MemoryLifecycleMetrics | null;
+	/** Who settles an escalated pair; empty: anyone. */
+	maintainers: string[];
+	/** Whether the person at this machine may settle an escalated pair. */
+	canArbitrate: boolean;
 	trash: TrashedMemory[];
 	conflicts: MemoryConflict[];
 	pinned: number;

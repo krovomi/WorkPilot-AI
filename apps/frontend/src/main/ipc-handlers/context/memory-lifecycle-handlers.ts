@@ -29,7 +29,9 @@ import {
 	entryId,
 	MAX_CANONICAL_LENGTH,
 	MAX_REASON_LENGTH,
+	maintainerNames,
 	memoryId,
+	scopeText,
 	trashId,
 } from "./memory-lifecycle-validation";
 
@@ -40,6 +42,8 @@ interface LifecycleResponse {
 	revertible?: MemoryLifecycleView["revertible"];
 	last_undo?: string | null;
 	metrics?: MemoryLifecycleMetrics;
+	maintainers?: string[];
+	can_arbitrate?: boolean;
 	trash?: MemoryLifecycleView["trash"];
 	conflicts?: MemoryLifecycleView["conflicts"];
 	pinned?: number;
@@ -82,6 +86,8 @@ export async function loadMemoryLifecycle(
 			revertible: result.revertible ?? {},
 			lastUndo: result.last_undo ?? null,
 			metrics: result.metrics ?? null,
+			maintainers: result.maintainers ?? [],
+			canArbitrate: result.can_arbitrate !== false,
 			trash: result.trash ?? [],
 			conflicts: result.conflicts ?? [],
 			pinned: result.pinned ?? 0,
@@ -218,6 +224,41 @@ export function registerMemoryLifecycleHandlers(): void {
 					conflict: result.conflict ?? null,
 				},
 			};
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE,
+		async (_, projectId: unknown, rawId: unknown, rawScope: unknown): Promise<IPCResult<{ appliesTo: string }>> => {
+			const project = localProject(projectId);
+			if ("error" in project) return { success: false, error: project.error };
+			const id = memoryId(rawId);
+			const scope = scopeText(rawScope);
+			if (!id || scope === null) return INVALID;
+			const result = await backendFetch<{ applies_to?: string }>(
+				"/api/brain/memory/scope",
+				post({ project_dir: project.path, id, applies_to: scope }),
+			);
+			return result.success
+				? { success: true, data: { appliesTo: result.applies_to ?? "" } }
+				: failure(result);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS,
+		async (_, projectId: unknown, rawNames: unknown): Promise<IPCResult<string[]>> => {
+			const project = localProject(projectId);
+			if ("error" in project) return { success: false, error: project.error };
+			const names = maintainerNames(rawNames);
+			if (!names) return INVALID;
+			const result = await backendFetch<{ maintainers?: string[] }>(
+				"/api/brain/memory/maintainers",
+				post({ project_dir: project.path, names }),
+			);
+			return result.success
+				? { success: true, data: result.maintainers ?? [] }
+				: failure(result);
 		},
 	);
 
