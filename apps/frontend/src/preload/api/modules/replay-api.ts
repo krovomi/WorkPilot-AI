@@ -12,6 +12,10 @@ import type {
 	ReplayExportOptions,
 	ReplayFileResult,
 	ReplayImportResult,
+	ReplaySummary,
+	ReplaySummaryRequest,
+	ReplayVideoOptions,
+	ReplayVideoResult,
 } from "../../../shared/types/replay-share";
 import { invokeIpc } from "./ipc-utils";
 
@@ -59,6 +63,16 @@ export interface ReplayAPI {
 		sessionId: string,
 		bookmarkId: string,
 	) => Promise<ReplayResult<object>>;
+	/** The masked page played step by step, as a WebM the person saves. */
+	exportReplayVideo: (
+		sessionId: string,
+		options: ReplayVideoOptions,
+	) => Promise<ReplayVideoResult>;
+	/** A model's summary of the steps, for a session with no thinking trace. */
+	summarizeReplaySession: (
+		sessionId: string,
+		request: ReplaySummaryRequest,
+	) => Promise<ReplayResult<{ summary: ReplaySummary }>>;
 }
 
 export const createReplayAPI = (): ReplayAPI => ({
@@ -84,4 +98,8 @@ export const createReplayAPI = (): ReplayAPI => ({
 		invokeIpc(IPC_CHANNELS.REPLAY_ADD_BOOKMARK, sessionId, bookmark),
 	removeReplayBookmark: (sessionId, bookmarkId) =>
 		invokeIpc(IPC_CHANNELS.REPLAY_REMOVE_BOOKMARK, sessionId, bookmarkId),
+	exportReplayVideo: (sessionId, options) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_EXPORT_VIDEO, sessionId, options),
+	summarizeReplaySession: (sessionId, request) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_SUMMARIZE_SESSION, sessionId, request),
 });

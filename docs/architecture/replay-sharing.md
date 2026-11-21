@@ -1,9 +1,10 @@
 ---
-feature: "Rejeu d'agent : partage, import et signets"
+feature: "Rejeu d'agent : partage, import, signets, vidéo et résumé"
 summary: >-
-  Une session enregistrée s'exporte en `.wpreplay` (JSON gzip) ou en page HTML sans script,
-  toujours masquée (secrets, dossiers du projet et du home) ; un rejeu importé est reconstruit
-  champ par champ, borné, sous un nouvel id ; les signets vivent dans la session.
+  Une session enregistrée s'exporte en `.wpreplay` (JSON gzip), en page HTML sans script ou en
+  vidéo WebM de cette page jouée hors réseau, toujours masquée (secrets, dossiers du projet et
+  du home) ; un rejeu importé est reconstruit champ par champ, borné, sous un nouvel id ; les
+  signets et le résumé des étapes écrit par un modèle vivent dans la session.
 ---
 
 # Partager un rejeu d'agent
@@ -14,18 +15,25 @@ summary: >-
 Le rejeu (`apps/backend/replay/`) enregistre chaque session d'agent dans
 `~/.workpilot/replays/<id>.json` : étapes, appels d'outils, diffs, raisonnement, tokens. Il ne
 quittait pas la machine : montrer à un collègue comment l'agent a résolu un problème demandait
-un partage d'écran. Une session se partage maintenant de deux façons, et se marque.
+un partage d'écran. Une session se partage maintenant de trois façons, se marque, et se
+résume quand son modèle n'a pas laissé de raisonnement.
 
 ```
 apps/backend/replay/
   bundle.py      le format .wpreplay : export masqué, import reconstruit et borné
   viewer.py      la page HTML autonome, rendue depuis un bundle déjà masqué
   bookmarks.py   signets d'une session enregistrée
+  video.py       la page jouée étape par étape dans Chromium, enregistrée en WebM
+  summary.py     le résumé des étapes par un modèle, pour une session sans raisonnement
   api.py         POST /replay/sessions/{id}/export, POST /replay/import,
-                 POST et DELETE /replay/sessions/{id}/bookmarks
+                 POST et DELETE /replay/sessions/{id}/bookmarks,
+                 POST /replay/sessions/{id}/video, POST /replay/sessions/{id}/summary
+apps/backend/foundation/platform/browser.py   chrome_executable, partagé avec verify
 apps/frontend/src/main/ipc-handlers/replay-share-handlers.ts   boîtes natives, fichiers
+apps/frontend/src/main/ipc-handlers/replay-video-handlers.ts   vidéo et résumé
 apps/frontend/src/renderer/stores/replay-share-store.ts
 apps/frontend/src/renderer/components/agent-replay/ReplaySharing.tsx
+apps/frontend/src/renderer/components/agent-replay/ReplayStepsSummary.tsx
 ```
 
 ## Le bundle `.wpreplay`
@@ -86,6 +94,67 @@ tourner, et la page s'ouvre hors ligne, sans WorkPilot ni SDK. Elle parle la lan
 l'a écrite (anglais ou français), avec ses propres libellés : c'est un document exporté, pas une
 vue du renderer.
 
+## La vidéo
+
+`video.py` enregistre la page HTML ci-dessus, écrite depuis le bundle déjà masqué (avec les
+mêmes options : raisonnement, tokens) : la vidéo ne montre rien que la page ne montrerait. Elle
+est jouée dans un Chromium sans fenêtre, celui que la vérification trouve
+(`chrome_executable`, déplacé de `verify/devtools.py` vers `foundation/platform/browser.py` :
+le rejeu est importé par les agents, et `verify` importe `core`, ce qui l'aurait fait entrer
+dans le cycle d'imports), ou celui de Playwright, sous l'enregistrement vidéo de Playwright :
+
+- **JavaScript coupé** (`java_script_enabled=False`). La page n'a aucun script et aucun n'y
+  tourne ; Playwright ouvre chaque étape en cliquant son `<summary>`, que le navigateur déplie
+  seul, referme la précédente, et fait défiler la page.
+- **Réseau coupé deux fois** : le contexte est hors ligne et refuse toute requête (`route` →
+  `abort`), la page est posée par `set_content` (aucune URL, aucun fichier) ; le navigateur
+  lui-même est lancé sans trafic de fond (mises à jour, pings) et derrière un proxy qui
+  n'existe pas, boucle locale comprise.
+- **Durée et taille bornées** : 1,5 s par étape, moins pour une longue session (jamais moins de
+  0,25 s), dans 120 s au total ; les étapes qui n'y tiennent pas sont laissées à la page, et la
+  notice le dit (« 3 étapes sur 9 »). L'enregistrement a une échéance (180 s), et la vidéo
+  n'est lue que si elle tient dans 40 Mo (une lecture, un octet de plus que la borne). Une
+  vidéo à la fois (409 sinon).
+- **Le fichier** : Playwright l'écrit dans un dossier temporaire fait pour lui ; son chemin est
+  résolu et vérifié dans ce dossier (et en `.webm`) avant d'être lu, puis le dossier est
+  supprimé. Le backend rend les octets ; le main vérifie qu'ils sont un WebM (en-tête EBML) dans
+  la borne avant d'ouvrir la boîte d'enregistrement, résout le dossier choisi (liens compris),
+  force le nom en `.webm`, refuse un lien ou un dossier à sa place et écrit par une seule
+  poignée ouverte sans suivre de lien (`O_NOFOLLOW` là où l'OS l'a).
+
+Pas de Playwright, pas de navigateur, ou pas d'encodeur vidéo de Playwright (`ffmpeg`, installé
+à part : `playwright install ffmpeg`) est une **réponse**, pas une erreur : la route répond
+`available: false` et le nom de ce qui manque (`no_playwright`, `no_browser`, `no_encoder`),
+et l'app l'affiche avec la commande qui l'installe. Le WebM est le format natif de Playwright ;
+un MP4 demanderait un second encodage, et une vidéo côte à côte (A/B) un rendu de la
+comparaison, que la page n'a pas.
+
+## Le résumé par un modèle
+
+Certains modèles ne donnent aucune trace de raisonnement : leur rejeu montre ce qui a été fait,
+jamais pourquoi. Pour une telle session (aucune étape `agent_thinking`, aucun `reasoning`), la
+vue propose « Résumer avec <provider> » ; une session qui a son raisonnement est refusée (409).
+
+- **Quel modèle** : le provider par défaut de l'app (Réglages → Agent, `selectedProvider`) et
+  son modèle rapide (`models_registry.tier_pick(…, "fast")`, sinon le modèle par défaut du
+  provider ; un provider local prend le modèle réglé pour lui, une CLI sans catalogue le sien).
+  Le nom du provider est contrôlé deux fois (main et route, `^[a-z0-9][a-z0-9_.-]{0,39}$`) ;
+  c'est `create_agent_client` qui le route, comme pour un build.
+- **Par quelle porte** : `core.client.create_agent_client`, atteint par le port
+  `agent_runtime` (les agents importent le rejeu, qui ne peut donc pas importer `core`), avec
+  le type `replay_summary` (aucun outil, aucun serveur MCP, roster `solo`), un dossier projet
+  vide et temporaire, et une échéance de 120 s. L'authentification est celle du provider
+  choisi : l'OAuth Claude ne compte que pour Claude.
+- **Ce que le modèle lit** : la session telle qu'elle serait exportée, masquée et sans tokens
+  ni coûts, en une ligne par étape (bornée : 300 étapes, 400 caractères par champ, 40 000 au
+  total), passée par `quote_untrusted` (nettoyée, délimitée). Une sortie d'outil ou une tâche
+  peut ressembler à une consigne : le prompt dit qu'elle n'en est pas une.
+- **Ce qui est gardé** : la réponse, masquée à son tour (mêmes motifs, mêmes dossiers), coupée à
+  4 000 caractères, rangée dans la session (`SessionSummary` : texte, provider, modèle, langue,
+  date). Elle part donc avec l'export, s'affiche dans la page (« Écrit par un modèle ») et dans
+  la vidéo, et revient à l'import, reconstruite et bornée comme le reste. L'app l'affiche comme
+  du texte.
+
 ## Les signets
 
 Un signet (`Bookmark` dans `models.py` : étape, note Markdown affichée comme texte, auteur,
@@ -96,10 +165,11 @@ note de 4 000 caractères.
 
 ## IPC
 
-Quatre canaux (`replay:exportSession`, `replay:importSession`, `replay:addBookmark`,
-`replay:removeBookmark`), un module de preload typé, un handler qui revalide : id de session
-`[A-Za-z0-9_-]`, format et langue en liste fermée, options booléennes, étape entière bornée,
-textes bornés. Le renderer ne donne jamais de chemin ; le nom de fichier proposé vient du
+Six canaux (`replay:exportSession`, `replay:importSession`, `replay:addBookmark`,
+`replay:removeBookmark`, `replay:exportVideo`, `replay:summarizeSession`), un module de preload
+typé, des handlers qui revalident : id de session `[A-Za-z0-9_-]`, format et langue en liste
+fermée, options booléennes, étape entière bornée, textes bornés, nom de provider de forme
+fermée. Le renderer ne donne jamais de chemin ; le nom de fichier proposé vient du
 backend et passe par `path.basename`. Le main n'écrit que ce qui a été demandé (un gzip pour un
 `.wpreplay`, une page pour l'HTML, borné comme un bundle) et lit un bundle par une seule poignée
 de fichier : le fichier vérifié est celui qui est lu, jamais au-delà de la borne.
@@ -109,8 +179,7 @@ de fichier : le fichier vérifié est celui qui est lu, jamais au-delà de la bo
 - **URL de partage signée** (TTL, révocable dans les réglages) : il faut un hébergement. La
   bonne place est le mode serveur, où les rejeux sont aujourd'hui une feature locale
   (`LOCAL_ONLY_FEATURES`).
-- **Export vidéo** (MP4 / WebM côte à côte) : il faut un moteur de rendu ; la page HTML couvre la
-  lecture, pas la démo animée.
-- **Résumé par un LLM** quand le modèle n'a pas de trace de raisonnement.
+- **Vidéo MP4 et vidéo côte à côte** (deux sessions comparées) : le WebM d'une session est
+  fait ; le MP4 demanderait un second encodage, le côte à côte une page de comparaison.
 - **Discussion d'un signet** à plusieurs, et les métriques d'usage (exports par semaine, taux de
   signets).

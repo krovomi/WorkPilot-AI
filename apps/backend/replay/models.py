@@ -249,6 +249,40 @@ class Bookmark:
 
 
 @dataclass
+class SessionSummary:
+    """A short account of the steps, written by a model on request (#347).
+
+    Only a session without a thinking trace takes one: it stands in for the
+    reasoning the model did not give. The text is masked like an export.
+    """
+
+    text: str = ""
+    provider: str = ""
+    model: str = ""
+    language: str = "en"
+    created_at: float = field(default_factory=time.time)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "text": self.text,
+            "provider": self.provider,
+            "model": self.model,
+            "language": self.language,
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "SessionSummary":
+        return cls(
+            text=data.get("text", ""),
+            provider=data.get("provider", ""),
+            model=data.get("model", ""),
+            language=data.get("language", "en"),
+            created_at=data.get("created_at", 0.0),
+        )
+
+
+@dataclass
 class ReplaySession:
     """A complete recorded agent session for replay."""
 
@@ -278,6 +312,9 @@ class ReplaySession:
 
     # Markers left by people on steps, kept with the session and its export
     bookmarks: list[Bookmark] = field(default_factory=list)
+
+    # A model's account of the steps, when the session has no thinking trace
+    summary: SessionSummary | None = None
 
     # Aggregate stats
     total_tokens: int = 0
@@ -354,6 +391,7 @@ class ReplaySession:
             "steps": [s.to_dict() for s in self.steps],
             "breakpoints": [b.to_dict() for b in self.breakpoints],
             "bookmarks": [b.to_dict() for b in self.bookmarks],
+            "summary": self.summary.to_dict() if self.summary else None,
             "total_tokens": self.total_tokens,
             "total_cost_usd": self.total_cost_usd,
             "total_tool_calls": self.total_tool_calls,
@@ -415,6 +453,8 @@ class ReplaySession:
             Breakpoint.from_dict(b) for b in data.get("breakpoints", [])
         ]
         session.bookmarks = [Bookmark.from_dict(b) for b in data.get("bookmarks", [])]
+        summary = data.get("summary")
+        session.summary = SessionSummary.from_dict(summary) if summary else None
         return session
 
 

@@ -74,6 +74,7 @@ import {
 	ReplayShareButton,
 	ReplayShareNotice,
 } from "./ReplaySharing";
+import { ReplayStepsSummary } from "./ReplayStepsSummary";
 import { TimeTravelPanel } from "./TimeTravelPanel";
 import { formatAppDateTime } from "@/lib/date-format";
 
@@ -1145,6 +1146,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										{t("replay:stepDetail.selectStep")}
 									</p>
 								)}
+								<ReplayStepsSummary session={activeSession} />
 								<ReplayBookmarks
 									session={activeSession}
 									currentStep={currentStep}
