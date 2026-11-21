@@ -22,8 +22,8 @@
 		"prompt": "Prompt",
 		"promptPlaceholder": "Describe the task you want all models to perform…",
 		"startBattle": "Start Battle",
-		"model": "Model",
 		"voteForThis": "Vote for this",
+		"voteForModel": "Vote for this: {{name}}",
 		"votePrompt": "The models have finished — which response is better?",
 		"winner": "Winner",
 		"newBattle": "New Battle",
@@ -52,7 +52,8 @@
 	"history": {
 		"loading": "Loading history…",
 		"empty": "No battles yet",
-		"battles": "battles",
+		"battleCount_one": "{{count}} battle",
+		"battleCount_other": "{{count}} battles",
 		"clearAll": "Clear All",
 		"awaitingVote": "Awaiting vote"
 	},
@@ -71,7 +72,7 @@
 	},
 	"routing": {
 		"autoRouting": "Auto-Routing",
-		"autoRoutingDesc": "Automatically route each task type to the best-performing model",
+		"autoRoutingDesc": "The model that wins your votes most often, for each task type",
 		"recommendations": "Current Recommendations",
 		"noRecommendations": "No recommendations yet",
 		"noRecommendationsHint": "Run at least 5 battles per task type",
@@ -84,7 +85,10 @@
 	},
 	"errors": {
 		"startFailed": "Failed to start battle",
-		"voteFailed": "Failed to submit vote"
+		"voteFailed": "Failed to submit vote",
+		"historyFailed": "Could not read the battle history",
+		"clearFailed": "Could not clear the battle history",
+		"analyticsFailed": "Could not compute the analytics"
 	},
 	"tokensUsed": "{{value}} tokens",
 	"modelFallback": "Model {{label}}"

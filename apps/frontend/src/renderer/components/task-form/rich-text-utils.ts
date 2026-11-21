@@ -63,8 +63,7 @@ const ALLOWED_ATTR = [
  * Sanitize raw HTML, keeping the formatting/markup we render while stripping
  * anything dangerous (scripts, event handlers, etc.).
  */
-export function sanitizeRichText(html: string): string {
-	if (!html) return "";
+function sanitizeRichText(html: string): string {
 	return DOMPurify.sanitize(html, {
 		ADD_TAGS: ALLOWED_TAGS,
 		ADD_ATTR: ALLOWED_ATTR,
@@ -78,7 +77,6 @@ export function sanitizeRichText(html: string): string {
  * again finds nothing left to replace.
  */
 function neutralizeThemeColors(html: string): string {
-	if (!html) return "";
 	return html
 		.replaceAll(/color:\s*#000000?/gi, "color: inherit")
 		.replaceAll(/color:\s*rgb\(0,\s*0,\s*0\)/gi, "color: inherit")
