@@ -55,6 +55,13 @@ export function EntryCell({
 		autoSize(ref.current);
 	}, []);
 
+	// Back to what was loaded: a value that was missing shows as missing again,
+	// not as an empty box that reads like a deliberate blank.
+	const revert = () => {
+		setFilling(false);
+		onRevert();
+	};
+
 	if (value === null && !filling) {
 		return (
 			<button
@@ -95,7 +102,7 @@ export function EntryCell({
 					if (e.key === "Escape" && isDirty) {
 						e.preventDefault();
 						e.stopPropagation();
-						onRevert();
+						revert();
 					}
 				}}
 				// biome-ignore lint/a11y/noAutofocus: only when the user just asked to fill this cell
@@ -110,7 +117,7 @@ export function EntryCell({
 			{isDirty && (
 				<button
 					type="button"
-					onClick={onRevert}
+					onClick={revert}
 					disabled={disabled}
 					title={t("i18nEditor.revertCell")}
 					aria-label={t("i18nEditor.revertCell")}

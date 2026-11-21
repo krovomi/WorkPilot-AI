@@ -1709,11 +1709,31 @@
 		"customDescription": "Choose specific model and thinking level",
 		"clickToCustomize": "Click to customize",
 		"selectThinkingLevel": "Select thinking level",
-		"autoLabel": "Auto (Optimized)",
-		"autoDescription": "Uses Opus across all phases with optimized thinking levels",
 		"autoDescriptionModel": "Uses {{model}} across all phases with optimized thinking levels",
 		"phaseConfiguration": "Phase Configuration",
 		"phaseConfigurationDescription": "Configure models and thinking levels for each development pipeline phase",
+		"presets": {
+			"auto": { "name": "Auto (Optimized)" },
+			"complex": {
+				"name": "Complex Tasks",
+				"description": "For intricate, multi-step implementations requiring deep analysis"
+			},
+			"balanced": {
+				"name": "Balanced",
+				"description": "Good balance of speed and quality for most tasks"
+			},
+			"quick": {
+				"name": "Quick Edits",
+				"description": "Fast iterations for simple changes and quick fixes"
+			}
+		},
+		"thinkingLevelDescriptions": {
+			"none": "No extended thinking",
+			"low": "Brief consideration",
+			"medium": "Moderate analysis",
+			"high": "Deep thinking",
+			"ultrathink": "Maximum reasoning depth"
+		},
 		"phases": {
 			"spec": {
 				"label": "Spec Creation",
