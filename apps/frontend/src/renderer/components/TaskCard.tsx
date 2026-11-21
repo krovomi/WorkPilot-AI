@@ -3,11 +3,9 @@ import {
 	AlertTriangle,
 	Archive,
 	Ban,
-	Bug,
 	CheckCircle2,
 	Clock,
 	Copy,
-	FileCode,
 	FileText,
 	FlaskConical,
 	Gauge,
@@ -17,22 +15,18 @@ import {
 	Lock,
 	Monitor,
 	MoreVertical,
-	Palette,
 	Pause,
 	Play,
 	RotateCcw,
-	Shield,
 	ShieldAlert,
 	ShieldCheck,
 	Smartphone,
 	Square,
-	Target,
 	Undo2,
 	Users,
 	Wrench,
 	X,
 	XCircle,
-	type Zap,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -49,7 +43,6 @@ import {
 	isExecutionPhaseActive,
 	JSON_ERROR_PREFIX,
 	JSON_ERROR_TITLE_SUFFIX,
-	TASK_CATEGORY_COLORS,
 	TASK_COMPLEXITY_COLORS,
 	TASK_IMPACT_COLORS,
 	TASK_PRIORITY_COLORS,
@@ -59,7 +52,6 @@ import type {
 	ExecutionPhase,
 	ReviewReason,
 	Task,
-	TaskCategory,
 	TaskStatus,
 } from "../../shared/types";
 import { isTaskEffectivelyComplete } from "../../shared/progress";
@@ -84,7 +76,8 @@ import { PhaseProgressIndicator } from "./PhaseProgressIndicator";
 import { TaskSandboxNotice } from "./task-sandbox/TaskSandboxNotice";
 import { SessionCompactionBadge } from "./SessionCompactionBadge";
 import { StreamingSessionButton } from "./streaming/StreamingSessionButton";
-import { TaskKindBadge } from "./task-detail/TaskKindBadge";
+import { CardTypeChip } from "./kanban/CardTypeChip";
+import { TaskCardPreview } from "./kanban/TaskCardPreview";
 import { TaskPermissionPrompt } from "./task-permission/TaskPermissionPrompt";
 import { SyncFromBranchDialog } from "./task-detail/task-review/SyncFromBranchDialog";
 import { Badge } from "./ui/badge";
@@ -96,6 +89,9 @@ import { FormulaBadge } from "./formula-lab/FormulaBadge";
 import { manualMoveTargets } from "../lib/kanban-columns";
 import { Checkbox } from "./ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { resolveCardType } from "../../shared/constants/card-types";
+import { installCardTypeStylesheet } from "../lib/card-type-tokens";
+import { useHoverPreview } from "../hooks/useHoverPreview";
 import { useKanbanBlockerStore } from "../stores/kanban-blocker-store";
 import { openSmartEstimation } from "../stores/smart-estimation-store";
 import { useKanbanConflictStore } from "../stores/kanban-conflict-store";
@@ -108,18 +104,6 @@ import {
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-// Category icon mapping
-const CategoryIcon: Record<TaskCategory, typeof Zap> = {
-	feature: Target,
-	bug_fix: Bug,
-	refactoring: Wrench,
-	documentation: FileCode,
-	security: Shield,
-	performance: Gauge,
-	ui_ux: Palette,
-	infrastructure: Wrench,
-	testing: FileCode,
-};
 
 // Catastrophic stuck detection interval (ms).
 // XState handles all normal process-exit transitions via PROCESS_EXITED events.
@@ -321,6 +305,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 	// Unfinished dependencies for this card. Amber in `queue`, where the gate
 	// actually holds the task back; neutral elsewhere, where it is context.
 	const blockers = useKanbanBlockerStore((s) => s.blockers[task.id]);
+	const cardType = resolveCardType(task.metadata);
 
 	// Extract status badge variant and label for non-done tasks
 	let statusBadgeVariant:
@@ -663,26 +648,8 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			<SplitPartBadge task={task} />
 			<ReviewLoadBadge task={task} />
 
-			{/* Kind of work (bug, hotfix, RUN…), decided without a model */}
-			<TaskKindBadge task={task} className="text-3xs px-1.5 py-0" />
-
-			{/* Category badge with icon */}
-			{task.metadata?.category && (
-				<Badge
-					variant="outline"
-					className={cn(
-						"text-3xs px-1.5 py-0",
-						TASK_CATEGORY_COLORS[task.metadata.category],
-					)}
-				>
-					{CategoryIcon[task.metadata.category] &&
-						(() => {
-							const Icon = CategoryIcon[task.metadata.category];
-							return <Icon className="h-2.5 w-2.5 mr-0.5" />;
-						})()}
-					{t(`tasks:form.classification.values.category.${task.metadata.category}`)}
-				</Badge>
-			)}
+			{/* The card's one type (bug, hotfix, security…), coloured per theme */}
+			{cardType && <CardTypeChip resolved={cardType} />}
 
 			{/* Impact badge - high visibility for important tasks */}
 			{task.metadata?.impact &&
@@ -1453,15 +1420,34 @@ export const TaskCard = memo(function TaskCard({
 	const isArchived = !!task.metadata?.archivedAt;
 	const isAbandoned = isTaskAbandoned(task);
 
+	// The card's colour family and its hover preview (lib/card-type-tokens.ts).
+	const cardType = useMemo(
+		() => resolveCardType(task.metadata),
+		[task.metadata],
+	);
+	const isBlocked = useKanbanBlockerStore(
+		(s) => (s.blockers[task.id]?.pending.length ?? 0) > 0,
+	);
+	const isFaded = !!cardType && (cardType.proposed || task.status === "done");
+	const preview = useHoverPreview(!showSyncDialog);
+	useEffect(() => {
+		installCardTypeStylesheet();
+	}, []);
+
 	// Check if task was imported from Azure DevOps
 	const isFromAzureDevOps = !!(
 		task.metadata?.azureDevOpsIdentifier || task.metadata?.azureDevOpsUrl
 	);
 
 	return (
+		<Tooltip open={preview.open} onOpenChange={preview.onOpenChange}>
+		<TooltipTrigger asChild {...preview.triggerProps}>
 		<Card
 			role="option"
 			aria-label={displayTitle}
+			data-card-type={cardType?.type}
+			data-card-faded={isFaded ? "" : undefined}
+			data-card-blocked={isBlocked ? "" : undefined}
 			aria-selected={isSelectable ? isSelected : undefined}
 			tabIndex={0}
 			onKeyDown={(e) => {
@@ -1578,7 +1564,7 @@ export const TaskCard = memo(function TaskCard({
 						{/* Description - sanitized to handle markdown content (memoized) */}
 						{sanitizedDescription && (
 							<p
-								className="mt-1 text-xs text-muted-foreground line-clamp-2"
+								className="kanban-card-desc mt-1 text-xs text-muted-foreground line-clamp-2"
 								title={sanitizedDescription}
 							>
 								{sanitizedDescription}
@@ -1808,5 +1794,19 @@ export const TaskCard = memo(function TaskCard({
 				/>
 			)}
 		</Card>
+		</TooltipTrigger>
+		<TooltipContent
+			side="right"
+			align="start"
+			sideOffset={8}
+			className="pointer-events-none max-w-none"
+		>
+			<TaskCardPreview
+				task={task}
+				resolved={cardType}
+				statusLabel={getStatusLabel(task.status, t)}
+			/>
+		</TooltipContent>
+		</Tooltip>
 	);
 }, taskCardPropsAreEqual);

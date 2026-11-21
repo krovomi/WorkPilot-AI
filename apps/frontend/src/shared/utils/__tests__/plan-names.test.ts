@@ -40,6 +40,13 @@ describe("claudePlanName", () => {
 		expect(claudePlanName("team_premium")).toBe("Claude Team Premium");
 	});
 
+	it("reads Anthropic's organization types the same way", () => {
+		expect(claudePlanName("claude_max", "default_claude_max_20x")).toBe(
+			"Claude Max 20x",
+		);
+		expect(claudePlanName("claude_pro")).toBe("Claude Pro");
+	});
+
 	it("says nothing without a plan", () => {
 		expect(claudePlanName(undefined)).toBeUndefined();
 		expect(claudePlanName(null)).toBeUndefined();

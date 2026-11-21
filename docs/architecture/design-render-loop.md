@@ -2,14 +2,15 @@
 feature: Import Design, boucle de rendu et d'auto-correction
 summary: >-
   Après la génération, Import Design rend le code dans un Chromium sans JavaScript ni réseau,
-  le compare à la maquette (pixels et SSIM, par zone) et fait corriger les écarts par le modèle
-  de vision du provider choisi, jusqu'au seuil ou au budget (temps, itérations, jetons, coût du
-  catalogue). Sur demande, la version gardée est contrôlée à trois largeurs et au survol/focus.
+  le compare à la maquette hors zones masquées (pixels et SSIM, par zone) et fait corriger les
+  écarts par le modèle de vision du provider choisi, jusqu'au seuil ou au budget. Sur demande,
+  la version gardée est contrôlée à trois largeurs et au survol/focus, puis corrigée une fois
+  d'après ces constats.
 ---
 
 # Import Design : la boucle de rendu et d'auto-correction
 
-Issue #379, lots 1 et 2. Le code généré depuis une maquette n'était jamais regardé : rien ne
+Issue #379, lots 1 à 3. Le code généré depuis une maquette n'était jamais regardé : rien ne
 disait qu'il lui ressemblait. La boucle le rend, mesure l'écart, montre au modèle ce qui diffère
 et recommence, dans des bornes fixes. L'interrupteur est sur l'étape « Code » de la page.
 
@@ -23,11 +24,15 @@ apps/backend/design_to_code/          paquet feuille (n'importe que models_regis
   loop.py        la boucle et ses règles d'arrêt
   budget.py      jetons lus chez le provider (ou estimés), coût, arrêt au budget
   passes.py      passe responsive (trois largeurs) et passe des états (survol, focus)
+  pass_fix.py    une correction d'après les constats des passes, gardée si elle aide
 apps/backend/services/design_to_code_render_loop.py   le raccord au service d'Import Design
+apps/backend/services/design_to_code_edit_calls.py    la correction de l'abonnement, en schéma imposé
 apps/backend/prompts/design_to_code_iteration.md      le prompt de correction
+apps/backend/prompts/design_to_code_pass_fix.md       le prompt de correction d'après les passes
 apps/frontend/.../design-import/IterationPanel.tsx    le panneau des itérations
 apps/frontend/.../design-import/LoopReport.tsx        dépense, passe responsive, états
 apps/frontend/.../design-import/LoopOptions.tsx       itérations, seuil, budgets, passes
+apps/frontend/.../design-import/MaskLayer.tsx         les zones tracées sur la maquette
 apps/frontend/src/main/design-render-loop-args.ts      les options revérifiées avant le runner
 ```
 
@@ -81,7 +86,10 @@ Algorithmique, sans modèle : numpy et Pillow, déjà dans le venv.
 - **Zones** : les `bounds` des composants de la spec quand le modèle de vision les a donnés,
   sinon cinq bandes horizontales.
 - **Masques** : les composants dont le type est dynamique (image, avatar, graphique, carte, date,
-  vidéo…) sont exclus de la mesure ; le panneau les nomme.
+  vidéo…) sont exclus de la mesure ; le panneau les nomme. S'y ajoutent les zones que la personne
+  trace sur la maquette (au plus `RENDER_LOOP_MAX_MASKS`, 12) : des fractions `x,y,w,h` que le
+  main ne transmet que finies, dans `[0, 1]`, non vides et dans l'image (`--loop-mask`), et que
+  le runner revérifie (argparse, même limite) ; le panneau en donne le nombre.
 - **Écarts relevés** par zone en échec : couleur de fond (cible et rendu en hexadécimal),
   décalage (corrélation croisée des profils, en px, par axe), taille (étendue du contenu, par
   axe), sinon « structure ».
@@ -94,15 +102,27 @@ délimités et dit qu'ils sont des données ; la réponse attendue est
 `{"edits": [{"path", "find", "replace"}], "notes": [...]}`. Une modification n'est appliquée
 que si `path` est un fichier de la version et que `find` y apparaît exactement une fois ; sinon
 elle est refusée avec sa raison (`unknown_file`, `not_found`, `ambiguous`), et une réponse
-illisible ne change rien. Rechercher-remplacer plutôt que fichiers entiers : les appels de
-vision du service plafonnent leur réponse, un fichier complet y serait tronqué.
+illisible ne change rien. Rechercher-remplacer plutôt que fichiers entiers : un fichier complet
+dépasserait la réponse plafonnée d'un appel de vision et y serait tronqué.
+
+**Réponse imposée** (`design_to_code_edit_calls.py`). Avec l'abonnement Claude, le modèle ne
+répond pas en texte : la correction passe par `core.simple_client`, l'image en bloc de contenu
+et `output_format` réglé sur le schéma JSON des modifications, que le SDK valide et redemande
+(sa sortie structurée est un appel d'outil forcé, d'où deux tours). Le type d'agent est celui
+de `commit_message`, sans aucun outil. La sortie structurée repasse par `parse_answer`, comme
+toute réponse ; un modèle qui répond en texte quand même est lu de la même façon. Les autres
+routes gardent le JSON dans le texte des appels de vision du service (voir « Pas encore fait »).
 
 La route suit le provider choisi pour la page, sans jamais en prendre un autre : Claude (clé ou
-abonnement), OpenAI (et Copilot), Google, Ollama. Une clé absente, un provider sans route de
+abonnement), OpenAI (et Copilot), Google, Ollama, LM Studio, llama.cpp. Une clé absente, un provider sans route de
 vision, ou un modèle que le registre marque texte seul (`supports_vision=False`,
-`models_registry.vision_support`) est un refus avec sa raison, que la page traduit. En hors-ligne
-strict (`offline_policy.airgap_status`), la seule route est un modèle de vision local par
-Ollama, en boucle locale (`docintel.engines.ollama_vision`) : aucune image ne quitte la machine.
+`models_registry.vision_support`) est un refus avec sa raison, que la page traduit. Un provider local répond sur cette machine : Ollama par `docintel.engines.ollama_vision`, LM
+Studio et llama.cpp par leur serveur compatible OpenAI, à l'adresse que donne
+`offline_policy.local_endpoint` (boucle locale seulement, sans proxy ; une autre adresse est un
+refus `local_unavailable`, détail `endpoint_not_loopback`). En hors-ligne strict
+(`offline_policy.airgap_status`), la seule route est un modèle local, celui du provider choisi
+s'il est local, sinon Ollama : aucune image ne quitte la machine. Un modèle local est au forfait
+(`flat_rate`).
 Une erreur du provider remonte comme « provider answered HTTP 500 », jamais avec le texte reçu.
 
 ## Le budget en jetons et en coût (`budget.py`)
@@ -156,6 +176,26 @@ le parcours au clavier s'arrête quand la page défile. Chaque état est captur�
 0,2 % de pixels changés, c'est « aucun style d'état ». Un focus sans style visible est aussi un
 échec d'accessibilité (WCAG 2.4.7) ; un élément que Tab n'atteint pas est compté à part.
 
+## La correction d'après les passes (`pass_fix.py`)
+
+Demandée par la case « Corriger d'après les passes » (inactive sans passe), elle suit les passes,
+une seule fois. Les constats qu'une correction peut traiter deviennent des phrases neutres : aux
+largeurs non comparées à la maquette, débordement de la page, élément qui dépasse le bord, texte
+coupé, chevauchement ; pour les états, survol sans style et focus sans style visible. Un élément
+que Tab n'atteint pas n'est pas renvoyé (le parcours s'arrête quand la page défile, ce n'est pas
+un constat sûr), ni la largeur comparée à la maquette, qui est le travail de la boucle. Le modèle
+reçoit le rendu à la taille de la maquette et les rendus des largeurs en défaut côte à côte, le
+prompt `design_to_code_pass_fix.md` (constats dans un bloc JSON qu'il dit être des données, comme
+les libellés qu'ils citent, venus du code généré) et répond comme une correction.
+
+La version corrigée est mesurée de nouveau : rendue à la taille de la maquette et comparée à
+elle, puis repassée par les mêmes passes. Elle remplace la version gardée seulement si les passes
+trouvent moins de problèmes et que le score n'a pas baissé de plus de `min_gain` ; sinon elle est
+écartée (`regressed`, `no_gain`). Ses jetons entrent dans le budget de la boucle (`Spend`), et un
+budget déjà épuisé l'empêche (`budget`). Le rapport `pass_fix` donne le statut, les constats
+avant et après, les modifications appliquées ou refusées, le score et la dépense ; une
+correction gardée remplace aussi le rapport des passes.
+
 ## Le suivi des écarts
 
 Un écart est identifié par sa zone, son type et son axe. Il est `open` tant qu'il se mesure,
@@ -174,28 +214,44 @@ ses constats, puis chaque élément interactif au repos, au survol et au focus. 
 la vue en direct et le nœud « Code » donnent l'itération en cours, puis la passe en cours.
 
 `LoopOptions.tsx`, dans la barre du bas quand la boucle est active, propose le nombre
-d'itérations, le seuil et les deux budgets en listes de choix (`RENDER_LOOP_CHOICES`) et les deux
-passes. Aucun canal IPC nouveau : la requête porte `renderLoop`, que le main ne transmet que s'il
+d'itérations, le seuil et les deux budgets en listes de choix (`RENDER_LOOP_CHOICES`), les deux
+passes et la correction d'après les passes. Sous la maquette, quand la boucle est active,
+`MaskLayer.tsx` trace les zones exclues du score : « Masquer une zone », puis un glisser sur
+l'image ; chaque zone a son bouton pour la retirer, et changer de maquette les efface. Sous les
+passes, une ligne dit ce qu'est devenue la correction d'après elles. Aucun canal IPC nouveau : la requête porte `renderLoop`, que le main ne transmet que s'il
 vaut strictement `true`, et `renderLoopOptions`, dont le main (`renderLoopArgs`) ne transmet
-qu'un nombre fini dans ses bornes (`RENDER_LOOP_BOUNDS`, entier quand il le faut) et un
-`true` strict ; le reste est laissé au défaut du runner, qui revérifie les bornes.
+qu'un nombre fini dans ses bornes (`RENDER_LOOP_BOUNDS`, entier quand il le faut), un `true`
+strict et les zones valides (au plus 12) ; le reste est laissé au défaut du runner, qui revérifie les bornes.
 
 ## Tests
 
 `tests/design_to_code/` (diff sur des images dessinées, rendu avec un faux Playwright, boucle
 avec un correcteur scripté, budget sur les formes de chaque provider, passes sur un faux
-navigateur qui dessine survol et focus), `tests/services/test_design_to_code_render_loop.py`,
+navigateur qui dessine survol et focus, correction d'après les passes avec chacune de ses
+issues), `tests/services/test_design_to_code_render_loop.py`,
+`tests/services/test_design_to_code_edit_calls.py` (sortie structurée sur un faux client du SDK),
 `tests/services/test_design_to_code_vision_usage.py`, `tests/test_design_to_code_runner_cli.py` ;
 côté app, `IterationPanel.test.tsx`, `LoopReport.test.tsx`, `LoopOptions.test.tsx`,
-`design-import.test.tsx`, `design-to-code-store.test.ts`, `design-to-code-run.test.ts`.
+`MaskLayer.test.tsx`, `design-import.test.tsx`, `design-to-code-store.test.ts`,
+`design-to-code-run.test.ts`.
 
 ## Pas encore fait (suite de #379)
 
 - Rendre les vrais composants par la chaîne d'outils du projet (Storybook, Vite, App
-  Emulator, snapshots par plateforme) au lieu du miroir HTML.
-- Diff sémantique (CLIP ou équivalent) en plus du diff de pixels.
-- Dessiner des masques dans la page.
-- Réponse imposée par tool use plutôt que JSON dans le texte.
-- Vision locale pour LM Studio et llama.cpp.
-- Corriger aussi d'après les passes (un écart responsive ou un état sans style renvoyé au
-  modèle) : elles constatent, elles ne corrigent pas encore.
+  Emulator, snapshots par plateforme) au lieu du miroir HTML : il faut exécuter le JavaScript du
+  code généré et lancer les outils du projet (installation, serveur de développement), donc
+  lever la garde du rendu (JavaScript coupé, hors réseau) pour du code non fiable ; cela demande
+  un lanceur isolé à concevoir, et App Emulator vit dans le main d'Electron, que le runner
+  n'atteint pas.
+- Diff sémantique (CLIP ou équivalent) : il faut des poids de modèle (plusieurs centaines de Mo)
+  que l'app ne livre pas et qu'elle ne peut pas télécharger en hors-ligne strict, et aucun des
+  providers de la page n'offre ici d'embeddings d'image (Gemini ne les donne que par Vertex AI,
+  avec un compte Google Cloud).
+- Réponse imposée (appel d'outil forcé) pour Claude par clé d'API, OpenAI, Gemini, LM Studio,
+  llama.cpp et Ollama : les clients d'agent de `core.client` n'envoient qu'un prompt texte, sans
+  image, et le chemin du SDK, seul à porter une image et un schéma de réponse, demande la
+  connexion Claude Code, qu'une clé d'API seule ne donne pas. Ces routes gardent le JSON dans le
+  texte des appels de vision du service ; il faut d'abord que `core` sache porter une image et
+  un outil imposé pour ces providers.
+- Vérifier le prompt sur au moins trois providers de vision réels : il faut leurs comptes
+  payants ; les tests jouent leurs formats sur de faux serveurs et un faux client du SDK.

@@ -39,8 +39,12 @@ describe("LoopOptions", () => {
 		fireEvent.change(screen.getByTestId("design-loop-threshold"), { target: { value: "0.9" } });
 		fireEvent.change(screen.getByTestId("design-loop-maxTokens"), { target: { value: "800000" } });
 		fireEvent.change(screen.getByTestId("design-loop-maxCostUsd"), { target: { value: "5" } });
+		// Without a pass there is nothing to fix from.
+		expect(screen.getByTestId("design-loop-fixPasses")).toBeDisabled();
 		fireEvent.click(screen.getByTestId("design-loop-responsive"));
 		fireEvent.click(screen.getByTestId("design-loop-states"));
+		expect(screen.getByTestId("design-loop-fixPasses")).toBeEnabled();
+		fireEvent.click(screen.getByTestId("design-loop-fixPasses"));
 		expect(useDesignToCodeStore.getState().loopOptions).toEqual({
 			maxIterations: 3,
 			threshold: 0.9,
@@ -48,6 +52,8 @@ describe("LoopOptions", () => {
 			maxCostUsd: 5,
 			responsive: true,
 			states: true,
+			fixPasses: true,
+			masks: [],
 		});
 
 		// A click inside keeps it open, a click outside closes it.

@@ -32,6 +32,7 @@ import { registerBountyBoardHandlers } from "./bounty-board-handlers";
 import { registerTechDebtHandlers } from "./tech-debt-handlers";
 import { registerServerAnalysisHandlers } from "./server-analyses";
 import { registerTeamBotHandlers } from "./team-bot-handlers";
+import { registerPixelOfficeHandlers } from "./pixel-office-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
 import { registerAppEmulatorHandlers } from "./app-emulator-handlers";
@@ -673,6 +674,9 @@ export function setupIpcHandlers(
 
 	// Team Bot handlers (Feature 4 — Slack / Microsoft Teams notifications)
 	registerTeamBotHandlers();
+
+	// Pixel Office mini-scenes written by the page's model (#350)
+	registerPixelOfficeHandlers();
 
 	// Env Snapshot handlers (Feature 11 — reproducible environment snapshots)
 	registerEnvSnapshotHandlers();

@@ -8,7 +8,7 @@
  *
  * | Provider | Subscription: where the plan name comes from | API key |
  * |---|---|---|
- * | Anthropic | `subscriptionType` + `rateLimitTier` Claude Code stores with its OAuth login (profile, else credentials store) | API profile or `globalAnthropicApiKey` |
+ * | Anthropic | the account's plan now (`claude-account-plan.ts`), else `subscriptionType` + `rateLimitTier` Claude Code stored with its OAuth login (profile, else credentials store) | API profile or `globalAnthropicApiKey` |
  * | OpenAI | `plan_type` ChatGPT / Codex CLI report (`openaiSubscription.planType`) | API profile or `globalOpenAIApiKey` |
  * | Copilot | `copilot_plan` + `access_type_sku` of `/copilot_internal/user` | — |
  * | Windsurf | `planName` the IDE caches in its state database | — |
@@ -16,8 +16,8 @@
  * | Gemini CLI | Google login: plan not reported, billing mode only | `gemini-api-key` / `vertex-ai` |
  * | Others (Mistral, Google, DeepSeek, Grok…) | — | API profile or global key |
  *
- * Nothing is sent anywhere: every source is local, or already fetched by the
- * monitor. When a provider does not say, the plan has no name; nothing is
+ * Every source is local or already fetched by the monitor, except the Claude
+ * plan, asked to the Anthropic host the monitor calls with the same token. When a provider does not say, the plan has no name; nothing is
  * guessed. No credential is ever logged or returned, only plan identifiers.
  */
 
@@ -44,6 +44,7 @@ import { readWindsurfCachedPlanInfo } from "../services/credential-manager";
 import { loadProfilesFile } from "../services/profile";
 import { loadBetterSqlite } from "../services/windsurf-sqlite";
 import { readSettingsFile } from "../settings-utils";
+import { readClaudeAccountPlan } from "./claude-account-plan";
 import { getFullCredentialsFromKeychain } from "./credential-utils";
 
 /** A plan changes rarely; reading it once per account every 5 minutes is enough. */
@@ -113,17 +114,50 @@ async function isApiKeyAccount(
 	}
 }
 
-/** Claude subscription of an OAuth profile, from what Claude Code stored at login. */
-function claudeProfilePlan(profileId: string): UsagePlan | undefined {
-	let profile: ReturnType<
-		ReturnType<typeof getClaudeProfileManager>["getProfile"]
-	>;
+/**
+ * Claude subscription of an OAuth profile: what Anthropic reports for the
+ * account now, else what Claude Code stored at login (profile, then
+ * credentials store). A plan that changed since the login (Pro → Max) is
+ * written back to the profile, so every view of it agrees.
+ */
+async function claudeProfilePlan(
+	profileId: string,
+): Promise<UsagePlan | undefined> {
+	let manager: ReturnType<typeof getClaudeProfileManager>;
+	let profile: ReturnType<typeof manager.getProfile>;
 	try {
-		profile = getClaudeProfileManager().getProfile(profileId);
+		manager = getClaudeProfileManager();
+		profile = manager.getProfile(profileId);
 	} catch {
 		return undefined;
 	}
 	if (!profile) return undefined;
+
+	const live = await readClaudeAccountPlan(profile.configDir);
+	if (live) {
+		// A tier reported for another plan type is not this plan's tier.
+		const rateLimitTier =
+			live.rateLimitTier ??
+			(live.subscriptionType === profile.subscriptionType
+				? profile.rateLimitTier
+				: undefined);
+		if (
+			live.subscriptionType !== profile.subscriptionType ||
+			rateLimitTier !== profile.rateLimitTier
+		) {
+			try {
+				manager.saveProfile({
+					...profile,
+					subscriptionType: live.subscriptionType,
+					rateLimitTier,
+				});
+			} catch {
+				// not saved: shown anyway, asked again on the next read
+			}
+		}
+		return subscription(claudePlanName(live.subscriptionType, rateLimitTier));
+	}
+
 	let { subscriptionType, rateLimitTier } = profile;
 	if (!subscriptionType) {
 		try {
@@ -202,7 +236,7 @@ async function resolvePlan(
 
 	switch (provider) {
 		case "anthropic": {
-			const oauth = claudeProfilePlan(snapshot.profileId);
+			const oauth = await claudeProfilePlan(snapshot.profileId);
 			if (oauth) return oauth;
 			return (await isApiKeyAccount(snapshot, provider)) ? API : undefined;
 		}

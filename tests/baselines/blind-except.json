@@ -329,7 +329,6 @@
   "apps/backend/services/hooks/scheduler.py": {"blind": 4, "silent": 1},
   "apps/backend/services/notifications/channels.py": {"blind": 2, "silent": 0},
   "apps/backend/services/notifications/service.py": {"blind": 1, "silent": 0},
-  "apps/backend/services/provider_registry.py": {"blind": 1, "silent": 0},
   "apps/backend/services/rate_limit_shield.py": {"blind": 1, "silent": 0},
   "apps/backend/services/smart_estimation_service.py": {"blind": 2, "silent": 0},
   "apps/backend/services/task_completion_service.py": {"blind": 2, "silent": 0},

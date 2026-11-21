@@ -3,9 +3,10 @@
 ``run_render_loop`` takes a successful ``PipelineResult`` and refines its files
 with ``design_to_code.loop``: it picks the vision route the person's provider
 allows (``design_to_code.vision``), builds the page the browser opens, and
-hands the loop a ``correct`` callable made of the service's own vision calls
-(or the local Ollama vision model of ``docintel`` under a strict offline
-policy). The files of the best version replace the generated ones; the loop's
+hands the loop a ``correct`` callable: the Claude subscription answers in the
+edits' schema (``design_to_code_edit_calls``), Claude's API, OpenAI, Gemini,
+LM Studio and llama.cpp through the service's own vision calls, Ollama through
+``docintel``'s local vision model. The files of the best version replace the generated ones; the loop's
 report is returned for the page, and a loop that cannot run says why instead
 of failing the run.
 """
@@ -17,7 +18,8 @@ import base64
 import os
 import re
 import tempfile
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -28,20 +30,31 @@ from design_to_code.diff import (
     Box,
     Region,
     band_regions,
+    compare,
     fraction_box,
     load_image,
 )
-from design_to_code.loop import CorrectionError, LoopConfig, Reply, run_loop, serialize
+from design_to_code.loop import (
+    CorrectionError,
+    LoopConfig,
+    LoopOutcome,
+    Reply,
+    run_loop,
+    serialize,
+)
+from design_to_code.pass_fix import fix_from_passes
 from design_to_code.passes import responsive_pass, states_pass
 from design_to_code.preview import PREVIEW_PATH, extract_html, html_page, mirror_prompt
 from design_to_code.render import Renderer, RenderError, font_families
 from design_to_code.vision import (
+    LOCAL_ROUTES,
     Credentials,
     VisionRoute,
     catalogue_provider,
     decide_route,
 )
 from PIL import UnidentifiedImageError
+from services.design_to_code_edit_calls import SCHEMA_ROUTES, ask_claude_for_edits
 from services.design_to_code_stacks import get_stack
 
 #: Component types whose pixels never match a generated placeholder, or change
@@ -142,6 +155,18 @@ def layout(
     return regions or band_regions(width, height), masks, masked
 
 
+def drawn_masks(
+    boxes: tuple[tuple[float, float, float, float], ...], width: int, height: int
+) -> list[Box]:
+    """The zones the person drew on the design (fractions), in pixels."""
+    found: list[Box] = []
+    for x, y, w, h in boxes:
+        box = fraction_box({"x": x, "y": y, "w": w, "h": h}, width, height)
+        if box is not None:
+            found.append(box)
+    return found
+
+
 def credentials() -> Credentials:
     from services.design_to_code_service import _claude_signed_in
 
@@ -181,6 +206,8 @@ def route_models(service: Any) -> dict[str, str]:
         "openai": OPENAI_VISION_MODEL,
         "google": os.getenv("DESIGN_TO_CODE_VISION_MODEL_GOOGLE", GOOGLE_VISION_MODEL),
         "ollama": local_vision_model(),
+        "lm-studio": _resolve_model("lm-studio", None, None),
+        "llama-cpp": _resolve_model("llama-cpp", None, None),
     }
 
 
@@ -193,7 +220,11 @@ def pricing_for(route: VisionRoute) -> Pricing:
     from cost_intelligence.catalog import FLAT_RATE_PROVIDERS, PricingCatalog
 
     provider = catalogue_provider(route.route)
-    if route.route == "claude_subscription" or provider in FLAT_RATE_PROVIDERS:
+    if (
+        route.route == "claude_subscription"
+        or route.route in LOCAL_ROUTES
+        or provider in FLAT_RATE_PROVIDERS
+    ):
         return Pricing(FLAT_RATE, lambda usage: 0.0)
     row = PricingCatalog().get_pricing(provider, route.model) if route.model else None
     if row is None:
@@ -231,24 +262,17 @@ def make_corrector(service: Any, route: VisionRoute) -> Callable[[str, bytes], A
         service.last_usage = None
         if route.route == "ollama":
             return Reply(await ask_local(prompt, png))
-        text = await ask_cloud(prompt, png)
-        return Reply(text, service.last_usage)
+        return await ask_model(prompt, png)
 
-    async def ask_cloud(prompt: str, png: bytes) -> str:
+    async def ask_model(prompt: str, png: bytes) -> Reply:
         data_url = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
         try:
-            if route.route == "claude_api":
-                return await service._call_claude_vision(
-                    os.environ["ANTHROPIC_API_KEY"], data_url, prompt
+            if route.route in SCHEMA_ROUTES:
+                answer = await ask_claude_for_edits(
+                    route.model, prompt, png, project_path=service.project_path
                 )
-            if route.route == "claude_subscription":
-                return await service._call_claude_subscription_vision(data_url, prompt)
-            if route.route == "openai":
-                return await service._call_openai_vision(
-                    os.environ["OPENAI_API_KEY"], data_url, prompt
-                )
-            key = os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"]
-            return await service._call_gemini_vision(key, data_url, prompt)
+                return Reply(answer.text, answer.usage)
+            return Reply(await ask_service(data_url, prompt), service.last_usage)
         except httpx.HTTPStatusError as exc:
             raise CorrectionError(
                 f"provider answered HTTP {exc.response.status_code}"
@@ -257,6 +281,20 @@ def make_corrector(service: Any, route: VisionRoute) -> Callable[[str, bytes], A
             raise CorrectionError(
                 f"provider call failed ({type(exc).__name__})"
             ) from exc
+
+    async def ask_service(data_url: str, prompt: str) -> str:
+        if route.route == "claude_api":
+            return await service._call_claude_vision(
+                os.environ["ANTHROPIC_API_KEY"], data_url, prompt
+            )
+        if route.route == "openai":
+            return await service._call_openai_vision(
+                os.environ["OPENAI_API_KEY"], data_url, prompt
+            )
+        if route.route in LOCAL_ROUTES:
+            return await service._call_local_vision(route.route, data_url, prompt)
+        key = os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"]
+        return await service._call_gemini_vision(key, data_url, prompt)
 
     return correct
 
@@ -272,6 +310,33 @@ async def _mirror(
     return extract_html(
         await oneshot_completion(prompt, project_dir=str(service.project_path))
     )
+
+
+def local_unavailable(route: VisionRoute) -> str:
+    """Why the route's local model cannot answer ("" when it can, or is not local).
+
+    Ollama is asked by ``docintel``'s engine; LM Studio and llama.cpp must have
+    a loopback endpoint (``offline_policy.local_endpoint``), and a server that
+    is not running fails the first correction instead.
+    """
+    if route.route == "ollama":
+        from docintel.engines.ollama_vision import OllamaVisionEngine
+        from docintel.settings import VISION_MODEL_ENV
+
+        return (
+            OllamaVisionEngine().available(
+                {**os.environ, VISION_MODEL_ENV: route.model}
+            )
+            or ""
+        )
+    if route.route in LOCAL_ROUTES:
+        from offline_policy import local_endpoint
+
+        try:
+            local_endpoint(route.route)
+        except ValueError:
+            return "endpoint_not_loopback"
+    return ""
 
 
 def active_provider() -> str:
@@ -318,17 +383,11 @@ async def run_render_loop(
     )
     if route.refusal:
         return skipped(route.refusal, threshold=threshold, route=route)
-    if route.route == "ollama":
-        from docintel.engines.ollama_vision import OllamaVisionEngine
-        from docintel.settings import VISION_MODEL_ENV
-
-        reason = OllamaVisionEngine().available(
-            {**os.environ, VISION_MODEL_ENV: route.model}
+    reason = local_unavailable(route)
+    if reason:
+        return skipped(
+            "local_unavailable", threshold=threshold, route=route, detail=reason
         )
-        if reason:
-            return skipped(
-                "local_unavailable", threshold=threshold, route=route, detail=reason
-            )
 
     stack = get_stack(framework)
     files = {f.path: f.content for f in result.generated_files}
@@ -345,6 +404,8 @@ async def run_render_loop(
     if decoded[1] in ("image/jpeg", "image/jpg"):
         config.tolerance = max(config.tolerance, JPEG_TOLERANCE)
     regions, masks, masked = layout(result.design_spec, *target.size)
+    drawn = drawn_masks(config.masks, *target.size)
+    masks = masks + drawn
     fonts = font_families(getattr(result.design_spec, "typography", None))
     from verify.devtools import chrome_executable
 
@@ -355,11 +416,12 @@ async def run_render_loop(
             async def render(version: dict[str, str]):
                 return load_image(await renderer.capture(version, entry, fonts))
 
+            correct = make_corrector(service, route)
             outcome = await run_loop(
                 target,
                 files,
                 render=render,
-                correct=make_corrector(service, route),
+                correct=correct,
                 regions=regions,
                 masks=masks,
                 stack_label=stack.label,
@@ -378,6 +440,31 @@ async def run_render_loop(
                 config=config,
                 on_progress=on_progress,
             )
+            if config.fix_passes:
+                fixed = await run_pass_fix(
+                    outcome,
+                    passes,
+                    render=render,
+                    rerun=lambda version: run_passes(
+                        renderer,
+                        replace(outcome, files=version),
+                        entry,
+                        target=target,
+                        regions=regions,
+                        masks=masks,
+                        config=config,
+                        on_progress=None,
+                    ),
+                    target=target,
+                    regions=regions,
+                    masks=masks,
+                    correct=correct,
+                    config=config,
+                    stack_label=stack.label,
+                    mirror=mirror,
+                    on_progress=on_progress,
+                )
+                passes = {**passes, **fixed}
     except RenderError as exc:
         return skipped(exc.code, threshold=threshold, route=route)
 
@@ -393,6 +480,7 @@ async def run_render_loop(
             "route": route.route,
             "model": route.model,
             "masked": masked,
+            "drawn_masks": len(drawn),
             "missing_fonts": renderer.missing_fonts,
             "viewport": {"width": width, "height": height, "scale": scale},
             "tolerance": config.tolerance,
@@ -447,4 +535,72 @@ async def run_passes(
                 found[name] = await states_pass(renderer, outcome.files, entry)
         except RenderError as exc:
             found[name] = {"status": "failed", "detail": exc.code}
+    return found
+
+
+async def run_pass_fix(
+    outcome: LoopOutcome,
+    passes: dict,
+    *,
+    render: Callable[[dict[str, str]], Awaitable[Any]],
+    rerun: Callable[[dict[str, str]], Awaitable[dict]],
+    target: Any,
+    regions: list[Region],
+    masks: list[Box],
+    correct: Callable[[str, bytes], Any],
+    config: LoopConfig,
+    stack_label: str,
+    mirror: bool,
+    on_progress: Progress | None,
+) -> dict:
+    """One correction from what the passes found (``design_to_code.pass_fix``).
+
+    A kept correction replaces the files and the passes of the outcome; the
+    spend then counts it. Returns what goes into the report.
+    """
+    if not outcome.iterations or not passes or outcome.ledger is None:
+        return {}
+    best = outcome.iterations[outcome.best_index]
+    if on_progress is not None:
+        on_progress(
+            {
+                "stage": "fix_passes",
+                "iteration": outcome.best_index,
+                "max_iterations": config.max_iterations,
+                "score": None,
+                "best": best.score,
+            }
+        )
+
+    async def score(version: dict[str, str]) -> float:
+        report = compare(
+            target,
+            await render(version),
+            regions,
+            masks=masks,
+            tolerance=config.tolerance,
+            threshold=config.threshold,
+        )
+        return report.score
+
+    fix = await fix_from_passes(
+        outcome.files,
+        passes,
+        render_png=best.render_png,
+        best_score=best.score,
+        correct=correct,
+        score=score,
+        rerun=rerun,
+        spend=outcome.ledger,
+        max_tokens=config.max_tokens,
+        max_cost_usd=config.max_cost_usd,
+        min_gain=config.min_gain,
+        stack_label=stack_label,
+        mirror=mirror,
+    )
+    outcome.spend = outcome.ledger.as_dict(config.max_tokens, config.max_cost_usd)
+    found: dict = {"pass_fix": fix.report}
+    if fix.files is not None:
+        outcome.files = fix.files
+        found.update(fix.passes or {})
     return found
