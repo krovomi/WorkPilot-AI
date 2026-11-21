@@ -86,7 +86,7 @@
   "apps/frontend/src/renderer/components/ProjectTabBar.tsx": 1,
   "apps/frontend/src/renderer/components/ScreenshotCapture.tsx": 1,
   "apps/frontend/src/renderer/components/SortableProjectTab.tsx": 1,
-  "apps/frontend/src/renderer/components/TaskCard.tsx": 7,
+  "apps/frontend/src/renderer/components/TaskCard.tsx": 6,
   "apps/frontend/src/renderer/components/TaskCreationWizard.tsx": 3,
   "apps/frontend/src/renderer/components/TaskEditDialog.tsx": 1,
   "apps/frontend/src/renderer/components/Terminal.tsx": 7,
