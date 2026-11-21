@@ -19,5 +19,8 @@ export const RENDER_LOOP_CHOICES = {
 	maxCostUsd: [0.5, 1, 2, 5, 10],
 } as const;
 
+/** Zones the person may draw on the design (`--loop-mask`, the runner's limit). */
+export const RENDER_LOOP_MAX_MASKS = 12;
+
 /** The three widths of the responsive pass (`design_to_code.passes.BREAKPOINTS`). */
 export const RENDER_LOOP_BREAKPOINTS = ["mobile", "tablet", "desktop"] as const;

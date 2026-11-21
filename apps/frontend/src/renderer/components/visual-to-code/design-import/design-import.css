@@ -326,6 +326,56 @@
 			0 0 24px -4px var(--di-rc);
 	}
 
+	/* Zones drawn on the design, left out of the render loop's score (#379). */
+	.di-mask-surface {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+
+	.di-mask-surface[data-drawing="true"] {
+		pointer-events: auto;
+		cursor: crosshair;
+		touch-action: none;
+	}
+
+	.di-mask {
+		position: absolute;
+		border: 1.5px solid var(--di-muted);
+		border-radius: 4px;
+		background: repeating-linear-gradient(
+			45deg,
+			color-mix(in srgb, var(--di-title) 22%, transparent) 0 6px,
+			color-mix(in srgb, var(--di-title) 8%, transparent) 6px 12px
+		);
+	}
+
+	.di-mask[data-draft="true"] {
+		border-style: dashed;
+	}
+
+	.di-mask button {
+		position: absolute;
+		top: 2px;
+		right: 2px;
+		display: grid;
+		place-items: center;
+		width: 1.1rem;
+		height: 1.1rem;
+		border-radius: 999px;
+		background: var(--di-card-solid);
+		color: var(--di-title);
+		pointer-events: auto;
+	}
+
+	.di-mask-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 0.5rem;
+	}
+
 	.di-scan {
 		position: absolute;
 		left: 0;
