@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DictationResult } from "@shared/types/dictation";
 import { captureDictation } from "../task-form/dictation-audio";
+import { createVoiceActivityDetector, type VoiceSensitivity } from "./voice-activity";
 
 /**
  * One spoken command through the app's local dictation (faster-whisper, the
@@ -27,11 +28,10 @@ export type CaptureError = (typeof CAPTURE_ERRORS)[number];
 export const SILENCE_MS = 1600;
 /** A command is short: past this, the sentence ends anyway. */
 export const MAX_LISTEN_MS = 30_000;
-/** `captureDictation`'s level for the RMS it treats as voice (0.008 × 8). */
-const VOICE_LEVEL = 0.064;
-
 interface Options {
 	language: string;
+	/** How far above the room's noise a frame must be to count as speech. */
+	sensitivity?: VoiceSensitivity;
 	projectPath?: string;
 	/** A transcribed phrase, in order. */
 	onText: (text: string) => void;
@@ -39,7 +39,7 @@ interface Options {
 	onDone: () => void;
 }
 
-export function useVoiceCapture({ language, projectPath, onText, onDone }: Options) {
+export function useVoiceCapture({ language, sensitivity, projectPath, onText, onDone }: Options) {
 	const [phase, setPhase] = useState<CapturePhase>("idle");
 	const [error, setError] = useState<CaptureError | null>(null);
 	const [level, setLevel] = useState(0);
@@ -122,14 +122,15 @@ export function useVoiceCapture({ language, projectPath, onText, onDone }: Optio
 							if (response.text) handlers.current.onText(response.text);
 						});
 					},
-					(value) => {
+					(value, voiced) => {
 						setLevel(value);
-						if (value > VOICE_LEVEL) {
+						if (voiced) {
 							spoke.current = true;
 							heardAt.current = Date.now();
 						}
 					},
 					finish,
+					createVoiceActivityDetector(sensitivity).isVoice,
 				);
 				if (session.current !== current) {
 					stop(true);
@@ -150,7 +151,7 @@ export function useVoiceCapture({ language, projectPath, onText, onDone }: Optio
 				cancel();
 			}
 		},
-		[cancel, finish, projectPath, transition],
+		[cancel, finish, projectPath, sensitivity, transition],
 	);
 
 	// The sentence ends on a silence after speech, or after MAX_LISTEN_MS.

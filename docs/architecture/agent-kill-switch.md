@@ -57,17 +57,19 @@ fermeture de l'app (`app_shutdown`) : le prochain lancement ne la reprend pas.
 insights…) n'a rien à reprendre : il est arrêté. Une tâche dont la pause ne s'écrit pas est
 arrêtée quand même : arrêter est la raison d'être du bouton.
 
+**À la voix.** L'assistant vocal offre un arrêt plus doux : « stop », confirmé, écrit la même
+pause (`reason: "voice_stop"`) sans arrêter le processus, et la session se termine après
+l'appel d'outil en cours, que `tool_breaker.py` voit passer
+([voice-assistant.md](voice-assistant.md)).
+
 **Où.** Le bouton rouge apparaît dans le rail de la barre latérale tant qu'une tâche tourne ; le
 raccourci Ctrl+Maj+. (Cmd+Maj+. sur macOS) marche toujours, même dans un champ de saisie. Le
 canal `AGENTS_STOP_ALL` ne prend aucun argument : ce qui tourne est lu dans le main.
 
 ## Pas encore fait (lots suivants de #353)
 
-- Les politiques versionnées (`workpilot.policy.yaml` : heures permises, fichiers interdits ou
-  soumis à revue, plafond de jetons par heure) appliquées à chaque outil sur tous les
-  fournisseurs, avec leur panneau. `core/governance/` (`PolicyEngine`, `ApprovalGate`) existe
-  mais n'est encore branché nulle part.
-- Le journal d'audit exportable (utilisateur, horodatage, spec, outil, fichier, décision,
-  fournisseur et modèle).
+- ~~Les politiques versionnées et le journal d'audit exportable~~ : faits au lot 2,
+  [governance-policy.md](governance-policy.md) (heures, fichiers interdits ou soumis à revue,
+  jetons par heure, journal `.workpilot/policy-audit.jsonl`, panneau et export CSV/JSON).
 - Les tâches d'un projet du mode serveur : leurs runs tournent sur le serveur, l'arrêt d'urgence
   de l'app ne les atteint pas.

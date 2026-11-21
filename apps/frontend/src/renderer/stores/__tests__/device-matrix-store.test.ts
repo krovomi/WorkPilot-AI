@@ -1,27 +1,46 @@
 /**
  * The device matrix store (#383): devices are captured one after the other in
- * catalogue order, a stop keeps what was rendered, and a failure is named.
+ * catalogue order under the chosen throttling, a stop keeps what was
+ * rendered, a failure is named, and the export names the rendered devices.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_MATRIX_DEVICE_IDS } from "../../../shared/constants/device-presets";
+import type { DeviceCapture } from "../../../shared/types/device-matrix";
 import { useDeviceMatrixStore } from "../device-matrix-store";
 
 const captureEmulatorDevice = vi.fn();
-Object.defineProperty(globalThis, "electronAPI", { value: { captureEmulatorDevice }, writable: true });
+const exportEmulatorDeviceGrid = vi.fn();
+Object.defineProperty(globalThis, "electronAPI", {
+	value: { captureEmulatorDevice, exportEmulatorDeviceGrid },
+	writable: true,
+});
 
-const capture = (deviceId: string) => ({
+const capture = (deviceId: string): { success: true; data: DeviceCapture } => ({
 	success: true,
-	data: { deviceId, url: "http://localhost:5173/", image: "data:image/png;base64,AA==", report: null },
+	data: {
+		deviceId,
+		url: "http://localhost:5173/",
+		image: "data:image/png;base64,AA==",
+		report: null,
+		network: "none",
+		cpu: "1x",
+		loadMs: 0,
+	},
 });
 
 describe("useDeviceMatrixStore", () => {
 	beforeEach(() => {
 		captureEmulatorDevice.mockReset();
+		exportEmulatorDeviceGrid.mockReset();
 		useDeviceMatrixStore.setState({
 			selected: [...DEFAULT_MATRIX_DEVICE_IDS],
 			entries: {},
 			running: false,
 			stopRequested: false,
+			network: "none",
+			cpu: "1x",
+			exporting: false,
+			exportStatus: null,
 		});
 	});
 
@@ -46,11 +65,14 @@ describe("useDeviceMatrixStore", () => {
 			})
 			.mockResolvedValueOnce({ success: false, error: "load-failed" })
 			.mockRejectedValueOnce(new Error("bridge gone"));
+		useDeviceMatrixStore.getState().setNetwork("fast-3g");
+		useDeviceMatrixStore.getState().setCpu("4x");
 		await useDeviceMatrixStore.getState().captureSelected("/cart");
+		const throttled = { network: "fast-3g", cpu: "4x" };
 		expect(captureEmulatorDevice.mock.calls.map(([request]) => request)).toEqual([
-			{ deviceId: "iphone-15", path: "/cart" },
-			{ deviceId: "pixel-8", path: "/cart" },
-			{ deviceId: "ipad-mini", path: "/cart" },
+			{ deviceId: "iphone-15", path: "/cart", ...throttled },
+			{ deviceId: "pixel-8", path: "/cart", ...throttled },
+			{ deviceId: "ipad-mini", path: "/cart", ...throttled },
 		]);
 		const { entries, running } = useDeviceMatrixStore.getState();
 		expect(running).toBe(false);
@@ -77,6 +99,8 @@ describe("useDeviceMatrixStore", () => {
 		await useDeviceMatrixStore.getState().captureSelected("/");
 		useDeviceMatrixStore.setState({ selected: ["iphone-15"], running: true });
 		await useDeviceMatrixStore.getState().captureSelected("/");
+		useDeviceMatrixStore.setState({ running: false, exporting: true });
+		await useDeviceMatrixStore.getState().captureSelected("/");
 		expect(captureEmulatorDevice).not.toHaveBeenCalled();
 	});
 
@@ -87,5 +111,53 @@ describe("useDeviceMatrixStore", () => {
 		useDeviceMatrixStore.setState({ running: false });
 		useDeviceMatrixStore.getState().clear();
 		expect(useDeviceMatrixStore.getState().entries).toEqual({});
+	});
+
+	it("exports the rendered devices, in catalogue order, and says where it saved", async () => {
+		useDeviceMatrixStore.setState({
+			entries: {
+				"desktop-1080p": { status: "done", capture: capture("desktop-1080p").data },
+				"pixel-8": { status: "failed", error: "load-failed" },
+				"iphone-15": { status: "done", capture: capture("iphone-15").data },
+			},
+			exportStatus: { status: "failed", error: "busy" },
+		});
+		exportEmulatorDeviceGrid.mockImplementationOnce(async () => {
+			expect(useDeviceMatrixStore.getState()).toMatchObject({ exporting: true, exportStatus: null });
+			return { success: true, data: { saved: true, fileName: "grid.png" } };
+		});
+		await useDeviceMatrixStore.getState().exportGrid();
+		expect(exportEmulatorDeviceGrid).toHaveBeenCalledWith({ deviceIds: ["iphone-15", "desktop-1080p"] });
+		expect(useDeviceMatrixStore.getState()).toMatchObject({
+			exporting: false,
+			exportStatus: { status: "saved", fileName: "grid.png" },
+		});
+	});
+
+	it("says nothing after a cancelled export, and names a failed one", async () => {
+		useDeviceMatrixStore.setState({ entries: { "iphone-15": { status: "done", capture: capture("iphone-15").data } } });
+		exportEmulatorDeviceGrid.mockResolvedValueOnce({ success: true, data: { saved: false } });
+		await useDeviceMatrixStore.getState().exportGrid();
+		expect(useDeviceMatrixStore.getState().exportStatus).toBeNull();
+		exportEmulatorDeviceGrid.mockResolvedValueOnce({ success: false, error: "write-failed" });
+		await useDeviceMatrixStore.getState().exportGrid();
+		expect(useDeviceMatrixStore.getState().exportStatus).toEqual({ status: "failed", error: "write-failed" });
+		exportEmulatorDeviceGrid.mockRejectedValueOnce(new Error("bridge gone"));
+		await useDeviceMatrixStore.getState().exportGrid();
+		expect(useDeviceMatrixStore.getState().exportStatus).toEqual({ status: "failed", error: "export-failed" });
+		// A new capture or a clear forgets the last export.
+		useDeviceMatrixStore.getState().clear();
+		expect(useDeviceMatrixStore.getState().exportStatus).toBeNull();
+	});
+
+	it("exports nothing without a rendered device, while capturing or while exporting", async () => {
+		useDeviceMatrixStore.setState({ entries: { "iphone-15": { status: "failed", error: "busy" } } });
+		await useDeviceMatrixStore.getState().exportGrid();
+		const done = { "iphone-15": { status: "done" as const, capture: capture("iphone-15").data } };
+		useDeviceMatrixStore.setState({ entries: done, running: true });
+		await useDeviceMatrixStore.getState().exportGrid();
+		useDeviceMatrixStore.setState({ running: false, exporting: true });
+		await useDeviceMatrixStore.getState().exportGrid();
+		expect(exportEmulatorDeviceGrid).not.toHaveBeenCalled();
 	});
 });

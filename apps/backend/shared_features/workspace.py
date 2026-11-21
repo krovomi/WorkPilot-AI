@@ -13,6 +13,10 @@ Every route takes a ``project_id``, never a path, and resolves it through
 only: ``analytics.read`` (the domain of the ``workspace`` feature), any role
 on the project. An error a run or a job ended with passes through
 ``redact_text``; nothing served says where the clone is.
+
+``/compare`` sets the project against the organization's other projects:
+only those the person may read themselves (``load_project_scope``), only as
+medians of groups of ``MIN_GROUP`` projects or more, and never by name.
 """
 
 from __future__ import annotations
@@ -21,12 +25,13 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
-from server.authz.scope import ProjectScope, resolve_project_scope
+from fastapi import APIRouter, Depends, HTTPException, Query
+from server.authz.principal import Principal, get_principal
+from server.authz.scope import ProjectScope, load_project_scope, resolve_project_scope
 from server.db.engine import get_db
 from server.db.models import AgentRun, Project, ProjectJob, SpecIndex, User
 from server.services.project_jobs import get_project_jobs
-from shared_features import usage_ledger
+from shared_features import build_compare, usage_ledger
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +39,11 @@ router = APIRouter(prefix="/api/features/workspace", tags=["features"])
 
 MAX_SESSIONS = 500
 MAX_ERROR = 2_000
+#: The organization's other projects a comparison reads, at most; and the
+#: fewest projects a group's median is given for, so that it never stands for
+#: one project the person could single out.
+MAX_PEERS = 100
+MIN_GROUP = 5
 
 #: The board's statuses (``implementation_plan.json``) in the words of the
 #: desktop's dashboard; the others are shown as they are.
@@ -193,3 +203,40 @@ async def dashboard(
         by_status[word] = by_status.get(word, 0) + int(count)
     ledgers = await asyncio.to_thread(usage_ledger.read_ledgers, scope.path)
     return {"snapshot": usage_ledger.dashboard(ledgers, by_status)}
+
+
+async def _readable_peers(
+    db: AsyncSession, principal: Principal, scope: ProjectScope
+) -> list[ProjectScope]:
+    """The organization's other projects that `principal` may read."""
+    listed = await db.scalars(
+        select(Project.id)
+        .where(Project.org_id == scope.org_id, Project.id != scope.project_id)
+        .order_by(Project.created_at, Project.id)
+        .limit(MAX_PEERS)
+    )
+    readable = []
+    for project_id in listed.all():
+        try:
+            readable.append(await load_project_scope(db, principal, project_id))
+        except HTTPException:
+            continue
+    return readable
+
+
+@router.get("/compare")
+async def compare(
+    scope: ProjectScope = Depends(resolve_project_scope),
+    principal: Principal = Depends(get_principal),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """How the project compares with its own past and with the organization's
+    other projects the person may read, as medians only (see the module)."""
+    peers = await _readable_peers(db, principal, scope)
+    return await asyncio.to_thread(
+        build_compare.compare_paths,
+        scope.path,
+        [peer.path for peer in peers],
+        datetime.now(UTC),
+        min_group=MIN_GROUP,
+    )

@@ -55,3 +55,41 @@ export interface LearnedSuppression {
 	line: number;
 	rejections: number;
 }
+
+/** What a learned rule does to a matching finding (lot 2 of #361). */
+export type LearnedRuleStatus = "downgraded" | "dropped";
+
+/** The verdicts on one category, the latest per finding. */
+export interface ReviewFeedbackCategoryStats {
+	category: string;
+	accepted: number;
+	rejected: number;
+	notApplicable: number;
+}
+
+/** A kind of remark the project rejected often enough to change the reviews. */
+export interface ReviewFeedbackRuleStats {
+	signature: string;
+	category: string;
+	/** Its newest wording, one bounded line. */
+	label: string;
+	rejections: number;
+	accepts: number;
+	status: LearnedRuleStatus;
+	topReason: ReviewFeedbackReason | null;
+}
+
+export interface ReviewFeedbackStats {
+	threshold: number;
+	categories: ReviewFeedbackCategoryStats[];
+	rules: ReviewFeedbackRuleStats[];
+}
+
+export type ReviewFeedbackStatsResult =
+	| { success: true; stats: ReviewFeedbackStats }
+	| { success: false; error: ReviewFeedbackError };
+
+/** `.workpilot/review-conventions.md`, written on request. */
+export type ReviewConventionsResult =
+	| { success: true; path: string; rules: number }
+	| { success: false; error: ReviewFeedbackError };

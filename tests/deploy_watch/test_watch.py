@@ -341,6 +341,117 @@ class TestRunRollback:
         )
 
 
+class TestIncident:
+    """The report and the revert PR that follow a bad verdict."""
+
+    def _critical(self, monkeypatch, current_sha="b" * 40):
+        plan = RollbackPlan("github", "rerun", automatic=True, current_sha=current_sha)
+        monkeypatch.setattr(watch, "plan_rollback", lambda *a: plan)
+        monkeypatch.setattr(watch, "changed_paths", lambda *a: None)
+
+    def _run(self, project, fake_fetch, health=500, **kwargs):
+        clock = Clock()
+        return run_watch(
+            project,
+            RUN_ID,
+            _env(CICD_MONITOR_PROMETHEUS_URL=""),
+            fetch=fake_fetch({HEALTH: (health, b"")}),
+            sleep=clock.sleep,
+            now=clock,
+            **kwargs,
+        )
+
+    def test_critical_opens_the_revert_pr(self, tmp_path, fake_fetch, monkeypatch):
+        runs = [
+            {
+                "id": RUN_ID,
+                "provider": "github",
+                "branch": "release",
+                "triggered_at": "2026-11-15T10:00:00Z",
+            }
+        ]
+        project = _project(tmp_path, runs, MONITORS + "revert_pr: true\n")
+        self._critical(monkeypatch)
+        requests = []
+
+        def opener(request):
+            requests.append(request)
+            return {"status": "opened", "url": "https://github.com/o/r/pull/9"}
+
+        asked = []
+
+        def ask(prompt, system, project_dir):
+            asked.append(prompt)
+            return "The health check failed twice."
+
+        state = self._run(project, fake_fetch, revert_opener=opener, ask=ask)
+        assert state["revert_pr"] == {
+            "status": "opened",
+            "sha": "b" * 40,
+            "url": "https://github.com/o/r/pull/9",
+        }
+        (request,) = requests
+        assert (request.sha, request.target) == ("b" * 40, "release")
+        assert "Health check: 2 of 2 failed" in request.body
+        report = state["incident"]
+        assert report["summary"]["critical_samples"] == 2
+        assert report["markdown"] in request.body
+        assert report["explanation"] == "The health check failed twice."
+        assert len(asked) == 1
+        assert read_state(project, RUN_ID)["incident"] == report
+
+    def test_no_revert_unless_the_file_asks(self, tmp_path, fake_fetch, monkeypatch):
+        project = _project(tmp_path, monitors=MONITORS)
+        self._critical(monkeypatch)
+        state = self._run(
+            project, fake_fetch, revert_opener=lambda r: pytest.fail("not asked")
+        )
+        assert "revert_pr" not in state
+        assert state["incident"]["explanation"] == ""
+
+    def test_no_explanation_when_the_file_says_no(
+        self, tmp_path, fake_fetch, monkeypatch
+    ):
+        project = _project(tmp_path, monitors=MONITORS + "explain_incident: false\n")
+        self._critical(monkeypatch)
+        state = self._run(project, fake_fetch, ask=lambda *a: pytest.fail("no model"))
+        assert state["incident"]["explanation"] == ""
+
+    def test_a_warning_gets_a_report_and_no_revert(self, tmp_path, fake_fetch):
+        project = _project(tmp_path, monitors=MONITORS + "revert_pr: true\n")
+        codes = iter([500, 200, 200])
+        clock = Clock()
+        state = run_watch(
+            project,
+            RUN_ID,
+            _env(CICD_MONITOR_PROMETHEUS_URL=""),
+            fetch=fake_fetch({HEALTH: lambda _r: (next(codes), b"")}),
+            sleep=clock.sleep,
+            now=clock,
+            revert_opener=lambda r: pytest.fail("not critical"),
+        )
+        assert state["verdict"] == "warning"
+        assert "revert_pr" not in state
+        assert state["incident"]["summary"]["verdict"] == "warning"
+
+    def test_a_healthy_run_has_no_report(self, tmp_path, fake_fetch):
+        project = _project(tmp_path, monitors=MONITORS)
+        state = self._run(project, fake_fetch, health=200)
+        assert state["verdict"] == "ok"
+        assert "incident" not in state
+
+    def test_bad_switches_are_named(self, tmp_path):
+        from deploy_watch.config import load_settings
+
+        project = _project(
+            tmp_path, monitors=MONITORS + "revert_pr: yes please\nexplain_incident: 1\n"
+        )
+        settings = load_settings(project, _env())
+        assert (settings.revert_pr, settings.explain_incident) == (False, True)
+        assert "revert_pr: not true or false" in settings.problems
+        assert "explain_incident: not true or false" in settings.problems
+
+
 RUNNER = (
     Path(__file__).resolve().parents[2]
     / "apps"

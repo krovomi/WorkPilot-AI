@@ -54,6 +54,8 @@ class Usage:
     output_tokens: int
     cost: float
     at: datetime
+    #: The agent that spent it (planner, coder, qa_reviewer…); "" when unrecorded.
+    agent_type: str = ""
 
     @property
     def tokens(self) -> int:
@@ -125,10 +127,11 @@ def _usage(raw: object) -> Usage | None:
         output_tokens=_count(raw.get("output_tokens")),
         cost=_amount(raw.get("cost")),
         at=at,
+        agent_type=_label(raw.get("agent_type")),
     )
 
 
-def _workspaces(clone: Path) -> Iterator[Path]:
+def workspace_dirs(clone: Path) -> Iterator[Path]:
     """The clone's ``.workpilot``, then each build workspace's, by card name."""
     from board_mcp.server import CARD_ID
 
@@ -146,7 +149,7 @@ def _workspaces(clone: Path) -> Iterator[Path]:
         yield tasks / name / ".workpilot"
 
 
-def _read(path: Path, root: Path, limit: int) -> tuple[Any, int]:
+def read_json(path: Path, root: Path, limit: int) -> tuple[Any, int]:
     """A JSON file's value and the bytes read for it; nothing for a link, a
     file out of the clone, over its size, or not JSON.
 
@@ -181,11 +184,11 @@ def read_ledgers(clone: Path) -> Ledgers:
     root = clone.resolve()
     found = Ledgers()
     budget = MAX_TOTAL_BYTES
-    for directory in _workspaces(clone):
+    for directory in workspace_dirs(clone):
         for name, limit in FILE_LIMITS.items():
             if budget <= 0:
                 return found
-            value, size = _read(directory / name, root, min(limit, budget))
+            value, size = read_json(directory / name, root, min(limit, budget))
             budget -= size
             if not isinstance(value, dict):
                 continue

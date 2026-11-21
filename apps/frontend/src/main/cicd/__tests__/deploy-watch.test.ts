@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+	deployAlertText,
 	deployWatchPath,
 	LiveDeployWatches,
 	parseDeployWatch,
@@ -192,5 +193,119 @@ describe("LiveDeployWatches", () => {
 		watches.start("/p", RUN, () => Promise.reject(new Error("boom")));
 		await new Promise((r) => setTimeout(r, 0));
 		expect(watches.isLive("/p", RUN)).toBe(false);
+	});
+});
+
+describe("revert PR and incident report", () => {
+	const REPORT = {
+		...STATE,
+		revert_pr: { status: "opened", url: "https://github.com/acme/shop/pull/7", sha: "b".repeat(40) },
+		incident: {
+			summary: {
+				critical_samples: 2,
+				warning_samples: 1,
+				health: { checks: 3, failed: 2 },
+				metrics: [
+					{ name: "errors", baseline: 0.01, worst: 0.05, worst_change_pct: 400, level: "critical" },
+					{ name: "odd", baseline: "x", worst: null, level: "nope" },
+				],
+			},
+			explanation: "e".repeat(2000),
+		},
+	};
+
+	it("reads both, bounded", () => {
+		const watch = parseDeployWatch(REPORT, false);
+		expect(watch?.revertPr).toEqual({
+			status: "opened",
+			url: "https://github.com/acme/shop/pull/7",
+			sha: "b".repeat(40),
+		});
+		expect(watch?.incident).toEqual({
+			criticalSamples: 2,
+			warningSamples: 1,
+			healthChecks: 3,
+			healthFailed: 2,
+			metrics: [
+				{ name: "errors", baseline: 0.01, worst: 0.05, worstChangePct: 400, level: "critical" },
+				{ name: "odd", baseline: null, worst: null, worstChangePct: null, level: "unknown" },
+			],
+			explanation: "e".repeat(1200),
+		});
+	});
+
+	it("drops an unknown status, a non-https link and odd counts", () => {
+		const odd = parseDeployWatch(
+			{
+				...STATE,
+				revert_pr: { status: "merged", url: "https://x/pr/1" },
+				incident: { summary: { critical_samples: -1, warning_samples: 1.5, metrics: "no" } },
+			},
+			false,
+		);
+		expect(odd?.revertPr).toBeUndefined();
+		expect(odd?.incident).toEqual({
+			criticalSamples: 0,
+			warningSamples: 0,
+			healthChecks: 0,
+			healthFailed: 0,
+			metrics: [],
+			explanation: "",
+		});
+		for (const url of ["http://x/pr/1", "https://x/pr 1", 7]) {
+			const watch = parseDeployWatch({ ...STATE, revert_pr: { status: "exists", url } }, false);
+			expect(watch?.revertPr).toEqual({ status: "exists", url: "", sha: "" });
+		}
+		expect(parseDeployWatch({ ...STATE, incident: "text" }, false)?.incident).toBeUndefined();
+	});
+});
+
+describe("deployAlertText", () => {
+	const critical = parseDeployWatch(
+		{
+			...STATE,
+			rollback: "started",
+			revert_pr: { status: "opened", url: "https://github.com/acme/shop/pull/7" },
+		},
+		true,
+	);
+
+	it("tells a critical verdict, its rollback and its revert PR", () => {
+		expect(deployAlertText("en", "Shop", critical)).toEqual({
+			title: "Deployment critical: Shop",
+			body: `Run ${RUN}: two critical samples in a row after the deployment. The rollback started. Revert PR: https://github.com/acme/shop/pull/7`,
+		});
+		expect(deployAlertText("fr", "Shop", critical)?.title).toBe("Déploiement critique : Shop");
+	});
+
+	it("tells a warning, and a revert PR that could not be opened", () => {
+		const warning = parseDeployWatch(
+			{ ...STATE, verdict: "warning", rollback: undefined, revert_pr: { status: "conflict" } },
+			true,
+		);
+		expect(deployAlertText("fr", "Shop", warning)).toEqual({
+			title: "Déploiement dégradé : Shop",
+			body: `Exécution ${RUN} : les métriques se sont dégradées pendant la fenêtre de surveillance. La PR de revert n'a pas pu être ouverte.`,
+		});
+		const existing = parseDeployWatch(
+			{ ...STATE, verdict: "warning", rollback: undefined, revert_pr: { status: "exists" } },
+			true,
+		);
+		expect(deployAlertText("en", "Shop", existing)?.body).toBe(
+			`Run ${RUN}: the metrics got worse during the watch window.`,
+		);
+	});
+
+	it("needs neither a rollback nor a revert PR", () => {
+		const bare = parseDeployWatch({ ...STATE, rollback: undefined }, true);
+		expect(deployAlertText("en", "Shop", bare)?.body).toBe(
+			`Run ${RUN}: two critical samples in a row after the deployment.`,
+		);
+	});
+
+	it("stays quiet otherwise", () => {
+		expect(deployAlertText("en", "Shop", undefined)).toBeNull();
+		expect(deployAlertText("en", "Shop", parseDeployWatch({ ...STATE, verdict: "ok" }, true))).toBeNull();
+		expect(deployAlertText("en", "Shop", parseDeployWatch({ ...STATE, phase: "watching" }, true))).toBeNull();
 	});
 });

@@ -1,14 +1,20 @@
 /**
  * The watch after a deployment, on a run of the CI/CD page (#366): the
  * verdict, the last sample, and the rollback (proposed, started, refused by a
- * migration, or by hand with a link to the last good run).
+ * migration, or by hand with a link to the last good run); after a bad
+ * verdict, the incident report and the revert PR of the deployed commit.
  */
 
-import { AlertTriangle, ExternalLink, Undo2 } from "lucide-react";
+import { AlertTriangle, ExternalLink, GitPullRequest, Undo2 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { DeployWatch, DeployWatchLevel } from "../../../shared/types/deploy-watch";
+import type {
+	DeployIncident,
+	DeployRevertPr,
+	DeployWatch,
+	DeployWatchLevel,
+} from "../../../shared/types/deploy-watch";
 import { CharterButton, Chip, Notice, type Tone } from "../charter";
 
 const VERDICT_TONES: Record<DeployWatchLevel, Tone> = {
@@ -34,6 +40,76 @@ export function isWatchRunning(watch: DeployWatch | undefined): boolean {
 
 function formatValue(value: number | null): string {
 	return value === null ? "—" : String(Math.round(value * 1000) / 1000);
+}
+
+/** The revert PR is on the forge, with a link to it. */
+export function revertOpened(revert: DeployRevertPr | undefined): boolean {
+	return Boolean(revert?.url && (revert.status === "opened" || revert.status === "exists"));
+}
+
+function RevertPrLine({ revert }: { readonly revert: DeployRevertPr }): React.ReactElement {
+	const { t } = useTranslation(["cicdTriggers"]);
+	if (revertOpened(revert)) {
+		return (
+			<a
+				href={revert.url}
+				target="_blank"
+				rel="noopener noreferrer"
+				className="inline-flex items-center gap-1 text-primary hover:underline"
+				data-testid="deploy-revert-pr"
+			>
+				<GitPullRequest className="h-3 w-3" />
+				{t("cicdTriggers:watch.revertPr.open", { sha: revert.sha.slice(0, 12) })}
+			</a>
+		);
+	}
+	const failed = revert.status !== "offline" && revert.status !== "unavailable";
+	return (
+		<div className={failed ? "text-destructive" : "wp-meta"} data-testid="deploy-revert-pr">
+			{t(`cicdTriggers:watch.revertPr.${revert.status}`)}
+		</div>
+	);
+}
+
+function IncidentReport({ incident }: { readonly incident: DeployIncident }): React.ReactElement {
+	const { t } = useTranslation(["cicdTriggers"]);
+	return (
+		<div className="space-y-0.5 rounded border border-border p-2" data-testid="deploy-incident">
+			<div className="font-medium">{t("cicdTriggers:watch.incident.title")}</div>
+			<div className="wp-meta">
+				{t("cicdTriggers:watch.incident.samples", {
+					critical: incident.criticalSamples,
+					warning: incident.warningSamples,
+				})}
+				{incident.healthChecks > 0 &&
+					` · ${t("cicdTriggers:watch.incident.health", {
+						failed: incident.healthFailed,
+						checks: incident.healthChecks,
+					})}`}
+			</div>
+			{incident.metrics.length > 0 && (
+				<ul className="space-y-0.5">
+					{incident.metrics.map((m) => (
+						<li key={m.name} className="wp-meta">
+							{t("cicdTriggers:watch.incident.metric", {
+								name: m.name,
+								baseline: formatValue(m.baseline),
+								worst: formatValue(m.worst),
+								change: m.worstChangePct === null ? "—" : String(m.worstChangePct),
+								level: t(`cicdTriggers:watch.verdict.${m.level}`),
+							})}
+						</li>
+					))}
+				</ul>
+			)}
+			{incident.explanation && (
+				<p className="whitespace-pre-line">
+					<span className="wp-meta">{t("cicdTriggers:watch.incident.explanation")} </span>
+					{incident.explanation}
+				</p>
+			)}
+		</div>
+	);
 }
 
 interface DeployWatchPanelProps {
@@ -112,7 +188,9 @@ export function DeployWatchPanel({ watch, busy, onRollback }: DeployWatchPanelPr
 					{t("cicdTriggers:watch.openTarget", { run: watch.plan.targetRun })}
 				</a>
 			)}
-			{watch.rollback === "started" && (
+			{watch.incident && <IncidentReport incident={watch.incident} />}
+			{watch.revertPr && <RevertPrLine revert={watch.revertPr} />}
+			{watch.rollback === "started" && !revertOpened(watch.revertPr) && (
 				<div className="wp-meta">{t("cicdTriggers:watch.revertHint")}</div>
 			)}
 			{canRollBack(watch) &&

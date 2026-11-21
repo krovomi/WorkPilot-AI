@@ -108,5 +108,55 @@
 	"pending": {
 		"description": "This task is queued and has not started yet. Go to the Kanban to launch it, reprioritise it or edit its specification.",
 		"hint": "Waiting for an available agent"
+	},
+	"achievements": {
+		"title": "Achievements",
+		"open": "Show the project's achievements",
+		"count": "{{earned}}/{{total}}",
+		"unlocked": "Achievement unlocked",
+		"dismiss": "Dismiss",
+		"locked": "Not earned yet",
+		"earnedOn": "Earned on {{date}}",
+		"items": {
+			"first-ship": {
+				"name": "First delivery",
+				"description": "A task was done or turned into a pull request."
+			},
+			"ten-ships-week": {
+				"name": "Busy week",
+				"description": "Ten tasks delivered within seven days."
+			},
+			"qa-first-try": {
+				"name": "Right the first time",
+				"description": "A task passed QA on its first review."
+			},
+			"qa-first-try-five": {
+				"name": "Steady hand",
+				"description": "Five tasks passed QA on their first review."
+			},
+			"incident-resolved": {
+				"name": "Back to green",
+				"description": "A Self-Healing incident was resolved."
+			},
+			"incident-fixed-by-agent": {
+				"name": "Fixed on its own",
+				"description": "An agent opened the pull request that resolved an incident."
+			},
+			"second-opinion": {
+				"name": "Second opinion",
+				"description": "A second engine reviewed a task and agreed with it."
+			}
+		}
+	},
+	"kiosk": {
+		"enter": "TV mode",
+		"exit": "Leave TV mode",
+		"calmOn": "Calm mode",
+		"calmOff": "Animations",
+		"calmLocked": "Your system asks for reduced motion, so the office stays still.",
+		"active": "Active",
+		"waiting": "Need you",
+		"shippedToday": "Delivered today",
+		"achievements": "Achievements"
 	}
 }
