@@ -1,5 +1,6 @@
 import {
 	AlertCircle,
+	Check,
 	CheckCircle2,
 	Clock,
 	Search,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
+import { type TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import type { RoadmapGenerationStatus } from "../../shared/types/roadmap";
 import { cn } from "../lib/utils";
@@ -36,31 +38,23 @@ function formatElapsedTime(seconds: number): string {
 }
 
 /**
- * Formats a timestamp into a human-readable relative time string.
- * Examples: "just now", "5s ago", "2m ago", "1h ago"
- *
- * @param timestamp - The Date object or timestamp to format
- * @returns Formatted relative time string
+ * How long ago a timestamp was, in the app's language ("just now", "5s ago",
+ * "2m ago", "1h ago", "3d ago").
  */
-function formatTimeAgo(timestamp: Date | string | undefined): string {
-	if (!timestamp) return "";
-
+function formatTimeAgo(timestamp: Date | string, t: TFunction): string {
 	const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
-	const now = new Date();
-	const diffMs = now.getTime() - date.getTime();
-	const diffSecs = Math.floor(diffMs / 1000);
+	const diffSecs = Math.floor((Date.now() - date.getTime()) / 1000);
 
-	if (diffSecs < 5) return "just now";
-	if (diffSecs < 60) return `${diffSecs}s ago`;
+	if (diffSecs < 5) return t("roadmapProgress.timeAgo.justNow");
+	if (diffSecs < 60) return t("roadmapProgress.timeAgo.seconds", { count: diffSecs });
 
 	const diffMins = Math.floor(diffSecs / 60);
-	if (diffMins < 60) return `${diffMins}m ago`;
+	if (diffMins < 60) return t("roadmapProgress.timeAgo.minutes", { count: diffMins });
 
 	const diffHours = Math.floor(diffMins / 60);
-	if (diffHours < 24) return `${diffHours}h ago`;
+	if (diffHours < 24) return t("roadmapProgress.timeAgo.hours", { count: diffHours });
 
-	const diffDays = Math.floor(diffHours / 24);
-	return `${diffDays}d ago`;
+	return t("roadmapProgress.timeAgo.days", { count: Math.floor(diffHours / 24) });
 }
 
 /**
@@ -68,11 +62,9 @@ function formatTimeAgo(timestamp: Date | string | undefined): string {
  * Listens for changes to the prefers-reduced-motion media query.
  */
 function useReducedMotion(): boolean {
-	const [reducedMotion, setReducedMotion] = useState(() => {
-		// Check if globalThis is available (for SSR safety)
-		if (typeof globalThis === "undefined") return false;
-		return globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
-	});
+	const [reducedMotion, setReducedMotion] = useState(
+		() => globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches,
+	);
 
 	useEffect(() => {
 		const mediaQuery = globalThis.matchMedia(
@@ -164,20 +156,16 @@ const STEP_PHASES: { key: GenerationPhase; labelKey: string }[] = [
  * Respects user's reduced motion preference.
  */
 function HeartbeatIndicator({
-	isActive,
 	reducedMotion,
 	color,
 	processingLabel,
 	tooltipText,
 }: Readonly<{
-	isActive: boolean;
 	reducedMotion: boolean;
 	color: string;
 	processingLabel: string;
 	tooltipText: string;
 }>) {
-	if (!isActive) return null;
-
 	// Heartbeat animation: subtle scale pulse to show process is alive
 	const heartbeatAnimation = reducedMotion
 		? { scale: 1, opacity: 1 }
@@ -273,20 +261,7 @@ function PhaseStepsIndicator({
 							transition={getStepTransition(state)}
 						>
 							{state === "complete" && (
-								// biome-ignore lint/a11y/noSvgWithoutTitle: SVG is decorative
-								<svg
-									className="h-3 w-3"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={3}
-										d="M5 13l4 4L19 7"
-									/>
-								</svg>
+								<Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
 							)}
 							{t(phase.labelKey)}
 						</motion.div>
@@ -328,13 +303,10 @@ export function RoadmapGenerationProgress({
 	/**
 	 * Calculate elapsed time from startedAt timestamp
 	 */
-	const calculateElapsedTime = useCallback(() => {
-		if (!startedAt) return 0;
-		const startDate =
-			startedAt instanceof Date ? startedAt : new Date(startedAt);
-		const now = new Date();
-		return Math.floor((now.getTime() - startDate.getTime()) / 1000);
-	}, [startedAt]);
+	const calculateElapsedTime = useCallback((start: Date | string) => {
+		const startDate = start instanceof Date ? start : new Date(start);
+		return Math.floor((Date.now() - startDate.getTime()) / 1000);
+	}, []);
 
 	/**
 	 * Update elapsed time every second while generation is active
@@ -353,11 +325,11 @@ export function RoadmapGenerationProgress({
 		}
 
 		// Calculate initial elapsed time
-		setElapsedTime(calculateElapsedTime());
+		setElapsedTime(calculateElapsedTime(startedAt));
 
 		// Set up interval to update every second
 		const intervalId = setInterval(() => {
-			setElapsedTime(calculateElapsedTime());
+			setElapsedTime(calculateElapsedTime(startedAt));
 		}, 1000);
 
 		return () => {
@@ -379,27 +351,26 @@ export function RoadmapGenerationProgress({
 		}
 
 		// Calculate initial display
-		setLastActivityDisplay(formatTimeAgo(lastActivityAt));
+		setLastActivityDisplay(formatTimeAgo(lastActivityAt, t));
 
 		// Update every 5 seconds to keep relative time current
 		const intervalId = setInterval(() => {
-			setLastActivityDisplay(formatTimeAgo(lastActivityAt));
+			setLastActivityDisplay(formatTimeAgo(lastActivityAt, t));
 		}, 5000);
 
 		return () => {
 			clearInterval(intervalId);
 		};
-	}, [phase, lastActivityAt]);
+	}, [phase, lastActivityAt, t]);
 
 	/**
 	 * Handle stop button click with error handling and double-click prevention
 	 */
-	const handleStopClick = async () => {
-		if (!onStop || isStopping) return;
-
+	// The button is disabled while stopping, so one click stops once.
+	const handleStopClick = async (stop: () => void | Promise<void>) => {
 		setIsStopping(true);
 		try {
-			await onStop();
+			await stop();
 		} catch (err) {
 			console.error("Failed to stop generation:", err);
 		} finally {
@@ -469,7 +440,7 @@ export function RoadmapGenerationProgress({
 							<Button
 								variant="destructive"
 								size="sm"
-								onClick={handleStopClick}
+								onClick={() => handleStopClick(onStop)}
 								disabled={isStopping}
 							>
 								<Square className="h-4 w-4 mr-1" />
@@ -565,7 +536,6 @@ export function RoadmapGenerationProgress({
 						<div className="flex items-center gap-3">
 							{/* Heartbeat indicator to show process is alive */}
 							<HeartbeatIndicator
-								isActive={isActivePhase}
 								reducedMotion={reducedMotion}
 								color={config.color}
 								processingLabel={t("roadmapProgress.processing")}
