@@ -91,6 +91,7 @@ class ProjectJobs:
         self._running: dict[tuple[str, str], str] = {}  # (project, slot) -> job
         self._active: dict[str, asyncio.subprocess.Process] = {}
         self._cancelled: set[str] = set()
+        self._starters: dict[str, str] = {}  # job -> who started it
         self._output: OrderedDict[str, _Output] = OrderedDict()
 
     def running_job(self, project_id: str, slot: str) -> str | None:
@@ -164,6 +165,7 @@ class ProjectJobs:
         # both pass the check and start two writers of the same files.
         job_id = str(uuid.uuid4())
         self._running[key] = job_id
+        self._starters[job_id] = user_id
         recorded = False
         try:
             async with get_session_factory()() as db:
@@ -181,6 +183,7 @@ class ProjectJobs:
         finally:
             if not recorded:
                 self._running.pop(key, None)
+                self._starters.pop(job_id, None)
         self._keep(job.id)
         # Announced while it waits for a slot, not only once it runs: a
         # teammate's open view follows it from the start.
@@ -216,13 +219,30 @@ class ProjectJobs:
     ) -> int:
         """Stop every job of a project and wait until they have ended, before
         the project and its clone are deleted (as ``RunManager.stop_project``)."""
-        jobs = [job for (owner, _), job in self._running.items() if owner == project_id]
-        for job_id in jobs:
-            await self.cancel(job_id)
+        jobs = await self.stop_jobs(project_id)
         await wait_until_ended(
             lambda: any(self.is_tracked(job) for job in jobs), timeout
         )
         return len(jobs)
+
+    def active_jobs(self, project_id: str, started_by: str | None = None) -> list[str]:
+        """The jobs of a project this process holds, only ``started_by``'s when given."""
+        return [
+            job
+            for (owner, _), job in self._running.items()
+            if owner == project_id
+            and (started_by is None or self._starters.get(job) == started_by)
+        ]
+
+    async def stop_jobs(
+        self, project_id: str, started_by: str | None = None
+    ) -> list[str]:
+        """Stop the project's jobs (only ``started_by``'s when given) without
+        waiting for them to end; the ids stopped."""
+        jobs = self.active_jobs(project_id, started_by)
+        for job_id in jobs:
+            await self.cancel(job_id)
+        return jobs
 
     def _keep(self, job_id: str) -> None:
         self._output[job_id] = _Output()
@@ -342,6 +362,7 @@ class ProjectJobs:
                     _notify(project_id, feature, job_id, status, user_id)
                 finally:
                     self._running.pop(key, None)
+                    self._starters.pop(job_id, None)
 
 
 async def _set_status(job_id: str, status: str, error: str | None = None) -> None:

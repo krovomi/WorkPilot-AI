@@ -103,6 +103,8 @@ describe("server projects", () => {
 		expect(projects[1].remote?.role).toBe("viewer");
 		expect(getServerProject(PROJECT_ID)?.name).toBe("Shop");
 		expect(getServerProject("../../etc")).toBeUndefined();
+		const { listedServerProjects } = await import("../server-projects");
+		expect(listedServerProjects().map((p) => p.id)).toEqual([PROJECT_ID, "c3"]);
 	});
 
 	it("lists nothing in local mode and forgets the server's projects", async () => {

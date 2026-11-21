@@ -28,6 +28,7 @@ import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Separator } from "../../ui/separator";
 import { Switch } from "../../ui/switch";
+import { ForgeBindingNotice } from "./ForgeBindingNotice";
 
 // Debug logging — disabled (kept as a no-op so call sites stay valid).
 function debugLog(_message: string, _data?: unknown) {
@@ -49,6 +50,8 @@ interface GitHubIntegrationProps {
 	readonly gitHubConnectionStatus: GitHubSyncStatus | null;
 	readonly isCheckingGitHub: boolean;
 	readonly projectPath?: string; // Project path for fetching git branches
+	/** The project these settings belong to: its remotes are checked against the repository. */
+	readonly projectId?: string;
 	// Project settings for mainBranch (used by kanban tasks and terminal worktrees)
 	readonly settings?: ProjectSettings;
 	readonly setSettings?: React.Dispatch<React.SetStateAction<ProjectSettings>>;
@@ -66,6 +69,7 @@ export function GitHubIntegration({
 	gitHubConnectionStatus,
 	isCheckingGitHub,
 	projectPath,
+	projectId,
 	settings,
 	setSettings,
 }: GitHubIntegrationProps) {
@@ -416,6 +420,13 @@ export function GitHubIntegration({
 							/>
 						</>
 					)}
+
+					<ForgeBindingNotice
+						projectId={projectId}
+						forge="github"
+						current={{ githubRepo: envConfig.githubRepo ?? "" }}
+						onApply={updateEnvConfig}
+					/>
 
 					{envConfig.githubToken && envConfig.githubRepo && (
 						<ConnectionStatus

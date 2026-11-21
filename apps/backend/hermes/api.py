@@ -45,7 +45,7 @@ half-answer.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from fastapi import APIRouter
 from foundation.api_safety import server_mode_roots
@@ -160,12 +160,11 @@ def _task_ref(project_dir: str | None, spec_id: str | None) -> str | None:
     """``<project>/<spec>`` for the brain, or None. Names only, nothing is read."""
     if not project_dir or not spec_id:
         return None
-    try:
-        from brain.tasks import project_name
+    from brain.tasks import project_name_from
 
-        return f"{project_name(Path(project_dir))}/{Path(spec_id).name}"
-    except Exception:  # noqa: BLE001 - a missing link is not a failed decision
-        return None
+    # A client path is read as a name, never resolved or opened.
+    spec = PurePath(spec_id.replace("\\", "/")).name
+    return f"{project_name_from(project_dir)}/{spec}"
 
 
 @router.post("/review")

@@ -1,15 +1,15 @@
 ---
 feature: Gouvernance des agents et journal d'audit
 summary: >-
-  `workpilot.policy.yaml` (lu dans le checkout principal) fixe heures permises, fichiers interdits
-  ou soumis à revue, jetons par heure et par tâche, limite du coupe-circuit ; schéma strict, invalide
-  = refus et pause ; hook d'outils, flux de session de tous les providers et vagues du Swarm ; journal
-  d'audit JSONL borné et compté, panneau en lecture seule, export CSV/JSON.
+  `workpilot.policy.yaml` fixe heures, fichiers interdits ou soumis à revue, jetons par heure et par
+  tâche, limite du coupe-circuit ; invalide = refus et pause ; hook, flux de session de tous les
+  providers, vagues du Swarm ; journal d'audit borné, export CSV/JSON ; en mode serveur, route
+  gardée (approbation nommée par compte et rôles, arrêt d'urgence) lue par l'app et le mobile.
 ---
 
 # Gouvernance des agents : heures, fichiers, budget de jetons
 
-Issue #353, deuxième et troisième lots. Le premier lot ([agent-kill-switch.md](agent-kill-switch.md)) arrête un
+Issue #353, lots 2 à 4. Le premier lot ([agent-kill-switch.md](agent-kill-switch.md)) arrête un
 agent qui tourne en rond et donne un bouton pour tout arrêter ; celui-ci dit, une fois pour toute
 l'équipe, **quand** les agents travaillent, **ce qu'ils ne touchent pas** et **combien ils
 consomment**, puis garde la trace de chaque décision.
@@ -28,6 +28,7 @@ schedule:
 files:
   forbidden: ["**/migrations/**", ".env*"]   # jamais écrits par un agent
   requires_review: ["infra/**"]              # approbation unique d'une personne
+  reviewers: [maintainer]                    # mode serveur : rôles qui peuvent la donner
 budget:
   max_tokens_per_hour: 500000     # toutes les sessions du projet, 60 dernières minutes
   max_tokens_per_task: 2000000    # toutes les sessions d'une tâche, depuis le début
@@ -57,9 +58,15 @@ le prompt ne part pas, son journal liste les cinq premières erreurs et sa carte
 a. Le hook seul laissait une session envoyer son prompt puis buter sur chaque outil. Une faute de frappe ne coupe jamais une limite en silence.
 
 **Le fuseau est celui du fichier**, jamais celui de la machine : une équipe répartie lit la même
-fenêtre. Un nom IANA demande les données de fuseau de Python ; une machine qui ne les a pas
-(Windows sans le paquet `tzdata`) refuse le fichier et dit d'écrire un décalage fixe (`UTC+01:00`),
-qui ne dépend de rien.
+fenêtre. Un nom IANA demande les données de fuseau de Python, que Windows et le Python embarqué
+n'ont pas : le backend dépend donc de `tzdata` (sans condition de plateforme, `zoneinfo` le lit
+quand le système n'a rien), et `tests/security/test_governance_tzdata.py` lit `Europe/Paris` sans
+aucune donnée du système. Une machine qui n'aurait toujours pas le paquet refuse le fichier et dit
+d'écrire un décalage fixe (`UTC+01:00`).
+
+**`files.reviewers`** (rôles du serveur, 20 au plus, minuscules, chiffres, `-` et `_`) dit qui peut
+approuver un fichier soumis à revue. Il ne vaut qu'en mode serveur, où la personne qui répond est un
+compte et ses rôles sont connus ; voir plus bas.
 
 ## Où elle s'applique
 
@@ -138,7 +145,9 @@ Chaque décision de la politique ajoute une ligne JSON à `.workpilot/policy-aud
 principal : refus, demande de revue, approbation, avertissement, politique invalide, hors horaires,
 budget atteint, coupe-circuit (liste fermée). Une ligne dit qui (utilisateur local), quand (UTC), quelle tâche,
 quel outil et quel fichier ou commande (résumé expurgé), la décision, ses règles, la raison, le
-provider et le modèle quand l'appelant les connaît.
+provider et le modèle quand l'appelant les connaît. Une approbation dit aussi qui l'a donnée
+(`approvedBy`, `policy_audit.approver_of`) : sur un serveur le compte, son id et ses rôles
+(`Ada <u-1> [maintainer]`), sur le bureau le nom local suivi de « local, not verified ».
 
 - **Borné** : au-delà de 4 Mo, seules les 10 000 dernières lignes restent.
 - **Chemin résolu dans le projet, lien refusé** : `.workpilot` ou le journal en lien symbolique,
@@ -169,18 +178,66 @@ de liste fermée ; le main relit le runner (`guardrails_runner.py audit`), recon
 (`main/ipc-handlers/governance-handlers.ts`, `main/governance/audit-export.ts`). Une cellule CSV
 qu'un tableur exécuterait comme formule (`=`, `+`, `-`, `@`) est précédée d'une apostrophe.
 
+## Un projet du mode serveur (`shared_features/governance.py`)
+
+Les agents d'un projet du serveur tournent sur le serveur, dans son clone : le panneau du bureau ne
+pouvait lire ni leur politique ni leur journal, et « Arrêter tous les agents » ne les atteignait
+pas. Le serveur lit donc lui-même le clone du projet et sert la gouvernance sous
+`/api/features/governance`, par `project_id` comme toute feature partagée
+([server-mode.md](server-mode.md#les-features-partagées)) : un projet d'un autre tenant répond
+404, un non-membre 403, et la réponse ne contient aucun chemin du serveur (le préfixe du clone est
+retiré, le dossier personnel devient `~`).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire la politique, les appels en attente, les agents et `may` | `GET /api/features/governance` | `audit.read` |
+| Exporter le journal | `GET /api/features/governance/audit` | `audit.export` |
+| Approuver ou refuser un appel | `POST /api/features/governance/approvals/{id}` | `review.approve`, rôle `member` ou plus ; pour approuver, un rôle de `files.reviewers` s'il y en a |
+| Arrêter ses agents, ou tous ceux du projet | `POST /api/features/governance/stop` | `agent.cancel`, rôle `member` ou plus ; `project` : propriétaire du projet ou administrateur de l'organisation |
+
+**L'approbateur nommé.** Le serveur répond au nom du compte connecté : l'approbation garde son id,
+son nom et les rôles qu'il tenait (`guardrail_ledger.answer`, `verified`), le journal l'écrit, et
+l'`AuditLog` du serveur aussi (`governance.approval.answered`). Quand `files.reviewers` nomme des
+rôles, une approbation sans l'un d'eux est refusée (403) ; un refus reste ouvert à qui peut
+approuver. Une demande déjà tranchée, ou tranchée par quelqu'un d'autre entre-temps, répond 404 :
+une approbation ne sert qu'une fois. Sur le bureau seul, il n'y a pas d'identité vérifiée : le
+panneau le dit (« sans identité vérifiée ») et le journal aussi.
+
+**L'arrêt d'urgence.** Le serveur retient qui a lancé chaque run et chaque job
+(`RunManager.stop_runs`, `ProjectJobs.stop_jobs`) : `mine` n'arrête que ceux de la personne, jamais
+ceux d'un collègue ; `project` les arrête tous et reste au propriétaire, puisqu'une carte prise par
+un autre est à lui. Un run arrêté est annulé, pas mis en pause : le serveur n'a pas de reprise à
+la demande, la carte se relance. L'appel écrit `governance.stop_all` dans l'`AuditLog`.
+« Arrêter tous les agents » de l'app envoie `mine` à chaque projet du serveur où la personne est
+membre ou propriétaire (`main/server-governance.ts`, `stopServerAgents`), après l'arrêt local, et
+le toast dit combien se sont arrêtés et quels projets n'ont pas répondu.
+
+**Le délai.** Les deux arrêts envoient SIGTERM tout de suite. Deux tests le mesurent sur de vrais
+processus et échouent au-delà de 2 s : `test_the_kill_switch_stops_the_agents_within_two_seconds`
+(`tests/backend/test_shared_governance.py`, runs du serveur) et « kill switch latency »
+(`stop-all-handlers.test.ts`, processus enfants tués par `killProcessGracefully`). Limite : un
+processus qui ignore SIGTERM est tué de force après 5 s sur le bureau
+(`GRACEFUL_KILL_TIMEOUT_MS`) ; le serveur n'envoie que SIGTERM. Les agents Python ne l'interceptent
+pas, et `confined_run` remplace son processus par l'agent (`execv`), donc le signal l'atteint.
+
+**Les vues.** Dans l'app, Garde-fous d'un projet du serveur affiche `ServerGovernancePanel.tsx` au
+lieu de l'éditeur de règles du miroir : politique, approbateur, appels en attente (Approuver,
+Refuser), agents (Arrêter mes agents, Arrêter tous les agents du projet après confirmation),
+dernières décisions, export. Le main n'envoie qu'un id de projet, revalide chaque argument du
+renderer (id de demande à 12 chiffres hexadécimaux, décision booléenne, portée et format en listes
+fermées) et reconstruit la réponse champ par champ. Sur le téléphone, la page Gouvernance
+(`apps/mobile/src/app/(app)/projects/[projectId]/governance.tsx`, lien du tableau avec
+`audit.read`) montre la même chose, sans l'export. Chaque bouton n'apparaît que là où le `may` du
+serveur l'autorise ; le serveur revérifie tout.
+
 ## Reste à faire sur #353
 
 - ~~Swarm et Continuous AI~~ : fait au lot 3 (vagues et essais du Swarm, voir plus haut ; le démon
   Continuous AI a été remplacé par les automatisations). ~~Budget par tâche en jetons~~,
   ~~limite de boucle dans la politique~~, ~~trace du coupe-circuit et compteurs~~ : faits au lot 3.
-- Les tâches d'un projet du mode serveur : elles tournent sur le serveur, dont le panneau ne lit
-  pas le journal et que l'arrêt d'urgence de l'app n'atteint pas. Il faut une route gardée par
-  une permission et la vue côté app et mobile : un lot à lui.
-- Un approbateur nommé pour `requires_review` : l'app de bureau n'a pas d'identité vérifiée de
-  la personne qui approuve ; il attend les rôles du mode serveur.
-- `tzdata` livré avec le Python embarqué de Windows, pour les noms IANA : une dépendance de plus,
-  donc un `requirements.lock` recompilé ; à faire quand le lock de `develop` est de nouveau
-  aligné sur `requirements.txt` (il ne l'est pas aujourd'hui, et le recompiler tirerait d'autres
-  montées de version). D'ici là, un décalage fixe (`UTC+01:00`) marche partout.
-- Le délai entre l'arrêt d'urgence et l'arrêt effectif (< 2 s demandé) n'est pas mesuré.
+- ~~Les tâches d'un projet du mode serveur~~, ~~un approbateur nommé pour `requires_review`~~,
+  ~~`tzdata` pour les noms IANA~~, ~~le délai de l'arrêt d'urgence mesuré~~ : faits au lot 4 (voir
+  plus haut).
+- Hors de portée : un approbateur vérifié sur le bureau seul (il n'y a pas de compte à vérifier ;
+  le serveur est la réponse), et un plafond de coût par jour (écarté plus haut, les
+  [budgets de coût](cost-budgets.md) le font).

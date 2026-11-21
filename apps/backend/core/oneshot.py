@@ -51,6 +51,8 @@ _DIRECT_PROVIDERS = frozenset(
         "mistral",
         "deepseek",
         "grok",
+        "openrouter",
+        "huggingface",
         "ollama",
         "local",
         "lmstudio",
@@ -99,6 +101,19 @@ _DEFAULT_MODELS = {
 }
 _FALLBACK_MODEL = "claude-haiku-4-5"
 
+# Providers answering through `CompatibleProviderAgentClient` (OpenAI format,
+# their own key): the base URLs live in `core.client._COMPATIBLE_PROVIDER_URLS`.
+_COMPATIBLE = frozenset({"mistral", "deepseek", "grok", "openrouter", "huggingface"})
+
+
+def _registry_default(provider: str) -> str | None:
+    """The provider's fast model in the shipped registry, else its default."""
+    from models_registry import get_default, get_tier
+
+    entry = get_tier(provider, "fast") or get_default(provider)
+    return entry.model_id if entry else None
+
+
 # When the provider has no known cheap default (exotic provider), fall back to a
 # model the task already uses (guaranteed valid for that provider).
 _PHASE_MODEL_PRIORITY = ("qa_review", "qa_fixing", "spec", "planning", "coding")
@@ -131,9 +146,10 @@ def _model_from_task(spec_dir: Path | None) -> str | None:
 def _resolve_model(provider: str, explicit: str | None, spec_dir: Path | None) -> str:
     if explicit:
         return explicit
-    if provider in ("mistral", "deepseek", "grok"):
+    if provider in _COMPATIBLE:
         return (
             _DEFAULT_MODELS.get(provider)
+            or _registry_default(provider)
             or _model_from_task(spec_dir)
             or _FALLBACK_MODEL
         )
@@ -342,8 +358,9 @@ def _build_client(
             agent_type="commit_message",
         )
 
-    if provider in ("mistral", "deepseek", "grok"):
+    if provider in _COMPATIBLE:
         from core.agent_client import CompatibleProviderAgentClient
+        from core.client import _COMPATIBLE_PROVIDER_URLS
         from provider_models_catalog import _api_key_for
 
         from src.connectors.llm_config import load_provider_config
@@ -355,11 +372,7 @@ def _build_client(
         base_url = (
             os.environ.get(f"{provider.upper()}_BASE_URL")
             or config.get("base_url")
-            or {
-                "mistral": "https://api.mistral.ai",
-                "deepseek": "https://api.deepseek.com",
-                "grok": "https://api.x.ai",
-            }[provider]
+            or _COMPATIBLE_PROVIDER_URLS[provider]
         )
         return CompatibleProviderAgentClient(
             provider=provider,

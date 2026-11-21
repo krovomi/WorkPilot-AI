@@ -390,6 +390,8 @@ def test_compatible_providers(harness, provider, default_url):
         # The cache routing each provider documents (`compatible_cache_routing`).
         "prompt_cache_key": f"ck:{provider}:coder",
         "cache_headers": {"h": provider},
+        # Gateway routing (`gateway_routing`): nothing for these providers.
+        "routing_params": {},
         "system_prompt": "BASE(hint=True)+coder",
         "project_dir": str(harness.project_dir),
         "agent_type": "coder",

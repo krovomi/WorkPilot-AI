@@ -10,6 +10,10 @@ import type { Project } from "../../../shared/types";
 import { getToolPath } from "../../cli-tool-manager";
 import { getAugmentedEnv } from "../../env-utils";
 import {
+	detectedGitLabProject,
+	listGitRemotes,
+} from "../../forge/project-forge-binding";
+import {
 	getProjectEnvPath,
 	readProjectEnvFileAsync,
 } from "../../project-env-file";
@@ -128,7 +132,8 @@ async function fileExists(filePath: string): Promise<boolean> {
  * Falls back to glab CLI token if GITLAB_TOKEN not in .env
  * Returns null if GitLab is explicitly disabled via GITLAB_ENABLED=false.
  * A project set as a clone URL (`https://gitlab.com/group/app.git`) is
- * reduced to its path, which the API endpoints take.
+ * reduced to its path, which the API endpoints take. A project that names
+ * none uses its own remote on the instance.
  */
 export async function getGitLabConfig(
 	project: Project,
@@ -149,7 +154,14 @@ export async function getGitLabConfig(
 		);
 		if (!instanceUrl) return null;
 		const ref = sanitizeProjectRef(vars[GITLAB_ENV_KEYS.PROJECT]);
-		const projectRef = ref && normalizeProjectReference(ref, instanceUrl);
+		// No project named: the project's own remote on this instance, never
+		// another project's (forge/project-forge-binding.ts).
+		const projectRef = ref
+			? normalizeProjectReference(ref, instanceUrl)
+			: detectedGitLabProject(
+					listGitRemotes(project.path),
+					new URL(instanceUrl).hostname,
+				);
 		const token =
 			sanitizeToken(vars[GITLAB_ENV_KEYS.TOKEN]) ??
 			(await getGlabToken(new URL(instanceUrl).host));

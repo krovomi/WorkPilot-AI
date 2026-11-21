@@ -385,6 +385,13 @@ jamais lu pour un projet du serveur.
 | Reconstruire l'index | `POST /api/features/context/jobs` | `agent.execute`, rôle `member` ou plus |
 | Lire, chercher les mémoires | `GET /api/features/context/memories` | `insight.read` |
 
+**La gouvernance d'un projet se lit sur le serveur.** Son `workpilot.policy.yaml`, son journal
+d'audit, les appels qu'attendent ses agents et son arrêt d'urgence sont servis par
+`/api/features/governance` (`shared_features/governance.py`, domaine `audit`) : une approbation y
+est donnée au nom du compte et de ses rôles, et `files.reviewers` peut en exiger un ; « Arrêter
+tous les agents » de l'app y arrête les runs et les jobs de la personne. Routes, permissions et
+délai mesuré : [governance-policy.md](governance-policy.md#un-projet-du-mode-serveur-shared_featuresgovernancepy).
+
 **Les vues GitHub d'un projet serveur passent par le serveur, avec le jeton de la personne.** Un
 projet cloné depuis github.com montre ses issues et ses pull requests. L'app n'a ni clone ni
 `gh` pour lui : `getGitHubConfig` lui donne pour jeton une poignée qui nomme le projet, pas un
@@ -568,9 +575,9 @@ moyen par complexité n'est enregistré nulle part, sur l'ordinateur non plus.
 Dans l'app, ces vues reconnaissent un projet du serveur (`useServerProjectId`) et demandent au main
 ses données par son id (`main/server-workspace.ts`, canaux `SERVER_WORKSPACE_*`), qui ne répond que
 pour un projet du serveur listé et revérifie chaque nombre et chaque libellé ; ni le miroir, ni le
-backend local, ni les fichiers de l'ordinateur ne sont lus pour lui. Les routes du tableau de bord
-écrites pour l'ordinateur (`dashboard/api.py` : `/api/dashboard/*`, `/api/sessions/*`), qui lisent
-la machine et non un projet, ne répondent qu'en mode local (404 sur un serveur).
+backend local, ni les fichiers de l'ordinateur ne sont lus pour lui. La route de l'historique
+écrite pour l'ordinateur (`dashboard/api.py` : `/api/sessions/*`), qui lit la machine et non un
+projet, ne répond qu'en mode local (404 sur un serveur).
 
 | Action | Route | Il faut |
 |---|---|---|

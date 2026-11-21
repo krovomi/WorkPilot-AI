@@ -40,19 +40,13 @@ def _run_validation(project_dir: Path) -> tuple[ArchitectureReport, str]:
 
     Returns the report and a marker indicating whether config was explicit
     or inferred — the frontend can use that to nudge users to commit a real
-    config file.
+    config file. Inference always yields a config, generic layers at worst.
     """
     config = load_architecture_config(project_dir)
     config_source = "explicit"
     if config is None:
         config = infer_architecture_config(project_dir)
         config_source = "inferred"
-    if config is None:
-        # Truly nothing to work with — return an empty report rather than
-        # crashing, the frontend will display a "no architecture config" state.
-        return ArchitectureReport(
-            passed=True, summary="No architecture config available"
-        ), "none"
 
     engine = ArchitectureRulesEngine(project_dir, config)
     report = engine.validate()

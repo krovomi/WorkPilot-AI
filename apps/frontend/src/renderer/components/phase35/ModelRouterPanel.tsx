@@ -31,6 +31,8 @@ const PROVIDER_OPTIONS = [
 	{ value: "mistral", labelKey: "modelRouter.providerMistral" },
 	{ value: "deepseek", labelKey: "modelRouter.providerDeepseek" },
 	{ value: "grok", labelKey: "modelRouter.providerGrok" },
+	{ value: "openrouter", labelKey: "modelRouter.providerOpenrouter" },
+	{ value: "huggingface", labelKey: "modelRouter.providerHuggingface" },
 	{ value: "copilot", labelKey: "modelRouter.providerCopilot" },
 	{ value: "ollama", labelKey: "modelRouter.providerOllama" },
 ] as const;
