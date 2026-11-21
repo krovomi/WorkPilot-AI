@@ -213,6 +213,7 @@ async def test_an_approval_short_of_the_quorum_still_escalates(world, monkeypatc
 async def test_the_second_group_leaves_out_the_author(world, monkeypatch):
     from server.db.engine import get_session_factory
     from server.db.models import Project
+    from server.services import approval_escalation
     from server.services.approval_escalation import second_group
 
     turn_on(monkeypatch, approval_escalation_roles="owner+maintainer")
@@ -227,6 +228,37 @@ async def test_the_second_group_leaves_out_the_author(world, monkeypatch):
             author_id=world.users["maintainer_a"],
         )
     assert people == [world.users["owner_a"]]
+
+    # A role that does not approve does not make an approver of its holder.
+    async def group(roles: str) -> list[str]:
+        settings(monkeypatch, approval_escalation_roles=roles)
+        async with get_session_factory()() as db:
+            project = await db.get(Project, world.projects["a"])
+            return await second_group(
+                db,
+                project=project,
+                spec_name=card,
+                card_dir=card_dir(world, "a", card),
+                author_id=None,
+            )
+
+    assert await group("viewer") == []
+    monkeypatch.setattr(approval_escalation, "MAX_RECIPIENTS", 1)
+    assert len(await group("owner+admin")) == 1
+
+
+async def test_enough_approvals_without_the_builds_approval_do_not_escalate(
+    world, monkeypatch
+):
+    from server.services import approval_escalation
+
+    turn_on(monkeypatch)
+    card = await new_card(world, "contributor_a")
+    await spec_ran(world, card, hours_ago=30)
+    assert (await approve(world, "reviewer_a", card)).json()["approved"] is True
+    # Whatever the build's own file says, the approvals are what count.
+    monkeypatch.setattr(approval_escalation.push, "awaits_approval", lambda *_: True)
+    assert await sweep([]) == 0
 
 
 async def test_a_muted_moment_or_sending_off_tells_nobody(world, monkeypatch):
@@ -279,13 +311,14 @@ async def test_the_loop_survives_a_failed_sweep_and_stops(world, monkeypatch):
     await approval_escalation.stop()  # Nothing running: nothing to do.
 
     # Without a readiness check, the loop sweeps straight away.
-    task = approval_escalation.start(interval=0.001)
+    before = len(turns)
+    approval_escalation.start(interval=0.001)
     for _ in range(200):
-        if len(turns) >= 4:
+        if len(turns) > before:
             break
         await asyncio.sleep(0.005)
     await approval_escalation.stop()
-    assert len(turns) >= 4
+    assert len(turns) > before and len(readied) == before
 
 
 async def test_the_server_runs_it_for_its_lifetime(world, monkeypatch):

@@ -168,7 +168,7 @@ async def _escalate(
     if status.complete:
         return False
     hours = dict(get_settings().approval_escalation_hours)[status.criticality]
-    waited = now - aware(run.finished_at or now)
+    waited = now - aware(run.finished_at)  # never None: see _waits
     if not hours or waited < timedelta(hours=hours):
         return False
     people = await second_group(
