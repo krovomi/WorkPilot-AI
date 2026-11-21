@@ -14,6 +14,7 @@ import type {
 	MemoryJournalEntry,
 	MemoryLifecycleView,
 	MemoryRestoreOutcome,
+	MemoryRevertOutcome,
 } from "../../../shared/types";
 import { invokeIpc } from "./ipc-utils";
 
@@ -49,6 +50,11 @@ export interface MemoryLifecycleAPI {
 		projectId: string,
 		conflictId: string,
 	) => Promise<IPCResult<MemoryConflictOpinion>>;
+	/** Undo an automatic decision of the last hour, or separate a merge. */
+	revertMemoryDecision: (
+		projectId: string,
+		entryId: string,
+	) => Promise<IPCResult<MemoryRevertOutcome>>;
 }
 
 export function createMemoryLifecycleAPI(): MemoryLifecycleAPI {
@@ -73,5 +79,7 @@ export function createMemoryLifecycleAPI(): MemoryLifecycleAPI {
 			),
 		suggestMemoryResolution: (projectId, conflictId) =>
 			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_SUGGEST_RESOLUTION, projectId, conflictId),
+		revertMemoryDecision: (projectId, entryId) =>
+			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, projectId, entryId),
 	};
 }

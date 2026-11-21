@@ -306,6 +306,7 @@ export const IPC_CHANNELS = {
 	CONTEXT_MEMORY_PIN: "context:memoryPin",
 	CONTEXT_MEMORY_RESOLVE_CONFLICT: "context:memoryResolveConflict",
 	CONTEXT_MEMORY_SUGGEST_RESOLUTION: "context:memorySuggestResolution",
+	CONTEXT_MEMORY_REVERT: "context:memoryRevert",
 
 	// Environment configuration
 	ENV_GET: "env:get",

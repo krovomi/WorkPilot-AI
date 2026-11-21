@@ -7,6 +7,9 @@ export const memoryLifecycleMock = {
 		success: true as const,
 		data: {
 			journal: [],
+			revertible: {},
+			lastUndo: null,
+			metrics: null,
 			trash: [],
 			conflicts: [],
 			pinned: 0,
@@ -32,6 +35,10 @@ export const memoryLifecycleMock = {
 		error: "Not available in browser mock",
 	}),
 	suggestMemoryResolution: async () => ({
+		success: false as const,
+		error: "Not available in browser mock",
+	}),
+	revertMemoryDecision: async () => ({
 		success: false as const,
 		error: "Not available in browser mock",
 	}),

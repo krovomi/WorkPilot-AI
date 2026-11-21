@@ -119,3 +119,44 @@ def test_server_mode_refuses_the_whole_surface(client, monkeypatch):
     ).json()
     assert got["reason"] == "server-mode"
     assert journal.read(Brain().root, BASE)[0].action == "create"
+
+
+def test_an_automatic_decision_is_undone_through_the_api(client):
+    from brain.lifecycle import store
+
+    store.forget(Brain().root, BASE, REL, actor="agent", reason_code="pattern-retired")
+    view = client.get(
+        "/api/brain/memory/lifecycle", params={"project_dir": PROJECT}
+    ).json()
+    entry = view["last_undo"]
+    assert view["revertible"] == {entry: "undo"}
+    assert view["metrics"]["automatic_forgets_week"] == 1
+
+    got = client.post(
+        "/api/brain/memory/revert", json={"project_dir": PROJECT, "entry_id": entry}
+    ).json()
+    assert got["success"] and got["mode"] == "undo" and got["path"] == REL
+    got = client.post(
+        "/api/brain/memory/revert", json={"project_dir": PROJECT, "entry_id": entry}
+    ).json()
+    assert got == {
+        "success": False,
+        "error": "not-revertible",
+        "code": "not-revertible",
+    }
+
+    client.get("/api/brain/memory/history", params={"project_dir": PROJECT, "id": REL})
+    view = client.get(
+        "/api/brain/memory/lifecycle", params={"project_dir": PROJECT}
+    ).json()
+    assert view["metrics"]["history_views"] == 1 and view["last_undo"] is None
+
+
+def test_revert_in_server_mode_is_refused(client, monkeypatch):
+    import brain.lifecycle.api as api
+
+    monkeypatch.setattr(api, "server_mode_roots", lambda: [Path("/srv")])
+    got = client.post(
+        "/api/brain/memory/revert", json={"project_dir": PROJECT, "entry_id": "x"}
+    ).json()
+    assert got["reason"] == "server-mode"

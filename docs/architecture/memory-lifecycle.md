@@ -95,6 +95,42 @@ en fin de ligne pour l'app (Obsidian le masque en lecture) :
   `notes.inside`. Le main Electron fait le même contrôle avant d'appeler le backend
   (`memory-lifecycle-validation.ts`).
 
+## Reprendre une décision (`undo.py`)
+
+Le journal dit pourquoi une mémoire est partie ; la personne peut répondre « non ».
+
+| Entrée du journal | Reprise | Proposée |
+|---|---|---|
+| `forget` par une automatisation (un agent, le learning loop) | la note revient de la corbeille | dans l'heure (`UNDO_WINDOW`) : **Annuler** |
+| `archive` par une automatisation (un arbitrage de synchronisation) | la variante revient et la paire attend une personne | dans l'heure : **Annuler** |
+| `archive`, quel que soit l'auteur | la même chose, sans limite | tant que la variante est à l'archive : **Séparer** |
+
+- **Annuler la dernière décision automatique** est un bandeau en tête de l'onglet (l'entrée la
+  plus récente de l'heure encore annulable) ; chaque entrée reprenable du journal a son bouton.
+- **Séparer, c'est la dé-fusion manuelle de l'issue.** Une note de consensus (`source:
+  team-consensus-…`, écrite par une personne à partir de deux variantes) se sépare en entier :
+  elle part à la corbeille (restaurable), les deux variantes reviennent, la paire revient dans la
+  file. Une autre note canonique reste ; la variante revient à côté, et la paire est remise dans la
+  file (`arbitration.requeue`, qui la retire de la liste « pas un conflit ») puisque les deux
+  notes se contredisent toujours. Une place reprise depuis (une paire textuelle dont l'autre
+  version a pris le nom de la note) fait revenir la variante en copie de conflit à côté.
+- **Une entrée se reprend une fois** : la reprise est un `restore` (raison `undone` ou
+  `unmerged`) qui porte l'id de l'entrée reprise (`undoes`). Un oubli par la personne se restaure
+  depuis la corbeille, pas ici ; une purge a supprimé la note ; une fusion du learning loop a plié
+  un pattern qui n'a jamais été une note à lui, donc rien à séparer. L'id reçu est vérifié deux
+  fois (12 caractères hexadécimaux dans le main, entrée du journal de *ce* projet dans le backend),
+  et le chemin que l'entrée nomme passe par `memory_rel` comme tout id.
+
+## Les chiffres (`metrics.py`)
+
+Lus dans le journal, rien n'est envoyé : restaurations et annulations de la semaine (beaucoup
+veut dire que les automatisations retirent trop, et l'onglet le dit à partir de
+`AGGRESSIVE_RESTORES`, 5), retraits automatiques, taux d'épingles, conflits des 30 derniers jours
+réglés par les règles ou par une personne, temps moyen avant qu'une personne tranche, et le
+nombre d'historiques ouverts (« pourquoi ? »). Ce dernier est compté par machine
+(`.workpilot-brain/lifecycle-views.json`, ignoré par git) : le compter dans le vault ferait de
+chaque lecture un commit.
+
 ## Après une synchronisation : les contradictions (`contradictions.py`, `arbitration.py`)
 
 `sync._pull` rapporte désormais les notes que le pull a ajoutées ou changées (`received`,
@@ -166,7 +202,8 @@ change pas.
 
 ## Surfaces
 
-- `GET /api/brain/memory/lifecycle`, `GET …/history`, `POST …/forget`, `…/restore`, `…/pin`,
+- `GET /api/brain/memory/lifecycle` (avec les entrées reprenables et les chiffres),
+  `GET …/history`, `POST …/forget`, `…/restore`, `…/pin`, `…/revert`,
   `…/conflicts/resolve`, `…/conflicts/suggest` (`brain/lifecycle/api.py`, inclus dans le routeur
   du cerveau : refusé en mode serveur comme lui, le projet est un nom lu dans `project_dir`).
 - Desktop : canaux `CONTEXT_MEMORY_*` (`main/ipc-handlers/context/memory-lifecycle-handlers.ts`,
@@ -177,10 +214,11 @@ change pas.
 ## Ce qui reste (lots suivants)
 
 - Projets du serveur : servir le cycle de vie par `/api/features/context/…` avec ses permissions.
-- Undo global d'une décision automatique dans l'heure, dé-fusion manuelle d'un merge.
+- Dé-fusion d'un pattern que le learning loop a plié dans un autre : le pattern plié n'est pas
+  gardé à part (seule son instruction est dans le journal) ; il faudrait que le learning loop le
+  conserve avant de le fusionner.
 - Notifications d'équipe (Slack, Teams, e-mail) quand un conflit est détecté ; mainteneur désigné,
   historique des votes, « cooldown » d'un arbitrage qui oscille.
 - Portées de mémoire au-delà d'`applies_to` (équipe, branche, module) et sélecteur dans l'UI.
 - Embeddings locaux pour rapprocher deux formulations équivalentes ; signature des instantanés et
   liste blanche des sources (aujourd'hui, la confiance est celle du distant git choisi).
-- Métriques (restaurations par semaine, taux d'épingles, conflits par sync).

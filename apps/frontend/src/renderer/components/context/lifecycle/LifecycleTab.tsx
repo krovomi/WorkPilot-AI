@@ -1,4 +1,13 @@
-import { AlertTriangle, GitMerge, History, Pin, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import {
+	AlertTriangle,
+	GitMerge,
+	History,
+	Pin,
+	RefreshCw,
+	RotateCcw,
+	Trash2,
+	Undo2,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatAppDateTime } from "../../../lib/date-format";
@@ -7,7 +16,8 @@ import { Button } from "../../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
 import { ScrollArea } from "../../ui/scroll-area";
 import { ConflictResolver } from "./ConflictResolver";
-import { errorLabel, shortPath } from "./lifecycle-labels";
+import { LifecycleMetrics } from "./LifecycleMetrics";
+import { entryLabel, errorLabel, shortPath } from "./lifecycle-labels";
 import { MemoryTimeline } from "./MemoryTimeline";
 import { useMemoryLifecycle } from "./useMemoryLifecycle";
 
@@ -43,7 +53,16 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 		await reload();
 	};
 
+	const revert = async (entryId: string) => {
+		const result = await window.electronAPI.revertMemoryDecision(projectId, entryId);
+		if (!result.success) setNotice(errorLabel(t, result.error));
+		else if (result.data?.conflict) setNotice(t("context:lifecycle.undo.queued"));
+		else setNotice(t("context:lifecycle.undo.done"));
+		await reload();
+	};
+
 	const expiring = view?.trash.filter((item) => item.expiring_soon).length ?? 0;
+	const lastUndo = view?.journal.find((entry) => entry.id === view.lastUndo);
 
 	return (
 		<ScrollArea className="h-full">
@@ -69,6 +88,24 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 					<p role="status" className="text-sm text-muted-foreground">
 						{notice}
 					</p>
+				)}
+
+				{lastUndo && (
+					<div
+						className="flex items-center justify-between gap-3 rounded-lg border border-border/60 p-3 text-xs"
+						data-testid="memory-last-undo"
+					>
+						<div className="min-w-0">
+							<div className="font-medium text-foreground">{t("context:lifecycle.undo.last")}</div>
+							<div className="truncate text-muted-foreground">
+								{entryLabel(t, lastUndo)} · <code>{shortPath(lastUndo.note)}</code>
+							</div>
+						</div>
+						<Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={() => revert(lastUndo.id)}>
+							<Undo2 className="h-3.5 w-3.5" />
+							{t("context:lifecycle.undo.undo")}
+						</Button>
+					</div>
 				)}
 
 				<section className="space-y-3">
@@ -138,9 +175,18 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						{view && <MemoryTimeline entries={view.journal} showNote />}
+						{view && (
+							<MemoryTimeline
+								entries={view.journal}
+								showNote
+								revertible={view.revertible}
+								onRevert={revert}
+							/>
+						)}
 					</CardContent>
 				</Card>
+
+				{view?.metrics && <LifecycleMetrics metrics={view.metrics} />}
 			</div>
 		</ScrollArea>
 	);

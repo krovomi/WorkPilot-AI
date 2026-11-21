@@ -170,7 +170,8 @@
 				"value": "Two values for the same setting",
 				"recommendation": "Opposite recommendations",
 				"negation": "One says to do it, the other not to",
-				"textual": "Edited on two machines"
+				"textual": "Edited on two machines",
+				"reopened": "An earlier decision was taken back"
 			},
 			"verdict": {
 				"contradiction": "They contradict each other",
@@ -248,7 +249,9 @@
 			"textual-conflict": "edited on two machines",
 			"person-chose": "a person chose",
 			"person-wrote": "a person wrote the canonical note",
-			"not-a-conflict": "a person said it is not a conflict"
+			"not-a-conflict": "a person said it is not a conflict",
+			"undone": "an automatic decision was undone",
+			"unmerged": "separated from the note it was merged into"
 		},
 		"errors": {
 			"failed": "the action failed",
@@ -265,7 +268,25 @@
 			"no-runtime": "no model is available",
 			"provider-refused": "the provider refused (offline mode?)",
 			"no-answer": "the model gave no usable answer",
-			"server-mode": "not available in server mode"
+			"server-mode": "not available in server mode",
+			"not-revertible": "this decision can no longer be taken back"
+		},
+		"undo": {
+			"last": "Undo the last automatic decision (within the hour)",
+			"undo": "Undo",
+			"unmerge": "Separate",
+			"done": "Decision taken back.",
+			"queued": "Decision taken back: the two memories are waiting for you under “To resolve”."
+		},
+		"metrics": {
+			"title": "How the lifecycle behaves",
+			"restores": "{{count}} memories restored this week",
+			"automaticForgets": "{{count}} removed automatically this week",
+			"pinRate": "{{rate}} % pinned ({{pinned}} of {{live}})",
+			"conflicts": "{{count}} conflicts in 30 days: {{auto}} settled by the rules, {{resolved}} by a person",
+			"resolution": "{{hours}} h on average before a person decides",
+			"views": "{{count}} histories opened on this computer",
+			"tooAggressive": "Many memories were restored this week: the automatic removals may be too aggressive."
 		}
 	}
 }

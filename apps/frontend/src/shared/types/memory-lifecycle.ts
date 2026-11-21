@@ -32,6 +32,8 @@ export interface MemoryJournalEntry {
 	reason_code: string;
 	reason: string;
 	related: string[];
+	/** The id of the entry this one takes back (an undo, a separation). */
+	undoes?: string;
 }
 
 export interface TrashedMemory {
@@ -68,7 +70,9 @@ export type MemoryConflictSignal =
 	| "value"
 	| "recommendation"
 	| "negation"
-	| "textual";
+	| "textual"
+	/** A pair whose earlier decision a person took back. */
+	| "reopened";
 
 export interface MemoryConflict {
 	id: string;
@@ -81,8 +85,33 @@ export interface MemoryConflict {
 	b: MemoryConflictSide;
 }
 
+/** How a journal entry can be taken back: `undo` (automatic, last hour) or `unmerge`. */
+export type MemoryRevertMode = "undo" | "unmerge";
+
+/** The lifecycle's figures, read from the journal (`brain/lifecycle/metrics.py`). */
+export interface MemoryLifecycleMetrics {
+	restores_week: number;
+	undone_week: number;
+	automatic_forgets_week: number;
+	live: number;
+	pinned: number;
+	pin_rate: number;
+	conflicts_month: number;
+	auto_settled_month: number;
+	resolved_month: number;
+	mean_resolution_hours: number | null;
+	history_views: number;
+	/** Many restores this week: the automations remove too much. */
+	too_aggressive: boolean;
+}
+
 export interface MemoryLifecycleView {
 	journal: MemoryJournalEntry[];
+	/** Entry id → how it can be taken back. */
+	revertible: Record<string, MemoryRevertMode>;
+	/** The newest automatic decision of the last hour still undoable. */
+	lastUndo: string | null;
+	metrics: MemoryLifecycleMetrics | null;
 	trash: TrashedMemory[];
 	conflicts: MemoryConflict[];
 	pinned: number;
@@ -102,4 +131,12 @@ export interface MemoryConflictOpinion {
 export interface MemoryRestoreOutcome {
 	path: string;
 	contradicts: Array<{ path: string; signal: string; detail: string }>;
+}
+
+export interface MemoryRevertOutcome {
+	mode: MemoryRevertMode;
+	/** The notes brought back. */
+	restored: string[];
+	/** The pair queued again for a person, if any. */
+	conflict: string | null;
 }

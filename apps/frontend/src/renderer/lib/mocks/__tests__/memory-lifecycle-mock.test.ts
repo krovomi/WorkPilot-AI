@@ -9,7 +9,17 @@ describe("the memory lifecycle browser mock", () => {
 	it("reads an empty lifecycle and an empty history", async () => {
 		expect(await memoryLifecycleMock.getMemoryLifecycle()).toEqual({
 			success: true,
-			data: { journal: [], trash: [], conflicts: [], pinned: 0, pinLimit: 50, retentionDays: 30 },
+			data: {
+				journal: [],
+				revertible: {},
+				lastUndo: null,
+				metrics: null,
+				trash: [],
+				conflicts: [],
+				pinned: 0,
+				pinLimit: 50,
+				retentionDays: 30,
+			},
 		});
 		expect(await memoryLifecycleMock.getMemoryHistory()).toEqual({ success: true, data: [] });
 	});
@@ -21,6 +31,7 @@ describe("the memory lifecycle browser mock", () => {
 			memoryLifecycleMock.pinMemory,
 			memoryLifecycleMock.resolveMemoryConflict,
 			memoryLifecycleMock.suggestMemoryResolution,
+			memoryLifecycleMock.revertMemoryDecision,
 		]) {
 			expect(await change()).toEqual({ success: false, error: "Not available in browser mock" });
 		}

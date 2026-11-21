@@ -25,7 +25,7 @@ vi.mock("../../server-feature-files", () => ({
 }));
 
 import { registerMemoryLifecycleHandlers } from "../memory-lifecycle-handlers";
-import { conflictId, memoryId, trashId } from "../memory-lifecycle-validation";
+import { conflictId, entryId, memoryId, trashId } from "../memory-lifecycle-validation";
 
 const MEMORY = "knowledge/projects/shop/memory/gotchas/never-push-on-friday.md";
 
@@ -150,7 +150,17 @@ describe("valid calls reach /api/brain/memory/*", () => {
 		const view = await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "p1");
 		expect(view).toEqual({
 			success: true,
-			data: { journal: [], trash: [], conflicts: [], pinned: 3, pinLimit: 50, retentionDays: 30 },
+			data: {
+				journal: [],
+				revertible: {},
+				lastUndo: null,
+				metrics: null,
+				trash: [],
+				conflicts: [],
+				pinned: 3,
+				pinLimit: 50,
+				retentionDays: 30,
+			},
 		});
 		state.backendFetch.mockResolvedValueOnce({ success: false, error: "pin-limit", code: "pin-limit" });
 		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_PIN, "p1", MEMORY, true)).toEqual({
@@ -250,7 +260,17 @@ describe("pins, conflicts and the arbiter's opinion", () => {
 		state.backendFetch.mockResolvedValueOnce({ success: true });
 		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "p1")).toEqual({
 			success: true,
-			data: { journal: [], trash: [], conflicts: [], pinned: 0, pinLimit: 50, retentionDays: 30 },
+			data: {
+				journal: [],
+				revertible: {},
+				lastUndo: null,
+				metrics: null,
+				trash: [],
+				conflicts: [],
+				pinned: 0,
+				pinLimit: 50,
+				retentionDays: 30,
+			},
 		});
 	});
 
@@ -350,5 +370,57 @@ describe("pins, conflicts and the arbiter's opinion", () => {
 			});
 		}
 		expect(state.backendFetch).not.toHaveBeenCalled();
+	});
+});
+
+describe("taking a decision back", () => {
+	const ENTRY = "0123456789ab";
+
+	it("names an entry by its journal id only", async () => {
+		expect(entryId(ENTRY)).toBe(ENTRY);
+		for (const hostile of ["../../x", "0123456789abc", "0123456789AB", 12, null]) {
+			expect(entryId(hostile)).toBeNull();
+			expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "p1", hostile)).toEqual({
+				success: false,
+				error: "invalid",
+			});
+		}
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "remote", ENTRY)).toEqual({
+			success: false,
+			error: "server-project",
+		});
+		expect(state.backendFetch).not.toHaveBeenCalled();
+	});
+
+	it("reverts with the project's own path and reads the outcome", async () => {
+		state.backendFetch.mockResolvedValueOnce({
+			success: true,
+			mode: "unmerge",
+			restored: [MEMORY],
+			conflict: "0123456789abcdef",
+		});
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "p1", ENTRY)).toEqual({
+			success: true,
+			data: { mode: "unmerge", restored: [MEMORY], conflict: "0123456789abcdef" },
+		});
+		const [path, init] = state.backendFetch.mock.calls[0];
+		expect(path).toBe("/api/brain/memory/revert");
+		expect(JSON.parse(init.body)).toEqual({ project_dir: "/work/shop", entry_id: ENTRY });
+
+		state.backendFetch.mockResolvedValueOnce({ success: true, mode: "anything" });
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "p1", ENTRY)).toEqual({
+			success: true,
+			data: { mode: "undo", restored: [], conflict: null },
+		});
+
+		state.backendFetch.mockResolvedValueOnce({
+			success: false,
+			error: "not-revertible",
+			code: "not-revertible",
+		});
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "p1", ENTRY)).toEqual({
+			success: false,
+			error: "not-revertible",
+		});
 	});
 });

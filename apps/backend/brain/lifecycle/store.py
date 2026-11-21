@@ -161,6 +161,7 @@ def _journal(
     reason_code: str,
     reason: str = "",
     related: list[str] | None = None,
+    undoes: str = "",
     now: datetime | None = None,
 ) -> None:
     title = str(note.meta.get("title") or "") if note else ""
@@ -176,6 +177,7 @@ def _journal(
             reason_code=reason_code,
             reason=reason,
             related=list(related or []),
+            undoes=undoes,
         ),
         now=now,
     )
@@ -414,9 +416,14 @@ def restore(
     trash_id: str,
     *,
     actor: str = "user",
+    reason_code: str = "restored",
+    undoes: str = "",
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Put a forgotten memory back. ``code``: ``not-found``, ``exists``, ``expired``.
+
+    *undoes* names the journal entry of the forget being taken back
+    (`undo.revert`), so that it is offered only once.
 
     ``contradicts`` lists the live notes the restored one disagrees with
     (`contradictions.find_for`): restoring a memory the team has since
@@ -441,7 +448,15 @@ def restore(
     write_note(root, restored)
     source.unlink()
     _journal(
-        root, base, "restore", actor, live, restored, reason_code="restored", now=moment
+        root,
+        base,
+        "restore",
+        actor,
+        live,
+        restored,
+        reason_code=reason_code,
+        undoes=undoes,
+        now=moment,
     )
     from .contradictions import find_for
 

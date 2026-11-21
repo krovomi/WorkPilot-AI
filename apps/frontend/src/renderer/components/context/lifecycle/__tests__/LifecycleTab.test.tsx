@@ -18,6 +18,9 @@ function view(): MemoryLifecycleView {
 		pinned: 2,
 		pinLimit: 50,
 		retentionDays: 30,
+		revertible: {},
+		lastUndo: null,
+		metrics: null,
 		journal: [
 			{
 				id: "e1",

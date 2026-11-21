@@ -46,7 +46,7 @@ from typing import Any
 
 from ..memories import redact
 from ..notes import Note, inside, now_iso, read_note, slugify, write_note
-from .contradictions import CHECKED_FOLDERS, find_for, statement
+from .contradictions import CHECKED_FOLDERS, compare, find_for, statement
 from .journal import JournalEntry, append, preview_of
 from .store import FOLDER_KIND, FOLDERS, archive, link_variants, own_text
 
@@ -57,6 +57,7 @@ __all__ = [
     "CONFIDENCE_GAP",
     "QUEUE_FILE",
     "open_conflicts",
+    "requeue",
     "resolve",
     "review_pull",
 ]
@@ -305,6 +306,31 @@ def _settle(
     return canonical
 
 
+def _item(
+    pair: str,
+    base: str,
+    folder: str,
+    a: tuple[str, Note],
+    b: tuple[str, Note],
+    textual: bool,
+    signal: str,
+    detail: str,
+) -> dict[str, Any]:
+    """One queued pair, as the Lifecycle tab shows it."""
+    return {
+        "id": pair,
+        "base": base,
+        "project": str(a[1].meta.get("project") or base.split("/")[2]),
+        "kind": FOLDER_KIND.get(folder, "note"),
+        "signal": signal,
+        "detail": detail,
+        "textual": textual,
+        "detected_at": now_iso(),
+        "a": _side(*a),
+        "b": _side(*b),
+    }
+
+
 def _consider(
     root: Path,
     data: dict[str, Any],
@@ -343,18 +369,7 @@ def _consider(
         summary["auto"] += 1
         return
     data["open"].append(
-        {
-            "id": pair,
-            "base": base,
-            "project": str(a.meta.get("project") or base.split("/")[2]),
-            "kind": FOLDER_KIND.get(folder, "note"),
-            "signal": signal,
-            "detail": detail,
-            "textual": textual,
-            "detected_at": now_iso(),
-            "a": _side(a_rel, a),
-            "b": _side(b_rel, b),
-        }
+        _item(pair, base, folder, (a_rel, a), (b_rel, b), textual, signal, detail)
     )
     append(
         root,
@@ -434,6 +449,61 @@ def review_pull(
     except (OSError, ValueError) as exc:
         logger.warning("brain: contradictions after the pull not reviewed: %s", exc)
     return summary
+
+
+def requeue(
+    root: Path,
+    base: str,
+    a_rel: str,
+    b_rel: str,
+    *,
+    textual: bool,
+    actor: str = "user",
+) -> str | None:
+    """Put a pair whose decision a person took back (`undo.revert`) in the queue.
+
+    Taking a decision back is asking for a new one: the pair leaves the
+    dismissed list, and its signal is the detector's when it still flags it,
+    ``reopened`` otherwise. Returns the pair's id, ``None`` when a side is gone.
+    """
+    where = _memory_of(a_rel)
+    if where is None or not (_exists(root, a_rel) and _exists(root, b_rel)):
+        return None
+    data = _load(root)
+    pair = _pair_id(a_rel, b_rel)
+    data["dismissed"] = [d for d in data["dismissed"] if d != pair]
+    if not any(i.get("id") == pair for i in data["open"]):
+        a, b = read_note(root, a_rel), read_note(root, b_rel)
+        found = None if textual else compare(a, b)
+        signal = "textual" if textual else (found.signal if found else "reopened")
+        data["open"].append(
+            _item(
+                pair,
+                base,
+                where[1],
+                (a_rel, a),
+                (b_rel, b),
+                textual,
+                signal,
+                found.detail if found else "",
+            )
+        )
+        append(
+            root,
+            base,
+            JournalEntry(
+                action="conflict",
+                actor=actor,
+                note=a_rel,
+                title=str(a.meta.get("title") or ""),
+                preview=preview_of(own_text(a.body)),
+                reason_code="textual-conflict" if textual else "contradiction-detected",
+                reason=found.detail if found else "",
+                related=[b_rel],
+            ),
+        )
+    _save(root, data)
+    return pair
 
 
 # -- a person decides ------------------------------------------------------------

@@ -170,7 +170,8 @@
 				"value": "Deux valeurs pour le même réglage",
 				"recommendation": "Recommandations opposées",
 				"negation": "L'une dit de le faire, l'autre non",
-				"textual": "Modifiée sur deux machines"
+				"textual": "Modifiée sur deux machines",
+				"reopened": "Une décision antérieure a été annulée"
 			},
 			"verdict": {
 				"contradiction": "Elles se contredisent",
@@ -248,7 +249,9 @@
 			"textual-conflict": "modifiée sur deux machines",
 			"person-chose": "une personne a choisi",
 			"person-wrote": "une personne a écrit la note canonique",
-			"not-a-conflict": "une personne a dit que ce n'était pas un conflit"
+			"not-a-conflict": "une personne a dit que ce n'était pas un conflit",
+			"undone": "une décision automatique a été annulée",
+			"unmerged": "séparée de la note dans laquelle elle avait été fusionnée"
 		},
 		"errors": {
 			"failed": "l'action a échoué",
@@ -265,7 +268,25 @@
 			"no-runtime": "aucun modèle disponible",
 			"provider-refused": "le fournisseur a refusé (mode hors-ligne ?)",
 			"no-answer": "le modèle n'a rien donné d'exploitable",
-			"server-mode": "indisponible en mode serveur"
+			"server-mode": "indisponible en mode serveur",
+			"not-revertible": "cette décision ne peut plus être annulée"
+		},
+		"undo": {
+			"last": "Annuler la dernière décision automatique (dans l'heure)",
+			"undo": "Annuler",
+			"unmerge": "Séparer",
+			"done": "Décision annulée.",
+			"queued": "Décision annulée : les deux mémoires vous attendent dans « À trancher »."
+		},
+		"metrics": {
+			"title": "Comportement du cycle de vie",
+			"restores": "{{count}} mémoires restaurées cette semaine",
+			"automaticForgets": "{{count}} retirées automatiquement cette semaine",
+			"pinRate": "{{rate}} % épinglées ({{pinned}} sur {{live}})",
+			"conflicts": "{{count}} conflits en 30 jours : {{auto}} réglés par les règles, {{resolved}} par une personne",
+			"resolution": "{{hours}} h en moyenne avant qu'une personne tranche",
+			"views": "{{count}} historiques ouverts sur cet ordinateur",
+			"tooAggressive": "Beaucoup de mémoires ont été restaurées cette semaine : les retraits automatiques sont peut-être trop agressifs."
 		}
 	}
 }

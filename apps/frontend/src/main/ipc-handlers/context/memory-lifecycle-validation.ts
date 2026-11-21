@@ -18,6 +18,7 @@ const MEMORY_ID = new RegExp(
 );
 const TRASH_ID = new RegExp(`^${FOLDERS}/(?:${SEGMENT}/)*${SEGMENT}\\.md$`);
 const CONFLICT_ID = /^[0-9a-f]{16}$/;
+const ENTRY_ID = /^[0-9a-f]{12}$/;
 const CHOICES: readonly MemoryConflictChoice[] = ["a", "b", "custom", "dismiss"];
 
 export const MAX_ID_LENGTH = 400;
@@ -44,6 +45,11 @@ export function trashId(value: unknown): string | null {
 
 export function conflictId(value: unknown): string | null {
 	return typeof value === "string" && CONFLICT_ID.test(value) ? value : null;
+}
+
+/** A journal entry's id (`brain/lifecycle/journal.py`), or `null`. */
+export function entryId(value: unknown): string | null {
+	return typeof value === "string" && ENTRY_ID.test(value) ? value : null;
 }
 
 export function conflictChoice(value: unknown): MemoryConflictChoice | null {
