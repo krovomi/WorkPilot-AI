@@ -6,30 +6,59 @@
  * 1. A spoken « stop » first (`voice-stop.ts`): never a model's call.
  * 2. The local reading (`voice-intent.ts`) when it is sure.
  * 3. The feature model otherwise, then the unsure local reading as a fallback.
+ *
+ * In pair mode (`voice-pair.ts`), a sentence that starts with « tell it… » is a
+ * message for the followed agent, and one the local reading is not sure of is
+ * too: it never goes to the feature model.
  */
 
 import type { StopAfterStepResult } from "@shared/types";
 import type { VoiceDestination, VoiceIntent } from "@shared/types/voice-assistant";
 import { readVoiceCommand } from "./voice-intent";
+import { readGuidance } from "./voice-pair";
 import { readStopCommand } from "./voice-stop";
 
 export type VoiceOutcome =
 	| { kind: "intent"; intent: VoiceIntent }
 	| { kind: "stop" }
+	| { kind: "guide"; taskId: string; title: string; text: string }
 	| { kind: "message"; key: string; text?: string };
 
+/** Outside pair mode, a sentence never becomes a message for an agent. */
+export type CommandOutcome = Exclude<VoiceOutcome, { kind: "guide" }>;
+
+export function resolveSentence(
+	said: string,
+	offered: readonly VoiceDestination[],
+	language: string,
+	projectId: string | undefined,
+	onThinking: () => void,
+): Promise<CommandOutcome>;
+export function resolveSentence(
+	said: string,
+	offered: readonly VoiceDestination[],
+	language: string,
+	projectId: string | undefined,
+	onThinking: () => void,
+	/** Pair mode: the task followed, whose agent gets the sentences that are not commands. */
+	pair: { id: string; title: string } | undefined,
+): Promise<VoiceOutcome>;
 export async function resolveSentence(
 	said: string,
 	offered: readonly VoiceDestination[],
 	language: string,
 	projectId: string | undefined,
 	onThinking: () => void,
+	pair?: { id: string; title: string },
 ): Promise<VoiceOutcome> {
 	const sentence = said.trim();
 	if (!sentence) return { kind: "message", key: "results.nothingHeard" };
 	if (readStopCommand(sentence)) return { kind: "stop" };
+	const guidance = pair && readGuidance(sentence);
+	if (pair && guidance) return { kind: "guide", taskId: pair.id, title: pair.title, text: guidance };
 	const local = readVoiceCommand(sentence, offered);
 	if (local.confident) return { kind: "intent", intent: local.intent };
+	if (pair) return { kind: "guide", taskId: pair.id, title: pair.title, text: sentence };
 	onThinking();
 	const answer = await window.electronAPI
 		.interpretVoiceCommand(sentence, [...offered], language, projectId)

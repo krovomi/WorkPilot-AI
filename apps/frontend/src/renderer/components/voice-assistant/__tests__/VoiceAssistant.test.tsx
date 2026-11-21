@@ -7,7 +7,10 @@ import { captureDictation } from "../../task-form/dictation-audio";
 import { VoiceAssistant } from "../VoiceAssistant";
 
 vi.mock("../../task-form/dictation-audio", () => ({ captureDictation: vi.fn() }));
-vi.mock("../../../stores/task-store", () => ({ createTask: vi.fn() }));
+vi.mock("../../../stores/task-store", async () => {
+	const { create } = await import("zustand");
+	return { createTask: vi.fn(), useTaskStore: create(() => ({ tasks: [] as unknown[] })) };
+});
 vi.mock("../../../hooks/use-toast", () => ({ toast: vi.fn() }));
 vi.mock("react-i18next", () => ({
 	useTranslation: () => ({

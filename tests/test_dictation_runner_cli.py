@@ -27,6 +27,12 @@ class _Segment:
     def __init__(self, text):
         self.text = text
 
+class _Info:
+    def __init__(self, language):
+        self.language = language
+        self.language_probability = 0.9
+
+
 class WhisperModel:
     def __init__(self, name, **options):
         log = os.environ["DICTATION_LOG"]
@@ -37,7 +43,7 @@ class WhisperModel:
 
     def transcribe(self, audio, **options):
         words = audio.read().decode("utf-8")
-        return [_Segment(" " + words + " "), _Segment("  ")], {"language": options["language"]}
+        return [_Segment(" " + words + " "), _Segment("  ")], _Info(options["language"] or "en")
 """
 
 
@@ -100,7 +106,7 @@ def test_a_session_transcribes_each_line(tmp_path: Path, recogniser: dict) -> No
     assert answers == [
         {"ready": True},
         {"text": "Bonjour, Überprüfung mañana."},
-        {"text": "hello"},
+        {"text": "hello", "language": "en"},
         {"error": "transcription"},
         {"error": "transcription"},
         {"error": "transcription"},

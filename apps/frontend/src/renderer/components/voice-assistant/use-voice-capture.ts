@@ -33,8 +33,8 @@ interface Options {
 	/** How far above the room's noise a frame must be to count as speech. */
 	sensitivity?: VoiceSensitivity;
 	projectPath?: string;
-	/** A transcribed phrase, in order. */
-	onText: (text: string) => void;
+	/** A transcribed phrase, in order, with the language Whisper heard (language « auto »). */
+	onText: (text: string, heardLanguage?: string) => void;
 	/** The sentence is over and every phrase has been transcribed. */
 	onDone: () => void;
 }
@@ -119,7 +119,7 @@ export function useVoiceCapture({ language, sensitivity, projectPath, onText, on
 								cancel();
 								return;
 							}
-							if (response.text) handlers.current.onText(response.text);
+							if (response.text) handlers.current.onText(response.text, response.language);
 						});
 					},
 					(value, voiced) => {
