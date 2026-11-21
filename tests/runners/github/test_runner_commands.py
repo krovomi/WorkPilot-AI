@@ -47,6 +47,7 @@ def runner():
         for name in _RUNNER_PACKAGES
         if name in sys.modules and getattr(sys.modules[name], "__spec__", None) is None
     }
+    before = set(sys.modules)
     spec = importlib.util.spec_from_file_location("github_runner_cli", RUNNER)
     module = importlib.util.module_from_spec(spec)
     try:
@@ -54,7 +55,18 @@ def runner():
     finally:
         sys.path[:] = saved
         sys.modules.update(stand_ins)
-    return module
+    yield module
+    # The runner imports its own modules by bare name ('orchestrator',
+    # 'models', 'batch_issues'...). Left in sys.modules, they would hand later
+    # test modules a second copy of classes such as ProgressCallback.
+    for name in set(sys.modules) - before:
+        if not name.startswith("runners.") and _is_runner_file(sys.modules[name]):
+            del sys.modules[name]
+
+
+def _is_runner_file(module: object) -> bool:
+    file = getattr(module, "__file__", None)
+    return bool(file) and Path(file).resolve().is_relative_to(RUNNER.parent)
 
 
 @pytest.fixture(scope="module")
