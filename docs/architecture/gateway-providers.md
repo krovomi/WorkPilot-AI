@@ -62,6 +62,16 @@ dans `src/shared/constants/gateway-providers.ts`.
   toucher au modèle local : on essaie un modèle sur une tâche avant d'en télécharger des gigaoctets
   (`HubDiscoveryWithCloud.tsx`). Le choix n'est qu'un identifiant de modèle ; la clé reste dans le
   main.
+- **Routage choisi sur la page du provider** (`apps/backend/gateway_routing.py`,
+  `src/shared/constants/gateway-routing.ts`). OpenRouter : jusqu'à trois modèles de secours
+  (`models`, essayés dans l'ordre), l'ordre des fournisseurs (`provider.sort` : prix, débit,
+  latence) et deux filtres de confidentialité (`provider.data_collection: "deny"`,
+  `provider.zdr`). Hugging Face : la politique du routeur (`:fastest`, `:cheapest`), écrite dans le
+  seul `model` de la requête : la session garde l'identifiant nu, que le relevé des coûts chiffre.
+  Les options passent du main au backend en variables d'environnement ; chaque côté les relit en
+  liste fermée (un identifiant de modèle `éditeur/modèle`, trois au plus) et ne transmet pas une
+  valeur inconnue. Un effort refusé est retiré sans toucher au routage. Une réponse servie par un
+  modèle de secours est chiffrée au prix du modèle par défaut.
 - **Hors-ligne strict.** Ce sont des providers cloud : `offline_policy` les refuse comme les autres.
 
 ## Où les toucher
@@ -72,5 +82,6 @@ dans `src/shared/constants/gateway-providers.ts`.
 | Client d'agent et appels courts | `core/client.py` (`_COMPATIBLE_PROVIDER_URLS`), `core/oneshot.py` |
 | Effort, attribution | `core/llm_optimization.py` (`gateway_effort_params`, `compatible_cache_routing`) |
 | Test de clé (API locale) | `provider_api.py` (`_VALIDATION_SPECS`) |
+| Routage (secours, ordre, confidentialité, politique) | `apps/backend/gateway_routing.py`, `src/shared/constants/gateway-routing.ts`, `src/renderer/components/settings/GatewayRoutingOptions.tsx` |
 | Catalogue sur la page du provider, « Essayer dans le cloud » | `src/renderer/components/settings/GatewayModelCatalog.tsx`, `HubDiscoveryWithCloud.tsx`, `gateway-model-catalog.ts` |
 | Réglages, environnement du backend, test de clé (Electron) | `src/shared/constants/gateway-providers.ts`, `src/main/services/provider-settings-keys.ts` |

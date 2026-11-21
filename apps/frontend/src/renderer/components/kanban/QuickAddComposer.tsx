@@ -11,7 +11,6 @@ import { useShallow } from "zustand/react/shallow";
 import {
 	CARD_TYPES,
 	type CardType,
-	type CardTypeFamily,
 } from "../../../shared/constants/card-types";
 import type { TaskPriority } from "../../../shared/types";
 import {
@@ -40,21 +39,11 @@ import { Button } from "../ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { CardTypeMenuItems, PriorityMenuItems } from "./CardChoiceMenuItems";
 import { CARD_TYPE_ICONS } from "./CardTypeChip";
 
-const PRIORITIES: readonly TaskPriority[] = ["low", "medium", "high", "urgent"];
-const FAMILIES: readonly CardTypeFamily[] = [
-	"build",
-	"fix",
-	"quality",
-	"know",
-	"ops",
-];
 const BASE_COLOR = Object.fromEntries(
 	CARD_TYPES.map((type) => [type.id, type.color]),
 ) as Record<CardType, string>;
@@ -262,34 +251,12 @@ export function QuickAddComposer({
 						</button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start" className="max-h-80 w-56 overflow-y-auto">
-						<DropdownMenuItem onSelect={() => setType(null)}>
-							{t("tasks:kanban.quickAdd.noType")}
-						</DropdownMenuItem>
-						{FAMILIES.map((family) => (
-							<div key={family}>
-								<DropdownMenuSeparator />
-								<DropdownMenuLabel className="text-2xs uppercase tracking-wide text-muted-foreground">
-									{t(`tasks:cardType.families.${family}`)}
-								</DropdownMenuLabel>
-								{CARD_TYPES.filter((ct) => ct.family === family).map((ct) => {
-									const Icon = CARD_TYPE_ICONS[ct.id];
-									return (
-										<DropdownMenuItem
-											key={ct.id}
-											onSelect={() => setType(ct.id)}
-											className="gap-2"
-										>
-											<Icon
-												className="h-3.5 w-3.5"
-												style={{ color: ct.color }}
-												aria-hidden="true"
-											/>
-											{t(`tasks:cardType.values.${ct.id}`)}
-										</DropdownMenuItem>
-									);
-								})}
-							</div>
-						))}
+						<CardTypeMenuItems
+							current={type}
+							onSelect={setType}
+							noneLabel={t("tasks:kanban.quickAdd.noType")}
+							onSelectNone={() => setType(null)}
+						/>
 					</DropdownMenuContent>
 				</DropdownMenu>
 				<DropdownMenu>
@@ -305,15 +272,12 @@ export function QuickAddComposer({
 						</button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start" className="w-44">
-						<DropdownMenuItem onSelect={() => setPriority(null)}>
-							{t("tasks:kanban.quickAdd.noPriority")}
-						</DropdownMenuItem>
-						<DropdownMenuSeparator />
-						{PRIORITIES.map((p) => (
-							<DropdownMenuItem key={p} onSelect={() => setPriority(p)}>
-								{t(`tasks:form.classification.values.priority.${p}`)}
-							</DropdownMenuItem>
-						))}
+						<PriorityMenuItems
+							current={priority}
+							onSelect={setPriority}
+							noneLabel={t("tasks:kanban.quickAdd.noPriority")}
+							onSelectNone={() => setPriority(null)}
+						/>
 					</DropdownMenuContent>
 				</DropdownMenu>
 				{lineCount > 1 && (

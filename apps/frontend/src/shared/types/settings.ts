@@ -327,6 +327,13 @@ export interface AppSettings {
 	/** Default model of each gateway (an id of its catalogue, e.g. `org/model`). */
 	globalOpenRouterModel?: string;
 	globalHuggingFaceModel?: string;
+	/** Gateway routing (shared/constants/gateway-routing.ts). */
+	/** `""` is the gateway's own choice (a saved value that clears the option). */
+	openRouterSort?: "price" | "throughput" | "latency" | "";
+	openRouterFallbackModels?: string[];
+	openRouterDenyDataCollection?: boolean;
+	openRouterZeroRetention?: boolean;
+	huggingFaceRoutingPolicy?: "fastest" | "cheapest" | "";
 	globalMistralApiKey?: string;
 	globalDeepSeekApiKey?: string;
 	globalMetaLlamaApiKey?: string;

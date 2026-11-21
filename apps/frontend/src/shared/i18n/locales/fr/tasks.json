@@ -415,6 +415,14 @@
 			"member": "Membre",
 			"owner": "Propriétaire"
 		},
+		"cardMenu": {
+			"label": "Actions de la carte",
+			"open": "Ouvrir",
+			"edit": "Modifier…",
+			"type": "Type",
+			"priority": "Priorité",
+			"saveFailed": "La modification n'a pas pu être enregistrée"
+		},
 		"quickAdd": {
 			"addCard": "Ajouter une carte",
 			"addQueued": "Ajouter et mettre en file",

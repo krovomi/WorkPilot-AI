@@ -39,6 +39,7 @@ import { kickQueue, useTaskStore } from "../../stores/task-store";
 import { KanbanBoard } from "../KanbanBoard";
 import { Toaster } from "../ui/toaster";
 import { TooltipProvider } from "../ui/tooltip";
+import { pickSubmenuItem } from "../../../__tests__/helpers/menus";
 
 type DragHandlers = {
 	onDragStart?: (e: unknown) => void;
@@ -844,7 +845,7 @@ describe("KanbanBoard — per-card actions", () => {
 		const user = userEvent.setup();
 		renderBoard([makeTask()]);
 		await user.click(screen.getByRole("button", { name: "Task actions" }));
-		await user.click(await screen.findByRole("menuitem", { name: "Queue" }));
+		await pickSubmenuItem(user, "Move to", "Queue");
 		await waitFor(() =>
 			expect(api.fn("updateTaskStatus")).toHaveBeenCalledWith("t1", "queue", undefined),
 		);
