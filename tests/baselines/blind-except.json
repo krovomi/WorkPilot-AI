@@ -1,5 +1,4 @@
 {
-  "apps/backend/agent_endpoints/api.py": {"blind": 8, "silent": 0},
   "apps/backend/agent_health/api.py": {"blind": 5, "silent": 0},
   "apps/backend/agent_health/persistence.py": {"blind": 2, "silent": 1},
   "apps/backend/agents/agent_audit.py": {"blind": 4, "silent": 0},
@@ -101,7 +100,7 @@
   "apps/backend/cost_intelligence/formula_matrix.py": {"blind": 3, "silent": 0},
   "apps/backend/cost_intelligence/formula_refine.py": {"blind": 2, "silent": 0},
   "apps/backend/cost_intelligence/live_tracker.py": {"blind": 2, "silent": 0},
-  "apps/backend/dashboard/api.py": {"blind": 5, "silent": 1},
+  "apps/backend/dashboard/api.py": {"blind": 1, "silent": 0},
   "apps/backend/docintel/api.py": {"blind": 10, "silent": 0},
   "apps/backend/docintel/api_capture.py": {"blind": 2, "silent": 0},
   "apps/backend/docintel/api_tests.py": {"blind": 4, "silent": 1},
@@ -142,7 +141,7 @@
   "apps/backend/harness/application/replay.py": {"blind": 1, "silent": 0},
   "apps/backend/harness/application/subagents.py": {"blind": 1, "silent": 0},
   "apps/backend/harness/tools/code_search_mcp.py": {"blind": 2, "silent": 0},
-  "apps/backend/hermes/api.py": {"blind": 5, "silent": 0},
+  "apps/backend/hermes/api.py": {"blind": 4, "silent": 0},
   "apps/backend/hermes/brain_link.py": {"blind": 3, "silent": 0},
   "apps/backend/hermes/home.py": {"blind": 1, "silent": 0},
   "apps/backend/hermes/loop.py": {"blind": 1, "silent": 0},

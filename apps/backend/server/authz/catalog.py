@@ -322,7 +322,6 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "github": "vcs",
         "system_status": "ops",
         "dashboard": "analytics",
-        "agent_endpoints": "agent",
         "event_hooks": "ops",
         "notifications": "integration",
         # How a task's worktree is prepared (setup commands, ports) is the
@@ -407,7 +406,6 @@ LOCAL_ONLY_FEATURES: frozenset[str] = frozenset(
         "github",
         "system_status",
         "dashboard",
-        "agent_endpoints",
         "event_hooks",
         "notifications",
         "worktree_recipe",
