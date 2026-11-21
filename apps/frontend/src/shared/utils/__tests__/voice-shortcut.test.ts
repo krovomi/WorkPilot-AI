@@ -3,6 +3,7 @@ import {
 	acceleratorFromEvent,
 	DEFAULT_VOICE_SHORTCUT,
 	formatShortcut,
+	isPedalKey,
 	matchesShortcut,
 	parseAccelerator,
 	type ShortcutKeyEvent,
@@ -46,6 +47,21 @@ describe("parseAccelerator", () => {
 		expect(parseAccelerator("Hyper+A")).toBeNull();
 		expect(parseAccelerator("CommandOrControl+Tab")).toBeNull();
 		expect(parseAccelerator(42)).toBeNull();
+		expect(parseAccelerator("F5")).toBeNull();
+		expect(parseAccelerator("F12")).toBeNull();
+	});
+
+	it("takes F13 to F24 alone: what a foot pedal or a switch sends", () => {
+		expect(isPedalKey("F13")).toBe(true);
+		expect(isPedalKey("F24")).toBe(true);
+		expect(isPedalKey("F12")).toBe(false);
+		expect(isPedalKey("F25")).toBe(false);
+		expect(parseAccelerator("F13")).toMatchObject({ key: "F13", mod: false, shift: false });
+		expect(parseAccelerator("Shift+F20")).toMatchObject({ key: "F20", shift: true });
+		expect(shortcutConflict("F13")).toBeNull();
+		expect(acceleratorFromEvent(key({ key: "F15", code: "F15" }), false)).toBe("F15");
+		expect(matchesShortcut(key({ key: "F15", code: "F15" }), "F15", true)).toBe(true);
+		expect(formatShortcut("F15", false)).toBe("F15");
 	});
 });
 

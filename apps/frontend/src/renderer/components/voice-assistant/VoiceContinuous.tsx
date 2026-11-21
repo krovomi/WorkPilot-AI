@@ -5,20 +5,27 @@ import type { VoiceDestination, VoiceIntent } from "@shared/types/voice-assistan
 import { cn } from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
 import { useSettingsStore } from "../../stores/settings-store";
-import { createTask } from "../../stores/task-store";
+import { createTask, useTaskStore } from "../../stores/task-store";
 import { useVoiceAssistantStore } from "../../stores/voice-assistant-store";
 import { Button } from "../ui/button";
+import { NativeSelect } from "../ui/native-select";
 import { useContinuousCapture } from "./use-continuous-capture";
 import { voiceSensitivity } from "./voice-activity";
 import { offeredDestinations } from "./voice-destinations";
 import { initialLanguage } from "./voice-language";
+import { followableTasks } from "./voice-pair";
 import { resolveSentence, stopAgentsAfterStep } from "./voice-resolve";
+import { sayFeedback, stopSpeaking } from "./voice-speech";
 import { readConfirmation } from "./voice-stop";
 
-/** What the mode asked and waits for a « yes » to: a spoken stop, or a task to create. */
+/**
+ * What the mode asked and waits for a « yes » to: a spoken stop, a task to
+ * create, or (pair mode) a message for the followed agent.
+ */
 type Pending =
 	| { kind: "stop" }
-	| { kind: "create"; projectId: string; title: string; description: string };
+	| { kind: "create"; projectId: string; title: string; description: string }
+	| { kind: "steer"; taskId: string; title: string; text: string };
 
 interface Note {
 	key: string;
@@ -39,6 +46,10 @@ interface VoiceContinuousProps {
  * dot while it listens, the sentence shown as it is transcribed, and a mute
  * button. Each sentence is read as in the panel (`voice-resolve.ts`); a spoken
  * « stop » or a task to create waits for a « yes » (or the button).
+ *
+ * Following a running task turns it into pair mode (`voice-pair.ts`): what the
+ * task does shows (and is said, with spoken feedback on), and a sentence that
+ * is not a command is offered as a message for its agent.
  */
 export function VoiceContinuous(props: VoiceContinuousProps) {
 	const continuous = useVoiceAssistantStore((s) => s.continuous);
@@ -49,6 +60,13 @@ function ContinuousBar({ destinations, onNavigate, onNewTask, onOpenSettings }: 
 	const { t, i18n } = useTranslation(["voiceAssistant"]);
 	const panelOpen = useVoiceAssistantStore((s) => s.isOpen);
 	const stopContinuous = useVoiceAssistantStore((s) => s.stopContinuous);
+	const formDictating = useVoiceAssistantStore((s) => s.formDictations > 0);
+	const assistantSpeaking = useVoiceAssistantStore((s) => s.speaking);
+	const pairTaskId = useVoiceAssistantStore((s) => s.pairTaskId);
+	const pairNarration = useVoiceAssistantStore((s) => s.pairNarration);
+	const followTask = useVoiceAssistantStore((s) => s.followTask);
+	const tasks = useTaskStore((s) => s.tasks);
+	const feedback = useSettingsStore((s) => s.settings.voiceAssistantFeedback);
 	const projectId = useProjectStore((s) => s.activeProjectId ?? s.selectedProjectId);
 	const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId));
 	const sensitivity = voiceSensitivity(useSettingsStore((s) => s.settings.voiceAssistantSensitivity));
@@ -60,30 +78,69 @@ function ContinuousBar({ destinations, onNavigate, onNewTask, onOpenSettings }: 
 	const pendingRef = useRef<Pending | null>(null);
 	pendingRef.current = pending;
 	const offered = useMemo(() => offeredDestinations(destinations), [destinations]);
+	const followable = useMemo(() => followableTasks(tasks), [tasks]);
+	const pairTask = followable.find((task) => task.id === pairTaskId);
+
+	const tell = useCallback(
+		(text: string) => sayFeedback(feedback, "short", text, i18n.language),
+		[feedback, i18n.language],
+	);
+
+	// The answer and the question are said too, with spoken feedback on.
+	const announce = useCallback(
+		(said: Note) => {
+			setNote(said);
+			tell(t(`voiceAssistant:${said.key}`, { text: said.text, title: said.text, count: said.count }));
+		},
+		[t, tell],
+	);
+	const ask = useCallback(
+		(question: Pending) => {
+			setPending(question);
+			tell(
+				question.kind === "stop"
+					? t("voiceAssistant:stop.confirm")
+					: question.kind === "create"
+						? t("voiceAssistant:continuous.createQuestion", { title: question.title })
+						: t("voiceAssistant:pair.sendQuestion", { title: question.title, text: question.text }),
+			);
+		},
+		[t, tell],
+	);
 
 	const confirm = useCallback(
 		async (asked: Pending) => {
 			setPending(null);
 			if (asked.kind === "stop") {
-				setNote(await stopAgentsAfterStep());
+				announce(await stopAgentsAfterStep());
+				return;
+			}
+			if (asked.kind === "steer") {
+				const sent = await window.electronAPI
+					.sendTaskSteering(asked.taskId, asked.text)
+					.catch(() => ({ success: false }));
+				announce({ key: sent.success ? "pair.sent" : "pair.sendFailed", text: asked.title });
 				return;
 			}
 			const task = await createTask(asked.projectId, asked.title.trim(), asked.description.trim());
-			setNote(
+			announce(
 				task
 					? { key: "results.created", text: task.title || asked.title }
 					: { key: "results.createFailed" },
 			);
 		},
-		[],
+		[announce],
 	);
 
 	const act = useCallback(
 		(intent: VoiceIntent, said: string) => {
 			switch (intent.kind) {
-				case "navigate":
+				case "navigate": {
 					onNavigate(intent.view);
+					const label = destinations.find((d) => d.id === intent.view)?.label ?? intent.view;
+					tell(t("voiceAssistant:speech.opening", { view: label }));
 					return;
+				}
 				case "new-task":
 					onNewTask();
 					return;
@@ -92,18 +149,18 @@ function ContinuousBar({ destinations, onNavigate, onNewTask, onOpenSettings }: 
 					return;
 				case "create-task":
 					if (projectId)
-						setPending({ kind: "create", projectId, title: intent.title, description: intent.description });
-					else setNote({ key: "results.noProject" });
+						ask({ kind: "create", projectId, title: intent.title, description: intent.description });
+					else announce({ key: "results.noProject" });
 					return;
 				default:
-					setNote({ key: "results.unknown", text: said });
+					announce({ key: "results.unknown", text: said });
 			}
 		},
-		[onNavigate, onNewTask, onOpenSettings, projectId],
+		[announce, ask, destinations, onNavigate, onNewTask, onOpenSettings, projectId, t, tell],
 	);
 
 	const onSentence = useCallback(
-		async (said: string) => {
+		async (said: string, heardLanguage?: string) => {
 			const asked = pendingRef.current;
 			if (asked) {
 				const answer = readConfirmation(said);
@@ -113,36 +170,45 @@ function ContinuousBar({ destinations, onNavigate, onNewTask, onOpenSettings }: 
 				}
 				if (answer === "no") {
 					setPending(null);
-					setNote({ key: "continuous.cancelled" });
+					announce({ key: "continuous.cancelled" });
 					return;
 				}
 				// Anything else is a new command: it replaces the question.
 				setPending(null);
 			}
 			setNote(null);
-			const outcome = await resolveSentence(said, offered, language, projectId ?? undefined, () =>
-				setThinking(true),
+			const outcome = await resolveSentence(
+				said,
+				offered,
+				heardLanguage ?? language,
+				projectId ?? undefined,
+				() => setThinking(true),
+				pairTask ? { id: pairTask.id, title: pairTask.title || pairTask.specId } : undefined,
 			);
 			setThinking(false);
-			if (outcome.kind === "stop") setPending({ kind: "stop" });
+			if (outcome.kind === "stop") ask({ kind: "stop" });
 			else if (outcome.kind === "intent") act(outcome.intent, said.trim());
-			else setNote({ key: outcome.key, text: outcome.text });
+			else if (outcome.kind === "guide") ask({ ...outcome, kind: "steer" });
+			else announce({ key: outcome.key, text: outcome.text });
 		},
-		[act, confirm, language, offered, projectId],
+		[act, announce, ask, confirm, language, offered, pairTask, projectId],
 	);
 
 	const capture = useContinuousCapture({
-		active: !muted && !panelOpen,
+		active: !muted && !panelOpen && !formDictating,
+		deaf: assistantSpeaking,
 		language,
 		sensitivity,
 		projectPath: project?.path,
-		onSentence: (said) => void onSentence(said),
+		onSentence: (said, heard) => void onSentence(said, heard),
 	});
 	const listening = capture.phase === "listening";
 	const status = muted
 		? "muted"
 		: panelOpen
 			? "paused"
+			: formDictating
+				? "dictating"
 			: thinking
 				? "thinking"
 				: capture.phase === "preparing"
@@ -180,7 +246,10 @@ function ContinuousBar({ destinations, onNavigate, onNewTask, onOpenSettings }: 
 					className="h-8 w-8"
 					aria-pressed={muted}
 					aria-label={t(muted ? "voiceAssistant:continuous.unmute" : "voiceAssistant:continuous.mute")}
-					onClick={() => setMuted((value) => !value)}
+					onClick={() => {
+						stopSpeaking();
+						setMuted((value) => !value);
+					}}
 				>
 					{muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
 				</Button>
@@ -200,12 +269,40 @@ function ContinuousBar({ destinations, onNavigate, onNewTask, onOpenSettings }: 
 				{capture.partial || t("voiceAssistant:continuous.hint")}
 			</p>
 
+			{(followable.length > 0 || pairTaskId) && (
+				<div className="space-y-1">
+					<label htmlFor="voice-pair-task" className="text-xs text-muted-foreground">
+						{t("voiceAssistant:pair.follow")}
+					</label>
+					<NativeSelect
+						id="voice-pair-task"
+						className="h-auto w-full px-2 py-1 text-xs"
+						value={pairTask?.id ?? ""}
+						onChange={(event) => followTask(event.target.value || null)}
+					>
+						<option value="">{t("voiceAssistant:pair.none")}</option>
+						{followable.map((task) => (
+							<option key={task.id} value={task.id}>
+								{task.title || task.specId}
+							</option>
+						))}
+					</NativeSelect>
+					{pairTask && (
+						<p aria-live="polite" className="text-xs">
+							{pairNarration || t("voiceAssistant:pair.hint")}
+						</p>
+					)}
+				</div>
+			)}
+
 			{pending && (
 				<div className="space-y-2 rounded-lg border border-border p-2" role="alertdialog" aria-label={t("voiceAssistant:continuous.question")}>
 					<p className="text-sm">
 						{pending.kind === "stop"
 							? t("voiceAssistant:stop.confirm")
-							: t("voiceAssistant:continuous.createQuestion", { title: pending.title })}
+							: pending.kind === "create"
+								? t("voiceAssistant:continuous.createQuestion", { title: pending.title })
+								: t("voiceAssistant:pair.sendQuestion", { title: pending.title, text: pending.text })}
 					</p>
 					<p className="text-xs text-muted-foreground">{t("voiceAssistant:continuous.sayYes")}</p>
 					<div className="flex justify-end gap-2">
@@ -218,7 +315,11 @@ function ContinuousBar({ destinations, onNavigate, onNewTask, onOpenSettings }: 
 							variant={pending.kind === "stop" ? "destructive" : "default"}
 							onClick={() => void confirm(pending)}
 						>
-							{pending.kind === "stop" ? t("voiceAssistant:stop.yes") : t("voiceAssistant:actions.create")}
+							{pending.kind === "stop"
+								? t("voiceAssistant:stop.yes")
+								: pending.kind === "create"
+									? t("voiceAssistant:actions.create")
+									: t("voiceAssistant:pair.send")}
 						</Button>
 					</div>
 				</div>
