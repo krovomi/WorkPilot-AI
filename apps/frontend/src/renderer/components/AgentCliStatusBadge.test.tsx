@@ -129,6 +129,32 @@ describe("AgentCliStatusBadge update", () => {
 		await waitFor(() => expect(checkAgentCli).toHaveBeenCalledTimes(2));
 	});
 
+	it("hands its update to the panel's « Update all » while a newer release is out", async () => {
+		checkAgentCli.mockResolvedValue({ tool: "gemini-cli", installed: true, version: "0.10.0" });
+		const upToDate = {
+			tool: "gemini-cli",
+			installed: true,
+			version: "0.12.0",
+			latest: "0.12.0",
+			isOutdated: false,
+		};
+		checkCliUpdate
+			.mockResolvedValueOnce({ ...upToDate, version: "0.10.0", isOutdated: true })
+			.mockResolvedValue(upToDate);
+		updateCli.mockResolvedValue({ tool: "gemini-cli", success: true, method: "npm", status: upToDate });
+		const onUpdateChange = vi.fn();
+		render(
+			<TooltipProvider>
+				<AgentCliStatusBadge tool="gemini-cli" onUpdateChange={onUpdateChange} />
+			</TooltipProvider>,
+		);
+		await waitFor(() => expect(onUpdateChange.mock.lastCall?.[0]).toBeTruthy());
+		await onUpdateChange.mock.lastCall?.[0].run();
+		expect(updateCli).toHaveBeenCalledWith("gemini-cli");
+		// Up to date now: nothing left for the panel to run.
+		await waitFor(() => expect(onUpdateChange).toHaveBeenLastCalledWith(null));
+	});
+
 	it("shows why an update failed, with the command output", async () => {
 		checkAgentCli.mockResolvedValue({ tool: "gemini-cli", installed: true, version: "0.10.0" });
 		checkCliUpdate.mockResolvedValue({

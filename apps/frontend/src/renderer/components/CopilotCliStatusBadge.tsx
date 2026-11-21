@@ -27,6 +27,8 @@ import {
 	AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
+import { type CliUpdateReporter, useReportCliUpdate } from "./cli-update-all";
+import { CliUpdateChip } from "./CliUpdateSection";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
@@ -46,6 +48,8 @@ interface CopilotCliStatusBadgeProps {
 	readonly isCollapsed?: boolean;
 	/** Where the « Outils CLI » panel places this badge, once its check answers. */
 	readonly onPresenceChange?: (presence: CliPresence) => void;
+	/** Hands this badge's update to the panel's « Tout mettre à jour ». */
+	readonly onUpdateChange?: CliUpdateReporter;
 }
 
 interface CopilotIconProps {
@@ -98,6 +102,7 @@ export function CopilotCliStatusBadge({
 	onNavigateToTerminals,
 	isCollapsed = false,
 	onPresenceChange,
+	onUpdateChange,
 }: CopilotCliStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation", "settings"]);
 	const { data, refreshCopilot } = useCliStatus();
@@ -317,6 +322,7 @@ export function CopilotCliStatusBadge({
 	const handleInstall = () => {
 		performInstall();
 	};
+	useReportCliUpdate(onUpdateChange, status === "outdated", isInstalling, performInstall);
 
 	// Handle installation selection
 	const handleInstallationSelect = (cliPath: string) => {
@@ -444,11 +450,7 @@ export function CopilotCliStatusBadge({
 											? ` (${versionInfo.installed})`
 											: ""}
 									</span>
-									{status === "outdated" && (
-										<span className="ml-auto text-3xs bg-warning/20 text-warning px-1.5 py-0.5 rounded">
-											{t("common:update", "Update")}
-										</span>
-									)}
+									{status === "outdated" && <CliUpdateChip isUpdating={isInstalling} />}
 									{(status === "not-found" ||
 										status === "gh-missing" ||
 										status === "error") && (
