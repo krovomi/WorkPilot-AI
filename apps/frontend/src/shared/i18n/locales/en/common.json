@@ -558,8 +558,6 @@
 	},
 	"usage": {
 		"claudeCodeSubscription": "Claude Code",
-		"claudeCodeSubscriptionPro": "Claude Code Pro",
-		"claudeCodeSubscriptionMax": "Claude Code Max",
 		"claudeCodeSubscriptionUnknown": "Claude Code",
 		"dataUnavailable": "Usage data unavailable",
 		"dataUnavailableDescription": "The usage monitoring endpoint for this provider is not available or not supported.",
