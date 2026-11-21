@@ -16,12 +16,19 @@
  * What the model says is streamed back to the backend as `output_delta`, then
  * the provider's usage and the end of the run, so the card, the tree and the
  * event log read it on their next poll.
+ *
+ * Live rebalancing (#344): a run that fails, or whose answer the backend sees
+ * looping (it says so in the reply to an update, and the run is stopped), is
+ * handed to `/rebalance` before its failure is recorded. The backend decides
+ * (another Claude profile, another provider, a bigger model, or nothing) and
+ * moves the agent; the same task then starts again on its new model.
  */
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { logger } from "../app-logger";
+import type { SDKRateLimitInfo } from "../../shared/types/terminal";
 import type { BackendResult } from "../ipc-handlers/_backend-fetch";
 import type { OneShotLLMOptions, OneShotUsage } from "../oneshot-llm";
 
@@ -31,6 +38,10 @@ export const RUN_TIMEOUT_MS = 10 * 60_000;
 /** Chunks are sent in batches: the page polls every 1.5 s anyway. */
 const FLUSH_INTERVAL_MS = 400;
 const AGENT_ID = /^[A-Za-z0-9-]{1,64}$/;
+/** What the backend keeps of a failure it classifies. */
+const MAX_ERROR_CHARS = 2_000;
+/** The providers whose rate limits the Claude profile system knows. */
+const CLAUDE_PROVIDERS = new Set(["anthropic", "claude"]);
 
 /** What each role is asked to be. Written for the model, never shown. */
 const ROLE_PROMPTS: Record<string, string> = {
@@ -85,11 +96,37 @@ export type StartResult = { success: true } | { success: false; error: string };
 
 const running = new Map<string, AbortController>();
 
+type UpdateReply = { agent?: { loop_detected?: boolean } };
+
 function post(deps: MissionControlDeps, agentId: string, body: unknown) {
-	return deps.backendFetch(`/api/mission-control/agents/${agentId}/update`, {
+	return deps.backendFetch<UpdateReply>(`/api/mission-control/agents/${agentId}/update`, {
 		method: "POST",
 		body: JSON.stringify(body),
 	});
+}
+
+type RebalanceReply = { rebalance?: { action: string }; agent?: AgentConfig };
+
+/** The agent's new configuration when the backend rebalanced it, else null. */
+async function rebalance(
+	deps: MissionControlDeps,
+	agentId: string,
+	error: string,
+	rateLimit: SDKRateLimitInfo | null,
+): Promise<AgentConfig | null> {
+	const reply = await deps.backendFetch<RebalanceReply>(
+		`/api/mission-control/agents/${agentId}/rebalance`,
+		{
+			method: "POST",
+			body: JSON.stringify({
+				error: error.slice(0, MAX_ERROR_CHARS),
+				rate_limited: rateLimit !== null,
+				alternate_profile: Boolean(rateLimit?.suggestedProfile),
+			}),
+		},
+	);
+	if (!reply.success || !reply.agent || !reply.rebalance) return null;
+	return reply.rebalance.action === "none" ? null : reply.agent;
 }
 
 /** Is a run of this agent in progress in this process? */
@@ -141,18 +178,30 @@ async function runAgent(
 ): Promise<void> {
 	let pending = "";
 	let streamed = false;
+	// The backend saw the answer loop: the run is stopped, then rebalanced.
+	let looped = false;
+	// Stopped from the card, or replaced by a new run: nothing more to report.
+	const stopped = () => running.get(agentId) !== controller;
 	let flushing: Promise<unknown> = Promise.resolve();
 	const flush = () => {
 		if (pending) {
 			const chunk = pending;
 			pending = "";
-			flushing = flushing.then(() => post(deps, agentId, { output_delta: chunk }));
+			flushing = flushing.then(async () => {
+				const reply = await post(deps, agentId, { output_delta: chunk });
+				if (reply.success && reply.agent?.loop_detected && !looped && !stopped()) {
+					looped = true;
+					controller.abort();
+				}
+			});
 		}
 		return flushing;
 	};
 	const timer = setInterval(() => void flush(), FLUSH_INTERVAL_MS);
 	let failure: string | null = null;
 	let usage: OneShotUsage | null = null;
+	let rateLimit: SDKRateLimitInfo | null = null;
+	const claude = CLAUDE_PROVIDERS.has(agent.provider);
 
 	// A CLI provider is driven by its agent client, which wants a spec
 	// directory: a throwaway one, so nothing lands in the project.
@@ -187,13 +236,23 @@ async function runAgent(
 			onFailure: (reason) => {
 				failure = reason;
 			},
+			// Only Claude's limits are read: they tell its profile system which
+			// profile to run the retry on.
+			...(claude
+				? {
+						rateLimitSource: "other" as const,
+						onRateLimit: (info: SDKRateLimitInfo) => {
+							rateLimit = info;
+						},
+					}
+				: {}),
 		});
 		clearInterval(timer);
 		// Stopped from the card: the backend already recorded it.
-		if (controller.signal.aborted) return;
+		if (stopped()) return;
 
 		// A client that does not stream hands over the whole text at the end.
-		if (text && !streamed) pending = text;
+		if (text && !streamed && !looped) pending = text;
 		await flush();
 		const reported = usage as OneShotUsage | null;
 		if (reported) {
@@ -203,19 +262,22 @@ async function runAgent(
 				cost_usd: reported.costUsd,
 			});
 		}
-		await post(
-			deps,
-			agentId,
-			text
-				? { status: "completed", progress: 1 }
-				: {
-						status: "error",
-						error: (failure || "No response from the provider").slice(0, 2_000),
-					},
-		);
+		if (text && !looped) {
+			await post(deps, agentId, { status: "completed", progress: 1 });
+			return;
+		}
+		const reason = looped
+			? "The answer kept repeating itself"
+			: failure || "No response from the provider";
+		const moved = await rebalance(deps, agentId, reason, rateLimit);
+		if (moved && !stopped()) {
+			await restart(deps, agentId, moved, prompt, projectDir);
+			return;
+		}
+		await post(deps, agentId, { status: "error", error: reason.slice(0, MAX_ERROR_CHARS) });
 	} catch (error) {
 		logger.warn("[MissionControl] Run failed:", error);
-		if (!controller.signal.aborted) {
+		if (!stopped()) {
 			await post(deps, agentId, {
 				status: "error",
 				error: error instanceof Error ? error.message : String(error),
@@ -226,6 +288,27 @@ async function runAgent(
 		if (running.get(agentId) === controller) running.delete(agentId);
 		if (specDir) rmSync(specDir, { recursive: true, force: true });
 	}
+}
+
+/** The same task again, on the model the backend rebalanced the agent to. */
+async function restart(
+	deps: MissionControlDeps,
+	agentId: string,
+	agent: AgentConfig,
+	prompt: string,
+	projectDir: string | undefined,
+): Promise<void> {
+	const started = await deps.backendFetch(`/api/mission-control/agents/${agentId}/start`, {
+		method: "POST",
+		body: JSON.stringify({ task: prompt, rebalanced: true }),
+	});
+	if (!started.success) {
+		await post(deps, agentId, { status: "error", error: started.error.slice(0, MAX_ERROR_CHARS) });
+		return;
+	}
+	const controller = new AbortController();
+	running.set(agentId, controller);
+	void runAgent(deps, agentId, agent, prompt, projectDir, controller);
 }
 
 /** Kill the run of `agentId`, if any. The backend records the stop itself. */

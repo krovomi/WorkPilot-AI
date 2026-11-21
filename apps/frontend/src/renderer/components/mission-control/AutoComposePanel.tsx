@@ -17,6 +17,7 @@ import type {
 	MissionControlCompositionRequest,
 	MissionControlCrew,
 	MissionControlPlannedAgent,
+	MissionControlPlanRequest,
 } from "../../../shared/types/mission-control";
 import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
@@ -52,7 +53,11 @@ type BudgetUnit = "usd" | "tokens";
 interface AutoComposePanelProps {
 	/** The provider the dialog had selected: the first of the mix. */
 	readonly defaultProvider: string;
-	readonly onApply: (agents: MissionControlPlannedAgent[]) => Promise<void>;
+	/** `plan`: the providers and budget the crew was composed on, for the session. */
+	readonly onApply: (
+		agents: MissionControlPlannedAgent[],
+		plan: MissionControlPlanRequest,
+	) => Promise<void>;
 }
 
 /** The budget field as the request wants it, or null when it is not a number. */
@@ -120,6 +125,17 @@ export function AutoComposePanel({ defaultProvider, onApply }: AutoComposePanelP
 	};
 
 	const crew: MissionControlCrew | null = result?.proposed ?? null;
+	const calibrated = result?.calibrated ?? [];
+
+	const apply = async (agents: MissionControlPlannedAgent[], budgetOfResult: MissionControlComposition["budget"]) => {
+		setBusy(true);
+		await onApply(agents, {
+			providers,
+			...(budgetOfResult.usd === null ? {} : { budgetUsd: budgetOfResult.usd }),
+			...(budgetOfResult.tokens === null ? {} : { budgetTokens: budgetOfResult.tokens }),
+		});
+		setBusy(false);
+	};
 
 	return (
 		<div className="space-y-4">
@@ -314,15 +330,17 @@ export function AutoComposePanel({ defaultProvider, onApply }: AutoComposePanelP
 							<p className="wp-meta">
 								{t("compose.total", { cost: usd(crew.cost_usd), tokens: count(crew.tokens) })}
 							</p>
+							{calibrated.length > 0 && (
+								<p className="wp-meta" data-testid="mc-composition-calibrated">
+									{t("compose.calibrated", { roles: calibrated.map(roleLabel).join(", ") })}
+								</p>
+							)}
+							<p className="wp-meta">{t("compose.rebalanceHint")}</p>
 							<CharterButton
 								variant="primary"
 								icon={Wand2}
 								disabled={busy || crew.agents.length === 0}
-								onClick={async () => {
-									setBusy(true);
-									await onApply(crew.agents);
-									setBusy(false);
-								}}
+								onClick={() => void apply(crew.agents, result.budget)}
 							>
 								{t("compose.apply", { count: crew.agents.length })}
 							</CharterButton>

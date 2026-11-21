@@ -857,6 +857,8 @@ export const IPC_CHANNELS = {
 	MISSION_CONTROL_START_AGENT: "missionControl:startAgent",
 	MISSION_CONTROL_STOP_AGENT: "missionControl:stopAgent",
 	MISSION_CONTROL_SUGGEST_COMPOSITION: "missionControl:suggestComposition",
+	MISSION_CONTROL_SET_PLAN: "missionControl:setPlan",
+	MISSION_CONTROL_GET_METRICS: "missionControl:getMetrics",
 
 	// Execution waves across specs (Conflict Predictor, #358): plan by task id
 	CONFLICT_WAVES_PLAN: "conflictWaves:plan",
