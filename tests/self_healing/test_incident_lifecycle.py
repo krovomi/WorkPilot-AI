@@ -27,7 +27,6 @@ from self_healing.incident_responder.models import (
     ProductionIncidentData,
 )
 from self_healing.incident_responder.orchestrator import (
-    NEEDS_A_PERSON,
     IncidentResponderOrchestrator,
 )
 from self_healing.incident_responder.proactive_mode import ProactiveMode
@@ -152,8 +151,8 @@ def test_an_unknown_source_has_no_adapter(project):
     assert not asyncio.run(_orch(project).connect_production_source(config))
 
 
-def test_a_production_incident_is_analysed_then_escalated(project):
-    orch = _orch(project)
+def test_a_production_incident_is_analysed_then_filed_as_a_card(project):
+    orch = _orch(project, auto_fix_production=True)
 
     operation = asyncio.run(
         orch.handle_production_incident(
@@ -162,8 +161,8 @@ def test_a_production_incident_is_analysed_then_escalated(project):
         )
     )
 
-    assert operation.incident.status == HealingStatus.ESCALATED
-    assert operation.incident.error_message == NEEDS_A_PERSON
+    assert operation.incident.status == HealingStatus.FIXING
+    assert operation.incident.fix_card
     assert _steps(operation)["Analyzing incident"][0] == "completed"
     # No trace, so no location is claimed.
     assert "stack_locations" not in operation.incident.source_data
@@ -329,7 +328,7 @@ def test_a_failed_incident_is_retried(project):
     operation = asyncio.run(orch.retry_incident(failed.id))
 
     assert operation is not None
-    assert failed.status == HealingStatus.ESCALATED
+    assert failed.status == HealingStatus.FIXING
     assert orch.get_operations() == [operation]
 
 
@@ -341,7 +340,7 @@ def test_only_an_operation_in_progress_is_cancelled(project):
 
     # The finished one keeps the verdict it reached.
     assert not orch.cancel_operation(finished.id)
-    assert incident.status == HealingStatus.ESCALATED
+    assert incident.status == HealingStatus.FIXING
     assert orch.cancel_operation(running.id)
     assert running.incident.status == HealingStatus.FAILED
     assert not orch.cancel_operation("no-such-id")
@@ -381,17 +380,25 @@ def test_a_pipeline_that_breaks_fails_the_incident(project, monkeypatch):
     assert operation.completed_at and not operation.success
 
 
-def test_the_average_resolution_time_counts_successful_operations(project):
+def test_the_average_resolution_time_counts_resolved_incidents(project):
     orch = _orch(project)
-    for success, seconds in ((True, 4.0), (True, 8.0), (False, 100.0)):
-        operation = orch._create_operation(_pending(orch))
-        operation.finalize(success)
-        operation.duration_seconds = seconds
+    for resolved_at in ("2026-11-01T10:00:04", "2026-11-01T10:00:08"):
+        incident = _pending(orch, status=HealingStatus.RESOLVED)
+        incident.created_at = "2026-11-01T10:00:00"
+        incident.resolved_at = resolved_at
+    # One that cannot be read, one resolved before it was reported: neither
+    # is a resolution time.
+    for created_at in ("yesterday", "2026-11-02T00:00:00"):
+        incident = _pending(orch, status=HealingStatus.RESOLVED)
+        incident.created_at = created_at
+        incident.resolved_at = "2026-11-01T10:00:00"
+    # A filed card is not a fix: the operation's success is not counted.
+    orch._create_operation(_pending(orch)).finalize(True)
 
     stats = orch.get_stats()
 
     assert stats.avg_resolution_time == 6.0
-    assert stats.auto_fix_rate == round(2 / 3 * 100, 1)
+    assert stats.auto_fix_rate == 0.0
 
 
 # --- the runtime verification -------------------------------------------
@@ -448,7 +455,7 @@ def test_a_hermes_cycle_that_breaks_changes_nothing(project, monkeypatch):
 
     asyncio.run(orch.trigger_fix(incident.id))
 
-    assert incident.status == HealingStatus.ESCALATED
+    assert incident.status == HealingStatus.FIXING
 
 
 # --- what is kept on disk -----------------------------------------------

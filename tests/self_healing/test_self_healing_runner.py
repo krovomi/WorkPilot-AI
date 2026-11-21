@@ -72,16 +72,14 @@ def test_config_merges_each_mode_into_one_file(project):
         ).returncode
         == 0
     )
-    done = _run(
-        project, "config", "--mode", "cicd", "--data", '{"autoCreatePR": false}'
-    )
+    done = _run(project, "config", "--mode", "cicd", "--data", '{"autoBisect": false}')
     assert done.returncode == 0
     assert json.loads(done.stdout)["config"] == {
         "autoFixEnabled": False,
-        "autoCreatePR": False,
+        "autoBisect": False,
     }
     saved = json.loads((project / DATA / "config.json").read_text(encoding="utf-8"))
-    assert saved == {"cicd": {"autoFixEnabled": False, "autoCreatePR": False}}
+    assert saved == {"cicd": {"autoFixEnabled": False, "autoBisect": False}}
 
     bad = _run(project, "config", "--mode", "proactive", "--data", "{nope")
     assert bad.returncode == 1
@@ -224,7 +222,7 @@ class Operation(SimpleNamespace):
 
 def _operation(success: bool, error: str = "", pr: str | None = None) -> Operation:
     incident = SimpleNamespace(
-        fix_branch="heal/fix-1", fix_pr_url=pr, error_message=error, title="Boom"
+        fix_card="007-fix-boom", fix_pr_url=pr, error_message=error, title="Boom"
     )
     return Operation(id="op-1", success=success, incident=incident)
 
@@ -280,7 +278,7 @@ def _main(runner, monkeypatch, project: Path, *argv: str) -> int:
 def test_cicd_heals_the_failure_it_is_given(
     runner, stand_in, monkeypatch, project, capsys
 ):
-    stand_in.answers["handle_cicd_failure"] = _operation(True, pr="https://pr/1")
+    stand_in.answers["handle_cicd_failure"] = _operation(True)
     code = _main(
         runner,
         monkeypatch,
@@ -307,8 +305,7 @@ def test_cicd_heals_the_failure_it_is_given(
         )
     ]
     out = capsys.readouterr().out
-    assert "Fix applied in branch: heal/fix-1" in out
-    assert "PR: https://pr/1" in out
+    assert "Fix card 007-fix-boom filed: its build fixes the incident" in out
 
 
 def test_cicd_runs_the_tests_itself_when_given_no_output(
@@ -326,7 +323,7 @@ def test_cicd_runs_the_tests_itself_when_given_no_output(
     assert _main(runner, monkeypatch, project, "cicd", "--commit", "abc") == 1
     out = capsys.readouterr().out
     assert "2 test(s) failing. Starting healing pipeline..." in out
-    assert "No fix applied. The incident needs manual review." in out
+    assert "No fix card was filed. The incident needs manual review." in out
     assert "   No safe fix found" in out
     assert stand_in.calls[-1][2]["test_output"] == "FAILED a\nFAILED b"
 
@@ -413,11 +410,11 @@ def test_production_hands_the_error_over(
         "stack_trace": "",
         "occurrence_count": 4,
     }
-    assert "Incident resolved! Fix in branch: heal/fix-1" in capsys.readouterr().out
+    assert "Fix card 007-fix-boom filed" in capsys.readouterr().out
 
     stand_in.answers["handle_production_incident"] = _operation(False)
     assert _main(runner, monkeypatch, project, *argv) == 1
-    assert "No fix applied." in capsys.readouterr().out
+    assert "No fix card was filed." in capsys.readouterr().out
 
     assert (
         _main(
@@ -620,16 +617,26 @@ def test_the_orchestrator_follows_the_saved_config(runner, project):
         project,
         "config.json",
         {
-            "cicd": {"autoFixEnabled": False, "autoCreatePR": False},
+            "cicd": {"autoFixEnabled": False},
+            "production": {"autoFix": True},
             "proactive": {"riskThreshold": 65},
         },
     )
     orchestrator = runner.SelfHealingRunner(project)._get_orchestrator()
     assert (
         orchestrator.auto_fix,
-        orchestrator.auto_create_pr,
+        orchestrator.auto_fix_production,
         orchestrator.proactive.risk_threshold,
-    ) == (False, False, 65.0)
+    ) == (False, True, 65.0)
+
+
+@pytest.mark.parametrize("value", [None, False, "yes", 1])
+def test_production_files_a_card_on_its_own_only_when_asked(runner, project, value):
+    _write(project, "config.json", {"production": {"autoFix": value}})
+
+    orchestrator = runner.SelfHealingRunner(project)._get_orchestrator()
+
+    assert orchestrator.auto_fix_production is False
 
 
 def test_an_unknown_command_prints_the_help(runner, capsys):
@@ -720,7 +727,7 @@ def test_a_report_of_a_known_bug_is_grouped(
 
     grouped.steps = [SimpleNamespace(name="Detect", detail="")]
     assert _main(runner, monkeypatch, project, *argv) == 1
-    assert "No fix applied." in capsys.readouterr().out
+    assert "No fix card was filed." in capsys.readouterr().out
 
 
 def test_cicd_names_the_first_bad_commit(
