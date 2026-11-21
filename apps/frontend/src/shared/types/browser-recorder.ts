@@ -1,6 +1,10 @@
 /**
  * The Browser Agent recorder (#387): a person drives a page, each action is a
- * step, and the steps become a Playwright or Cypress test.
+ * step, and the steps become a Playwright, Cypress, Selenium or WebdriverIO
+ * test. A step also says where its element lives (the iframes and open shadow
+ * roots above it, each a CSS selector) and what its action caused (the page
+ * it led to, the request it started, an element that appeared), which the
+ * exports wait for instead of pausing.
  *
  * Steps are made by the Python recorder (`apps/backend/browser_agent/`) from
  * what the page reported, so their text is page content: data, shown as text,
@@ -16,7 +20,14 @@ export type RecordedStepKind = (typeof RECORDED_STEP_KINDS)[number];
 export const SELECTOR_STRATEGIES = ["testid", "role", "label", "placeholder", "text", "css"] as const;
 export type SelectorStrategy = (typeof SELECTOR_STRATEGIES)[number];
 
-export const TEST_FORMATS = ["playwright-ts", "playwright-python", "cypress"] as const;
+export const TEST_FORMATS = [
+	"playwright-ts",
+	"playwright-python",
+	"cypress",
+	"selenium-python",
+	"selenium-java",
+	"webdriverio",
+] as const;
 export type TestFormat = (typeof TEST_FORMATS)[number];
 
 /** Where an export goes: shown only, a review card, or a file the person picks. */
@@ -27,6 +38,11 @@ export const MAX_RECORDED_STEPS = 300;
 const MAX_TEXT = 2048;
 const STEP_ID = /^s\d{1,6}$/;
 const ENV_NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
+const MAX_CHAIN = 4;
+const MAX_SELECTOR = 300;
+export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
+export type HttpMethod = (typeof HTTP_METHODS)[number];
+const REQUEST_PATH = /^\/[^\s?#]{0,299}$/;
 
 export interface RecordedSelector {
 	readonly strategy: SelectorStrategy;
@@ -44,6 +60,16 @@ export interface RecordedStep {
 	readonly secretEnv?: string;
 	readonly key?: string;
 	readonly text?: string;
+	/** CSS selectors of the iframes down to the element's frame, outermost first. */
+	readonly frames?: readonly string[];
+	/** CSS selectors of the shadow hosts down to the element, outermost first. */
+	readonly shadow?: readonly string[];
+	/** The element appeared after the previous action. */
+	readonly waitVisible?: boolean;
+	/** The page the action led to, without query or fragment. */
+	readonly waitUrl?: string;
+	/** The first same-origin request the action started. */
+	readonly waitRequest?: { readonly method: HttpMethod; readonly path: string };
 }
 
 export type RecorderStatus = "idle" | "starting" | "recording" | "stopping";
@@ -83,6 +109,23 @@ function isOneOf<T extends string>(list: readonly T[], value: unknown): value is
 	return typeof value === "string" && (list as readonly string[]).includes(value);
 }
 
+/** A list of CSS selectors (frames, shadow hosts): undefined when absent, null when malformed. */
+function cssChain(value: unknown): string[] | undefined | null {
+	if (value === undefined) return undefined;
+	if (!Array.isArray(value) || value.length > MAX_CHAIN) return null;
+	const chain = value.map((item) => (typeof item === "string" ? item : ""));
+	return chain.every((item) => item && item.length <= MAX_SELECTOR) ? chain : null;
+}
+
+function requestWait(value: unknown): RecordedStep["waitRequest"] {
+	if (!value || typeof value !== "object") return undefined;
+	const r = value as Record<string, unknown>;
+	if (!isOneOf(HTTP_METHODS, r.method) || typeof r.path !== "string" || !REQUEST_PATH.test(r.path)) {
+		return undefined;
+	}
+	return { method: r.method, path: r.path };
+}
+
 /** A step as the runner printed it, or null when it is not one. */
 export function parseRecordedStep(raw: unknown): RecordedStep | null {
 	if (!raw || typeof raw !== "object") return null;
@@ -95,6 +138,10 @@ export function parseRecordedStep(raw: unknown): RecordedStep | null {
 		if (!isOneOf(SELECTOR_STRATEGIES, s.strategy) || !value) continue;
 		selectors.push(s.strategy === "role" ? { strategy: s.strategy, value, role: text(s.role, 20) } : { strategy: s.strategy, value });
 	}
+	const frames = cssChain(r.frames);
+	const shadow = cssChain(r.shadow);
+	if (frames === null || shadow === null) return null;
+	const waitRequest = requestWait(r.waitRequest);
 	const step: RecordedStep = {
 		id: r.id,
 		kind: r.kind,
@@ -104,6 +151,11 @@ export function parseRecordedStep(raw: unknown): RecordedStep | null {
 		...(typeof r.secretEnv === "string" && ENV_NAME.test(r.secretEnv) && { secretEnv: r.secretEnv }),
 		...(text(r.key, 10) && { key: text(r.key, 10) }),
 		...(text(r.text, 200) && { text: text(r.text, 200) }),
+		...(frames?.length && { frames }),
+		...(shadow?.length && { shadow }),
+		...(r.waitVisible === true && { waitVisible: true }),
+		...(/^https?:\/\/[^\s?#]+$/.test(text(r.waitUrl)) && { waitUrl: text(r.waitUrl) }),
+		...(waitRequest && { waitRequest }),
 	};
 	if (step.kind === "navigate") return step.url ? step : null;
 	return selectors.length ? step : null;

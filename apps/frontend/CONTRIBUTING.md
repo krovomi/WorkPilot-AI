@@ -105,6 +105,9 @@ npm run test:coverage
 
 # E2E tests
 npm run test:e2e
+
+# Only the journeys that cross several features (e2e/journeys/)
+npm run test:e2e:journeys
 ```
 
 ### Writing Tests

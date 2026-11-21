@@ -62,7 +62,7 @@
 		"monitor_deploy_wait_minutes": "Attente du déploiement (minutes)",
 		"auto_rollback": "Rollback automatique sur un verdict critique",
 		"autoRollbackHint": "Désactivé : le rollback est proposé ici. Activé : GitHub Actions et Azure Pipelines reviennent à la dernière exécution réussie, sauf si le changement contient une migration de base de données.",
-		"fileHint": "Métriques et seuils : .workpilot/deploy-monitors.yaml (requête PromQL, type error_rate, latency, throughput ou custom, warning et critical en pourcentage)."
+		"fileHint": "Métriques et seuils : .workpilot/deploy-monitors.yaml (requête PromQL, type error_rate, latency, throughput ou custom, warning et critical en pourcentage). revert_pr: true ouvre une PR qui revert le commit déployé après un verdict critique ; explain_incident: false retire le modèle du rapport d'incident."
 	},
 	"watch": {
 		"notConfigured": "Non surveillé : aucun health check ni aucune métrique configurés.",
@@ -107,6 +107,25 @@
 		"rollbackButton": "Revenir en arrière",
 		"confirm": "Relancer le dernier déploiement réussi ?",
 		"confirmButton": "Confirmer le rollback",
-		"cancel": "Annuler"
+		"cancel": "Annuler",
+		"revertPr": {
+			"open": "Ouvrir la PR de revert de {{sha}}",
+			"opened": "PR de revert ouverte.",
+			"exists": "Une PR de revert est déjà ouverte.",
+			"failed": "La PR de revert n'a pas pu être ouverte.",
+			"conflict": "Le commit déployé ne se revert pas proprement : revertez-le à la main.",
+			"no_commit": "Le fournisseur n'a pas dit quel commit il a déployé : pas de PR de revert.",
+			"unknown_commit": "Le commit déployé n'est pas dans le clone local : récupérez-le, puis revertez-le à la main.",
+			"not_on_branch": "Le commit déployé n'est pas sur la branche cible : rien à y revert.",
+			"offline": "Mode hors-ligne strict : aucune PR de revert n'est ouverte.",
+			"unavailable": "Aucune forge disponible pour ouvrir la PR de revert."
+		},
+		"incident": {
+			"title": "Rapport d'incident",
+			"samples": "{{critical}} mesure(s) critique(s) et {{warning}} dégradée(s)",
+			"health": "health check en échec {{failed}} fois sur {{checks}}",
+			"metric": "{{name}} : {{baseline}} avant, {{worst}} au pire ({{change}} %, {{level}})",
+			"explanation": "Le modèle du projet :"
+		}
 	}
 }

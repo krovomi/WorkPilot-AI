@@ -139,3 +139,20 @@ def secret_env_name(target: dict[str, object]) -> str:
         if words and not words[0].isdigit():
             return f"E2E_{words}"[:64].rstrip("_")
     return "E2E_SECRET"
+
+
+def css_selector(target: object) -> str:
+    """The element as one CSS selector (an iframe, a shadow host), or ``""``.
+
+    WebDriver goes into a frame or a shadow root by CSS only, so of the
+    element's selectors this keeps the first CSS one: its test id, a stable
+    id, its ``name``, or its path.
+    """
+    if not isinstance(target, dict):
+        return ""
+    for s in build_selectors(target):
+        if s.strategy == "testid":
+            return f'[data-testid="{_css_string(s.value)}"]'
+        if s.strategy == "css":
+            return s.value
+    return ""

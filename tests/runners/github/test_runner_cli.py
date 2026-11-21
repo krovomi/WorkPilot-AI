@@ -174,7 +174,7 @@ def test_check_labels_lists_an_issue_a_maintainer_labelled(project, gh):
     gh.answer(
         {
             **ANSWERS,
-            "api /repos/own/repo/issues/5/events": {
+            "api --method GET /repos/own/repo/issues/5/events": {
                 "stdout": json.dumps(
                     [
                         {
@@ -185,10 +185,10 @@ def test_check_labels_lists_an_issue_a_maintainer_labelled(project, gh):
                     ]
                 )
             },
-            "api /repos/own/repo/collaborators/ann/permission": {
+            "api --method GET /repos/own/repo/collaborators/ann/permission": {
                 "stdout": json.dumps({"permission": "admin"})
             },
-            "api /repos/own/repo": {
+            "api --method GET /repos/own/repo": {
                 "stdout": json.dumps({"owner": {"login": "own", "type": "User"}})
             },
         }

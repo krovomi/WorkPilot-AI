@@ -61,6 +61,7 @@ import enIdeation from "./locales/en/ideation.json";
 import enInitDialog from "./locales/en/initDialog.json";
 import enInsights from "./locales/en/insights.json";
 import enLearningLoop from "./locales/en/learningLoop.json";
+import enReviewFeedback from "./locales/en/reviewFeedback.json";
 import enArchitectureVisualizer from "./locales/en/architectureVisualizer.json";
 import enPerformanceProfiler from "./locales/en/performanceProfiler.json";
 import enCodeMigration from "./locales/en/codeMigration.json";
@@ -158,6 +159,7 @@ import frIdeation from "./locales/fr/ideation.json";
 import frInitDialog from "./locales/fr/initDialog.json";
 import frInsights from "./locales/fr/insights.json";
 import frLearningLoop from "./locales/fr/learningLoop.json";
+import frReviewFeedback from "./locales/fr/reviewFeedback.json";
 import frArchitectureVisualizer from "./locales/fr/architectureVisualizer.json";
 import frPerformanceProfiler from "./locales/fr/performanceProfiler.json";
 import frCodeMigration from "./locales/fr/codeMigration.json";
@@ -251,6 +253,7 @@ export const resources = {
 		initDialog: enInitDialog,
 		insights: enInsights,
 		learningLoop: enLearningLoop,
+		reviewFeedback: enReviewFeedback,
 		multiRepo: enMultiRepo,
 		architectureVisualizer: enArchitectureVisualizer,
 		performanceProfiler: enPerformanceProfiler,
@@ -348,6 +351,7 @@ export const resources = {
 		initDialog: frInitDialog,
 		insights: frInsights,
 		learningLoop: frLearningLoop,
+		reviewFeedback: frReviewFeedback,
 		multiRepo: frMultiRepo,
 		architectureVisualizer: frArchitectureVisualizer,
 		performanceProfiler: frPerformanceProfiler,
@@ -452,6 +456,7 @@ i18n.use(initReactI18next).init({
 		"initDialog",
 		"insights",
 		"learningLoop",
+		"reviewFeedback",
 		"multiRepo",
 		"architectureVisualizer",
 		"performanceProfiler",

@@ -58,4 +58,14 @@ describe("VoiceAssistantSettings", () => {
 			voiceAssistantSystemWide: true,
 		});
 	});
+
+	it("chooses the microphone sensitivity, medium by default", () => {
+		const change = vi.fn();
+		render(<VoiceAssistantSettings settings={base} onSettingsChange={change} />);
+		const select = screen.getByLabelText("settings.sensitivity");
+		expect(select).toHaveValue("medium");
+		expect(screen.getByText("settings.sensitivityLevels.low")).toBeInTheDocument();
+		fireEvent.change(select, { target: { value: "low" } });
+		expect(change).toHaveBeenCalledWith({ voiceAssistantSensitivity: "low" });
+	});
 });

@@ -242,7 +242,8 @@ async def test_a_request_for_changes_is_written_where_the_build_reads_it(
             _scope(pid, oid, clone, "member"),
             db,
         )
-    assert result == {"requested": True}
+    # The author asks for the changes: the build they start is approved.
+    assert result == {"requested": True, "approved": True}
 
     spec = workspace / ".workpilot/specs" / card_id
     request = (spec / "QA_FIX_REQUEST.md").read_text(encoding="utf-8")

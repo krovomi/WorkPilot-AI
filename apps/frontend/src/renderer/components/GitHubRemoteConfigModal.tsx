@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Globe } from "@/lib/icons";
 import { Button } from "./ui/button";
@@ -40,17 +40,11 @@ export function GitHubRemoteConfigModal({
 		"idle" | "testing" | "success" | "error"
 	>("idle");
 	const [connectionMessage, setConnectionMessage] = useState("");
+	// Counts the connection tests and the edits, to know an answer is still current.
+	const testRunRef = useRef(0);
 
-	// Détection du type de token
-	const getTokenType = (tokenString: string) => {
-		if (tokenString.startsWith("github_pat_")) {
-			return "fine-grained";
-		}
-		if (/^(ghp_|gho_|ghu_|ghs_|ghr_)/.test(tokenString)) {
-			return "classic";
-		}
-		return "unknown";
-	};
+	// Fine-grained tokens need other permissions than the classic ones.
+	const isFineGrained = token.trim().startsWith("github_pat_");
 
 	// Fonctions de validation
 	const validateRepositoryFormat = (repoString: string) => {
@@ -77,15 +71,25 @@ export function GitHubRemoteConfigModal({
 		return "";
 	};
 
+	// A result or an error about other values no longer holds once one is changed.
+	const forgetResults = () => {
+		testRunRef.current++;
+		setConnectionStatus("idle");
+		setConnectionMessage("");
+		setError(null);
+	};
+
 	// Validation en temps réel
 	const handleRepoChange = (value: string) => {
 		setRepo(value);
+		forgetResults();
 		const error = validateRepositoryFormat(value);
 		setValidationErrors((prev) => ({ ...prev, repo: error }));
 	};
 
 	const handleTokenChange = (value: string) => {
 		setToken(value);
+		forgetResults();
 		const error = validateTokenFormat(value);
 		setValidationErrors((prev) => ({ ...prev, token: error }));
 	};
@@ -104,45 +108,40 @@ export function GitHubRemoteConfigModal({
 		setConnectionStatus("testing");
 		setConnectionMessage("");
 		setError(null);
+		const run = ++testRunRef.current;
 
+		let outcome: { status: "success" | "error"; message: string };
 		try {
 			// Utiliser l'API backend pour tester la connexion GitHub
 			const result = await globalThis.electronAPI.testGitHubConnection({
 				repo: repo.trim(),
 				token: token.trim(),
 			});
-
-			if (result.success) {
-				setConnectionStatus("success");
-				setConnectionMessage(t("githubSetup.connectionSuccess"));
-			} else {
-				setConnectionStatus("error");
-
-				// Messages d'erreur spécifiques selon le type de token
-				const tokenType = getTokenType(token);
-				if (result.status === 403) {
-					if (tokenType === "fine-grained") {
-						setConnectionMessage(
-							t("githubSetup.fineGrainedTokenPermissionsError"),
-						);
-					} else {
-						setConnectionMessage(t("githubSetup.classicTokenPermissionsError"));
-					}
-				} else if (result.status === 404) {
-					setConnectionMessage(t("githubSetup.repositoryNotFoundError"));
-				} else {
-					setConnectionMessage(
-						result.error || t("githubSetup.connectionFailed"),
-					);
-				}
-			}
+			outcome = result.success
+				? { status: "success", message: t("githubSetup.connectionSuccess") }
+				: { status: "error", message: describeFailure(result) };
 		} catch (err) {
-			setConnectionStatus("error");
 			console.error("GitHub connection test failed:", err);
-			setConnectionMessage(t("githubSetup.networkError"));
-		} finally {
-			setIsValidating(false);
+			outcome = { status: "error", message: t("githubSetup.networkError") };
 		}
+		setIsValidating(false);
+		// The answer is about the values sent: dropped if one was changed since.
+		if (run !== testRunRef.current) return;
+		setConnectionStatus(outcome.status);
+		setConnectionMessage(outcome.message);
+	};
+
+	// Messages d'erreur spécifiques selon le type de token
+	const describeFailure = (result: { status?: number; error?: string }) => {
+		if (result.status === 403) {
+			return isFineGrained
+				? t("githubSetup.fineGrainedTokenPermissionsError")
+				: t("githubSetup.classicTokenPermissionsError");
+		}
+		if (result.status === 404) {
+			return t("githubSetup.repositoryNotFoundError");
+		}
+		return result.error || t("githubSetup.connectionFailed");
 	};
 
 	const handleSave = () => {
@@ -184,12 +183,9 @@ export function GitHubRemoteConfigModal({
 	};
 
 	return (
-		<Dialog
-			open={open}
-			onOpenChange={() => {
-				/* noop */
-			}}
-		>
+		// Outside clicks and Escape are ignored so a typed token is not lost; the
+		// close button closes (it did nothing).
+		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent
 				className="sm:max-w-2xl"
 				onInteractOutside={(e) => e.preventDefault()}
@@ -277,12 +273,12 @@ export function GitHubRemoteConfigModal({
 						{token.trim() && !validationErrors.token && (
 							<div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
 								<div className="font-medium mb-1">
-									{getTokenType(token) === "fine-grained"
+									{isFineGrained
 										? t("githubSetup.fineGrainedTokenTitle")
 										: t("githubSetup.classicTokenTitle")}
 								</div>
 								<div>
-									{getTokenType(token) === "fine-grained"
+									{isFineGrained
 										? t("githubSetup.fineGrainedTokenPermissions")
 										: t("githubSetup.classicTokenPermissions")}
 								</div>
