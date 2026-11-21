@@ -501,6 +501,7 @@
 			"notePlaceholder": "Why this does not apply here",
 			"save": "Save",
 			"cancel": "Cancel",
+			"held": "Waiting for a maintainer: the reviewer learns from this rejection once a project owner approves it.",
 			"show": "Show",
 			"hide": "Hide",
 			"learnedBadge_one": "Rejected {{count}} time on this project",
@@ -1148,7 +1149,8 @@
 				"execution": "Where it runs",
 				"freshness": "Freshness",
 				"supplyChain": "Known vulnerabilities",
-				"maintainers": "Maintainers"
+				"maintainers": "Maintainers",
+				"code": "Source code"
 			},
 			"reasons": {
 				"official": "Maintained by {{author}}, the vendor of the product.",
@@ -1168,7 +1170,20 @@
 				"noKnownVulnerability": "No known vulnerability for version {{version}}.",
 				"changed": "New maintainers since the first check: {{names}}.",
 				"noSource": "The package names no source repository.",
-				"stable": "Same {{count}} maintainers as at the first check."
+				"stable": "Same {{count}} maintainers as at the first check.",
+				"codeUnknown": "Its code has not been read yet.",
+				"codeClean": "Nothing risky found in the {{files}} source files of version {{version}}.",
+				"undeclaredCommands": "Its code starts other programs, while none of its tools says it runs commands.",
+				"dynamicCode": "Its code runs code it builds or loads at run time.",
+				"hardcodedSecret": "Its code holds a string shaped like a credential.",
+				"undeclaredWrites": "Its code writes files, while all its tools only read.",
+				"sourceUnavailable": {
+					"missing": "The archive of version {{version}} is no longer on the registry: its code cannot be audited.",
+					"noArchive": "The registry publishes no archive for version {{version}}: its code cannot be audited.",
+					"unsupported": "The archive of version {{version}} could not be read: its code cannot be audited.",
+					"tooLarge": "The archive of version {{version}} is too large to read: its code cannot be audited.",
+					"integrity": "The archive of version {{version}} does not match the registry's digest: its code cannot be audited."
+				}
 			},
 			"alerts": {
 				"maintainerChanged": "Maintainers changed: {{names}}. A new maintainer can publish anything under this name; check before updating.",
@@ -1177,7 +1192,27 @@
 				"deprecated": "The publisher deprecated this package.",
 				"noSource": "Source code unavailable: it cannot be audited.",
 				"unpinned": "Not pinned: each start runs the newest release, whatever it contains.",
-				"executesCommands": "It can run commands ({{tools}}): give it only to the agents that need it."
+				"executesCommands": "It can run commands ({{tools}}): give it only to the agents that need it.",
+				"sourceUnavailable": "The code of version {{version}} could not be read: it cannot be audited.",
+				"undeclaredCommands": "Starts other programs without a tool that says so ({{files}}): review it before installing.",
+				"dynamicCode": "Runs code built or loaded at run time ({{files}}): what it runs cannot be read in advance.",
+				"hardcodedSecret": "A string shaped like a credential is in its code ({{files}})."
+			},
+			"code": {
+				"title": "Code scan of version {{version}}: {{files}} source files",
+				"partial_one": "{{count}} file was too large or beyond the limit and was not read.",
+				"partial_other": "{{count}} files were too large or beyond the limit and were not read.",
+				"none": "No pattern found.",
+				"more_one": "and {{count}} more match",
+				"more_other": "and {{count}} more matches",
+				"accepted": "accepted by the project's MCP policy: {{reason}}",
+				"rules": {
+					"shellExec": "Starts programs",
+					"dynamicCode": "Dynamic code",
+					"hardcodedSecret": "Credential-shaped string",
+					"fileWrite": "Writes files",
+					"network": "Network access"
+				}
 			}
 		},
 		"policy": {
@@ -1201,7 +1236,9 @@
 				"notAllowed": "The project's MCP policy does not allow {{name}}.",
 				"scoreTooLow": "{{name}} has a security score of {{score}}; the project's MCP policy needs {{minScore}} or more.",
 				"customBlocked": "The project's MCP policy refuses servers outside the catalog ({{name}})."
-			}
+			},
+			"acceptedFindings_one": "{{count}} finding of the code scan accepted, with its reason.",
+			"acceptedFindings_other": "{{count}} findings of the code scan accepted, each with its reason."
 		},
 		"watch": {
 			"title": "Security alerts",
@@ -1221,7 +1258,9 @@
 				"newVulnerability": "New advisory for version {{version}}: {{id}}, {{summary}}",
 				"maintainerAdded": "New maintainer: {{names}}. A new maintainer can publish anything under this name; check its latest release.",
 				"deprecated": "The publisher deprecated or withdrew this package.",
-				"lowScore": "The security score fell to {{score}} (it was {{previous}})."
+				"lowScore": "The security score fell to {{score}} (it was {{previous}}).",
+				"newCodeFinding": "Version {{version}} brings code that the previous one did not have: {{rule}} ({{file}}).",
+				"sourceUnavailable": "The code of version {{version}} can no longer be read: it cannot be audited."
 			}
 		}
 	},

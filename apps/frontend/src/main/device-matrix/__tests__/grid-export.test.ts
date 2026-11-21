@@ -4,17 +4,22 @@
 /**
  * Exporting the device matrix (#383): the main's own captures, shrunk to
  * their cells and drawn on a canvas of a hidden sandboxed blank page that
- * goes nowhere; labels are drawn text; only a bounded PNG comes back.
+ * goes nowhere; labels are drawn text; only a bounded PNG comes back, or a
+ * bounded PDF printed from that PNG alone. Faulty elements can be boxed.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+const PDF_PAGE_START = "(function (src, width, height)";
 
 const state = vi.hoisted(() => ({
 	windows: [] as FakeWindow[],
 	run: (async () => "") as (code: string) => Promise<unknown>,
 	empty: false,
 	resized: [] as unknown[],
+	printed: (async () => Buffer.from("%PDF-1.7\n")) as () => Promise<unknown>,
+	printOptions: [] as unknown[],
+	codes: [] as string[],
 }));
 
 interface FakeWindow {
@@ -44,8 +49,14 @@ vi.mock("electron", () => {
 					record.loaded = url;
 				},
 				executeJavaScript: (code: string) => {
+					state.codes.push(code);
+					if (code.startsWith(PDF_PAGE_START)) return Promise.resolve(true);
 					record.code = code;
 					return state.run(code);
+				},
+				printToPDF: (options: unknown) => {
+					state.printOptions.push(options);
+					return state.printed();
 				},
 			};
 		}
@@ -75,14 +86,24 @@ import {
 	GridExportFailure,
 	MAX_COLUMNS,
 	MAX_EXPORT_CHARS,
+	MAX_PDF_BYTES,
 	MAX_TILE_IMAGE_HEIGHT,
+	PDF_PAGE,
 	TILE_WIDTH,
 	composeGrid,
+	exportedPdf,
 	exportedPng,
 	layoutGrid,
 } from "../grid-export";
+import type { IssueMarker } from "../../../shared/utils/issue-markers";
 
-const tile = (label: string, aspect = 2) => ({ label, detail: "393 × 852 @3x", image: PNG, aspect });
+const tile = (label: string, aspect = 2, markers: IssueMarker[] = []) => ({
+	label,
+	detail: "393 × 852 @3x",
+	image: PNG,
+	aspect,
+	markers,
+});
 const lastWindow = () => state.windows[state.windows.length - 1];
 
 describe("layoutGrid", () => {
@@ -127,12 +148,59 @@ describe("exportedPng", () => {
 	});
 });
 
+describe("exportedPdf", () => {
+	it("keeps a PDF, and only a bounded one", () => {
+		expect(exportedPdf(Buffer.from("%PDF-1.7 x"))?.length).toBe(10);
+		expect(exportedPdf("%PDF-1.7")).toBeNull();
+		expect(exportedPdf(Buffer.from("<html>"))).toBeNull();
+		const huge = Buffer.alloc(MAX_PDF_BYTES + 1);
+		huge.write("%PDF-");
+		expect(exportedPdf(huge)).toBeNull();
+	});
+});
+
 describe("composeGrid", () => {
 	beforeEach(() => {
 		state.windows = [];
 		state.run = async () => PNG;
 		state.empty = false;
 		state.resized = [];
+		state.printed = async () => Buffer.from("%PDF-1.7\n");
+		state.printOptions = [];
+		state.codes = [];
+	});
+
+	it("hands the composer only the numbers of each marker", async () => {
+		const marker = { kind: "small-text", selector: "p.tiny", x: 0.1, y: 0.2, width: 0.3, height: 0.05 } as const;
+		await composeGrid([tile("iPhone 15", 2, [marker])]);
+		const input = JSON.parse((lastWindow().code ?? "").slice(GRID_COMPOSER.length + 1, -1));
+		expect(input.tiles[0].markers).toEqual([{ x: 0.1, y: 0.2, width: 0.3, height: 0.05 }]);
+	});
+
+	it("prints the PNG alone on one page of its size for a PDF", async () => {
+		const pdf = await composeGrid([tile("iPhone 15")], "pdf");
+		expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+		const layout = layoutGrid([2]);
+		const page = state.codes.find((code) => code.startsWith(PDF_PAGE));
+		expect(page).toBeDefined();
+		const args = JSON.parse((page ?? "").slice(PDF_PAGE.length + 4, -1));
+		expect(args[0]).toMatch(/^data:image\/png;base64,iVBORw0KGgo/);
+		expect(args.slice(1)).toEqual([layout.width, layout.height]);
+		expect(state.printOptions).toEqual([
+			{
+				printBackground: true,
+				margins: { top: 0, bottom: 0, left: 0, right: 0 },
+				pageSize: { width: layout.width / 96, height: layout.height / 96 },
+				pageRanges: "1",
+			},
+		]);
+		expect(lastWindow().destroy).toHaveBeenCalled();
+	});
+
+	it("refuses a print that is not a PDF", async () => {
+		state.printed = async () => Buffer.from("<html>");
+		await expect(composeGrid([tile("iPhone 15")], "pdf")).rejects.toBeInstanceOf(GridExportFailure);
+		expect(lastWindow().destroy).toHaveBeenCalled();
 	});
 
 	it("draws the shrunk captures in a hidden sandboxed blank page that goes nowhere", async () => {
@@ -190,6 +258,36 @@ describe("composeGrid", () => {
 	});
 });
 
+describe("PDF_PAGE", () => {
+	it("shows the image alone, at its size, without margins", async () => {
+		class FakeImage {
+			width = 0;
+			height = 0;
+			src = "";
+			decode() {
+				return Promise.resolve();
+			}
+		}
+		const appended: unknown[] = [];
+		vi.spyOn(document.body, "appendChild").mockImplementation((node) => {
+			appended.push(node);
+			return node;
+		});
+		vi.stubGlobal("Image", FakeImage);
+		try {
+			const run = (window as unknown as { eval: (code: string) => Promise<boolean> }).eval(
+				`${PDF_PAGE}(${JSON.stringify(PNG)}, 640, 480)`,
+			);
+			expect(await run).toBe(true);
+			expect(appended).toEqual([expect.objectContaining({ src: PNG, width: 640, height: 480 })]);
+			expect(document.head.querySelector("style")?.textContent).toContain("@page { margin: 0 }");
+		} finally {
+			vi.unstubAllGlobals();
+			vi.restoreAllMocks();
+		}
+	});
+});
+
 describe("GRID_COMPOSER", () => {
 	it("draws each caption as text and each capture in its cell, then hands back a PNG", async () => {
 		const calls: [string, ...unknown[]][] = [];
@@ -218,7 +316,12 @@ describe("GRID_COMPOSER", () => {
 		vi.stubGlobal("Image", FakeImage);
 		try {
 			const layout = layoutGrid([2]);
-			const input = { layout, tiles: [{ label: "<b>iPhone</b>", detail: "Slow 3G", image: PNG }], tileWidth: TILE_WIDTH };
+			const markers = [{ x: 0.5, y: 0.25, width: 0.1, height: 0.1 }];
+			const input = {
+				layout,
+				tiles: [{ label: "<b>iPhone</b>", detail: "Slow 3G", image: PNG, markers }],
+				tileWidth: TILE_WIDTH,
+			};
 			const run = (window as unknown as { eval: (code: string) => Promise<string> }).eval(
 				`${GRID_COMPOSER}(${JSON.stringify(input)})`,
 			);
@@ -229,6 +332,13 @@ describe("GRID_COMPOSER", () => {
 			expect(texts).toEqual(["<b>iPhone</b>", "Slow 3G"]);
 			const [cell] = layout.cells;
 			expect(calls).toContainEqual(["drawImage", expect.any(FakeImage), cell.x, cell.y, cell.width, cell.height]);
+			expect(calls).toContainEqual([
+				"strokeRect",
+				cell.x + 0.5 * cell.width,
+				cell.y + 0.25 * cell.height,
+				0.1 * cell.width,
+				0.1 * cell.height,
+			]);
 		} finally {
 			vi.unstubAllGlobals();
 			vi.restoreAllMocks();

@@ -16,6 +16,7 @@ import {
 	isBrowsableUrl,
 	type LandingGuess,
 } from "../../../shared/utils/emulator-landing";
+import { touchesUserInterface } from "../../../shared/utils/ui-change";
 import {
 	startAppEmulator,
 	stopAppEmulator,
@@ -34,6 +35,8 @@ interface TaskEmulatorProps {
 	worktreePath?: string;
 	/** La spec de la tâche : sans elle, pas de capture pour la revue visuelle. */
 	specId?: string;
+	/** La carte attend la revue humaine : une tâche qui touche l'interface y reçoit la matrice d'office. */
+	inReview?: boolean;
 }
 
 /**
@@ -81,6 +84,7 @@ export function TaskEmulator({
 	project,
 	worktreePath,
 	specId,
+	inReview = false,
 }: TaskEmulatorProps) {
 	const { t } = useTranslation(["appEmulator", "tasks"]);
 	const [browserError, setBrowserError] = useState<string | null>(null);
@@ -280,6 +284,11 @@ export function TaskEmulator({
 		[changedFiles, config?.framework, config?.launchPath],
 	);
 	const landing = landingCandidates[0] ?? null;
+	// La revue d'une tâche qui touche l'interface, servie depuis son worktree : la matrice s'ouvre d'office.
+	const autoMatrix =
+		inReview &&
+		captureSide(config?.projectDir, resolvedWorktreePath) === "task" &&
+		touchesUserInterface(changedFiles.map((file) => file.path));
 
 	// L'aperçu dit où il en est ; on ne le lui demande pas. Stable pour que le
 	// rendu du parent ne relance pas l'abonnement de l'enfant.
@@ -483,6 +492,7 @@ export function TaskEmulator({
 						onPoint={project?.path ? (id) => void handlePoint(id) : undefined}
 						pointing={pointing}
 						onCancelPoint={handleCancelPoint}
+						autoMatrixKey={autoMatrix ? taskId : null}
 					/>
 				) : (
 					<div className="flex h-full flex-col">

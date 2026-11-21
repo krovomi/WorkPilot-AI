@@ -8,6 +8,11 @@
 // inserted after the previous action says so (`appeared`), for the replay to
 // wait for it. A value typed into a password field, or into a field named
 // like a secret, is never sent: the report says `secret: true` instead.
+// Each role, label, placeholder and text is counted in the element's root
+// (`matches`), so a selector that is not unique keeps the element's place.
+// After an action, a status, an alert or a heading that showed up is proposed
+// as a check (`suggest`), and a loading indicator that showed and went away
+// is reported (`settled`) by what it has, never by a selector of the page.
 // Everything sent is plain data that Python bounds and checks again.
 (() => {
 	if (window.__workpilotRecorder) return;
@@ -18,6 +23,27 @@
 	const SECRET_AUTOCOMPLETE = /password|one-time-code|cc-number|cc-csc/i;
 	const TEST_ATTRS = ["data-test", "data-cy", "data-qa"];
 	const TEXT_INPUTS = /^(|text|email|password|search|tel|url|number|date|time|datetime-local|month|week)$/;
+	// Counting stops past this many candidates (the count is then not sent).
+	const MAX_SCAN = 3000;
+	const MAX_MATCHES = 20;
+	// What may become a proposed check, once it shows after an action.
+	const NOTABLE =
+		'[role="alert"], [role="status"], [role="alertdialog"], [role="dialog"], [role="heading"], [aria-live="polite"], [aria-live="assertive"], output, h1, h2, h3';
+	const LOADER =
+		'[role="progressbar"], [aria-busy="true"], [class*="spin"], [class*="load"], [class*="skeleton"]';
+	// The elements that may have a role implicitly, by role (any element may set it).
+	const ROLE_TAGS = {
+		button: "button, summary, input, ",
+		link: "a[href], ",
+		heading: "h1, h2, h3, h4, h5, h6, ",
+		img: "img, ",
+		option: "option, ",
+		combobox: "select, ",
+		listbox: "select, ",
+	};
+	const SUGGEST_AFTER_MS = 1000;
+	const SETTLE_POLL_MS = 200;
+	const SETTLE_FOR_MS = 15000;
 
 	const send = (report) => {
 		try {
@@ -51,15 +77,33 @@
 		return root && root !== document && root.host ? root.host : null;
 	};
 
-	// Elements the page inserted, by the number of actions sent before.
+	// Elements the page inserted, by the number of actions sent before; what
+	// the last action changed that may be checked, and the loaders it showed.
 	let actions = 0;
 	const inserted = new WeakMap();
+	let changed = new Set();
+	let loaders = new Set();
+	const noteChange = (node) => {
+		const el = node.nodeType === 1 ? node : node.parentElement;
+		if (!el || changed.size >= 20) return;
+		const notable = el.closest(NOTABLE);
+		if (notable) changed.add(notable);
+		if (node.nodeType !== 1) return;
+		for (const inner of el.querySelectorAll(NOTABLE)) if (changed.size < 20) changed.add(inner);
+		for (const loader of [el, ...el.querySelectorAll(LOADER)]) {
+			if (loader.matches(LOADER) && loaders.size < 10) loaders.add(loader);
+		}
+	};
 	new MutationObserver((records) => {
 		if (!actions) return;
 		for (const record of records) {
-			for (const node of record.addedNodes) if (node.nodeType === 1) inserted.set(node, actions);
+			if (record.type === "characterData") noteChange(record.target);
+			for (const node of record.addedNodes) {
+				if (node.nodeType === 1) inserted.set(node, actions);
+				noteChange(node);
+			}
 		}
-	}).observe(document, { childList: true, subtree: true });
+	}).observe(document, { childList: true, subtree: true, characterData: true });
 
 	const appeared = (el) => {
 		for (let node = el; node; node = node.parentElement || hostOf(node)) {
@@ -89,6 +133,29 @@
 	};
 
 	const textOf = (el) => line(el.innerText || el.textContent || "");
+
+	const shows = (el) =>
+		el.isConnected && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+
+	// How many elements of `root` give `same(candidate)`, and `el`'s place among them.
+	const matchesOf = (root, css, el, same) => {
+		let list;
+		try {
+			list = root.querySelectorAll(css);
+		} catch (_error) {
+			return null;
+		}
+		if (list.length > MAX_SCAN) return null;
+		let count = 0;
+		let index = -1;
+		for (const candidate of list) {
+			if (!same(candidate)) continue;
+			if (candidate === el) index = count;
+			count += 1;
+			if (count > MAX_MATCHES) break;
+		}
+		return { count, index };
+	};
 
 	const labelOf = (el) => {
 		const ids = (el.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean);
@@ -148,6 +215,41 @@
 		);
 	};
 
+	const roleOf = (el) => line(el.getAttribute("role") || "").split(" ")[0] || implicitRole(el);
+
+	// The text a getByText query matches: the innermost element holding it.
+	const ownText = (el, text) =>
+		line(el.textContent || "") === text &&
+		!Array.from(el.children).some((child) => line(child.textContent || "") === text);
+
+	const countMatches = (el, root, role, name, label, placeholder) => {
+		const matches = {};
+		if (role && name) {
+			const css = `${ROLE_TAGS[role] || "input, textarea, "}[role]`;
+			matches.role = matchesOf(root, css, el, (c) => roleOf(c) === role && nameOf(c) === name);
+		}
+		if (label) {
+			matches.label = matchesOf(
+				root,
+				"input, select, textarea, [aria-labelledby], [aria-label]",
+				el,
+				(c) => labelOf(c) === label || line(c.getAttribute("aria-label") || "") === label,
+			);
+		}
+		if (placeholder) {
+			matches.placeholder = matchesOf(
+				root,
+				"[placeholder]",
+				el,
+				(c) => line(c.getAttribute("placeholder") || "") === placeholder,
+			);
+		}
+		const text = line(el.textContent || "");
+		if (text && ownText(el, text)) matches.text = matchesOf(root, "*", el, (c) => ownText(c, text));
+		for (const key of Object.keys(matches)) if (!matches[key]) delete matches[key];
+		return matches;
+	};
+
 	const describeElement = (el) => {
 		const root = rootOf(el);
 		const tag = el.tagName.toLowerCase();
@@ -156,12 +258,17 @@
 		const nameAttr = el.getAttribute("name") || "";
 		const attr = TEST_ATTRS.find((name) => el.hasAttribute(name));
 		const attrValue = attr ? el.getAttribute(attr) || "" : "";
+		const role = roleOf(el);
+		const name = nameOf(el);
+		const label = labelOf(el);
+		const placeholder = line(el.getAttribute("placeholder") || "");
 		return {
 			tag,
-			role: line(el.getAttribute("role") || "").split(" ")[0] || implicitRole(el),
-			name: nameOf(el),
-			label: labelOf(el),
-			placeholder: line(el.getAttribute("placeholder") || ""),
+			role,
+			name,
+			label,
+			placeholder,
+			matches: countMatches(el, root, role, name, label, placeholder),
 			text: ["input", "textarea", "select"].includes(tag) ? "" : textOf(el),
 			testId: line(testId),
 			testIdUnique: Boolean(testId) && count(root, `[data-testid="${CSS.escape(testId)}"]`) === 1,
@@ -200,9 +307,63 @@
 		return path.length ? path[0] : event.target;
 	};
 
+	// What a loading indicator has, for Python to build its selector from.
+	const loaderOf = (el) => ({
+		testId: line(el.getAttribute("data-testid") || ""),
+		id: line(el.id || ""),
+		role: roleOf(el),
+		busy: el.getAttribute("aria-busy") === "true",
+		className: line(typeof el.className === "string" ? el.className : ""),
+	});
+
+	// After action `at`: propose what showed up, report a loader that went away.
+	const watch = (at) => {
+		changed = new Set();
+		loaders = new Set();
+		setTimeout(() => {
+			if (actions !== at) return;
+			suggest(Array.from(changed));
+		}, SUGGEST_AFTER_MS);
+		const seen = new Map();
+		const started = Date.now();
+		const timer = setInterval(() => {
+			if (actions !== at || Date.now() - started > SETTLE_FOR_MS) {
+				clearInterval(timer);
+				return;
+			}
+			for (const loader of loaders) {
+				if (hostOf(loader)) continue;
+				if (shows(loader)) seen.set(loader, loaderOf(loader));
+				else if (seen.has(loader)) {
+					clearInterval(timer);
+					send({ kind: "settled", loader: seen.get(loader) });
+					return;
+				}
+			}
+		}, SETTLE_POLL_MS);
+	};
+
+	const suggest = (candidates) => {
+		const texts = new Set();
+		for (const el of candidates) {
+			if (texts.size >= 3) return;
+			const text = shows(el) ? textOf(el) : "";
+			if (!text || texts.has(text)) continue;
+			texts.add(text);
+			send({ kind: "suggest", target: describe(el), text });
+		}
+	};
+
+	// A page an action led to: its main heading and alerts may be checked.
+	const onLoad = () =>
+		setTimeout(() => suggest(Array.from(document.querySelectorAll('h1, [role="alert"]'))), SUGGEST_AFTER_MS);
+	if (document.readyState === "complete") onLoad();
+	else window.addEventListener("load", onLoad, { once: true });
+
 	const act = (report) => {
 		send(report);
 		actions += 1;
+		watch(actions);
 	};
 
 	const ACTIONABLE =

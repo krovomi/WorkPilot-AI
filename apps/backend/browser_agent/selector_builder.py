@@ -15,6 +15,14 @@ Playwright and Testing Library guides do:
 5. its visible text (not for a form field, whose text is what was typed);
 6. a short CSS selector: a stable unique id, a unique ``name``, or the path.
 
+The page also counts how many elements each of 2 to 5 matches (``matches``,
+in the element's document or shadow root). One that matches several keeps
+the element's place among them (``nth``) and moves after the stable CSS
+selectors, before the CSS path: a replay must never act on the first of
+several "Save" buttons by chance. One that matches more than
+:data:`~browser_agent.recording.MAX_MATCHES`, or that the page says matches
+nothing, is dropped. A descriptor without counts keeps the order above.
+
 An id that looks generated (``btn-a1b2c3``, ``:r1:``, ``ember123``) is never
 used: it changes with the next build. Each candidate is page text, kept as a
 bounded string; it becomes code only through ``codegen.py``, as a literal.
@@ -32,6 +40,7 @@ import re
 from foundation.log_redaction import redact_text
 
 from .recording import (
+    MAX_MATCHES,
     MAX_SELECTOR_VALUE,
     MAX_SELECTORS,
     ROLES,
@@ -71,16 +80,36 @@ def looks_generated(element_id: str) -> bool:
     return not _PLAIN_ID.match(element_id) or bool(_GENERATED_ID.search(element_id))
 
 
+def place(target: dict[str, object], strategy: str) -> tuple[bool, int | None]:
+    """Whether a ``strategy`` selector is kept, and its ``nth`` when not unique."""
+    matches = target.get("matches")
+    counted = matches.get(strategy) if isinstance(matches, dict) else None
+    if not isinstance(counted, dict):
+        return True, None  # not counted: kept as it is
+    count, index = counted.get("count"), counted.get("index")
+    if not isinstance(count, int) or isinstance(count, bool):
+        return False, None
+    if count == 1:
+        return True, None
+    if count > MAX_MATCHES or not isinstance(index, int) or isinstance(index, bool):
+        return False, None
+    return (True, index) if 0 <= index < count else (False, None)
+
+
 def build_selectors(target: dict[str, object]) -> list[Selector]:
     """The element's selectors, most robust first; empty when none holds."""
     tag = clean_line(target.get("tag"), 20).lower()
     found: list[Selector] = []
+    placed: list[Selector] = []
 
     def add(strategy: str, value: str, role: str = "") -> None:
-        if value and len(value) <= MAX_SELECTOR_VALUE:
-            candidate = Selector(strategy, value, role)
-            if candidate not in found:
-                found.append(candidate)
+        if not value or len(value) > MAX_SELECTOR_VALUE:
+            return
+        kept, nth = place(target, strategy) if strategy != "css" else (True, None)
+        candidate = Selector(strategy, value, role, nth)
+        bucket = found if nth is None else placed
+        if kept and candidate not in bucket:
+            bucket.append(candidate)
 
     test_id = clean_line(target.get("testId"), MAX_SELECTOR_VALUE)
     if test_id and target.get("testIdUnique") is True:
@@ -113,6 +142,7 @@ def build_selectors(target: dict[str, object]) -> list[Selector]:
     field_name = clean_line(target.get("nameAttr"), 100)
     if field_name and target.get("nameUnique") is True and re.match(r"^[a-z]+$", tag):
         add("css", f'{tag}[name="{_css_string(field_name)}"]')
+    found += placed
     add("css", clean_line(target.get("path"), MAX_SELECTOR_VALUE + 1))
     return found[:MAX_SELECTORS]
 

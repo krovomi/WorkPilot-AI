@@ -2,8 +2,10 @@
  * The device matrix channels (#383): the renderer names a catalogue device, a
  * path and two throttling profiles; the origin is always the emulator's own
  * server, a path that leaves it is refused, an unknown profile too, and only
- * one capture runs at a time. The export names devices only: the images are
- * the main's own captures, the file goes where the save dialog says.
+ * one capture runs at a time. An orientation is a name, the preview's session
+ * a yes or no. The export names devices, a format and whether to box faulty
+ * elements: the images and the boxes are the main's own, the file goes where
+ * the save dialog says.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,9 +55,13 @@ const call = (channel: string, raw: unknown) => {
 const invoke = (raw: unknown) =>
 	call(
 		IPC_CHANNELS.APP_EMULATOR_CAPTURE_DEVICE,
-		raw && typeof raw === "object" ? { network: "none", cpu: "1x", ...raw } : raw,
+		raw && typeof raw === "object"
+			? { network: "none", cpu: "1x", orientation: "portrait", previewSession: false, ...raw }
+			: raw,
 	);
-const exportGrid = (raw: unknown) => call(IPC_CHANNELS.APP_EMULATOR_EXPORT_DEVICE_GRID, raw);
+/** An export request: the given fields over a plain PNG one. */
+const exportGrid = (raw: Record<string, unknown>) =>
+	call(IPC_CHANNELS.APP_EMULATOR_EXPORT_DEVICE_GRID, { format: "png", markers: false, ...raw });
 
 const shot = { url: "http://localhost:5173/cart", image: "data:image/png;base64,AA==", report: null, loadMs: 420 };
 
@@ -84,33 +90,47 @@ describe("resolveCaptureUrl", () => {
 });
 
 describe("readCaptureRequest", () => {
-	const plain = { network: "none", cpu: "1x" };
-	it("keeps only a device id, a path and two profile ids, all strings", () => {
+	const plain = { network: "none", cpu: "1x", orientation: "portrait", previewSession: false };
+	it("keeps only a device id, a path, two profile ids, an orientation and a yes or no", () => {
 		expect(
 			readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, url: "https://evil.example", latency: 0 }),
-		).toEqual({ deviceId: "pixel-8", path: "/", network: "none", cpu: "1x" });
+		).toEqual({ deviceId: "pixel-8", path: "/", ...plain });
 		expect(readCaptureRequest(null)).toBeNull();
 		expect(readCaptureRequest("pixel-8")).toBeNull();
 		expect(readCaptureRequest({ deviceId: 8, path: "/", ...plain })).toBeNull();
 		expect(readCaptureRequest({ deviceId: "pixel-8", path: ["/"], ...plain })).toBeNull();
 		expect(readCaptureRequest({ deviceId: "pixel-8", path: "/", cpu: "1x" })).toBeNull();
-		expect(readCaptureRequest({ deviceId: "pixel-8", path: "/", network: "none", cpu: 4 })).toBeNull();
+		expect(readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, cpu: 4 })).toBeNull();
+		expect(readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, orientation: 90 })).toBeNull();
+		expect(readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, previewSession: "yes" })).toBeNull();
 	});
 });
 
 describe("readExportRequest", () => {
-	it("keeps catalogue ids, once each, in the order received", () => {
-		expect(readExportRequest({ deviceIds: ["pixel-8", "iphone-15", "pixel-8"] })).toEqual(["pixel-8", "iphone-15"]);
+	const plain = { format: "png", markers: false };
+	it("keeps catalogue ids, once each, in the order received, a known format and a yes or no", () => {
+		expect(readExportRequest({ deviceIds: ["pixel-8", "iphone-15", "pixel-8"], ...plain })).toEqual({
+			deviceIds: ["pixel-8", "iphone-15"],
+			format: "png",
+			markers: false,
+		});
+		expect(readExportRequest({ deviceIds: ["pixel-8"], format: "pdf", markers: true })).toMatchObject({
+			format: "pdf",
+			markers: true,
+		});
 	});
 
 	it.each([
 		["nothing", null],
 		["a string", "pixel-8"],
-		["no list", { deviceIds: "pixel-8" }],
-		["an empty list", { deviceIds: [] }],
-		["an unknown id", { deviceIds: ["pixel-8", "../../etc"] }],
-		["a non-string id", { deviceIds: [8] }],
-		["more ids than the catalogue", { deviceIds: Array.from({ length: 11 }, () => "pixel-8") }],
+		["no list", { deviceIds: "pixel-8", ...plain }],
+		["an empty list", { deviceIds: [], ...plain }],
+		["an unknown id", { deviceIds: ["pixel-8", "../../etc"], ...plain }],
+		["a non-string id", { deviceIds: [8], ...plain }],
+		["more ids than the catalogue", { deviceIds: Array.from({ length: 11 }, () => "pixel-8"), ...plain }],
+		["an unknown format", { deviceIds: ["pixel-8"], format: "svg", markers: false }],
+		["no format", { deviceIds: ["pixel-8"], markers: false }],
+		["markers that are not a yes or no", { deviceIds: ["pixel-8"], format: "png", markers: "all" }],
 	])("refuses %s", (_label, raw) => {
 		expect(readExportRequest(raw)).toBeNull();
 	});
@@ -124,11 +144,43 @@ describe("APP_EMULATOR_CAPTURE_DEVICE", () => {
 
 	it("captures a catalogue device on the server's origin", async () => {
 		const result = await invoke({ deviceId: "pixel-8", path: "/cart" });
-		expect(result).toEqual({ success: true, data: { deviceId: "pixel-8", ...shot, network: "none", cpu: "1x" } });
-		const [device, url, throttling] = capture.fn.mock.calls[0];
+		expect(result).toEqual({
+			success: true,
+			data: {
+				deviceId: "pixel-8",
+				...shot,
+				network: "none",
+				cpu: "1x",
+				orientation: "portrait",
+				width: 412,
+				height: 915,
+				previewSession: false,
+			},
+		});
+		const [device, url, throttling, options] = capture.fn.mock.calls[0];
 		expect(device).toMatchObject({ id: "pixel-8", width: 412 });
 		expect(url).toBe("http://localhost:5173/cart");
 		expect(throttling).toEqual({ network: { id: "none", conditions: null, loadTimeoutMs: 30_000 }, cpu: { id: "1x", rate: 1 } });
+		expect(options).toEqual({ previewSession: false });
+	});
+
+	it("turns the device to the named orientation and lends the preview's session when asked", async () => {
+		const result = await invoke({ deviceId: "pixel-8", path: "/", orientation: "landscape", previewSession: true });
+		expect(result).toMatchObject({
+			success: true,
+			data: { orientation: "landscape", width: 915, height: 412, previewSession: true },
+		});
+		const [device, , , options] = capture.fn.mock.calls[0];
+		expect(device).toMatchObject({ id: "pixel-8", width: 915, height: 412 });
+		expect(options).toEqual({ previewSession: true });
+	});
+
+	it("refuses an orientation that is not in the list", async () => {
+		expect(await invoke({ deviceId: "pixel-8", path: "/", orientation: "upside-down" })).toEqual({
+			success: false,
+			error: "invalid-request",
+		});
+		expect(capture.fn).not.toHaveBeenCalled();
 	});
 
 	it("applies the named throttling profiles, never values from the renderer", async () => {
@@ -200,7 +252,19 @@ describe("APP_EMULATOR_EXPORT_DEVICE_GRID", () => {
 		exporting.compose = vi.fn(async () => png);
 		exporting.write = vi.fn(async () => undefined);
 		// The main keeps its own last capture of each device.
-		capture.fn = vi.fn(async (device: { id: string }) => ({ ...shot, image: `data:image/png;base64,${device.id}` }));
+		capture.fn = vi.fn(async (device: { id: string }) => ({
+			...shot,
+			image: `data:image/png;base64,${device.id}`,
+			report: {
+				viewportWidth: 393,
+				scrollWidth: 393,
+				scanned: 10,
+				truncated: false,
+				issues: [
+					{ kind: "small-text", count: 1, samples: [{ selector: "p.tiny", x: 0, y: 0, width: 393, height: 426 }] },
+				],
+			},
+		}));
 		await invoke({ deviceId: "iphone-15", path: "/", network: "fast-3g", cpu: "2x" });
 		await invoke({ deviceId: "desktop-1080p", path: "/" });
 	});
@@ -221,15 +285,35 @@ describe("APP_EMULATOR_EXPORT_DEVICE_GRID", () => {
 				detail: "393 × 852 @3x · 3G rapide · Processeur 2× plus lent",
 				image: "data:image/png;base64,iphone-15",
 				aspect: 852 / 393,
+				markers: [],
 			},
 			{
 				label: "Ordinateur Full HD",
 				detail: "1920 × 1080 @1x",
 				image: "data:image/png;base64,desktop-1080p",
 				aspect: 1080 / 1920,
+				markers: [],
 			},
 		]);
+		expect(exporting.compose.mock.calls[0][1]).toBe("png");
 		expect(exporting.write).toHaveBeenCalledWith("/home/someone/Pictures/grid.png", png);
+	});
+
+	it("exports a PDF, boxing the faulty elements from the main's own report, in the rendered orientation", async () => {
+		await invoke({ deviceId: "iphone-15", path: "/", orientation: "landscape" });
+		exporting.dialog = vi.fn(async () => ({ canceled: false, filePath: "/home/someone/grid.pdf" }));
+		const result = await exportGrid({ deviceIds: ["iphone-15"], format: "pdf", markers: true });
+		expect(result).toEqual({ success: true, data: { saved: true, fileName: "grid.pdf" } });
+		expect(exporting.dialog).toHaveBeenCalledWith({
+			defaultPath: "device-matrix.pdf",
+			filters: [{ name: "PDF", extensions: ["pdf"] }],
+		});
+		const [tiles, format] = exporting.compose.mock.calls[0];
+		expect(format).toBe("pdf");
+		expect(tiles[0]).toMatchObject({ detail: "852 × 393 @3x · Landscape", aspect: 393 / 852 });
+		expect(tiles[0].markers).toEqual([
+			{ kind: "small-text", selector: "p.tiny", x: 0, y: 0, width: 393 / 852, height: 1 },
+		]);
 	});
 
 	it("writes nothing when the person cancels the dialog", async () => {

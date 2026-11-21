@@ -501,6 +501,7 @@
 			"notePlaceholder": "Pourquoi cela ne s'applique pas ici",
 			"save": "Enregistrer",
 			"cancel": "Annuler",
+			"held": "En attente d'un mainteneur : le relecteur apprendra de ce rejet une fois approuvé par un propriétaire du projet.",
 			"show": "Afficher",
 			"hide": "Masquer",
 			"learnedBadge_one": "Rejeté {{count}} fois sur ce projet",
@@ -1148,7 +1149,8 @@
 				"execution": "Où il tourne",
 				"freshness": "Fraîcheur",
 				"supplyChain": "Vulnérabilités connues",
-				"maintainers": "Mainteneurs"
+				"maintainers": "Mainteneurs",
+				"code": "Code source"
 			},
 			"reasons": {
 				"official": "Maintenu par {{author}}, l'éditeur du produit.",
@@ -1168,7 +1170,20 @@
 				"noKnownVulnerability": "Aucune vulnérabilité connue pour la version {{version}}.",
 				"changed": "Nouveaux mainteneurs depuis la première vérification : {{names}}.",
 				"noSource": "Le paquet ne nomme aucun dépôt source.",
-				"stable": "Les mêmes {{count}} mainteneurs qu'à la première vérification."
+				"stable": "Les mêmes {{count}} mainteneurs qu'à la première vérification.",
+				"codeUnknown": "Son code n'a pas encore été lu.",
+				"codeClean": "Rien de risqué dans les {{files}} fichiers source de la version {{version}}.",
+				"undeclaredCommands": "Son code lance d'autres programmes, alors qu'aucun de ses outils ne dit lancer de commandes.",
+				"dynamicCode": "Son code exécute du code qu'il construit ou charge à l'exécution.",
+				"hardcodedSecret": "Son code contient une chaîne qui a la forme d'un identifiant.",
+				"undeclaredWrites": "Son code écrit des fichiers, alors que tous ses outils ne font que lire.",
+				"sourceUnavailable": {
+					"missing": "L'archive de la version {{version}} n'est plus sur le registre : son code ne peut pas être audité.",
+					"noArchive": "Le registre ne publie aucune archive pour la version {{version}} : son code ne peut pas être audité.",
+					"unsupported": "L'archive de la version {{version}} n'a pas pu être lue : son code ne peut pas être audité.",
+					"tooLarge": "L'archive de la version {{version}} est trop grande pour être lue : son code ne peut pas être audité.",
+					"integrity": "L'archive de la version {{version}} ne correspond pas à l'empreinte du registre : son code ne peut pas être audité."
+				}
 			},
 			"alerts": {
 				"maintainerChanged": "Mainteneurs changés : {{names}}. Un nouveau mainteneur peut publier n'importe quoi sous ce nom ; vérifiez avant de mettre à jour.",
@@ -1177,7 +1192,27 @@
 				"deprecated": "L'éditeur a déprécié ce paquet.",
 				"noSource": "Code source indisponible : impossible de l'auditer.",
 				"unpinned": "Version non figée : chaque démarrage lance la dernière version, quoi qu'elle contienne.",
-				"executesCommands": "Il peut lancer des commandes ({{tools}}) : ne le donnez qu'aux agents qui en ont besoin."
+				"executesCommands": "Il peut lancer des commandes ({{tools}}) : ne le donnez qu'aux agents qui en ont besoin.",
+				"sourceUnavailable": "Le code de la version {{version}} n'a pas pu être lu : il ne peut pas être audité.",
+				"undeclaredCommands": "Lance d'autres programmes sans outil qui le dise ({{files}}) : à examiner avant de l'installer.",
+				"dynamicCode": "Exécute du code construit ou chargé à l'exécution ({{files}}) : ce qu'il lance ne se lit pas à l'avance.",
+				"hardcodedSecret": "Une chaîne qui a la forme d'un identifiant est dans son code ({{files}})."
+			},
+			"code": {
+				"title": "Analyse du code de la version {{version}} : {{files}} fichiers source",
+				"partial_one": "{{count}} fichier trop grand ou au-delà de la limite n'a pas été lu.",
+				"partial_other": "{{count}} fichiers trop grands ou au-delà de la limite n'ont pas été lus.",
+				"none": "Aucun motif trouvé.",
+				"more_one": "et {{count}} autre occurrence",
+				"more_other": "et {{count}} autres occurrences",
+				"accepted": "accepté par la politique MCP du projet : {{reason}}",
+				"rules": {
+					"shellExec": "Lance des programmes",
+					"dynamicCode": "Code dynamique",
+					"hardcodedSecret": "Chaîne en forme d'identifiant",
+					"fileWrite": "Écrit des fichiers",
+					"network": "Accès réseau"
+				}
 			}
 		},
 		"policy": {
@@ -1201,7 +1236,9 @@
 				"notAllowed": "La politique MCP du projet n'autorise pas {{name}}.",
 				"scoreTooLow": "{{name}} a un score de sécurité de {{score}} ; la politique MCP du projet exige {{minScore}} ou plus.",
 				"customBlocked": "La politique MCP du projet refuse les serveurs hors catalogue ({{name}})."
-			}
+			},
+			"acceptedFindings_one": "{{count}} constat de l'analyse du code accepté, avec sa raison.",
+			"acceptedFindings_other": "{{count}} constats de l'analyse du code acceptés, chacun avec sa raison."
 		},
 		"watch": {
 			"title": "Alertes de sécurité",
@@ -1221,7 +1258,9 @@
 				"newVulnerability": "Nouvel avis pour la version {{version}} : {{id}}, {{summary}}",
 				"maintainerAdded": "Nouveau mainteneur : {{names}}. Un nouveau mainteneur peut publier n'importe quoi sous ce nom ; vérifiez sa dernière version.",
 				"deprecated": "L'éditeur a déprécié ou retiré ce paquet.",
-				"lowScore": "Le score de sécurité est tombé à {{score}} (il était de {{previous}})."
+				"lowScore": "Le score de sécurité est tombé à {{score}} (il était de {{previous}}).",
+				"newCodeFinding": "La version {{version}} apporte du code que la précédente n'avait pas : {{rule}} ({{file}}).",
+				"sourceUnavailable": "Le code de la version {{version}} ne peut plus être lu : il ne peut pas être audité."
 			}
 		}
 	},

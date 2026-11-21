@@ -178,7 +178,8 @@
 			"load-failed": "The page did not load on this device in time.",
 			"capture-failed": "The page could not be captured on this device.",
 			"unknown-throttling": "This throttling profile is not in the list.",
-			"throttling-failed": "The network or CPU throttling could not be applied on this device."
+			"throttling-failed": "The network or CPU throttling could not be applied on this device.",
+			"session-failed": "The preview's session could not be read: capture again without it."
 		},
 		"report": {
 			"unavailable": "The page could not be read for responsive bugs.",
@@ -198,7 +199,9 @@
 			"overlappingElements_one": "{{count}} pair of elements overlap",
 			"overlappingElements_other": "{{count}} pairs of elements overlap",
 			"truncatedText_one": "{{count}} text is cut off or spills out of its box",
-			"truncatedText_other": "{{count}} texts are cut off or spill out of their box"
+			"truncatedText_other": "{{count}} texts are cut off or spill out of their box",
+			"brokenNavigation_one": "{{count}} navigation cannot be reached on mobile",
+			"brokenNavigation_other": "{{count}} navigations cannot be reached on mobile"
 		},
 		"throttling": {
 			"network": "Network",
@@ -219,7 +222,6 @@
 		},
 		"cpuSlowdown": "CPU {{rate}}× slower",
 		"loadTime": "Loaded in {{seconds}} s",
-		"export": "Export",
 		"exporting": "Exporting…",
 		"exported": "Grid saved as {{name}}.",
 		"exportErrors": {
@@ -228,6 +230,18 @@
 			"busy": "A capture or another export is in progress: wait for it to finish.",
 			"export-failed": "The grid image could not be built.",
 			"write-failed": "The image could not be written where you chose."
-		}
+		},
+		"orientation": {
+			"label": "Orientation",
+			"portrait": "Portrait",
+			"landscape": "Landscape"
+		},
+		"previewSession": "Use the preview's session (cookies)",
+		"previewSessionHint": "The cookies the preview sends to this server are lent to each capture, so a page behind a sign-in shows as you see it. Local storage is not shared.",
+		"withPreviewSession": "Preview's session",
+		"markers": "Box the faulty elements",
+		"exportPng": "Export PNG",
+		"exportPdf": "Export PDF",
+		"auto": "Shown for the review of this task: its changes touch the interface."
 	}
 }

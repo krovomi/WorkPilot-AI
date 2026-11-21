@@ -116,12 +116,15 @@
 			"trend": "Tendance",
 			"project": "Projet",
 			"segment": "Pile et taille",
-			"specs": "Specs"
+			"specs": "Specs",
+			"weeks_one": "Dernière semaine",
+			"weeks_other": "{{count}} dernières semaines"
 		},
 		"groups": {
 			"segment": "Même pile et taille",
 			"stack": "Même pile",
-			"all": "Tous les projets"
+			"all": "Tous les projets",
+			"team": "Même taille d'équipe"
 		},
 		"projectCount_one": "{{count}} projet",
 		"projectCount_other": "{{count}} projets",
@@ -144,6 +147,33 @@
 		"lowerIsBetter": "Plus bas, c'est mieux, pour chaque chiffre. La durée d'un build va de la première session d'agent de la spec à la dernière.",
 		"yourProjects": "Vos autres projets",
 		"noOtherProjects": "Aucun de vos autres projets n'a construit de spec sur cette période.",
+		"teams": {
+			"solo": "Solo",
+			"small": "Équipe de 2 à 5",
+			"medium": "Équipe de 6 à 20",
+			"large": "Équipe de plus de 20",
+			"unknown": "Équipe inconnue"
+		},
+		"top": "10 % les meilleurs : {{value}}",
+		"topNote_one": "« 10 % les meilleurs » est le chiffre qu'atteint le meilleur dixième d'un groupe ; il s'affiche à partir de {{count}} projet actif.",
+		"topNote_other": "« 10 % les meilleurs » est le chiffre qu'atteint le meilleur dixième d'un groupe ; il s'affiche à partir de {{count}} projets actifs qui ont ce chiffre.",
+		"sparkline": "{{metric}}, semaine par semaine",
+		"report": {
+			"button": "Générer le rapport d'équipe",
+			"title": "Où vous en êtes : rapport d'équipe",
+			"generated": "Généré le {{date}}.",
+			"segment": "Segment : {{stack}}, {{size}}, {{team}}.",
+			"saved": "Rapport d'équipe enregistré dans {{path}}",
+			"error": "Impossible d'enregistrer le rapport d'équipe"
+		},
+		"kinds": {
+			"title": "Par type de travail",
+			"kind": "Type",
+			"others": "Autres projets",
+			"none": "Aucune spec de cette période n'a de type enregistré sur sa carte.",
+			"note_one": "Chaque case : ce projet, puis la médiane des autres projets pour le même type, à partir de {{count}} projet.",
+			"note_other": "Chaque case : ce projet, puis la médiane des autres projets pour le même type, à partir de {{count}} projets."
+		},
 		"ciPending": "Le taux de CI vert du premier coup n'est pas encore enregistré : il n'est pas comparé."
 	}
 }
