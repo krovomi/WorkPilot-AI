@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	bindPhase35Project,
 	PAIR_AI_USER_ID,
 	setupPairRealtimeListeners,
 	useAgentHealthStore,
@@ -264,6 +265,67 @@ describe.each(cases)("$name", (c) => {
 		mock(c.channel).mockRejectedValue("socket closed");
 		await c.run();
 		expect(c.state()).toMatchObject({ phase: "error", error: "socket closed" });
+	});
+});
+
+/** The actions whose answer belongs to the open project. */
+const PROJECT_BOUND = new Set([
+	"longevity compute",
+	"agent health refresh",
+	"domain bundle",
+	"license scan",
+	"architecture scan",
+	"architecture baseline",
+	"architecture drift",
+	"context optimisation",
+	"audit events",
+	"audit replay",
+	"audit verify",
+]);
+let otherProject = 0;
+
+describe.each(cases.filter((c) => PROJECT_BOUND.has(c.name)))("$name, once another project is open", (c) => {
+	it("drops the answer of the project that was open when it started", async () => {
+		let answer!: (value: unknown) => void;
+		mock(c.channel).mockReturnValue(new Promise((r) => (answer = r)));
+		const run = c.run();
+		otherProject += 1;
+		bindPhase35Project(`/other-${otherProject}`);
+		answer({ success: true, ...c.answer });
+		await run;
+		expect(c.state()).toMatchObject({ phase: "idle", error: null });
+		expect(c.state()).not.toMatchObject(c.expected);
+	});
+
+	it("drops its failure too", async () => {
+		let fail!: (reason: unknown) => void;
+		mock(c.channel).mockReturnValue(new Promise((_r, j) => (fail = j)));
+		const run = c.run();
+		otherProject += 1;
+		bindPhase35Project(`/other-${otherProject}`);
+		fail(new Error("too late"));
+		await run;
+		expect(c.state()).toMatchObject({ phase: "idle", error: null });
+	});
+});
+
+describe("binding the open project", () => {
+	it("clears the findings only when the project changes", () => {
+		bindPhase35Project("/same");
+		useLongevityStore.setState({ report: { score: 1 } as never });
+		bindPhase35Project("/same");
+		expect(useLongevityStore.getState().report).toEqual({ score: 1 });
+		bindPhase35Project("/another");
+		expect(useLongevityStore.getState().report).toBeNull();
+	});
+
+	it("keeps the agent scores of the same project while they reload, not another's", async () => {
+		mock("scoreProjectAgentHealth").mockReturnValue(new Promise(() => undefined));
+		useAgentHealthStore.setState({ projectPath: "/p", health: { scores: [] } as never });
+		void useAgentHealthStore.getState().refresh("/p");
+		expect(useAgentHealthStore.getState().health).toEqual({ scores: [] });
+		void useAgentHealthStore.getState().refresh("/q");
+		expect(useAgentHealthStore.getState()).toMatchObject({ projectPath: "/q", health: null });
 	});
 });
 

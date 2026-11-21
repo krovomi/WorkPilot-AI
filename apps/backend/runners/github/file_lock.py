@@ -21,6 +21,7 @@ Example Usage:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import tempfile
@@ -31,7 +32,9 @@ from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Any
 
-_IS_WINDOWS = os.name == "nt"
+from foundation.platform import is_windows
+
+_IS_WINDOWS = is_windows()
 _WINDOWS_LOCK_SIZE = 1024 * 1024
 
 try:
@@ -202,22 +205,22 @@ class FileLock:
             await asyncio.sleep(0.01)
 
     def _release_lock(self) -> None:
-        """Release the file lock."""
+        """Release the file lock (best effort: a release never raises)."""
         if self._fd is not None:
-            try:
-                _unlock(self._fd)
-                os.close(self._fd)
-            except Exception:
-                pass  # Best effort cleanup
-            finally:
-                self._fd = None
+            fd, self._fd = self._fd, None
+            with contextlib.suppress(OSError):
+                _unlock(fd)
+            with contextlib.suppress(OSError):
+                os.close(fd)
 
-        # Clean up lock file
-        if self._lock_file and self._lock_file.exists():
-            try:
-                self._lock_file.unlink()
-            except Exception:
-                pass  # Best effort cleanup
+        # On POSIX the lock file stays. Removing it let a waiter that had
+        # already opened it lock a file nobody could see any more, while the
+        # next caller created and locked a fresh one: two holders at once.
+        # Windows refuses to delete a file another process holds open, so
+        # there the last one out can remove it safely.
+        if _IS_WINDOWS and self._lock_file is not None:
+            with contextlib.suppress(OSError):
+                self._lock_file.unlink(missing_ok=True)
 
     def __enter__(self):
         """Synchronous context manager entry."""
@@ -276,10 +279,8 @@ def atomic_write(filepath: str | Path, mode: str = "w", encoding: str = "utf-8")
 
     except Exception:
         # Clean up temp file on error
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp_path)
-        except Exception:
-            pass
         raise
 
 
@@ -340,12 +341,10 @@ async def locked_write(
 
         except Exception:
             # Clean up temp file on error
-            try:
+            with contextlib.suppress(OSError):
                 await asyncio.get_running_loop().run_in_executor(
                     None, os.unlink, tmp_path
                 )
-            except Exception:
-                pass
             raise
 
     finally:
@@ -503,12 +502,10 @@ async def locked_json_update(
             )
 
         except Exception:
-            try:
+            with contextlib.suppress(OSError):
                 await asyncio.get_running_loop().run_in_executor(
                     None, os.unlink, tmp_path
                 )
-            except Exception:
-                pass
             raise
 
         return updated_data
