@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 import warnings
 
-import file_lock
 import pytest
 from file_lock import (
     FileLock,
@@ -25,6 +25,9 @@ from file_lock import (
     locked_read,
     locked_write,
 )
+
+#: The module itself, for the tests that swap its platform hooks.
+file_lock = sys.modules[FileLock.__module__]
 
 
 def test_a_waiter_never_shares_the_lock_with_a_newcomer(tmp_path):
@@ -83,10 +86,13 @@ def test_an_atomic_write_is_whole_or_absent(tmp_path):
         f.write(b"\x00\x01")
     assert (tmp_path / "blob.bin").read_bytes() == b"\x00\x01"
 
-    with pytest.raises(RuntimeError):
+    def crash_mid_write() -> None:
         with atomic_write(target) as f:
             f.write('{"n": 2, "half')
             raise RuntimeError("crashed mid-write")
+
+    with pytest.raises(RuntimeError):
+        crash_mid_write()
     assert json.loads(target.read_text(encoding="utf-8")) == {"n": 1}
     assert sorted(p.name for p in target.parent.iterdir()) == ["state.json"]
 

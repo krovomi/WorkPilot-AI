@@ -327,7 +327,6 @@ class TestProcessAgentStreamIntegration:
     @pytest.mark.asyncio
     async def test_claude_client_through_process_agent_stream(self):
         """ClaudeAgentClient messages should be processed by process_agent_stream."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         # Create a ClaudeAgentClient with mock SDK
         # Use proper named classes since SimpleNamespace.__class__ assignment is
@@ -377,8 +376,6 @@ class TestProcessAgentStreamIntegration:
     async def test_copilot_client_through_process_agent_stream(self):
         """CopilotAgentClient messages should be processed by process_agent_stream."""
         import time
-
-        from runners.github.services.sdk_utils import process_agent_stream
 
         client = CopilotAgentClient(model="gpt-4o", github_token="gho_test_oauth")
         # Pre-set a valid copilot token to avoid real HTTP token exchange

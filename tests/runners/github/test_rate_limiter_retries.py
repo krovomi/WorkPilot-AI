@@ -9,11 +9,11 @@ any other error has to surface at once rather than be retried.
 from __future__ import annotations
 
 import asyncio
+import sys
 import time
 import types
 
 import pytest
-import rate_limiter as rate_limiter_module
 from rate_limiter import (
     RateLimiter,
     RateLimitExceeded,
@@ -21,6 +21,9 @@ from rate_limiter import (
     check_rate_limit,
     rate_limited,
 )
+
+#: The module itself, for the tests that replace its clock.
+rate_limiter_module = sys.modules[RateLimiter.__module__]
 
 
 @pytest.fixture(autouse=True)

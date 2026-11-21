@@ -47,7 +47,7 @@ reviewer_module = importlib.import_module(
 )
 
 FILES_ENDPOINT = (
-    "api --method GET repos/{owner}/{repo}/pulls/9/files?page=1&per_page=100"
+    "api --method GET repos/{owner}/{repo}/pulls/9/files -f page=1 -f per_page=100"
 )
 EXPLANATION = "The finding claimed X; the code shows Y, so it is not real."
 

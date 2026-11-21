@@ -41,8 +41,8 @@ from runners.github.services.deep_context_provider import DeepContext
 HEAD = "bbb222ccc333"
 CHECKS = "pr checks 5 --json name,state -R own/repo"
 HEAD_OID = "pr view 5 --json headRefOid -R own/repo"
-RUNS = "api --method GET repos/{owner}/{repo}/actions/runs?status=action_required&per_page=100"
-FILES = "api --method GET repos/{owner}/{repo}/pulls/5/files?page=1&per_page=100"
+RUNS = "api --method GET repos/{owner}/{repo}/actions/runs -f status=action_required -f per_page=100"
+FILES = "api --method GET repos/{owner}/{repo}/pulls/5/files -f page=1 -f per_page=100"
 
 
 def finding(

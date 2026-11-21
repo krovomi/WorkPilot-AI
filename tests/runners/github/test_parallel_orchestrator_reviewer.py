@@ -59,7 +59,7 @@ EXPLANATION = "The finding claimed X; the code shows Y, which settles it."
 
 CHECKS = "pr checks 7 --json name,state -R own/repo"
 HEAD_OID = "pr view 7 --json headRefOid -R own/repo"
-FILES = "api --method GET repos/{owner}/{repo}/pulls/7/files?page=1&per_page=100"
+FILES = "api --method GET repos/{owner}/{repo}/pulls/7/files -f page=1 -f per_page=100"
 
 
 def fid(file: str, line: int, title: str) -> str:

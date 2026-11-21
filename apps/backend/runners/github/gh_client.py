@@ -64,6 +64,19 @@ class GHCommandResult:
     total_time: float
 
 
+def _get_args(endpoint: str, **params: object) -> list[str]:
+    """`gh api` arguments for a GET with query parameters.
+
+    The parameters go as `-f` fields: with `--method GET`, gh puts them in the
+    query string (without it, gh would send a POST). No argument carries `&`,
+    which a Windows `.cmd` shim of gh would read as a command separator.
+    """
+    args = ["api", "--method", "GET", endpoint]
+    for key, value in params.items():
+        args.extend(["-f", f"{key}={value}"])
+    return args
+
+
 class GHClient:
     """
     Async client for GitHub CLI with timeout and retry protection.
@@ -587,15 +600,7 @@ class GHClient:
         Returns:
             JSON response
         """
-        # Explicit GET: with fields and no --method, gh sends a POST and puts
-        # the fields in its body; with GET they go to the query string.
-        args = ["api", "--method", "GET", endpoint]
-
-        if params:
-            for key, value in params.items():
-                args.extend(["-f", f"{key}={value}"])
-
-        result = await self.run(args)
+        result = await self.run(_get_args(endpoint, **(params or {})))
         return json.loads(result.stdout)
 
     async def pr_merge(
@@ -920,10 +925,11 @@ class GHClient:
 
             # Query workflow runs with action_required status
             # Note: We need to use the API endpoint as gh CLI doesn't have direct support
-            endpoint = (
-                "repos/{owner}/{repo}/actions/runs?status=action_required&per_page=100"
+            args = _get_args(
+                "repos/{owner}/{repo}/actions/runs",
+                status="action_required",
+                per_page=100,
             )
-            args = ["api", "--method", "GET", endpoint]
 
             result = await self.run(args, timeout=30.0)
             data = json.loads(result.stdout) if result.stdout.strip() else {}
@@ -1036,8 +1042,11 @@ class GHClient:
         per_page = 100
 
         while True:
-            endpoint = f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/files?page={page}&per_page={per_page}"
-            args = ["api", "--method", "GET", endpoint]
+            args = _get_args(
+                f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/files",
+                page=page,
+                per_page=per_page,
+            )
 
             result = await self.run(args, timeout=60.0)
             page_files = json.loads(result.stdout) if result.stdout.strip() else []
@@ -1088,8 +1097,11 @@ class GHClient:
         per_page = 100
 
         while True:
-            endpoint = f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/commits?page={page}&per_page={per_page}"
-            args = ["api", "--method", "GET", endpoint]
+            args = _get_args(
+                f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/commits",
+                page=page,
+                per_page=per_page,
+            )
 
             result = await self.run(args, timeout=60.0)
             page_commits = json.loads(result.stdout) if result.stdout.strip() else []

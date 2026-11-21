@@ -488,9 +488,7 @@ MERGE_STATUS = "pr view 7 --json mergeable,mergeStateStatus"
 
 
 def _pages(kind: str) -> str:
-    return (
-        f"api --method GET repos/{{owner}}/{{repo}}/pulls/7/{kind}?page=1&per_page=100"
-    )
+    return f"api --method GET repos/{{owner}}/{{repo}}/pulls/7/{kind} -f page=1 -f per_page=100"
 
 
 def _since(kind: str) -> str:

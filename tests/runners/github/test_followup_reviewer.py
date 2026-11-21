@@ -37,7 +37,7 @@ from runners.github.services.followup_reviewer import FollowupReviewer
 from tests.review_llm_fake import StandInModel
 
 FILES_ENDPOINT = (
-    "api --method GET repos/{owner}/{repo}/pulls/9/files?page=1&per_page=100"
+    "api --method GET repos/{owner}/{repo}/pulls/9/files -f page=1 -f per_page=100"
 )
 
 DIFF = """--- a/app.py

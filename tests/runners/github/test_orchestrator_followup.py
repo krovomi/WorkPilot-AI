@@ -35,7 +35,7 @@ OLD = "aaa111bbb222"
 NEW = "ccc333ddd444"
 CHECKS = "pr checks 5 --json name,state -R own/repo"
 HEAD_OID = "pr view 5 --json headRefOid -R own/repo"
-RUNS = "api --method GET repos/{owner}/{repo}/actions/runs?status=action_required&per_page=100"
+RUNS = "api --method GET repos/{owner}/{repo}/actions/runs -f status=action_required -f per_page=100"
 
 
 def finding(fid, severity=ReviewSeverity.MEDIUM) -> PRReviewFinding:

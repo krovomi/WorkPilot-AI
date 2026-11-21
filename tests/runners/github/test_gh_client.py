@@ -194,6 +194,12 @@ def test_without_a_repository_no_repository_flag_is_sent(local_client, gh):
     ]
 
 
+PR_FIELDS = (
+    "number,title,body,state,headRefName,baseRefName,author,files,"
+    "additions,deletions,changedFiles"
+)
+
+
 def test_a_pull_request_is_read_with_its_files_by_default(client, gh):
     gh.answer({"pr view 7": {"stdout": json.dumps({"number": 7})}})
     assert run(client.pr_get(7)) == {"number": 7}
@@ -202,8 +208,7 @@ def test_a_pull_request_is_read_with_its_files_by_default(client, gh):
         "view",
         "7",
         "--json",
-        "number,title,body,state,headRefName,baseRefName,author,files,"
-        "additions,deletions,changedFiles",
+        PR_FIELDS,
         "-R",
         REPO,
     ]
@@ -494,7 +499,7 @@ def test_unreadable_checks_are_reported_as_an_error(client, gh):
 
 RUNS_KEY = (
     "api --method GET repos/{owner}/{repo}/actions/runs"
-    "?status=action_required&per_page=100"
+    " -f status=action_required -f per_page=100"
 )
 
 
@@ -596,7 +601,7 @@ def test_runs_awaiting_approval_count_as_pending_checks(client, gh):
 def _page_key(kind: str, page: int) -> str:
     return (
         f"api --method GET repos/{{owner}}/{{repo}}/pulls/7/{kind}"
-        f"?page={page}&per_page=100"
+        f" -f page={page} -f per_page=100"
     )
 
 
@@ -610,6 +615,9 @@ def test_pull_request_files_are_read_page_by_page(client, gh):
     )
     files = run(client.get_pr_files(7))
     assert len(files) == 101 and files[-1]["filename"] == "last.py"
+    # The query goes in fields: no argument holds the `&` that a Windows
+    # `.cmd` shim of gh would read as a command separator.
+    assert not any("&" in arg for call in gh.calls() for arg in call)
 
 
 def test_a_full_last_page_ends_on_the_next_empty_one(client, gh):

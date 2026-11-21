@@ -140,7 +140,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_delegates_to_sdk_stream_for_non_agent_client(self):
         """Non-AgentClient objects should delegate to process_sdk_stream."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         raw_sdk_client = MagicMock()  # Not an AgentClient instance
 
@@ -164,7 +163,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_basic_text_stream(self):
         """Simple text messages should accumulate in result_text."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         client = MockAgentClient(messages=[_text_msg("Hello "), _text_msg("World")])
 
@@ -177,7 +175,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_text_callback_invoked(self):
         """on_text callback should be called for text blocks."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         texts = []
         client = MockAgentClient(messages=[_text_msg("abc")])
@@ -189,7 +186,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_thinking_callback(self):
         """on_thinking callback should be called for thinking blocks."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         thoughts = []
         client = MockAgentClient(messages=[_thinking_msg("Let me think...")])
@@ -203,7 +199,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_tool_use_callback(self):
         """on_tool_use callback should be called for tool invocations."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         tools = []
         client = MockAgentClient(
@@ -221,7 +216,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_tool_result_callback(self):
         """on_tool_result callback should be called for tool results."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         results = []
         client = MockAgentClient(
@@ -241,7 +235,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_structured_output_callback(self):
         """on_structured_output should be called and structured_output captured."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         outputs = []
         data = {"findings": [{"severity": "high"}]}
@@ -258,7 +251,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_subagent_task_tool_tracking(self):
         """Task tool calls should be tracked as sub-agent invocations."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         client = MockAgentClient(
             messages=[
@@ -275,7 +267,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_circuit_breaker_max_messages(self):
         """Message count exceeding limit should trigger circuit breaker."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         # Create more messages than the limit
         msgs = [_text_msg(f"msg{i}") for i in range(10)]
@@ -291,7 +282,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_concurrency_error_detection(self):
         """Tool concurrency error in text should be detected."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         # The error pattern that _is_tool_concurrency_error checks for
         error_text = "Error: 400 tool use is not allowed"
@@ -305,7 +295,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_result_block_structured_output(self):
         """ResultMessage with structured_output should be captured."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         data = {"score": 95}
         client = MockAgentClient(messages=[_result_msg(structured_output=data)])
@@ -317,7 +306,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_result_block_error_subtype(self):
         """ResultMessage with error subtype should set stream_error."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         client = MockAgentClient(
             messages=[_result_msg(subtype="error_max_structured_output_retries")]
@@ -330,7 +318,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_empty_stream(self):
         """Empty stream should return clean result."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         client = MockAgentClient(messages=[])
 
@@ -344,7 +331,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_mixed_message_stream(self):
         """Complex stream with thinking, tool use, results, and text."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         client = MockAgentClient(
             messages=[
@@ -381,7 +367,6 @@ class TestProcessAgentStream:
     @pytest.mark.asyncio
     async def test_exception_in_stream(self):
         """Exception during stream processing should be caught and returned as error."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         class FailingClient(MockAgentClient):
             async def receive_response(self):
