@@ -82,7 +82,8 @@ def build_feedback(report: DiffReport, *, iteration: int, threshold: float) -> d
     }
 
 
-def _files_block(files: dict[str, str]) -> str:
+def files_block(files: dict[str, str]) -> str:
+    """The files in delimited blocks, cut past ``MAX_FILES_CHARS`` in all."""
     parts: list[str] = []
     budget = MAX_FILES_CHARS
     for path, content in files.items():
@@ -111,12 +112,20 @@ def build_prompt(
         "width": str(feedback["size"]["width"]),
         "height": str(feedback["size"]["height"]),
         "threshold": str(feedback["threshold"]),
-        "preview_note": _MIRROR_NOTE.format(stack=stack_label, preview=PREVIEW_PATH)
-        if mirror
-        else "",
+        "preview_note": mirror_note(stack_label) if mirror else "",
         "feedback": json.dumps(feedback, indent=2),
-        "files": _files_block(files),
+        "files": files_block(files),
     }
+    return fill(template, values)
+
+
+def mirror_note(stack_label: str) -> str:
+    """What the model is told when the rendering is the static HTML mirror."""
+    return _MIRROR_NOTE.format(stack=stack_label, preview=PREVIEW_PATH)
+
+
+def fill(template: str, values: dict[str, str]) -> str:
+    """``template`` with each ``{{key}}`` replaced by its value."""
     for key, value in values.items():
         template = template.replace("{{" + key + "}}", value)
     return template

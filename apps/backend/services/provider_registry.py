@@ -1,12 +1,12 @@
 """
-Provider Registry Backend - Service centralisé pour la gestion des providers LLM
-Point d'entrée unique pour le backend
+The static provider catalogue: each provider's label, category and models.
+
+Read by `shared_board/engines.py`, which offers these models on the phone's
+New card screen (`GET /api/board/engines`). It says nothing about whether a
+provider is configured on this machine: that is `core.auth` and
+`capabilities/providers.yaml`.
 """
 
-import os
-import subprocess
-import threading
-from datetime import datetime
 from typing import Any
 
 # Constants for commonly used model names to avoid duplication
@@ -36,47 +36,10 @@ class Provider:
         self.models = models or []
 
 
-class ProviderStatus:
-    def __init__(
-        self,
-        available: bool = False,
-        authenticated: bool = False,
-        error: str | None = None,
-        last_checked: datetime | None = None,
-    ):
-        self.available = available
-        self.authenticated = authenticated
-        self.error = error
-        self.last_checked = last_checked or datetime.now()
-
-
 class ProviderRegistry:
-    _instance = None
-    # Lock guards both __new__ and get_instance against concurrent
-    # bootstrap. Without it, two threads racing into ProviderRegistry()
-    # could both observe `_instance is None`, each create + initialize
-    # their own dict (2x `_initialize_providers` work), and the loser
-    # would discard updates the winner just made.
-    _instance_lock = threading.Lock()
-
-    def __new__(cls):
-        if cls._instance is None:
-            with cls._instance_lock:
-                if cls._instance is None:
-                    instance = super().__new__(cls)
-                    instance._providers = {}
-                    instance._initialize_providers()
-                    # Publish AFTER initialization so other threads never
-                    # see a half-built instance.
-                    cls._instance = instance
-        return cls._instance
-
-    @classmethod
-    def get_instance(cls):
-        # __new__ already handles the locking; calling cls() here is safe.
-        if cls._instance is None:
-            return cls()
-        return cls._instance
+    def __init__(self) -> None:
+        self._providers: dict[str, Provider] = {}
+        self._initialize_providers()
 
     def _initialize_providers(self):
         """Initialise tous les providers disponibles"""
@@ -820,204 +783,5 @@ class ProviderRegistry:
             for p in self._providers.values()
         ]
 
-    def get_provider(self, name: str) -> Provider | None:
-        """Retourne un provider par son nom"""
-        return self._providers.get(name)
 
-    def check_provider_status(
-        self, name: str, profiles: list[dict[str, Any]] = None
-    ) -> ProviderStatus:
-        """Vérifie le statut d'authentification d'un provider"""
-        provider = self.get_provider(name)
-        if not provider:
-            return ProviderStatus(
-                available=False, authenticated=False, error=f"Provider {name} not found"
-            )
-
-        status = ProviderStatus(available=True, authenticated=False)
-
-        try:
-            # Cas spécial pour Anthropic (toujours disponible via OAuth/Claude Code)
-            if name == "anthropic":
-                from core.auth import get_auth_token
-
-                token = get_auth_token() or os.getenv("ANTHROPIC_API_KEY")
-                status.authenticated = bool(token)
-                return status
-
-            # Cas spécial pour GitHub Copilot (vérification gh CLI)
-            if name == "copilot" and provider.requires_cli:
-                status.authenticated = self._check_copilot_auth()
-                return status
-
-            # Vérification pour les providers requiring API key
-            if provider.requires_api_key:
-                has_profile = self._has_profile_for_provider(name, profiles or [])
-                has_env_key = bool(os.getenv(f"{name.upper()}_API_KEY"))
-                status.authenticated = has_profile or has_env_key
-
-            # Vérification pour les providers requiring OAuth
-            if provider.requires_oauth:
-                status.authenticated = self._check_oauth_status(name)
-
-        except Exception as e:
-            status.error = str(e)
-            status.authenticated = False
-
-        return status
-
-    def check_all_providers_status(
-        self, profiles: list[dict[str, Any]] = None
-    ) -> dict[str, ProviderStatus]:
-        """Vérifie le statut de tous les providers"""
-        status = {}
-        for name in self._providers.keys():
-            status[name] = self.check_provider_status(name, profiles)
-        return status
-
-    def _check_copilot_auth(self) -> bool:
-        """Vérifie si GitHub Copilot CLI est authentifié et fonctionnel"""
-        try:
-            result = subprocess.run(
-                ["gh", "auth", "status"], capture_output=True, text=True, timeout=10
-            )
-            output = result.stdout + result.stderr
-            if "Logged in to github.com" in output:
-                copilot_check = subprocess.run(
-                    ["gh", "copilot", "--version"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                return copilot_check.returncode == 0
-            return False
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return False
-
-    def _has_profile_for_provider(
-        self, provider_name: str, profiles: list[dict[str, Any]]
-    ) -> bool:
-        """Vérifie si un profil existe pour le provider"""
-        for profile in profiles:
-            if self._detect_provider_from_profile(profile) == provider_name:
-                return True
-        return False
-
-    def _detect_provider_from_profile(self, profile: dict[str, Any]) -> str:
-        """Détecte le provider à partir d'un profil"""
-        base_url = profile.get("baseUrl", "").lower()
-        name = profile.get("name", "").lower()
-
-        # Configuration de détection des providers
-        provider_patterns = [
-            ("anthropic", ["anthropic.com", "claude"]),
-            ("openai", ["openai.com", "openai"]),
-            ("google", ["google.com", "gemini"]),
-            ("meta", ["meta.com", "llama"]),
-            ("mistral", ["mistral.ai", "mistral"]),
-            ("deepseek", ["deepseek.com", "deepseek"]),
-            ("aws", ["aws.amazon.com", "bedrock"]),
-            ("ollama", ["ollama"]),
-            ("grok", ["x.ai", "grok"]),
-            ("windsurf", ["codeium.com", "windsurf", "api.windsurf.com"]),
-        ]
-
-        # Recherche du provider correspondant
-        for provider_name, patterns in provider_patterns:
-            if self._matches_patterns(base_url, name, patterns):
-                return provider_name
-
-        return "custom"
-
-    def _matches_patterns(self, base_url: str, name: str, patterns: list[str]) -> bool:
-        """Vérifie si l'URL ou le nom correspond aux patterns du provider"""
-        for pattern in patterns:
-            if pattern in base_url or pattern in name:
-                return True
-        return False
-
-    def _check_oauth_status(self, provider_name: str) -> bool:
-        """Vérifie le statut OAuth/SSO pour un provider"""
-        # Logique OAuth spécifique
-        if provider_name == "anthropic":
-            # Vérifier le token Claude Code OAuth
-            return bool(
-                os.getenv("CLAUDE_CODE_OAUTH_TOKEN") or os.getenv("ANTHROPIC_API_KEY")
-            )
-        if provider_name == "windsurf":
-            # Windsurf SSO: check for Codeium OAuth token from local IDE installation
-            return bool(
-                os.getenv("WINDSURF_OAUTH_TOKEN") or os.getenv("CODEIUM_API_KEY")
-            )
-        return False
-
-    def add_provider(self, provider: Provider) -> None:
-        """Ajoute dynamiquement un nouveau provider"""
-        self._providers[provider.name] = provider
-
-    def remove_provider(self, name: str) -> bool:
-        """Supprime un provider"""
-        return name in self._providers and self._providers.pop(name) is not None
-
-    def update_provider(self, name: str, updates: dict[str, Any]) -> bool:
-        """Met à jour un provider existant"""
-        existing = self._providers.get(name)
-        if not existing:
-            return False
-
-        for key, value in updates.items():
-            if hasattr(existing, key):
-                setattr(existing, key, value)
-
-        return True
-
-
-# Singleton instance
-provider_registry = ProviderRegistry.get_instance()
-
-
-# Fonctions utilitaires pour la compatibilité avec l'ancien code
-def get_providers_dict():
-    """Fonction de compatibilité - retourne le statut des providers au format ancien"""
-    status = provider_registry.check_all_providers_status()
-    return {name: status.authenticated for name, status in status.items()}
-
-
-def list_available_providers() -> list[str]:
-    """Retourne la liste des providers LLM disponibles sur cette machine."""
-    providers_dict = get_providers_dict()
-    return [name for name, ok in providers_dict.items() if ok]
-
-
-def validate_provider(provider: str) -> bool:
-    """Vérifie si le provider est disponible/configuré."""
-    providers_dict = get_providers_dict()
-    return provider in providers_dict and providers_dict[provider]
-
-
-def get_provider_status() -> dict[str, bool]:
-    """Retourne le statut de disponibilité de chaque provider connu."""
-    return get_providers_dict()
-
-
-def get_providers_with_status(profiles: list[dict[str, Any]] = None) -> dict[str, Any]:
-    """Retourne les providers avec leur statut (format compatible avec l'API existante)"""
-    status = provider_registry.check_all_providers_status(profiles)
-    providers = provider_registry.get_all_providers()
-
-    # Convertir le statut au format booléen pour compatibilité
-    simplified_status = {name: status.authenticated for name, status in status.items()}
-
-    return {"providers": providers, "status": simplified_status}
-
-
-def get_provider_models(provider_name: str) -> list[dict[str, Any]]:
-    """Retourne les modèles pour un provider"""
-    provider = provider_registry.get_provider(provider_name)
-    return provider.models if provider else []
-
-
-if __name__ == "__main__":
-    print("Providers disponibles :")
-    for name, status in get_provider_status().items():
-        print(f"- {name}: {'OK' if status else 'Non configuré'}")
+provider_registry = ProviderRegistry()

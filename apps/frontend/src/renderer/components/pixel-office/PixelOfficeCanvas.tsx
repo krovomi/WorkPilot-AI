@@ -6,6 +6,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FAMILY_SHIRTS } from "../../lib/pixel-office-providers";
+import type { DecorId } from "../../lib/pixel-office-seasons";
 import {
 	type AgentActivity,
 	type PixelAgent,
@@ -21,6 +23,7 @@ import {
 	seatPosition,
 	toOfficePoint,
 } from "./office-layout";
+import { drawSeasonDecor } from "./office-decor";
 import {
 	type ActivityIcon,
 	CHAIR_H,
@@ -298,6 +301,7 @@ function drawAgent({
 		agent.characterIndex,
 		activityToDirection(agent.activity),
 		animFrame,
+		agent.providerFamily && FAMILY_SHIRTS[agent.providerFamily],
 	);
 
 	// Selection ring
@@ -443,6 +447,8 @@ function drawDecorations(
 
 // ── Component ────────────────────────────────────────────────
 
+const NO_DECOR: readonly DecorId[] = [];
+
 interface PixelOfficeCanvasProps {
 	readonly width: number;
 	readonly height: number;
@@ -450,6 +456,8 @@ interface PixelOfficeCanvasProps {
 	readonly emptyDeskLabel: string;
 	/** Calm: the scene is still drawn, but nothing bobs, glows or blinks. */
 	readonly calm?: boolean;
+	/** The decor the project's seasons earned. */
+	readonly decor?: readonly DecorId[];
 	readonly onAgentClick?: (
 		agentId: string,
 		screenX: number,
@@ -462,6 +470,7 @@ export function PixelOfficeCanvas({
 	height,
 	emptyDeskLabel,
 	calm = false,
+	decor = NO_DECOR,
 	onAgentClick,
 }: PixelOfficeCanvasProps) {
 	// State rather than a ref: the effects below run again once the element
@@ -505,6 +514,8 @@ export function PixelOfficeCanvas({
 	emptyLabelRef.current = emptyDeskLabel;
 	const calmRef = useRef(calm);
 	calmRef.current = calm;
+	const decorRef = useRef(decor);
+	decorRef.current = decor;
 
 	// ── Render loop ────────────────────────────────────────
 
@@ -589,6 +600,7 @@ export function PixelOfficeCanvas({
 			}
 
 			drawDecorations(ctx, layout, z);
+			drawSeasonDecor(ctx, layout, z, decorRef.current);
 			ctx.restore();
 		},
 		[],

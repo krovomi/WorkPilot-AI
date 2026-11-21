@@ -703,6 +703,40 @@
 		},
 		"help": "Décidé sans IA d'après la catégorie, l'élément importé ou les mots du titre. Changez-le s'il est faux : les prochaines versions choisiront le parcours à partir de lui."
 	},
+	"cardType": {
+		"label": "Type de carte",
+		"values": {
+			"feature": "Fonctionnalité",
+			"ux": "UI / UX",
+			"bug": "Bug",
+			"hotfix": "Correctif urgent",
+			"security": "Sécurité",
+			"perf": "Performance",
+			"refactor": "Refactoring",
+			"test": "Tests",
+			"investigation": "Investigation",
+			"spike": "Spike / POC",
+			"docs": "Documentation",
+			"run": "Exploitation (RUN)",
+			"upgrade": "Montée de version",
+			"infra": "Infra / maintenance"
+		},
+		"proposedTitle": "{{type}} (proposé, à confirmer dans le détail de la tâche)",
+		"also": "Aussi : {{type}}",
+		"basis": {
+			"user": "choisi par vous",
+			"category": "d'après la catégorie",
+			"import": "d'après l'élément importé",
+			"keywords": "d'après le titre",
+			"severity": "d'après la sévérité de sécurité",
+			"origin": "d'après l'origine de la carte"
+		},
+		"preview": {
+			"field": "{{label}} : {{value}}",
+			"progress": "{{status}} · {{percent}} %",
+			"blockedBy": "Attend : {{titles}}"
+		}
+	},
 	"images": {
 		"removeImageAriaLabel": "Supprimer l'image {{filename}}",
 		"pasteHint": "Astuce : Collez des captures d'écran directement avec {{shortcut}} pour ajouter des images de référence."

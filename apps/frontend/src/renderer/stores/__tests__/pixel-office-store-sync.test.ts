@@ -104,6 +104,29 @@ describe("Kanban tasks", () => {
 		expect(todo).toMatchObject({ seatIndex: -1, waitingIndex: 0, isClaudeMode: false });
 	});
 
+	it("dresses each agent in the colour of the provider running it", () => {
+		const metadata = { phaseProviders: { planning: "google", coding: "openai", qa: "ollama" } };
+		store().syncAll(
+			[terminal("claude", { isClaudeMode: true }), terminal("shell")],
+			[
+				task("plan", { metadata, executionProgress: { phase: "planning" } } as never),
+				task("none"),
+			],
+		);
+		const familyOf = (id: string) => store().agents.find((a) => a.id === id)?.providerFamily;
+		expect(familyOf("claude")).toBe("anthropic");
+		expect(familyOf("shell")).toBeUndefined();
+		expect(familyOf("task:plan")).toBe("google");
+		expect(familyOf("task:none")).toBeUndefined();
+
+		store().syncAll(
+			[terminal("claude"), terminal("shell")],
+			[task("plan", { metadata, executionProgress: { phase: "qa_review" } } as never)],
+		);
+		expect(familyOf("claude")).toBeUndefined();
+		expect(familyOf("task:plan")).toBe("ollama");
+	});
+
 	it("keeps an agent's character and desk across syncs", () => {
 		store().syncAll([terminal("t")], [task("k")]);
 		const before = store().agents.find((a) => a.id === "task:k");
@@ -216,10 +239,23 @@ describe("selection and settings", () => {
 			soundEnabled: false,
 			autoAssignSeats: true,
 			calmMode: false,
+			narratives: true,
+			narrativesAi: false,
 		});
 
 		localStorage.setItem("pixel-office-settings", JSON.stringify({ state: null, version: 0 }));
 		await usePixelOfficeStore.persist.rehydrate();
 		expect(store().settings.zoom).toBe(3);
+	});
+
+	it("turns the model's scenes on only for a saved true", async () => {
+		for (const [saved, on] of [[true, true], ["true", false], [1, false]] as const) {
+			localStorage.setItem(
+				"pixel-office-settings",
+				JSON.stringify({ state: { settings: { narrativesAi: saved } }, version: 0 }),
+			);
+			await usePixelOfficeStore.persist.rehydrate();
+			expect(store().settings.narrativesAi).toBe(on);
+		}
 	});
 });

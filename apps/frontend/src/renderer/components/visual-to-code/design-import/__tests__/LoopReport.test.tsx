@@ -16,7 +16,7 @@ import type {
 	DesignBreakpointCheck,
 	DesignLoopSpend,
 } from "../../../../../shared/types/design-to-code";
-import { dollars, ResponsivePanel, SpendLine, StatesPanel } from "../LoopReport";
+import { dollars, PassFixLine, ResponsivePanel, SpendLine, StatesPanel } from "../LoopReport";
 
 function spend(overrides: Partial<DesignLoopSpend> = {}): DesignLoopSpend {
 	return {
@@ -186,5 +186,25 @@ describe("StatesPanel", () => {
 		expect(screen.getByTestId("design-loop-states")).toHaveTextContent("loop.reason.load_failed");
 		rerender(<StatesPanel pass={{ status: "failed" }} />);
 		expect(screen.getByTestId("design-loop-states")).toHaveTextContent("loop.reason.load_failed");
+	});
+});
+
+describe("PassFixLine", () => {
+	it("says whether the fix was kept, and why not", () => {
+		const { rerender } = render(
+			<PassFixLine fix={{ status: "kept", before: 6, after: 1, score: 0.966, score_before: 0.97, applied_edits: 2 }} />,
+		);
+		const line = screen.getByTestId("design-loop-pass-fix");
+		expect(line).toHaveTextContent('loop.passFix.kept {"before":6,"after":1,"score":"96.6","scoreBefore":"97"}');
+
+		rerender(<PassFixLine fix={{ status: "budget", budget_kind: "cost", before: 3 }} />);
+		expect(line).toHaveTextContent('loop.passFix.budget_cost {"before":3,"after":3,"score":"0","scoreBefore":"0"}');
+		rerender(<PassFixLine fix={{ status: "budget", before: 3 }} />);
+		expect(line).toHaveTextContent("loop.passFix.budget_tokens");
+
+		rerender(<PassFixLine fix={{ status: "failed", before: 3, detail: "provider answered HTTP 500" }} />);
+		expect(screen.getByText("provider answered HTTP 500")).toBeInTheDocument();
+		rerender(<PassFixLine fix={{ status: "failed", before: 3 }} />);
+		expect(screen.queryByText("provider answered HTTP 500")).toBeNull();
 	});
 });

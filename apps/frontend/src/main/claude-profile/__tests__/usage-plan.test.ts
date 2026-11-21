@@ -17,6 +17,11 @@ const world = vi.hoisted(() => ({
 	home: "",
 	profiles: new Map<string, Record<string, unknown>>(),
 	profileManagerThrows: false,
+	saved: [] as Array<Record<string, unknown>>,
+	saveThrows: false,
+	live: undefined as
+		| { subscriptionType: string; rateLimitTier?: string }
+		| undefined,
 	keychain: {
 		subscriptionType: null as string | null,
 		rateLimitTier: null as string | null,
@@ -46,8 +51,19 @@ vi.mock("node:os", async (importOriginal) => {
 vi.mock("../../claude-profile-manager", () => ({
 	getClaudeProfileManager: () => {
 		if (world.profileManagerThrows) throw new Error("not initialized");
-		return { getProfile: (id: string) => world.profiles.get(id) };
+		return {
+			getProfile: (id: string) => world.profiles.get(id),
+			saveProfile: (profile: Record<string, unknown>) => {
+				if (world.saveThrows) throw new Error("disk full");
+				world.saved.push(profile);
+				return profile;
+			},
+		};
 	},
+}));
+
+vi.mock("../claude-account-plan", () => ({
+	readClaudeAccountPlan: vi.fn(async () => world.live),
 }));
 
 vi.mock("../credential-utils", () => ({
@@ -98,6 +114,7 @@ vi.mock("../../platform", () => ({
 	isMacOS: () => world.mac,
 }));
 
+import { readClaudeAccountPlan } from "../claude-account-plan";
 import { getFullCredentialsFromKeychain } from "../credential-utils";
 import {
 	readCursorMembership,
@@ -146,6 +163,9 @@ beforeEach(() => {
 	world.home = mkdtempSync(path.join(tmpdir(), "usage-plan-"));
 	world.profiles = new Map();
 	world.profileManagerThrows = false;
+	world.saved = [];
+	world.saveThrows = false;
+	world.live = undefined;
 	world.keychain = { subscriptionType: null, rateLimitTier: null };
 	world.keychainThrows = false;
 	world.apiProfiles = [];
@@ -181,6 +201,60 @@ describe("withUsagePlan — Claude", () => {
 			name: "Claude Max 20x",
 		});
 		expect(getFullCredentialsFromKeychain).not.toHaveBeenCalled();
+	});
+
+	it("shows the plan the account has now and saves it over a stale login copy", async () => {
+		// Signed in on Pro, moved to Max since.
+		world.profiles.set("claude-1", {
+			id: "claude-1",
+			configDir: "/cfg",
+			subscriptionType: "pro",
+			rateLimitTier: "default_claude_ai",
+		});
+		world.live = { subscriptionType: "max", rateLimitTier: "default_claude_max_20x" };
+		const result = await withUsagePlan(snapshot());
+		expect(result.plan).toEqual({ billing: "subscription", name: "Claude Max 20x" });
+		expect(readClaudeAccountPlan).toHaveBeenCalledWith("/cfg");
+		expect(world.saved).toEqual([
+			{
+				id: "claude-1",
+				configDir: "/cfg",
+				subscriptionType: "max",
+				rateLimitTier: "default_claude_max_20x",
+			},
+		]);
+	});
+
+	it("keeps the stored tier when the account's plan is the same and says no tier", async () => {
+		world.profiles.set("claude-1", {
+			id: "claude-1",
+			subscriptionType: "max",
+			rateLimitTier: "default_claude_max_5x",
+		});
+		world.live = { subscriptionType: "max" };
+		expect((await withUsagePlan(snapshot())).plan?.name).toBe("Claude Max 5x");
+		expect(world.saved).toEqual([]);
+	});
+
+	it("drops a tier stored for another plan", async () => {
+		world.profiles.set("claude-1", {
+			id: "claude-1",
+			subscriptionType: "max",
+			rateLimitTier: "default_claude_max_20x",
+		});
+		world.live = { subscriptionType: "pro" };
+		expect((await withUsagePlan(snapshot())).plan?.name).toBe("Claude Pro");
+		expect(world.saved[0]).toMatchObject({
+			subscriptionType: "pro",
+			rateLimitTier: undefined,
+		});
+	});
+
+	it("shows the account's plan even when it cannot be saved", async () => {
+		world.profiles.set("claude-1", { id: "claude-1", subscriptionType: "pro" });
+		world.live = { subscriptionType: "max" };
+		world.saveThrows = true;
+		expect((await withUsagePlan(snapshot())).plan?.name).toBe("Claude Max");
 	});
 
 	it("reads the credentials store when the profile has no plan yet", async () => {
