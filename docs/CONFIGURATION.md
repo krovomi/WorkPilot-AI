@@ -807,6 +807,8 @@ Project settings writes `GITHUB_REPO` and `GITLAB_PROJECT` into the project's
 | `GITLAB_PROJECT` | — | The project's `group/project`, for the same uses on GitLab. |
 | `AZURE_DEVOPS_EXT_PAT` | — | Read when `AZURE_DEVOPS_PAT` is unset (it is the Azure DevOps CLI's name for it): pushes a task branch and opens its pull request. Secret. |
 | `GITHUB_BOT_TOKEN` | — | Token of the GitHub automation runner's bot account (PR review, auto-fix, triage) when `--bot-token` is not given. It only identifies that account, so the runner skips what the bot wrote itself; nothing is posted with it. Secret. |
+| `ISSUE_EMBEDDINGS_PROVIDER` | first with a key | Which service compares issues by meaning for triage's possible duplicates: `huggingface`, `openai`, `voyage`, `local` (sentence-transformers), or `none` for shared title words. Unset, the first of Hugging Face, OpenAI and Voyage with a key; under strict offline mode only `local`, and only when named. A failing service falls back to shared words. |
+| `ISSUE_EMBEDDINGS_MODEL` | service default | Embedding model of that service (`thenlper/gte-large` on Hugging Face, `text-embedding-3-small`, `voyage-large-2`, `all-MiniLM-L6-v2`). Vectors are cached per service and model in `.workpilot/github/embeddings/`. |
 | `MAX_PR_WORKTREES` | 10 | PR-review worktrees kept in `.workpilot/github/pr/worktrees`; the oldest go beyond that. |
 | `PR_WORKTREE_MAX_AGE_DAYS` | 7 | Age, in days, past which a PR-review worktree is removed, checked before each new review. `0` removes them all. |
 
