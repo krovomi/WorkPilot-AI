@@ -35,5 +35,8 @@
 	"kickers": {
 		"queue": "Queue",
 		"plan": "Plan"
+	},
+	"server": {
+		"waiting": "Your approval is recorded: {{count}} of {{needed}}. The build starts once the card has every approval it needs."
 	}
 }

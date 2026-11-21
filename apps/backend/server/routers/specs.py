@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import (
@@ -17,8 +18,8 @@ from server.auth.deps import (
     effective_project_role,
     require_project_role,
 )
+from server.authz.approvals import may_approve_alone
 from server.authz.principal import get_principal
-from server.authz.self_approval import may_approve_own
 from server.db.engine import get_db
 from server.db.models import (
     AgentRun,
@@ -229,15 +230,18 @@ async def start_run(
     spec = await _get_spec_or_404(db, project_id, spec_id)
     ensure_can_act_on_spec(spec, user, None)
 
-    # A card without a review approves its own plan: the approval right's,
-    # within the deployment's rule on approving one's own card. Read before
-    # the claim below is written, which holds the database until committed.
-    may_skip_review = principal.has("review.approve") and await may_approve_own(
+    # A card without a review approves its own plan: only for someone whose
+    # approval alone is enough for the card, within the deployment's rule on
+    # approving one's own card. Read before the claim below is written, which
+    # holds the database until committed.
+    may_skip_review = await may_approve_alone(
         db,
+        principal=principal,
         project_id=project_id,
         org_id=project.org_id,
-        user_id=user.id,
         author_id=spec.created_by,
+        spec_name=spec.spec_name,
+        card_dir=Path(project.server_path) / ".workpilot" / "specs" / spec.spec_name,
     )
     if spec.claimed_by is None:
         spec.claimed_by = user.id

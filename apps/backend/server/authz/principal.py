@@ -40,6 +40,9 @@ class Principal:
     is_local: bool = False
     # Elevation granted by a recent step-up authentication, if any.
     elevated: bool = False
+    # ``(project_id, approver_id)``: the approvals lent to this person now
+    # (``server/authz/delegation.py``). Only the review routes honour them.
+    delegations: tuple[tuple[str, str], ...] = ()
 
     @property
     def is_platform_admin(self) -> bool:
@@ -53,6 +56,17 @@ class Principal:
 
     def has_all(self, *permissions: str) -> bool:
         return all(self.has(p) for p in permissions)
+
+    def acting_for(self, project_id: str | None) -> str | None:
+        """The approver whose approval this person holds on that project."""
+        return next((by for pid, by in self.delegations if pid == project_id), None)
+
+    def approval_slot(self, project_id: str | None) -> str | None:
+        """Whose approval this person gives on that project: their own, the
+        approver's they stand in for, or nobody's."""
+        if self.has("review.approve"):
+            return self.id
+        return self.acting_for(project_id)
 
 
 LOCAL_PRINCIPAL = Principal(

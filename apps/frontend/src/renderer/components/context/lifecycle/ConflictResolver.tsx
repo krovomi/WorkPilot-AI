@@ -12,12 +12,15 @@ import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { Card, CardContent } from "../../ui/card";
 import { Textarea } from "../../ui/textarea";
-import { errorLabel, shortPath } from "./lifecycle-labels";
+import { actorLabel, errorLabel, shortPath } from "./lifecycle-labels";
 
 interface ConflictResolverProps {
 	readonly projectId: string;
 	readonly conflict: MemoryConflict;
 	readonly onResolved: () => void;
+	/** False: an escalated pair waits for one of the maintainers. */
+	readonly canArbitrate?: boolean;
+	readonly maintainers?: string[];
 }
 
 function Side({
@@ -73,9 +76,18 @@ function Side({
 }
 
 /** Two memories side by side: keep one, write the canonical note, or dismiss. */
-export function ConflictResolver({ projectId, conflict, onResolved }: ConflictResolverProps) {
+export function ConflictResolver({
+	projectId,
+	conflict,
+	onResolved,
+	canArbitrate = true,
+	maintainers = [],
+}: ConflictResolverProps) {
 	const { t } = useTranslation(["context"]);
-	const [busy, setBusy] = useState(false);
+	const escalated = conflict.escalated;
+	const [working, setBusy] = useState(false);
+	// An escalated pair a maintainer settles: the backend refuses anyone else too.
+	const busy = working || (!!escalated && !canArbitrate);
 	const [error, setError] = useState<string | null>(null);
 	const [writing, setWriting] = useState(false);
 	const [draft, setDraft] = useState("");
@@ -126,6 +138,16 @@ export function ConflictResolver({ projectId, conflict, onResolved }: ConflictRe
 						<code className="text-xs text-muted-foreground">{conflict.detail}</code>
 					)}
 				</div>
+				{escalated && (
+					<p className="text-xs text-warning" data-testid="memory-conflict-escalated">
+						{t("context:lifecycle.conflicts.escalated", {
+							date: formatAppDateTime(escalated.at),
+							actor: actorLabel(t, escalated.actor, escalated.by),
+						})}
+						{!canArbitrate &&
+							` ${t("context:lifecycle.conflicts.waitingMaintainer", { names: maintainers.join(", ") })}`}
+					</p>
+				)}
 				<div className="flex flex-col gap-3 md:flex-row">
 					<Side
 						side={conflict.a}

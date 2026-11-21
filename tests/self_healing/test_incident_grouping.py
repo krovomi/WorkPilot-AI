@@ -451,7 +451,7 @@ def test_a_poll_opens_one_incident_per_bug(orchestrator, monkeypatch):
     )
 
     async def poll_all():
-        return [raw, raw]
+        return [(IncidentSource.SENTRY, raw), (IncidentSource.SENTRY, raw)]
 
     monkeypatch.setattr(orchestrator.production.connector, "poll_all", poll_all)
     import asyncio

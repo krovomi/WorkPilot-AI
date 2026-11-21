@@ -126,6 +126,12 @@ async def _attach_principal(request: Request, claims: dict) -> bool:
             platform_role=platform_role,
             org_id=org_id,
         )
+        # Approvals lent to someone who cannot approve on their own.
+        delegations: tuple[tuple[str, str], ...] = ()
+        if org_id and "review.approve" not in permissions:
+            from server.authz.delegation import delegations_to
+
+            delegations = await delegations_to(db, user_id=user_id, org_id=org_id)
 
     request.state.org_id = org_id
     request.state.principal = Principal(
@@ -136,6 +142,7 @@ async def _attach_principal(request: Request, claims: dict) -> bool:
         org_id=org_id,
         org_role_slug=org_role_slug,
         permissions=permissions,
+        delegations=delegations,
     )
     return True
 
