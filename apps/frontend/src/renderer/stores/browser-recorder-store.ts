@@ -23,7 +23,7 @@ import type {
 	RecorderStatus,
 	TestFormat,
 } from "../../shared/types/browser-recorder";
-import type { RecordedTestRun, ReshootStep } from "../../shared/types/browser-recorder-run";
+import type { RecorderAssist, RecordedTestRun, ReshootStep } from "../../shared/types/browser-recorder-run";
 
 interface BrowserRecorderState {
 	status: RecorderStatus;
@@ -43,6 +43,9 @@ interface BrowserRecorderState {
 	reshoot: ReshootStep[] | null;
 	/** Steps that took the selectors the reshoot proposed. */
 	applied: string[];
+	assisting: boolean;
+	/** Where the last name and ranking came from. */
+	assistSource: RecorderAssist["source"] | null;
 
 	setFormat: (format: TestFormat) => void;
 	setName: (name: string) => void;
@@ -54,6 +57,7 @@ interface BrowserRecorderState {
 	runTest: (projectPath: string) => Promise<void>;
 	reshootSteps: (projectPath: string) => Promise<void>;
 	applyReshoot: (projectPath: string, ids: string[]) => Promise<void>;
+	assist: (projectPath: string) => Promise<void>;
 	start: (projectPath: string, url: string) => Promise<void>;
 	stop: () => Promise<void>;
 	exportTo: (projectPath: string, destination: ExportDestination) => Promise<void>;
@@ -94,6 +98,8 @@ export const useBrowserRecorderStore = create<BrowserRecorderState>((set, get) =
 	reshooting: false,
 	reshoot: null,
 	applied: [],
+	assisting: false,
+	assistSource: null,
 
 	setFormat: (format) => set({ format, outcome: null }),
 	setName: (name) => set({ name }),
@@ -202,6 +208,31 @@ export const useBrowserRecorderStore = create<BrowserRecorderState>((set, get) =
 	applyReshoot: async (projectPath, ids) => {
 		const result = await globalThis.electronAPI.applyBrowserReshoot(projectPath, ids);
 		if (result.success) set((state) => ({ applied: [...state.applied, ...ids], outcome: null }));
+	},
+
+	assist: async (projectPath) => {
+		set({ assisting: true, error: null });
+		try {
+			const outcome = await globalThis.electronAPI.assistBrowserRecording(projectPath);
+			const assist = outcome.assist;
+			if (!outcome.success || !assist) {
+				set({ error: outcome.error ?? null });
+				return;
+			}
+			const rank = (id: string) => {
+				const index = assist.checks.indexOf(id);
+				return index < 0 ? assist.checks.length : index;
+			};
+			set((state) => ({
+				name: assist.name || state.name,
+				suggestions: [...state.suggestions].sort((a, b) => rank(a.id) - rank(b.id)),
+				assistSource: assist.source,
+			}));
+		} catch (error) {
+			set({ error: message(error) });
+		} finally {
+			set({ assisting: false });
+		}
 	},
 
 	exportTo: async (projectPath, destination) => {

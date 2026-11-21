@@ -788,6 +788,7 @@ export const IPC_CHANNELS = {
 	BROWSER_AGENT_RECORD_RUN: "browserAgent:recordRun", // Run the test proposed on a review card, in its worktree
 	BROWSER_AGENT_RECORD_RESHOOT: "browserAgent:recordReshoot", // Replay the stopped recording headless: which selectors still work
 	BROWSER_AGENT_RECORD_RESHOOT_APPLY: "browserAgent:recordReshootApply", // Give steps the selectors the reshoot proposed
+	BROWSER_AGENT_RECORD_ASSIST: "browserAgent:recordAssist", // A light model (or rules) names the test, ranks the checks
 	BROWSER_AGENT_RECORD_EXPORT: "browserAgent:recordExport", // Steps → Playwright / Cypress test: preview, review card or file
 	BROWSER_AGENT_RECORD_EVENT: "browserAgent:recordEvent", // main → renderer: step, started, stopped, error
 

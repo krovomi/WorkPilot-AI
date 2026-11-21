@@ -13,6 +13,7 @@ const api = {
 	runBrowserRecordedTest: vi.fn(),
 	reshootBrowserRecording: vi.fn(),
 	applyBrowserReshoot: vi.fn(),
+	assistBrowserRecording: vi.fn(),
 	exportBrowserRecording: vi.fn(),
 	onBrowserRecorderEvent: vi.fn(),
 };
@@ -117,6 +118,34 @@ describe("browser recorder store", () => {
 		api.runBrowserRecordedTest.mockRejectedValueOnce(new Error("ipc"));
 		await store().runTest("/p");
 		expect(store()).toMatchObject({ error: "ipc", running: false });
+	});
+
+	it("takes the assistant's name and ranks the proposed checks", async () => {
+		store().handleEvent({ type: "step", step: click("s1") });
+		for (const id of ["s2", "s3", "s4"]) store().handleEvent({ type: "step", step: check(id, "s1", id) });
+		api.assistBrowserRecording.mockResolvedValueOnce({
+			success: true,
+			assist: { name: "log in", checks: ["s4", "s2"], source: "model" },
+		});
+		await store().assist("/p");
+		expect(store()).toMatchObject({ name: "log in", assistSource: "model", assisting: false });
+		expect(store().suggestions.map((s) => s.id)).toEqual(["s4", "s2", "s3"]);
+		store().setName("mine");
+		api.assistBrowserRecording.mockResolvedValueOnce({
+			success: true,
+			assist: { name: "", checks: [], source: "rules" },
+		});
+		await store().assist("/p");
+		expect(store()).toMatchObject({ name: "mine", assistSource: "rules" });
+		api.assistBrowserRecording.mockResolvedValueOnce({ success: false, error: "stop first" });
+		await store().assist("/p");
+		expect(store().error).toBe("stop first");
+		api.assistBrowserRecording.mockResolvedValueOnce({ success: true });
+		await store().assist("/p");
+		expect(store().error).toBeNull();
+		api.assistBrowserRecording.mockRejectedValueOnce(new Error("ipc"));
+		await store().assist("/p");
+		expect(store()).toMatchObject({ error: "ipc", assisting: false });
 	});
 
 	it("reshoots the steps and applies the proposals picked", async () => {

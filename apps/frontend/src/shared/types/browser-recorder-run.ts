@@ -87,6 +87,30 @@ export function parseReshoot(raw: unknown): ReshootStep[] {
 	return shots;
 }
 
+export const ASSIST_SOURCES = ["model", "rules"] as const;
+
+/** A name for the test and the proposed checks ranked, by a light model or by rules. */
+export interface RecorderAssist {
+	readonly name: string;
+	readonly checks: readonly string[];
+	readonly source: (typeof ASSIST_SOURCES)[number];
+}
+
+export interface RecorderAssistOutcome {
+	readonly success: boolean;
+	readonly error?: string;
+	readonly assist?: RecorderAssist;
+}
+
+/** The runner's `RECORDER_ASSIST` answer, its checks among `known`, or null. */
+export function parseAssist(raw: unknown, known: readonly string[]): RecorderAssist | null {
+	if (!raw || typeof raw !== "object") return null;
+	const r = raw as Record<string, unknown>;
+	if (typeof r.name !== "string" || !(ASSIST_SOURCES as readonly string[]).includes(String(r.source))) return null;
+	const checks = Array.isArray(r.checks) ? r.checks.filter((id): id is string => known.includes(String(id))) : [];
+	return { name: r.name.slice(0, 80), checks: [...new Set(checks)], source: r.source as RecorderAssist["source"] };
+}
+
 /** Step ids the renderer asks to update from the last reshoot, or null (S6). */
 export function readStepIds(raw: unknown): string[] | null {
 	if (!Array.isArray(raw)) return null;

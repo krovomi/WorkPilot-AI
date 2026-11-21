@@ -3,7 +3,7 @@
  * and step ids from the renderer are read again (#387).
  */
 import { describe, expect, it } from "vitest";
-import { parseReshoot, parseTestRun, readStepIds } from "../browser-recorder-run";
+import { parseAssist, parseReshoot, parseTestRun, readStepIds } from "../browser-recorder-run";
 
 describe("parseTestRun", () => {
 	it("keeps a run's result, bounded", () => {
@@ -39,6 +39,22 @@ describe("parseTestRun", () => {
 			firstPassed: 0,
 		});
 		for (const raw of [null, "x", { passed: "yes" }]) expect(parseTestRun(raw)).toBeNull();
+	});
+});
+
+describe("parseAssist", () => {
+	it("keeps a bounded name and only the checks the session proposed", () => {
+		expect(
+			parseAssist({ name: "n".repeat(100), checks: ["s3", "s9", "s3", 4], source: "model" }, ["s3", "s4"]),
+		).toEqual({ name: "n".repeat(80), checks: ["s3"], source: "model" });
+		expect(parseAssist({ name: "", checks: "s3", source: "rules" }, ["s3"])).toEqual({
+			name: "",
+			checks: [],
+			source: "rules",
+		});
+		for (const raw of [null, "x", { name: 3, source: "model" }, { name: "a", source: "guess" }]) {
+			expect(parseAssist(raw, [])).toBeNull();
+		}
 	});
 });
 

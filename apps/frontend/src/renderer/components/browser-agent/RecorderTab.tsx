@@ -23,6 +23,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { CharterButton, Chip, EmptyStage, Notice, Panel, Tabs } from "../charter";
 import { GeneratedReviewBanner } from "../generated-review/GeneratedReviewBanner";
 import { Input } from "../ui/input";
+import { RecorderAssistButton } from "./RecorderAssistButton";
 import { RecorderDialog } from "./RecorderDialog";
 import { RecorderRun } from "./RecorderRun";
 import { selectorSummary, stepDetail } from "./recorder-steps";
@@ -230,6 +231,7 @@ export function RecorderTab({ projectPath }: RecorderTabProps) {
 						placeholder={t("browserAgent:recorder.namePlaceholder")}
 						className="h-8 text-sm"
 					/>
+					<RecorderAssistButton projectPath={projectPath} />
 					<Tabs<TestFormat>
 						label={t("browserAgent:recorder.formatLabel")}
 						value={recorder.format}

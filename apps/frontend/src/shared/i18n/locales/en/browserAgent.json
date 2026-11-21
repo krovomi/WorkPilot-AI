@@ -182,6 +182,11 @@
 				"failed": "Action failed",
 				"not-reached": "Not reached"
 			}
+		},
+		"assist": {
+			"start": "Suggest a name and rank the checks",
+			"model": "Named and ranked by the provider's fast model; nothing you typed was sent.",
+			"rules": "Named and ranked by rules: no model was asked."
 		}
 	}
 }

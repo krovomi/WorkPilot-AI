@@ -17,6 +17,9 @@ Subcommands:
                              first run in the project
   reshoot --project P        replay a recording (JSON, stdin) without a window
                              and say, per step, whether its selectors still work
+  assist --project P         name the test and rank the proposed checks
+                             (stdin: steps and suggestions), by the provider's
+                             fast model, or by rules without one
 
 Output lines (stdout), for the desktop app:
   RECORDER_STEP:<step JSON>       a step added or updated (``record``)
@@ -25,10 +28,11 @@ Output lines (stdout), for the desktop app:
   RECORDER_EXPORT:<test JSON>     the generated test (``export``)
   RECORDER_RUN:<result JSON>      passed, exit code, output, first-run counts (``run``)
   RECORDER_RESHOOT:<steps JSON>   per step: ok, changed (new selectors), missing… (``reshoot``)
+  RECORDER_ASSIST:<JSON>          name, ranked check ids, source (``assist``)
   RECORDER_ERROR:<message JSON>   what went wrong
 
-No model is called. A strict offline project only records a page of this
-computer (``offline_policy``).
+Only ``assist`` calls a model (no tool, through ``create_agent_client``). A
+strict offline project only records a page of this computer (``offline_policy``).
 """
 
 from __future__ import annotations
@@ -54,6 +58,7 @@ MAX_ANSWER = 4000
 EXPORT = "RECORDER_EXPORT:"
 RUN = "RECORDER_RUN:"
 RESHOOT = "RECORDER_RESHOOT:"
+ASSIST = "RECORDER_ASSIST:"
 ERROR = "RECORDER_ERROR:"
 #: A recording sent back by the app: 300 steps fit well under this.
 MAX_INPUT = 2_000_000
@@ -238,6 +243,23 @@ async def run_reshoot(raw: str, project: Path) -> dict:
     return {"steps": [shot.to_dict() for shot in shots]}
 
 
+async def run_assist(raw: str) -> dict:
+    """A name and the ranked checks for the steps and suggestions in ``raw``."""
+    import core.agent_runtime  # noqa: F401 - installs the runtime the assist asks
+    from browser_agent.recorder_assist import assist
+    from browser_agent.recording import Recording
+    from core.client import peek_active_provider
+    from replay.summary import fast_model
+
+    recording = _recording(raw, "name")
+    suggestions = Recording.from_dict(
+        {"steps": json.loads(raw).get("suggestions") or []}
+    ).steps
+    provider = peek_active_provider()
+    answer = await assist(recording, suggestions, provider, fast_model(provider))
+    return answer.to_dict()
+
+
 def main(argv: list[str] | None = None) -> int:
     from browser_agent.codegen import FORMATS
     from playwright.async_api import Error as BrowserError
@@ -259,6 +281,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--spec", required=True, help="The review card's spec")
     shoot = sub.add_parser("reshoot", help="Replay a recording (stdin) headless")
     shoot.add_argument("--project", required=True)
+    helper = sub.add_parser("assist", help="Name the test, rank its checks")
+    helper.add_argument("--project", required=True)
     args = parser.parse_args(argv)
 
     try:
@@ -274,6 +298,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "reshoot":
             raw = sys.stdin.read(MAX_INPUT + 1)
             _emit(RESHOOT, asyncio.run(run_reshoot(raw, project)))
+        elif args.command == "assist":
+            raw = sys.stdin.read(MAX_INPUT + 1)
+            _emit(ASSIST, asyncio.run(run_assist(raw)))
         else:
             root = Path(args.root).resolve() if args.root else None
             raw = sys.stdin.read(MAX_INPUT + 1)

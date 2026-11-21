@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
 	runTest: vi.fn(async () => ({ success: true })),
 	reshoot: vi.fn(async () => ({ success: true, steps: [] })),
 	apply: vi.fn(() => ({ success: true, applied: 1 })),
+	assist: vi.fn(async () => ({ success: true })),
 	exportRecording: vi.fn(async () => ({ success: true, code: "x" })),
 }));
 
@@ -25,6 +26,7 @@ vi.mock("../../browser-recorder/recorder-session", () => ({
 	answerDialog: state.answer,
 }));
 vi.mock("../../browser-recorder/recorder-export", () => ({ exportRecording: state.exportRecording }));
+vi.mock("../../browser-recorder/recorder-assist", () => ({ assistRecording: state.assist }));
 vi.mock("../../browser-recorder/recorder-run", () => ({
 	runRecordedTest: state.runTest,
 	reshootRecording: state.reshoot,
@@ -65,7 +67,13 @@ describe("browser recorder handlers", () => {
 			applied: 1,
 		});
 		expect(state.apply).toHaveBeenCalledWith("/p", ["s2"], { deps: true });
-		for (const channel of [IPC_CHANNELS.BROWSER_AGENT_RECORD_RUN, IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT]) {
+		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_ASSIST, "/p")).toEqual({ success: true });
+		expect(state.assist).toHaveBeenCalledWith("/p");
+		for (const channel of [
+			IPC_CHANNELS.BROWSER_AGENT_RECORD_RUN,
+			IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT,
+			IPC_CHANNELS.BROWSER_AGENT_RECORD_ASSIST,
+		]) {
 			expect(await call(channel, "")).toEqual({ success: false, error: "No project" });
 		}
 		expect(await call(IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT_APPLY, "/p", "s2")).toEqual({

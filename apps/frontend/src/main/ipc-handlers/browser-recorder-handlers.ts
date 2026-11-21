@@ -9,6 +9,7 @@
  *   invoke "browserAgent:recordRun"     → (projectPath): run the test proposed on a review card, see recorder-run.ts
  *   invoke "browserAgent:recordReshoot" → (projectPath): replay the stopped recording without a window
  *   invoke "browserAgent:recordReshootApply" → (projectPath, stepIds): take the selectors it proposed
+ *   invoke "browserAgent:recordAssist"  → (projectPath): a name and the checks ranked, see recorder-assist.ts
  *
  * Renderer event:
  *   "browserAgent:recordEvent" (a step, started, stopped, an error)
@@ -23,6 +24,7 @@ import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { readExportRequest } from "../../shared/types/browser-recorder";
 import { readStepIds } from "../../shared/types/browser-recorder-run";
 import { exportRecording } from "../browser-recorder/recorder-export";
+import { assistRecording } from "../browser-recorder/recorder-assist";
 import { applyReshoot, defaultRunDeps, reshootRecording, runRecordedTest } from "../browser-recorder/recorder-run";
 import { answerDialog, startRecording, stopRecording } from "../browser-recorder/recorder-session";
 
@@ -38,6 +40,12 @@ export function registerBrowserRecorderHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.BROWSER_AGENT_RECORD_RUN, (_event, projectPath: unknown) =>
 		typeof projectPath === "string" && projectPath
 			? runRecordedTest(projectPath, defaultRunDeps)
+			: { success: false, error: "No project" },
+	);
+
+	ipcMain.handle(IPC_CHANNELS.BROWSER_AGENT_RECORD_ASSIST, (_event, projectPath: unknown) =>
+		typeof projectPath === "string" && projectPath
+			? assistRecording(projectPath)
 			: { success: false, error: "No project" },
 	);
 

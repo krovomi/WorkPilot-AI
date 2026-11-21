@@ -48,7 +48,7 @@ export interface RunDeps {
 const proposals = new Map<string, Map<string, readonly RecordedSelector[]>>();
 
 /** Runs the runner with `args` (and `input` on stdin); its line starting with `prefix`, parsed. */
-async function runnerResult(
+export async function runnerResult(
 	spawnRunner: SpawnRunner,
 	args: string[],
 	prefix: string,

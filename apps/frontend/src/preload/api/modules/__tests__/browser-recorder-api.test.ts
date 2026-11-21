@@ -34,6 +34,8 @@ describe("createBrowserRecorderAPI", () => {
 		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_EXPORT, "/p", request);
 		await api.runBrowserRecordedTest("/p");
 		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_RUN, "/p");
+		await api.assistBrowserRecording("/p");
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_ASSIST, "/p");
 		await api.reshootBrowserRecording("/p");
 		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT, "/p");
 		await api.applyBrowserReshoot("/p", ["s1"]);

@@ -586,6 +586,15 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "none",
     },
+    "recorder_assist": {
+        # browser_agent/recorder_assist.py — what the recorded steps say of a
+        # page (never a typed value), quoted as data; one JSON object out (a
+        # test name, the proposed checks ranked), read through closed lists.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
     "code_playground": {
         # runners/code_playground_runner.py — an idea in, one JSON object with
         # the playground's files out, which the runner hands to the UI as

@@ -9,7 +9,7 @@ import type {
 	RecorderExportOutcome,
 	RecorderExportRequest,
 } from "../../../shared/types/browser-recorder";
-import type { RecorderRunOutcome, ReshootOutcome } from "../../../shared/types/browser-recorder-run";
+import type { RecorderAssistOutcome, RecorderRunOutcome, ReshootOutcome } from "../../../shared/types/browser-recorder-run";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 
 export interface BrowserRecorderAPI {
@@ -26,6 +26,7 @@ export interface BrowserRecorderAPI {
 	) => Promise<RecorderExportOutcome>;
 	onBrowserRecorderEvent: (callback: (event: RecorderEvent) => void) => () => void;
 	runBrowserRecordedTest: (projectPath: string) => Promise<RecorderRunOutcome>;
+	assistBrowserRecording: (projectPath: string) => Promise<RecorderAssistOutcome>;
 	reshootBrowserRecording: (projectPath: string) => Promise<ReshootOutcome>;
 	applyBrowserReshoot: (projectPath: string, stepIds: readonly string[]) => Promise<{ success: boolean; applied: number }>;
 }
@@ -40,6 +41,7 @@ export const createBrowserRecorderAPI = (): BrowserRecorderAPI => ({
 	onBrowserRecorderEvent: (callback) =>
 		createIpcListener<[RecorderEvent]>(IPC_CHANNELS.BROWSER_AGENT_RECORD_EVENT, (event) => callback(event)),
 	runBrowserRecordedTest: (projectPath) => invokeIpc(IPC_CHANNELS.BROWSER_AGENT_RECORD_RUN, projectPath),
+	assistBrowserRecording: (projectPath) => invokeIpc(IPC_CHANNELS.BROWSER_AGENT_RECORD_ASSIST, projectPath),
 	reshootBrowserRecording: (projectPath) => invokeIpc(IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT, projectPath),
 	applyBrowserReshoot: (projectPath, stepIds) =>
 		invokeIpc(IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT_APPLY, projectPath, stepIds),

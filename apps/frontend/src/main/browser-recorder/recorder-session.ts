@@ -216,6 +216,12 @@ export function sessionSteps(projectPath: string): RecordedStep[] {
 	return [...session.steps];
 }
 
+/** The checks proposed during `projectPath`'s last recording, once it has stopped. */
+export function sessionSuggestions(projectPath: string): RecordedStep[] {
+	if (!session || session.projectPath !== projectPath || session.child) return [];
+	return [...session.suggestions];
+}
+
 /** Gives a step of the stopped recording new selectors: the step updated, or null. */
 export function updateStepSelectors(
 	projectPath: string,

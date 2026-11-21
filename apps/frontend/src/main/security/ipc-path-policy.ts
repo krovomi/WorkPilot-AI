@@ -41,6 +41,7 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"browserAgent:getDashboard": [0],
 	"browserAgent:listBaselines": [0],
 	"browserAgent:navigate": [0],
+	"browserAgent:recordAssist": [0],
 	"browserAgent:recordExport": [0],
 	"browserAgent:recordReshoot": [0],
 	"browserAgent:recordReshootApply": [0],

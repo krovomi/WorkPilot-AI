@@ -182,6 +182,11 @@
 				"failed": "Action en échec",
 				"not-reached": "Non atteint"
 			}
+		},
+		"assist": {
+			"start": "Proposer un nom et classer les vérifications",
+			"model": "Nommé et classé par le modèle rapide du fournisseur ; rien de ce que vous avez saisi n'a été envoyé.",
+			"rules": "Nommé et classé par des règles : aucun modèle n'a été sollicité."
 		}
 	}
 }
