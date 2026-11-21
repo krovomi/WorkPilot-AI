@@ -4,7 +4,8 @@
  * The selected project's MCP servers, as its agents get them: every custom
  * server of `.workpilot/.env`, with the agents that use it. A server added
  * by hand in Agent Tools shows here too; which agents use a server is
- * changed in Agent Tools.
+ * changed in Agent Tools. Each row shows what the daily security check
+ * found on it (`McpInstalledAlerts`).
  */
 
 import { Globe, Power, Terminal, Trash2, Wrench } from "lucide-react";
@@ -17,10 +18,11 @@ import {
 } from "../../stores/mcp-marketplace-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { McpWatchBadge, McpWatchDetails } from "./McpInstalledAlerts";
 
 export function McpInstalledList() {
 	const { t } = useTranslation(["common"]);
-	const { installed, agentOverrides, projectId, isInstalledLoading, catalog } =
+	const { installed, agentOverrides, projectId, isInstalledLoading, catalog, watch } =
 		useMcpMarketplaceStore(
 			useShallow((s) => ({
 				installed: s.installed,
@@ -28,6 +30,7 @@ export function McpInstalledList() {
 				projectId: s.projectId,
 				isInstalledLoading: s.isInstalledLoading,
 				catalog: s.catalog,
+				watch: s.watchProjectId === s.projectId ? s.installedWatch : null,
 			})),
 		);
 
@@ -73,12 +76,11 @@ export function McpInstalledList() {
 							t(`mcpMarketplace.agents.${agent}`, { defaultValue: agent }),
 						)
 						.join(", ");
+					const serverWatch = watch?.servers.find((w) => w.serverId === server.id);
 
 					return (
-						<div
-							key={server.id}
-							className="wp-card wp-card-pad flex items-center gap-4"
-						>
+						<div key={server.id} className="wp-card wp-card-pad">
+						<div className="flex items-center gap-4">
 							<div
 								className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg text-white text-sm font-bold"
 								style={{ backgroundColor: color }}
@@ -96,6 +98,7 @@ export function McpInstalledList() {
 											{t("mcpMarketplace.installedTab.custom")}
 										</Badge>
 									)}
+									{serverWatch && <McpWatchBadge watch={serverWatch} />}
 								</div>
 								<div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
 									<span className="flex items-center gap-1">
@@ -125,6 +128,8 @@ export function McpInstalledList() {
 							>
 								<Trash2 className="h-4 w-4" />
 							</Button>
+						</div>
+						{serverWatch && <McpWatchDetails watch={serverWatch} projectId={projectId} />}
 						</div>
 					);
 				})}

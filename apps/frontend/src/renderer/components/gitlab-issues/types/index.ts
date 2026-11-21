@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import type {
 	GitLabInvestigationResult,
+	GitLabInvestigationStatus,
 	GitLabIssue,
 } from "../../../../shared/types";
 
@@ -33,12 +34,7 @@ export interface InvestigationDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	selectedIssue: GitLabIssue | null;
-	investigationStatus: {
-		phase: string;
-		progress: number;
-		message: string;
-		error?: string;
-	};
+	investigationStatus: GitLabInvestigationStatus;
 	onStartInvestigation: (selectedNoteIds: number[]) => void;
 	onClose: () => void;
 	projectId?: string;

@@ -1080,7 +1080,13 @@
 			"getSources": "Failed to get screenshot sources",
 			"fetchSources": "Failed to fetch screenshot sources",
 			"capture": "Failed to capture screenshot",
-			"captureFailed": "Failed to capture screenshot"
+			"captureFailed": "Failed to capture screenshot",
+			"codes": {
+				"sources_failed": "The screens and windows could not be listed. Check that the app is allowed to record the screen.",
+				"invalid_source": "No screen or window was picked.",
+				"source_not_found": "This screen or window is no longer available. Refresh the list and pick it again.",
+				"capture_failed": "The capture did not go through. Try again."
+			}
 		},
 		"devMode": {
 			"title": "Screenshot capture unavailable",

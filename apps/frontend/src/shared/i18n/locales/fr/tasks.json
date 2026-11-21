@@ -1080,7 +1080,13 @@
 			"getSources": "Échec de l'obtention des sources de capture d'écran",
 			"fetchSources": "Échec de la récupération des sources de capture d'écran",
 			"capture": "Échec de la capture d'écran",
-			"captureFailed": "Échec de la capture d'écran"
+			"captureFailed": "Échec de la capture d'écran",
+			"codes": {
+				"sources_failed": "Impossible de lister les écrans et les fenêtres. Vérifiez que l'app a le droit d'enregistrer l'écran.",
+				"invalid_source": "Aucun écran ni aucune fenêtre n'a été choisi.",
+				"source_not_found": "Cet écran ou cette fenêtre n'est plus disponible. Actualisez la liste et choisissez-le de nouveau.",
+				"capture_failed": "La capture n'a pas abouti. Réessayez."
+			}
 		},
 		"devMode": {
 			"title": "Capture d'écran non disponible",

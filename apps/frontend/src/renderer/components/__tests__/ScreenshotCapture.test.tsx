@@ -142,9 +142,11 @@ describe("ScreenshotCapture — failures", () => {
 		[{ success: false }, "Failed to get screenshot sources"],
 		[{ success: true }, "Failed to get screenshot sources"],
 		[
-			{ success: false, error: "Screen recording is not allowed" },
-			"Failed to get screenshot sources\nScreen recording is not allowed",
+			{ success: false, error: "sources_failed" },
+			"Failed to get screenshot sources\nThe screens and windows could not be listed. Check that the app is allowed to record the screen.",
 		],
+		// Only a code is shown: a sentence the main process might still send is not
+		[{ success: false, error: "Screen recording is not allowed" }, "Failed to get screenshot sources"],
 	])("says the sources could not be read (%j)", async (answer, message) => {
 		getSources.mockResolvedValue(answer);
 		renderPicker();
@@ -167,7 +169,18 @@ describe("ScreenshotCapture — failures", () => {
 	});
 
 	it.each([
-		[{ success: false, error: "Source not found" }, "Failed to capture screenshot\nSource not found"],
+		[
+			{ success: false, error: "source_not_found" },
+			"Failed to capture screenshot\nThis screen or window is no longer available. Refresh the list and pick it again.",
+		],
+		[
+			{ success: false, error: "invalid_source" },
+			"Failed to capture screenshot\nNo screen or window was picked.",
+		],
+		[
+			{ success: false, error: "capture_failed" },
+			"Failed to capture screenshot\nThe capture did not go through. Try again.",
+		],
 		[{ success: true }, "Failed to capture screenshot"],
 	])("says the capture failed and stays open (%j)", async (answer, message) => {
 		capture.mockResolvedValue(answer);
@@ -190,6 +203,17 @@ describe("ScreenshotCapture — failures", () => {
 		expect((await screen.findByRole("alert")).textContent).toBe(message);
 		expect(captureButton()).toBeEnabled();
 	});
+});
+
+it("says why in French too", async () => {
+	await i18n.changeLanguage("fr");
+	capture.mockResolvedValue({ success: false, error: "source_not_found" });
+	renderPicker();
+	fireEvent.click(await screen.findByRole("button", { name: /Entire screen/ }));
+	fireEvent.click(screen.getByRole("button", { name: "Capturer" }));
+	expect((await screen.findByRole("alert")).textContent).toMatch(
+		/Cet écran ou cette fenêtre n'est plus disponible/,
+	);
 });
 
 describe("ScreenshotCapture — development build", () => {

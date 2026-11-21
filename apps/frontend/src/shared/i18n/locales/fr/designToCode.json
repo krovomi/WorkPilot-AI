@@ -250,7 +250,9 @@
 			"budget": "Budget de temps épuisé : {{score}} % de correspondance",
 			"stalled": "Plus de progrès : {{score}} % de correspondance",
 			"failed": "Arrêté sur une erreur : {{score}} % de correspondance",
-			"skipped": "La boucle de rendu n'a pas tourné"
+			"skipped": "La boucle de rendu n'a pas tourné",
+			"budget_tokens": "Budget en jetons épuisé : {{score}} % de correspondance",
+			"budget_cost": "Budget en coût épuisé : {{score}} % de correspondance"
 		},
 		"reason": {
 			"no_model": "Aucun modèle n'a répondu à la génération : il n'y a rien de réel à corriger.",
@@ -295,13 +297,64 @@
 		"live": "Itération {{iteration}}/{{max}} : {{stage}}",
 		"stage": {
 			"render": "rendu",
-			"correct": "correction"
+			"correct": "correction",
+			"responsive": "passe responsive",
+			"states": "passe survol et focus"
 		},
 		"axis": {
 			"x": "horizontal",
 			"y": "vertical",
 			"width": "largeur",
 			"height": "hauteur"
+		},
+		"spend": {
+			"tokens": "{{tokens}} jetons sur {{max}}",
+			"tokensEstimated": "environ {{tokens}} jetons sur {{max}} (estimés : le provider n'en a donné aucun)",
+			"cost": "{{cost}} $ sur {{max}} $ (catalogue des prix)",
+			"flatRate": "aucun coût par jeton (forfait ou modèle local)",
+			"unknownCost": "coût inconnu : le catalogue des prix n'a pas de prix pour ce modèle",
+			"costUnchecked": "le budget en coût n'a pas pu être vérifié"
+		},
+		"responsive": {
+			"title": "Passe responsive",
+			"mobile": "Mobile",
+			"tablet": "Tablette",
+			"desktop": "Bureau",
+			"size": "{{width}} × {{height}}",
+			"compared": "comparé à la maquette : {{score}} %",
+			"notCompared": "pas de maquette à cette largeur : contrôlé seul",
+			"clean": "Ni débordement, ni texte coupé, ni chevauchement.",
+			"overflow": "La page dépasse l'écran de {{px}} px",
+			"outside": "{{label}} dépasse le bord droit",
+			"clipped": "{{label}} : texte coupé par sa boîte",
+			"overlap": "{{a}} chevauche {{b}}"
+		},
+		"states": {
+			"title": "Survol et focus ({{limit}} premiers éléments interactifs)",
+			"noElements": "Aucun élément interactif à l'écran.",
+			"summary": "Sans survol visible : {{hover}} · sans focus visible : {{focus}} · non atteints au clavier : {{unreached}}",
+			"rest": "Au repos",
+			"hover": "Survol",
+			"focus": "Focus",
+			"visible": "change à l'écran",
+			"none_hover": "aucun style de survol",
+			"none_focus": "aucun focus visible (WCAG 2.4.7)",
+			"unreached": "non atteint"
 		}
+	},
+	"loopOptions": {
+		"button": "Boucle",
+		"summary": "{{iterations}} × {{threshold}} %",
+		"maxIterations": "Itérations",
+		"threshold": "Seuil",
+		"maxTokens": "Budget en jetons",
+		"maxCostUsd": "Budget en coût",
+		"iterationsValue_one": "{{count}} correction",
+		"iterationsValue_other": "{{count}} corrections",
+		"tokensValue": "{{value}} k jetons",
+		"costValue": "{{value}} $",
+		"budgetHint": "Le budget en coût s'applique quand le catalogue des prix connaît le modèle ; le backend garde chaque valeur dans ses bornes.",
+		"responsive": "Passe responsive (mobile, tablette, bureau)",
+		"states": "Captures survol et focus"
 	}
 }
