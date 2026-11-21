@@ -81,6 +81,7 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/auth/config"): public(),
     ("POST", "/auth/login"): public(),
     ("POST", "/auth/oidc/exchange"): public(),
+    ("POST", "/auth/sso/exchange"): public(),
     ("POST", "/auth/refresh"): public(),
     ("POST", "/auth/logout"): public(),
     ("POST", "/auth/invitations/lookup"): public(),

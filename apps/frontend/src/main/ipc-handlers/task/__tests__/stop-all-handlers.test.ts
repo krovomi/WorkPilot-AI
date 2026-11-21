@@ -152,6 +152,8 @@ describe("stopAllAgents", () => {
 describe("AGENTS_STOP_ALL", () => {
 	it("takes no argument and answers with what it stopped", async () => {
 		registerStopAllHandlers(manager([]) as unknown as AgentManager);
+		// The spoken stop is registered with it.
+		expect(handlers.has(IPC_CHANNELS.AGENTS_STOP_AFTER_STEP)).toBe(true);
 		const handler = handlers.get(IPC_CHANNELS.AGENTS_STOP_ALL);
 		expect(await handler?.()).toEqual({
 			success: true,

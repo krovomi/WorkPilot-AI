@@ -5,6 +5,10 @@
  * `e2e/app-harness.ts`. CI runs them on Linux under xvfb (`ci.yml`, job
  * `e2e`). A retry is allowed to collect a trace, never to turn a failure
  * green: a test that only passes on retry fails the run.
+ *
+ * Two projects, both run by `pnpm run test:e2e`: "electron", one feature per
+ * spec, and "journeys" (`e2e/journeys/`), the paths that cross several
+ * features (`pnpm run test:e2e:journeys` runs them alone).
  */
 import { defineConfig } from "@playwright/test";
 
@@ -29,6 +33,11 @@ export default defineConfig({
 		{
 			name: "electron",
 			testMatch: "**/*.e2e.ts",
+			testIgnore: "journeys/**",
+		},
+		{
+			name: "journeys",
+			testMatch: "journeys/**/*.e2e.ts",
 		},
 	],
 });

@@ -273,7 +273,10 @@
 		"bulkRestoreSuccess": "{{count}} task(s) restored",
 		"sortActiveDragHint": "Manual reordering is disabled while a sort is active. Switch back to \"Manual order\" to drag and drop.",
 		"aging": {
-			"idleFor": "Idle for {{duration}}"
+			"idleFor": "Idle for {{duration}}",
+			"days": "{{count}}d",
+			"hours": "{{count}}h",
+			"minutes": "{{count}}min"
 		},
 		"stale": {
 			"chip": "{{count}} idle",
@@ -1066,6 +1069,10 @@
 		"capture": "Capture",
 		"capturing": "Capturing...",
 		"noSources": "No screens or windows found",
+		"kind": {
+			"screen": "Screen",
+			"window": "Window"
+		},
 		"errors": {
 			"getSources": "Failed to get screenshot sources",
 			"fetchSources": "Failed to fetch screenshot sources",
@@ -2614,7 +2621,8 @@
 		"chip": "Circuit breaker: {{tool}}",
 		"body": "The agent called {{tool}} {{repeats}} times with the same arguments and got the same result each time, with no file changed in between. The task paused itself rather than pay for a loop.",
 		"hint": "Read its logs. Resume restarts the phase with the same conversation; if it loops again, switch the model or make the task more precise.",
-		"killSwitch": "Stopped by Stop all agents"
+		"killSwitch": "Stopped by Stop all agents",
+		"voiceStop": "Stopped by voice after its step"
 	},
 	"safetyPause": {
 		"anomalyChip": "Trust score: {{score}}/100",

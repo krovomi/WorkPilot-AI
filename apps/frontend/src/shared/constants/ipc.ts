@@ -44,6 +44,7 @@ export const IPC_CHANNELS = {
 	TASK_START: "task:start",
 	TASK_STOP: "task:stop",
 	AGENTS_STOP_ALL: "agents:stopAll",
+	AGENTS_STOP_AFTER_STEP: "agents:stopAfterStep",
 	TASK_REVIEW: "task:review",
 	TASK_UPDATE_STATUS: "task:updateStatus",
 	TASK_UPDATE_PLAN: "task:updatePlan", // Update plan phases and subtasks
@@ -1154,6 +1155,7 @@ export const IPC_CHANNELS = {
 	CREDENTIAL_CHECK_CLAUDE_OAUTH: "credential:checkClaudeOAuth",
 	CREDENTIAL_CHECK_OPENAI_CODEX_OAUTH: "credential:checkOpenAICodexOAuth",
 	CREDENTIAL_DETECT_WINDSURF_TOKEN: "credential:detectWindsurfToken",
+	CREDENTIAL_SAVE_DETECTED_WINDSURF_TOKEN: "credential:saveDetectedWindsurfToken",
 	CREDENTIAL_GET_ACTIVE: "credential:getActive",
 	CREDENTIAL_SET_ACTIVE: "credential:setActive",
 	CREDENTIAL_TEST_PROVIDER: "credential:testProvider",
@@ -1338,6 +1340,7 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_LIST_INVITES: "server-auth:list-invites",
 	SERVER_AUTH_LOGIN_ENTRA: "server-auth:login-entra",
 	SERVER_AUTH_LOGIN_LOCAL: "server-auth:login-local",
+	SERVER_AUTH_LOGIN_SSO: "server-auth:login-sso",
 	SERVER_AUTH_LOGOUT: "server-auth:logout",
 	SERVER_AUTH_LOOKUP_INVITE: "server-auth:lookup-invite",
 	SERVER_AUTH_RESTORE: "server-auth:restore",

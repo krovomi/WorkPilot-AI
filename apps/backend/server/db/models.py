@@ -69,6 +69,8 @@ class ProjectRole(str, enum.Enum):
 class IdentityProvider(str, enum.Enum):
     LOCAL = "local"
     ENTRA = "entra"
+    # Any OpenID Connect provider (``server/auth/oidc_generic.py``).
+    OIDC = "oidc"
 
 
 class RoleScope(str, enum.Enum):
@@ -205,11 +207,12 @@ class User(Base):
 
 
 class UserIdentity(Base):
-    """One login method for a user (local password or Entra ID subject).
+    """One login method for a user (local password, Entra ID or OIDC subject).
 
     A single user may have both: e.g. an admin with a local password who
     also signs in with SSO. ``subject`` is the Entra ``oid`` claim for
-    provider=entra, or the (lowercased) email for provider=local.
+    provider=entra, ``<issuer>|<sub>`` for provider=oidc, or the (lowercased)
+    email for provider=local.
     """
 
     __tablename__ = "user_identities"

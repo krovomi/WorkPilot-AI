@@ -255,7 +255,7 @@ function WindsurfAuthContent({
 						{t("sections.accounts.providerConfig.windsurfAuth.tokenReceived")}
 					</p>
 					<p className="text-xs text-success mt-1 font-mono break-all">
-						{windsurfSsoToken.substring(0, 20)}...
+						{windsurfSsoToken}
 					</p>
 				</div>
 				<Button
