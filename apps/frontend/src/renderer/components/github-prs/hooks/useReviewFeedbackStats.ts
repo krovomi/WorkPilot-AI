@@ -1,7 +1,8 @@
 /**
  * The project's feedback on PR review findings, as a whole (#361, lot 2):
- * acceptance rate per category, learned rules, reset, conventions file.
- * Loaded on demand; the main process reads and validates everything.
+ * acceptance rate per category, learned rules, reset, conventions file, and
+ * on a server project the rejections held for a maintainer (lot 3). Loaded on
+ * demand; the main process reads and validates everything.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -21,10 +22,13 @@ export interface ReviewFeedbackStatsState {
 	loading: boolean;
 	error: ReviewFeedbackError | null;
 	pendingSignature: string | null;
+	/** `<pr>:<finding>` of the held rejection being decided. */
+	pendingHeld: string | null;
 	writing: boolean;
 	written: ConventionsWritten | null;
 	load: () => Promise<void>;
 	reset: (signature: string) => Promise<void>;
+	decide: (prNumber: number, findingId: string, approve: boolean) => Promise<void>;
 	writeConventions: () => Promise<void>;
 }
 
@@ -35,6 +39,7 @@ export function useReviewFeedbackStats(
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<ReviewFeedbackError | null>(null);
 	const [pendingSignature, setPendingSignature] = useState<string | null>(null);
+	const [pendingHeld, setPendingHeld] = useState<string | null>(null);
 	const [writing, setWriting] = useState(false);
 	const [written, setWritten] = useState<ConventionsWritten | null>(null);
 	// The project the answers are for: a late answer for another one is dropped.
@@ -101,6 +106,29 @@ export function useReviewFeedbackStats(
 		[projectId, apply, forCurrent],
 	);
 
+	const decide = useCallback(
+		async (prNumber: number, findingId: string, approve: boolean) => {
+			if (!projectId) return;
+			setPendingHeld(`${prNumber}:${findingId}`);
+			try {
+				apply(
+					projectId,
+					await window.electronAPI.github.decideHeldReviewFeedback(
+						projectId,
+						prNumber,
+						findingId,
+						approve,
+					),
+				);
+			} catch {
+				forCurrent(projectId, () => setError("write_failed"));
+			} finally {
+				setPendingHeld(null);
+			}
+		},
+		[projectId, apply, forCurrent],
+	);
+
 	const writeConventions = useCallback(async () => {
 		if (!projectId) return;
 		setWriting(true);
@@ -128,10 +156,12 @@ export function useReviewFeedbackStats(
 		loading,
 		error,
 		pendingSignature,
+		pendingHeld,
 		writing,
 		written,
 		load,
 		reset,
+		decide,
 		writeConventions,
 	};
 }

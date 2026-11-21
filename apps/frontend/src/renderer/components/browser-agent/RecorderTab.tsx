@@ -22,18 +22,21 @@ import { useProjectStore } from "@/stores/project-store";
 import { CharterButton, Chip, EmptyStage, Notice, Panel, Tabs } from "../charter";
 import { GeneratedReviewBanner } from "../generated-review/GeneratedReviewBanner";
 import { Input } from "../ui/input";
+import { RecorderSuggestions } from "./RecorderSuggestions";
 
 interface RecorderTabProps {
 	readonly projectPath: string;
 }
 
-/** How the step finds its element, as a short line: the first, most robust selector. */
+/** How the step finds its element, as a short line: the first, most robust selector (and its place, `#n`). */
 export function selectorSummary(step: RecordedStep): string {
 	const selector = step.selectors[0];
 	if (!selector) return step.url ?? "";
-	return selector.strategy === "role"
-		? `${selector.role} "${selector.value}"`
-		: `${selector.strategy} "${selector.value}"`;
+	const found =
+		selector.strategy === "role"
+			? `${selector.role} "${selector.value}"`
+			: `${selector.strategy} "${selector.value}"`;
+	return selector.nth === undefined ? found : `${found} #${selector.nth + 1}`;
 }
 
 function StepDetail({ step }: { readonly step: RecordedStep }) {
@@ -61,6 +64,7 @@ export function StepNotes({ step }: { readonly step: RecordedStep }) {
 		...(step.waitRequest
 			? [{ icon: Hourglass, text: t("browserAgent:recorder.waits.request", step.waitRequest) }]
 			: []),
+		...(step.waitHidden ? [{ icon: Hourglass, text: t("browserAgent:recorder.waits.hidden") }] : []),
 		...(step.waitUrl ? [{ icon: Hourglass, text: t("browserAgent:recorder.waits.url", { url: step.waitUrl }) }] : []),
 	];
 	if (!notes.length) return null;
@@ -194,6 +198,8 @@ export function RecorderTab({ projectPath }: RecorderTabProps) {
 					</ol>
 				)}
 			</Panel>
+
+			<RecorderSuggestions />
 
 			<Panel>
 				<h3 className="wp-kicker mb-2">{t("browserAgent:recorder.exportTitle")}</h3>

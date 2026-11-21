@@ -4,14 +4,15 @@
  * The renderer names a project by id, a PR by number and a finding by id;
  * every argument is checked here (`validateFeedback`) before anything is read
  * or written, and the project's folder is the one the project store holds.
- * A server project's reviews live on the server, which does not take this
- * feedback yet: the call answers `server_project`.
+ * A server project's reviews live on the server, which keeps their feedback
+ * (`review-feedback-server.ts`): the checked call is sent there.
  */
 
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { ReviewFeedbackResult } from "../../../shared/types/review-feedback";
 import { serverProjectOf } from "../server-review-jobs";
+import { recordServerFeedback, serverFeedback } from "./review-feedback-server";
 import {
 	isPrNumber,
 	readFeedback,
@@ -34,9 +35,8 @@ export function registerReviewFeedbackHandlers(): void {
 			}
 			const feedback = validateFeedback(prNumber, input);
 			if (!feedback) return { success: false, error: "invalid" };
-			if (serverProjectOf(projectId)) {
-				return { success: false, error: "server_project" };
-			}
+			const remote = serverProjectOf(projectId);
+			if (remote) return recordServerFeedback(remote, feedback);
 			const result = await withProjectOrNull(projectId, async (project) =>
 				recordFeedback(project.path, feedback),
 			);
@@ -54,9 +54,8 @@ export function registerReviewFeedbackHandlers(): void {
 			if (typeof projectId !== "string" || !isPrNumber(prNumber)) {
 				return { success: false, error: "invalid" };
 			}
-			if (serverProjectOf(projectId)) {
-				return { success: false, error: "server_project" };
-			}
+			const remote = serverProjectOf(projectId);
+			if (remote) return serverFeedback(remote, prNumber);
 			const result = await withProjectOrNull(projectId, async (project) => ({
 				success: true as const,
 				feedback: readFeedback(project.path, prNumber),

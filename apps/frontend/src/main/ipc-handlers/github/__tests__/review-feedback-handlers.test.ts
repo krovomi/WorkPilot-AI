@@ -1,7 +1,7 @@
 /**
  * The two feedback channels (#361): every argument the renderer sends is
- * checked before a project is looked up, a server project is answered without
- * touching a folder, and an unknown project is refused.
+ * checked before a project is looked up, a server project's call goes to the
+ * server (lot 3) without touching a folder, and an unknown project is refused.
  */
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -29,6 +29,14 @@ vi.mock("../../../project-store", () => ({
 vi.mock("../../server-review-jobs", () => ({
 	serverProjectOf: (id: unknown) =>
 		typeof id === "string" && state.remote.has(id) ? { id } : undefined,
+}));
+const server = vi.hoisted(() => ({
+	record: vi.fn(),
+	read: vi.fn(),
+}));
+vi.mock("../review-feedback-server", () => ({
+	recordServerFeedback: server.record,
+	serverFeedback: server.read,
 }));
 vi.mock("../utils/project-middleware", () => ({
 	withProjectOrNull: async (
@@ -101,11 +109,25 @@ describe("setting feedback", () => {
 		});
 	});
 
-	it("answers a server project without opening a folder", async () => {
+	it("sends a server project's checked verdict to the server", async () => {
+		server.record.mockResolvedValueOnce({ success: true, feedback: {}, held: [] });
 		await expect(call(SET, "remote", 3, REJECT)).resolves.toEqual({
-			success: false,
-			error: "server_project",
+			success: true,
+			feedback: {},
+			held: [],
 		});
+		expect(server.record).toHaveBeenCalledWith(
+			{ id: "remote" },
+			expect.objectContaining({ prNumber: 3, findingId: REJECT.findingId }),
+		);
+	});
+
+	it("checks a server project's arguments before sending them", async () => {
+		server.record.mockClear();
+		await expect(
+			call(SET, "remote", 3, { findingId: "f-1", verdict: "drop_table" }),
+		).resolves.toEqual({ success: false, error: "invalid" });
+		expect(server.record).not.toHaveBeenCalled();
 	});
 
 	it("refuses a project it does not know", async () => {
@@ -127,11 +149,13 @@ describe("reading feedback", () => {
 		});
 	});
 
-	it("answers a server project and an unknown one", async () => {
+	it("reads a server project from the server and refuses an unknown one", async () => {
+		server.read.mockResolvedValueOnce({ success: true, feedback: { a: "accepted" } });
 		await expect(call(GET, "remote", 3)).resolves.toEqual({
-			success: false,
-			error: "server_project",
+			success: true,
+			feedback: { a: "accepted" },
 		});
+		expect(server.read).toHaveBeenCalledWith({ id: "remote" }, 3);
 		await expect(call(GET, "nobody", 3)).resolves.toEqual({
 			success: false,
 			error: "not_found",

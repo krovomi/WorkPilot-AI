@@ -501,6 +501,7 @@
 			"notePlaceholder": "Pourquoi cela ne s'applique pas ici",
 			"save": "Enregistrer",
 			"cancel": "Annuler",
+			"held": "En attente d'un mainteneur : le relecteur apprendra de ce rejet une fois approuvé par un propriétaire du projet.",
 			"show": "Afficher",
 			"hide": "Masquer",
 			"learnedBadge_one": "Rejeté {{count}} fois sur ce projet",
