@@ -141,6 +141,16 @@ DEEPSEEK_MODEL = _DEEPSEEK_ENTRY.model_id if _DEEPSEEK_ENTRY else "deepseek-flas
 _GROK_ENTRY = get_default("grok")
 GROK_MODEL = _GROK_ENTRY.model_id if _GROK_ENTRY else "grok-4.3"
 
+_OPENROUTER_ENTRY = get_default("openrouter")
+OPENROUTER_MODEL = (
+    _OPENROUTER_ENTRY.model_id if _OPENROUTER_ENTRY else "moonshotai/kimi-k3.1-pro"
+)
+
+_HUGGINGFACE_ENTRY = get_default("huggingface")
+HUGGINGFACE_MODEL = (
+    _HUGGINGFACE_ENTRY.model_id if _HUGGINGFACE_ENTRY else "moonshotai/Kimi-K3.1-Pro"
+)
+
 #: The model id a CLI-backed provider (OpenCode, Antigravity) reads as "use
 #: the CLI's own default".
 CLI_DEFAULT_MODEL = "default"
@@ -200,6 +210,19 @@ PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
         "planning": GROK_MODEL,
         "coding": GROK_MODEL,
         "qa": GROK_MODEL,
+    },
+    # Gateways (gateway_providers.py)
+    "openrouter": {
+        "spec": OPENROUTER_MODEL,
+        "planning": OPENROUTER_MODEL,
+        "coding": OPENROUTER_MODEL,
+        "qa": OPENROUTER_MODEL,
+    },
+    "huggingface": {
+        "spec": HUGGINGFACE_MODEL,
+        "planning": HUGGINGFACE_MODEL,
+        "coding": HUGGINGFACE_MODEL,
+        "qa": HUGGINGFACE_MODEL,
     },
     # Meta (LLaMA)
     "meta": {
