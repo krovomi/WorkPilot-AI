@@ -114,6 +114,7 @@ import {
 } from "./services/profile/profile-manager";
 import { initSentryMain } from "./sentry";
 import { armSmokeTest, isSmokeTest } from "./smoke-test";
+import { forgeAccountsFilePath } from "./forge/forge-accounts";
 import { initSecretStorage, primeSecretFiles } from "./secret-storage";
 import {
 	getSettingsPath,
@@ -898,6 +899,7 @@ function appSecretFiles(): string[] {
 		getProfilesFilePath(),
 		join(app.getPath("userData"), "config", "claude-profiles.json"),
 		teamBotConfigPath(),
+		forgeAccountsFilePath(),
 	];
 }
 

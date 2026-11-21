@@ -225,7 +225,7 @@ describe("runButtonReview (first review)", () => {
 			root,
 			"review-pr",
 			"7",
-			JSON.stringify({ model: "claude-sonnet-5-5", thinkingLevel: "high" }),
+			JSON.stringify({ model: "claude-sonnet-5-5", thinkingLevel: "high", repo: "acme/shop" }),
 		]);
 		expect(options.pythonPath).toBe("/backend/python");
 		expect(options.cwd).toBe("/backend");

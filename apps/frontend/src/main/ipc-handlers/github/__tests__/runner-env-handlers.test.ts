@@ -333,7 +333,8 @@ describe("GitHub runner env usage", () => {
 			projectRef.current?.id,
 		);
 
-		expect(mockGetRunnerEnv).toHaveBeenCalledWith();
+		// No GitHub configuration for the project: nothing over the default env.
+		expect(mockGetRunnerEnv).toHaveBeenCalledWith({});
 		expect(mockRunPythonSubprocess).toHaveBeenCalledWith(
 			expect.objectContaining({
 				env: { ANTHROPIC_AUTH_TOKEN: "token" },

@@ -20,7 +20,6 @@ The cheapest moment to remove them is before the bytes reach the disk.
 | `clean`    | given text on its way to disk, the clean text — and what changed   |
 | `hook`     | the PreToolUse hook every agent Write and Edit passes through      |
 | `ledger`   | `<spec_dir>/watermarks.jsonl` — the record of every silent edit    |
-| `api`      | `GET /api/watermarks/status`                                       |
 
 Everything fails open. A checkout with no `vendor/` tree, a settings key turned
 off, content above the size cap, upstream raising: the content is written

@@ -164,6 +164,8 @@
 				"aws": "AWS Bedrock and Amazon services",
 				"copilot": "GitHub Copilot",
 				"grok": "Grok xAI models",
+				"openrouter": "Hundreds of models from many vendors (Kimi, GLM, DeepSeek, Claude, GPT…) with one OpenRouter key",
+				"huggingface": "Open models of the Hugging Face Hub through Inference Providers, billed to your Hugging Face account",
 				"windsurf": "Windsurf AI Provider",
 				"cursor": "Cursor AI Provider",
 				"ollama": "Local open-source models with Ollama",
@@ -282,7 +284,59 @@
 					"unverified": "● Tool-calling to verify",
 					"unverifiedDetail": "— not confirmed from the name; open the model card. \"~GB\" sizes are estimates (4-bit quant)."
 				},
-				"estimatedSize": " · ~{{size}} GB"
+				"estimatedSize": " · ~{{size}} GB",
+				"cloudBadge": "Cloud",
+				"cloudBadgeTitle": "Served by the Hugging Face router with tool calling",
+				"cloudPrice": "{{price}} per M tokens",
+				"tryInCloud": "Try in the cloud",
+				"tryInCloudTooltip": "Make {{id}} the Hugging Face cloud model, nothing to download",
+				"cloudDefault": "Cloud model",
+				"cloudChosen": "{{id}} is now the Hugging Face cloud model. Pick the Hugging Face engine on a task to try it, nothing to download.",
+				"cloudNeedsToken": "Add a Hugging Face token on the Hugging Face provider page first.",
+				"cloudSaveFailed": "The cloud model could not be saved."
+			},
+			"gatewayCatalog": {
+				"title": "Models of {{name}}",
+				"description": "The live list of the models {{name}} serves with tool calling, with their price. Click one to make it the default model.",
+				"searchPlaceholder": "Filter models…",
+				"empty": "No model matches.",
+				"more": "{{count}} more: refine the filter.",
+				"price": "{{price}} per M tokens",
+				"context": "{{size}} context",
+				"providers_one": "{{count}} provider",
+				"providers_other": "{{count}} providers",
+				"default": "Default",
+				"setDefault": "Make {{id}} the default model",
+				"offline": "Offline list: {{name}} could not be reached.",
+				"loading": "Loading the models…"
+			},
+			"gatewayRouting": {
+				"title": "Routing",
+				"description": {
+					"openrouter": "How OpenRouter picks the provider that answers, and what that provider may do with your prompts.",
+					"huggingface": "How the Hugging Face router picks the inference provider that answers."
+				},
+				"sort": "Provider order",
+				"sortDefault": "OpenRouter's choice (load balancing)",
+				"sorts": {
+					"price": "Cheapest first",
+					"throughput": "Fastest output first",
+					"latency": "Lowest latency first"
+				},
+				"denyDataCollection": "Only providers that do not store or train on prompts",
+				"zeroRetention": "Only zero-data-retention providers",
+				"fallbacks": "Fallback models",
+				"fallbacksHint": "Tried in order when the default model is down, rate-limited or refuses the request. Up to {{count}}.",
+				"fallbackAria": "Fallback model {{index}}",
+				"fallbackPlaceholder": "vendor/model",
+				"invalidModel": "Not a model id: {{id}}",
+				"policy": "Router policy",
+				"policyDefault": "Hugging Face default",
+				"policies": {
+					"fastest": "Fastest provider",
+					"cheapest": "Cheapest provider"
+				},
+				"saveFailed": "The routing could not be saved."
 			}
 		},
 		"updates": {
@@ -1713,7 +1767,9 @@
 		"phaseConfiguration": "Phase Configuration",
 		"phaseConfigurationDescription": "Configure models and thinking levels for each development pipeline phase",
 		"presets": {
-			"auto": { "name": "Auto (Optimized)" },
+			"auto": {
+				"name": "Auto (Optimized)"
+			},
 			"complex": {
 				"name": "Complex Tasks",
 				"description": "For intricate, multi-step implementations requiring deep analysis"
@@ -3096,6 +3152,29 @@
 		"exported_one": "{{count}} decision exported to {{path}}",
 		"exported_other": "{{count}} decisions exported to {{path}}",
 		"exportFailed": "The export failed: {{error}}",
+		"approvedBy": "approved by {{name}}",
+		"localApprover": "On this computer an approval is given in your name, with no verified identity. On a server, the account that approves and its roles are recorded.",
+		"serverApprover": "Any member of the project who may approve reviews answers, under their server account.",
+		"serverReviewers": "Approved by a member holding one of these roles: {{roles}}. Anyone who may approve can refuse.",
+		"serverTitle": "Governance of the server project",
+		"serverHint": "This project's agents run on the server: its workpilot.policy.yaml, its audit trail, the calls its agents wait on and its kill switch are read and run there. The server checks your rights on every action.",
+		"agentsLine": "Agents running on the server: {{mine}} yours, {{project}} in all",
+		"stopMine": "Stop my agents",
+		"stopProject": "Stop every agent of the project",
+		"stopProjectConfirm_one": "Confirm: stop {{count}} agent, whoever started it",
+		"stopProjectConfirm_other": "Confirm: stop {{count}} agents, whoever started them",
+		"stopped_one": "{{count}} agent stopped. Its card can be started again.",
+		"stopped_other": "{{count}} agents stopped. Their cards can be started again.",
+		"stopFailed": "The agents could not be stopped: {{error}}",
+		"pendingTitle_one": "{{count}} call waiting for an approval",
+		"pendingTitle_other": "{{count}} calls waiting for an approval",
+		"approve": "Approve",
+		"refuse": "Refuse",
+		"answered": {
+			"approved": "Approved in your name: the agent's next identical call goes through, once.",
+			"refused": "Refused: the agent keeps being denied this call."
+		},
+		"answerFailed": "The answer was not recorded: {{error}}",
 		"decisions": {
 			"deny": "Refused",
 			"review": "Review",
@@ -3105,6 +3184,51 @@
 			"budget_exceeded": "Budget reached",
 			"invalid_policy": "Invalid policy",
 			"tool_loop": "Circuit breaker"
+		}
+	},
+	"forgeBinding": {
+		"mismatchTitle": "This project points at {{saved}}, which is not one of its remotes",
+		"mismatchDescription": "The repository may come from another project. Use the repository of this project's own remote:",
+		"mismatchNoRemote": "None of this project's remotes is on this forge: this repository probably belongs to another project. Check it, or turn this integration off for this project.",
+		"useRemote": "Use {{repo}}",
+		"detected": "No repository saved: this project uses the one of its git remote, {{repo}}.",
+		"saveDetected": "Save it in the settings"
+	},
+	"forgeAccounts": {
+		"navLabel": "Forge accounts",
+		"title": "Forge accounts",
+		"description": "Save your GitHub, GitLab, Azure DevOps and Bitbucket accounts once (work, personal, a client…). Each project then picks the one it works with in its own settings. Tokens stay encrypted on this computer and are never shown again.",
+		"empty": "No forge account saved yet.",
+		"add": "Add an account",
+		"forge": "Forge",
+		"label": "Name",
+		"labelPlaceholder": "Work, Personal, Client X…",
+		"gitlabHost": "GitLab instance",
+		"azureHost": "Azure DevOps organization",
+		"bitbucketUsername": "Username or email (optional)",
+		"bitbucketUsernameHint": "With an API token or an app password, the username or Atlassian email it signs in with. Leave empty for a workspace or repository access token.",
+		"token": "Token",
+		"tokenPlaceholder": "Personal access token",
+		"tokenKeep": "Leave empty to keep the saved token",
+		"save": "Save",
+		"cancel": "Cancel",
+		"tokenSet": "Token saved",
+		"noToken": "No token",
+		"test": "Test",
+		"testOk": "Connected as {{username}}",
+		"testFailed": "Connection failed: {{error}}",
+		"edit": "Edit {{label}}",
+		"delete": "Delete {{label}}",
+		"deleteTitle": "Delete the account {{label}}?",
+		"deleteDescription": "Projects that use it will have no token for this forge until you pick another account or enter a token of their own.",
+		"picker": {
+			"label": "Account",
+			"ownToken": "This project's own token",
+			"withUsername": "{{label}} ({{username}})",
+			"missing": "Deleted account",
+			"hint": "A saved account brings its token and its address. Manage accounts in Settings, Forge accounts.",
+			"noneHint": "To use the same account in several projects, save it once in Settings, Forge accounts.",
+			"missingHint": "The account this project used was deleted: pick another one or enter a token for this project."
 		}
 	}
 }

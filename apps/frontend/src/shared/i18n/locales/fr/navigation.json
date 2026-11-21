@@ -509,7 +509,11 @@
 		"done_other": "{{count}} tâches en pause",
 		"resumeHint": "Tous les agents sont arrêtés. Reprenez chaque tâche depuis sa carte quand vous voulez.",
 		"nothing": "Aucun agent ne tournait",
-		"failed": "Les agents n'ont pas pu être arrêtés"
+		"failed": "Les agents n'ont pas pu être arrêtés",
+		"serverDone_one": "{{count}} de vos agents arrêté sur le serveur.",
+		"serverDone_other": "{{count}} de vos agents arrêtés sur le serveur.",
+		"serverFailed_one": "{{count}} projet du serveur injoignable : arrêtez ses agents depuis sa page Garde-fous.",
+		"serverFailed_other": "{{count}} projets du serveur injoignables : arrêtez leurs agents depuis leur page Garde-fous."
 	},
 	"resize": {
 		"label": "Redimensionner le menu",

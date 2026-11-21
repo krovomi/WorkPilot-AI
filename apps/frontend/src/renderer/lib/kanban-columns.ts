@@ -19,6 +19,18 @@ export function getVisualColumn(status: TaskStatus): TaskStatusColumn {
 	return status;
 }
 
+/**
+ * The two columns a person creates cards in (quick add, the "+" of the
+ * header). The others are agent, CI or pull-request phases: a card created
+ * there would describe nothing real.
+ */
+export const QUICK_ADD_COLUMNS = ["backlog", "queue"] as const;
+export type QuickAddColumn = (typeof QUICK_ADD_COLUMNS)[number];
+
+export function isQuickAddColumn(status: TaskStatus): status is QuickAddColumn {
+	return (QUICK_ADD_COLUMNS as readonly string[]).includes(status);
+}
+
 /** One empty list per column, in board order. */
 export function emptyColumnGroups(): Record<TaskStatusColumn, Task[]> {
 	return Object.fromEntries(

@@ -171,6 +171,7 @@ class _OpenAIAdapter(ChatCompletionsAdapter):
         if client._reasoning_effort:
             payload["reasoning_effort"] = client._reasoning_effort
         payload.update(client._effort_params)
+        payload.update(client._routing_params)
         if client._prompt_cache_key:
             payload["prompt_cache_key"] = client._prompt_cache_key
 
@@ -306,6 +307,9 @@ class OpenAIAgentClient(McpBridgeMixin, AgentClient):
         # Provider-specific effort fields beyond `reasoning_effort` (DeepSeek's
         # `thinking`, …); set by the subclasses that have them.
         self._effort_params: dict[str, Any] = {}
+        # A gateway's routing fields (OpenRouter `models` / `provider`, the
+        # Hugging Face policy suffix of `model`); kept when an effort is refused.
+        self._routing_params: dict[str, Any] = {}
         self._prompt_cache_key = prompt_cache_key
         # Headers a provider documents for cache routing (xAI's
         # `x-grok-conv-id`); set by the subclasses that have them.

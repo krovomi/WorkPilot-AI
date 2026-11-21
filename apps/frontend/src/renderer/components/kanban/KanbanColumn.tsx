@@ -17,14 +17,12 @@ import {
 	Ban,
 	Check,
 	CheckCircle2,
-	ChevronLeft,
 	ChevronRight,
 	Eye,
 	Gauge,
 	GitPullRequest,
 	GripVertical,
 	Inbox,
-	ListPlus,
 	Loader2,
 	Lock,
 	MoreHorizontal,
@@ -33,11 +31,13 @@ import {
 	Unlock,
 	X,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TASK_STATUS_LABELS } from "../../../shared/constants";
 import type { Task, TaskStatus } from "../../../shared/types";
+import { isQuickAddColumn } from "../../lib/kanban-columns";
 import { cn } from "../../lib/utils";
+import { useQuickAddShortcut } from "../../hooks/useQuickAddShortcut";
 import {
 	COLLAPSED_COLUMN_WIDTH,
 	DEFAULT_COLUMN_WIDTH,
@@ -45,17 +45,24 @@ import {
 	MIN_COLUMN_WIDTH,
 } from "../../stores/kanban-settings-store";
 import { SortableTaskCard } from "../SortableTaskCard";
+import {
+	type ColumnMenuActions,
+	ColumnMenuItems,
+	hasColumnMenuItems,
+} from "./ColumnMenuItems";
+import { PointerMenu, useContextMenuAt } from "./PointerMenu";
+import type { SelectGesture } from "../../hooks/useBoardSelection";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
-	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { ScrollArea } from "../ui/scroll-area";
+import { QuickAddComposer } from "./QuickAddComposer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 // Max cards a single column renders before collapsing the tail behind a
@@ -64,6 +71,18 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 // bounded while reusing the exact same (drag-enabled) render path for the
 // visible slice — no change to drag-and-drop behaviour.
 export const COLUMN_RENDER_CAP = 60;
+
+// A double-click on these is theirs (a card, a control, the quick-add box),
+// never a request for a new card.
+const QUICK_ADD_IGNORED_TARGETS =
+	'.kanban-card, button, a, input, textarea, [role="menu"], [data-quick-add]';
+
+// A click with a modifier on these keeps its own meaning.
+const SELECT_GESTURE_IGNORED_TARGETS = 'button, a, input, textarea, [role="checkbox"]';
+
+// A right-click on these keeps its own menu (a card's, a text field's).
+const COLUMN_MENU_IGNORED_TARGETS =
+	'.kanban-card, input, textarea, [contenteditable="true"], [data-quick-add]';
 
 export interface DroppableColumnProps {
 	status: TaskStatus;
@@ -89,6 +108,12 @@ export interface DroppableColumnProps {
 	onSelectAll?: () => void;
 	onDeselectAll?: () => void;
 	onToggleSelect?: (taskId: string) => void;
+	/** Ctrl/Cmd+click (toggle) or Shift+click (range) on a card of the column. */
+	onCardSelectGesture?: (
+		taskId: string,
+		gesture: SelectGesture,
+		columnTaskIds: readonly string[],
+	) => void;
 	onDeleteTask?: (taskId: string) => void;
 	onDuplicateTask?: (taskId: string) => void;
 	onViewPRFiles?: (prUrl: string, taskId: string) => void;
@@ -161,6 +186,7 @@ export function droppableColumnPropsAreEqual(
 	if (prevProps.onSelectAll !== nextProps.onSelectAll) return false;
 	if (prevProps.onDeselectAll !== nextProps.onDeselectAll) return false;
 	if (prevProps.onToggleSelect !== nextProps.onToggleSelect) return false;
+	if (prevProps.onCardSelectGesture !== nextProps.onCardSelectGesture) return false;
 	if (prevProps.isCollapsed !== nextProps.isCollapsed) return false;
 	if (prevProps.columnWidth !== nextProps.columnWidth) return false;
 	if (prevProps.isResizing !== nextProps.isResizing) return false;
@@ -370,6 +396,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 	onSelectAll,
 	onDeselectAll,
 	onToggleSelect,
+	onCardSelectGesture,
 	onDeleteTask,
 	onDuplicateTask,
 	onViewPRFiles,
@@ -431,8 +458,102 @@ export const DroppableColumn = memo(function DroppableColumn({
 	);
 	const hiddenCardCount = tasks.length - visibleTasks.length;
 
+	// Quick add (Planification and File d'attente only): the box at the top
+	// of the list, opened by "+", the row under the cards, a double-click on
+	// the column's empty space, or N for Planification.
+	const canQuickAdd = isQuickAddColumn(status) && !!onAddClick;
+	const [isQuickAdding, setIsQuickAdding] = useState(false);
+	const openQuickAdd = useCallback(() => {
+		if (isCollapsed) onToggleCollapsed?.();
+		setIsQuickAdding(true);
+	}, [isCollapsed, onToggleCollapsed]);
+	const closeQuickAdd = useCallback(() => setIsQuickAdding(false), []);
+	useQuickAddShortcut(canQuickAdd && status === "backlog", openQuickAdd);
+
+	// One list of column actions, for the header "⋯" menu and the right-click
+	// menu; an action that does not apply here is left out.
+	const columnActions: ColumnMenuActions = {
+		onToggleSelectAll:
+			onSelectAll && onDeselectAll && taskCount > 0
+				? handleSelectAllChange
+				: undefined,
+		isAllSelected,
+		onQueueAll:
+			status === "backlog" && tasks.length > 0 ? onQueueAll : undefined,
+		onQueueSettings: status === "queue" ? onQueueSettings : undefined,
+		onArchiveAll:
+			status === "done" && tasks.length > 0 && !showArchived
+				? onArchiveAll
+				: undefined,
+		onToggleArchived:
+			status === "done" && (archivedCount ?? 0) > 0
+				? onToggleArchived
+				: undefined,
+		showArchived,
+		onToggleLocked,
+		isLocked,
+		onToggleCollapsed,
+	};
+	const columnRef = useRef<HTMLDivElement | null>(null);
+	const setColumnRef = useCallback(
+		(node: HTMLDivElement | null) => {
+			columnRef.current = node;
+			setNodeRef(node);
+		},
+		[setNodeRef],
+	);
+	const columnMenu = useContextMenuAt(
+		columnRef,
+		!isCollapsed && (canQuickAdd || hasColumnMenuItems(columnActions)),
+		COLUMN_MENU_IGNORED_TARGETS,
+	);
+	const listAreaRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		const area = listAreaRef.current;
+		if (!area || !canQuickAdd) return;
+		const onDoubleClick = (e: MouseEvent) => {
+			const target = e.target as Element | null;
+			if (target?.closest(QUICK_ADD_IGNORED_TARGETS)) return;
+			openQuickAdd();
+		};
+		area.addEventListener("dblclick", onDoubleClick);
+		return () => area.removeEventListener("dblclick", onDoubleClick);
+	}, [canQuickAdd, openQuickAdd]);
+
 	// Memoize taskIds to prevent SortableContext from re-rendering unnecessarily
 	const taskIds = useMemo(() => visibleTasks.map((t) => t.id), [visibleTasks]);
+
+	// Ctrl/Cmd+click and Shift+click on a card select instead of opening it:
+	// caught before the card's own click (a native capture listener).
+	useEffect(() => {
+		const area = listAreaRef.current;
+		if (!area || !onCardSelectGesture || isCollapsed) return;
+		const cardOf = (e: MouseEvent) => {
+			if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return null;
+			const target = e.target as Element | null;
+			if (target?.closest(SELECT_GESTURE_IGNORED_TARGETS)) return null;
+			return target?.closest<HTMLElement>("[data-task-id]") ?? null;
+		};
+		const onClick = (e: MouseEvent) => {
+			const card = cardOf(e);
+			if (!card) return;
+			e.preventDefault();
+			e.stopPropagation();
+			// The selector above guarantees the attribute.
+			const taskId = card.getAttribute("data-task-id") as string;
+			onCardSelectGesture(taskId, e.shiftKey ? "range" : "toggle", taskIds);
+		};
+		// Shift+press would otherwise select the text between two cards.
+		const onMouseDown = (e: MouseEvent) => {
+			if (e.shiftKey && cardOf(e)) e.preventDefault();
+		};
+		area.addEventListener("click", onClick, true);
+		area.addEventListener("mousedown", onMouseDown, true);
+		return () => {
+			area.removeEventListener("click", onClick, true);
+			area.removeEventListener("mousedown", onMouseDown, true);
+		};
+	}, [onCardSelectGesture, taskIds, isCollapsed]);
 
 	// Create stable onClick handlers for each task to prevent unnecessary re-renders
 	const onClickHandlers = useMemo(() => {
@@ -702,7 +823,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 			}}
 		>
 			<div
-				ref={setNodeRef}
+				ref={setColumnRef}
 				className={cn(
 					"kanban-column relative flex min-w-0 flex-1 flex-col rounded-xl transition-colors duration-200",
 					getColumnBorderColor(),
@@ -839,21 +960,29 @@ export const DroppableColumn = memo(function DroppableColumn({
 								onSetWipLimit={onSetWipLimit}
 							/>
 						)}
-						{status === "backlog" && onAddClick && (
+						{canQuickAdd && (
 									<Tooltip delayDuration={200}>
 										<TooltipTrigger asChild>
 											<Button
 												variant="ghost"
 												size="icon"
 												className="h-6 w-6 hover:bg-primary/10 hover:text-primary transition-colors"
-												onClick={onAddClick}
-												aria-label={t("kanban.addTaskAriaLabel")}
+												onClick={openQuickAdd}
+												aria-label={t(
+													status === "queue"
+														? "kanban.quickAdd.addQueued"
+														: "kanban.addTaskAriaLabel",
+												)}
 											>
 												<Plus className="h-4 w-4" />
 											</Button>
 										</TooltipTrigger>
 										<TooltipContent side="left">
-											{t("kanban.addTaskAriaLabel")}
+											{t(
+												status === "queue"
+													? "kanban.quickAdd.addQueued"
+													: "kanban.quickAdd.addTooltip",
+											)}
 										</TooltipContent>
 									</Tooltip>
 						)}
@@ -916,9 +1045,9 @@ export const DroppableColumn = memo(function DroppableColumn({
 									</TooltipContent>
 								</Tooltip>
 							)}
-						{/* Column menu: width lock and collapse, rarely used, so out of
-						    the header. */}
-						{(onToggleLocked || onToggleCollapsed) && (
+						{/* Column menu: the same list as the right-click menu (rarely used
+						    actions, so out of the header). */}
+						{hasColumnMenuItems(columnActions) && (
 							<DropdownMenu>
 								<DropdownMenuTrigger asChild>
 									<Button
@@ -932,30 +1061,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 									</Button>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent align="end">
-									{onToggleLocked && (
-										<DropdownMenuItem onClick={onToggleLocked}>
-											{isLocked ? (
-												<Unlock className="mr-2 h-4 w-4" />
-											) : (
-												<Lock className="mr-2 h-4 w-4" />
-											)}
-											{isLocked
-												? t("kanban.unlockColumn")
-												: t("kanban.lockColumn")}
-										</DropdownMenuItem>
-									)}
-									{status === "backlog" && onQueueAll && tasks.length > 0 && (
-										<DropdownMenuItem onClick={onQueueAll}>
-											<ListPlus className="mr-2 h-4 w-4" />
-											{t("queue.queueAll")}
-										</DropdownMenuItem>
-									)}
-									{onToggleCollapsed && (
-										<DropdownMenuItem onClick={onToggleCollapsed}>
-											<ChevronLeft className="mr-2 h-4 w-4" />
-											{t("kanban.collapseColumn")}
-										</DropdownMenuItem>
-									)}
+									<ColumnMenuItems {...columnActions} />
 								</DropdownMenuContent>
 							</DropdownMenu>
 						)}
@@ -980,14 +1086,23 @@ export const DroppableColumn = memo(function DroppableColumn({
 				</div>
 
 				{/* Task list */}
-				<div className="flex-1 min-h-0">
+				<div ref={listAreaRef} className="flex-1 min-h-0">
 					<ScrollArea className="h-full px-2.5 pb-2.5 pt-1">
+						{canQuickAdd && isQuickAdding && isQuickAddColumn(status) && (
+							<div className="mb-2">
+								<QuickAddComposer
+									status={status}
+									onClose={closeQuickAdd}
+									onOpenWizard={onAddClick}
+								/>
+							</div>
+						)}
 						<SortableContext
 							items={taskIds}
 							strategy={verticalListSortingStrategy}
 						>
 							<div className="space-y-2 min-h-0">
-								{tasks.length === 0 ? (
+								{tasks.length === 0 && isQuickAdding ? null : tasks.length === 0 ? (
 									<div
 										className={cn(
 											"empty-column-dropzone flex flex-col items-center justify-center py-6",
@@ -1024,8 +1139,34 @@ export const DroppableColumn = memo(function DroppableColumn({
 								)}
 							</div>
 						</SortableContext>
+						{canQuickAdd && !isQuickAdding && (
+							<button
+								type="button"
+								onClick={openQuickAdd}
+								className="kanban-quick-add-row mt-2"
+							>
+								<Plus className="h-3.5 w-3.5" aria-hidden="true" />
+								{t(
+									status === "queue"
+										? "kanban.quickAdd.addQueued"
+										: "kanban.quickAdd.addCard",
+								)}
+							</button>
+						)}
 					</ScrollArea>
 				</div>
+				{columnMenu.at && (
+					<PointerMenu
+						at={columnMenu.at}
+						onClose={columnMenu.close}
+						label={t("kanban.columnOptions")}
+					>
+						<ColumnMenuItems
+							onAddCard={canQuickAdd ? openQuickAdd : undefined}
+							{...columnActions}
+						/>
+					</PointerMenu>
+				)}
 			</div>
 
 			{/* Resize handle on right edge */}

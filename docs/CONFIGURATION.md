@@ -455,9 +455,6 @@ is taken so the user knows the output is not live data:
 - **Bounty board** — contestants fall back to a `[stub:...]` output string
   when the `llm_client` module is not importable. Logs a warning per
   contestant.
-- **Analytics API** ([apps/backend/analytics/api_minimal.py](../apps/backend/analytics/api_minimal.py))
-  currently returns empty/mock payloads for every endpoint. Treat it as a
-  scaffold until a real database-backed implementation lands.
 
 ## QA validation loop
 
@@ -702,7 +699,7 @@ setting them by hand matters mainly for the CLI and headless runs.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `AUTO_CLAUDE_PROVIDER` | — | Default provider when nothing more specific names one: a task's own engine, the provider picked in the UI, `SELECTED_LLM_PROVIDER` and `task_metadata.json` all win over it. Accepted: `claude`, `copilot`, `openai`, `google`, `gemini`, `ollama`, `meta`, `mistral`, `deepseek`, `grok`, `aws`, `windsurf`, `cursor`, `custom`, `opencode`, `antigravity`, `agy`, `pi`, `gemini-cli`. Any other value, `anthropic` included, is ignored. |
+| `AUTO_CLAUDE_PROVIDER` | — | Default provider when nothing more specific names one: a task's own engine, the provider picked in the UI, `SELECTED_LLM_PROVIDER` and `task_metadata.json` all win over it. Accepted: `claude`, `copilot`, `openai`, `google`, `gemini`, `ollama`, `meta`, `mistral`, `deepseek`, `grok`, `openrouter`, `huggingface`, `aws`, `windsurf`, `cursor`, `custom`, `opencode`, `antigravity`, `agy`, `pi`, `gemini-cli`, and `anthropic` (read as `claude`). Any other value is ignored. |
 | `WORKPILOT_PI_MODE` | `json` | `rpc` keeps one pi process per session (`compact` on demand, `abort` on cancel, the model's context window read from `get_state`); `json` starts one per turn. Any other value is `json`. |
 | `PI_CODING_AGENT_DIR` | `~/.pi/agent` | Where pi keeps `trust.json`, `mcp.json` and `models.json`; read by the pi provider and by `brain connect`. The provider sets `PI_CODING_AGENT_SESSION_DIR` (the task's `<spec>/pi-sessions`) and `PI_SKIP_VERSION_CHECK=1` on the pi subprocess itself. Guide: [`integrations/pi.md`](integrations/pi.md). |
 | `GEMINI_API_KEY` | — | Read only by the `gemini-cli` (ACP) provider, to sign Gemini CLI in with its `gemini-api-key` method when a session asks for a login; otherwise sign in once with `gemini`. Guide: [`architecture/acp.md`](architecture/acp.md). |
@@ -713,9 +710,22 @@ setting them by hand matters mainly for the CLI and headless runs.
 | `MISTRAL_BASE_URL` | `https://api.mistral.ai` | Mistral API base, with or without `/v1`. |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | Same, for DeepSeek. |
 | `GROK_BASE_URL` | `https://api.x.ai` | Same, for xAI Grok. |
+| `OPENROUTER_API_KEY` | — | Key of the `openrouter` provider (Settings → AI accounts → OpenRouter). Secret. |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base. |
+| `HUGGINGFACE_API_KEY` | — | Hugging Face token of the `huggingface` provider, a fine-grained token with "Make calls to Inference Providers"; `HF_TOKEN` is read when it is unset. Secret. |
+| `HUGGINGFACE_BASE_URL` | `https://router.huggingface.co/v1` | Hugging Face Inference Providers router. |
+| `OPENROUTER_FALLBACK_MODELS` | — | Up to 3 OpenRouter model ids, comma-separated, tried in order when the default model fails (sent as `models`). Set from the OpenRouter page (Routing). |
+| `OPENROUTER_PROVIDER_SORT` | — | `price`, `throughput` or `latency`: order of the providers OpenRouter tries (`provider.sort`). |
+| `OPENROUTER_DATA_COLLECTION` | — | `deny`: only providers that do not store or train on prompts (`provider.data_collection`). |
+| `OPENROUTER_ZDR` | — | `1`: only zero-data-retention providers (`provider.zdr`). |
+| `HUGGINGFACE_ROUTING_POLICY` | — | `fastest` or `cheapest`: Hugging Face router policy, added to the request's model id unless it names a provider. |
+| `OPENROUTER_MODEL`, `HUGGINGFACE_MODEL` | registry default | Default model of the gateway, chosen on its provider page or with « Try in the cloud » in the Hub model search; the app sets it for the backend. |
 
-For the three base URLs, agent sessions prefer the variable to the URL saved in
-the provider configuration; the model list does the opposite.
+For these base URLs, agent sessions prefer the variable to the URL saved in
+the provider configuration; the model list does the opposite. OpenRouter and
+Hugging Face answer their model list without a key, so their dropdowns are
+live even before a key is set; see
+[`architecture/gateway-providers.md`](architecture/gateway-providers.md).
 
 The `meta`, `aws` and `cursor` providers have no adapter of their own: their
 credentials only feed the provider status, and their builds run on Claude.
@@ -797,6 +807,8 @@ Project settings writes `GITHUB_REPO` and `GITLAB_PROJECT` into the project's
 | `GITLAB_PROJECT` | — | The project's `group/project`, for the same uses on GitLab. |
 | `AZURE_DEVOPS_EXT_PAT` | — | Read when `AZURE_DEVOPS_PAT` is unset (it is the Azure DevOps CLI's name for it): pushes a task branch and opens its pull request. Secret. |
 | `GITHUB_BOT_TOKEN` | — | Token of the GitHub automation runner's bot account (PR review, auto-fix, triage) when `--bot-token` is not given. It only identifies that account, so the runner skips what the bot wrote itself; nothing is posted with it. Secret. |
+| `ISSUE_EMBEDDINGS_PROVIDER` | first with a key | Which service compares issues by meaning for triage's possible duplicates: `huggingface`, `openai`, `voyage`, `local` (sentence-transformers), or `none` for shared title words. Unset, the first of Hugging Face, OpenAI and Voyage with a key; under strict offline mode only `local`, and only when named. A failing service falls back to shared words. |
+| `ISSUE_EMBEDDINGS_MODEL` | service default | Embedding model of that service (`thenlper/gte-large` on Hugging Face, `text-embedding-3-small`, `voyage-large-2`, `all-MiniLM-L6-v2`). Vectors are cached per service and model in `.workpilot/github/embeddings/`. |
 | `MAX_PR_WORKTREES` | 10 | PR-review worktrees kept in `.workpilot/github/pr/worktrees`; the oldest go beyond that. |
 | `PR_WORKTREE_MAX_AGE_DAYS` | 7 | Age, in days, past which a PR-review worktree is removed, checked before each new review. `0` removes them all. |
 

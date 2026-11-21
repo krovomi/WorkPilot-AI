@@ -42,6 +42,7 @@ import { recordTaskActivity, useTaskStore } from "../../stores/task-store";
 import { TaskCard } from "../TaskCard";
 import { Toaster } from "../ui/toaster";
 import { TooltipProvider } from "../ui/tooltip";
+import { pickSubmenuItem } from "../../../__tests__/helpers/menus";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
 	return {
@@ -757,7 +758,7 @@ describe("TaskCard — options menu", () => {
 		expect(onDuplicate).toHaveBeenCalled();
 
 		await openMenu();
-		await user.click(await screen.findByRole("menuitem", { name: "Queue" }));
+		await pickSubmenuItem(user, "Move to", "Queue");
 		expect(onStatusChange).toHaveBeenCalledWith("queue");
 
 		await openMenu();
@@ -781,11 +782,15 @@ describe("TaskCard — options menu", () => {
 		);
 	});
 
-	it("has no menu when there is nothing to offer", () => {
+	it("still offers edit and estimate on a done card, not sync nor pause", async () => {
+		const user = userEvent.setup();
 		renderCard({ task: makeTask({ status: "done" }) });
-		expect(
-			screen.queryByRole("button", { name: "Task actions" }),
-		).not.toBeInTheDocument();
+		await user.click(screen.getByRole("button", { name: "Task actions" }));
+		expect(await screen.findByRole("menuitem", { name: "Edit…" })).toBeInTheDocument();
+		expect(screen.getByRole("menuitem", { name: "Estimate complexity" })).toBeInTheDocument();
+		expect(screen.queryByRole("menuitem", { name: "Sync from branch" })).toBeNull();
+		expect(screen.queryByRole("menuitem", { name: "Pause" })).toBeNull();
+		expect(screen.queryByRole("menuitem", { name: "Move to" })).toBeNull();
 	});
 });
 
@@ -1263,5 +1268,304 @@ describe("TaskCard — type colour and hover preview", () => {
 			vi.advanceTimersByTime(200);
 		});
 		expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+	});
+});
+
+describe("TaskCard — right-click menu and quick edits", () => {
+	const cardOf = (title = "Add login page") =>
+		screen.getByRole("option", { name: title });
+	const menu = () => screen.getByRole("menu", { name: "Card actions" });
+
+	function saving() {
+		api.restore();
+		api = installRendererApi({
+			updateTask: vi.fn(async (_id: string, updates: { metadata?: object }) => ({
+				success: true,
+				data: { ...makeTask(), metadata: updates.metadata },
+			})),
+		});
+	}
+
+	it("opens at the pointer and opens the card", async () => {
+		const user = userEvent.setup();
+		const { onClick } = renderCard({ task: makeTask() });
+		fireEvent.contextMenu(cardOf(), { clientX: 40, clientY: 60 });
+		expect(menu()).toBeInTheDocument();
+		const anchor = document.querySelector<HTMLElement>("[data-pointer-menu-anchor]");
+		expect(anchor?.style.left).toBe("40px");
+		expect(anchor?.style.top).toBe("60px");
+		// A click in the menu does not reach the card under it…
+		fireEvent.click(menu());
+		expect(onClick).not.toHaveBeenCalled();
+		// …and a right-click in it opens no second menu.
+		fireEvent.contextMenu(screen.getByRole("menuitem", { name: "Open" }));
+		expect(screen.getAllByRole("menu")).toHaveLength(1);
+		await user.click(screen.getByRole("menuitem", { name: "Open" }));
+		expect(onClick).toHaveBeenCalledTimes(1);
+		expect(screen.queryByRole("menu")).toBeNull();
+	});
+
+	it("opens near the card's corner from the keyboard", () => {
+		renderCard({ task: makeTask() });
+		fireEvent.contextMenu(cardOf());
+		const anchor = document.querySelector<HTMLElement>("[data-pointer-menu-anchor]");
+		expect(anchor?.style.left).toBe("8px");
+		expect(anchor?.style.top).toBe("24px");
+	});
+
+	it("sets the type and the priority from their submenus", async () => {
+		saving();
+		const user = userEvent.setup();
+		renderCard({ task: makeTask() });
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		await pickSubmenuItem(user, "Type", "Bug");
+		await waitFor(() =>
+			expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", {
+				metadata: { kind: "bug_fix", kindSource: "user" },
+			}),
+		);
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		await pickSubmenuItem(user, "Priority", "High");
+		await waitFor(() =>
+			expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", {
+				metadata: { priority: "high" },
+			}),
+		);
+	});
+
+	it("saves nothing when the type or priority picked is the card's own", async () => {
+		saving();
+		const user = userEvent.setup();
+		renderCard({
+			task: makeTask({
+				metadata: { kind: "bug_fix", kindSource: "user", priority: "high" } as never,
+			}),
+		});
+		await user.click(screen.getByRole("button", { name: "Task actions" }));
+		await pickSubmenuItem(user, "Type", "Bug");
+		await user.click(screen.getByRole("button", { name: "Task actions" }));
+		await pickSubmenuItem(user, "Priority", "High");
+		expect(api.fn("updateTask")).not.toHaveBeenCalled();
+	});
+
+	it("says so when a change is not saved", async () => {
+		const user = userEvent.setup();
+		render(
+			<TooltipProvider>
+				<TaskCard task={makeTask()} onClick={vi.fn()} />
+				<Toaster />
+			</TooltipProvider>,
+		);
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		await pickSubmenuItem(user, "Priority", "Urgent");
+		expect(
+			await screen.findByText("The change could not be saved"),
+		).toBeInTheDocument();
+	});
+
+	it("edits in a dialog whose clicks and keys stay in it", async () => {
+		const user = userEvent.setup();
+		const onDelete = vi.fn();
+		const { onClick } = renderCard({ task: makeTask(), onDelete });
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		await user.click(screen.getByRole("menuitem", { name: "Edit…" }));
+		const dialog = await screen.findByRole("dialog");
+		const field = within(dialog).getAllByRole("textbox")[0];
+		fireEvent.keyDown(field, { key: " " });
+		fireEvent.keyDown(field, { key: "Enter" });
+		fireEvent.mouseDown(field);
+		fireEvent.click(field);
+		fireEvent.contextMenu(field);
+		expect(onClick).not.toHaveBeenCalled();
+		expect(onDelete).not.toHaveBeenCalled();
+		expect(screen.queryByRole("menu")).toBeNull();
+		await user.keyboard("{Escape}");
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+	});
+
+	it("keeps the text, type and priority while an agent works on the card", async () => {
+		renderCard({ task: makeTask({ status: "in_progress" }) });
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		for (const name of ["Edit…", "Type", "Priority"]) {
+			expect(screen.getByRole("menuitem", { name })).toHaveAttribute(
+				"data-disabled",
+			);
+		}
+		expect(screen.getByRole("menuitem", { name: "Pause" })).toBeInTheDocument();
+	});
+
+	it("resumes a paused card, deletes one and estimates from the title", async () => {
+		const user = userEvent.setup();
+		const onDelete = vi.fn();
+		useSmartEstimationStore.getState().reset();
+		renderCard({
+			task: makeTask({
+				status: "in_progress",
+				description: "",
+				metadata: { paused: { enabled: true } } as never,
+			}),
+			onDelete,
+		});
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		expect(screen.queryByRole("menuitem", { name: "Pause" })).toBeNull();
+		await user.click(screen.getByRole("menuitem", { name: "Resume" }));
+		await waitFor(() =>
+			expect(api.fn("invoke")).toHaveBeenCalledWith("TASK_RESUME", "task-1"),
+		);
+
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		await user.click(screen.getByRole("menuitem", { name: "Estimate complexity" }));
+		expect(useSmartEstimationStore.getState().initialTaskDescription).toBe(
+			"Add login page",
+		);
+
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+		expect(onDelete).toHaveBeenCalledTimes(1);
+	});
+
+	it("offers no sync for a card outside a known project", async () => {
+		useProjectStore.setState({ projects: [] });
+		renderCard({ task: makeTask() });
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		expect(screen.getByRole("menuitem", { name: "Estimate complexity" })).toBeInTheDocument();
+		expect(screen.queryByRole("menuitem", { name: "Sync from branch" })).toBeNull();
+	});
+
+	it("keeps clicks in the sync dialog and in the ⋮ menu off the card", async () => {
+		const user = userEvent.setup();
+		const { onClick } = renderCard({ task: makeTask() });
+		await user.click(screen.getByRole("button", { name: "Task actions" }));
+		const actions = await screen.findByRole("menu");
+		fireEvent.click(actions);
+		fireEvent.contextMenu(actions);
+		expect(screen.queryByRole("menu", { name: "Card actions" })).toBeNull();
+		await user.click(screen.getByRole("menuitem", { name: "Sync from branch" }));
+		fireEvent.click(await screen.findByRole("dialog"));
+		expect(onClick).not.toHaveBeenCalled();
+	});
+
+	it("leaves Enter on one of its buttons to that button", () => {
+		const { onClick } = renderCard({ task: makeTask() });
+		const button = within(cardOf())
+			.getAllByRole("button")
+			.find((b) => b.getAttribute("aria-label") !== "Task actions");
+		if (!button) throw new Error("the card has no button");
+		fireEvent.keyDown(button, { key: "Enter" });
+		expect(onClick).not.toHaveBeenCalled();
+		fireEvent.keyDown(cardOf(), { key: "Enter" });
+		expect(onClick).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("TaskCard — renaming in place", () => {
+	const cardOf = (title = "Add login page") =>
+		screen.getByRole("option", { name: title });
+	const titleOf = () => screen.getByRole("heading", { name: "Add login page" });
+	const box = () => screen.getByRole("textbox", { name: "Card title" });
+
+	function saving() {
+		api.restore();
+		api = installRendererApi({
+			updateTask: vi.fn(async (_id: string, updates: { title?: string }) => ({
+				success: true,
+				data: { ...makeTask(), ...updates },
+			})),
+		});
+	}
+
+	afterEach(() => vi.useRealTimers());
+
+	it("renames on a double-click on the title, without opening the card", async () => {
+		saving();
+		vi.useFakeTimers();
+		const { onClick } = renderCard({ task: makeTask() });
+		fireEvent.click(titleOf(), { detail: 1 });
+		fireEvent.click(titleOf(), { detail: 2 });
+		act(() => vi.advanceTimersByTime(1000));
+		expect(onClick).not.toHaveBeenCalled();
+		expect(box()).toHaveValue("Add login page");
+		// Clicks and presses in the box stay in it.
+		fireEvent.click(box());
+		fireEvent.doubleClick(box());
+		fireEvent.pointerDown(box());
+		fireEvent.mouseDown(box());
+		expect(onClick).not.toHaveBeenCalled();
+		fireEvent.change(box(), { target: { value: "  Add the login page " } });
+		fireEvent.keyDown(box(), { key: "a" });
+		fireEvent.keyDown(box(), { key: "Enter" });
+		expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", {
+			title: "Add the login page",
+		});
+		expect(screen.queryByRole("textbox", { name: "Card title" })).toBeNull();
+		expect(document.activeElement).toBe(cardOf());
+	});
+
+	it("opens the card a moment after a single click on the title", () => {
+		vi.useFakeTimers();
+		const { onClick, unmount } = renderCard({ task: makeTask() });
+		fireEvent.click(titleOf(), { detail: 1 });
+		expect(onClick).not.toHaveBeenCalled();
+		act(() => vi.advanceTimersByTime(300));
+		expect(onClick).toHaveBeenCalledTimes(1);
+		// A click still waiting when the card goes away opens nothing.
+		fireEvent.click(titleOf(), { detail: 1 });
+		unmount();
+		act(() => vi.advanceTimersByTime(300));
+		expect(onClick).toHaveBeenCalledTimes(1);
+	});
+
+	it("renames with F2; Escape, an empty or the same title change nothing", () => {
+		saving();
+		renderCard({ task: makeTask() });
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.change(box(), { target: { value: "Something else" } });
+		fireEvent.keyDown(box(), { key: "Escape" });
+		expect(document.activeElement).toBe(cardOf());
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.change(box(), { target: { value: "   " } });
+		fireEvent.blur(box());
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.blur(box());
+		expect(api.fn("updateTask")).not.toHaveBeenCalled();
+	});
+
+	it("saves when the box is left", async () => {
+		saving();
+		renderCard({ task: makeTask() });
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.change(box(), { target: { value: "Login page" } });
+		fireEvent.blur(box());
+		expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", { title: "Login page" });
+	});
+
+	it("says so when the title is not saved", async () => {
+		render(
+			<TooltipProvider>
+				<TaskCard task={makeTask()} onClick={vi.fn()} />
+				<Toaster />
+			</TooltipProvider>,
+		);
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.change(box(), { target: { value: "Login page" } });
+		fireEvent.keyDown(box(), { key: "Enter" });
+		await waitFor(() => expect(api.fn("updateTask")).toHaveBeenCalled());
+		expect(
+			await screen.findByText("The change could not be saved"),
+		).toBeInTheDocument();
+	});
+
+	it("is not offered while an agent works on the card, nor on an error title", () => {
+		const { onClick, unmount } = renderCard({
+			task: makeTask({ status: "in_progress" }),
+		});
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.click(titleOf(), { detail: 1 });
+		expect(onClick).toHaveBeenCalledTimes(1);
+		expect(screen.queryByRole("textbox", { name: "Card title" })).toBeNull();
+		unmount();
+		renderCard({ task: makeTask({ title: `Broken${JSON_ERROR_TITLE_SUFFIX}` }) });
+		fireEvent.keyDown(screen.getByRole("option"), { key: "F2" });
+		expect(screen.queryByRole("textbox", { name: "Card title" })).toBeNull();
 	});
 });

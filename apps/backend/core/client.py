@@ -263,6 +263,8 @@ from core.custom_mcp_validation import (
 from core.mcp_pinning import custom_servers as _custom_servers
 from core.mcp_pinning import pinned_servers
 from docintel.read_guard import make_read_guard_hook
+from gateway_providers import BASE_URLS as GATEWAY_BASE_URLS
+from gateway_routing import gateway_routing_params
 from harness.application.budget import session_budget_usd
 from harness.application.subagents import (
     SUBAGENT_TOOLS,
@@ -1695,6 +1697,8 @@ _PROVIDER_ALIASES: dict[str, str] = {
     "mistral": "mistral",
     "deepseek": "deepseek",
     "grok": "grok",
+    "openrouter": "openrouter",
+    "huggingface": "huggingface",
     "aws": "aws",
     "windsurf": "windsurf",
     "cursor": "cursor",
@@ -1881,27 +1885,7 @@ def _resolve_active_provider(spec_dir: Path | None = None) -> tuple[str, bool]:
 
     # 2. Environment variable override
     env_provider = os.environ.get("AUTO_CLAUDE_PROVIDER", "").lower().strip()
-    if env_provider in (
-        "claude",
-        "copilot",
-        "openai",
-        "google",
-        "gemini",
-        "ollama",
-        "meta",
-        "mistral",
-        "deepseek",
-        "grok",
-        "aws",
-        "windsurf",
-        "cursor",
-        "custom",
-        "opencode",
-        "antigravity",
-        "agy",
-        "pi",
-        *acp_provider_names(),
-    ):
+    if env_provider in _PROVIDER_ALIASES:
         return _normalize_provider_name(env_provider), True
 
     # 3. Project-level setting from spec's parent project
@@ -1922,26 +1906,7 @@ def _resolve_active_provider(spec_dir: Path | None = None) -> tuple[str, bool]:
                         line = line.strip()
                         if line.startswith("AI_PROVIDER="):
                             value = line.split("=", 1)[1].strip().strip("\"'").lower()
-                            if value in (
-                                "claude",
-                                "copilot",
-                                "openai",
-                                "google",
-                                "ollama",
-                                "meta",
-                                "mistral",
-                                "deepseek",
-                                "grok",
-                                "aws",
-                                "windsurf",
-                                "cursor",
-                                "custom",
-                                "opencode",
-                                "antigravity",
-                                "agy",
-                                "pi",
-                                *acp_provider_names(),
-                            ):
+                            if value in _PROVIDER_ALIASES:
                                 return _normalize_provider_name(value), True
             except Exception:
                 # Une source de provider illisible : on passe a la suivante, c'est le but de la chaine.
@@ -2790,11 +2755,12 @@ _COMPATIBLE_PROVIDER_URLS = {
     "mistral": "https://api.mistral.ai",
     "deepseek": "https://api.deepseek.com",
     "grok": "https://api.x.ai",
+    **GATEWAY_BASE_URLS,  # OpenRouter, Hugging Face (gateway_providers)
 }
 
 
 def _compatible_client(req: _ClientRequest):
-    """Mistral, DeepSeek and Grok: OpenAI-compatible APIs with their own key."""
+    """Mistral, DeepSeek, Grok, OpenRouter, Hugging Face: OpenAI-compatible APIs."""
     from core.agent_client import CompatibleProviderAgentClient
     from core.llm_optimization import compatible_cache_routing, compatible_effort_params
     from provider_models_catalog import _api_key_for
@@ -2823,10 +2789,7 @@ def _compatible_client(req: _ClientRequest):
     logger.info(
         "[create_agent_client] Using CompatibleProviderAgentClient "
         "(provider=%s, model=%s, agent_type=%s, effort=%s)",
-        provider,
-        req.model,
-        req.agent_type,
-        effort_params,
+        *(provider, req.model, req.agent_type, effort_params),
     )
     cache = compatible_cache_routing(provider, req.spec_dir, req.agent_type)
     return CompatibleProviderAgentClient(
@@ -2837,6 +2800,7 @@ def _compatible_client(req: _ClientRequest):
         effort_params=effort_params,
         prompt_cache_key=cache.body_key,
         cache_headers=cache.headers,
+        routing_params=gateway_routing_params(provider, req.model),
         system_prompt=req.prompt(tool_use_hint=True),
         project_dir=str(req.project_dir),
         agent_type=req.agent_type,

@@ -13,8 +13,9 @@ from `models_registry.py`, so the UI never sees an empty dropdown — and a mode
 released after that file was last edited still reaches it.
 
 Supported providers (with live fetching):
-    anthropic, openai, google, mistral, deepseek, grok, ollama, lm-studio,
-    llama-cpp, copilot (through the GitHub CLI's token)
+    anthropic, openai, google, mistral, deepseek, grok, openrouter,
+    huggingface (both keyless), ollama, lm-studio, llama-cpp, copilot
+    (through the GitHub CLI's token)
 
 Other providers (aws, meta, custom, windsurf, …) get the static
 catalog without a live fetch.
@@ -33,11 +34,12 @@ from typing import Any
 import httpx
 
 try:
-    from . import public_model_registry
+    from . import gateway_providers, public_model_registry
     from .models_registry import provider_catalog
 except ImportError:
     # Module is imported as a top-level "provider_models_catalog" (no package
     # context), e.g. by provider_api.py when apps/backend is on sys.path.
+    import gateway_providers  # type: ignore[no-redef]
     import public_model_registry  # type: ignore[no-redef]
     from models_registry import provider_catalog  # type: ignore[no-redef]
 
@@ -246,6 +248,8 @@ def _api_key_for(provider: str) -> str | None:
         "google": ("gemini",),
     }
     key = cfg.get("api_key") or os.environ.get(f"{provider.upper()}_API_KEY")
+    if not key and gateway_providers.is_gateway(provider):
+        key = gateway_providers.env_key(provider)
     for alias in aliases.get(provider, ()):
         if not key:
             key = (load_provider_config(alias) or {}).get("api_key")
@@ -524,6 +528,11 @@ def _fetch_grok() -> list[dict[str, Any]]:
     )
 
 
+def _fetch_gateway(provider: str) -> list[dict[str, Any]]:
+    """OpenRouter or Hugging Face: their list answers without a key."""
+    return gateway_providers.fetch_models(provider, _api_key_for(provider))
+
+
 def _local_llm_root(provider: str = "ollama") -> str:
     """Resolve the local LLM server root (no path), honouring env + saved config.
 
@@ -644,6 +653,8 @@ _FETCHERS = {
     "mistral": _fetch_mistral,
     "deepseek": _fetch_deepseek,
     "grok": _fetch_grok,
+    "openrouter": lambda: _fetch_gateway("openrouter"),
+    "huggingface": lambda: _fetch_gateway("huggingface"),
     "ollama": _fetch_ollama,
     "windsurf": _fetch_windsurf,
     "local": _fetch_ollama,

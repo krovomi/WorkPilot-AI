@@ -202,4 +202,13 @@ describe("AzureDevOpsIntegration", () => {
 		rerender(<AzureDevOpsIntegration {...props} envConfig={{ ...props.envConfig, azureDevOpsAutoSync: true } as ProjectEnvConfig} />);
 		expect(screen.getByText("Note:")).toBeInTheDocument();
 	});
+
+	it("uses a saved account instead of the organization and PAT fields", async () => {
+		const { updateEnvConfig } = renderAzure({ azureDevOpsAccountId: "acct-1" });
+		expect(screen.queryByLabelText("Organization URL")).toBeNull();
+		expect(screen.queryByLabelText("Personal Access Token (PAT)")).toBeNull();
+		expect(await screen.findByRole("option", { name: "Deleted account" })).toBeInTheDocument();
+		await userEvent.selectOptions(screen.getByLabelText("Account"), "");
+		expect(updateEnvConfig).toHaveBeenCalledWith({ azureDevOpsAccountId: "" });
+	});
 });
