@@ -53,10 +53,11 @@ def _get_max_age_days() -> int:
 
 
 # Safe pattern for git refs (SHA, branch names)
-# Allows: alphanumeric, dots, underscores, hyphens, forward slashes
+# Allows: alphanumeric, dots, underscores, hyphens, forward slashes; the first
+# character is alphanumeric, so a ref is never read by git as an option
 import re
 
-SAFE_REF_PATTERN = re.compile(r"^[a-zA-Z0-9._/\-]+$")
+SAFE_REF_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/\-]*$")
 
 
 class WorktreeInfo(NamedTuple):
