@@ -97,70 +97,12 @@ class MCPSourceAdapter:
         # the MCP server tools via the Claude SDK runtime.
         return []
 
-    async def get_incident_details(self, event_id: str) -> dict[str, Any] | None:
-        """Get detailed information about a specific incident."""
-        if not self._connected:
-            return None
-        return None
-
-    def _normalize_severity(self, raw_severity: str) -> str:
-        """Normalize severity from source-specific format to our enum."""
-        severity_map = {
-            # Sentry
-            "fatal": "critical",
-            "error": "high",
-            "warning": "medium",
-            "info": "info",
-            # Datadog
-            "alert": "critical",
-            "warn": "medium",
-            # CloudWatch
-            "alarm": "critical",
-            "insufficient_data": "info",
-            "ok": "info",
-            # PagerDuty
-            "p1": "critical",
-            "p2": "high",
-            "p3": "medium",
-            "p4": "low",
-            "p5": "info",
-        }
-        normalized = raw_severity.lower().strip()
-        return severity_map.get(normalized, normalized)
-
 
 class SentryAdapter(MCPSourceAdapter):
     """Adapter for Sentry MCP server."""
 
     def __init__(self, config: MCPSourceConfig):
         super().__init__(IncidentSource.SENTRY, config)
-
-    def _parse_sentry_event(self, event: dict[str, Any]) -> ProductionIncidentData:
-        """Parse a Sentry event into our standard format."""
-        exception = event.get("exception", {})
-        values = exception.get("values", [{}])
-        first_exc = values[0] if values else {}
-
-        frames = first_exc.get("stacktrace", {}).get("frames", [])
-        stack_lines = []
-        for frame in reversed(frames):
-            filename = frame.get("filename", "?")
-            lineno = frame.get("lineno", "?")
-            function = frame.get("function", "?")
-            stack_lines.append(f'  File "{filename}", line {lineno}, in {function}')
-
-        return ProductionIncidentData(
-            error_type=first_exc.get("type", "Unknown"),
-            error_message=first_exc.get("value", ""),
-            stack_trace="\n".join(stack_lines),
-            occurrence_count=event.get("count", 1),
-            first_seen=event.get("firstSeen", ""),
-            last_seen=event.get("lastSeen", ""),
-            affected_users=event.get("userCount", 0),
-            environment=self.config.environment,
-            service_name=event.get("project", {}).get("slug"),
-            event_url=event.get("permalink"),
-        )
 
 
 class DatadogAdapter(MCPSourceAdapter):
@@ -243,36 +185,16 @@ class MCPConnector:
             self._configs.pop(source, None)
         return success
 
-    async def poll_all(self) -> list[ProductionIncidentData]:
-        """Poll all connected sources for new incidents."""
-        all_incidents: list[ProductionIncidentData] = []
+    async def poll_all(self) -> list[tuple[IncidentSource, ProductionIncidentData]]:
+        """Poll all connected sources for new incidents, each with its source."""
+        all_incidents: list[tuple[IncidentSource, ProductionIncidentData]] = []
         for source, adapter in self._adapters.items():
             try:
                 incidents = await adapter.poll_incidents()
-                all_incidents.extend(incidents)
+                all_incidents.extend((source, incident) for incident in incidents)
             except Exception as e:
                 logger.error(f"Error polling {source.value}: {e}")
         return all_incidents
-
-    async def poll_source(self, source: IncidentSource) -> list[ProductionIncidentData]:
-        """Poll a specific source for new incidents."""
-        adapter = self._adapters.get(source)
-        if not adapter:
-            return []
-        try:
-            return await adapter.poll_incidents()
-        except Exception as e:
-            logger.error(f"Error polling {source.value}: {e}")
-            return []
-
-    async def get_incident_details(
-        self, source: IncidentSource, event_id: str
-    ) -> dict[str, Any] | None:
-        """Get detailed incident information from a specific source."""
-        adapter = self._adapters.get(source)
-        if not adapter:
-            return None
-        return await adapter.get_incident_details(event_id)
 
     def get_status(self) -> dict[str, Any]:
         """Get connector status for dashboard display."""

@@ -67,9 +67,8 @@ class ProductionMode:
         raw_incidents = await self.connector.poll_all()
         incidents: list[Incident] = []
 
-        for raw in raw_incidents:
-            incident = self._create_incident_from_production_data(raw)
-            incidents.append(incident)
+        for source, raw in raw_incidents:
+            incidents.append(self._create_incident_from_production_data(source, raw))
 
         return incidents
 
@@ -225,21 +224,14 @@ class ProductionMode:
         return "\n".join(lines)
 
     def _create_incident_from_production_data(
-        self, data: ProductionIncidentData
+        self, source: IncidentSource, data: ProductionIncidentData
     ) -> Incident:
-        """Create an Incident from raw production data."""
+        """Create an Incident from what ``source`` reported."""
         severity = self._assess_severity(data)
         affected_files = self._correlate_stack_trace(data.stack_trace)
         source_data = data.to_dict()
         if locations := self._stack_locations(data.stack_trace):
             source_data["stack_locations"] = locations
-
-        source = IncidentSource.SENTRY  # Default, overridden by connector
-        if data.service_name:
-            for src in IncidentSource:
-                if src.value in (data.service_name or "").lower():
-                    source = src
-                    break
 
         incident = Incident(
             mode=IncidentMode.PRODUCTION,
