@@ -335,20 +335,12 @@
 		"done": "Done",
 		"less": "Less",
 		"more": "More",
-		"subtaskLabel": "Subtask: {{name}}",
-		"progress": "Progress",
-		"phasePlanning": "Planning (0-20%)",
-		"phaseCoding": "Coding (20-80%)",
-		"phaseReview": "AI Review (80-95%)",
-		"phaseComplete": "Complete (95-100%)",
 		"editFilesTitle": "Edit Files: {{name}}",
 		"moreFiles": "+{{count}} more",
 		"noSubtasks": "No subtasks defined",
 		"noSubtasksHint": "Implementation subtasks will appear here after planning",
 		"editFiles": "Edit files",
-		"saveChanges": "Save Changes",
-		"subtasksCompleted": "{{completed}}/{{total}} subtasks completed",
-		"noSubtasksYet": "No subtasks yet"
+		"saveChanges": "Save Changes"
 	},
 	"conflicts": {
 		"detected_one": "{{count}} potential conflict detected.",

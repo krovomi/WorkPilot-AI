@@ -92,6 +92,7 @@
 		"stuck": "Bloqué",
 		"incomplete": "Incomplet",
 		"recovering": "Récupération...",
+		"recoverFailed": "Impossible de récupérer la tâche",
 		"needsRecovery": "Récupération requise",
 		"needsResume": "Reprise requise",
 		"tdd": "TDD",
