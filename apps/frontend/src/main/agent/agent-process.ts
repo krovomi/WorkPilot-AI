@@ -21,7 +21,7 @@ import { getClaudeProfileManager } from "../claude-profile-manager";
 import { getToolInfo } from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
 import { isWindows, killProcessGracefully } from "../platform";
-import { readProjectEnv } from "../project-env-file";
+import { readProjectForgeEnv } from "../forge/forge-credentials";
 import { projectStore } from "../project-store";
 import {
 	chainHasOtherProvider,
@@ -769,7 +769,7 @@ export class AgentProcessManager {
 
 		// Skip empty values to prevent overriding valid values from other sources
 		return Object.fromEntries(
-			Object.entries(readProjectEnv(project)).filter(([, value]) => value),
+			Object.entries(readProjectForgeEnv(project)).filter(([, value]) => value),
 		);
 	}
 

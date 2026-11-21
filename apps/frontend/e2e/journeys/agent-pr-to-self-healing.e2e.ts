@@ -132,7 +132,7 @@ test("Self-Healing takes the CI's failures, and leaves the repair to a person", 
 	const view = page.getByTestId("self-healing-view");
 	await expect(view.getByText("No CI/CD incidents detected")).toBeVisible({ timeout: 30_000 });
 	await view.getByLabel("Enable CI/CD healing").check();
-	await view.getByLabel("Auto-fix regressions").uncheck();
+	await view.getByLabel("File a fix card for each regression").uncheck();
 	const config = path.join(projectDir, ".workpilot", "self-healing", "config.json");
 	await expect
 		.poll(() => (existsSync(config) ? readJson(config).cicd : null), { timeout: 15_000 })

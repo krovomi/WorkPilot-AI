@@ -72,6 +72,8 @@ PROVIDER_IDS: dict[str, str] = {
     "grok": "xai",
     "copilot": "github-copilot",
     "aws": "amazon-bedrock",
+    "openrouter": "openrouter",
+    "huggingface": "huggingface",
 }
 
 # `limit` carries `context` (the window) that context_mgmt reads for models

@@ -14,7 +14,7 @@ import { promisify } from "node:util";
 import type { Project } from "../shared/types";
 import { appLog } from "./app-logger";
 import { getToolPath } from "./cli-tool-manager";
-import { readProjectEnv } from "./project-env-file";
+import { readProjectForgeEnv } from "./forge/forge-credentials";
 
 const execute = promisify(execFile);
 
@@ -77,7 +77,7 @@ async function run(tool: "gh" | "glab", args: string[], cwd: string): Promise<st
 
 async function azureState(url: string, project: Project): Promise<PrState> {
 	const match = AZURE.exec(url);
-	const token = readProjectEnv(project).AZURE_DEVOPS_PAT;
+	const token = readProjectForgeEnv(project).AZURE_DEVOPS_PAT;
 	if (!match || !token) return "unknown";
 	const [, org, name, repo, id] = match;
 	const api = `https://dev.azure.com/${org}/${name}/_apis/git/repositories/${repo}/pullrequests/${id}?api-version=7.1`;

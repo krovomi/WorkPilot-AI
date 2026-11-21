@@ -18,7 +18,7 @@ import {
 
 export const AUDIT_FORMATS: readonly AuditExportFormat[] = ["csv", "json"];
 
-/** The columns of the CSV, in this order: who, when, what, decision, why, which model. */
+/** The columns of the CSV, in this order: who, when, what, decision, why, which model, who approved. */
 export const AUDIT_COLUMNS = [
 	"at",
 	"user",
@@ -31,6 +31,7 @@ export const AUDIT_COLUMNS = [
 	"reason",
 	"provider",
 	"model",
+	"approvedBy",
 ] as const;
 
 const MAX_EVENTS = 10_000;
@@ -71,6 +72,7 @@ export function auditEvents(answer: unknown): PolicyAuditEvent[] {
 			reason: text(e.reason),
 			provider: text(e.provider),
 			model: text(e.model),
+			approvedBy: e.decision === "approved" ? text(e.approvedBy) : null,
 		});
 	}
 	return events;

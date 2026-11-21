@@ -34,6 +34,7 @@ applications mobiles pour un projet.
 | Tableau de bord | `src/app/(app)/projects/[projectId]/dashboard.tsx` | `GET /api/features/workspace/dashboard` et `.../costs` |
 | Sessions | `src/app/(app)/projects/[projectId]/sessions.tsx` | `GET /api/features/workspace/sessions` (les 100 dernières) |
 | Analyses | `src/app/(app)/projects/[projectId]/analyses/` | `GET /api/features/analyses/<analyse>/report`, `POST .../jobs` pour la lancer, suivie comme un job |
+| Gouvernance | `src/app/(app)/projects/[projectId]/governance.tsx` | `GET /api/features/governance`, `POST .../approvals/{id}` pour approuver ou refuser un appel, `POST .../stop` pour l'arrêt d'urgence (voir « La gouvernance ») |
 | Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout`, `PUT /users/me/preferences` (le thème, `src/ui/ThemeSection.tsx`) |
 | Administration | `src/app/(app)/admin/` | `/admin/members`, `/auth/invitations`, `/admin/groups` (membres et projets), `/admin/roles` et `/admin/permissions` (`src/admin/api.ts`) |
 | Mes jetons sur le serveur | `src/app/(app)/tokens.tsx` | `GET`, `PUT /users/me/secrets`, `DELETE /users/me/secrets/{kind}` |
@@ -252,6 +253,18 @@ relancent comme un job. Tout cela demande `analytics.read` ; lancer une analyse 
 `agent.execute`, que le serveur revérifie. Un rapport d'analyse est une sortie d'agent : l'app ne
 l'affiche pas tel quel mais en tire des chiffres et des listes bornés (`src/insights/digest.ts`),
 et ignore ce qu'elle ne reconnaît pas.
+
+## La gouvernance
+
+La page Gouvernance d'un projet (lien du Kanban avec `audit.read`) montre ce que le serveur lit
+dans le `workpilot.policy.yaml` de son clone : heures, fichiers interdits, fichiers soumis à revue
+et qui les approuve (les rôles de `files.reviewers`, ou tout membre), budget de jetons, limite du
+coupe-circuit, erreurs d'une politique refusée ; puis les appels qu'attendent ses agents, avec
+Approuver et Refuser, les agents en cours, avec « Arrêter mes agents » et, pour le propriétaire,
+« Arrêter tous les agents du projet » après confirmation, et les vingt dernières décisions avec qui
+les a approuvées. Chaque bouton suit le `may` de la réponse ; le serveur revérifie, et quand il
+refuse une approbation faute de rôle, la page nomme les rôles demandés. L'export du journal reste
+sur le bureau. Conception : [governance-policy.md](governance-policy.md#un-projet-du-mode-serveur-shared_featuresgovernancepy).
 
 ## Les notifications push
 

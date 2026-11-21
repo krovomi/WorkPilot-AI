@@ -26,7 +26,7 @@ import type {
 import { slugifySpecTitle } from "../../../shared/utils/spec-slug";
 import type { AgentManager } from "../../agent";
 import { getAppLanguage } from "../../app-language";
-import { readProjectEnv } from "../../project-env-file";
+import { readProjectForgeEnv } from "../../forge/forge-credentials";
 import { projectStore } from "../../project-store";
 import { getRemoteTasks } from "../../remote-board";
 import {
@@ -59,7 +59,7 @@ function loadAzureDevOpsConfig(
 	projectPath: string,
 	autoBuildPath: string,
 ): { pat: string | null; orgUrl: string | null } {
-	const vars = readProjectEnv({ path: projectPath, autoBuildPath });
+	const vars = readProjectForgeEnv({ path: projectPath, autoBuildPath });
 	return {
 		pat: vars.AZURE_DEVOPS_PAT || null,
 		orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,

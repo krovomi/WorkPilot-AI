@@ -34,7 +34,6 @@ apps/backend/watermarks/
   clean.py     text on its way to disk -> clean text, and what changed
   hook.py      the PreToolUse hook every agent Write and Edit passes through
   ledger.py    <spec_dir>/watermarks.jsonl — the record of every silent edit
-  api.py       GET /api/watermarks/status
 ```
 
 **One file is vendored, not fifty.** `service/scripts/text_unicode.py` is Layer
@@ -125,8 +124,7 @@ needed the work, silently, on every build.
 | `WATERMARKS_MAX_BYTES` | `1048576` | Above this the content is passed through and the skip is reported. A nonsense value falls back to the default rather than disabling anything through a knob documented as a size |
 
 All of them are read from `.workpilot/.env` as well as the environment, so what
-Settings writes reaches the hook, the tool executor and the status endpoint from
-one place. Real environment variables win.
+Settings writes reaches the hook and the tool executor from one place. Real environment variables win.
 
 **How it is verified.** The layers split by what they need, the same way rtk's
 do:

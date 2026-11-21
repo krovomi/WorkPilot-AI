@@ -4,7 +4,7 @@ Semantic Duplicate Detection
 
 Uses embeddings-based similarity to detect duplicate issues:
 - Replaces simple word overlap with semantic similarity
-- Integrates with OpenAI/Voyage AI embeddings
+- Integrates with OpenAI, Voyage AI and Hugging Face embeddings
 - Caches embeddings with TTL
 - Extracts entities (error codes, file paths, function names)
 - Provides similarity breakdown by component
@@ -27,6 +27,13 @@ logger = logging.getLogger(__name__)
 DUPLICATE_THRESHOLD = 0.85  # Cosine similarity for "definitely duplicate"
 SIMILAR_THRESHOLD = 0.70  # Cosine similarity for "potentially related"
 EMBEDDING_CACHE_TTL_HOURS = 24
+
+# Hugging Face Inference Providers serve embeddings on the router's
+# feature-extraction pipeline, not on its OpenAI-compatible `/v1`
+# (huggingface.co/docs/inference-providers/tasks/feature-extraction).
+HF_EMBEDDINGS_URL = "https://router.huggingface.co/hf-inference/models/{model}/pipeline/feature-extraction"
+# A Hub repo id: it becomes a URL path, so nothing else is accepted.
+_HF_REPO_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
 @dataclass
@@ -208,6 +215,7 @@ class EmbeddingProvider:
     Supports multiple backends:
     - OpenAI (text-embedding-3-small)
     - Voyage AI (voyage-large-2)
+    - Hugging Face Inference Providers (thenlper/gte-large)
     - Local (sentence-transformers)
     """
 
@@ -225,6 +233,7 @@ class EmbeddingProvider:
         defaults = {
             "openai": "text-embedding-3-small",
             "voyage": "voyage-large-2",
+            "huggingface": "thenlper/gte-large",
             "local": "all-MiniLM-L6-v2",
         }
         return defaults.get(self.provider, "text-embedding-3-small")
@@ -235,6 +244,8 @@ class EmbeddingProvider:
             return await self._openai_embedding(text)
         elif self.provider == "voyage":
             return await self._voyage_embedding(text)
+        elif self.provider == "huggingface":
+            return await self._huggingface_embedding(text)
         else:
             return await self._local_embedding(text)
 
@@ -276,6 +287,42 @@ class EmbeddingProvider:
             raise Exception(
                 f"Voyage embeddings required but failed: {e}. Configure VOYAGE_API_KEY or use 'local' provider."
             )
+
+    async def _huggingface_embedding(self, text: str) -> list[float]:
+        """Get embedding from Hugging Face Inference Providers.
+
+        A cold model answers 503 while it loads: asked once more, waiting for
+        it. The answer is one vector, or a list holding it.
+        """
+        import httpx
+
+        if not _HF_REPO_ID.fullmatch(self.model):
+            raise ValueError(f"Not a Hugging Face model id: {self.model!r}")
+        url = HF_EMBEDDINGS_URL.format(model=self.model)
+        body = {"inputs": text[:8000], "normalize": True, "truncate": True}
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(60.0, connect=5.0)
+        ) as client:
+            response = await client.post(url, headers=headers, json=body)
+            if response.status_code == 503:
+                # Loading: this time wait for the model instead of a 503.
+                response = await client.post(
+                    url, headers={**headers, "x-wait-for-model": "true"}, json=body
+                )
+            response.raise_for_status()
+            data = response.json()
+        if isinstance(data, list) and data and isinstance(data[0], list):
+            data = data[0]
+        if (
+            not isinstance(data, list)
+            or not data
+            or not all(
+                isinstance(x, int | float) and not isinstance(x, bool) for x in data
+            )
+        ):
+            raise ValueError("Hugging Face returned no embedding vector")
+        return [float(x) for x in data]
 
     async def _local_embedding(self, text: str) -> list[float]:
         """Get embedding from local model."""

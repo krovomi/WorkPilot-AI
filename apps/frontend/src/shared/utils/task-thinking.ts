@@ -8,6 +8,7 @@ import {
 	resolveCatalogModelValue,
 } from "../constants/models";
 import { canonicalLocalModelName, isEmbeddingModel } from "./local-models";
+import { providerDefaultModel } from "./provider-default-model";
 import type {
 	AppSettings,
 	PhaseModelConfig,
@@ -77,6 +78,8 @@ type PhaseDefaultsSettings = Pick<
 	| "customPhaseModels"
 	| "customPhaseThinking"
 	| "globalOllamaModel"
+	| "globalOpenRouterModel"
+	| "globalHuggingFaceModel"
 >;
 
 /**
@@ -108,22 +111,12 @@ export function resolvePhaseDefaults(
 		profile?.phaseModels ||
 		DEFAULT_PHASE_MODELS;
 
-	// For local providers (Ollama / LM Studio …) the user configures a single
-	// default model in the provider page (`globalOllamaModel`). Use it for every
-	// phase so tasks default to the model actually installed/configured, instead
-	// of a generic catalog name (e.g. "qwen2.5-coder") the user never picked —
-	// unless they've set an explicit per-provider phase config.
-	const isLocalProvider =
-		effectiveProvider === "ollama" ||
-		effectiveProvider === "local" ||
-		effectiveProvider === "lmstudio";
-	if (
-		isLocalProvider &&
-		!settings?.providerPhaseModels?.[effectiveProvider] &&
-		settings?.globalOllamaModel?.trim()
-	) {
-		const m = settings.globalOllamaModel.trim();
-		phaseModels = { spec: m, planning: m, coding: m, qa: m };
+	// A local server or a gateway has one default model, set on its provider
+	// page; tasks start every phase on it instead of a catalogue name the user
+	// never picked, unless the provider has its own per-phase config.
+	const pageModel = providerDefaultModel(effectiveProvider, settings);
+	if (pageModel && !settings?.providerPhaseModels?.[effectiveProvider]) {
+		phaseModels = { spec: pageModel, planning: pageModel, coding: pageModel, qa: pageModel };
 	}
 
 	const phaseThinking =
@@ -365,13 +358,12 @@ export function buildGlobalProviderMetadataUpdate(
 ): { provider: string; model: string; isAutoProfile: boolean; phaseProviders: PhaseProviderConfig; phaseModels: PhaseModelConfig; phaseThinking: PhaseThinkingConfig; thinkingLevel: ThinkingLevel } {
  const defaults = resolvePhaseDefaults(settings, provider);
  const catalog = getModelsForProvider(provider).filter(m => m.value !== "custom");
- const local = ["ollama", "local", "lmstudio"].includes(provider);
  const phaseModels = { ...defaults.phaseModels };
  for (const phase of ["spec", "planning", "coding", "qa"] as const) {
   const configured = settings?.providerPhaseModels?.[provider]?.[phase];
   const model = phaseModels[phase];
   const match = catalog.find(m => getCanonicalModelKey(m.value) === getCanonicalModelKey(model));
-  phaseModels[phase] = configured || (local ? settings?.globalOllamaModel?.trim() || match?.value || catalog[0]?.value || model : match?.value || catalog[0]?.value || model);
+  phaseModels[phase] = configured || providerDefaultModel(provider, settings) || match?.value || catalog[0]?.value || model;
  }
  return {
   provider, model: phaseModels.coding, isAutoProfile: true,

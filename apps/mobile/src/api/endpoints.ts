@@ -15,6 +15,7 @@ import type {
 	CardKind,
 	Criticality,
 	Delegation,
+	GovernanceReport,
 	MyPermissions,
 	ProjectMember,
 	RunPhase,
@@ -197,6 +198,23 @@ export function api(client: ServerClient) {
 			);
 			return { available: found.available, memories: (q ? found.results : found.memories) ?? [] };
 		},
+		/** The policy of the project, its waiting calls and its agents, as the server reads them. */
+		governance: (projectId: string) =>
+			client.request<GovernanceReport>("GET", featurePath("governance", "", projectId)),
+		/** Approve or refuse a waiting call, in the name of the person signed in. */
+		answerGovernance: (projectId: string, requestId: string, approved: boolean) =>
+			client.request<{ answer: { decision: "approved" | "refused" } }>(
+				"POST",
+				featurePath("governance", `/approvals/${enc(requestId)}`, projectId),
+				{ approved },
+			),
+		/** The kill switch of the project: the person's agents, or (its owner) all of them. */
+		stopGovernance: (projectId: string, scope: "mine" | "project") =>
+			client.request<{ stoppedRuns: number; stoppedJobs: number }>(
+				"POST",
+				featurePath("governance", "/stop", projectId),
+				{ scope },
+			),
 		secretKinds: async () => (await client.request<{ kinds: string[] }>("GET", "/users/me/secrets")).kinds,
 		setSecret: (kind: SecretKind, value: string) =>
 			client.request<{ saved: boolean }>("PUT", "/users/me/secrets", { kind, value }),

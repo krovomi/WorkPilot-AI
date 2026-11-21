@@ -257,6 +257,20 @@ _DEFAULT_CATALOG: dict[str, dict[str, dict[str, float]]] = {
         "deepseek-v4-flash": _price(0.30, 1.20, cache_read=0.006),
         "deepseek-v4-pro": _price(1.32, 3.96, cache_read=0.044),
     },
+    # OpenRouter — https://openrouter.ai/api/v1/models, read 2026-11-21 (USD
+    # per token there, per million here). The live list carries every model's
+    # price; these rows price the registry's defaults.
+    "openrouter": {
+        "moonshotai/kimi-k3.1-pro": _price(0.253, 8.8, cache_read=0.18),
+        "anthropic/claude-fable-5.2": _price(8.0, 40.0, cache_read=0.2),
+    },
+    # Hugging Face Inference Providers — https://router.huggingface.co/v1/models,
+    # read 2026-11-21: the cheapest live provider that calls tools. The router
+    # balances price, speed and reliability, so a request may bill more.
+    "huggingface": {
+        "moonshotai/Kimi-K3.1-Pro": _price(0.2403, 8.4023),
+        "zai-org/GLM-5.3-Flash": _price(0.0399, 0.0784),
+    },
     # Amazon Bedrock — AWS Price List API, us-east-1 offers AmazonBedrock
     # (2026-10-14) and AmazonBedrockFoundationModels (2026-10-12), read
     # 2026-10-15 (https://aws.amazon.com/bedrock/pricing/ renders no table).

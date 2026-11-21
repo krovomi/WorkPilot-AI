@@ -526,12 +526,42 @@ def mistral_reasoning_effort(model: str, thinking_budget: int | None) -> str | N
     return "high" if thinking_budget else "none"
 
 
+# The gateways map one effort onto each model's own setting and drop it for a
+# model without one. OpenRouter documents `reasoning.effort`
+# (openrouter.ai/docs, "Reasoning Tokens"); the Hugging Face router takes the
+# OpenAI field. "none" sends nothing: a model whose reasoning is mandatory
+# would refuse it. A refusal of either is retried without it
+# (`effort_was_rejected`).
+_GATEWAY_EFFORT_BY_LEVEL = {
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "ultrathink": "xhigh",
+}
+
+
+def gateway_effort_params(
+    provider: str, thinking_budget: int | None
+) -> dict[str, Any] | None:
+    """The effort fields for OpenRouter or Hugging Face, or None."""
+    if not thinking_budget:
+        return None
+    effort = _GATEWAY_EFFORT_BY_LEVEL.get(_thinking_level_from_budget(thinking_budget))
+    if effort is None:
+        return None
+    if provider == "openrouter":
+        return {"reasoning": {"effort": effort}}
+    return {"reasoning_effort": "high" if effort == "xhigh" else effort}
+
+
 def compatible_effort_params(
     provider: str, model: str, thinking_budget: int | None
 ) -> dict[str, Any] | None:
     """The effort fields for one of the OpenAI-compatible providers, or None."""
     if provider == "deepseek":
         return deepseek_effort_params(model, thinking_budget)
+    if provider in ("openrouter", "huggingface"):
+        return gateway_effort_params(provider, thinking_budget)
     if provider == "grok":
         effort = grok_reasoning_effort(model, thinking_budget)
     elif provider == "mistral":
@@ -631,6 +661,12 @@ class CacheRouting:
     headers: dict[str, str] = field(default_factory=dict)
 
 
+_OPENROUTER_ATTRIBUTION = {
+    "HTTP-Referer": "https://github.com/krovomi/WorkPilot-AI",
+    "X-OpenRouter-Title": "WorkPilot AI",
+}
+
+
 def compatible_cache_routing(
     provider: str, spec_dir: Path | str | None, agent_type: str
 ) -> CacheRouting:
@@ -646,6 +682,11 @@ def compatible_cache_routing(
     The key is the task/phase key OpenAI receives, hashed: these providers
     ask for no user data in it, and a task folder is named after the task.
     """
+    if provider == "openrouter":
+        # OpenRouter keeps a conversation on the provider holding its cache by
+        # itself; the headers only name the app on the user's activity page
+        # (openrouter.ai/docs, "App Attribution"). Nothing of the task.
+        return CacheRouting(headers=dict(_OPENROUTER_ATTRIBUTION))
     key = openai_prompt_cache_key(spec_dir, agent_type)
     if key is None:
         return CacheRouting()

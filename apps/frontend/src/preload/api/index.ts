@@ -32,6 +32,10 @@ import {
 	type LocalBackendAPI,
 } from "./modules/local-backend-api";
 import {
+	createForgeAccountsAPI,
+	type ForgeAccountsAPI,
+} from "./modules/forge-accounts-api";
+import {
 	type BlastRadiusAPI,
 	createBlastRadiusAPI,
 } from "./modules/blast-radius-api";
@@ -369,6 +373,7 @@ export interface ElectronAPI
 		GovernanceAPI,
 		AgentDebuggerAPI,
 		LocalBackendAPI,
+		ForgeAccountsAPI,
 		ReplayAPI,
 		BlastRadiusAPI,
 		Phase35FeaturesAPI,
@@ -525,6 +530,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createGovernanceAPI(),
 		...createAgentDebuggerAPI(),
 		...createLocalBackendAPI(),
+		...createForgeAccountsAPI(),
 		...createReplayAPI(),
 		...createBlastRadiusAPI(),
 		...createPhase35FeaturesAPI(),

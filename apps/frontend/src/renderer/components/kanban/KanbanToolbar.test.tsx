@@ -16,6 +16,7 @@ import type { Project } from "../../../shared/types";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
 import { useMultiRepoStore } from "../../stores/multi-repo-store";
 import { useProjectStore } from "../../stores/project-store";
+import { useShortcutsHelpStore } from "../../stores/shortcuts-help-store";
 import { TooltipProvider } from "../ui/tooltip";
 import { KanbanToolbar } from "./KanbanToolbar";
 
@@ -248,5 +249,14 @@ describe("local and server boards", () => {
 		expect(api.fn("listPurgeableWorktrees")).toHaveBeenCalledWith("p1");
 		await userEvent.keyboard("{Escape}");
 		expect(screen.queryByRole("dialog", { name: "Purge finished worktrees" })).toBeNull();
+	});
+});
+
+describe("keyboard shortcuts", () => {
+	it("opens the board's keyboard help", async () => {
+		useShortcutsHelpStore.setState({ open: false });
+		renderToolbar();
+		await userEvent.click(screen.getByRole("button", { name: "Keyboard shortcuts" }));
+		expect(useShortcutsHelpStore.getState().open).toBe(true);
 	});
 });
