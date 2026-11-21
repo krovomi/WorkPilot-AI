@@ -56,7 +56,9 @@ async def test_a_delegate_approves_in_the_approver_s_name(world):
     lent = await lend(world, "reviewer_a", "contributor_a")
     assert lent.status_code == 201
     body = lent.json()
-    assert body["from"]["name"] == "reviewer_a" and body["to"]["name"] == "contributor_a"
+    assert (
+        body["from"]["name"] == "reviewer_a" and body["to"]["name"] == "contributor_a"
+    )
     assert body["active"] is True
 
     card = await new_card(world, "maintainer_a")

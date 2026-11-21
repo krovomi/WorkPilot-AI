@@ -265,7 +265,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - Notifications on Slack, Teams, Discord, Google Chat, webhooks, ntfy and Telegram.
 
 **Team**
-- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT, Microsoft Entra or any OpenID Connect sign-in (Okta, Google, Keycloak...), spec approval by someone other than the card's author ([operations guide](docs/server-operations.md)).
+- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT, Microsoft Entra or any OpenID Connect sign-in (Okta, Google, Keycloak...), spec approval by someone other than the card's author, by as many approvers as the card's criticality needs, approvals lent for a holiday ([operations guide](docs/server-operations.md)).
 - **Mobile app** for iOS and Android, team chat, invitation-only sign-up.
 
 **Cost and monitoring**

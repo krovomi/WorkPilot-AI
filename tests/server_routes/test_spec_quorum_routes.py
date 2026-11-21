@@ -112,7 +112,9 @@ async def test_an_edit_voids_the_approvals_given_before(world, monkeypatch):
 
 
 async def test_a_criticality_may_ask_for_a_role(world, monkeypatch):
-    settings(monkeypatch, approval_quorum="medium=2", approval_roles="medium=maintainer")
+    settings(
+        monkeypatch, approval_quorum="medium=2", approval_roles="medium=maintainer"
+    )
     card = await new_card(world, "contributor_a")
     await approve(world, "reviewer_a", card)
     two = (await approve(world, "owner_a", card)).json()
@@ -171,6 +173,17 @@ async def test_going_without_review_needs_an_approval_that_is_enough(
     meta = card_dir(world, "b", other["id"]) / "task_metadata.json"
     # admin_b is no maintainer: their approval alone does not meet the role.
     assert json.loads(meta.read_text(encoding="utf-8"))["requireReviewBeforeCoding"]
+
+    settings(monkeypatch, approval_roles="medium=admin")
+    held = await world.ok(
+        "admin_b",
+        "POST",
+        "/api/board/cards",
+        params=params(world, "b"),
+        json={"title": "Alone, with the role", "require_review": False},
+    )
+    meta = card_dir(world, "b", held["id"]) / "task_metadata.json"
+    assert not json.loads(meta.read_text(encoding="utf-8"))["requireReviewBeforeCoding"]
 
 
 async def test_a_change_request_is_one_of_the_approvals(world, monkeypatch):

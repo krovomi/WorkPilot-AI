@@ -46,7 +46,9 @@ def test_the_roles_are_slugs(caplog):
     )
     assert roles == {"low": (), "medium": (), "high": ("tech-lead", "security")}
     assert "Bad Slug" in caplog.text
-    many = dict(server_config._approval_roles("low=" + "+".join(f"r{i}" for i in range(9))))
+    many = dict(
+        server_config._approval_roles("low=" + "+".join(f"r{i}" for i in range(9)))
+    )
     assert len(many["low"]) == 5
 
 
@@ -201,7 +203,10 @@ async def test_nobody_s_approval_is_not_given(tmp_path):
     from shared_board.approvals import give_approval
 
     scope = ProjectScope("p", "o", tmp_path, "member")
-    assert await give_approval(None, scope, Principal(id="x"), tmp_path, None, None) is None
+    assert (
+        await give_approval(None, scope, Principal(id="x"), tmp_path, None, None)
+        is None
+    )
 
 
 async def test_an_unknown_person_holds_no_approval(tmp_path, monkeypatch):
@@ -213,7 +218,9 @@ async def test_an_unknown_person_holds_no_approval(tmp_path, monkeypatch):
     await db_engine.dispose_engine()
 
 
-async def test_roles_come_from_the_organization_groups_and_project(tmp_path, monkeypatch):
+async def test_roles_come_from_the_organization_groups_and_project(
+    tmp_path, monkeypatch
+):
     from server.authz.approvals import role_slugs
     from server.db.models import (
         GroupMember,
@@ -233,7 +240,9 @@ async def test_roles_come_from_the_organization_groups_and_project(tmp_path, mon
         db.add_all([org, user])
         await db.flush()
         roles = {
-            slug: Role(id=slug, org_id="o", slug=slug, name=slug, scope="org", permissions=[])
+            slug: Role(
+                id=slug, org_id="o", slug=slug, name=slug, scope="org", permissions=[]
+            )
             for slug in ("dev", "security", "lead")
         }
         db.add_all(roles.values())
@@ -243,7 +252,9 @@ async def test_roles_come_from_the_organization_groups_and_project(tmp_path, mon
         db.add(UserGroup(id="g", org_id="o", name="Sec", role_id="security"))
         await db.flush()
         db.add(GroupMember(group_id="g", user_id="u"))
-        db.add(ProjectMember(project_id="p", user_id="u", role="member", role_id="lead"))
+        db.add(
+            ProjectMember(project_id="p", user_id="u", role="member", role_id="lead")
+        )
         await db.commit()
         assert await role_slugs(db, user_id="u", org_id="o", project_id="p") == [
             "dev",
