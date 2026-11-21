@@ -380,6 +380,13 @@ export interface AppSettings {
 	// How far above the room's noise the assistant's microphone counts speech
 	// (`voice-assistant/voice-activity.ts`; "medium" when absent).
 	voiceAssistantSensitivity?: "low" | "medium" | "high";
+	// Spoken feedback with the system's local voices (`voice-assistant/voice-speech.ts`;
+	// "off" when absent): the answers ("short"), plus the running tasks ("verbose").
+	voiceAssistantFeedback?: "off" | "short" | "verbose";
+	// The optional wake word (`voice-assistant/voice-wake.ts`), off by default, and
+	// its phrase ("Hey WorkPilot" when absent).
+	voiceAssistantWakeWord?: boolean;
+	voiceAssistantWakePhrase?: string;
 	// Developer tools preferences
 	preferredIDE?: SupportedIDE;
 	customIDEPath?: string; // For 'custom' IDE

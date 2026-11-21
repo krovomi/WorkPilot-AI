@@ -1,10 +1,10 @@
 ---
 feature: Assistant vocal
 summary: >-
-  Raccourci global, Whisper local, commandes simples lues localement puis modèle « Assistant vocal
-  » ; liste fermée d'actions (vue de la barre latérale, tâche après confirmation, réglages),
-  réponse revalidée dans le main. Écoute continue avec détection de la voix calibrée, et « stop »
-  qui arrête les tâches après l'appel d'outil en cours.
+  Raccourci global (ou pédale F13–F24), Whisper local, commandes lues localement puis modèle ;
+  liste fermée d'actions revalidée dans le main. Écoute continue, « stop » après l'appel d'outil
+  en cours, retour vocal par les voix locales, mot d'éveil, mode binôme par la file de guidage,
+  langue détectée par Whisper.
 ---
 
 # Assistant vocal
@@ -32,11 +32,18 @@ apps/frontend/src/renderer/components/voice-assistant/
   voice-intent.ts         la lecture locale (fr, en), sans modèle
   voice-destinations.ts   à quoi sert chaque vue (mots et description)
   voice-language.ts       la langue de transcription choisie dans le panneau
-apps/frontend/src/renderer/stores/voice-assistant-store.ts ouvert ou non ; second appui
+  voice-speech.ts         le retour vocal (voix locales du système), muet / court / bavard
+  voice-narration.ts      ce que font les tâches, dit à voix haute
+  voice-wake.ts           le mot d'éveil lu dans la transcription
+  VoiceWake.tsx           l'écoute du mot d'éveil : voyant, micro coupé
+  voice-pair.ts           le mode binôme : tâches suivables, « dis-lui… »
+apps/frontend/src/renderer/stores/voice-assistant-store.ts ouvert ou non ; second appui ; micro partagé
 apps/frontend/src/main/voice-assistant/
   interpret.ts            la requête bornée, le prompt, la réponse revalidée
   global-shortcut.ts      l'enregistrement auprès de l'OS (option)
 apps/frontend/src/main/ipc-handlers/voice-assistant-handlers.ts
+apps/frontend/src/main/ipc-handlers/dictation-handlers.ts            réponse du runner relue (langue entendue)
+apps/backend/runners/dictation_runner.py                             Whisper local, langue détectée
 apps/frontend/src/main/ipc-handlers/task/stop-after-step-handlers.ts   « stop » : pause après l'étape
 apps/backend/agents/tool_breaker.py                                   où la session s'arrête
 apps/frontend/src/renderer/components/settings/VoiceAssistantSettings.tsx
@@ -73,6 +80,10 @@ sont un seul appui vu deux fois (OS puis fenêtre).
 
 Un second appui pendant l'écoute termine la phrase ; après une réponse, il
 réécoute.
+
+**Pédale ou contacteur** : une touche de F13 à F24 peut être le raccourci à elle seule
+(`isPedalKey`). Aucune disposition ne tape avec et l'app ne s'en sert pas ; c'est ce
+qu'envoie une pédale USB ou un contacteur d'accessibilité vu comme un clavier (HID).
 
 ## De la voix au texte
 
@@ -182,6 +193,66 @@ prochain lancement de l'app ne la reprend pas tout seul. Un agent qui n'est pas 
 les agents » reste le bouton pour eux. Un agent qui réfléchit longtemps sans appeler
 d'outil s'arrête à la fin de sa session.
 
+## La langue entendue
+
+Sur « Détecter automatiquement », le runner renvoie avec le texte la langue que Whisper
+a reconnue (`language`), seulement si elle est dans sa liste fermée et que Whisper en est
+sûr à 50 % au moins. Le main ne la transmet que dans cette liste (`runnerAnswer`). Le
+panneau l'affiche ; le panneau et l'écoute continue l'envoient au modèle à la place de
+« auto », pour qu'il écrive le titre et la description dans la langue parlée. Changer de
+langue d'une phrase à l'autre suit sans rien régler.
+
+## Retour vocal
+
+Paramètres → Assistant vocal → Retour vocal : muet (par défaut), court ou bavard
+(`voiceAssistantFeedback`). La synthèse est celle du système, par l'API Web Speech de
+Chromium (`speechSynthesis`) : rien à installer, aucun compte, et le texte reste sur
+l'ordinateur ; une voix qui ne se dit pas locale n'est jamais utilisée, et sans voix locale
+la page des réglages le dit. Court dit les réponses : la vue ouverte, la question posée
+(tâche à créer, stop, message à l'agent), le résultat. Bavard dit aussi ce que font les
+tâches du projet (`voice-narration.ts`) : une nouvelle phase, la revue, l'échec, la fin. Ces
+lignes viennent du store des tâches que le tableau tient déjà à jour, comparé à sa version
+précédente : pas d'écouteur IPC de plus, rien de nouveau côté backend, donc tous les
+fournisseurs. Trois lignes au plus par mise à jour.
+
+Pendant que l'assistant parle, les micros de l'écoute continue et du mot d'éveil jettent
+ce qu'ils entendent, plus 0,4 s d'écho, sans fermer leur session : l'assistant ne prend pas
+sa propre voix pour une commande. Couper le micro coupe aussi la parole.
+
+## Mot d'éveil
+
+Optionnel (`voiceAssistantWakeWord`, éteint par défaut), avec sa phrase
+(`voiceAssistantWakePhrase`, « Hey WorkPilot »). Il n'écoute que quand ni le panneau ni
+l'écoute continue ne sont ouverts. La même session de dictée que l'écoute continue
+transcrit chaque phrase sur l'ordinateur ; `readWakePhrase` la compare sans casse, accents,
+ponctuation ni espaces (« Hey, Work Pilot. », « hé WorkPilot »), la salutation pouvant être
+l'une d'une courte liste, après deux mots de remplissage au plus. Toute autre phrase est
+jetée. Entendue, la phrase ouvre le panneau, qui lit tout de suite ce qui a été dit après
+(`openWith`) ou écoute. Le micro ouvert se voit toujours : un voyant qui pulse et un bouton
+pour le couper restent en bas à droite. Pas de modèle de mot-clé : la détection coûte une
+transcription par phrase parlée, jamais pour le silence (`voice-activity.ts`).
+
+## Mode binôme
+
+En écoute continue, « Mode binôme : suivre une tâche en cours » propose les tâches sur
+lesquelles un agent travaille (en cours ou en revue IA, pas abandonnées). Suivie, la tâche
+s'affiche dans l'encadré avec sa dernière ligne (phase, sous-tâche commencée, sous-tâche
+finie), dite à voix haute si le retour vocal n'est pas muet. Une phrase qui n'est ni un stop
+ni une commande sûre de la lecture locale, ou qui commence par « dis-lui », « dis à l'agent »,
+« tell it », « tell the agent »…, devient un message pour son agent : l'encadré demande
+« Envoyer à … ? », et un « oui » (ou le bouton) l'envoie par la file de guidage de la tâche
+(`sendTaskSteering`, [steering.md](steering.md)) ; la prochaine session de code ou de
+correction le reçoit, quel que soit le fournisseur. En mode binôme, une phrase libre ne part
+jamais au modèle de l'assistant : ce sont les mots de la personne, pour l'agent qu'elle guide.
+
+## Un seul micro
+
+Une seule dictée tourne à la fois (`dictation-handlers.ts`). Le panneau met l'écoute
+continue et le mot d'éveil en pause. La dictée du formulaire de tâche prend le micro
+(`claimMicrophoneForForm`) : les micros de l'assistant, enregistrés par
+`holdVoiceMicrophone`, le lâchent aussitôt, avant que sa session démarre, et le
+reprennent quand elle finit ; l'encadré affiche la pause.
+
 ## Mode serveur
 
 Sur un projet du serveur, l'assistant crée la carte sur le serveur et n'offre
@@ -189,15 +260,20 @@ que les vues que le serveur partage. La dictée et l'interprétation tournent su
 l'ordinateur de la personne, avec son fournisseur. L'app mobile n'a pas
 d'assistant : le clavier du téléphone dicte déjà dans le formulaire de carte.
 
-## Pas encore fait (lots suivants de #385)
+## Pas encore fait (#385)
 
-- Le retour vocal (synthèse : Piper en local, ou un service du fournisseur), muet, court ou
-  bavard.
-- Le mot d'éveil (« Hey WorkPilot »), seulement quand l'écoute continue est éteinte.
-- La détection automatique de la langue parlée (Whisper la donne) pour adapter la lecture.
-- Le mode binôme : une session vocale où l'agent explique ce qu'il fait pendant qu'il code.
-- Une pédale ou un périphérique HID pour activer le micro.
-- La dictée des tickets pendant l'écoute continue : il faut couper le micro d'abord.
+- Synthèse par Piper (voix locales de meilleure qualité) ou par un service (OpenAI, ElevenLabs,
+  Google, Azure) : Piper est une nouvelle dépendance avec ses modèles à télécharger, les services
+  demandent un compte payant ; ni l'un ni l'autre ne se teste ici. Les voix du système couvrent le
+  besoin hors ligne.
+- Transcription par un service (OpenAI Whisper, Deepgram, Google, Azure, Groq) : compte payant,
+  et l'audio quitterait l'ordinateur. Whisper local reste le seul moteur.
+- Pédale MIDI : il faudrait ouvrir la permission `midi` du renderer et un appareil pour la tester ;
+  une pédale vue comme un clavier (F13–F24) marche déjà.
+- Un modèle de mot-clé dédié (Porcupine, openWakeWord) pour le mot d'éveil : nouvelle dépendance
+  et modèles ; la transcription Whisper fait le travail, au prix d'une transcription par phrase.
+- Les métriques (durée des sessions vocales, interruptions suivies d'une correction) et
+  l'enquête de satisfaction : pas de télémétrie produit dans l'app pour les porter.
 
 ## Tests
 
@@ -208,4 +284,9 @@ de modèle, téléchargement), `VoiceAssistantSettings.test.tsx` (enregistrement
 refus, AltGr, interrupteur, sensibilité), `voice-activity.test.ts`, `voice-stop.test.ts`,
 `voice-resolve.test.ts`, `VoiceContinuous.test.tsx`, `VoiceAssistant.stop.test.tsx`,
 `stop-after-step-handlers.test.ts`, `tests/agents/test_tool_breaker_pause.py` (sur le flux
-normalisé et sur le flux du SDK Claude).
+normalisé et sur le flux du SDK Claude), `voice-speech.test.ts`, `voice-narration.test.tsx`,
+`voice-wake.test.ts`, `VoiceWake.test.tsx`, `voice-pair.test.ts`, `VoiceContinuous.pair.test.tsx`
+(binôme, retour vocal, écho, langue entendue, micro cédé au formulaire),
+`VoiceAssistant.speech.test.tsx`, `voice-assistant-store.test.ts`, `TaskDictation.test.tsx`,
+`voice-shortcut.test.ts` (pédale), `dictation-handlers.test.ts` (`runnerAnswer`),
+`tests/test_dictation_runner.py` et `tests/test_dictation_runner_cli.py` (langue détectée).

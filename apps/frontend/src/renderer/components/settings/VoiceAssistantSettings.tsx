@@ -1,4 +1,4 @@
-import { Keyboard, RotateCcw } from "lucide-react";
+import { Keyboard, RotateCcw, Volume2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSettings } from "@shared/types";
@@ -10,7 +10,10 @@ import {
 } from "@shared/utils/voice-shortcut";
 import { isMacOS } from "../../lib/os-detection";
 import { VOICE_SENSITIVITIES, voiceSensitivity } from "../voice-assistant/voice-activity";
+import { canSpeak, speak, VOICE_FEEDBACKS, voiceFeedback } from "../voice-assistant/voice-speech";
+import { DEFAULT_WAKE_PHRASE, MAX_WAKE_PHRASE } from "../voice-assistant/voice-wake";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { NativeSelect } from "../ui/native-select";
 import { Switch } from "../ui/switch";
@@ -25,8 +28,10 @@ const MODIFIER_KEYS = new Set(["Control", "Shift", "Alt", "Meta", "AltGraph", "O
 
 /** The assistant's shortcut and whether it also works in the background. */
 export function VoiceAssistantSettings({ settings, onSettingsChange }: VoiceAssistantSettingsProps) {
-	const { t } = useTranslation("voiceAssistant");
+	const { t, i18n } = useTranslation("voiceAssistant");
 	const mac = useMemo(() => isMacOS(), []);
+	const speechReady = useMemo(() => canSpeak(), []);
+	const feedback = voiceFeedback(settings.voiceAssistantFeedback);
 	const shortcut = settings.voiceAssistantShortcut || DEFAULT_VOICE_SHORTCUT;
 	const [recording, setRecording] = useState(false);
 	const [refusal, setRefusal] = useState<string | null>(null);
@@ -161,6 +166,75 @@ export function VoiceAssistantSettings({ settings, onSettingsChange }: VoiceAssi
 						))}
 					</NativeSelect>
 					<p className="text-xs text-muted-foreground">{t("settings.sensitivityHelp")}</p>
+				</div>
+
+				<div className="space-y-2">
+					<Label htmlFor="voice-assistant-feedback">{t("settings.feedback")}</Label>
+					<div className="flex flex-wrap items-center gap-2">
+						<NativeSelect
+							id="voice-assistant-feedback"
+							className="w-auto"
+							value={feedback}
+							onChange={(event) =>
+								onSettingsChange({
+									...settings,
+									voiceAssistantFeedback: voiceFeedback(event.target.value),
+								})
+							}
+						>
+							{VOICE_FEEDBACKS.map((level) => (
+								<option key={level} value={level}>
+									{t(`settings.feedbackLevels.${level}`)}
+								</option>
+							))}
+						</NativeSelect>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							disabled={!speechReady || feedback === "off"}
+							onClick={() => speak(t("settings.feedbackSample"), i18n.language)}
+						>
+							<Volume2 className="mr-2 h-4 w-4" />
+							{t("settings.feedbackTry")}
+						</Button>
+					</div>
+					<p className="text-xs text-muted-foreground">{t("settings.feedbackHelp")}</p>
+					{!speechReady && (
+						<p role="alert" className="text-xs text-warning">
+							{t("settings.feedbackUnavailable")}
+						</p>
+					)}
+				</div>
+
+				<div className="space-y-3 rounded-lg border border-border p-4">
+					<div className="flex items-start justify-between gap-4">
+						<div className="space-y-1">
+							<Label htmlFor="voice-assistant-wake">{t("settings.wake")}</Label>
+							<p className="text-xs text-muted-foreground">{t("settings.wakeHelp")}</p>
+						</div>
+						<Switch
+							id="voice-assistant-wake"
+							checked={settings.voiceAssistantWakeWord === true}
+							onCheckedChange={(checked) =>
+								onSettingsChange({ ...settings, voiceAssistantWakeWord: checked })
+							}
+						/>
+					</div>
+					{settings.voiceAssistantWakeWord === true && (
+						<div className="space-y-1">
+							<Label htmlFor="voice-assistant-wake-phrase">{t("settings.wakePhrase")}</Label>
+							<Input
+								id="voice-assistant-wake-phrase"
+								className="max-w-xs"
+								maxLength={MAX_WAKE_PHRASE}
+								value={settings.voiceAssistantWakePhrase ?? DEFAULT_WAKE_PHRASE}
+								onChange={(event) =>
+									onSettingsChange({ ...settings, voiceAssistantWakePhrase: event.target.value })
+								}
+							/>
+						</div>
+					)}
 				</div>
 
 				<div className="space-y-1 text-xs text-muted-foreground">

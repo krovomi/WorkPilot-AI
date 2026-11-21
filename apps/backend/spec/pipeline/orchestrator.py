@@ -18,6 +18,7 @@ from foundation.pause_state import is_paused
 from phase_config import get_thinking_budget
 from prompts_pkg.project_context import should_refresh_project_index
 from review import run_review_checkpoint
+from review.state import keep_reviewed_approval_only, read_review_record
 from task_logger import (
     LogEntryType,
     LogPhase,
@@ -325,6 +326,9 @@ class SpecOrchestrator:
             )
         )
 
+        # What the review file holds before any phase runs an agent here.
+        review_record = read_review_record(self.spec_dir)
+
         # Smart cache: refresh project index if dependency files have changed
         await self._ensure_fresh_project_index()
 
@@ -531,6 +535,8 @@ class SpecOrchestrator:
         )
 
         # === HUMAN REVIEW CHECKPOINT ===
+        # Only the review approves: an approval the phases left is withdrawn.
+        keep_reviewed_approval_only(self.spec_dir, review_record)
         return self._run_review_checkpoint(auto_approve)
 
     def _emit_planning_failed(self, phase_name: str, errors: list[str]) -> None:
