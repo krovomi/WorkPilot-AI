@@ -1482,7 +1482,8 @@
 		"parent": "⬆ Dossier parent",
 		"noFolders": "Aucun dossier trouvé.",
 		"checkPath": "Vérifiez le chemin ou vos droits d'accès.",
-		"dragReferences": "Glissez des fichiers pour les ajouter en référence"
+		"dragReferences": "Glissez des fichiers pour les ajouter en référence",
+		"loadFailed": "Impossible d'ouvrir ce dossier."
 	},
 	"shortcutsOverlay": {
 		"title": "Raccourcis clavier",
