@@ -5,7 +5,7 @@
 
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
-import type { BuildComparison } from "../../../shared/types/build-compare";
+import type { BuildComparison, CompareReportDocument } from "../../../shared/types/build-compare";
 import type { CostBudgetConfig, CostBudgetStatus } from "../../../shared/types/cost-budget";
 import type {
 	CostSummary,
@@ -69,6 +69,8 @@ export interface CostAPI {
 	getServerSessions(projectId: string): Promise<IPCResult<WorkspaceSession[]>>;
 	/** "How you compare": a project of this computer, by its folder. */
 	getBuildComparison(projectPath: string): Promise<IPCResult<BuildComparison>>;
+	/** The path the team report was saved to; null data when the person cancelled. */
+	exportBuildComparison(report: CompareReportDocument): Promise<IPCResult<string | null>>;
 	/** "How you compare" for a server project, by id: medians only. */
 	getServerBuildComparison(
 		projectId: string,
@@ -108,6 +110,9 @@ export const createCostAPI = (): CostAPI => ({
 
 	getServerBuildComparison: (projectId: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.SERVER_WORKSPACE_COMPARE, projectId),
+
+	exportBuildComparison: (report: CompareReportDocument) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DASHBOARD_COMPARE_EXPORT, report),
 
 	onCostsUpdated: (callback: (projectPath: string) => void) => {
 		const handler = (_event: Electron.IpcRendererEvent, projectPath: string) =>

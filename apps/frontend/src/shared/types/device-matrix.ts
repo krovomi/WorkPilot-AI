@@ -11,6 +11,12 @@
 
 export type DeviceCategory = "phone" | "tablet" | "desktop" | "tv";
 
+/** Le sens de l'écran : la liste fermée de `DEVICE_ORIENTATIONS`. */
+export type DeviceOrientation = "portrait" | "landscape";
+
+/** Le format du fichier exporté : la liste fermée de `GRID_EXPORT_FORMATS`. */
+export type DeviceGridExportFormat = "png" | "pdf";
+
 /** Un appareil prêt à l'emploi : sa fenêtre CSS, sa densité, son navigateur. */
 export interface DevicePreset {
 	/** Identifiant stable, aussi la clé i18n `appEmulator:devices.<id>`. */
@@ -62,7 +68,8 @@ export type ResponsiveIssueKind =
 	| "small-touch-target"
 	| "small-text"
 	| "overlapping-elements"
-	| "truncated-text";
+	| "truncated-text"
+	| "broken-navigation";
 
 /** Un élément fautif, décrit sans son contenu. */
 export interface ResponsiveIssueSample {
@@ -95,7 +102,7 @@ export interface ResponsiveReport {
 	readonly issues: readonly ResponsiveIssue[];
 }
 
-/** Ce que le renderer envoie : un appareil connu, un chemin du serveur lancé, deux profils nommés. */
+/** Ce que le renderer envoie : un appareil connu, un chemin du serveur lancé, deux profils nommés, un sens, un choix de session. */
 export interface DeviceCaptureRequest {
 	readonly deviceId: string;
 	/** Chemin absolu (`/compte?onglet=2`), résolu par le main sur l'origine du serveur. */
@@ -104,6 +111,14 @@ export interface DeviceCaptureRequest {
 	readonly network: string;
 	/** Un id de `CPU_PROFILES`, jamais un facteur. */
 	readonly cpu: string;
+	/** Un sens de `DEVICE_ORIENTATIONS`, jamais une taille. */
+	readonly orientation: string;
+	/**
+	 * Rendre avec les cookies que l'aperçu envoie à ce serveur (une page derrière
+	 * une connexion) ; sinon une session vierge. Le main lit les cookies, le
+	 * renderer ne les voit jamais.
+	 */
+	readonly previewSession: boolean;
 }
 
 export interface DeviceCapture {
@@ -119,6 +134,12 @@ export interface DeviceCapture {
 	readonly cpu: CpuProfileId;
 	/** Durée du chargement (jusqu'à `load`), en millisecondes, sous ces profils. */
 	readonly loadMs: number;
+	/** Le sens rendu, et la fenêtre CSS qui en découle (celle de l'image et des exemples du rapport). */
+	readonly orientation: DeviceOrientation;
+	readonly width: number;
+	readonly height: number;
+	/** Rendu avec les cookies de l'aperçu. */
+	readonly previewSession: boolean;
 }
 
 /** Les refus et les échecs, en liste fermée : le renderer en fait un texte traduit. */
@@ -130,6 +151,7 @@ export type DeviceCaptureError =
 	| "invalid-path"
 	| "busy"
 	| "throttling-failed"
+	| "session-failed"
 	| "load-failed"
 	| "capture-failed";
 
@@ -140,6 +162,10 @@ export type DeviceCaptureResult =
 /** L'export de la grille : le renderer nomme les appareils affichés, rien d'autre. */
 export interface DeviceGridExportRequest {
 	readonly deviceIds: readonly string[];
+	/** Un format de `GRID_EXPORT_FORMATS`. */
+	readonly format: string;
+	/** Encadrer sur chaque capture les éléments fautifs du rapport. */
+	readonly markers: boolean;
 }
 
 export type DeviceGridExportError =

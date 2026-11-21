@@ -7,8 +7,11 @@
 
 import {
 	type BuildComparison,
+	COMPARE_GROUPS,
 	COMPARE_METRICS,
 	type CompareGroup,
+	type CompareGroupName,
+	type CompareKindLine,
 	type CompareMedians,
 	type CompareProjectLine,
 	type CompareWindow,
@@ -18,6 +21,11 @@ import {
 export const MAX_OTHERS = 50;
 const MAX_NAME = 120;
 const MAX_SEGMENT = 40;
+/** Weeks of a sparkline and kinds of work, at most (the backend sends 8 and 10). */
+const MAX_WEEKS = 12;
+const MAX_KINDS = 16;
+/** A kind names a translation key: a short identifier, nothing else. */
+const KIND = /^[a-z][a-z_]{0,31}$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return !!value && typeof value === "object" && !Array.isArray(value);
@@ -66,7 +74,17 @@ function toGroup(raw: unknown): CompareGroup {
 	return {
 		projects: count(record.projects),
 		medians: isRecord(record.medians) ? medians(record.medians) : null,
+		top: isRecord(record.top) ? medians(record.top) : null,
 	};
+}
+
+function toKind(raw: unknown): CompareKindLine | null {
+	if (!isRecord(raw) || typeof raw.kind !== "string" || !KIND.test(raw.kind)) return null;
+	return { kind: raw.kind, ...toWindow(raw), group: toGroup(raw.group) };
+}
+
+function list(value: unknown, limit: number): unknown[] {
+	return Array.isArray(value) ? value.slice(0, limit) : [];
 }
 
 function toLine(raw: unknown): CompareProjectLine | null {
@@ -76,6 +94,7 @@ function toLine(raw: unknown): CompareProjectLine | null {
 		name: text(raw.name, MAX_NAME, "?"),
 		stack: text(raw.stack, MAX_SEGMENT, "other"),
 		size: text(raw.size, MAX_SEGMENT, "unknown"),
+		team: text(raw.team, MAX_SEGMENT, "unknown"),
 		current: raw.current === true,
 	};
 }
@@ -89,24 +108,27 @@ export function toBuildComparison(raw: unknown): BuildComparison | null {
 export function comparisonFrom(raw: Record<string, unknown>): BuildComparison {
 	const segment = isRecord(raw.segment) ? raw.segment : {};
 	const groups = isRecord(raw.groups) ? raw.groups : {};
-	const lines = Array.isArray(raw.projects) ? raw.projects : [];
+	const minTop = count(raw.min_top);
 	return {
 		window_days: Math.max(1, count(raw.window_days)),
 		min_group: Math.max(1, count(raw.min_group)),
+		min_top: minTop > 0 ? minTop : null,
 		segment: {
 			stack: text(segment.stack, MAX_SEGMENT, "other"),
 			size: text(segment.size, MAX_SEGMENT, "unknown"),
+			team: text(segment.team, MAX_SEGMENT, "unknown"),
 		},
 		recent: toWindow(raw.recent),
 		previous: toWindow(raw.previous),
 		trend: medians(isRecord(raw.trend) ? raw.trend : {}, trend),
-		groups: {
-			segment: toGroup(groups.segment),
-			stack: toGroup(groups.stack),
-			all: toGroup(groups.all),
-		},
-		projects: lines
-			.slice(0, MAX_OTHERS + 1)
+		weeks: list(raw.weeks, MAX_WEEKS).map(toWindow),
+		groups: Object.fromEntries(
+			COMPARE_GROUPS.map((name) => [name, toGroup(groups[name])]),
+		) as Record<CompareGroupName, CompareGroup>,
+		kinds: list(raw.kinds, MAX_KINDS)
+			.map(toKind)
+			.filter((line): line is CompareKindLine => line !== null),
+		projects: list(raw.projects, MAX_OTHERS + 1)
 			.map(toLine)
 			.filter((line): line is CompareProjectLine => line !== null),
 	};

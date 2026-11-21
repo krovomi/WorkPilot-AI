@@ -20,6 +20,7 @@ import { formatAppDateTime } from "../../lib/date-format";
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { McpCodeScanDetails } from "./McpCodeScanDetails";
 import { mainFailureText } from "./main-failure";
 
 export interface McpServerSecurity {
@@ -167,6 +168,7 @@ export function McpSecurityDetails({ security }: { readonly security: McpServerS
 					</li>
 				))}
 			</ul>
+			{score.code && <McpCodeScanDetails report={score.code} />}
 			{score.level === "low" && (
 				<p className="text-destructive">{t("mcpMarketplace.security.lowScore")}</p>
 			)}

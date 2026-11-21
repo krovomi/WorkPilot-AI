@@ -19,31 +19,43 @@ Per spec (a ``spec_id`` with at least one recorded agent session):
   on it, when the ledger names them.
 
 A project's figure for a window is the median over the specs that started in
-it: the last thirty days, and the thirty before for the trend. Projects are
-grouped by segment, their main language and a size bucket of tracked files,
-so a side project is not set against a monorepo. A group's median is given
-only when it holds ``min_group`` projects or more; below that only its size
-is, so a median never stands for one identifiable project.
+it: the last thirty days, and the thirty before for the trend, and each of
+the last eight weeks for its sparkline. Projects are grouped by segment,
+their main language and a size bucket of tracked files, so a side project is
+not set against a monorepo, and by the size of their team
+(``build_compare_segments``). A group's median is given only when it holds
+``min_group`` projects or more; below that only its size is, so a median
+never stands for one identifiable project. Its top tenth (the figure the best
+tenth of its projects reach) needs ``min_top`` projects with that figure.
+Specs are also compared kind by kind (bug fix, feature, refactoring…), as
+their card recorded it, against the same kind in the other projects.
 """
 
 from __future__ import annotations
 
 import statistics
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from foundation.git_executable import run_git
+from shared_features import build_compare_segments as segments
 from shared_features import usage_ledger
 
 WINDOW = timedelta(days=30)
+#: The weeks of a project's own sparkline, the oldest first.
+WEEKS = 8
 METRICS = ("minutes", "cost", "qa_iterations", "agents")
 #: Spec plans read per project, the most read of one and of all, in bytes.
 MAX_PLANS = 500
 PLAN_LIMIT = 2_000_000
 PLANS_TOTAL = 32_000_000
+#: A card's metadata read per spec, the most read of one and of all, in bytes.
+METADATA_FILE = "task_metadata.json"
+METADATA_LIMIT = 200_000
+METADATA_TOTAL = 8_000_000
 #: Tracked files counted, and the seconds `git ls-files` may take.
 GIT_TIMEOUT = 20
 #: Upper bounds of the size buckets, in tracked files.
@@ -62,6 +74,7 @@ class SpecFacts:
     cost: float
     qa_iterations: int | None
     agents: int | None
+    kind: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +84,7 @@ class ProjectFacts:
     stack: str
     size: str
     specs: tuple[SpecFacts, ...]
+    team: str = "unknown"
 
 
 def _qa_session(plan: object) -> int | None:
@@ -85,15 +99,16 @@ def _qa_session(plan: object) -> int | None:
     return value if 0 < value <= MAX_QA_SESSIONS else None
 
 
-def qa_iterations(project_dir: Path) -> dict[str, int]:
-    """Each spec's QA sessions, from its plan at the project's root or in its
-    build workspace (the higher count wins: the workspace is where QA ran)."""
+def _spec_files(
+    project_dir: Path, filename: str, limit: int, total: int
+) -> Iterator[tuple[str, Any]]:
+    """Each spec's `filename`, at the project's root then in each build
+    workspace: `MAX_PLANS` files and `total` bytes at most, `limit` each."""
     from board_mcp.server import CARD_ID
 
     root = project_dir.resolve()
-    found: dict[str, int] = {}
     read = 0
-    budget = PLANS_TOTAL
+    budget = total
     for workpilot in usage_ledger.workspace_dirs(project_dir):
         specs = workpilot / "specs"
         try:
@@ -102,22 +117,45 @@ def qa_iterations(project_dir: Path) -> dict[str, int]:
             continue
         for name in names:
             if read >= MAX_PLANS or budget <= 0:
-                return found
+                return
             read += 1
-            plan, size = usage_ledger.read_json(
-                specs / name / "implementation_plan.json",
-                root,
-                min(PLAN_LIMIT, budget),
+            value, size = usage_ledger.read_json(
+                specs / name / filename, root, min(limit, budget)
             )
             budget -= size
-            sessions = _qa_session(plan)
-            if sessions is not None:
-                found[name] = max(sessions, found.get(name, 0))
+            yield name, value
+
+
+def qa_iterations(project_dir: Path) -> dict[str, int]:
+    """Each spec's QA sessions, from its plan at the project's root or in its
+    build workspace (the higher count wins: the workspace is where QA ran)."""
+    found: dict[str, int] = {}
+    plans = _spec_files(
+        project_dir, "implementation_plan.json", PLAN_LIMIT, PLANS_TOTAL
+    )
+    for name, plan in plans:
+        sessions = _qa_session(plan)
+        if sessions is not None:
+            found[name] = max(sessions, found.get(name, 0))
+    return found
+
+
+def spec_kinds(project_dir: Path) -> dict[str, str]:
+    """Each spec's kind, as its card recorded it; the build workspace's copy,
+    read last, wins over the root's."""
+    found: dict[str, str] = {}
+    files = _spec_files(project_dir, METADATA_FILE, METADATA_LIMIT, METADATA_TOTAL)
+    for name, metadata in files:
+        kind = segments.spec_kind(metadata)
+        if kind is not None:
+            found[name] = kind
     return found
 
 
 def spec_facts(
-    usages: Iterable[usage_ledger.Usage], qa: dict[str, int]
+    usages: Iterable[usage_ledger.Usage],
+    qa: dict[str, int],
+    kinds: dict[str, str] | None = None,
 ) -> tuple[SpecFacts, ...]:
     """One line per spec that recorded an agent session."""
     facts = []
@@ -131,6 +169,7 @@ def spec_facts(
                 cost=sum(u.cost for u in spent),
                 qa_iterations=qa.get(spec_id),
                 agents=len(agents) or None,
+                kind=(kinds or {}).get(spec_id),
             )
         )
     return tuple(facts)
@@ -159,12 +198,16 @@ def main_stack(project_dir: Path) -> str:
 
 
 def project_facts(project_dir: Path) -> ProjectFacts:
-    """Read a project: its ledgers, its plans, its stack and its size."""
+    """Read a project: its ledgers, its plans and cards, its stack, its size
+    and its team."""
     ledgers = usage_ledger.read_ledgers(project_dir)
     return ProjectFacts(
         stack=main_stack(project_dir),
         size=size_bucket(project_dir),
-        specs=spec_facts(ledgers.usages, qa_iterations(project_dir)),
+        specs=spec_facts(
+            ledgers.usages, qa_iterations(project_dir), spec_kinds(project_dir)
+        ),
+        team=segments.team_bucket(project_dir),
     )
 
 
@@ -173,9 +216,25 @@ def _median(values: Iterable[float | int | None]) -> float | None:
     return float(statistics.median(present)) if present else None
 
 
-def window(facts: ProjectFacts, start: datetime, end: datetime) -> dict[str, Any]:
-    """The project's medians over the specs started in [start, end)."""
-    inside = [s for s in facts.specs if start <= s.started < end]
+def _top(values: Iterable[float | None], min_top: int | None) -> float | None:
+    """The figure the best tenth reach (lower is better), from `min_top`
+    values up; None below, or when no `min_top` is set."""
+    present = sorted(v for v in values if v is not None)
+    if min_top is None or len(present) < max(min_top, 2):
+        return None
+    return float(statistics.quantiles(present, n=10, method="inclusive")[0])
+
+
+def window(
+    facts: ProjectFacts, start: datetime, end: datetime, kind: str | None = None
+) -> dict[str, Any]:
+    """The project's medians over the specs started in [start, end), of
+    `kind` only when one is given."""
+    inside = [
+        s
+        for s in facts.specs
+        if start <= s.started < end and (kind is None or s.kind == kind)
+    ]
     return {
         "specs": len(inside),
         "minutes": _median(s.minutes for s in inside),
@@ -192,13 +251,42 @@ def _trend(recent: float | None, previous: float | None) -> float | None:
     return (recent - previous) / previous * 100
 
 
-def _group(members: list[dict[str, Any]], min_group: int) -> dict[str, Any]:
+def _group(
+    members: list[dict[str, Any]], min_group: int, min_top: int | None = None
+) -> dict[str, Any]:
     if len(members) < min_group:
-        return {"projects": len(members), "medians": None}
+        return {"projects": len(members), "medians": None, "top": None}
+    top = {m: _top((p[m] for p in members), min_top) for m in METRICS}
     return {
         "projects": len(members),
         "medians": {m: _median(p[m] for p in members) for m in METRICS},
+        "top": top if any(v is not None for v in top.values()) else None,
     }
+
+
+def _kinds(
+    current: ProjectFacts,
+    peers: list[ProjectFacts],
+    start: datetime,
+    end: datetime,
+    min_group: int,
+) -> list[dict[str, Any]]:
+    """The project's figures kind by kind, against the same kind in the
+    other projects, the most built kind first."""
+    lines = []
+    for kind in segments.KINDS:
+        own = window(current, start, end, kind)
+        if not own["specs"]:
+            continue
+        others = [window(peer, start, end, kind) for peer in peers]
+        lines.append(
+            {
+                "kind": kind,
+                **own,
+                "group": _group([f for f in others if f["specs"]], min_group),
+            }
+        )
+    return sorted(lines, key=lambda line: -line["specs"])
 
 
 def compare(
@@ -207,12 +295,14 @@ def compare(
     now: datetime,
     *,
     min_group: int,
+    min_top: int | None = None,
 ) -> dict[str, Any]:
     """The comparison of `current` with its own past and with `peers`.
 
     Only peers with a spec in the last window count. `peers_detail` is left
     to the caller: the desktop lists the person's own projects, a server
-    never lists another project.
+    never lists another project. A group's top tenth is given from `min_top`
+    projects, never without one.
     """
     recent = window(current, now - WINDOW, now)
     previous = window(current, now - 2 * WINDOW, now - WINDOW)
@@ -222,18 +312,31 @@ def compare(
     same_segment = [
         f for p, f in active if p.stack == current.stack and p.size == current.size
     ]
+    same_team = [f for p, f in active if p.team == current.team]
+    week = timedelta(days=7)
     return {
         "window_days": WINDOW.days,
         "min_group": min_group,
-        "segment": {"stack": current.stack, "size": current.size},
+        "min_top": min_top,
+        "segment": {
+            "stack": current.stack,
+            "size": current.size,
+            "team": current.team,
+        },
         "recent": recent,
         "previous": previous,
         "trend": {m: _trend(recent[m], previous[m]) for m in METRICS},
+        "weeks": [
+            window(current, now - (i + 1) * week, now - i * week)
+            for i in reversed(range(WEEKS))
+        ],
         "groups": {
-            "segment": _group(same_segment, min_group),
-            "stack": _group(same_stack, min_group),
-            "all": _group([f for _p, f in active], min_group),
+            "segment": _group(same_segment, min_group, min_top),
+            "stack": _group(same_stack, min_group, min_top),
+            "team": _group(same_team, min_group, min_top),
+            "all": _group([f for _p, f in active], min_group, min_top),
         },
+        "kinds": _kinds(current, [p for p, _f in active], now - WINDOW, now, min_group),
     }
 
 
@@ -243,10 +346,17 @@ def compare_paths(
     now: datetime,
     *,
     min_group: int,
+    min_top: int | None = None,
     read: Callable[[Path], ProjectFacts] = project_facts,
 ) -> dict[str, Any]:
     """`compare` over project folders, each read with `read`."""
-    return compare(read(current), [read(p) for p in peers], now, min_group=min_group)
+    return compare(
+        read(current),
+        [read(p) for p in peers],
+        now,
+        min_group=min_group,
+        min_top=min_top,
+    )
 
 
 def peer_line(name: str, facts: ProjectFacts, now: datetime) -> dict[str, Any]:
@@ -255,5 +365,6 @@ def peer_line(name: str, facts: ProjectFacts, now: datetime) -> dict[str, Any]:
         "name": name,
         "stack": facts.stack,
         "size": facts.size,
+        "team": facts.team,
         **window(facts, now - WINDOW, now),
     }

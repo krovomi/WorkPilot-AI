@@ -49,13 +49,28 @@ export const useSyncStatusStore = create<SyncStatusState>((set, get) => ({
 /**
  * Check GitHub connection status
  */
+/**
+ * The latest check: switching projects starts a new one, and the previous
+ * project's answer (its repository) must not land after it.
+ */
+let latestConnectionCheck = 0;
+let latestCheckedProjectId: string | null = null;
+
 export async function checkGitHubConnection(
 	projectId: string,
 ): Promise<GitHubSyncStatus | null> {
 	const store = useSyncStatusStore.getState();
+	const check = ++latestConnectionCheck;
+	// Another project: its status is unknown until GitHub answers, never the
+	// previous project's repository.
+	if (latestCheckedProjectId !== projectId) {
+		latestCheckedProjectId = projectId;
+		store.setSyncStatus(null);
+	}
 
 	try {
 		const result = await window.electronAPI.checkGitHubConnection(projectId);
+		if (check !== latestConnectionCheck) return null;
 		if (result.success && result.data) {
 			store.setSyncStatus(result.data);
 			return result.data;
@@ -65,6 +80,7 @@ export async function checkGitHubConnection(
 			return null;
 		}
 	} catch (error) {
+		if (check !== latestConnectionCheck) return null;
 		store.setConnectionError(error instanceof Error ? error.message : null);
 		return null;
 	}

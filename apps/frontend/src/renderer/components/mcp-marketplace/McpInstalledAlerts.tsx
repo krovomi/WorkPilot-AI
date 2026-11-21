@@ -88,7 +88,13 @@ export function McpWatchDetails({
 							<li key={alert.id} className="flex items-start gap-1 text-warning">
 								<AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
 								<span>
-									{t(`mcpMarketplace.watch.alerts.${alert.kind}`, alert.values ?? {})}{" "}
+									{t(`mcpMarketplace.watch.alerts.${alert.kind}`, {
+										...alert.values,
+										// A code-scan rule is an id: shown by its name.
+										...(alert.values?.rule
+											? { rule: t(`mcpMarketplace.security.code.rules.${alert.values.rule}`) }
+											: {}),
+									})}{" "}
 									<span className="text-muted-foreground">
 										{t("mcpMarketplace.watch.detectedAt", {
 											date: formatAppDateTime(alert.detectedAt),

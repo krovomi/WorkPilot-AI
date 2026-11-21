@@ -3067,7 +3067,7 @@
 		"hint": "Ce que workpilot.policy.yaml impose à chaque agent, sur tous les providers. En lecture seule : modifiez le fichier dans le dépôt et faites-le relire comme du code.",
 		"refresh": "Actualiser",
 		"loadFailed": "La politique de gouvernance n'a pas pu être lue : {{error}}",
-		"invalid": "workpilot.policy.yaml est refusé : aucun agent n'écrit de fichier ni ne lance de commande tant qu'il n'est pas corrigé.",
+		"invalid": "workpilot.policy.yaml est refusé : tant qu'il n'est pas corrigé, chaque tâche se met en pause avant sa prochaine session et aucun agent n'écrit de fichier ni ne lance de commande.",
 		"none": "workpilot.policy.yaml ne fixe ni heures, ni fichiers, ni budget de jetons.",
 		"scheduleTitle": "Heures permises",
 		"noSchedule": "À toute heure",
@@ -3079,8 +3079,16 @@
 		"requiresReview": "Revue requise",
 		"noFiles": "Aucune règle de fichier",
 		"budgetTitle": "Budget de jetons",
-		"noBudget": "Pas de limite horaire",
+		"noBudget": "Pas de limite de jetons",
 		"budgetLine": "{{spent}} jetons sur {{limit}} dans la dernière heure",
+		"taskBudgetLine": "Au plus {{limit}} jetons par tâche",
+		"loopTitle": "Coupe-circuit",
+		"loopLine": "Met un agent en pause après {{count}} appels d'outil identiques",
+		"noLoop": "La limite propre à l'app",
+		"metricsBlocked_one": "{{count}} action d'agent arrêtée dans les dernières 24 h",
+		"metricsBlocked_other": "{{count}} actions d'agent arrêtées dans les dernières 24 h",
+		"metricsTrips_one": "{{count}} déclenchement du coupe-circuit sur les 7 derniers jours",
+		"metricsTrips_other": "{{count}} déclenchements du coupe-circuit sur les 7 derniers jours",
 		"decisionsTitle": "Dernières décisions",
 		"noDecisions": "La politique n'a encore pris aucune décision.",
 		"exportCsv": "Exporter en CSV",
@@ -3095,7 +3103,8 @@
 			"warn": "Averti",
 			"outside_hours": "Hors horaires",
 			"budget_exceeded": "Budget atteint",
-			"invalid_policy": "Politique invalide"
+			"invalid_policy": "Politique invalide",
+			"tool_loop": "Coupe-circuit"
 		}
 	}
 }
