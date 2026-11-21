@@ -9,7 +9,9 @@ shows. A critical verdict ends the window early and plans the rollback.
 A warning or critical verdict then gets its incident report (`incident`):
 the numbers, and a few sentences by the project's model unless the YAML file
 says `explain_incident: false`. A critical one opens the revert PR of the
-deployed commit when the file says `revert_pr: true` (`revert`).
+deployed commit when the file says `revert_pr: true` (`revert`). Last, the
+alert channels of the CI/CD settings (Slack, PagerDuty, e-mail) get the facts
+(`alerts`).
 
 Under a strict offline policy only endpoints on the machine or a private
 address are read, and no provider API is called: the rollback stays manual.
@@ -28,7 +30,8 @@ from pathlib import Path
 from foundation.file_utils import write_json_atomic
 from offline_policy import airgap_status
 
-from .collectors import Fetch, default_fetch, health_check, prometheus_value
+from .alerts import SmtpFactory, send_alerts
+from .collectors import Fetch, default_fetch, health_check
 from .config import WatchSettings, is_local_host, load_settings
 from .evaluate import HealthResult, Level, compare, sample_level, verdict
 from .incident import Ask, explain, markdown, summarize
@@ -103,24 +106,24 @@ def _confine(
 ) -> WatchSettings:
     if not offline:
         return settings
-    health, prometheus = settings.health_url, settings.prometheus_url
+    health, source = settings.health_url, settings.source
     if health and not is_local_host(health):
         problems.append("offline: health check skipped")
         health = ""
-    if prometheus and not is_local_host(prometheus):
-        problems.append("offline: Prometheus skipped")
-        prometheus = ""
-    return replace(settings, health_url=health, prometheus_url=prometheus)
+    if source and not source.local:
+        problems.append(f"offline: {source.label} skipped")
+        source = None
+    return replace(settings, health_url=health, source=source)
 
 
-def _measure(settings: WatchSettings, fetch: Fetch) -> dict[str, float | None]:
-    if not settings.prometheus_url:
+def _measure(
+    settings: WatchSettings, fetch: Fetch, now: datetime
+) -> dict[str, float | None]:
+    source = settings.source
+    if source is None:
         return {}
     return {
-        rule.name: prometheus_value(
-            settings.prometheus_url, settings.prometheus_token, rule.query, fetch
-        )
-        for rule in settings.metrics
+        rule.name: source.value(rule.query, fetch, now) for rule in settings.metrics
     }
 
 
@@ -130,11 +133,11 @@ def _sample(
     fetch: Fetch,
     now: datetime,
 ) -> dict:
-    values = _measure(settings, fetch)
+    values = _measure(settings, fetch, now)
     checks = [
         compare(rule, baseline.get(rule.name), values.get(rule.name))
         for rule in settings.metrics
-        if settings.prometheus_url
+        if settings.source
     ]
     health: HealthResult | None = (
         health_check(settings.health_url, fetch) if settings.health_url else None
@@ -202,6 +205,9 @@ def run_watch(
     now: Callable[[], datetime] = _now,
     revert_opener: OpenRevertPR | None = None,
     ask: Ask | None = None,
+    project_name: str = "",
+    language: str = "en",
+    smtp: SmtpFactory | None = None,
 ) -> dict:
     project_dir = Path(project_dir)
     run = find_run(project_dir, run_id)
@@ -234,7 +240,7 @@ def run_watch(
         _save(project_dir, state, now())
         return state
 
-    baseline = _measure(settings, fetch)
+    baseline = _measure(settings, fetch, now())
     state["baseline"] = baseline
     state["phase"] = "waiting"
     _save(project_dir, state, now())
@@ -273,6 +279,17 @@ def run_watch(
         # The verdict is on the page before the PR and the model are asked.
         _save(project_dir, state, now())
         _report(project_dir, state, run, settings, offline, revert_opener, ask)
+        alerts = send_alerts(
+            state,
+            env,
+            project=project_name or project_dir.name,
+            language=language,
+            offline=offline,
+            fetch=fetch,
+            **({"smtp": smtp} if smtp else {}),
+        )
+        if alerts:
+            state["alerts"] = alerts
     _save(project_dir, state, now())
     return state
 

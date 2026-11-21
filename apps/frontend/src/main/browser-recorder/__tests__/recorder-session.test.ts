@@ -144,6 +144,25 @@ describe("startRecording", () => {
 		expect(recordedSteps("/p", ids)).toHaveLength(300);
 	});
 
+	it("keeps proposed checks apart, capped, and exports one only when named", async () => {
+		const child = fakeChild();
+		const { deps: d, events } = deps(child);
+		await startRecording("/p", "http://a.test", d);
+		for (let i = 1; i <= 301; i++) {
+			child.stdout.write(`RECORDER_STEP:${JSON.stringify({ id: `s${i}`, kind: "click", selectors: [button] })}\n`);
+		}
+		for (let i = 400; i <= 500; i++) {
+			const check = { id: `s${i}`, kind: "assert_text", selectors: [button], text: "Saved", after: "s1" };
+			child.stdout.write(`RECORDER_STEP:${JSON.stringify(check)}\n`);
+		}
+		await tick();
+		const steps = events.flatMap((e) => (e.type === "step" ? [e.step] : []));
+		expect(steps.filter((s) => s.after)).toHaveLength(100);
+		expect(steps.filter((s) => !s.after)).toHaveLength(300);
+		expect(steps.find((s) => s.id === "s400")?.after).toBe("s1");
+		expect(recordedSteps("/p", ["s1", "s400", "s500"]).map((s) => s.id)).toEqual(["s1", "s400"]);
+	});
+
 	it("reports a runner error once, and a runner that died without one", async () => {
 		const child = fakeChild();
 		const { deps: d, events } = deps(child);

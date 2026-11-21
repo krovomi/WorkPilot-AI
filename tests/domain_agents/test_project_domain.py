@@ -108,7 +108,7 @@ class TestAgentsGetTheProjectDomain:
         spec = _spec(worktree, ".workpilot", "specs", "001-x")
         (worktree / "Shop.csproj").write_text("<Project />", encoding="utf-8")
         addendum = load_domain_addendum(spec, role="coder")
-        assert "Stripe.net" in addendum
+        assert "- `Stripe.net`, `NodaMoney`" in addendum
         assert "py-moneyed" not in addendum
 
 

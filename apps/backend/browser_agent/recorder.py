@@ -20,6 +20,13 @@ reports into typed, bounded steps:
   :data:`REQUEST_WINDOW_S` is that action's ``wait_request`` (method and path
   only: never the query, never a path that holds a key); an element the page
   inserted after the previous action is waited for (``wait_visible``);
+- a loading indicator that showed after an action and then went away is
+  what that action's replay waits to see gone (``wait_hidden``), named by a
+  selector built here from a closed set of patterns (:func:`loader_css`);
+- a status, an alert or a heading that showed up just after an action is a
+  proposed check (an ``assert_text`` step whose ``after`` names the action):
+  at most :data:`SUGGESTIONS_PER_ACTION` per action, never part of the
+  recording until the person keeps it in the desktop app;
 - at :data:`~browser_agent.recording.MAX_STEPS` the recording stops growing
   and says it was truncated;
 - a secret is never kept (``selector_builder.is_secret_field``), and a URL
@@ -32,6 +39,7 @@ person to stop it or close the window. No model is called anywhere.
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -41,6 +49,7 @@ from urllib.parse import urlsplit
 from foundation.log_redaction import redact_text
 from playwright.async_api import Error as BrowserError
 
+from .codegen_text import css_string
 from .recording import (
     ACTION_KINDS,
     HTTP_METHODS,
@@ -56,12 +65,14 @@ from .recording import (
     clean_request_path,
     clean_value,
     is_web_url,
+    loader_selector,
     page_url,
 )
 from .selector_builder import (
     build_selectors,
     css_selector,
     is_secret_field,
+    looks_generated,
     secret_env_name,
 )
 
@@ -69,6 +80,14 @@ from .selector_builder import (
 NAVIGATION_WINDOW_S = 2.5
 #: A request this soon after an action is that action's doing.
 REQUEST_WINDOW_S = 1.0
+#: A loading indicator gone this soon after an action was that action's doing.
+SETTLE_WINDOW_S = 15.0
+#: A check proposed this soon after an action follows that action.
+SUGGEST_WINDOW_S = 5.0
+SUGGESTIONS_PER_ACTION = 3
+MAX_SUGGESTIONS = 100
+_LOADER_CLASS = re.compile(r"^[A-Za-z_-][A-Za-z0-9_-]{0,60}$", re.ASCII)
+_LOADER_WORD = re.compile(r"spin|load|skeleton|progress", re.IGNORECASE)
 #: The parent frame's script describes an ``<iframe>`` element.
 DESCRIBE_FRAME = (
     "el => (typeof window.__workpilotDescribe === 'function' "
@@ -86,6 +105,32 @@ def safe_url(raw: object) -> str:
     if redact_text(url) != url:
         url = url.split("?", 1)[0].split("#", 1)[0]
     return url
+
+
+def loader_css(raw: object) -> str:
+    """The CSS a replay waits on for a loading indicator, or ``""``.
+
+    The page only says what the indicator has (a test id, an id, the
+    progressbar role, ``aria-busy``, a class); the selector is built here,
+    from those patterns only, and never from a CSS path: once the indicator
+    is gone, a path would name whatever took its place.
+    """
+    if not isinstance(raw, dict):
+        return ""
+    test_id = clean_line(raw.get("testId"), 100)
+    if test_id:
+        return loader_selector(f'[data-testid="{css_string(test_id)}"]')
+    element_id = clean_line(raw.get("id"), 100)
+    if element_id and not looks_generated(element_id):
+        return loader_selector(f"#{element_id}")
+    if raw.get("role") == "progressbar":
+        return '[role="progressbar"]'
+    if raw.get("busy") is True:
+        return '[aria-busy="true"]'
+    for name in clean_line(raw.get("className"), 300).split(" "):
+        if _LOADER_CLASS.match(name) and _LOADER_WORD.search(name):
+            return f".{name}"
+    return ""
 
 
 def _origin(url: str) -> tuple[str, str]:
@@ -114,6 +159,9 @@ class Recorder:
         self._initial = False
         self._last_action_at = float("-inf")
         self._last_action: RecordedStep | None = None
+        #: Proposed checks, by the action they follow: their texts.
+        self._suggested: dict[str, list[str]] = {}
+        self.suggestions = 0
 
     @property
     def steps(self) -> list[RecordedStep]:
@@ -180,6 +228,33 @@ class Recorder:
         step.wait_request = RequestWait(str(method), path)
         return step
 
+    def _recent_action(self, window: float) -> RecordedStep | None:
+        """The last action, when it happened within ``window`` seconds."""
+        if self._clock() - self._last_action_at > window:
+            return None
+        return self._last_action
+
+    def on_settled(self, payload: object, frames: list[str]) -> RecordedStep | None:
+        """A loading indicator went away: the last action waits for that."""
+        step = self._recent_action(SETTLE_WINDOW_S)
+        if frames or step is None or step.wait_hidden or not isinstance(payload, dict):
+            return None
+        step.wait_hidden = loader_css(payload.get("loader"))
+        return step if step.wait_hidden else None
+
+    def _suggest(self, step: RecordedStep) -> RecordedStep | None:
+        """``step`` (a text check) proposed after the last action, or None."""
+        action = self._recent_action(SUGGEST_WINDOW_S)
+        if action is None or self.suggestions >= MAX_SUGGESTIONS:
+            return None
+        texts = self._suggested.setdefault(action.id, [])
+        if len(texts) >= SUGGESTIONS_PER_ACTION or step.text in texts:
+            return None
+        texts.append(step.text)
+        self.suggestions += 1
+        step.after = action.id
+        return step
+
     def on_page_event(
         self, payload: object, frames: list[str] | None = None
     ) -> RecordedStep | None:
@@ -187,8 +262,12 @@ class Recorder:
         if not isinstance(payload, dict):
             return None
         kind = payload.get("kind")
+        if kind == "settled":
+            return self.on_settled(payload, list(frames or []))
         target = payload.get("target")
-        if kind not in (*ACTION_KINDS, "assert_text") or not isinstance(target, dict):
+        if kind not in (*ACTION_KINDS, "assert_text", "suggest"):
+            return None
+        if not isinstance(target, dict):
             return None
         selectors = build_selectors(target)
         shadow = shadow_hosts(target.get("shadow"))
@@ -226,12 +305,13 @@ class Recorder:
                 return None
             step.key = str(payload.get("key"))
             return self._acted(self._add(step))
-        if kind == "assert_text":
+        if kind in ("assert_text", "suggest"):
+            step.kind = "assert_text"
             step.text = clean_line(payload.get("text"))
             # Nothing to assert, or page text holding a key: not recorded.
             if not step.text or redact_text(step.text) != step.text:
                 return None
-            return self._add(step)
+            return self._suggest(step) if kind == "suggest" else self._add(step)
         return self._acted(self._add(step))
 
     def _acted(self, step: RecordedStep | None) -> RecordedStep | None:

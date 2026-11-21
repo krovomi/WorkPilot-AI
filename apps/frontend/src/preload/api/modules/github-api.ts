@@ -450,6 +450,13 @@ export interface GitHubAPI {
 		projectId: string,
 		signature: string,
 	) => Promise<ReviewFeedbackStatsResult>;
+	/** A maintainer approves or discards a held rejection (server projects). */
+	decideHeldReviewFeedback: (
+		projectId: string,
+		prNumber: number,
+		findingId: string,
+		approve: boolean,
+	) => Promise<ReviewFeedbackStatsResult>;
 	/** Write `.workpilot/review-conventions.md` from the feedback. */
 	writeReviewConventions: (
 		projectId: string,
@@ -1092,6 +1099,20 @@ export const createGitHubAPI = (): GitHubAPI => ({
 		signature: string,
 	): Promise<ReviewFeedbackStatsResult> =>
 		invokeIpc(IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_RESET, projectId, signature),
+
+	decideHeldReviewFeedback: (
+		projectId: string,
+		prNumber: number,
+		findingId: string,
+		approve: boolean,
+	): Promise<ReviewFeedbackStatsResult> =>
+		invokeIpc(
+			IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_HELD_DECIDE,
+			projectId,
+			prNumber,
+			findingId,
+			approve,
+		),
 
 	writeReviewConventions: (
 		projectId: string,

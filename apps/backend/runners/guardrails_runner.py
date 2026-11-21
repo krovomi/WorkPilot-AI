@@ -11,8 +11,9 @@ the command line (``python apps/backend/runners/guardrails_runner.py <command>``
   file by file, without blocking anything (``workpilot policy validate``);
 * ``activity``   the log of triggered rules and the requests awaiting approval;
 * ``answer``     approve or refuse one pending request;
-* ``governance`` the hours, files and token budget of ``workpilot.policy.yaml``,
-  the tokens spent in the last hour, and the last decisions of the audit trail;
+* ``governance`` the hours, files and token budgets of ``workpilot.policy.yaml``,
+  the tokens spent in the last hour, the last decisions of the audit trail and
+  its counts (agents stopped in the last day, breaker trips in the week);
 * ``audit``      the audit trail itself, newest first, for an export.
 
 Output: one line ``GUARDRAILS_RESULT:<json>``, or ``GUARDRAILS_ERROR:<json string>``.
@@ -108,7 +109,7 @@ def governance_report(project: Path) -> dict[str, Any]:
     """What the read-only governance panel shows: the policy, its state, its decisions."""
     from agents.policy_watch import tokens_last_hour
     from security.guardrail_policy import load_policy
-    from security.policy_audit import read_events
+    from security.policy_audit import metrics, read_events
 
     policy = load_policy(project)
     return {
@@ -117,6 +118,7 @@ def governance_report(project: Path) -> dict[str, Any]:
         "sources": [s.__dict__ for s in policy.sources if s.layer == "repository"],
         "tokensLastHour": tokens_last_hour(project),
         "events": read_events(project, 50),
+        "metrics": metrics(project),
     }
 
 

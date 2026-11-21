@@ -33,6 +33,7 @@ function plan(waves: string[][], maxParallel = 3): ExecutionWavePlan {
 		residualRisk: 0,
 		mergeChecks: { checked: 0, conflicts: 0, unchecked: 0, failed: 0 },
 		fragileZones: { enabled: false, commits: null },
+		codeLinks: { enabled: false, files: 0, capped: false },
 		computedAt: "2026-11-14T08:00:00.000Z",
 	};
 }

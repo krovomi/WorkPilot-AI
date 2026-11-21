@@ -64,8 +64,19 @@ describe("validateRunState", () => {
 		["started not a list", { ...STATE, started: "001-a" }],
 		["a started task outside the waves", { ...STATE, started: ["009-z"] }],
 		["a task started twice", { ...STATE, started: ["001-a", "001-a"] }],
+		["avoided counts that are not an object", { ...STATE, avoided: 3 }],
+		["a negative avoided count", { ...STATE, avoided: { conflicts: -1, risk: 0 } }],
+		["a fractional avoided risk", { ...STATE, avoided: { conflicts: 0, risk: 0.5 } }],
+		["a huge avoided count", { ...STATE, avoided: { conflicts: 2_000_000, risk: 0 } }],
 	])("refuses %s", (_name, raw) => {
 		expect(validateRunState(raw, PROJECT_ID)).toBeNull();
+	});
+
+	it("keeps what the plan avoided, its two counters only", () => {
+		expect(validateRunState({ ...STATE, avoided: { conflicts: 2, risk: 5, note: "x" } }, PROJECT_ID)).toEqual({
+			...STATE,
+			avoided: { conflicts: 2, risk: 5 },
+		});
 	});
 
 	it("refuses an ill-formed project id even when both sides agree", () => {
@@ -128,7 +139,7 @@ describe("writeSavedRun / readSavedRun", () => {
 		mkdirSync(path.join(project, ".workpilot"));
 		symlinkSync(elsewhere, runFile());
 		expect(readSavedRun(project, PROJECT_ID, KNOWN)).toEqual({ run: null, ignored: true });
-		expect(() => writeSavedRun(project, STATE, NOW)).toThrow(/linked run file/);
+		expect(() => writeSavedRun(project, STATE, NOW)).toThrow(/linked file/);
 		expect(readFileSync(elsewhere, "utf-8")).toContain('"version":1');
 	});
 

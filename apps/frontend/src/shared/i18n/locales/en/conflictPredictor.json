@@ -82,7 +82,10 @@
 			"fragile": "Fragile zones",
 			"fragileHint": "Files the last commits changed together, one in each spec, add to the pair's score.",
 			"fragileOn": "From the history",
-			"fragileOff": "Off"
+			"fragileOff": "Off",
+			"code": "Code links",
+			"codeHint": "A file of one spec importing a module the other edits, or using a symbol the other removes, adds to the pair's score.",
+			"codeOn": "From the code"
 		},
 		"empty": {
 			"noProject": "Select a project to plan its waves.",
@@ -119,7 +122,9 @@
 			"together": "may share a wave",
 			"mergeClean": "test merge clean",
 			"mergeConflict": "test merge conflicts",
-			"fragile": "{{count}} fragile links"
+			"fragile": "{{count}} fragile links",
+			"imports": "{{count}} cross imports",
+			"symbols": "{{count}} removed symbols still used"
 		},
 		"run": {
 			"running": "Running wave {{current}} of {{total}}.",
@@ -154,6 +159,15 @@
 		"fragile": {
 			"summary": "Fragile zones: files changed together in the last {{commits}} commits add to the scores.",
 			"unavailable": "Fragile zones: git could not read the project's history; scores use shared files only."
+		},
+		"code": {
+			"summary": "Code links: {{count}} files read for imports and removed symbols, in any language.",
+			"capped": "The file limit was reached: some files were not read."
+		},
+		"history": {
+			"summary": "Last {{days}} days: {{runs}} runs ended ({{stopped}} stopped), {{conflicts}} conflicts avoided (risk {{risk}} taken out), {{started}} specs started.",
+			"last": "Last run ended {{finishedAt}}.",
+			"ignored": "The run history of this project could not be read: it starts again with the next run."
 		}
 	}
 }

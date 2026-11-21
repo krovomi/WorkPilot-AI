@@ -36,7 +36,7 @@ export const MAX_THRESHOLD = 50;
 export const PROTECTED_CATEGORIES: ReadonlySet<string> = new Set(["security"]);
 
 export const SIGNATURE = /^[0-9a-f]{16}$/;
-const FINDING_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
+export const FINDING_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 const CATEGORY = /^[a-z_]{1,32}$/;
 const SEVERITIES: ReadonlySet<string> = new Set([
 	"critical",

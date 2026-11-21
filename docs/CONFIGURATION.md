@@ -421,7 +421,7 @@ These apply with or without server mode.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `WORKPILOT_EXTRA_CORS_ORIGINS` | — | Comma-separated origins added to the local API's built-in localhost and Electron list, with credentials allowed. Never `*`: with credentials allowed, it lets any origin in. |
+| `WORKPILOT_EXTRA_CORS_ORIGINS` | — | Comma-separated origins added to the local API's built-in localhost and Electron list, with credentials allowed. Never `*`: with credentials allowed, it lets any origin in. Their hosts are also accepted in the `Host` header: otherwise the local API answers only `127.0.0.1`, `localhost` and `::1` (421 for the rest). |
 | `WORKPILOT_WS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,file://` | Comma-separated browser origins allowed to open the streaming WebSocket. It replaces the default list, entries are not trimmed: write them without spaces. |
 | `AUDIT_TRAIL_ALLOWED_ROOTS` | — | Desktop mode: directories, separated by `:` (`;` on Windows), under which the audit-trail panel may keep a project's trail (`<project>/.workpilot/audit-trail`); a directory outside them is refused. Unset, any directory is accepted. In server mode a client cannot name a directory at all (see [Paths are no longer supplied by the client](#paths-are-no-longer-supplied-by-the-client)). |
 | `AUDIT_TRAIL_FERNET_KEY` | — | Fernet key encrypting each new audit-trail line on disk; lines written before stay readable. Every process that writes trails needs it: the API and the build agents. There is one key and no rotation: changing it makes the lines encrypted with the old one unreadable. |

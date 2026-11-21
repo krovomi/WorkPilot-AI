@@ -1,13 +1,13 @@
 /**
  * Execution waves (#358, lot 2): what the preventive merge check found and
- * how far back fragile zones were read, the
- * run saved before a restart (resume or abandon), and the waves of a resumed
- * run while no plan is shown.
+ * how far back fragile zones were read, how much code was read for code links, the
+ * run saved before a restart (resume or abandon), the waves of a resumed
+ * run while no plan is shown, and the sprint metrics of the run history.
  */
 
-import { AlertTriangle, GitMerge, History, Play, Trash2 } from "lucide-react";
+import { AlertTriangle, BarChart3, GitMerge, History, Play, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { ExecutionWavePlan, SavedWaveRun } from "../../../shared/types/conflict-waves";
+import type { ExecutionWavePlan, SavedWaveRun, WaveRunHistory } from "../../../shared/types/conflict-waves";
 import { formatAppDateTime } from "../../lib/date-format";
 import { CharterButton, Notice, Panel } from "../charter";
 
@@ -47,6 +47,12 @@ export function MergeCheckNotices({
 						? t("conflictPredictor:waves.fragile.unavailable")
 						: t("conflictPredictor:waves.fragile.summary", { commits: plan.fragileZones.commits })}
 				</p>
+			)}
+			{plan.codeLinks.enabled && (
+				<p className="wp-meta">{t("conflictPredictor:waves.code.summary", { count: plan.codeLinks.files })}</p>
+			)}
+			{plan.codeLinks.enabled && plan.codeLinks.capped && (
+				<p className="wp-meta">{t("conflictPredictor:waves.code.capped")}</p>
 			)}
 		</>
 	);
@@ -118,5 +124,39 @@ export function RunWavesList({
 				))}
 			</ol>
 		</Panel>
+	);
+}
+
+/** The window of the sprint metrics. */
+export const SPRINT_DAYS = 14;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Sprint metrics (#358, lot 3): over the last `SPRINT_DAYS` days, the runs
+ * that ended, the conflicts their plans avoided and the specs they started.
+ * Counted from the run history; no duration is estimated.
+ */
+export function RunHistorySummary({ history, now = Date.now() }: { history: WaveRunHistory; now?: number }) {
+	const { t } = useTranslation(["conflictPredictor"]);
+	if (history.ignored) {
+		return <p className="wp-meta">{t("conflictPredictor:waves.history.ignored")}</p>;
+	}
+	const recent = history.records.filter((r) => now - Date.parse(r.finishedAt) <= SPRINT_DAYS * DAY_MS);
+	if (recent.length === 0) return null;
+	const sum = (pick: (r: (typeof recent)[number]) => number) => recent.reduce((total, r) => total + pick(r), 0);
+	return (
+		<Notice tone="muted" icon={BarChart3} role="status">
+			<span data-testid="wave-run-history">
+				{t("conflictPredictor:waves.history.summary", {
+					days: SPRINT_DAYS,
+					runs: recent.length,
+					stopped: recent.filter((r) => r.outcome === "stopped").length,
+					conflicts: sum((r) => r.conflictsAvoided),
+					risk: sum((r) => r.riskAvoided),
+					started: sum((r) => r.started),
+				})}{" "}
+				{t("conflictPredictor:waves.history.last", { finishedAt: formatAppDateTime(recent[0].finishedAt) })}
+			</span>
+		</Notice>
 	);
 }

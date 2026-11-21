@@ -50,6 +50,7 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from foundation.loopback_host import LoopbackHostOnly
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -314,12 +315,8 @@ _ALLOWED_ORIGINS = [
     "file://",  # Electron file:// protocol
 ]
 
-# There used to be an `allow_origin_regex` of
-# ``^https?://(localhost|127\.0\.0\.1)(:\d+)?$`` here. Combined with
-# ``allow_credentials=True`` that trusted *any* page served from *any* local port — so
-# any other local dev server, or a page a user happened to open from a local static
-# server, could make credentialed calls to this API. The explicit list above already
-# covers the ports WorkPilot itself uses; anything else must be opted into deliberately.
+# No `allow_origin_regex` for any local port: with credentials it trusted every page of
+# every local server. The list covers WorkPilot's ports; others are opted into.
 _EXTRA_ORIGINS = [
     origin.strip()
     for origin in os.environ.get("WORKPILOT_EXTRA_CORS_ORIGINS", "").split(",")
@@ -348,6 +345,8 @@ app.add_middleware(
         "X-WorkPilot-Org",  # server mode: the org a request acts in, checked server-side
     ],
 )
+if not _SERVER_MODE_ACTIVE:  # the local API answers only what is addressed to it
+    app.add_middleware(LoopbackHostOnly, extra_origins=_EXTRA_ORIGINS)
 
 
 def _get_anthropic_token() -> str | None:
