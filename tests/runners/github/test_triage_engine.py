@@ -163,3 +163,49 @@ def test_the_context_shows_at_most_five_look_alikes(tmp_path):
     assert "Potential Duplicates" not in engine.build_triage_context(
         untitled, [untitled, {"number": 9, "title": "Other"}]
     )
+
+
+def test_issues_compared_by_meaning_show_their_similarity(tmp_path):
+    engine = TriageEngine.__new__(TriageEngine)
+    engine.github_dir = tmp_path
+    dupes = [
+        {"number": 2, "title": "Cannot sign in", "similarity": 0.91},
+        {"number": 3, "title": "Safari session lost", "similarity": 0.7},
+    ]
+
+    context = engine.build_triage_context(ISSUE, OTHERS, potential_dupes=dupes)
+
+    assert "### Potential Duplicates (closest in meaning)" in context
+    listed = [line for line in context.splitlines() if line.startswith("- #")]
+    assert listed == [
+        "- #2 (similarity 0.91): Cannot sign in",
+        "- #3 (similarity 0.70): Safari session lost",
+    ]
+
+
+def test_triage_shows_the_model_the_issues_closest_in_meaning(
+    engine, model, monkeypatch
+):
+    seen = []
+
+    async def potential_duplicates(issue, all_issues, **options):
+        seen.append(options)
+        return [{"number": 3, "title": "Add dark mode", "similarity": 0.8}]
+
+    monkeypatch.setattr(
+        importlib.import_module("runners.github.services.duplicate_candidates"),
+        "potential_duplicates",
+        potential_duplicates,
+    )
+    made = model(text(MessageRole.ASSISTANT, '{"category": "bug"}'))
+
+    asyncio.run(engine.triage_single_issue(ISSUE, OTHERS))
+
+    assert seen == [
+        {
+            "repo": "own/repo",
+            "cache_dir": engine.github_dir / "embeddings",
+            "project_dir": engine.project_dir,
+        }
+    ]
+    assert "- #3 (similarity 0.80): Add dark mode" in made[0].prompts[0]
