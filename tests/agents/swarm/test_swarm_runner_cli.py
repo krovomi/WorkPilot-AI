@@ -139,7 +139,9 @@ def runner(monkeypatch: pytest.MonkeyPatch):
     return module
 
 
-@pytest.mark.parametrize(("phase", "code"), [("complete", None), ("failed", 1)])
+@pytest.mark.parametrize(
+    ("phase", "code"), [("complete", None), ("failed", 1), ("paused", 1)]
+)
 def test_the_waves_run_and_the_outcome_sets_the_exit_code(
     runner, project: Path, monkeypatch, capsys, phase: str, code
 ) -> None:
@@ -153,6 +155,7 @@ def test_the_waves_run_and_the_outcome_sets_the_exit_code(
             self.completed_subtasks = 3 if phase == "complete" else 1
             self.total_subtasks = 3
             self.failed_subtasks = 0 if phase == "complete" else 2
+            self.error = "paused before wave 2 (policy_hours)"
 
         def to_dict(self) -> dict:
             return {"phase": phase}
@@ -189,6 +192,8 @@ def test_the_waves_run_and_the_outcome_sets_the_exit_code(
     assert "  SWARM MODE — Execution Complete" in out
     assert f"  Status:    {phase}" in out
     assert "  Completed: 3/3" in out if phase == "complete" else "  Failed:    2" in out
+    stopped = "  Stopped:   paused before wave 2 (policy_hours)"
+    assert (stopped in out) is (phase == "paused")
 
     result = asyncio.run(
         runner.run_swarm(project, project / ".workpilot" / "specs" / "007-login")

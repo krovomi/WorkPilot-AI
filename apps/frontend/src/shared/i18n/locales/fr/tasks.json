@@ -2689,6 +2689,11 @@
 		"hoursBody": "workpilot.policy.yaml permet aux agents de travailler {{hours}} ({{timezone}}). La tâche s'est mise en pause une fois son action en cours terminée.",
 		"budgetChip": "Budget de jetons atteint",
 		"budgetBody": "Les agents du projet ont dépensé {{spent}} jetons dans la dernière heure, autant ou plus que les {{limit}} permis par workpilot.policy.yaml.",
+		"taskBudgetChip": "Budget de jetons de la tâche atteint",
+		"taskBudgetBody": "Les agents de cette tâche ont dépensé {{spent}} jetons, autant ou plus que les {{limit}} par tâche permis par workpilot.policy.yaml.",
+		"invalidChip": "Politique invalide",
+		"invalidBody_one": "La politique de garde-fous a {{count}} erreur : aucun agent ne tourne tant qu'elle n'est pas corrigée. Réglages > Garde-fous la détaille.",
+		"invalidBody_other": "La politique de garde-fous a {{count}} erreurs : aucun agent ne tourne tant qu'elles ne sont pas corrigées. Réglages > Garde-fous les détaille.",
 		"hint": "Reprenez-la quand la politique le permet de nouveau ; la décision figure dans le journal d'audit de Réglages > Garde-fous."
 	}
 }

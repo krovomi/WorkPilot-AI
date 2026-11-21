@@ -40,6 +40,14 @@ describe("governance:report", () => {
 		const report = await handlers.get(IPC_CHANNELS.GOVERNANCE_REPORT)?.({}, { projectPath: "/projects/app" });
 		expect(mocks.run).toHaveBeenCalledWith("governance", { projectPath: "/projects/app" });
 		expect((report as { events: unknown[] }).events).toHaveLength(1);
+		expect((report as { metrics: unknown }).metrics).toEqual({ blocked24h: 0, breakerTrips7d: 0 });
+	});
+
+	it("keeps the trail's counts, bounded", async () => {
+		mocks.known.mockReturnValue("/projects/app");
+		mocks.run.mockResolvedValue({ events: [], metrics: { blocked24h: 4.7, breakerTrips7d: 1e12 } });
+		const report = await governanceReport({ projectPath: "/projects/app" });
+		expect(report.metrics).toEqual({ blocked24h: 4, breakerTrips7d: 1_000_000 });
 	});
 
 	it("refuses a folder that is not a project of the app", async () => {

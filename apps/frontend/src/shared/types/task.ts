@@ -684,7 +684,7 @@ export interface TaskMetadata {
 		 * said « stop » to the voice assistant (after the current step).
 		 * "anomaly" / "sandbox" when the session watch stopped an agent
 		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
-		 * "policy_hours" / "policy_budget" when
+		 * "policy_hours" / "policy_budget" / "policy_invalid" when
 		 * workpilot.policy.yaml said agents must stop (`agents/policy_watch.py`),
 		 * with `policy`.
 		 */
@@ -847,7 +847,7 @@ export interface ImplementationPlan {
 		 * said « stop » to the voice assistant (after the current step).
 		 * "anomaly" / "sandbox" when the session watch stopped an agent
 		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
-		 * "policy_hours" / "policy_budget" when
+		 * "policy_hours" / "policy_budget" / "policy_invalid" when
 		 * workpilot.policy.yaml said agents must stop (`agents/policy_watch.py`),
 		 * with `policy`.
 		 */

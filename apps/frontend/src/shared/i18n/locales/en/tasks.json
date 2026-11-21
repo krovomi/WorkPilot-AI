@@ -2689,6 +2689,11 @@
 		"hoursBody": "workpilot.policy.yaml lets agents work {{hours}} ({{timezone}}). The task paused itself once its current action had finished.",
 		"budgetChip": "Token budget reached",
 		"budgetBody": "The project's agents spent {{spent}} tokens in the last hour, at or past the {{limit}} workpilot.policy.yaml allows.",
+		"taskBudgetChip": "Task token budget reached",
+		"taskBudgetBody": "This task's agents spent {{spent}} tokens, at or past the {{limit}} per task workpilot.policy.yaml allows.",
+		"invalidChip": "Invalid policy",
+		"invalidBody_one": "The guardrails policy has {{count}} error: no agent runs until it is fixed. Settings > Guardrails lists it.",
+		"invalidBody_other": "The guardrails policy has {{count}} errors: no agent runs until they are fixed. Settings > Guardrails lists them.",
 		"hint": "Resume it when the policy allows again; the decision is in the audit trail of Settings > Guardrails."
 	}
 }
