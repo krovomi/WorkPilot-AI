@@ -705,7 +705,9 @@ async def test_an_org_administrator_outside_the_project_may_stop_it_all(server):
     """No membership row, but the right to manage members: the owner's say."""
     from shared_features.governance import StopRequest, governance, stop
 
-    admin = _principal("u-eve", org="org-a", permissions=_ALL | {"project.member.write"})
+    admin = _principal(
+        "u-eve", org="org-a", permissions=_ALL | {"project.member.write"}
+    )
     scope = await _scope(admin, "p-a")
     assert scope.project_role is None
     report = await governance(scope=scope, principal=admin)
