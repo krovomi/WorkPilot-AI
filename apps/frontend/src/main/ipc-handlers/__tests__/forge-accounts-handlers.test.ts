@@ -22,7 +22,7 @@ vi.mock("electron", () => ({
 vi.mock("../../secret-storage", () => ({
 	encryptSecret: (value: string) => `enc:${value}`,
 	decryptSecret: (stored: string) => stored.replace(/^enc:/, ""),
-	prepareSecrets: (...args: unknown[]) => prepareSecrets(...args),
+	prepareSecrets: (values: unknown) => prepareSecrets(values),
 }));
 const prepareSecrets = vi.fn(async (_values: unknown) => undefined);
 const testForgeAccount = vi.fn();
