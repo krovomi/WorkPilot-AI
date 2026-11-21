@@ -193,7 +193,7 @@ describe("Roadmap view", () => {
 		expect(useTaskStore.getState().tasks).toEqual([]);
 	});
 
-	it("saves what the board changed, reloads a refused save and says when a save fails", async () => {
+	it("saves what the board changed, and reloads and says so when a save does not land", async () => {
 		const rm = roadmap();
 		show(rm);
 		renderView();
@@ -204,10 +204,12 @@ describe("Roadmap view", () => {
 		const loads = api.getRoadmap.mock.calls.length;
 		fireEvent.click(screen.getByRole("button", { name: "kanban-save" }));
 		await waitFor(() => expect(api.getRoadmap.mock.calls.length).toBe(loads + 1));
+		const refused = await screen.findByText("Failed to save roadmap");
 
 		api.saveRoadmap.mockRejectedValueOnce(new Error("disk"));
 		fireEvent.click(await screen.findByRole("button", { name: "kanban-save" }));
-		expect(await screen.findByText("Failed to save roadmap")).toBeInTheDocument();
+		// The failure brings a toast of its own in place of the first one.
+		await waitFor(() => expect(screen.getByText("Failed to save roadmap")).not.toBe(refused));
 	});
 
 	it("writes nothing when the roadmap was cleared before the save", async () => {

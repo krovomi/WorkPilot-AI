@@ -49,7 +49,7 @@ export interface RoadmapStatusColumn {
 	id: string;
 	label: string;
 	color: string;
-	icon: string;
+	icon: "Eye" | "Calendar" | "Play" | "Check";
 }
 
 export const ROADMAP_STATUS_COLUMNS: RoadmapStatusColumn[] = [
