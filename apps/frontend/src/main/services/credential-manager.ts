@@ -20,6 +20,14 @@ import { readSettingsFile, writeSettingsFile } from "../settings-utils";
 import { findExecutable } from "../env-utils";
 import { isMacOS, isWindows } from "../platform";
 import { loadProfilesFile, saveProfilesFile } from "../utils/profile-manager";
+import {
+	gatewayKeyCheck,
+	NON_CLAUDE_PROVIDERS,
+	PROVIDER_BASE_URL_ENV_VARS,
+	PROVIDER_KEY_ENV_VARS,
+	PROVIDER_SETTINGS_KEYS,
+	providerModelEnv,
+} from "./provider-settings-keys";
 import { loadBetterSqlite } from "./windsurf-sqlite";
 
 const execFileAsync = promisify(execFile);
@@ -577,18 +585,7 @@ export class CredentialManager extends EventEmitter {
 			if (!apiKey) {
 				try {
 					const settings = readSettingsFile();
-					const globalKeyOptions: Record<string, string[]> = {
-						openai: ["globalOpenAIApiKey"],
-						google: ["globalGoogleDeepMindApiKey", "globalGoogleApiKey"],
-						gemini: ["globalGoogleApiKey", "globalGoogleDeepMindApiKey"],
-						mistral: ["globalMistralApiKey"],
-						deepseek: ["globalDeepSeekApiKey"],
-						grok: ["globalGrokApiKey"],
-						meta: ["globalMetaApiKey"],
-						aws: ["globalAWSApiKey"],
-						cursor: ["globalCursorApiKey"],
-					};
-					const settingsKeys = globalKeyOptions[provider] || [];
+					const settingsKeys = PROVIDER_SETTINGS_KEYS[provider] || [];
 					if (settings) {
 						for (const settingsKey of settingsKeys) {
 							// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
@@ -839,8 +836,10 @@ export class CredentialManager extends EventEmitter {
 		try {
 			let response: Response;
 			const timeout = AbortSignal.timeout(10000);
+			const gatewayCheck = gatewayKeyCheck(provider, apiKey, timeout);
 
-			switch (provider) {
+			if (gatewayCheck) response = await gatewayCheck;
+			else switch (provider) {
 				case "openai":
 					response = await fetch(modelsUrl(baseUrl, "https://api.openai.com"), {
 						headers: { Authorization: `Bearer ${apiKey}` },
@@ -1316,8 +1315,10 @@ export class CredentialManager extends EventEmitter {
 				const apiKey = this.activeCredential.credentials.apiKey!;
 				const baseUrl = this.activeCredential.credentials.baseUrl || "";
 				let response: Response;
+				const gatewayCheck = gatewayKeyCheck(provider, apiKey);
 
-				switch (provider) {
+				if (gatewayCheck) response = await gatewayCheck;
+				else switch (provider) {
 					case "anthropic":
 					case "claude":
 						response = await fetch(
@@ -1452,19 +1453,7 @@ export class CredentialManager extends EventEmitter {
 				selectedProviderOverride ??
 				(settings?.selectedProvider as string | undefined)
 			)?.toLowerCase();
-			const nonClaudeProviders = [
-				"copilot",
-				"openai",
-				"google",
-				"ollama",
-				"meta",
-				"mistral",
-				"deepseek",
-				"grok",
-				"aws",
-				"custom",
-			];
-			if (selectedProvider && nonClaudeProviders.includes(selectedProvider)) {
+			if (selectedProvider && NON_CLAUDE_PROVIDERS.includes(selectedProvider)) {
 				// The active credential from profiles.json may be a Claude profile —
 				// still force SELECTED_LLM_PROVIDER so the backend routes to the right client.
 				env.SELECTED_LLM_PROVIDER = selectedProvider;
@@ -1488,37 +1477,6 @@ export class CredentialManager extends EventEmitter {
 				// The activeCredential may be type:'oauth' (set by PROVIDER_SELECT handler)
 				// which bypasses the switch statement below — so we must inject the key here.
 				// Source priority: profiles.json → globalXxxApiKey in settings.json
-				const globalKeyMap: Record<string, string[]> = {
-					openai: ["globalOpenAIApiKey"],
-					google: ["globalGoogleDeepMindApiKey", "globalGoogleApiKey"],
-					gemini: ["globalGoogleApiKey", "globalGoogleDeepMindApiKey"],
-					mistral: ["globalMistralApiKey"],
-					deepseek: ["globalDeepSeekApiKey"],
-					grok: ["globalGrokApiKey"],
-					meta: ["globalMetaApiKey"],
-					aws: ["globalAWSApiKey"],
-					windsurf: ["globalWindsurfApiKey"],
-				};
-				const envVarMap: Record<string, string> = {
-					openai: "OPENAI_API_KEY",
-					google: "GOOGLE_API_KEY",
-					gemini: "GOOGLE_API_KEY",
-					mistral: "MISTRAL_API_KEY",
-					deepseek: "DEEPSEEK_API_KEY",
-					grok: "GROK_API_KEY",
-					meta: "META_API_KEY",
-					aws: "AWS_ACCESS_KEY_ID",
-					windsurf: "WINDSURF_API_KEY",
-				};
-				const baseUrlMap: Record<string, string> = {
-					openai: "OPENAI_BASE_URL",
-					mistral: "MISTRAL_BASE_URL",
-					deepseek: "DEEPSEEK_BASE_URL",
-					grok: "GROK_BASE_URL",
-					meta: "META_BASE_URL",
-					aws: "AWS_BEDROCK_ENDPOINT",
-				};
-
 				// Check profiles.json first (most specific), then global settings
 				let apiKey = "";
 				let baseUrl = "";
@@ -1544,7 +1502,7 @@ export class CredentialManager extends EventEmitter {
 				}
 
 				if (!apiKey) {
-					for (const key of globalKeyMap[selectedProvider] ?? []) {
+					for (const key of PROVIDER_SETTINGS_KEYS[selectedProvider] ?? []) {
 						// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 						const val = (settings as any)?.[key] as string | undefined;
 						if (val?.trim()) {
@@ -1558,7 +1516,7 @@ export class CredentialManager extends EventEmitter {
 				// specific OpenAI scopes that the ChatGPT OAuth flow does not grant.
 				// Users must provide a real API key (sk-...) from platform.openai.com.
 
-				const envVar = envVarMap[selectedProvider];
+				const envVar = PROVIDER_KEY_ENV_VARS[selectedProvider];
 				if (
 					envVar &&
 					apiKey &&
@@ -1566,7 +1524,7 @@ export class CredentialManager extends EventEmitter {
 				) {
 					env[envVar] = apiKey;
 				}
-				const baseUrlVar = baseUrlMap[selectedProvider];
+				const baseUrlVar = PROVIDER_BASE_URL_ENV_VARS[selectedProvider];
 				if (baseUrlVar && baseUrl) env[baseUrlVar] = baseUrl;
 
 				// Ollama / local LLM: inject base URL if configured.
@@ -1582,17 +1540,10 @@ export class CredentialManager extends EventEmitter {
 						| string
 						| undefined;
 					if (ollamaUrl?.trim()) env.OLLAMA_BASE_URL = ollamaUrl.trim();
-					// The model the user picked (incl. HF-discovered ids like
-					// "hf.co/org/model") is stored under `globalOllamaModel`. Inject it
-					// so the backend asks the local server for THIS model instead of
-					// falling back to the registry default ("llama3.3"). LOCAL_LLM_MODEL
-					// is the generic alias consumed by the same backend resolution.
-					const ollamaModel = s?.globalOllamaModel as string | undefined;
-					if (ollamaModel?.trim()) {
-						env.OLLAMA_MODEL = ollamaModel.trim();
-						env.LOCAL_LLM_MODEL = ollamaModel.trim();
-					}
 				}
+				// The provider page's model (an Ollama tag, `hf.co/org/model`, a
+				// gateway id): without it the backend falls back to the registry's.
+				Object.assign(env, providerModelEnv(selectedProvider, settings));
 
 				return Object.fromEntries(
 					Object.entries(env).filter(([_, value]) => value.trim() !== ""),
@@ -1712,6 +1663,12 @@ export class CredentialManager extends EventEmitter {
 			case "meta":
 				env.META_API_KEY = apiKey;
 				if (baseUrl) env.META_BASE_URL = baseUrl;
+				break;
+
+			case "openrouter":
+			case "huggingface":
+				env[PROVIDER_KEY_ENV_VARS[provider]] = apiKey;
+				if (baseUrl) env[PROVIDER_BASE_URL_ENV_VARS[provider]] = baseUrl;
 				break;
 
 			case "aws":

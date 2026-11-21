@@ -164,6 +164,8 @@
 				"aws": "AWS Bedrock and Amazon services",
 				"copilot": "GitHub Copilot",
 				"grok": "Grok xAI models",
+				"openrouter": "Hundreds of models from many vendors (Kimi, GLM, DeepSeek, Claude, GPT…) with one OpenRouter key",
+				"huggingface": "Open models of the Hugging Face Hub through Inference Providers, billed to your Hugging Face account",
 				"windsurf": "Windsurf AI Provider",
 				"cursor": "Cursor AI Provider",
 				"ollama": "Local open-source models with Ollama",
@@ -282,7 +284,31 @@
 					"unverified": "● Tool-calling to verify",
 					"unverifiedDetail": "— not confirmed from the name; open the model card. \"~GB\" sizes are estimates (4-bit quant)."
 				},
-				"estimatedSize": " · ~{{size}} GB"
+				"estimatedSize": " · ~{{size}} GB",
+				"cloudBadge": "Cloud",
+				"cloudBadgeTitle": "Served by the Hugging Face router with tool calling",
+				"cloudPrice": "{{price}} per M tokens",
+				"tryInCloud": "Try in the cloud",
+				"tryInCloudTooltip": "Make {{id}} the Hugging Face cloud model, nothing to download",
+				"cloudDefault": "Cloud model",
+				"cloudChosen": "{{id}} is now the Hugging Face cloud model. Pick the Hugging Face engine on a task to try it, nothing to download.",
+				"cloudNeedsToken": "Add a Hugging Face token on the Hugging Face provider page first.",
+				"cloudSaveFailed": "The cloud model could not be saved."
+			},
+			"gatewayCatalog": {
+				"title": "Models of {{name}}",
+				"description": "The live list of the models {{name}} serves with tool calling, with their price. Click one to make it the default model.",
+				"searchPlaceholder": "Filter models…",
+				"empty": "No model matches.",
+				"more": "{{count}} more: refine the filter.",
+				"price": "{{price}} per M tokens",
+				"context": "{{size}} context",
+				"providers_one": "{{count}} provider",
+				"providers_other": "{{count}} providers",
+				"default": "Default",
+				"setDefault": "Make {{id}} the default model",
+				"offline": "Offline list: {{name}} could not be reached.",
+				"loading": "Loading the models…"
 			}
 		},
 		"updates": {
@@ -1713,7 +1739,9 @@
 		"phaseConfiguration": "Phase Configuration",
 		"phaseConfigurationDescription": "Configure models and thinking levels for each development pipeline phase",
 		"presets": {
-			"auto": { "name": "Auto (Optimized)" },
+			"auto": {
+				"name": "Auto (Optimized)"
+			},
 			"complex": {
 				"name": "Complex Tasks",
 				"description": "For intricate, multi-step implementations requiring deep analysis"

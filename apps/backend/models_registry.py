@@ -345,6 +345,49 @@ _GROK_MODELS = [
 ]
 
 # =============================================================================
+# GATEWAYS — one key, many vendors' models (gateway_providers.py)
+# OpenRouter: https://openrouter.ai/api/v1/models, read 2026-11-21.
+# Hugging Face Inference Providers: https://router.huggingface.co/v1/models,
+# read 2026-11-21. Both lists are fetched live and keyless; these entries are
+# only the defaults an auto-configured provider runs and the offline fallback.
+# =============================================================================
+
+_OPENROUTER_MODELS = [
+    ModelEntry(
+        "openrouter",
+        "moonshotai/kimi-k3.1-pro",
+        "Kimi K3.1 Pro",
+        "standard",
+        supports_thinking=True,
+        is_default=True,
+    ),
+    ModelEntry(
+        "openrouter",
+        "anthropic/claude-fable-5.2",
+        "Claude Fable 5.2",
+        "flagship",
+        supports_thinking=True,
+        supports_vision=True,
+    ),
+]
+
+_HUGGINGFACE_MODELS = [
+    ModelEntry(
+        "huggingface",
+        "moonshotai/Kimi-K3.1-Pro",
+        "Kimi K3.1 Pro",
+        "standard",
+        is_default=True,
+    ),
+    ModelEntry(
+        "huggingface",
+        "zai-org/GLM-5.3-Flash",
+        "GLM 5.3 Flash",
+        "fast",
+    ),
+]
+
+# =============================================================================
 # META / LLAMA MODELS
 # =============================================================================
 
@@ -798,6 +841,8 @@ REGISTRY: tuple[ModelEntry, ...] = tuple(
     + _MISTRAL_MODELS
     + _DEEPSEEK_MODELS
     + _GROK_MODELS
+    + _OPENROUTER_MODELS
+    + _HUGGINGFACE_MODELS
     + _META_MODELS
     + _OLLAMA_MODELS
     + _WINDSURF_MODELS

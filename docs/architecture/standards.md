@@ -44,6 +44,8 @@ n'a pas de ligne : il tourne comme son `degrades_to`.
 | `mistral` | bridged | injected |
 | `deepseek` | bridged | injected |
 | `grok` | bridged | injected |
+| `openrouter` | bridged | injected |
+| `huggingface` | bridged | injected |
 | `opencode` | handed : les serveurs approuvés dans `OPENCODE_CONFIG_CONTENT`, plus sa propre config | `agents_md` |
 | `pi` | own : `.pi/mcp.json`, chargé seulement dans un dépôt de confiance | `agents_md` |
 | `gemini-cli` | handed : les serveurs approuvés dans `mcpServers` de `session/new`, plus sa propre config | unverified : Gemini CLI lit `GEMINI.md` par défaut, `AGENTS.md` seulement si `context.fileName` le nomme |

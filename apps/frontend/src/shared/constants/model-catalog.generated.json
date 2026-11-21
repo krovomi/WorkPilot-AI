@@ -347,6 +347,34 @@
 			"supportsThinking": false
 		}
 	],
+	"openrouter": [
+		{
+			"value": "moonshotai/kimi-k3.1-pro",
+			"label": "Kimi K3.1 Pro",
+			"tier": "standard",
+			"supportsThinking": true
+		},
+		{
+			"value": "anthropic/claude-fable-5.2",
+			"label": "Claude Fable 5.2",
+			"tier": "flagship",
+			"supportsThinking": true
+		}
+	],
+	"huggingface": [
+		{
+			"value": "moonshotai/Kimi-K3.1-Pro",
+			"label": "Kimi K3.1 Pro",
+			"tier": "standard",
+			"supportsThinking": false
+		},
+		{
+			"value": "zai-org/GLM-5.3-Flash",
+			"label": "GLM 5.3 Flash",
+			"tier": "fast",
+			"supportsThinking": false
+		}
+	],
 	"meta": [
 		{
 			"value": "llama-3.3-70b",

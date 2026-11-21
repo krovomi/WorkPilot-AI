@@ -4,7 +4,9 @@ import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { HuggingFaceModelDiscovery } from "./HuggingFaceModelDiscovery";
+import { isGatewayProvider } from "../../../shared/constants/gateway-providers";
+import { GatewayModelCatalog } from "./GatewayModelCatalog";
+import { HubDiscoveryWithCloud } from "./HubDiscoveryWithCloud";
 import { OllamaInstalledModels } from "./OllamaInstalledModels";
 import type { ProviderConfig } from "./providerConfig";
 
@@ -80,7 +82,7 @@ export function ApiKeyConfigContent({
 							onFormDataChange({ ...formData, model })
 						}
 					/>
-					<HuggingFaceModelDiscovery
+					<HubDiscoveryWithCloud
 						className="pt-2 border-t border-border"
 						hfToken={formData.apiKey}
 						selectedModel={formData.model}
@@ -90,6 +92,16 @@ export function ApiKeyConfigContent({
 						}
 					/>
 				</>
+			)}
+
+			{/* A gateway: its live catalogue, to pick the default model. */}
+			{isGatewayProvider(providerId) && (
+				<GatewayModelCatalog
+					className="pt-2 border-t border-border"
+					provider={providerId}
+					selectedModel={formData.model}
+					onSelectModel={(model) => onFormDataChange({ ...formData, model })}
+				/>
 			)}
 
 			{testResult && <TestResultAlert testResult={testResult} />}

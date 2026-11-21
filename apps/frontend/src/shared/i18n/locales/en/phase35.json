@@ -148,6 +148,8 @@
 		"tierFor": "{{tier}} tier for a {{task}}",
 		"providerDeepseek": "DeepSeek",
 		"providerGrok": "Grok (xAI)",
+		"providerOpenrouter": "OpenRouter",
+		"providerHuggingface": "Hugging Face",
 		"providerCopilot": "GitHub Copilot",
 		"hintAuto": "Inferred from the prompt",
 		"removeProvider": "Remove {{provider}}",

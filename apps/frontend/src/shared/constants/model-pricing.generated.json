@@ -456,6 +456,26 @@
 				"output": 3.96
 			}
 		},
+		"openrouter": {
+			"moonshotai/kimi-k3.1-pro": {
+				"input": 0.253,
+				"output": 8.8
+			},
+			"anthropic/claude-fable-5.2": {
+				"input": 8.0,
+				"output": 40.0
+			}
+		},
+		"huggingface": {
+			"moonshotai/Kimi-K3.1-Pro": {
+				"input": 0.2403,
+				"output": 8.4023
+			},
+			"zai-org/GLM-5.3-Flash": {
+				"input": 0.0399,
+				"output": 0.0784
+			}
+		},
 		"aws": {
 			"anthropic.claude-fable-5-1": {
 				"input": 10.0,
