@@ -4,7 +4,7 @@ import type {
 	DesignRenderLoop,
 } from "../../../../shared/types/design-to-code";
 import { useDesignToCodeStore } from "../../../stores/design-to-code-store";
-import { ResponsivePanel, SpendLine, StatesPanel } from "./LoopReport";
+import { PassFixLine, ResponsivePanel, SpendLine, StatesPanel } from "./LoopReport";
 
 /** A 0..1 score as a percentage with one decimal. */
 export function percent(score: number | null | undefined): string {
@@ -89,6 +89,9 @@ export function IterationPanel({ loop }: { loop: DesignRenderLoop }) {
 					{t("loop.masked", { zones: loop.masked?.join(", ") })}
 				</div>
 			)}
+			{Boolean(loop.drawn_masks) && (
+				<div className="di-muted text-xs">{t("loop.drawnMasks", { count: loop.drawn_masks })}</div>
+			)}
 
 			<fieldset className="di-loop-strip" aria-label={t("loop.iterationsLabel")}>
 				{loop.iterations.map((it) => (
@@ -148,6 +151,7 @@ export function IterationPanel({ loop }: { loop: DesignRenderLoop }) {
 			)}
 			{loop.responsive && <ResponsivePanel pass={loop.responsive} />}
 			{loop.states && <StatesPanel pass={loop.states} />}
+			{loop.pass_fix && <PassFixLine fix={loop.pass_fix} />}
 		</div>
 	);
 }

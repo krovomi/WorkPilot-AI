@@ -173,18 +173,24 @@ function cachedSprite(
 	return canvas;
 }
 
+/**
+ * A character's sprite. `shirt`, when given, replaces the palette's shirt
+ * colour: the provider family the agent works for (`FAMILY_SHIRTS`).
+ */
 export function getCharacterSprite(
 	characterIndex: number,
 	direction: Direction,
 	frame: number,
+	shirt?: string,
 ): HTMLCanvasElement {
 	return cachedSprite(
-		`char-${characterIndex}-${direction}-${frame}`,
+		`char-${characterIndex}-${direction}-${frame}-${shirt ?? ""}`,
 		SPRITE_W,
 		SPRITE_H,
 		(ctx) => {
-			const palette =
+			const base =
 				CHARACTER_PALETTES[characterIndex % CHARACTER_PALETTES.length];
+			const palette = shirt ? { ...base, shirt } : base;
 			for (const { x, y, color } of getCharacterPixels(
 				palette,
 				direction,

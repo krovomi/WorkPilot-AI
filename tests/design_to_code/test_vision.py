@@ -12,6 +12,8 @@ MODELS = {
     "openai": "",
     "google": "",
     "ollama": "local-vision-model",
+    "lm-studio": "qwen2.5-vl-7b",
+    "llama-cpp": "",
 }
 #: Read from the catalogue rather than named here.
 TEXT_ONLY = next(
@@ -38,6 +40,11 @@ def _route(provider, *, strict=False, models=MODELS, **creds):
         ("copilot", {"openai_key": True}, "openai"),
         ("gemini", {"google_key": True}, "google"),
         ("ollama", {}, "ollama"),
+        ("local", {}, "ollama"),
+        ("lmstudio", {}, "lm-studio"),
+        ("LM-Studio", {}, "lm-studio"),
+        ("llama.cpp", {}, "llama-cpp"),
+        ("llamacpp", {}, "llama-cpp"),
     ],
 )
 def test_each_provider_takes_its_own_route(provider, creds, route) -> None:
@@ -65,6 +72,14 @@ def test_a_route_without_its_credential_is_refused(provider) -> None:
 def test_strict_offline_mode_keeps_the_pictures_on_the_machine() -> None:
     decided = _route("anthropic", strict=True, anthropic_key=True)
     assert decided.route == "ollama"
+
+
+@pytest.mark.parametrize(
+    ("provider", "route"), [("lm-studio", "lm-studio"), ("llama-cpp", "llama-cpp")]
+)
+def test_strict_offline_mode_keeps_the_local_runtime_chosen(provider, route) -> None:
+    decided = _route(provider, strict=True)
+    assert (decided.route, decided.refusal) == (route, None)
 
 
 def test_a_text_only_model_is_refused_with_its_name() -> None:

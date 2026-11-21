@@ -10,6 +10,10 @@ import type {
 	SubtaskState as SwarmSubtaskState,
 } from "../../shared/types/swarm";
 import type { ExecutionPhase, Task } from "../../shared/types/task";
+import {
+	type ProviderFamily,
+	taskProviderFamily,
+} from "../lib/pixel-office-providers";
 import { getDisplayProgress } from "../lib/utils";
 import type { Terminal } from "./terminal-store";
 
@@ -37,6 +41,8 @@ export interface PixelAgent {
 	activity: AgentActivity; // Current visual activity
 	seatIndex: number; // Which desk the agent sits at (NO_SEAT when queued)
 	isClaudeMode: boolean; // Whether in Claude mode (terminals) / always true for tasks
+	/** The provider family running it (its shirt colour); none when unknown. */
+	providerFamily?: ProviderFamily;
 	// Task-specific fields
 	taskId?: string; // Kanban task ID (for type === 'task')
 	phase?: ExecutionPhase; // Current execution phase
@@ -58,6 +64,10 @@ export interface PixelOfficeSettings {
 	autoAssignSeats: boolean;
 	/** Calm mode: the characters and the queue hold still (TV mode's switch). */
 	calmMode: boolean;
+	/** Mini-scenes when a task changes hands (written from templates). */
+	narratives: boolean;
+	/** Have the page's model write the scenes (sends the task's title to it). */
+	narrativesAi: boolean;
 }
 
 /**
@@ -270,6 +280,11 @@ function shortTitle(title: string): string {
 	return title.length > 40 ? `${title.slice(0, 39)}…` : title;
 }
 
+/** A terminal in Claude mode runs Claude Code; any other names no provider. */
+function terminalFamily(terminal: Terminal): ProviderFamily | undefined {
+	return terminal.isClaudeMode ? "anthropic" : undefined;
+}
+
 function buildTerminalAgent(
 	terminal: Terminal,
 	existing: PixelAgent | undefined,
@@ -285,6 +300,7 @@ function buildTerminalAgent(
 			fullName: terminal.title,
 			activity,
 			isClaudeMode: terminal.isClaudeMode,
+			providerFamily: terminalFamily(terminal),
 		};
 	}
 	return {
@@ -296,6 +312,7 @@ function buildTerminalAgent(
 		activity,
 		seatIndex: NO_SEAT,
 		isClaudeMode: terminal.isClaudeMode,
+		providerFamily: terminalFamily(terminal),
 	};
 }
 
@@ -340,6 +357,7 @@ function buildTaskAgent(
 			activity,
 			...progress,
 			isClaudeMode: !isPending,
+			providerFamily: taskProviderFamily(task),
 			taskId: task.id,
 		};
 	}
@@ -352,6 +370,7 @@ function buildTaskAgent(
 		activity,
 		seatIndex: NO_SEAT,
 		isClaudeMode: !isPending,
+		providerFamily: taskProviderFamily(task),
 		taskId: task.id,
 		taskName: task.title,
 		...progress,
@@ -392,6 +411,8 @@ const DEFAULT_SETTINGS: PixelOfficeSettings = {
 	soundEnabled: false,
 	autoAssignSeats: true,
 	calmMode: false,
+	narratives: true,
+	narrativesAi: false,
 };
 
 export const usePixelOfficeStore = create<PixelOfficeState>()(
@@ -504,14 +525,20 @@ export const usePixelOfficeStore = create<PixelOfficeState>()(
 			// them would restore a room full of characters whose terminals are long
 			// gone. Only the view preferences survive a restart.
 			partialize: (state) => ({ settings: state.settings }),
-			merge: (persisted, current) => ({
-				...current,
-				settings: {
-					...DEFAULT_SETTINGS,
-					...((persisted as { settings?: Partial<PixelOfficeSettings> } | null)
-						?.settings ?? {}),
-				},
-			}),
+			merge: (persisted, current) => {
+				const saved =
+					(persisted as { settings?: Partial<PixelOfficeSettings> } | null)
+						?.settings ?? {};
+				return {
+					...current,
+					settings: {
+						...DEFAULT_SETTINGS,
+						...saved,
+						// Sending titles to a model is opt-in: only a saved `true` turns it on.
+						narrativesAi: saved.narrativesAi === true,
+					},
+				};
+			},
 		},
 	),
 );

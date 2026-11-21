@@ -30,6 +30,7 @@ vi.mock("../generated-review/review-run", () => ({
 	openReviewRun: () => Promise.reject(new Error("no review run in this test")),
 }));
 
+import { RENDER_LOOP_MAX_MASKS } from "../../shared/constants/design-render-loop";
 import { renderLoopArgs } from "../design-render-loop-args";
 import { DesignToCodeService } from "../design-to-code-service";
 
@@ -124,5 +125,32 @@ describe("renderLoopArgs", () => {
 			"--loop-threshold",
 			"0.5",
 		]);
+	});
+
+	it("passes the fix only on a strict true and each drawn zone inside the design", () => {
+		expect(renderLoopArgs({ fixPasses: "true", masks: "0,0,1,1" })).toEqual([]);
+		expect(
+			renderLoopArgs({
+				fixPasses: true,
+				masks: [
+					{ x: 0, y: 0.5, w: 1, h: 0.25 },
+					null,
+					"0,0,1,1",
+					{ x: 0.5, y: 0, w: 0.6, h: 0.5 },
+					{ x: 0, y: 0, w: 0, h: 0.5 },
+					{ x: 0, y: 0, w: 0.5, h: -0.1 },
+					{ x: 0, y: 0.9, w: 0.5, h: 0.2 },
+					{ x: Number.NaN, y: 0, w: 0.5, h: 0.5 },
+					{ x: "0", y: 0, w: 0.5, h: 0.5 },
+					{ x: 0.1, y: 0.2, w: 0.3, h: 0.4 },
+				],
+			}),
+		).toEqual(["--loop-fix-passes", "--loop-mask", "0,0.5,1,0.25", "--loop-mask", "0.1,0.2,0.3,0.4"]);
+	});
+
+	it("passes at most the runner's number of zones", () => {
+		const masks = Array.from({ length: RENDER_LOOP_MAX_MASKS + 3 }, () => ({ x: 0, y: 0, w: 0.5, h: 0.5 }));
+		const args = renderLoopArgs({ masks });
+		expect(args.filter((arg) => arg === "--loop-mask")).toHaveLength(RENDER_LOOP_MAX_MASKS);
 	});
 });
