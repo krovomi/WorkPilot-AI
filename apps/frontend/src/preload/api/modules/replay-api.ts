@@ -8,12 +8,17 @@
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import type {
 	ReplayBookmark,
+	ReplayBookmarkReply,
+	ReplayBookmarkReplyRequest,
 	ReplayBookmarkRequest,
 	ReplayExportOptions,
 	ReplayFileResult,
 	ReplayImportResult,
 	ReplaySummary,
 	ReplaySummaryRequest,
+	ReplayTeamShareListResult,
+	ReplayTeamShareRequest,
+	ReplayTeamShareResult,
 	ReplayVideoOptions,
 	ReplayVideoResult,
 } from "../../../shared/types/replay-share";
@@ -63,9 +68,26 @@ export interface ReplayAPI {
 		sessionId: string,
 		bookmarkId: string,
 	) => Promise<ReplayResult<object>>;
+	/** Answer a bookmark's note; the reply travels with the session. */
+	addReplayBookmarkReply: (
+		sessionId: string,
+		bookmarkId: string,
+		reply: ReplayBookmarkReplyRequest,
+	) => Promise<ReplayResult<{ reply: ReplayBookmarkReply }>>;
+	removeReplayBookmarkReply: (
+		sessionId: string,
+		bookmarkId: string,
+		replyId: string,
+	) => Promise<ReplayResult<object>>;
 	/** The masked page played step by step, as a WebM the person saves. */
 	exportReplayVideo: (
 		sessionId: string,
+		options: ReplayVideoOptions,
+	) => Promise<ReplayVideoResult>;
+	/** Two sessions side by side, their steps played at once. */
+	exportReplayComparisonVideo: (
+		sessionAId: string,
+		sessionBId: string,
 		options: ReplayVideoOptions,
 	) => Promise<ReplayVideoResult>;
 	/** A model's summary of the steps, for a session with no thinking trace. */
@@ -73,6 +95,18 @@ export interface ReplayAPI {
 		sessionId: string,
 		request: ReplaySummaryRequest,
 	) => Promise<ReplayResult<{ summary: ReplaySummary }>>;
+	/** Leave the masked session with a server project; answers its link. */
+	shareReplayToTeam: (
+		sessionId: string,
+		request: ReplayTeamShareRequest,
+	) => Promise<ReplayTeamShareResult>;
+	listReplayTeamShares: (projectId: string) => Promise<ReplayTeamShareListResult>;
+	revokeReplayTeamShare: (
+		projectId: string,
+		shareId: string,
+	) => Promise<ReplayResult<object>>;
+	/** A pasted team link, opened from this server and imported here. */
+	openReplayTeamShare: (link: string) => Promise<ReplayImportResult>;
 }
 
 export const createReplayAPI = (): ReplayAPI => ({
@@ -98,8 +132,21 @@ export const createReplayAPI = (): ReplayAPI => ({
 		invokeIpc(IPC_CHANNELS.REPLAY_ADD_BOOKMARK, sessionId, bookmark),
 	removeReplayBookmark: (sessionId, bookmarkId) =>
 		invokeIpc(IPC_CHANNELS.REPLAY_REMOVE_BOOKMARK, sessionId, bookmarkId),
+	addReplayBookmarkReply: (sessionId, bookmarkId, reply) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_ADD_BOOKMARK_REPLY, sessionId, bookmarkId, reply),
+	removeReplayBookmarkReply: (sessionId, bookmarkId, replyId) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_REMOVE_BOOKMARK_REPLY, sessionId, bookmarkId, replyId),
 	exportReplayVideo: (sessionId, options) =>
 		invokeIpc(IPC_CHANNELS.REPLAY_EXPORT_VIDEO, sessionId, options),
+	exportReplayComparisonVideo: (sessionAId, sessionBId, options) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_EXPORT_COMPARISON_VIDEO, sessionAId, sessionBId, options),
 	summarizeReplaySession: (sessionId, request) =>
 		invokeIpc(IPC_CHANNELS.REPLAY_SUMMARIZE_SESSION, sessionId, request),
+	shareReplayToTeam: (sessionId, request) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_SHARE_TO_TEAM, sessionId, request),
+	listReplayTeamShares: (projectId) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_LIST_TEAM_SHARES, projectId),
+	revokeReplayTeamShare: (projectId, shareId) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_REVOKE_TEAM_SHARE, projectId, shareId),
+	openReplayTeamShare: (link) => invokeIpc(IPC_CHANNELS.REPLAY_OPEN_TEAM_SHARE, link),
 });

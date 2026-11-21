@@ -161,6 +161,7 @@ import { registerTimeTravelHandlers } from "./time-travel-handlers";
 import { registerLocalBackendHandlers } from "./local-backend-handlers";
 import { registerReplayHandlers } from "./replay-handlers";
 import { registerReplayShareHandlers } from "./replay-share-handlers";
+import { registerReplayTeamShareHandlers } from "./replay-team-share-handlers";
 import { registerReplayVideoHandlers } from "./replay-video-handlers";
 import {
 	registerVisualProgrammingHandlers,
@@ -280,6 +281,7 @@ export { setupTestGenerationHandlers } from "./test-generation-handlers";
 export { registerTimeTravelHandlers } from "./time-travel-handlers";
 export { registerReplayHandlers } from "./replay-handlers";
 export { registerReplayShareHandlers } from "./replay-share-handlers";
+export { registerReplayTeamShareHandlers } from "./replay-team-share-handlers";
 export { registerReplayVideoHandlers } from "./replay-video-handlers";
 export {
 	registerVisualProgrammingHandlers,
@@ -574,6 +576,7 @@ export function setupIpcHandlers(
 	registerReplayHandlers();
 	registerReplayShareHandlers();
 	registerReplayVideoHandlers();
+	registerReplayTeamShareHandlers();
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);

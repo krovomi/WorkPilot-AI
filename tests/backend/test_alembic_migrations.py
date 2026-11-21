@@ -99,3 +99,28 @@ def test_the_approval_tables_come_and_go_with_their_revision(alembic_config):
     assert not approvals & _tables(db)
     command.upgrade(config, "head")
     assert approvals <= _tables(db)
+
+
+def test_the_replay_shares_table_comes_and_goes_with_its_revision(alembic_config):
+    config, db = alembic_config
+    command.upgrade(config, "head")
+    assert "replay_shares" in _tables(db)
+    command.downgrade(config, "0016_spec_approvals")
+    assert "replay_shares" not in _tables(db)
+    command.upgrade(config, "head")
+    assert "replay_shares" in _tables(db)
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        indexes = {i["name"] for i in sa.inspect(engine).get_indexes("replay_shares")}
+    finally:
+        engine.dispose()
+    assert "ix_replay_shares_project" in indexes
+    # A table already gone (dropped by hand) does not stop the downgrade.
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(sa.text("DROP TABLE replay_shares"))
+    finally:
+        engine.dispose()
+    command.downgrade(config, "0016_spec_approvals")
+    assert "replay_shares" not in _tables(db)

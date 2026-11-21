@@ -1,6 +1,7 @@
 /**
- * Sharing a recorded agent session (#347), lot 2: a video of the replay and a
- * model's summary of its steps.
+ * Sharing a recorded agent session (#347), lot 2: a video of the replay (WebM,
+ * or MP4 encoded again by the backend's ffmpeg), a video of two sessions side
+ * by side, and a model's summary of its steps.
  *
  * The local backend records the video (the masked page, played step by step
  * in a headless browser, `apps/backend/replay/video.py`) and asks the model
@@ -30,14 +31,28 @@ import { isReplayId } from "./replay-handlers";
 export const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
 /** The backend's deadline (`DEADLINE_SECONDS`), and time to send the file. */
 const VIDEO_TIMEOUT_MS = 240_000;
+/** The backend gives ffmpeg 120 s for an MP4 (`replay/mp4.py`). */
+const MP4_TIMEOUT_MS = 120_000;
 /** The backend gives the model 120 s. */
 const SUMMARY_TIMEOUT_MS = 150_000;
 const EXTENSION = ".webm";
 const WEBM_MAGIC = Buffer.from([0x1a, 0x45, 0xdf, 0xa3]);
+/** An MP4 starts with the size of its first box, then `ftyp`. */
+const MP4_BOX = Buffer.from("ftyp");
+const FORMATS = {
+	webm: { extension: ".webm", filter: { name: "WebM", extensions: ["webm"] } },
+	mp4: { extension: ".mp4", filter: { name: "MP4", extensions: ["mp4"] } },
+} as const;
+type VideoFormat = keyof typeof FORMATS;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 /** A provider name as the backend's clients know it (`SummarizeRequest`). */
 const PROVIDER = /^[a-z0-9][a-z0-9_.-]{0,39}$/;
-const REFUSALS = new Set<ReplayVideoRefusal>(["no_playwright", "no_browser", "no_encoder"]);
+const REFUSALS = new Set<ReplayVideoRefusal>([
+	"no_playwright",
+	"no_browser",
+	"no_encoder",
+	"no_mp4_encoder",
+]);
 
 const invalid = (what: string) => ({
 	success: false as const,
@@ -60,6 +75,7 @@ export interface VideoBody {
 	strip_reasoning: boolean;
 	strip_tokens: boolean;
 	language: "en" | "fr";
+	format: VideoFormat;
 }
 
 /** The video the renderer asks for, or null when malformed. */
@@ -69,10 +85,13 @@ export function videoBody(raw: unknown): VideoBody | null {
 	const reasoning = flag(source.stripReasoning);
 	const tokens = flag(source.stripTokens);
 	if (reasoning === null || tokens === null) return null;
+	const format = source.format ?? "webm";
+	if (format !== "webm" && format !== "mp4") return null;
 	return {
 		strip_reasoning: reasoning,
 		strip_tokens: tokens,
 		language: language(source.language),
+		format,
 	};
 }
 
@@ -88,25 +107,33 @@ export function summaryBody(
 	return { provider: source.provider, language: language(source.language) };
 }
 
-/** The bytes the backend recorded, only when they are a WebM within the bound. */
-export function exportedVideo(raw: unknown): Buffer | null {
+/** The bytes the backend recorded, only when they are a video of `format` within the bound. */
+export function exportedVideo(raw: unknown, format: VideoFormat = "webm"): Buffer | null {
 	if (typeof raw !== "string" || !BASE64.test(raw)) return null;
 	if (raw.length > Math.ceil(MAX_VIDEO_BYTES / 3) * 4) return null;
 	const bytes = Buffer.from(raw, "base64");
 	if (bytes.length > MAX_VIDEO_BYTES) return null;
-	return bytes.subarray(0, WEBM_MAGIC.length).equals(WEBM_MAGIC) ? bytes : null;
+	const valid =
+		format === "mp4"
+			? bytes.subarray(4, 8).equals(MP4_BOX)
+			: bytes.subarray(0, WEBM_MAGIC.length).equals(WEBM_MAGIC);
+	return valid ? bytes : null;
 }
 
 /**
  * The file to write for the path the dialog gave: its folder resolved (links
- * included) and checked to be a folder, its name ending in `.webm`, and no
- * link or folder already in its place. Null when it is not one to write.
+ * included) and checked to be a folder, its name ending in `extension`
+ * (`.webm` or `.mp4`), and no link or folder already in its place. Null when
+ * it is not one to write.
  */
-export async function saveTarget(chosen: string): Promise<string | null> {
+export async function saveTarget(
+	chosen: string,
+	extension: string = EXTENSION,
+): Promise<string | null> {
 	if (!chosen || chosen.includes("\0")) return null;
 	let name = path.basename(chosen);
 	if (!name || name === "." || name === "..") return null;
-	if (path.extname(name).toLowerCase() !== EXTENSION) name += EXTENSION;
+	if (path.extname(name).toLowerCase() !== extension) name += extension;
 	try {
 		const folder = await realpath(path.dirname(path.resolve(chosen)));
 		if (!(await stat(folder)).isDirectory()) return null;
@@ -154,17 +181,15 @@ interface VideoAnswer {
 const count = (value: unknown): number =>
 	Number.isInteger(value) && (value as number) >= 0 ? (value as number) : 0;
 
-async function exportVideo(
-	sessionId: unknown,
-	options: unknown,
+/** Ask the backend to record at `route`, then save what it made where the person says. */
+async function recordAndSave(
+	route: string,
+	body: VideoBody & { session_a_id?: string; session_b_id?: string },
 ): Promise<ReplayVideoResult> {
-	if (!isReplayId(sessionId)) return invalid("session id");
-	const body = videoBody(options);
-	if (!body) return invalid("video options");
 	const built = await backendFetch<VideoAnswer>(
-		`/replay/sessions/${sessionId}/video`,
+		route,
 		json(body),
-		VIDEO_TIMEOUT_MS,
+		body.format === "mp4" ? VIDEO_TIMEOUT_MS + MP4_TIMEOUT_MS : VIDEO_TIMEOUT_MS,
 	);
 	if (!built.success) return built;
 	if (built.available === false) {
@@ -173,14 +198,15 @@ async function exportVideo(
 			? { success: true, refused: refusal }
 			: { success: false, error: "bad_export" };
 	}
-	const content = exportedVideo(built.content_base64);
+	const content = exportedVideo(built.content_base64, body.format);
 	if (!content) return { success: false, error: "bad_export" };
+	const { extension, filter } = FORMATS[body.format];
 	const { canceled, filePath } = await showSaveDialog({
-		defaultPath: path.basename(String(built.file_name ?? `replay${EXTENSION}`)),
-		filters: [{ name: "WebM", extensions: ["webm"] }],
+		defaultPath: path.basename(String(built.file_name ?? `replay${extension}`)),
+		filters: [{ name: filter.name, extensions: [...filter.extensions] }],
 	});
 	if (canceled || !filePath) return { success: true, canceled: true };
-	const target = await saveTarget(filePath);
+	const target = await saveTarget(filePath, extension);
 	if (!target || !(await writeVideo(target, content))) {
 		return { success: false, error: "bad_target" };
 	}
@@ -192,10 +218,42 @@ async function exportVideo(
 	};
 }
 
+async function exportVideo(
+	sessionId: unknown,
+	options: unknown,
+): Promise<ReplayVideoResult> {
+	if (!isReplayId(sessionId)) return invalid("session id");
+	const body = videoBody(options);
+	if (!body) return invalid("video options");
+	return recordAndSave(`/replay/sessions/${sessionId}/video`, body);
+}
+
+/** Two sessions side by side, their steps played at once. */
+async function exportComparisonVideo(
+	sessionAId: unknown,
+	sessionBId: unknown,
+	options: unknown,
+): Promise<ReplayVideoResult> {
+	if (!isReplayId(sessionAId) || !isReplayId(sessionBId)) return invalid("session id");
+	const body = videoBody(options);
+	if (!body) return invalid("video options");
+	return recordAndSave("/replay/compare/video", {
+		...body,
+		session_a_id: sessionAId,
+		session_b_id: sessionBId,
+	});
+}
+
 export function registerReplayVideoHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.REPLAY_EXPORT_VIDEO,
 		(_e, sessionId: unknown, options: unknown) => exportVideo(sessionId, options),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.REPLAY_EXPORT_COMPARISON_VIDEO,
+		(_e, sessionAId: unknown, sessionBId: unknown, options: unknown) =>
+			exportComparisonVideo(sessionAId, sessionBId, options),
 	);
 
 	ipcMain.handle(

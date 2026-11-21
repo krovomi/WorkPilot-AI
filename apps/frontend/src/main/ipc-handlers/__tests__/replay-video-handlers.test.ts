@@ -89,11 +89,13 @@ describe("videoBody", () => {
 			strip_reasoning: false,
 			strip_tokens: true,
 			language: "fr",
+			format: "webm",
 		});
 		expect(videoBody({ stripReasoning: true, language: "de" })).toEqual({
 			strip_reasoning: true,
 			strip_tokens: false,
 			language: "en",
+			format: "webm",
 		});
 	});
 
@@ -224,6 +226,7 @@ describe("REPLAY_EXPORT_VIDEO", () => {
 			strip_reasoning: true,
 			strip_tokens: false,
 			language: "fr",
+			format: "webm",
 		});
 		expect(dialogs.save.mock.calls[0][0].defaultPath).toBe("replay-coder.webm");
 		expect(result).toMatchObject({ success: true, stepsPlayed: 3, stepsTotal: 5 });
