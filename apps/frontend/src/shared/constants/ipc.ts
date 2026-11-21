@@ -1190,6 +1190,9 @@ export const IPC_CHANNELS = {
 	// "How you compare": a project's specs against its past and the person's
 	// other projects, read from their folders (main/build-compare.ts)
 	DASHBOARD_COMPARE: "dashboard:compare",
+	// Its team report, worded by the renderer, printed to a PDF the person
+	// saves (main/build-compare-report.ts)
+	DASHBOARD_COMPARE_EXPORT: "dashboard:compareExport",
 	DASHBOARD_GET_SNAPSHOT: "dashboard:getSnapshot",
 	DESIGN_TO_CODE_DETECT_STACK: "designToCode:detectStack",
 	DESIGN_TO_CODE_PROGRESS: "designToCode:progress",
