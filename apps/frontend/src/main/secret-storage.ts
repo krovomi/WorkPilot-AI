@@ -151,6 +151,14 @@ async function decryptAhead(ciphertext: string): Promise<void> {
 export async function initSecretStorage(
 	files: readonly string[] = [],
 ): Promise<void> {
+	if (selectedBackend() === "basic_text") {
+		// No keyring to use (secrets stay in clear, with the banner), but the
+		// async API still asks the Secret Service, and a locked one opens an
+		// unlock prompt (blank under WSLg) for nothing: do not ask at all.
+		asyncEncryptionAvailable = false;
+		publish();
+		return;
+	}
 	try {
 		const answer = await bounded(safeStorage.isAsyncEncryptionAvailable());
 		if (answer !== TIMED_OUT) asyncEncryptionAvailable = answer;
