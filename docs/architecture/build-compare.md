@@ -76,8 +76,9 @@ d'espace de travail) :
 - les pairs sont les projets de **la même organisation** (100 au plus) pour lesquels
   `load_project_scope` réussit pour la personne : rien qu'elle ne pourrait déjà lire ;
 - la réponse ne contient que des médianes et des nombres de projets, **jamais un nom ni un id** ;
-  une médiane de groupe n'est donnée qu'à partir de **5 projets** (`MIN_GROUP`), en dessous seul le
-  nombre l'est, pour qu'aucune médiane ne désigne un projet ;
+  une médiane de groupe n'est donnée qu'à partir de **5 projets** (`MIN_GROUP`), et chaque
+  indicateur seulement si autant de projets l'ont ; en dessous seul le nombre l'est, pour
+  qu'aucune médiane ne désigne un projet ;
 - le main revérifie la réponse (`build-compare-shape.ts`) et vide la liste de projets quoi que le
   serveur envoie ; un type de travail n'est gardé que s'il est un identifiant court (il nomme une
   clé de traduction), semaines et types sont bornés.
