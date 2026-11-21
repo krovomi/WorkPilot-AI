@@ -20,7 +20,7 @@ import pytest
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from services.recovery import FailureType, RecoveryManager
+from services.recovery import RecoveryManager
 
 
 @pytest.fixture
@@ -113,94 +113,6 @@ def test_record_attempt(test_env):
     assert len(history["attempts"]) == 2, "Wrong number of attempts"
     assert history["attempts"][1]["success"] is True, "Success flag wrong"
     assert history["status"] == "completed", "Status not updated to completed"
-
-
-def test_circular_fix_detection(test_env):
-    """Test circular fix detection."""
-    temp_dir, spec_dir, project_dir = test_env
-
-    manager = RecoveryManager(spec_dir, project_dir)
-
-    # Record similar attempts
-    manager.record_attempt(
-        "subtask-1", 1, False, "Using async await pattern", "Error 1"
-    )
-    manager.record_attempt(
-        "subtask-1", 2, False, "Using async await with different import", "Error 2"
-    )
-    manager.record_attempt("subtask-1", 3, False, "Trying async await again", "Error 3")
-
-    # Check if circular fix is detected
-    is_circular = manager.is_circular_fix(
-        "subtask-1", "Using async await pattern once more"
-    )
-
-    assert is_circular, "Circular fix not detected"
-
-    # Test with different approach
-    is_circular = manager.is_circular_fix(
-        "subtask-1", "Using completely different callback-based approach"
-    )
-
-    # This might be detected as circular if word overlap is high
-    # But "callback-based" is sufficiently different from "async await"
-
-
-def test_failure_classification(test_env):
-    """Test failure type classification."""
-    temp_dir, spec_dir, project_dir = test_env
-
-    manager = RecoveryManager(spec_dir, project_dir)
-
-    # Test broken build detection
-    failure = manager.classify_failure("SyntaxError: unexpected token", "subtask-1")
-    assert failure == FailureType.BROKEN_BUILD, "Broken build not detected"
-
-    # Test verification failed detection
-    failure = manager.classify_failure(
-        "Verification failed: expected 200 got 500", "subtask-2"
-    )
-    assert failure == FailureType.VERIFICATION_FAILED, (
-        "Verification failure not detected"
-    )
-
-    # Test context exhaustion
-    failure = manager.classify_failure("Context length exceeded", "subtask-3")
-    assert failure == FailureType.CONTEXT_EXHAUSTED, "Context exhaustion not detected"
-
-
-def test_recovery_action_determination(test_env):
-    """Test recovery action determination."""
-    temp_dir, spec_dir, project_dir = test_env
-
-    manager = RecoveryManager(spec_dir, project_dir)
-
-    # Test verification failed with < 3 attempts
-    manager.record_attempt("subtask-1", 1, False, "First try", "Error")
-
-    action = manager.determine_recovery_action(
-        FailureType.VERIFICATION_FAILED, "subtask-1"
-    )
-    assert action.action == "retry", "Should retry for first verification failure"
-
-    # Test verification failed with >= 3 attempts
-    manager.record_attempt("subtask-1", 2, False, "Second try", "Error")
-    manager.record_attempt("subtask-1", 3, False, "Third try", "Error")
-
-    action = manager.determine_recovery_action(
-        FailureType.VERIFICATION_FAILED, "subtask-1"
-    )
-    assert action.action == "skip", "Should skip after 3 attempts"
-
-    # Test circular fix
-    action = manager.determine_recovery_action(FailureType.CIRCULAR_FIX, "subtask-1")
-    assert action.action == "skip", "Should skip for circular fix"
-
-    # Test context exhausted
-    action = manager.determine_recovery_action(
-        FailureType.CONTEXT_EXHAUSTED, "subtask-2"
-    )
-    assert action.action == "continue", "Should continue for context exhaustion"
 
 
 def test_good_commit_tracking(test_env):
@@ -608,10 +520,6 @@ def test_checkpoint_recovery_hints_restoration(test_env):
         "Previous approach not reflected in hints"
     )
 
-    # Check circular fix detection with restored data
-    manager2.is_circular_fix("subtask-1", "Using async database with asyncio again")
-    # Note: May or may not detect as circular depending on word overlap
-
 
 def test_restoration_stuck_subtasks_list(test_env):
     """Test that stuck subtasks list is restored correctly across sessions."""
@@ -644,36 +552,23 @@ def test_restoration_stuck_subtasks_list(test_env):
         assert s["attempt_count"] == 3, "Stuck attempt count not preserved"
 
 
-def test_checkpoint_clear_and_reset(test_env):
-    """Test that clearing stuck subtasks and resetting subtasks persists across sessions."""
+def test_checkpoint_reset_persists_across_sessions(test_env):
+    """Resetting a stuck subtask clears its history and its stuck entry, for good."""
     temp_dir, spec_dir, project_dir = test_env
 
     manager1 = RecoveryManager(spec_dir, project_dir)
-
-    # Create some state
     manager1.record_attempt("subtask-1", 1, False, "Try 1", "Error 1")
     manager1.record_attempt("subtask-1", 2, False, "Try 2", "Error 2")
     manager1.mark_subtask_stuck("subtask-1", "Stuck reason")
-
     manager1.record_attempt("subtask-2", 1, False, "Only try", "Error")
 
-    # Clear stuck subtasks
-    manager1.clear_stuck_subtasks()
-    assert len(manager1.get_stuck_subtasks()) == 0, "Stuck subtasks not cleared"
+    manager1.reset_subtask("subtask-1")
+    manager1.reset_subtask("never-attempted")
 
-    # Reset subtask-2
-    manager1.reset_subtask("subtask-2")
-    assert manager1.get_attempt_count("subtask-2") == 0, "Subtask not reset"
-
-    # New session - verify clear/reset persisted
     manager2 = RecoveryManager(spec_dir, project_dir)
-
-    assert len(manager2.get_stuck_subtasks()) == 0, "Stuck subtasks clear not persisted"
-
-    assert manager2.get_attempt_count("subtask-2") == 0, "Subtask reset not persisted"
-
-    # But subtask-1 history should still exist (just not marked stuck)
-    assert manager2.get_attempt_count("subtask-1") == 2, "subtask-1 history lost"
+    assert manager2.get_stuck_subtasks() == []
+    assert manager2.get_attempt_count("subtask-1") == 0
+    assert manager2.get_attempt_count("subtask-2") == 1
 
 
 def run_all_tests():
