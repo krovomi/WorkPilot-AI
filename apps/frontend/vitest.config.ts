@@ -43,7 +43,7 @@ export default defineConfig({
 			// floor when the suite grows, never lower it to merge.
 			thresholds: {
 				statements: 73.3,
-				lines: 73.6,
+				lines: 73.7,
 				functions: 71.4,
 				branches: 68,
 			},
