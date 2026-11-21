@@ -1617,6 +1617,7 @@
 		"loadFailed": "Could not load the issues",
 		"loadMoreFailed": "Could not load more issues",
 		"importFailed": "Could not create tasks from the issues",
+		"createCardFailed": "Failed to create the card",
 		"unknownError": "Unknown error",
 		"selectIssue": "Select an issue to view details",
 		"filterLabel": "Show issues",

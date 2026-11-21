@@ -1,3 +1,4 @@
+import i18n from "i18next";
 import { create } from "zustand";
 import { useProjectStore } from "./project-store";
 import { loadTasks } from "./task-store";
@@ -84,6 +85,14 @@ export const useGitLabStore = create<GitLabState>((set, get) => ({
 	},
 }));
 
+/**
+ * An answer counts only while its project is still the one on screen: a person
+ * who left the project before the answer arrived would otherwise see the issues
+ * or the connection of the project they left in the one they are looking at.
+ */
+const isShownProject = (projectId: string) =>
+	useProjectStore.getState().selectedProjectId === projectId;
+
 // Action functions for use outside of React components
 export async function loadGitLabIssues(
 	projectId: string,
@@ -101,16 +110,20 @@ export async function loadGitLabIssues(
 
 	try {
 		const result = await window.electronAPI.getGitLabIssues(projectId, state);
+		if (!isShownProject(projectId)) return;
 		if (result.success && result.data) {
 			store.setIssues(result.data);
 		} else {
-			store.setError(result.error || "Failed to load GitLab issues");
+			store.setError(result.error || i18n.t("gitlab:errors.loadIssues"));
 		}
 	} catch (error) {
-		store.setError(error instanceof Error ? error.message : "Unknown error");
-	} finally {
-		store.setLoading(false);
+		if (!isShownProject(projectId)) return;
+		store.setError(
+			error instanceof Error ? error.message : i18n.t("gitlab:errors.unknown"),
+		);
 	}
+	// A stale answer leaves the loading flag to the load of the project shown.
+	store.setLoading(false);
 }
 
 export async function checkGitLabConnection(
@@ -120,15 +133,18 @@ export async function checkGitLabConnection(
 
 	try {
 		const result = await window.electronAPI.checkGitLabConnection(projectId);
+		if (!isShownProject(projectId)) return null;
 		if (result.success && result.data) {
 			store.setSyncStatus(result.data);
 			return result.data;
-		} else {
-			store.setError(result.error || "Failed to check GitLab connection");
-			return null;
 		}
+		store.setError(result.error || i18n.t("gitlab:errors.checkConnection"));
+		return null;
 	} catch (error) {
-		store.setError(error instanceof Error ? error.message : "Unknown error");
+		if (!isShownProject(projectId)) return null;
+		store.setError(
+			error instanceof Error ? error.message : i18n.t("gitlab:errors.unknown"),
+		);
 		return null;
 	}
 }
@@ -143,7 +159,7 @@ export function investigateGitLabIssue(
 		phase: "fetching",
 		issueIid,
 		progress: 0,
-		message: "Starting investigation...",
+		message: i18n.t("gitlab:investigation.phases.fetching"),
 	});
 	store.setInvestigationResult(null);
 
@@ -161,18 +177,16 @@ export function investigateGitLabIssue(
  * Only the project on screen is followed, read when the event arrives.
  */
 export function setupGitLabInvestigationListeners(): () => void {
-	const isShown = (projectId: string) =>
-		useProjectStore.getState().selectedProjectId === projectId;
 	const store = () => useGitLabStore.getState();
 
 	const cleanupProgress = window.electronAPI.onGitLabInvestigationProgress(
 		(projectId, status) => {
-			if (isShown(projectId)) store().setInvestigationStatus(status);
+			if (isShownProject(projectId)) store().setInvestigationStatus(status);
 		},
 	);
 	const cleanupComplete = window.electronAPI.onGitLabInvestigationComplete(
 		(projectId, result) => {
-			if (!isShown(projectId)) return;
+			if (!isShownProject(projectId)) return;
 			store().setInvestigationResult(result);
 			// The new task appears on the Kanban board.
 			if (result.success && result.taskId) loadTasks(projectId);
@@ -180,12 +194,13 @@ export function setupGitLabInvestigationListeners(): () => void {
 	);
 	const cleanupError = window.electronAPI.onGitLabInvestigationError(
 		(projectId, error) => {
-			if (!isShown(projectId)) return;
+			if (!isShownProject(projectId)) return;
 			store().setError(error);
 			store().setInvestigationStatus({
 				phase: "error",
 				progress: 0,
 				message: error,
+				error,
 			});
 		},
 	);

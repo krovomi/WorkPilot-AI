@@ -1617,6 +1617,7 @@
 		"loadFailed": "Impossible de charger les issues",
 		"loadMoreFailed": "Impossible de charger plus d'issues",
 		"importFailed": "Impossible de créer les tâches depuis les issues",
+		"createCardFailed": "Impossible de créer la carte",
 		"unknownError": "Erreur inconnue",
 		"selectIssue": "Choisissez une issue pour voir son détail",
 		"filterLabel": "Issues affichées",
