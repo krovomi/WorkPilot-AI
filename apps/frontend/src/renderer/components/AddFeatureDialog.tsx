@@ -6,26 +6,18 @@
  * Follows the same dialog pattern as TaskEditDialog for consistency.
  *
  * Features:
- * - Form validation (title and description required)
+ * - Add is enabled once the title, the description and a phase are set
  * - Selectable classification fields (priority, phase, complexity, impact)
- * - Adds feature to roadmap store and persists to file
- *
- * @example
- * ```tsx
- * <AddFeatureDialog
- *   phases={roadmap.phases}
- *   open={isAddDialogOpen}
- *   onOpenChange={setIsAddDialogOpen}
- *   onFeatureAdded={(featureId) => console.log('Feature added:', featureId)}
- * />
- * ```
+ * - Adds the feature to the roadmap store and saves the roadmap; a failed
+ *   save takes the feature back out and says why
  */
 
 import { Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ROADMAP_PRIORITY_LABELS } from "../../shared/constants";
+import { ROADMAP_PRIORITIES } from "./roadmap/tones";
 import type {
+	Roadmap,
 	RoadmapFeaturePriority,
 	RoadmapFeatureStatus,
 	RoadmapPhase,
@@ -52,8 +44,8 @@ import {
 import { Textarea } from "./ui/textarea";
 
 // Type alias for complexity and impact levels
-type ComplexityLevel = "low" | "medium" | "high";
-type ImpactLevel = "low" | "medium" | "high";
+type ComplexityLevel = (typeof LEVELS)[number];
+type ImpactLevel = ComplexityLevel;
 
 /**
  * Props for the AddFeatureDialog component
@@ -65,32 +57,14 @@ interface AddFeatureDialogProps {
 	readonly open: boolean;
 	/** Callback when the dialog open state changes */
 	readonly onOpenChange: (open: boolean) => void;
-	/** Optional callback when feature is successfully added, receives the new feature ID */
-	readonly onFeatureAdded?: (featureId: string) => void;
-	/** Optional default phase ID to pre-select */
-	readonly defaultPhaseId?: string;
 }
 
-// Complexity options (keys for translation)
-const COMPLEXITY_OPTIONS = [
-	{ value: "low", labelKey: "addFeature.lowComplexity" },
-	{ value: "medium", labelKey: "addFeature.mediumComplexity" },
-	{ value: "high", labelKey: "addFeature.highComplexity" },
-] as const;
-
-// Impact options (keys for translation)
-const IMPACT_OPTIONS = [
-	{ value: "low", labelKey: "addFeature.lowImpact" },
-	{ value: "medium", labelKey: "addFeature.mediumImpact" },
-	{ value: "high", labelKey: "addFeature.highImpact" },
-] as const;
+const LEVELS = ["low", "medium", "high"] as const;
 
 export function AddFeatureDialog({
 	phases,
 	open,
 	onOpenChange,
-	onFeatureAdded,
-	defaultPhaseId,
 }: AddFeatureDialogProps) {
 	const { t } = useTranslation("dialogs");
 
@@ -109,6 +83,7 @@ export function AddFeatureDialog({
 
 	// Store actions
 	const addFeature = useRoadmapStore((state) => state.addFeature);
+	const deleteFeature = useRoadmapStore((state) => state.deleteFeature);
 
 	// Reset form when dialog opens/closes
 	useEffect(() => {
@@ -117,69 +92,43 @@ export function AddFeatureDialog({
 			setDescription("");
 			setRationale("");
 			setPriority("should");
-			setPhaseId(defaultPhaseId || (phases.length > 0 ? phases[0].id : ""));
+			setPhaseId(phases[0]?.id ?? "");
 			setComplexity("medium");
 			setImpact("medium");
 			setError(null);
 		}
-	}, [open, defaultPhaseId, phases]);
+	}, [open, phases]);
 
+	// Add is only enabled once the form is valid (isValid below).
 	const handleSave = async () => {
-		// Validate required fields
-		if (!title.trim()) {
-			setError(t("addFeature.titleRequired"));
-			return;
-		}
-		if (!description.trim()) {
-			setError(t("addFeature.descriptionRequired"));
-			return;
-		}
-		if (!phaseId) {
-			setError(t("addFeature.phaseRequired"));
-			return;
-		}
-
 		setIsSaving(true);
 		setError(null);
+		const newFeatureId = addFeature({
+			title: title.trim(),
+			description: description.trim(),
+			rationale: rationale.trim() || t("addFeature.defaultRationale"),
+			priority,
+			complexity,
+			impact,
+			phaseId,
+			dependencies: [],
+			status: "under_review" as RoadmapFeatureStatus,
+			acceptanceCriteria: [],
+			userStories: [],
+			source: { provider: "internal" },
+		});
 
+		// The view only offers this dialog with a roadmap open, and addFeature
+		// added to it: save it.
+		const roadmap = useRoadmapStore.getState().roadmap as Roadmap;
 		try {
-			// Add feature to store
-			const newFeatureId = addFeature({
-				title: title.trim(),
-				description: description.trim(),
-				rationale:
-					rationale.trim() || `User-created feature for ${title.trim()}`,
-				priority,
-				complexity,
-				impact,
-				phaseId,
-				dependencies: [],
-				status: "under_review" as RoadmapFeatureStatus,
-				acceptanceCriteria: [],
-				userStories: [],
-				source: { provider: "internal" },
-			});
-
-			// Persist to file via IPC
-			const roadmap = useRoadmapStore.getState().roadmap;
-			if (roadmap) {
-				// Get the project ID from the roadmap
-				const result = await globalThis.electronAPI.saveRoadmap(
-					roadmap.projectId,
-					roadmap,
-				);
-				if (!result.success) {
-					throw new Error(result.error || "Failed to save roadmap");
-				}
-			}
-
-			// Success - close dialog and notify parent
+			const result = await globalThis.electronAPI.saveRoadmap(roadmap.projectId, roadmap);
+			if (!result.success) throw new Error(result.error);
 			onOpenChange(false);
-			onFeatureAdded?.(newFeatureId);
 		} catch (err) {
-			setError(
-				err instanceof Error ? err.message : t("addFeature.failedToAdd"),
-			);
+			// Not saved: the feature leaves the board again rather than looking kept.
+			deleteFeature(newFeatureId);
+			setError(err instanceof Error && err.message ? err.message : t("addFeature.failedToAdd"));
 		} finally {
 			setIsSaving(false);
 		}
@@ -314,13 +263,11 @@ export function AddFeatureDialog({
 									<SelectValue placeholder={t("addFeature.selectPriority")} />
 								</SelectTrigger>
 								<SelectContent>
-									{Object.entries(ROADMAP_PRIORITY_LABELS).map(
-										([value, label]) => (
-											<SelectItem key={value} value={value}>
-												{label}
-											</SelectItem>
-										),
-									)}
+									{ROADMAP_PRIORITIES.map((value) => (
+										<SelectItem key={value} value={value}>
+											{t(`roadmap:priorityLabels.${value}`)}
+										</SelectItem>
+									))}
 								</SelectContent>
 							</Select>
 						</div>
@@ -344,9 +291,9 @@ export function AddFeatureDialog({
 									<SelectValue placeholder={t("addFeature.selectComplexity")} />
 								</SelectTrigger>
 								<SelectContent>
-									{COMPLEXITY_OPTIONS.map(({ value, labelKey }) => (
+									{LEVELS.map((value) => (
 										<SelectItem key={value} value={value}>
-											{t(labelKey)}
+											{t(`roadmap:levels.complexity.${value}`)}
 										</SelectItem>
 									))}
 								</SelectContent>
@@ -370,9 +317,9 @@ export function AddFeatureDialog({
 									<SelectValue placeholder={t("addFeature.selectImpact")} />
 								</SelectTrigger>
 								<SelectContent>
-									{IMPACT_OPTIONS.map(({ value, labelKey }) => (
+									{LEVELS.map((value) => (
 										<SelectItem key={value} value={value}>
-											{t(labelKey)}
+											{t(`roadmap:levels.impactBadge.${value}`)}
 										</SelectItem>
 									))}
 								</SelectContent>

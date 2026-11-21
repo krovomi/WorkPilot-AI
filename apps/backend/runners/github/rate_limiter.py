@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import inspect
 import math
 import threading
 import time
@@ -557,7 +558,9 @@ def rate_limited(
         async def async_wrapper(*args, **kwargs):
             limiter = RateLimiter.get_instance()
 
-            for attempt in range(max_retries + 1):
+            # Each pass returns, raises once `max_retries` is spent, or backs off.
+            attempt = 0
+            while True:
                 try:
                     # Pre-flight check
                     if operation_type == "github":
@@ -574,8 +577,11 @@ def rate_limited(
                                 f"GitHub API rate limit exceeded: {msg}"
                             )
 
-                    # Execute function
-                    result = await func(*args, **kwargs)
+                    # Execute function (a plain function, through sync_wrapper,
+                    # returns its value rather than a coroutine)
+                    result = func(*args, **kwargs)
+                    if inspect.isawaitable(result):
+                        result = await result
                     return result
 
                 except CostLimitExceeded:
@@ -627,6 +633,7 @@ def rate_limited(
                     else:
                         # Not a rate limit error - propagate immediately
                         raise
+                attempt += 1
 
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
@@ -665,70 +672,3 @@ async def check_rate_limit(operation_type: str = "github") -> None:
         available, msg = limiter.check_cost_available()
         if not available:
             raise CostLimitExceeded(f"Cost budget exceeded: {msg}")
-
-
-# Example usage and testing
-if __name__ == "__main__":
-
-    async def example_usage():
-        """Example of using the rate limiter."""
-
-        # Initialize with custom limits
-        limiter = RateLimiter.get_instance(
-            github_limit=5000,
-            github_refill_rate=1.4,
-            cost_limit=10.0,
-        )
-
-        print("Rate Limiter Example")
-        print("=" * 60)
-
-        # Example 1: Manual rate check
-        print("\n1. Manual rate check:")
-        available, msg = limiter.check_github_available()
-        print(f"   GitHub API: {msg}")
-
-        # Example 2: Acquire token
-        print("\n2. Acquire GitHub token:")
-        if await limiter.acquire_github():
-            print("   ✓ Token acquired")
-        else:
-            print("   ✗ Rate limited")
-
-        # Example 3: Track AI cost
-        print("\n3. Track AI cost:")
-        try:
-            cost = limiter.track_ai_cost(
-                input_tokens=1000,
-                output_tokens=500,
-                model="claude-sonnet-4-5-20250929",
-                operation_name="PR review",
-            )
-            print(f"   Cost: ${cost:.4f}")
-            print(
-                f"   Remaining budget: ${limiter.cost_tracker.remaining_budget():.2f}"
-            )
-        except CostLimitExceeded as e:
-            print(f"   ✗ {e}")
-
-        # Example 4: Decorated function
-        print("\n4. Using @rate_limited decorator:")
-
-        @rate_limited(operation_type="github")
-        async def fetch_github_data(resource: str):
-            print(f"   Fetching: {resource}")
-            # Simulate GitHub API call
-            await asyncio.sleep(0.1)
-            return {"data": "example"}
-
-        try:
-            result = await fetch_github_data("pr/123")
-            print(f"   Result: {result}")
-        except RateLimitExceeded as e:
-            print(f"   ✗ {e}")
-
-        # Final report
-        print("\n" + limiter.report())
-
-    # Run example
-    asyncio.run(example_usage())

@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import type { LicenseScanReport } from "../../../preload/api/modules/phase35-features-api";
 import { useLicenseStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
@@ -71,7 +72,15 @@ function ConflictTable({ rows }: { rows: Conflict[] }) {
 
 export function LicensePanel({ projectPath }: LicensePanelProps) {
 	const { t } = useTranslation("phase35");
-	const { phase, error, report, online, scan } = useLicenseStore();
+	const { phase, error, report, online, scan } = useLicenseStore(
+		useShallow((s) => ({
+			phase: s.phase,
+			error: s.error,
+			report: s.report,
+			online: s.online,
+			scan: s.scan,
+		})),
+	);
 	const [policy, setPolicy] =
 		useState<"permissive_only" | "open_source_friendly" | "saas_safe">("permissive_only");
 	const [askRegistries, setAskRegistries] = useState(true);

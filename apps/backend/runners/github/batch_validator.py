@@ -125,33 +125,10 @@ class BatchValidator:
             )
 
     def _resolve_model(self, model: str) -> str:
-        """Resolve model shorthand via phase_config.resolve_model_id()."""
-        try:
-            # Use the established try/except pattern for imports (matching
-            # parallel_orchestrator_reviewer.py and other files in runners/github/services/)
-            # This ensures consistency across the codebase and proper caching in sys.modules.
-            from ..phase_config import resolve_model_id
+        """Resolve a model shorthand ("sonnet") the way every phase does."""
+        from phase_config import resolve_model_id
 
-            return resolve_model_id(model)
-        except (ImportError, ValueError, SystemError):
-            # Fallback to absolute import - wrap in try/except for safety
-            try:
-                from phase_config import resolve_model_id
-
-                return resolve_model_id(model)
-            except Exception as e:
-                # Log and return original model as final fallback
-                logger.debug(
-                    f"Fallback import failed, using original model '{model}': {e}"
-                )
-                return model
-        except Exception as e:
-            # Log at debug level to aid diagnosis without polluting normal output
-            logger.debug(
-                f"Model resolution via phase_config failed, using original model '{model}': {e}"
-            )
-            # Fallback to returning the original model string
-            return model
+        return resolve_model_id(model)
 
     def _format_issues(self, issues: list[dict[str, Any]]) -> str:
         """Format issues for the prompt."""
@@ -221,50 +198,30 @@ class BatchValidator:
         )
 
         try:
-            # Create settings for minimal permissions (no tools needed)
-            settings = {
-                "permissions": {
-                    "defaultMode": "ignore",
-                    "allow": [],
-                },
-            }
+            from core.simple_client import create_simple_client
 
-            settings_file = self.project_dir / ".batch_validator_settings.json"
-            with open(settings_file, "w", encoding="utf-8") as f:
-                json.dump(settings, f)
+            client = create_simple_client(
+                agent_type="batch_validation",
+                model=self.model,
+                system_prompt="You are an expert at analyzing GitHub issues and determining if they should be grouped together for a combined fix.",
+                cwd=self.project_dir,
+                max_thinking_tokens=self.thinking_budget,  # Extended thinking
+            )
 
-            try:
-                # Create Claude SDK client with extended thinking
-                from core.simple_client import create_simple_client
+            async with client:
+                await client.query(prompt)
+                result_text = await self._collect_response(client)
 
-                client = create_simple_client(
-                    agent_type="batch_validation",
-                    model=self.model,
-                    system_prompt="You are an expert at analyzing GitHub issues and determining if they should be grouped together for a combined fix.",
-                    cwd=self.project_dir,
-                    max_thinking_tokens=self.thinking_budget,  # Extended thinking
-                )
+            result_json = self._parse_json_response(result_text)
 
-                async with client:
-                    await client.query(prompt)
-                    result_text = await self._collect_response(client)
-
-                # Parse JSON response
-                result_json = self._parse_json_response(result_text)
-
-                return BatchValidationResult(
-                    batch_id=batch_id,
-                    is_valid=result_json.get("is_valid", True),
-                    confidence=result_json.get("confidence", 0.5),
-                    reasoning=result_json.get("reasoning", "No reasoning provided"),
-                    suggested_splits=result_json.get("suggested_splits"),
-                    common_theme=result_json.get("common_theme", ""),
-                )
-
-            finally:
-                # Cleanup settings file
-                if settings_file.exists():
-                    settings_file.unlink()
+            return BatchValidationResult(
+                batch_id=batch_id,
+                is_valid=result_json.get("is_valid", True),
+                confidence=result_json.get("confidence", 0.5),
+                reasoning=result_json.get("reasoning", "No reasoning provided"),
+                suggested_splits=result_json.get("suggested_splits"),
+                common_theme=result_json.get("common_theme", ""),
+            )
 
         except Exception as e:
             logger.error(f"Batch validation failed: {e}")

@@ -9,45 +9,17 @@ PR's worktree.
 from __future__ import annotations
 
 import asyncio
-import importlib.util
+import importlib
 import json
 import logging
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
-# The parallel reviewer imports its siblings by bare name (`context_gatherer`,
-# `services.agent_utils`…), as the GitHub runner starts it. Same set-up as
-# tests/test_copilot_integration.py: the folder appended, never prepended (its
-# `services/` would shadow apps/backend/services), its services preloaded.
-_BACKEND = Path(__file__).parent.parent / "apps" / "backend"
-_GITHUB_DIR = _BACKEND / "runners" / "github"
-if str(_GITHUB_DIR) not in sys.path:
-    sys.path.append(str(_GITHUB_DIR))
-for _name in (
-    "agent_utils",
-    "category_utils",
-    "io_utils",
-    "pydantic_models",
-    "pr_worktree_manager",
-    "sdk_utils",
-):
-    if f"services.{_name}" not in sys.modules:
-        _spec = importlib.util.spec_from_file_location(
-            f"services.{_name}",
-            _GITHUB_DIR / "services" / f"{_name}.py",
-            submodule_search_locations=[],
-        )
-        _module = importlib.util.module_from_spec(_spec)
-        sys.modules[f"services.{_name}"] = _module
-        _spec.loader.exec_module(_module)
-
-import runners.github.orchestrator as orchestrator_module  # noqa: E402
-from learning_loop import review_feedback as rf  # noqa: E402
-from runners.github.context_gatherer import ChangedFile, PRContext  # noqa: E402
-from runners.github.models import (  # noqa: E402
+import runners.github.orchestrator as orchestrator_module
+from learning_loop import review_feedback as rf
+from runners.github.context_gatherer import ChangedFile, PRContext
+from runners.github.models import (
     FollowupReviewContext,
     GitHubRunnerConfig,
     MergeVerdict,
@@ -57,17 +29,17 @@ from runners.github.models import (  # noqa: E402
     ReviewPass,
     ReviewSeverity,
 )
-from runners.github.services.learned_suppression import (  # noqa: E402
+from runners.github.services.learned_suppression import (
     apply_to_followup,
 )
-from runners.github.services.parallel_followup_reviewer import (  # noqa: E402
+from runners.github.services.parallel_followup_reviewer import (
     ParallelFollowupReviewer,
 )
-from runners.github.services.parallel_orchestrator_reviewer import (  # noqa: E402
+from runners.github.services.parallel_orchestrator_reviewer import (
     SPECIALIST_CONFIGS,
     ParallelOrchestratorReviewer,
 )
-from runners.github.services.pr_review_engine import PRReviewEngine  # noqa: E402
+from runners.github.services.pr_review_engine import PRReviewEngine
 
 
 def _rejections(project: Path, n: int, title: str = "Missing docstring on `foo`"):

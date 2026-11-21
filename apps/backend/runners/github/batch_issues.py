@@ -93,12 +93,7 @@ class ClaudeBatchAnalyzer:
             ]
 
         try:
-            import sys
-
             import claude_agent_sdk  # noqa: F401 - check availability
-
-            backend_path = Path(__file__).parent.parent.parent
-            sys.path.insert(0, str(backend_path))
             from core.auth import ensure_claude_code_oauth_token
         except ImportError as e:
             logger.error(f"claude-agent-sdk not available: {e}")
@@ -950,7 +945,7 @@ class IssueBatcher:
                 self._batch_index[item.issue_number] = batch.batch_id
 
             # Save batch
-            batch.save(self.github_dir)
+            await batch.save(self.github_dir)
             final_batches.append(batch)
 
             logger.info(
@@ -1166,7 +1161,6 @@ class IssueBatcher:
 
         # Delete batch file
         batch_file = self.github_dir / "batches" / f"batch_{batch_id}.json"
-        if batch_file.exists():
-            batch_file.unlink()
+        batch_file.unlink(missing_ok=True)
 
         return True

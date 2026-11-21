@@ -204,25 +204,23 @@ class TestBatchValidatorModelResolution:
         # Verify DEFAULT_MODEL is "sonnet" (shorthand)
         assert 'DEFAULT_MODEL = "sonnet"' in content
 
-    def test_uses_try_except_import_pattern(self, batch_validator_file: Path):
-        """BatchValidator uses try/except import pattern (established codebase convention).
+    def test_a_shorthand_resolves_like_every_phase(self, tmp_path: Path):
+        """BatchValidator resolves "sonnet" through phase_config, env override included.
 
-        This is an implementation-detail test that guards against import patterns
-        causing circular dependencies. The try/except pattern (relative imports
-        falling back to absolute imports) is the established convention across
-        runners/github/ and ensures proper module caching in sys.modules.
-
-        Note: batch_validator.py is in runners/github/ (not services/), so it uses
-        ..phase_config (2 dots) to reach apps/backend/phase_config.py.
+        It once tried `from ..phase_config` first, which from runners.github
+        names runners.phase_config and always failed; the absolute import is
+        the one that runs.
         """
-        content = batch_validator_file.read_text(encoding="utf-8")
-        # Verify the try/except pattern IS present (relative import first)
-        assert "from ..phase_config import resolve_model_id" in content
-        # Verify fallback to absolute import is present
-        assert "except (ImportError, ValueError, SystemError):" in content
-        assert "from phase_config import resolve_model_id" in content
-        # Verify debug logging is present for error diagnosis
-        assert "logger.debug" in content
+        from runners.github.batch_validator import BatchValidator
+
+        with patch.dict(os.environ, {"ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.7"}):
+            assert BatchValidator(project_dir=tmp_path).model == "glm-4.7"
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("ANTHROPIC_DEFAULT_SONNET_MODEL", None)
+            assert (
+                BatchValidator(project_dir=tmp_path, model="sonnet").model
+                == MODEL_ID_MAP["sonnet"]
+            )
 
     def test_has_resolve_model_method(self, batch_validator_file: Path):
         """BatchValidator has _resolve_model method that resolves models."""

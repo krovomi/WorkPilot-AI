@@ -18,7 +18,7 @@ import {
 	THINKING_LEVELS,
 } from "@shared/constants/models";
 import type { ThinkingLevel } from "@shared/types/settings";
-import type { PageLlmPage } from "@shared/utils/page-llm";
+import type { PageLlmOverride } from "@shared/utils/page-llm";
 import {
 	isPageLlmPage,
 	normalizeProviderId,
@@ -29,7 +29,7 @@ import type { CanonicalProvider } from "@shared/utils/providers";
 import { getStaticProviders } from "@shared/utils/providers";
 import { RotateCcw, Sparkles } from "lucide-react";
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { saveSettings, useSettingsStore } from "../stores/settings-store";
 import { useShallow } from "zustand/react/shallow";
@@ -66,36 +66,48 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 		{},
 	);
 	const [isOpen, setIsOpen] = useState(false);
+	const [saveFailed, setSaveFailed] = useState(false);
+	const fieldId = useId();
 
 	useEffect(() => {
 		let cancelled = false;
-		getStaticProviders(profiles, settings as unknown as Record<string, unknown>)
-			.then((data) => {
-				if (cancelled) return;
-				setProviders(data.providers);
-				setProviderStatus(data.status);
-			})
-			.catch(() => {
-				if (!cancelled) setProviders([]);
-			});
+		// getStaticProviders does not reject: each check it makes catches its own failure.
+		void getStaticProviders(
+			profiles,
+			settings as unknown as Record<string, unknown>,
+		).then((data) => {
+			if (cancelled) return;
+			setProviders(data.providers);
+			setProviderStatus(data.status);
+		});
 		return () => {
 			cancelled = true;
 		};
 	}, [profiles, settings]);
 
+	const pageId = isPageLlmPage(page) ? page : null;
 	const resolved = useMemo(
-		() =>
-			isPageLlmPage(page)
-				? resolvePageLlm(settings, page as PageLlmPage)
-				: null,
-		[page, settings],
+		() => (pageId ? resolvePageLlm(settings, pageId) : null),
+		[pageId, settings],
 	);
 
 	const { models } = useProviderModelCatalog(resolved?.provider || "");
 
-	if (!resolved || !isPageLlmPage(page)) return null;
+	if (!resolved || !pageId) return null;
 
-	const override = settings.pageLlmOverrides?.[page] ?? {};
+	const override = settings.pageLlmOverrides?.[pageId] ?? {};
+	/** What the page would use for this field if it named nothing for it. */
+	const inheritedFor = (field: keyof PageLlmOverride) =>
+		resolvePageLlm(
+			{
+				...settings,
+				pageLlmOverrides: {
+					...settings.pageLlmOverrides,
+					[pageId]: { ...override, [field]: undefined },
+				},
+			},
+			pageId,
+		);
 	// Les tables de capacités sont indexées sur « anthropic », le backend sur
 	// « claude » : le résolveur rend la seconde forme, il faut demander la
 	// première — sinon l'effort disparaît de la page sur le fournisseur qui le
@@ -105,13 +117,14 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 	const supportsThinking =
 		!capabilityProvider || providerSupportsThinking(capabilityProvider);
 
-	const providerLabel =
-		providers.find((p) => normalizeProviderId(p.name) === resolved.provider)
-			?.label ||
-		resolved.provider ||
+	const providerName = (id: string) =>
+		providers.find((p) => normalizeProviderId(p.name) === id)?.label ||
+		id ||
 		t("dialogs:pageLlm.providerUnset");
-	const modelLabel =
-		models.find((m) => m.value === resolved.model)?.label ?? resolved.model;
+	const modelName = (value: string) =>
+		models.find((m) => m.value === value)?.label ?? value;
+	const providerLabel = providerName(resolved.provider);
+	const modelLabel = modelName(resolved.model);
 	// Un modèle de page que le résolveur a écarté (il appartient à un autre
 	// fournisseur) ne s'affiche pas comme le choix de la page : c'est l'héritage
 	// qui s'applique, et c'est lui que la liste doit montrer.
@@ -131,7 +144,7 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 	) => {
 		const next = setPageLlmOverride(
 			settings.pageLlmOverrides,
-			page as PageLlmPage,
+			pageId,
 			{
 				[field]:
 					value === INHERIT
@@ -142,13 +155,19 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 			},
 			inheritedProvider,
 		);
-		await saveSettings({ pageLlmOverrides: next });
+		await save(next);
 	};
 
 	const reset = async () => {
-		const next = { ...(settings.pageLlmOverrides ?? {}) };
-		delete next[page];
-		await saveSettings({ pageLlmOverrides: next });
+		// Reset is enabled only when this page has an override stored.
+		const next = { ...settings.pageLlmOverrides };
+		delete next[pageId];
+		await save(next);
+	};
+
+	const save = async (pageLlmOverrides: Record<string, PageLlmOverride>) => {
+		setSaveFailed(false);
+		if (!(await saveSettings({ pageLlmOverrides }))) setSaveFailed(true);
 	};
 
 	return (
@@ -185,20 +204,20 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 
 				{/* Fournisseur */}
 				<div className="space-y-1">
-					<Label className="text-xs text-muted-foreground">
+					<Label htmlFor={`${fieldId}-provider`} className="text-xs text-muted-foreground">
 						{t("dialogs:providerSelector.label")}
 					</Label>
 					<Select
 						value={override.provider ?? INHERIT}
 						onValueChange={(value) => patch("provider", value)}
 					>
-						<SelectTrigger className="h-9">
+						<SelectTrigger id={`${fieldId}-provider`} className="h-9">
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent searchable>
 							<SelectItem value={INHERIT}>
 								{t("dialogs:pageLlm.inheritProvider", {
-									provider: providerLabel,
+									provider: providerName(globalProvider),
 								})}
 							</SelectItem>
 							{providers.map((p) => (
@@ -216,19 +235,21 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 
 				{/* Modèle */}
 				<div className="space-y-1">
-					<Label className="text-xs text-muted-foreground">
+					<Label htmlFor={`${fieldId}-model`} className="text-xs text-muted-foreground">
 						{t("dialogs:pageLlm.model")}
 					</Label>
 					<Select
 						value={pageModel ?? INHERIT}
 						onValueChange={(value) => patch("model", value)}
 					>
-						<SelectTrigger className="h-9">
+						<SelectTrigger id={`${fieldId}-model`} className="h-9">
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent searchable>
 							<SelectItem value={INHERIT}>
-								{t("dialogs:pageLlm.inheritModel", { model: modelLabel })}
+								{t("dialogs:pageLlm.inheritModel", {
+									model: modelName(inheritedFor("model").model),
+								})}
 							</SelectItem>
 							{models.map((m) => (
 								<SelectItem key={m.value} value={m.value}>
@@ -242,20 +263,22 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 				{/* Effort — masqué quand le fournisseur n'a pas de réflexion étendue */}
 				{supportsThinking && (
 					<div className="space-y-1">
-						<Label className="text-xs text-muted-foreground">
+						<Label htmlFor={`${fieldId}-effort`} className="text-xs text-muted-foreground">
 							{t("dialogs:pageLlm.effortLabel")}
 						</Label>
 						<Select
 							value={override.thinking ?? INHERIT}
 							onValueChange={(value) => patch("thinking", value)}
 						>
-							<SelectTrigger className="h-9">
+							<SelectTrigger id={`${fieldId}-effort`} className="h-9">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value={INHERIT}>
 									{t("dialogs:pageLlm.inheritEffort", {
-										effort: t(`dialogs:pageLlm.effort.${resolved.thinking}`),
+										effort: t(
+											`dialogs:pageLlm.effort.${inheritedFor("thinking").thinking}`,
+										),
 									})}
 								</SelectItem>
 								{THINKING_LEVELS.map((level) => (
@@ -266,6 +289,12 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 							</SelectContent>
 						</Select>
 					</div>
+				)}
+
+				{saveFailed && (
+					<p role="alert" className="text-xs text-destructive">
+						{t("dialogs:pageLlm.saveFailed")}
+					</p>
 				)}
 
 				<div className="flex items-center justify-between pt-1">
