@@ -9,6 +9,7 @@
     "genai_trace",
     "goal",
     "mcp_tasks",
+    "mission_control",
     "os_sandbox",
     "schema_guard",
     "red_team",

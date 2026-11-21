@@ -1,0 +1,53 @@
+{
+  "_comment": "Shared by tests/test_review_feedback_lot2.py and review-feedback-dataset.test.ts: the backend and the desktop app must name a kind of remark the same way.",
+  "cases": [
+    {
+      "category": "style",
+      "title": "Missing docstring on `foo`",
+      "normalized": "missing docstring on q",
+      "signature": "9d3300eeb6b55f42"
+    },
+    {
+      "category": "style",
+      "title": "Missing type hint on \"bar\" (line 12)",
+      "normalized": "missing type hint on q line #",
+      "signature": "79d8d7c9cc3cb21b"
+    },
+    {
+      "category": "quality",
+      "title": "Prefer an early return",
+      "normalized": "prefer an early return",
+      "signature": "3edaeafb455f6032"
+    },
+    {
+      "category": "Performance",
+      "title": "N+1 query in 'load_users' — 3 calls",
+      "normalized": "n # query in q # calls",
+      "signature": "7cf16f141d4064d6"
+    },
+    {
+      "category": "docs",
+      "title": "Ünïcödé Títle: café, naïve résumé!",
+      "normalized": "ünïcödé títle café naïve résumé",
+      "signature": "15a6cacb40ae10c3"
+    },
+    {
+      "category": "style",
+      "title": "  Tabs\tand\nnewlines  ",
+      "normalized": "tabs and newlines",
+      "signature": "b2ed693c1f7f2aae"
+    },
+    {
+      "category": "quality",
+      "title": "Use `Optional[int]` instead of `int | None` on 42 places",
+      "normalized": "use q instead of q on # places",
+      "signature": "914a8698ddadf437"
+    },
+    {
+      "category": "style",
+      "title": "数字 123 と記号 #tag_name",
+      "normalized": "数字 # と記号 #tag_name",
+      "signature": "38ceaa7a9879417a"
+    }
+  ]
+}

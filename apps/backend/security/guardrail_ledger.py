@@ -38,7 +38,26 @@ _SUMMARY_CHARS = 200
 
 
 def _dir(project: Path) -> Path:
-    return Path(project) / ".workpilot"
+    """The project's own ``.workpilot`` folder; a link or a folder elsewhere is refused."""
+    root = Path(project).resolve()
+    directory = Path(project) / ".workpilot"
+    if directory.is_symlink() or not directory.resolve().is_relative_to(root):
+        raise OSError(f"{directory} is not a folder of the project")
+    return directory
+
+
+def _plain_file(path: Path) -> Path:
+    """``path`` itself, never what a link there points to."""
+    if path.is_symlink():
+        raise OSError(f"{path} is a link")
+    return path
+
+
+def _append(path: Path, line: str) -> None:
+    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(_plain_file(path), flags, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as handle:
+        handle.write(line)
 
 
 def _now() -> datetime:
@@ -115,13 +134,12 @@ def record(
         "task": _task_of(root),
         "message": _redact(decision.message)[:1000],
     }
-    path = _dir(project) / LOG_NAME
     try:
+        path = _dir(project) / LOG_NAME
         path.parent.mkdir(parents=True, exist_ok=True)
         if outcome == "pending" and _pending_exists(path, event):
             return
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+        _append(path, json.dumps(event, ensure_ascii=False) + "\n")
         _trim(path)
     except OSError:
         return
@@ -143,7 +161,7 @@ def _pending_exists(path: Path, event: dict[str, Any]) -> bool:
 
 def _tail(path: Path, count: int) -> list[dict[str, Any]]:
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()[-count:]
+        lines = _plain_file(path).read_text(encoding="utf-8").splitlines()[-count:]
     except OSError:
         return []
     events = []
@@ -177,8 +195,8 @@ def _atomic_write(path: Path, text: str) -> None:
 
 
 def _load_approvals(project: Path) -> list[dict[str, Any]]:
-    path = _dir(project) / APPROVALS_NAME
     try:
+        path = _plain_file(_dir(project) / APPROVALS_NAME)
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []

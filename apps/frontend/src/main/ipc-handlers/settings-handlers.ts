@@ -161,6 +161,25 @@ function openTerminalForPlatform(resolvedPath: string): IPCResult<void> {
 /**
  * Validates a directory path for terminal opening
  */
+/**
+ * The file filters a dialog request names, kept only when each one is a name
+ * and a list of extensions; anything else gives no filter.
+ */
+export function dialogFilters(
+	filters: unknown,
+): { name: string; extensions: string[] }[] | undefined {
+	if (!Array.isArray(filters) || filters.length === 0) return undefined;
+	const valid = filters.every(
+		(f) =>
+			typeof f?.name === "string" &&
+			Array.isArray(f.extensions) &&
+			f.extensions.every((e: unknown) => typeof e === "string"),
+	);
+	return valid
+		? filters.map((f) => ({ name: f.name, extensions: [...f.extensions] }))
+		: undefined;
+}
+
 function validateDirectoryPath(dirPath: string): IPCResult<string> {
 	// Validate dirPath input
 	if (!dirPath || typeof dirPath !== "string" || dirPath.trim() === "") {
@@ -975,13 +994,19 @@ export function registerSettingsHandlers(
 			if (!mainWindow) return [];
 
 			const properties: ("openFile" | "multiSelections")[] = ["openFile"];
-			if (options?.multi) properties.push("multiSelections");
+			if (options?.multi === true) properties.push("multiSelections");
+			const filters = dialogFilters(options?.filters);
 
 			const result = await dialog.showOpenDialog(mainWindow, {
 				properties,
-				title: options?.title ?? "Select Files",
-				defaultPath: options?.defaultPath,
-				filters: options?.filters,
+				title:
+					typeof options?.title === "string" && options.title
+						? options.title
+						: "Select Files",
+				...(typeof options?.defaultPath === "string" && options.defaultPath
+					? { defaultPath: options.defaultPath }
+					: {}),
+				...(filters ? { filters } : {}),
 			});
 
 			if (result.canceled) return [];

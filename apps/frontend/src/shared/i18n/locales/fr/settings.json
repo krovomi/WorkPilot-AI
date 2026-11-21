@@ -80,6 +80,7 @@
 					"openWindsurfLogin": "windsurf.com/account",
 					"orManual": "Ou connectez-vous manuellement :",
 					"saveAndConnect": "Enregistrer et connecter",
+					"saveFailed": "Impossible d'enregistrer le jeton Windsurf détecté. Relancez la détection ou collez une clé dans l'onglet Clé API.",
 					"saveSuccess": "Connexion Windsurf enregistrée avec succès !",
 					"terminalInstructions": "Cela ouvrira un terminal où vous pourrez exécuter la commande `/login` pour vous authentifier.",
 					"tokenDetected": "Clé API détectée",
@@ -891,7 +892,7 @@
 		"filterStateLabel": "État",
 		"filterTypeAll": "Tous les types",
 		"filterTypeLabel": "Type d'élément de travail",
-		"importButton_one": "Importer les éléments depuis Azure DevOps",
+		"importButton_one": "Importer {{count}} élément",
 		"importButton_other": "Importer {{count}} éléments",
 		"importConfirmButton": "Importer {{count}} élément(s)",
 		"importConfirmDescription": "Les éléments suivants seront importés dans la colonne {{column}}.",
@@ -915,11 +916,11 @@
 		"successTitle": "Import réussi !",
 		"title": "Importer les éléments Azure DevOps",
 		"titleWithRepository": "Importer les éléments de {{repository}}",
-		"toggleSelection": "Basculer la sélection pour l'élément de travail {{id}}",
 		"importError": "Échec de l'import Azure DevOps",
 		"repositoryLabel": "Dépôt :",
 		"sidePanelAriaLabel": "Panneau d'import Azure DevOps",
-		"resizeHandleAriaLabel": "Redimensionner le panneau"
+		"resizeHandleAriaLabel": "Redimensionner le panneau",
+		"priorityBadge": "P{{priority}}"
 	},
 	"collaboration": {
 		"description": "Paramètres de collaboration multi-utilisateurs",
@@ -1574,7 +1575,8 @@
 		"statusLabel": "Statut",
 		"allStatuses": "Tous les statuts",
 		"dragHint": "Glissez les tickets sélectionnés dans une colonne du Kanban pour les importer",
-		"resize": "Redimensionner"
+		"resize": "Redimensionner",
+		"sidePanelAriaLabel": "Panneau d'import Jira"
 	},
 	"language": {
 		"description": "Sélectionnez la langue de l'interface de l'application",
@@ -3057,6 +3059,43 @@
 			"dragHandle": "Déplacer {{name}}",
 			"saveError": "Les réglages du basculement n'ont pas pu être enregistrés.",
 			"orderError": "L'ordre de la chaîne n'a pas pu être enregistré."
+		}
+	},
+	"governance": {
+		"kicker": "Gouvernance",
+		"title": "Heures, fichiers et budget de jetons",
+		"hint": "Ce que workpilot.policy.yaml impose à chaque agent, sur tous les providers. En lecture seule : modifiez le fichier dans le dépôt et faites-le relire comme du code.",
+		"refresh": "Actualiser",
+		"loadFailed": "La politique de gouvernance n'a pas pu être lue : {{error}}",
+		"invalid": "workpilot.policy.yaml est refusé : aucun agent n'écrit de fichier ni ne lance de commande tant qu'il n'est pas corrigé.",
+		"none": "workpilot.policy.yaml ne fixe ni heures, ni fichiers, ni budget de jetons.",
+		"scheduleTitle": "Heures permises",
+		"noSchedule": "À toute heure",
+		"openNow": "Ouvert maintenant",
+		"closedNow": "Fermé maintenant",
+		"scheduleLine": "{{hours}} ({{timezone}}), {{days}}",
+		"filesTitle": "Fichiers",
+		"forbidden": "Interdits",
+		"requiresReview": "Revue requise",
+		"noFiles": "Aucune règle de fichier",
+		"budgetTitle": "Budget de jetons",
+		"noBudget": "Pas de limite horaire",
+		"budgetLine": "{{spent}} jetons sur {{limit}} dans la dernière heure",
+		"decisionsTitle": "Dernières décisions",
+		"noDecisions": "La politique n'a encore pris aucune décision.",
+		"exportCsv": "Exporter en CSV",
+		"exportJson": "Exporter en JSON",
+		"exported_one": "{{count}} décision exportée dans {{path}}",
+		"exported_other": "{{count}} décisions exportées dans {{path}}",
+		"exportFailed": "L'export a échoué : {{error}}",
+		"decisions": {
+			"deny": "Refusé",
+			"review": "Revue",
+			"approved": "Approuvé",
+			"warn": "Averti",
+			"outside_hours": "Hors horaires",
+			"budget_exceeded": "Budget atteint",
+			"invalid_policy": "Politique invalide"
 		}
 	}
 }

@@ -60,7 +60,7 @@ class TriageEngine:
             project_dir=self.project_dir,
             spec_dir=self.github_dir,
             model=model,
-            agent_type="qa_reviewer",
+            agent_type="issue_triage",
         )
 
         try:
@@ -104,22 +104,44 @@ class TriageEngine:
             if overlap > 0.3:
                 potential_dupes.append(other)
 
+        # Issue text is quoted with the shared helpers (rule S2).
+        from runners.forge_review_prompt import one_line
+        from security.untrusted import quote_untrusted
+
+        source = f"github:issue#{issue['number']}"
+
+        def quoted(text: str, kind: str) -> str:
+            return quote_untrusted(
+                text, kind=kind, source=source, spec_dir=self.github_dir
+            )
+
+        labels = ", ".join(label["name"] for label in issue.get("labels", []))
+        details = "\n".join(
+            [
+                f"Title: {one_line(issue['title'], 'comment', source, limit=500)}",
+                f"Author: {one_line(issue['author']['login'], 'comment', source)}",
+                f"Created: {one_line(issue['createdAt'], 'comment', source)}",
+                f"Labels: {one_line(labels, 'comment', source, limit=500)}",
+            ]
+        )
         lines = [
-            f"## Issue #{issue['number']}",
-            f"**Title:** {issue['title']}",
-            f"**Author:** {issue['author']['login']}",
-            f"**Created:** {issue['createdAt']}",
-            f"**Labels:** {', '.join(label['name'] for label in issue.get('labels', []))}",
+            f"## Issue #{int(issue['number'])}",
+            "",
+            "### Details",
+            quoted(details, "comment"),
             "",
             "### Body",
-            issue.get("body", "No description"),
+            quoted(issue.get("body") or "No description", "issue_body"),
             "",
         ]
 
         if potential_dupes:
+            dupes = "\n".join(
+                f"- #{int(d['number'])}: {one_line(d['title'], 'comment', source)}"
+                for d in potential_dupes[:5]
+            )
             lines.append("### Potential Duplicates (similar titles)")
-            for d in potential_dupes[:5]:
-                lines.append(f"- #{d['number']}: {d['title']}")
+            lines.append(quoted(dupes, "comment"))
             lines.append("")
 
         return "\n".join(lines)

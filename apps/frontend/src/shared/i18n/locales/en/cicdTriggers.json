@@ -62,7 +62,7 @@
 		"monitor_deploy_wait_minutes": "Wait for the deployment to land (minutes)",
 		"auto_rollback": "Roll back by itself on a critical verdict",
 		"autoRollbackHint": "Off: the rollback is offered here. On: GitHub Actions and Azure Pipelines go back to the last run that succeeded, unless the change holds a database migration.",
-		"fileHint": "Metrics and thresholds: .workpilot/deploy-monitors.yaml (PromQL query, kind error_rate, latency, throughput or custom, warning and critical in percent)."
+		"fileHint": "Metrics and thresholds: .workpilot/deploy-monitors.yaml (PromQL query, kind error_rate, latency, throughput or custom, warning and critical in percent). revert_pr: true opens a PR that reverts the deployed commit after a critical verdict; explain_incident: false keeps the model out of the incident report."
 	},
 	"watch": {
 		"notConfigured": "Not watched: no health check or metric is configured.",
@@ -107,6 +107,25 @@
 		"rollbackButton": "Roll back",
 		"confirm": "Run the last good deployment again?",
 		"confirmButton": "Confirm the rollback",
-		"cancel": "Cancel"
+		"cancel": "Cancel",
+		"revertPr": {
+			"open": "Open the revert PR of {{sha}}",
+			"opened": "Revert PR opened.",
+			"exists": "A revert PR is already open.",
+			"failed": "The revert PR could not be opened.",
+			"conflict": "The deployed commit does not revert cleanly: revert it by hand.",
+			"no_commit": "The provider did not say which commit it deployed: no revert PR.",
+			"unknown_commit": "The deployed commit is not in the local clone: fetch it, then revert it by hand.",
+			"not_on_branch": "The deployed commit is not on the target branch: nothing to revert there.",
+			"offline": "Strict offline mode: no revert PR is opened.",
+			"unavailable": "No forge is available to open the revert PR."
+		},
+		"incident": {
+			"title": "Incident report",
+			"samples": "{{critical}} critical and {{warning}} degraded sample(s)",
+			"health": "health check failed {{failed}} of {{checks}} times",
+			"metric": "{{name}}: {{baseline}} before, {{worst}} at worst ({{change}} %, {{level}})",
+			"explanation": "The project's model:"
+		}
 	}
 }

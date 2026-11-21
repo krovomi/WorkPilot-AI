@@ -175,7 +175,7 @@ async def test_a_viewer_reads_but_cannot_change_a_card(tmp_path):
         for call in (
             lambda: create_card(CardCreate(title="T2"), _request(), viewer, db),
             lambda: delete_card(card["id"], _request(), viewer, db),
-            lambda: approve_card(card["id"], _request(), viewer),
+            lambda: approve_card(card["id"], _request(), viewer, db),
         ):
             with pytest.raises(HTTPException) as exc:
                 await call()
@@ -213,12 +213,14 @@ async def test_a_started_card_cannot_be_edited_and_approval_follows_the_spec(tmp
         card = await create_card(CardCreate(title="T"), _request(), scope, db)
     directory = clone / ".workpilot/specs" / card["id"]
 
-    with pytest.raises(HTTPException) as exc:
-        await approve_card(card["id"], _request(), scope)
-    assert exc.value.status_code == 409  # nothing to approve yet
+    async with await _db() as db:
+        with pytest.raises(HTTPException) as exc:
+            await approve_card(card["id"], _request(), scope, db)
+        assert exc.value.status_code == 409  # nothing to approve yet
 
-    (directory / "spec.md").write_text("# Spec\n", encoding="utf-8")
-    result = await approve_card(card["id"], _request(email="lead@x"), scope)
+        (directory / "spec.md").write_text("# Spec\n", encoding="utf-8")
+        # Its author, alone on the project, approves it.
+        result = await approve_card(card["id"], _request(email="lead@x"), scope, db)
     assert result == {"approved": True, "approvedBy": "lead@x"}
     assert ReviewState.load(directory).is_approval_valid(directory)
 
@@ -400,6 +402,7 @@ async def test_a_run_skips_the_review_only_for_who_may_approve(monkeypatch):
 
     class Spec:
         claimed_by = "u-1"
+        created_by = None
 
     class Project:
         server_path = "/srv/p"
