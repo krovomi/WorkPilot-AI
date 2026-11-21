@@ -50,7 +50,7 @@ export function TaskEngineChip({ task, onClick }: TaskEngineChipProps) {
 	const uniform = isUniformEngine(engine);
 	const main = engine.coding;
 	const label = uniform
-		? `${providerName(main.provider)} · ${shortModel(main.model)} · ${effortLabel(main.effort)}`
+		? `${providerName(main.provider)} · ${shortModel(main.model)} · ${effortLabel(main.effort, t)}`
 		: t("tasks:engine.chipMixed", { provider: providerName(main.provider) });
 
 	const content = (
@@ -91,7 +91,7 @@ export function TaskEngineChip({ task, onClick }: TaskEngineChipProps) {
 							{" — "}
 							{providerName(engine[phase].provider)} ·{" "}
 							{shortModel(engine[phase].model)} ·{" "}
-							{effortLabel(engine[phase].effort)}
+							{effortLabel(engine[phase].effort, t)}
 						</div>
 					))}
 				</div>

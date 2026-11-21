@@ -41,6 +41,45 @@ export interface DeployRollbackPlan {
 	currentSha: string;
 }
 
+/** What became of the revert PR of the deployed commit (`revert_pr: true`). */
+export type DeployRevertStatus =
+	| "opened"
+	| "exists"
+	| "failed"
+	| "conflict"
+	| "no_commit"
+	| "unknown_commit"
+	| "not_on_branch"
+	| "offline"
+	| "unavailable";
+
+export interface DeployRevertPr {
+	status: DeployRevertStatus;
+	/** https only; "" when the forge gave none. */
+	url: string;
+	sha: string;
+}
+
+/** One metric over the window: before, at its worst, and its level then. */
+export interface DeployIncidentMetric {
+	name: string;
+	baseline: number | null;
+	worst: number | null;
+	worstChangePct: number | null;
+	level: DeployWatchLevel;
+}
+
+/** The incident report of a warning or critical verdict. */
+export interface DeployIncident {
+	criticalSamples: number;
+	warningSamples: number;
+	healthChecks: number;
+	healthFailed: number;
+	metrics: DeployIncidentMetric[];
+	/** The project's model, plain text; "" when there is none. */
+	explanation: string;
+}
+
 export interface DeployWatch {
 	runId: string;
 	phase: DeployWatchPhase;
@@ -60,4 +99,6 @@ export interface DeployWatch {
 	migrations?: string[] | null;
 	rollback?: DeployRollbackState;
 	rollbackByPerson: boolean;
+	revertPr?: DeployRevertPr;
+	incident?: DeployIncident;
 }

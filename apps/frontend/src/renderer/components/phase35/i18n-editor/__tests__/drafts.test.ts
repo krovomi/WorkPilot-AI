@@ -12,6 +12,7 @@ import {
 	looksUntranslated,
 	placeholdersOf,
 	renameKey,
+	restoreKey,
 	revertValue,
 	setValue,
 } from "../drafts";
@@ -296,5 +297,35 @@ describe("filterRows", () => {
 			locales: LOCALES,
 		});
 		expect(out.map((r) => r.key)).toEqual(["buttons.undo"]);
+	});
+});
+
+describe("the draft's edge cases", () => {
+	it("sees no mismatch without a reference value", () => {
+		const [, undo] = applyDraft(entries(), emptyDraft(), LOCALES, "fr");
+		expect(undo.values.fr).toBeNull();
+		expect(undo.placeholderMismatch).toBe(false);
+	});
+
+	it("reverts one cell of a key and keeps its other edits", () => {
+		let draft = setValue(emptyDraft(), "buttons.save", "fr", "Sauver");
+		draft = setValue(draft, "buttons.save", "en", "Store");
+		draft = revertValue(draft, "buttons.save", "fr");
+		expect(draft.edits).toEqual({ "buttons.save": { en: "Store" } });
+		expect(revertValue(draft, "buttons.save", "fr")).toBe(draft);
+		expect(revertValue(draft, "greeting", "en")).toBe(draft);
+	});
+
+	it("deletes a key once, and restores only a deleted key", () => {
+		const deleted = deleteKey(emptyDraft(), "greeting");
+		expect(deleteKey(deleted, "greeting")).toBe(deleted);
+		expect(restoreKey(deleted, "buttons.save")).toBe(deleted);
+		expect(restoreKey(deleted, "greeting").deletes).toEqual([]);
+	});
+
+	it("renames a key created in the session under its new name", () => {
+		const draft = renameKey(addKey(emptyDraft(), "menu.open", { en: "Open" }), "menu.open", "menu.show");
+		expect(draft.added).toEqual({ "menu.show": { en: "Open" } });
+		expect(countChanges(draft)).toBe(1);
 	});
 });

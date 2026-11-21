@@ -4,7 +4,9 @@
  * circuit breaker saw its agent repeat the same tool call
  * (`apps/backend/agents/tool_breaker.py`), or because the session watch saw
  * its trust score fall or a sandbox limit crossed
- * (`apps/backend/agents/safety_watch.py`). The pause keeps the card in its
+ * (`apps/backend/agents/safety_watch.py`), or because `workpilot.policy.yaml`
+ * says agents must stop: outside its hours or past its token budget
+ * (`apps/backend/agents/policy_watch.py`). The pause keeps the card in its
  * column, so without this nobody would know the task stopped until they opened
  * it. Read from the task's `pause_state.json`, written by the backend.
  */
@@ -14,6 +16,7 @@ import path from "node:path";
 import { AUTO_BUILD_PATHS } from "../shared/constants";
 import type { BudgetPauseDetail } from "../shared/types/cost-budget";
 import type { AnomalyPauseDetail, SandboxPauseDetail } from "../shared/types/agent-safety";
+import type { PolicyPauseDetail } from "../shared/types/governance";
 import type { BreakerPauseDetail } from "../shared/types/task";
 import { getAppLanguage } from "./app-language";
 import { notificationService } from "./notification-service";
@@ -36,6 +39,11 @@ const STRINGS = {
 		sandbox: '"{title}" crossed a sandbox limit. Read the card before resuming it.',
 		sandboxStopped:
 			'"{title}" wrote outside the sandbox\'s rules. The session was stopped and its files restored to the snapshot taken before it.',
+		hoursTitle: "Task paused: outside allowed hours",
+		hours: '"{title}" paused: workpilot.policy.yaml lets agents work {hours} ({timezone}). Resume it inside those hours.',
+		policyBudgetTitle: "Task paused: token budget reached",
+		policyBudget:
+			'"{title}" paused: the project\'s agents spent {spent} tokens in the last hour, past the {limit} workpilot.policy.yaml allows.',
 	},
 	fr: {
 		title: "Tâche en pause : budget atteint",
@@ -54,6 +62,11 @@ const STRINGS = {
 		sandbox: "« {title} » a franchi une limite du bac à sable. Lisez la carte avant de la reprendre.",
 		sandboxStopped:
 			"« {title} » a écrit hors des règles du bac à sable. La session a été arrêtée et ses fichiers ramenés à l'instantané pris avant elle.",
+		hoursTitle: "Tâche en pause : hors des heures permises",
+		hours: "« {title} » en pause : workpilot.policy.yaml permet aux agents de travailler {hours} ({timezone}). Reprenez-la pendant ces heures.",
+		policyBudgetTitle: "Tâche en pause : budget de jetons atteint",
+		policyBudget:
+			"« {title} » en pause : les agents du projet ont dépensé {spent} jetons dans la dernière heure, au-delà des {limit} permis par workpilot.policy.yaml.",
 	},
 };
 
@@ -64,6 +77,7 @@ interface PauseRecord {
 	breaker?: BreakerPauseDetail;
 	anomaly?: AnomalyPauseDetail;
 	sandbox?: SandboxPauseDetail;
+	policy?: PolicyPauseDetail;
 }
 
 type Words = (typeof STRINGS)["en"];
@@ -103,6 +117,28 @@ function safetyMessage(record: PauseRecord, title: string, words: Words) {
 	return { title: words.sandboxTitle, body };
 }
 
+function policyMessage(detail: PolicyPauseDetail | undefined, title: string, words: Words) {
+	if (detail?.reason === "policy_hours" && Array.isArray(detail.allowedHours)) {
+		const body = words.hours
+			.replace("{title}", title)
+			.replace("{hours}", detail.allowedHours.join(", ").slice(0, 120))
+			.replace("{timezone}", String(detail.timezone ?? "").slice(0, 64));
+		return { title: words.hoursTitle, body };
+	}
+	if (
+		detail?.reason === "policy_budget" &&
+		typeof detail.tokensLastHour === "number" &&
+		typeof detail.maxTokensPerHour === "number"
+	) {
+		const body = words.policyBudget
+			.replace("{title}", title)
+			.replace("{spent}", String(Math.trunc(detail.tokensLastHour)))
+			.replace("{limit}", String(Math.trunc(detail.maxTokensPerHour)));
+		return { title: words.policyBudgetTitle, body };
+	}
+	return null;
+}
+
 /** The message for a pause the backend took itself, or null for any other pause. */
 export function backendPauseMessage(
 	record: PauseRecord | null,
@@ -118,6 +154,9 @@ export function backendPauseMessage(
 	if (record.reason === "tool_loop") return breakerMessage(record.breaker, title, words);
 	if (record.reason === "anomaly" || record.reason === "sandbox") {
 		return safetyMessage(record, title, words);
+	}
+	if (record.reason === "policy_hours" || record.reason === "policy_budget") {
+		return policyMessage(record.policy, title, words);
 	}
 	return null;
 }

@@ -1,10 +1,12 @@
-"""Authentication endpoints: local login, Entra ID exchange, refresh, logout."""
+"""Authentication endpoints: local login, Entra ID and OIDC sign-in, refresh, logout."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from server.auth import oidc_generic
 from server.auth.deps import CurrentUser, get_current_user, require_admin
 from server.auth.jwt_tokens import (
     TokenError,
@@ -75,6 +77,32 @@ async def auth_config() -> dict:
         "entra_enabled": settings.entra_enabled,
         "entra_tenant_id": settings.entra_tenant_id or None,
         "entra_client_id": settings.entra_client_id or None,
+        **await _sso_config(),
+    }
+
+
+async def _sso_config() -> dict:
+    """The generic OpenID Connect sign-in, as the client runs it.
+
+    Off when it is not configured, and when the provider's discovery document
+    cannot be read or fails its checks: a button that cannot work is not shown.
+    """
+    settings = get_settings()
+    off = {"sso_enabled": False}
+    if not settings.oidc_enabled:
+        return off
+    try:
+        found = await asyncio.to_thread(oidc_generic.discover)
+    except OidcError as e:
+        logger.warning("Single sign-on is configured but unusable: %s", e)
+        return off
+    return {
+        "sso_enabled": True,
+        "sso_name": settings.oidc_name,
+        "sso_client_id": settings.oidc_client_id,
+        "sso_scopes": settings.oidc_scopes,
+        "sso_authorization_endpoint": found["authorization_endpoint"],
+        "sso_token_endpoint": found["token_endpoint"],
     }
 
 
@@ -103,6 +131,22 @@ async def oidc_exchange(
     except OidcError as e:
         raise HTTPException(status_code=401, detail=str(e))
     db.add(AuditLog(user_id=user.id, action="auth.login.entra"))
+    await db.commit()
+    return await _token_response(db, user, request)
+
+
+@router.post("/sso/exchange", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def sso_exchange(
+    body: OidcExchangeRequest, request: Request, db: AsyncSession = Depends(get_db)
+) -> TokenResponse:
+    """Exchange an id_token of the configured OpenID Connect provider."""
+    try:
+        claims = await oidc_generic.avalidate_id_token(body.id_token)
+        user = await oidc_generic.provision_oidc_user(db, claims)
+    except OidcError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    db.add(AuditLog(user_id=user.id, action="auth.login.oidc"))
     await db.commit()
     return await _token_response(db, user, request)
 

@@ -42,4 +42,16 @@ describe("review feedback preload", () => {
 			3,
 		);
 	});
+
+	it("reads the stats, resets a rule and writes the conventions on their channels", async () => {
+		const api = createGitHubAPI();
+		await api.getReviewFeedbackStats("p1");
+		await api.resetReviewFeedbackRule("p1", "0123456789abcdef");
+		await api.writeReviewConventions("p1");
+		expect(invoke.mock.calls).toEqual([
+			[IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_STATS, "p1"],
+			[IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_RESET, "p1", "0123456789abcdef"],
+			[IPC_CHANNELS.GITHUB_PR_REVIEW_CONVENTIONS_WRITE, "p1"],
+		]);
+	});
 });

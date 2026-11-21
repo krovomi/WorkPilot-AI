@@ -210,7 +210,13 @@ describe("selection and settings", () => {
 
 		localStorage.setItem("pixel-office-settings", JSON.stringify({ state: { settings: { zoom: 5 } }, version: 0 }));
 		await usePixelOfficeStore.persist.rehydrate();
-		expect(store().settings).toEqual({ zoom: 5, showGrid: false, soundEnabled: false, autoAssignSeats: true });
+		expect(store().settings).toEqual({
+			zoom: 5,
+			showGrid: false,
+			soundEnabled: false,
+			autoAssignSeats: true,
+			calmMode: false,
+		});
 
 		localStorage.setItem("pixel-office-settings", JSON.stringify({ state: null, version: 0 }));
 		await usePixelOfficeStore.persist.rehydrate();

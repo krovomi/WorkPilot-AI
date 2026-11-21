@@ -77,7 +77,7 @@
 	},
 	"recorder": {
 		"title": "Record a test",
-		"description": "Open a page in a browser window, do what the test should do, then export the steps as a Playwright or Cypress test. Alt+click an element to check its visible text.",
+		"description": "Open a page in a browser window, do what the test should do, then export the steps as a Playwright, Cypress, Selenium or WebdriverIO test. Alt+click an element to check its visible text. Iframes and open shadow roots are recorded; the test waits for what each action caused (a page, a request, an element) instead of pausing.",
 		"urlLabel": "Address to record from",
 		"start": "Record",
 		"stop": "Stop",
@@ -97,6 +97,15 @@
 			"press": "Press",
 			"assert_text": "Check text"
 		},
+		"place": {
+			"frame": "in a frame",
+			"shadow": "in a shadow root"
+		},
+		"waits": {
+			"visible": "waits for it to show",
+			"request": "waits for {{method}} {{path}}",
+			"url": "waits for {{url}}"
+		},
 		"exportTitle": "Export",
 		"nameLabel": "Test name",
 		"namePlaceholder": "recorded flow",
@@ -104,7 +113,10 @@
 		"formats": {
 			"playwright-ts": "Playwright (TypeScript)",
 			"playwright-python": "Playwright (Python)",
-			"cypress": "Cypress"
+			"cypress": "Cypress",
+			"selenium-python": "Selenium (Python)",
+			"selenium-java": "Selenium (Java)",
+			"webdriverio": "WebdriverIO"
 		},
 		"preview": "Preview",
 		"review": "Propose on a review card",

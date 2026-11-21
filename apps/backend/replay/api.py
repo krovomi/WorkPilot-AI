@@ -33,7 +33,8 @@ from .bundle import (
     file_name,
     session_from_bundle,
 )
-from .recorder import get_replay_recorder
+from .models import BreakpointType
+from .recorder import compare, get_replay_recorder
 from .time_travel import get_time_travel_engine
 from .viewer import render_viewer
 
@@ -52,7 +53,7 @@ FORK_NOT_FOUND = "Fork not found"
 
 
 class AddBreakpointRequest(BaseModel):
-    breakpoint_type: str  # tool_call, file_change, decision, error, token_threshold, step_index, pattern_match
+    breakpoint_type: BreakpointType
     condition: str = ""
     description: str = ""
 
@@ -334,7 +335,7 @@ async def add_breakpoint(session_id: str, req: AddBreakpointRequest):
     recorder = get_replay_recorder()
     bp = recorder.add_breakpoint(
         session_id,
-        breakpoint_type=req.breakpoint_type,
+        breakpoint_type=req.breakpoint_type.value,
         condition=req.condition,
         description=req.description,
     )
@@ -519,10 +520,7 @@ async def summarize_session(session_id: str, req: SummarizeRequest):
 
 @router.post(
     "/compare",
-    responses={
-        404: {"description": "Session A or B not found"},
-        500: {"description": "Failed to compare sessions"},
-    },
+    responses={404: {"description": "Session A or B not found"}},
 )
 async def compare_sessions(req: CompareSessionsRequest):
     """Compare two replay sessions side by side (A/B comparison)."""
@@ -540,13 +538,9 @@ async def compare_sessions(req: CompareSessionsRequest):
             status_code=404, detail=f"Session B not found: {req.session_b_id}"
         )
 
-    comparison = recorder.compare_sessions(req.session_a_id, req.session_b_id)
-    if not comparison:
-        raise HTTPException(status_code=500, detail="Failed to compare sessions")
-
     return {
         "success": True,
-        "comparison": comparison.to_dict(),
+        "comparison": compare(session_a, session_b).to_dict(),
         "session_a": session_a.to_summary(),
         "session_b": session_b.to_summary(),
     }

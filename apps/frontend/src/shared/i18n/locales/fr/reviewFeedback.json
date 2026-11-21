@@ -1,0 +1,43 @@
+{
+	"title": "Retours sur les revues de ce projet",
+	"subtitle": "Ce qui a été accepté et rejeté dans toutes les revues de PR, et ce que le relecteur en a appris.",
+	"show": "Afficher",
+	"hide": "Masquer",
+	"refresh": "Actualiser",
+	"loading": "Chargement des retours…",
+	"empty": "Aucun retour pour l'instant. Acceptez ou rejetez des résultats pour apprendre au relecteur les conventions de ce projet.",
+	"overall": "{{rate}} % des {{total}} résultats évalués acceptés",
+	"byCategory": "Taux d'acceptation par catégorie",
+	"columns": {
+		"category": "Catégorie",
+		"accepted": "Acceptés",
+		"rejected": "Rejetés",
+		"notApplicable": "Non applicables",
+		"rate": "Acceptation"
+	},
+	"rate": "{{rate}} %",
+	"rulesTitle": "Appris des rejets",
+	"rulesHint": "Un type de résultat rejeté {{threshold}} fois de plus qu'il n'a été accepté passe en sévérité basse ; au double, il est masqué. Les résultats de sécurité et critiques ne sont jamais touchés.",
+	"noRules": "Aucun type de résultat n'a été assez souvent rejeté pour changer les revues.",
+	"status": {
+		"dropped": "Masqué",
+		"downgraded": "Rétrogradé en bas"
+	},
+	"counts": "Rejeté {{rejected}}, accepté {{accepted}}",
+	"mostly": "Surtout : {{reason}}",
+	"reset": "Réinitialiser",
+	"resetLabel": "Oublier les retours sur « {{label}} »",
+	"resetHint": "Réinitialiser oublie les verdicts donnés jusqu'ici sur ce type de résultat : le relecteur le signale de nouveau jusqu'à ce qu'il soit de nouveau rejeté.",
+	"conventions": {
+		"write": "Générer review-conventions.md",
+		"hint": "Écrit les règles déduites de ces retours dans .workpilot/review-conventions.md, sans aucun modèle. Les mêmes retours donnent toujours le même fichier.",
+		"written_one": "Écrit dans {{path}} ({{count}} règle).",
+		"written_other": "Écrit dans {{path}} ({{count}} règles)."
+	},
+	"errors": {
+		"invalid": "Cette demande n'a pas pu être lue.",
+		"not_found": "Ce projet ou ce type de résultat est introuvable.",
+		"server_project": "Les retours sur les résultats ne sont pas encore disponibles pour les projets serveur.",
+		"write_failed": "Le fichier n'a pas pu être écrit."
+	}
+}

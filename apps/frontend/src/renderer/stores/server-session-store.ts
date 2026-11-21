@@ -42,6 +42,7 @@ interface ServerSessionState {
 		password: string,
 	) => Promise<{ ok: boolean; error?: string }>;
 	loginEntra: (serverUrl: string) => Promise<{ ok: boolean; error?: string }>;
+	loginSso: (serverUrl: string) => Promise<{ ok: boolean; error?: string }>;
 	lookupInvite: (
 		serverUrl: string,
 		token: string,
@@ -169,6 +170,15 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 
 		loginEntra: async (serverUrl) => {
 			const result = await window.electronAPI.serverAuth.loginEntra(serverUrl);
+			if (result.ok) {
+				set({ isLoginScreenOpen: false });
+				return { ok: true };
+			}
+			return { ok: false, error: result.error };
+		},
+
+		loginSso: async (serverUrl) => {
+			const result = await window.electronAPI.serverAuth.loginSso(serverUrl);
 			if (result.ok) {
 				set({ isLoginScreenOpen: false });
 				return { ok: true };

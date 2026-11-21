@@ -5,6 +5,7 @@ from __future__ import annotations
 from browser_agent.recording import Selector
 from browser_agent.selector_builder import (
     build_selectors,
+    css_selector,
     is_secret_field,
     looks_generated,
     secret_env_name,
@@ -107,3 +108,22 @@ def test_the_env_name_is_built_from_the_field() -> None:
     )
     assert secret_env_name({"placeholder": "é"}) == "E2E_SECRET"
     assert len(secret_env_name({"nameAttr": "x" * 200})) == 64
+
+
+def test_a_frame_or_a_shadow_host_is_named_by_its_first_css_selector() -> None:
+    assert css_selector({"tag": "x-card", "testId": "card", "testIdUnique": True}) == (
+        '[data-testid="card"]'
+    )
+    assert (
+        css_selector(
+            {"tag": "iframe", "nameAttr": "pay", "nameUnique": True, "path": "iframe"}
+        )
+        == 'iframe[name="pay"]'
+    )
+    # A role or a text is no CSS: the path is.
+    assert (
+        css_selector({"tag": "x-tab", "role": "tab", "name": "Pay", "path": "x-tab"})
+        == "x-tab"
+    )
+    assert css_selector({"tag": "div", "role": "tab", "name": "Pay"}) == ""
+    assert css_selector("iframe") == ""

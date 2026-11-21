@@ -33,9 +33,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { useI18nEditorStore } from "../../../stores/i18n-editor-store";
 import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/button";
+import { translateBackendError } from "../_translate-backend-error";
 import { AddKeyDialog } from "./AddKeyDialog";
 import { EntryCell } from "./EntryCell";
 import { NamespaceList } from "./NamespaceList";
@@ -74,13 +76,37 @@ export function TranslationEditor() {
 		discard,
 		save,
 		reloadKeepingDraft,
-	} = useI18nEditorStore();
+	} = useI18nEditorStore(
+		useShallow((s) => ({
+			phase: s.phase,
+			error: s.error,
+			stale: s.stale,
+			locales: s.locales,
+			namespaces: s.namespaces,
+			selectedNamespace: s.selectedNamespace,
+			view: s.view,
+			draft: s.draft,
+			referenceLocale: s.referenceLocale,
+			lastSave: s.lastSave,
+			selectNamespace: s.selectNamespace,
+			setValue: s.setValue,
+			revertValue: s.revertValue,
+			addKey: s.addKey,
+			deleteKey: s.deleteKey,
+			restoreKey: s.restoreKey,
+			renameKey: s.renameKey,
+			discard: s.discard,
+			save: s.save,
+			reloadKeepingDraft: s.reloadKeepingDraft,
+		})),
+	);
 
 	const [query, setQuery] = useState("");
 	const [filter, setFilter] = useState<RowFilter>("all");
 	const [limit, setLimit] = useState(PAGE);
 	const [adding, setAdding] = useState(false);
-	const [renaming, setRenaming] = useState<string | null>(null);
+	/** The row being renamed: its key at load time, and the name it has now. */
+	const [renaming, setRenaming] = useState<{ originalKey: string; key: string } | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
 
 	const busy = phase === "saving" || phase === "loadingNamespace";
@@ -116,10 +142,6 @@ export function TranslationEditor() {
 		[rows, query, filter, locales],
 	);
 
-	useEffect(() => {
-		setLimit(PAGE);
-	}, []);
-
 	// Ctrl/Cmd+S is what anyone editing a file reaches for. Without it the
 	// browser's own save dialog opens over the app, which is worse than nothing.
 	useEffect(() => {
@@ -138,12 +160,21 @@ export function TranslationEditor() {
 		[rows, deletedRows],
 	);
 
-	const commitRename = (originalKey: string) => {
+	// Why the typed name cannot be used, said under the box: Enter used to
+	// drop an invalid or taken name without a word.
+	const renameProblem = useMemo(() => {
+		if (!renaming) return null;
 		const next = renameDraft.trim();
+		const shape = keyError(next);
+		if (shape) return t(`i18nEditor.keyError.${shape}`);
+		if (next !== renaming.key && existingKeys.includes(next)) return t("i18nEditor.keyError.taken");
+		return null;
+	}, [renaming, renameDraft, existingKeys, t]);
+
+	const commitRename = (originalKey: string) => {
+		if (renameProblem) return;
 		setRenaming(null);
-		if (!next || keyError(next)) return;
-		if (next !== originalKey && existingKeys.includes(next)) return;
-		renameKey(originalKey, next);
+		renameKey(originalKey, renameDraft.trim());
 	};
 
 	return (
@@ -235,8 +266,11 @@ export function TranslationEditor() {
 							</div>
 						)}
 						{error && !stale && (
-							<p className="border-b bg-destructive/10 px-3 py-2 text-xs text-destructive">
-								{error}
+							<p
+								role="alert"
+								className="border-b bg-destructive/10 px-3 py-2 text-xs text-destructive"
+							>
+								{translateBackendError(error, t)}
 							</p>
 						)}
 
@@ -276,20 +310,32 @@ export function TranslationEditor() {
 												className="group border-b align-top hover:bg-muted/30"
 											>
 												<td className="px-2 py-1.5">
-													{renaming === row.originalKey ? (
-														<Input
-															spellCheck={false}
-															value={renameDraft}
-															onChange={(e) => setRenameDraft(e.target.value)}
-															onBlur={() => commitRename(row.originalKey)}
-															onKeyDown={(e) => {
-																if (e.key === "Enter") commitRename(row.originalKey);
-																if (e.key === "Escape") setRenaming(null);
-															}}
-															aria-label={t("i18nEditor.renameKey")}
-															className="w-full px-1.5 py-1 font-mono text-xs h-auto"
-															autoFocus
-														/>
+													{renaming?.originalKey === row.originalKey ? (
+														<>
+															<Input
+																spellCheck={false}
+																value={renameDraft}
+																onChange={(e) => setRenameDraft(e.target.value)}
+																// Leaving the box keeps a valid name and drops an invalid one.
+																onBlur={() =>
+																	renameProblem ? setRenaming(null) : commitRename(row.originalKey)
+																}
+																onKeyDown={(e) => {
+																	if (e.key === "Enter") commitRename(row.originalKey);
+																	if (e.key === "Escape") setRenaming(null);
+																}}
+																aria-label={t("i18nEditor.renameKey")}
+																aria-invalid={Boolean(renameProblem) || undefined}
+																aria-describedby={renameProblem ? "rename-key-error" : undefined}
+																className="w-full px-1.5 py-1 font-mono text-xs h-auto"
+																autoFocus
+															/>
+															{renameProblem && (
+																<p id="rename-key-error" className="mt-1 text-3xs text-destructive">
+																	{renameProblem}
+																</p>
+															)}
+														</>
 													) : (
 														<div className="flex items-start gap-1">
 															<span
@@ -320,9 +366,8 @@ export function TranslationEditor() {
 																<span
 																	className="shrink-0 text-warning"
 																	title={t("i18nEditor.mismatchHint", {
-																		vars: placeholdersOf(
-																			row.values[referenceLocale] ?? "",
-																		).join(", "),
+																		// A mismatch needs a reference value: never null here.
+																		vars: placeholdersOf(row.values[referenceLocale] as string).join(", "),
 																	})}
 																>
 																	<AlertTriangle className="h-3 w-3" />
@@ -356,7 +401,7 @@ export function TranslationEditor() {
 															title={t("i18nEditor.renameKey")}
 															aria-label={t("i18nEditor.renameKey")}
 															onClick={() => {
-																setRenaming(row.originalKey);
+																setRenaming({ originalKey: row.originalKey, key: row.key });
 																setRenameDraft(row.key);
 															}}
 														>

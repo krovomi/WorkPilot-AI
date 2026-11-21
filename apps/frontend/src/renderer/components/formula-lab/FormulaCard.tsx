@@ -16,14 +16,15 @@ import { SuccessRing } from "./SuccessRing";
 export interface FormulaCardProps {
 	readonly formula: Formula;
 	/** Headline tag, e.g. "🏆 Best value". */
-	readonly pickLabel?: string;
+	readonly pickLabel: string;
 	/** Accent colour for the headline tag. */
-	readonly accent?: string;
-	readonly selected?: boolean;
-	readonly applied?: boolean;
-	readonly applying?: boolean;
-	readonly onSelect?: () => void;
-	readonly onApply?: () => void;
+	readonly accent: string;
+	readonly selected: boolean;
+	/** This formula is the one the task runs on. */
+	readonly applied: boolean;
+	readonly applying: boolean;
+	readonly onSelect: () => void;
+	readonly onApply: () => void;
 }
 
 /**
@@ -44,33 +45,27 @@ export function FormulaCard({
 	const color = providerColor(formula.provider);
 
 	return (
-		// A div (not a button) so the inner "Apply" Button isn't a nested button —
-		// nested <button> is invalid HTML and triggers a hydration error.
-		// biome-ignore lint/a11y/useSemanticElements: nested button constraint required
+		// The select area is a real button; "Apply" sits next to it, not inside
+		// it, since a <button> cannot contain another one.
 		<div
-			role="button"
-			tabIndex={0}
-			onClick={onSelect}
-			onKeyDown={(e) => {
-				if (e.key === "Enter" || e.key === " ") {
-					e.preventDefault();
-					onSelect?.();
-				}
-			}}
-			className={`group relative flex w-full cursor-pointer flex-col gap-2 rounded-xl border p-3 text-left transition-all hover:shadow-md ${
+			className={`group relative flex w-full flex-col gap-2 rounded-xl border p-3 transition-all hover:shadow-md ${
 				selected
 					? "border-primary ring-2 ring-primary/40"
 					: "border-border hover:border-primary/40"
 			}`}
 		>
-			{pickLabel && (
+			<button
+				type="button"
+				onClick={onSelect}
+				aria-pressed={selected}
+				className="flex w-full cursor-pointer flex-col gap-2 text-left"
+			>
 				<span
 					className="absolute -top-2 left-3 rounded-full px-2 py-0.5 text-3xs font-semibold text-white shadow-sm"
-					style={{ backgroundColor: accent ?? color }}
+					style={{ backgroundColor: accent }}
 				>
 					{pickLabel}
 				</span>
-			)}
 
 			<div className="flex items-center justify-between gap-2 pt-1">
 				<div className="min-w-0">
@@ -85,7 +80,7 @@ export function FormulaCard({
 					</div>
 					<div className="mt-0.5 flex items-center gap-1.5 text-2xs capitalize text-muted-foreground">
 						<span>
-							{formula.provider} · {effortLabel(formula.effort)}
+							{formula.provider} · {effortLabel(formula.effort, t)}
 						</span>
 						{formula.provider === "ollama" &&
 							(formula.installed ? (
@@ -128,17 +123,14 @@ export function FormulaCard({
 					</Badge>
 				)}
 			</div>
+			</button>
 
-			{onApply && (
 				<Button
 					size="sm"
 					variant={applied ? "secondary" : "default"}
 					className="mt-1 w-full gap-1.5"
 					disabled={applying || applied}
-					onClick={(e) => {
-						e.stopPropagation();
-						onApply();
-					}}
+					onClick={onApply}
 				>
 					{applying ? (
 						<Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -149,7 +141,6 @@ export function FormulaCard({
 						? t("formulaLab:applied")
 						: t("formulaLab:apply")}
 				</Button>
-			)}
 		</div>
 	);
 }

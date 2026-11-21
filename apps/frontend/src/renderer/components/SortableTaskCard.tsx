@@ -83,7 +83,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
 		agingLevel === "none"
 			? undefined
 			: t("kanban.aging.idleFor", {
-					duration: formatAgingDuration(getTaskAgingHours(task)),
+					duration: formatAgingDuration(getTaskAgingHours(task), t),
 				});
 
 	// Memoize onClick to prevent unnecessary TaskCard re-renders

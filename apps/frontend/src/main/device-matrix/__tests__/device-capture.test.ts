@@ -2,6 +2,8 @@
  * Capturing one device of the matrix (#383): a hidden, sandboxed window on an
  * in-memory session that grants nothing, the device emulated before the page
  * loads, no way off the server's origin, and the window always destroyed.
+ * Network and CPU throttling, when a profile asks for it, is set the same
+ * way, before the page loads, and the load is timed under it.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +16,7 @@ const state = vi.hoisted(() => ({
 	shownUrl: "http://localhost:5173/account",
 	attachThrows: false,
 	detachThrows: false,
+	refuse: null as string | null,
 }));
 
 interface FakeSession {
@@ -74,6 +77,7 @@ vi.mock("electron", () => {
 						record.attached = false;
 					},
 					sendCommand: async (method: string, params?: Record<string, unknown>) => {
+						if (method === state.refuse) throw new Error(`'${method}' wasn't found`);
 						record.commands.push({ method, params });
 						return method === "Page.captureScreenshot" ? state.screenshot : {};
 					},
@@ -92,18 +96,31 @@ vi.mock("electron", () => {
 });
 
 import { findDevicePreset } from "../../../shared/constants/device-presets";
-import { DeviceCaptureFailure, LOAD_TIMEOUT_MS, MAX_IMAGE_CHARS, SETTLE_MS, captureDevice } from "../device-capture";
+import {
+	BASE_LOAD_TIMEOUT_MS,
+	MAX_LOAD_TIMEOUT_MS,
+	findCpuProfile,
+	findNetworkProfile,
+} from "../../../shared/constants/emulation-throttling";
+import { DeviceCaptureFailure, MAX_IMAGE_CHARS, SETTLE_MS, type Throttling, captureDevice } from "../device-capture";
 
 const iphone = findDevicePreset("iphone-15");
 const desktop = findDevicePreset("desktop-1080p");
 if (!iphone || !desktop) throw new Error("presets missing");
 
-async function run(device = iphone, url = "http://localhost:5173/account") {
-	const done = captureDevice(device as NonNullable<typeof iphone>, url);
+async function run(device = iphone, url = "http://localhost:5173/account", throttling?: Throttling) {
+	const done = captureDevice(device as NonNullable<typeof iphone>, url, throttling);
 	// Observed now: a refusal may settle before the settle delay runs out.
 	done.catch(() => undefined);
-	await vi.advanceTimersByTimeAsync(SETTLE_MS);
+	await vi.advanceTimersByTimeAsync(SETTLE_MS * (throttling?.cpu.rate ?? 1));
 	return done;
+}
+
+function throttling(network: string, cpu: string): Throttling {
+	const profile = findNetworkProfile(network);
+	const rate = findCpuProfile(cpu);
+	if (!profile || !rate) throw new Error("profiles missing");
+	return { network: profile, cpu: rate };
 }
 
 const lastWindow = () => state.windows[state.windows.length - 1];
@@ -118,6 +135,7 @@ describe("captureDevice", () => {
 		state.shownUrl = "http://localhost:5173/account";
 		state.attachThrows = false;
 		state.detachThrows = false;
+		state.refuse = null;
 	});
 
 	it("renders in a hidden sandboxed window that grants nothing", async () => {
@@ -145,6 +163,7 @@ describe("captureDevice", () => {
 			url: "http://localhost:5173/account",
 			image: "data:image/png;base64,iVBORw0KGgo=",
 			report: { viewportWidth: 393, scrollWidth: 393, scanned: 0, truncated: false, issues: [] },
+			loadMs: 0,
 		});
 		expect(window.destroy).toHaveBeenCalled();
 		expect(session.clearStorageData).toHaveBeenCalled();
@@ -214,8 +233,71 @@ describe("captureDevice", () => {
 		state.loadURL = () => new Promise(() => undefined);
 		const pending = captureDevice(iphone, "http://localhost:5173/");
 		const settled = expect(pending).rejects.toMatchObject({ code: "load-failed" });
-		await vi.advanceTimersByTimeAsync(LOAD_TIMEOUT_MS);
+		await vi.advanceTimersByTimeAsync(BASE_LOAD_TIMEOUT_MS);
 		await settled;
+	});
+
+	it("throttles the network and the CPU before loading, from the named profiles only", async () => {
+		await run(iphone, "http://localhost:5173/account", throttling("slow-3g", "4x"));
+		const { commands } = lastWindow();
+		expect(commands.map((command) => command.method)).toEqual([
+			"Emulation.setDeviceMetricsOverride",
+			"Emulation.setTouchEmulationEnabled",
+			"Emulation.setUserAgentOverride",
+			"Network.enable",
+			"Network.emulateNetworkConditions",
+			"Emulation.setCPUThrottlingRate",
+			"Page.captureScreenshot",
+		]);
+		expect(commands[4].params).toEqual({
+			offline: false,
+			latency: 2000,
+			downloadThroughput: 50_000,
+			uploadThroughput: 50_000,
+		});
+		expect(commands[5].params).toEqual({ rate: 4 });
+	});
+
+	it("touches only what a profile asks for", async () => {
+		await run(iphone, "http://localhost:5173/", throttling("none", "6x"));
+		expect(lastWindow().commands.map((command) => command.method)).not.toContain("Network.enable");
+		expect(lastWindow().commands.map((command) => command.method)).toContain("Emulation.setCPUThrottlingRate");
+		await run(iphone, "http://localhost:5173/", throttling("4g", "1x"));
+		const methods = lastWindow().commands.map((command) => command.method);
+		expect(methods).toContain("Network.emulateNetworkConditions");
+		expect(methods).not.toContain("Emulation.setCPUThrottlingRate");
+	});
+
+	it("names a throttling the protocol refuses, rather than capture unthrottled", async () => {
+		state.refuse = "Network.emulateNetworkConditions";
+		await expect(run(iphone, "http://localhost:5173/", throttling("fast-3g", "1x"))).rejects.toEqual(
+			new DeviceCaptureFailure("throttling-failed"),
+		);
+		expect(lastWindow().destroy).toHaveBeenCalled();
+	});
+
+	it("times the load and gives a throttled page longer to load and settle", async () => {
+		state.loadURL = () => new Promise((resolve) => setTimeout(resolve, 1500));
+		const slow = captureDevice(iphone, "http://localhost:5173/", throttling("slow-3g", "2x"));
+		await vi.advanceTimersByTimeAsync(1500);
+		// Settling waits SETTLE_MS times the slowdown: not done after one SETTLE_MS.
+		let done = false;
+		void slow.then(() => (done = true));
+		await vi.advanceTimersByTimeAsync(SETTLE_MS);
+		expect(done).toBe(false);
+		await vi.advanceTimersByTimeAsync(SETTLE_MS);
+		expect((await slow).loadMs).toBe(1500);
+
+		state.loadURL = () => new Promise(() => undefined);
+		const capped = captureDevice(iphone, "http://localhost:5173/", throttling("slow-3g", "6x"));
+		const refused = expect(capped).rejects.toMatchObject({ code: "load-failed" });
+		await vi.advanceTimersByTimeAsync(BASE_LOAD_TIMEOUT_MS);
+		let pending = true;
+		capped.catch(() => (pending = false));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(pending).toBe(true);
+		await vi.advanceTimersByTimeAsync(MAX_LOAD_TIMEOUT_MS - BASE_LOAD_TIMEOUT_MS);
+		await refused;
 	});
 
 	it("refuses an empty, missing or oversized image", async () => {

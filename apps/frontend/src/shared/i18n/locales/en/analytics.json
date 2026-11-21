@@ -37,7 +37,8 @@
 		"costs": "Costs",
 		"performance": "Performance",
 		"builds": "Builds",
-		"errors": "Errors"
+		"errors": "Errors",
+		"compare": "How you compare"
 	},
 	"sections": {
 		"tasksByStatus": "Tasks by Status",
@@ -98,5 +99,51 @@
 		"pending": "Pending",
 		"failed": "Failed",
 		"cancelled": "Cancelled"
+	},
+	"compare": {
+		"title": "How you compare",
+		"loading": "Reading your projects...",
+		"error": "Could not compare this project",
+		"privacyLocal": "Compared with your other projects on this computer, read from their folders. Nothing leaves your computer.",
+		"privacyServer_one": "Compared with the projects of your organization you can read, as medians only, never by name, and only for groups of {{count}} project or more. Nothing leaves the server.",
+		"privacyServer_other": "Compared with the projects of your organization you can read, as medians only, never by name, and only for groups of {{count}} projects or more. Nothing leaves the server.",
+		"window_one": "Medians per spec over the last {{days}} days ({{count}} spec), against the {{days}} days before ({{previous}}).",
+		"window_other": "Medians per spec over the last {{days}} days ({{count}} specs), against the {{days}} days before ({{previous}}).",
+		"columns": {
+			"metric": "Per spec",
+			"recent": "This project",
+			"previous": "Before",
+			"trend": "Trend",
+			"project": "Project",
+			"segment": "Stack and size",
+			"specs": "Specs"
+		},
+		"groups": {
+			"segment": "Same stack and size",
+			"stack": "Same stack",
+			"all": "All projects"
+		},
+		"projectCount_one": "{{count}} project",
+		"projectCount_other": "{{count}} projects",
+		"metrics": {
+			"minutes": "Build time",
+			"cost": "Cost (USD)",
+			"qaIterations": "QA iterations",
+			"agents": "Agents"
+		},
+		"sizes": {
+			"small": "Small repo",
+			"medium": "Medium repo",
+			"large": "Large repo",
+			"monorepo": "Monorepo",
+			"unknown": "Size unknown"
+		},
+		"otherStack": "Other stack",
+		"smallGroup_one": "A group's median shows from {{count}} active project.",
+		"smallGroup_other": "A group's median shows from {{count}} active projects: below that, only its size.",
+		"lowerIsBetter": "Lower is better for every figure. A spec's build time runs from its first agent session to its last.",
+		"yourProjects": "Your other projects",
+		"noOtherProjects": "None of your other projects built a spec in this period.",
+		"ciPending": "First-run CI pass rate is not recorded yet, so it is not compared."
 	}
 }
