@@ -177,6 +177,8 @@ PHASE_ALIASES: dict[str, str] = {
     # which composes no roster today; the entry says which one they want the
     # day they move to `create_client`.
     "batch_analysis": "research",
+    # One issue classified from the text it is given: nothing to delegate.
+    "issue_triage": "solo",
     "batch_validation": "research",
     # Writing or questioning the spec, while there is still no code to point at.
     "spec_writer": "spec",

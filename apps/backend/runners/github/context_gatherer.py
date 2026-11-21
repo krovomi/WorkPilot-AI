@@ -35,8 +35,9 @@ except (ImportError, ValueError, SystemError):
     from gh_client import GHClient, PRTooLargeError
 
 # Validation patterns for git refs and paths (defense-in-depth)
-# These patterns allow common valid characters while rejecting potentially dangerous ones
-SAFE_REF_PATTERN = re.compile(r"^[a-zA-Z0-9._/\-]+$")
+# These patterns allow common valid characters while rejecting potentially dangerous ones;
+# a ref starts with an alphanumeric character, so git never reads it as an option
+SAFE_REF_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/\-]*$")
 SAFE_PATH_PATTERN = re.compile(r"^[a-zA-Z0-9._/\-@]+$")
 
 
