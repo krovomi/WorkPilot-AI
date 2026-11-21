@@ -45,8 +45,10 @@ banner asking them to install one.
 
 `apps/frontend/src/main/linux-password-store.ts` handles that one case before
 `ready`, when Chromium reads the switch. With no desktop declared, a session
-bus address set and `org.freedesktop.secrets` owned on that bus (`dbus-send`
-calling `NameHasOwner`), it adds `--password-store=gnome-libsecret`.
+bus address set, `org.freedesktop.secrets` owned on that bus (`dbus-send`
+calling `NameHasOwner`) and its `default` collection unlocked (`ReadAlias`,
+then the collection's `Locked` property), it adds
+`--password-store=gnome-libsecret`.
 
 - An explicit `--password-store`, `basic` included, always wins.
 - A declared desktop keeps Chromium's choice, even one it does not recognise
@@ -56,6 +58,12 @@ calling `NameHasOwner`), it adds `--password-store=gnome-libsecret`.
   opens a "create a keyring" prompt the user never asked for.
 - The probe gets the bus address and `XDG_RUNTIME_DIR`, not the app's
   environment, which holds the `.env-files` secrets by then (rule S4).
+- A locked keyring, or none behind the `default` alias, does not count
+  either: libsecret would answer the first encryption with an unlock (or
+  create) prompt, and that prompt renders blank under WSLg and nowhere over
+  SSH. Chromium waited on it forever, and the app never opened. The session
+  keeps `basic_text` and logs why; unlocking the keyring before launching
+  (`gnome-keyring-daemon --unlock`) gets libsecret back at the next start.
 
 If libsecret then fails (keyring locked, prompt refused),
 `safeStorage.isEncryptionAvailable()` is false: Chromium only reports a key
@@ -64,6 +72,32 @@ for. `secret-storage.ts` keeps writing in clear and the banner stays, as
 before. The values encrypted in a session with the keyring need it in the
 next: launched without it, they cannot be decrypted and are kept as they are
 (see *Reading never destroys*).
+
+## Startup never waits on the keyring
+
+The test above can pass and the keyring still stall: a declared desktop whose
+prompter is broken, KWallet waiting on its own dialog, a keyring locked between
+the probe and the first call. `secret-storage.ts` therefore never lets the
+main process wait on it, on Linux:
+
+- No synchronous `safeStorage` call before `initSecretStorage` has answered:
+  `decryptSecret` returns undefined (the value is kept, as when the keyring is
+  locked), and `encryptSecret` writes in clear with the banner. The sync calls
+  are the ones that froze the app: a settings read during startup
+  (`initAppLanguage`…) reached `decryptString`, which blocked the main thread
+  on the unlock prompt.
+- `initSecretStorage` asks `isAsyncEncryptionAvailable`, then encrypts a probe
+  value with `encryptStringAsync`, where libsecret and KWallet first hand the
+  key over. Every async call is raced against `KEYRING_TIMEOUT_MS` (5 s); past
+  it, the session goes on without the keyring and logs why. Values already
+  encrypted are kept as they are (see *Reading never destroys*).
+- Callers of their own follow that state: `server-connection.ts` asks
+  `asyncEncryptionUsable()`, and the API Explorer and JEV stores, which call
+  safeStorage synchronously on a user action, get `guardedSafeStorage`, which
+  reports no encryption whenever a sync call could wait.
+
+Windows (DPAPI) never prompts. macOS shows its own Keychain dialog, which the
+user can answer, so neither is bounded.
 
 ## One reader, one writer per file
 

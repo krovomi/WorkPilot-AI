@@ -20,6 +20,16 @@
  * decrypts the secrets already on disk with the async API once `ready` fires,
  * and `prepareSecrets` encrypts a new secret before it is written. The
  * synchronous calls remain only as a fallback for a value neither has seen.
+ *
+ * Startup never waits on the keyring. On Linux, libsecret and KWallet hand the
+ * key over on the first encryption, and a locked keyring answers with an
+ * unlock prompt that may never show (blank under WSLg, absent over SSH): a
+ * synchronous call there freezes the main process. So on Linux the sync API is
+ * only used once the async probe has answered, and each async call is bounded
+ * by KEYRING_TIMEOUT_MS: past it, the session goes on without the keyring
+ * (secrets already encrypted are kept as they are, new ones written in clear
+ * with the banner). Windows (DPAPI) never prompts; macOS shows its own Keychain
+ * dialog the user answers, so neither is bounded.
  */
 
 import { readFile } from "node:fs/promises";
@@ -50,6 +60,37 @@ const encryptedCache = new Map<string, string>();
 const DECRYPTED_CACHE_LIMIT = 256;
 /** What `isAsyncEncryptionAvailable` answered; null until it has. */
 let asyncEncryptionAvailable: boolean | null = null;
+/** How long a Linux keyring may take to answer before the session goes on without it. */
+export const KEYRING_TIMEOUT_MS = 5000;
+const TIMED_OUT = Symbol("keyring timed out");
+const PROBE_VALUE = "workpilot-keyring-probe";
+
+/**
+ * `operation`, raced on Linux against KEYRING_TIMEOUT_MS. Past it, the session
+ * stops asking the keyring: its pending call may wait on a prompt forever.
+ */
+async function bounded<T>(operation: Promise<T>): Promise<T | typeof TIMED_OUT> {
+	if (!isLinux()) return operation;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timeout = new Promise<typeof TIMED_OUT>((resolve) => {
+		timer = setTimeout(() => resolve(TIMED_OUT), KEYRING_TIMEOUT_MS);
+	});
+	try {
+		const result = await Promise.race([operation, timeout]);
+		if (result === TIMED_OUT) keyringStalled();
+		return result;
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
+function keyringStalled(): void {
+	if (asyncEncryptionAvailable === false) return;
+	asyncEncryptionAvailable = false;
+	console.warn(
+		`[SecretStorage] The OS keyring did not answer within ${KEYRING_TIMEOUT_MS / 1000} s (locked, or its unlock prompt cannot show): this session goes on without it. Secrets already encrypted are kept as they are; unlock the keyring, then restart.`,
+	);
+}
 
 function remember(ciphertext: string, plaintext: string): void {
 	if (decryptedCache.size >= DECRYPTED_CACHE_LIMIT) {
@@ -60,20 +101,25 @@ function remember(ciphertext: string, plaintext: string): void {
 	encryptedCache.set(plaintext, ciphertext);
 }
 
-function beforeReady(): boolean {
+/** Whether the app is ready; null without an app (tests, a plain Node process). */
+function appReady(): boolean | null {
 	try {
-		return !app.isReady();
+		return app.isReady();
 	} catch {
-		return false; // No app (tests, a plain Node process): just probe.
+		return null;
 	}
 }
 
 /** safeStorage can run at all — enough to decrypt what is already stored. */
 function safeStorageReady(): boolean {
 	if (asyncEncryptionAvailable !== null) return asyncEncryptionAvailable;
+	const ready = appReady();
 	// Before `ready` safeStorage cannot decrypt anyway (Linux, Windows); not
 	// asking spares the deprecated synchronous probe.
-	if (beforeReady()) return false;
+	if (ready === false) return false;
+	// Linux, ready but not probed yet: a sync call could wait on an unlock
+	// prompt that never shows. Wait for initSecretStorage instead.
+	if (ready === true && isLinux()) return false;
 	try {
 		return safeStorage.isEncryptionAvailable();
 	} catch {
@@ -86,10 +132,12 @@ const ENCRYPTED_VALUE = /enc:([A-Za-z0-9+/]+=*)/g;
 async function decryptAhead(ciphertext: string): Promise<void> {
 	if (decryptedCache.has(ciphertext)) return;
 	try {
-		const { result } = await safeStorage.decryptStringAsync(
-			Buffer.from(ciphertext.slice(ENCRYPTED_SECRET_PREFIX.length), "base64"),
+		const answer = await bounded(
+			safeStorage.decryptStringAsync(
+				Buffer.from(ciphertext.slice(ENCRYPTED_SECRET_PREFIX.length), "base64"),
+			),
 		);
-		remember(ciphertext, result);
+		if (answer !== TIMED_OUT) remember(ciphertext, answer.result);
 	} catch {
 		// Left to decryptSecret, which keeps the value and warns once.
 	}
@@ -104,13 +152,55 @@ export async function initSecretStorage(
 	files: readonly string[] = [],
 ): Promise<void> {
 	try {
-		asyncEncryptionAvailable = await safeStorage.isAsyncEncryptionAvailable();
+		const answer = await bounded(safeStorage.isAsyncEncryptionAvailable());
+		if (answer !== TIMED_OUT) asyncEncryptionAvailable = answer;
 	} catch {
 		asyncEncryptionAvailable = false;
 	}
+	if (asyncEncryptionAvailable && isLinux()) await probeLinuxKeyring();
 	await primeSecretFiles(files);
 	publish();
 }
+
+/**
+ * libsecret and KWallet hand the key over on the first encryption, which is
+ * where a locked keyring prompts. Ask once, bounded, so no sync call ever does.
+ */
+async function probeLinuxKeyring(): Promise<void> {
+	try {
+		await bounded(safeStorage.encryptStringAsync(PROBE_VALUE));
+	} catch {
+		asyncEncryptionAvailable = false; // The keyring refused: no key to use.
+	}
+}
+
+/**
+ * The async safeStorage API may be used: the keyring answered, or there is
+ * none to wait on. For callers of their own (server-connection.ts), so they
+ * never wait on a keyring that timed out at startup.
+ */
+export async function asyncEncryptionUsable(): Promise<boolean> {
+	if (asyncEncryptionAvailable !== null) return asyncEncryptionAvailable;
+	try {
+		const answer = await bounded(safeStorage.isAsyncEncryptionAvailable());
+		return answer === TIMED_OUT ? false : answer;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * safeStorage for a store that calls it synchronously on its own (API
+ * Explorer, JEV): it reports no encryption whenever the sync API could wait on
+ * the keyring (Linux before the probe, or after a timeout), so the store
+ * neither decrypts nor writes there.
+ */
+export const guardedSafeStorage = {
+	isEncryptionAvailable: (): boolean => safeStorageReady(),
+	getSelectedStorageBackend: (): string => safeStorage.getSelectedStorageBackend(),
+	encryptString: (value: string): Buffer => safeStorage.encryptString(value),
+	decryptString: (value: Buffer): string => safeStorage.decryptString(value),
+};
 
 /**
  * Decrypt ahead, with the async safeStorage API, the `enc:` values `files`
@@ -153,7 +243,8 @@ export async function prepareSecrets(values: Iterable<unknown>): Promise<void> {
 	await Promise.all(
 		[...pending].map(async (value) => {
 			try {
-				const encrypted = await safeStorage.encryptStringAsync(value);
+				const encrypted = await bounded(safeStorage.encryptStringAsync(value));
+				if (encrypted === TIMED_OUT) return;
 				remember(
 					`${ENCRYPTED_SECRET_PREFIX}${encrypted.toString("base64")}`,
 					value,
