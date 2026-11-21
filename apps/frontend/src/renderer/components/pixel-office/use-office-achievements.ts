@@ -81,5 +81,15 @@ export function useOfficeAchievements({
 
 	const dismissToast = useCallback(() => setToasts((queue) => queue.slice(1)), []);
 
-	return { unlocked: unlocked ?? {}, toast: toasts[0], dismissToast, refresh };
+	return {
+		unlocked: unlocked ?? {},
+		toast: toasts[0],
+		dismissToast,
+		refresh,
+		/** The incidents last read (null while reading), for the season goals. */
+		incidents,
+		/** The instant the rules were last evaluated at. */
+		now,
+		projectTasks,
+	};
 }

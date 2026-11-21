@@ -210,6 +210,28 @@ describe("PixelOfficeCanvas drawing", () => {
 		expect(drawn.filter((c) => c.name === "strokeRect" && c.strokeStyle === "#FFD700")).toHaveLength(1);
 	});
 
+	it("dresses an agent in its provider's colour", () => {
+		seat([agent({ providerFamily: "openai" })]);
+		const { calls } = mount();
+		const [character] = imagesOf(drawFrame(calls), 16, 24);
+		const sprite = character.args[0] as HTMLCanvasElement;
+		expect(contextOf(sprite).calls.map((c) => c.fillStyle)).toContain("#10A37F");
+	});
+
+	it("draws the decor the seasons earned, and none by default", () => {
+		seat([agent({})]);
+		const plain = mount();
+		const neon = (calls: CanvasCall[]) => calls.some((c) => c.fillStyle === "#F472B6");
+		expect(neon(drawFrame(plain.calls))).toBe(false);
+		plain.unmount();
+
+		const view = render(
+			<PixelOfficeCanvas width={WIDTH} height={HEIGHT} emptyDeskLabel="free" decor={["neon-sign"]} />,
+		);
+		const canvas = view.container.querySelector("canvas") as HTMLCanvasElement;
+		expect(neon(drawFrame(() => contextOf(canvas).calls))).toBe(true);
+	});
+
 	it("draws the tile grid only when it is switched on", () => {
 		seat([agent({})]);
 		const off = mount();
