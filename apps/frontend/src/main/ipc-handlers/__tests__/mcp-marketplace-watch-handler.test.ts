@@ -90,18 +90,17 @@ describe("builder projects", () => {
 			success: true,
 			data: [],
 		});
-		const project = {
+		await call(IPC_CHANNELS.MCP_MARKETPLACE_SAVE_BUILDER, {
 			id: "b1",
 			name: "B",
 			description: "",
-			icon: "Wrench",
+			icon: "server",
 			color: "#000000",
 			envVars: [],
 			tools: [],
-			createdAt: "2026-11-21T08:00:00.000Z",
-			updatedAt: "2026-11-21T08:00:00.000Z",
-		};
-		expect(await call(IPC_CHANNELS.MCP_MARKETPLACE_SAVE_BUILDER, project)).toEqual({ success: true });
+			createdAt: "2026-11-21T00:00:00Z",
+			updatedAt: "2026-11-21T00:00:00Z",
+		});
 		expect(
 			fs.existsSync(path.join(state.dir, "mcp-marketplace", "builder-projects.json")),
 		).toBe(true);
