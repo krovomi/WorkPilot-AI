@@ -49,14 +49,16 @@ def finding(
     fid="f1",
     severity=ReviewSeverity.MEDIUM,
     category=ReviewCategory.QUALITY,
-    title="Possible None dereference",
+    title=None,
     **extra,
 ) -> PRReviewFinding:
+    # Each finding gets its own wording: the self-check merges reports of one
+    # wording at one place into a single finding (services/self_critique.py).
     return PRReviewFinding(
         id=fid,
         severity=severity,
         category=category,
-        title=title,
+        title=title or f"Possible None dereference of {fid}",
         description="d",
         file="src/cache.py",
         line=12,
