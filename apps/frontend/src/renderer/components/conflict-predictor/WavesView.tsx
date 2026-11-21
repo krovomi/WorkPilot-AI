@@ -2,7 +2,8 @@
  * Execution waves across specs (#358): the waves the main process planned,
  * a Gantt-like layout by wave (no duration: the waves run one after the
  * other), the merge order, the riskiest pairs, and "Execute in optimal order",
- * which starts wave after wave through the ordinary task start path.
+ * which starts wave after wave through the ordinary task start path. A run
+ * saved before a restart is offered to resume or abandon.
  */
 
 import { AlertTriangle, GitMerge, Layers, Play, RefreshCw, Square } from "lucide-react";
@@ -12,6 +13,7 @@ import { useShallow } from "zustand/react/shallow";
 import type { ExecutionWavePlan, WavePlanTask, WaveRiskLevel } from "../../../shared/types/conflict-waves";
 import { useExecutionWavesStore } from "../../stores/execution-waves-store";
 import { useProjectStore } from "../../stores/project-store";
+import { useTaskStore } from "../../stores/task-store";
 import {
 	CharterButton,
 	Chip,
@@ -24,6 +26,7 @@ import {
 	Stats,
 	type Tone,
 } from "../charter";
+import { MergeCheckNotices, RunWavesList, SavedRunNotice } from "./WavesNotices";
 
 const TOLERANCES = [0, 1, 2, 4] as const;
 const MAX_PAIRS = 10;
@@ -36,17 +39,20 @@ const LEVEL_TONE: Record<WaveRiskLevel, Tone> = {
 	critical: "red",
 };
 
+/** Titles from the plan, else from the board (a resumed run has no plan yet). */
 function useTitles(plan: ExecutionWavePlan | null): (id: string) => string {
+	const tasks = useTaskStore((s) => s.tasks);
 	return useMemo(() => {
-		const titles = new Map((plan?.tasks ?? []).map((t) => [t.taskId, t.title]));
+		const titles = new Map(tasks.map((t) => [t.id, t.title]));
+		for (const t of plan?.tasks ?? []) titles.set(t.taskId, t.title);
 		return (id: string) => titles.get(id) ?? id;
-	}, [plan]);
+	}, [plan, tasks]);
 }
 
 export function WavesView() {
 	const { t } = useTranslation(["conflictPredictor", "common"]);
 	const projectId = useProjectStore((s) => s.selectedProjectId);
-	const { plan, isPlanning, error, options, execution, blocked, startFailures } =
+	const { plan, isPlanning, error, options, execution, blocked, startFailures, savedRun, savedRunIgnoredFor } =
 		useExecutionWavesStore(
 			useShallow((s) => ({
 				plan: s.plan,
@@ -56,14 +62,18 @@ export function WavesView() {
 				execution: s.execution,
 				blocked: s.blocked,
 				startFailures: s.startFailures,
+				savedRun: s.savedRun,
+				savedRunIgnoredFor: s.savedRunIgnoredFor,
 			})),
 		);
-	const { setOptions, computePlan, execute, stop } = useExecutionWavesStore(
+	const { setOptions, computePlan, execute, stop, resumeSavedRun, abandonSavedRun } = useExecutionWavesStore(
 		useShallow((s) => ({
 			setOptions: s.setOptions,
 			computePlan: s.computePlan,
 			execute: s.execute,
 			stop: s.stop,
+			resumeSavedRun: s.resumeSavedRun,
+			abandonSavedRun: s.abandonSavedRun,
 		})),
 	);
 	const title = useTitles(plan);
@@ -137,6 +147,20 @@ export function WavesView() {
 							{t("conflictPredictor:waves.options.unplannedIndependent")}
 						</Chip>
 					</Chips>
+					<span className="wp-meta">{t("conflictPredictor:waves.options.fragile")}</span>
+					<Chips>
+						<Chip
+							dot={false}
+							pressed={options.fragileZones}
+							title={t("conflictPredictor:waves.options.fragileHint")}
+							onClick={() => setOptions({ fragileZones: true })}
+						>
+							{t("conflictPredictor:waves.options.fragileOn")}
+						</Chip>
+						<Chip dot={false} pressed={!options.fragileZones} onClick={() => setOptions({ fragileZones: false })}>
+							{t("conflictPredictor:waves.options.fragileOff")}
+						</Chip>
+					</Chips>
 					<span className="wp-meta">{t("conflictPredictor:waves.options.advance")}</span>
 					<Chips>
 						<Chip
@@ -155,6 +179,15 @@ export function WavesView() {
 						</Chip>
 					</Chips>
 				</div>
+
+				{!running && projectId && (
+					<SavedRunNotice
+						run={savedRun?.projectId === projectId ? savedRun : null}
+						ignored={savedRunIgnoredFor === projectId}
+						onResume={() => void resumeSavedRun()}
+						onAbandon={() => void abandonSavedRun()}
+					/>
+				)}
 
 				{error && (
 					<Notice tone="red" icon={AlertTriangle} role="alert">
@@ -185,6 +218,8 @@ export function WavesView() {
 
 				{!projectId ? (
 					<EmptyStage icon={Layers} tone="orange" title={t("conflictPredictor:waves.empty.noProject")} />
+				) : !shownPlan && running && execution ? (
+					<RunWavesList waves={execution.waves} current={execution.current} title={title} />
 				) : !shownPlan ? (
 					<EmptyStage icon={Layers} tone="orange" title={t("conflictPredictor:waves.empty.noPlan")} />
 				) : (
@@ -256,6 +291,7 @@ function PlanBody({ plan, title, execution }: PlanBodyProps) {
 					{t("conflictPredictor:waves.notices.unplanned", { count: unplanned.length })}
 				</Notice>
 			)}
+			<MergeCheckNotices plan={plan} title={title} />
 
 			{waveCount > 0 && (
 				<Panel>
@@ -350,6 +386,18 @@ function PlanBody({ plan, title, execution }: PlanBodyProps) {
 										: t("conflictPredictor:waves.pairs.shared", { count: pair.sharedFiles.length })}
 								</span>
 								{!pair.blocking && <Chip tone="green">{t("conflictPredictor:waves.pairs.together")}</Chip>}
+								{pair.fragileLinks && (
+									<Chip tone="violet" title={pair.fragileLinks.join("\n")}>
+										{t("conflictPredictor:waves.pairs.fragile", { count: pair.fragileLinks.length })}
+									</Chip>
+								)}
+								{pair.mergeCheck && (
+									<Chip tone={pair.mergeCheck === "conflict" ? "red" : "green"}>
+										{pair.mergeCheck === "conflict"
+											? t("conflictPredictor:waves.pairs.mergeConflict")
+											: t("conflictPredictor:waves.pairs.mergeClean")}
+									</Chip>
+								)}
 							</li>
 						))}
 					</ul>

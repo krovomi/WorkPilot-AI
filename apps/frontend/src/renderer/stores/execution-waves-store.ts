@@ -12,16 +12,21 @@
 import { create } from "zustand";
 import type {
 	ExecutionWavePlan,
+	SavedWaveRun,
 	UnplannedPolicy,
 	WaveAdvanceWhen,
+	WaveRunState,
 } from "../../shared/types/conflict-waves";
 import { stepWaveExecution, type WaveExecution } from "../lib/wave-execution";
+import { useProjectStore } from "./project-store";
 import { persistTaskStatus, useTaskStore } from "./task-store";
 
 export interface WaveOptions {
 	tolerance: number;
 	unplannedPolicy: UnplannedPolicy;
 	advanceWhen: WaveAdvanceWhen;
+	/** Count files the history changes together (fragile zones). */
+	fragileZones: boolean;
 }
 
 interface ExecutionWavesState {
@@ -34,17 +39,25 @@ interface ExecutionWavesState {
 	blocked: string[];
 	/** Tasks the start path refused, with its reason. */
 	startFailures: Record<string, string>;
+	/** A run saved in the project before a restart, waiting for the person. */
+	savedRun: SavedWaveRun | null;
+	/** Project whose saved run could not be read or was incoherent. */
+	savedRunIgnoredFor: string | null;
 	setOptions: (patch: Partial<WaveOptions>) => void;
 	computePlan: (projectId: string) => Promise<void>;
 	execute: () => Promise<void>;
 	stop: () => void;
 	tick: () => Promise<void>;
+	loadSavedRun: (projectId: string) => Promise<void>;
+	resumeSavedRun: () => Promise<void>;
+	abandonSavedRun: () => Promise<void>;
 }
 
 const DEFAULT_OPTIONS: WaveOptions = {
 	tolerance: 0,
 	unplannedPolicy: "isolate",
 	advanceWhen: "merged",
+	fragileZones: true,
 };
 
 const NOT_STARTED = new Set(["backlog", "queue"]);
@@ -60,16 +73,18 @@ export const useExecutionWavesStore = create<ExecutionWavesState>((set, get) => 
 	execution: null,
 	blocked: [],
 	startFailures: {},
+	savedRun: null,
+	savedRunIgnoredFor: null,
 
 	setOptions: (patch) => set((s) => ({ options: { ...s.options, ...patch } })),
 
 	computePlan: async (projectId) => {
-		const { tolerance, unplannedPolicy } = get().options;
+		const { tolerance, unplannedPolicy, fragileZones } = get().options;
 		set({ isPlanning: true, error: null });
 		try {
 			const result = await globalThis.electronAPI.planExecutionWaves({
 				projectId,
-				options: { tolerance, unplannedPolicy },
+				options: { tolerance, unplannedPolicy, fragileZones },
 			});
 			if (result.data) {
 				set({ plan: result.data, isPlanning: false });
@@ -96,6 +111,7 @@ export const useExecutionWavesStore = create<ExecutionWavesState>((set, get) => 
 			},
 			blocked: [],
 			startFailures: {},
+			savedRun: null,
 		});
 		await get().tick();
 	},
@@ -105,6 +121,49 @@ export const useExecutionWavesStore = create<ExecutionWavesState>((set, get) => 
 		if (execution?.status === "running") {
 			set({ execution: { ...execution, status: "stopped" }, blocked: [] });
 		}
+	},
+
+	loadSavedRun: async (projectId) => {
+		if (get().execution?.status === "running") return;
+		try {
+			const result = await globalThis.electronAPI.loadExecutionWaveRun(projectId);
+			const data = result.data;
+			// A run started meanwhile, or another project selected: drop the answer.
+			if (
+				!data ||
+				get().execution?.status === "running" ||
+				useProjectStore.getState().selectedProjectId !== projectId
+			) {
+				return;
+			}
+			set({
+				savedRun: data.run,
+				savedRunIgnoredFor: data.ignored ? projectId : null,
+			});
+		} catch {
+			// Nothing to offer: the run can always be planned again.
+		}
+	},
+
+	resumeSavedRun: async () => {
+		const { savedRun, execution } = get();
+		if (!savedRun || execution?.status === "running") return;
+		const { savedAt: _savedAt, ...state } = savedRun;
+		set({
+			execution: { ...state, status: "running" },
+			savedRun: null,
+			blocked: [],
+			startFailures: {},
+			options: { ...get().options, advanceWhen: state.advanceWhen },
+		});
+		await get().tick();
+	},
+
+	abandonSavedRun: async () => {
+		const { savedRun } = get();
+		if (!savedRun) return;
+		set({ savedRun: null });
+		await persist(() => globalThis.electronAPI.clearExecutionWaveRun(savedRun.projectId));
 	},
 
 	tick: async () => {
@@ -179,12 +238,12 @@ async function replanRemaining(get: Get, execution: WaveExecution): Promise<Wave
 	if (remaining.length === 0) {
 		return { ...execution, current: next };
 	}
-	const { tolerance, unplannedPolicy } = get().options;
+	const { tolerance, unplannedPolicy, fragileZones } = get().options;
 	try {
 		const result = await globalThis.electronAPI.planExecutionWaves({
 			projectId: execution.projectId,
 			taskIds: remaining,
-			options: { tolerance, unplannedPolicy },
+			options: { tolerance, unplannedPolicy, fragileZones },
 		});
 		if (result.data) {
 			const replanned = result.data.waves.map((w) => [...w.taskIds]);
@@ -203,11 +262,57 @@ async function replanRemaining(get: Get, execution: WaveExecution): Promise<Wave
 	return { ...execution, current: next };
 }
 
-/** Runs the execution on every change of the task list. */
+/** Saves and clears run one after the other, in the order they were asked. */
+let persistQueue: Promise<void> = Promise.resolve();
+
+function persist(write: () => Promise<unknown>): Promise<void> {
+	const next = persistQueue
+		.then(async () => {
+			await write();
+		})
+		.catch(() => {
+			// The run goes on in memory; the next step saves it again.
+		});
+	persistQueue = next;
+	return next;
+}
+
+function runState(execution: WaveExecution): WaveRunState {
+	const { status: _status, ...state } = execution;
+	return state;
+}
+
+/**
+ * Runs the execution on every change of the task list, saves it in the
+ * project at every step (forgets it once finished or stopped), and offers a
+ * run saved before a restart when its project is selected.
+ */
 export function setupExecutionWavesListeners(): () => void {
-	return useTaskStore.subscribe((state, previous) => {
+	const offTasks = useTaskStore.subscribe((state, previous) => {
 		if (state.tasks === previous.tasks) return;
 		if (useExecutionWavesStore.getState().execution?.status !== "running") return;
 		void useExecutionWavesStore.getState().tick();
 	});
+	const offRun = useExecutionWavesStore.subscribe((state, previous) => {
+		const execution = state.execution;
+		if (!execution || execution === previous.execution) return;
+		if (execution.status === "running") {
+			const saved = runState(execution);
+			void persist(() => globalThis.electronAPI.saveExecutionWaveRun(saved));
+		} else if (previous.execution?.status === "running") {
+			void persist(() => globalThis.electronAPI.clearExecutionWaveRun(execution.projectId));
+		}
+	});
+	const load = (projectId: string | null) => {
+		if (projectId) void useExecutionWavesStore.getState().loadSavedRun(projectId);
+	};
+	const offProject = useProjectStore.subscribe((state, previous) => {
+		if (state.selectedProjectId !== previous.selectedProjectId) load(state.selectedProjectId);
+	});
+	load(useProjectStore.getState().selectedProjectId);
+	return () => {
+		offTasks();
+		offRun();
+		offProject();
+	};
 }
