@@ -24,7 +24,7 @@ import {
 	parseBuilderProject,
 	validBuilderProjects,
 } from "./mcp-builder-args";
-import { RegistryFactsStore } from "../mcp-security/registry-facts";
+import {
 	installedWatchView,
 	McpWatchRequestError,
 	parseAcknowledgeRequest,
