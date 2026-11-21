@@ -5,7 +5,6 @@ import {
 	ROADMAP_COMPLEXITY_COLORS,
 	ROADMAP_IMPACT_COLORS,
 	ROADMAP_PRIORITY_COLORS,
-	ROADMAP_PRIORITY_LABELS,
 } from "../../shared/constants";
 import type { Roadmap, RoadmapFeature } from "../../shared/types";
 import { cn } from "../lib/utils";
@@ -17,7 +16,7 @@ import { useTranslation } from "react-i18next";
 
 interface SortableFeatureCardProps {
 	readonly feature: RoadmapFeature;
-	readonly roadmap?: Roadmap;
+	readonly roadmap: Roadmap;
 	readonly onClick: () => void;
 	readonly onConvertToSpec?: (feature: RoadmapFeature) => void;
 	readonly onGoToTask?: (specId: string) => void;
@@ -38,7 +37,6 @@ export function SortableFeatureCard({
 		transform,
 		transition,
 		isDragging,
-		isOver,
 	} = useSortable({ id: feature.id });
 
 	const style = {
@@ -52,11 +50,15 @@ export function SortableFeatureCard({
 		!!feature.competitorInsightIds && feature.competitorInsightIds.length > 0;
 
 	// Get phase name for the feature
-	const phaseName = roadmap?.phases.find((p) => p.id === feature.phaseId)?.name;
+	const phaseName = roadmap.phases.find((p) => p.id === feature.phaseId)?.name;
 
-	// Check if feature has external source (e.g., Canny)
-	const isExternal =
-		feature.source?.provider && feature.source.provider !== "internal";
+	// A feature imported from another tool (Canny, GitHub Issues) says from where.
+	const provider = feature.source?.provider;
+	const providerName =
+		provider && provider !== "internal"
+			? t(`roadmap:providers.${provider}`, { defaultValue: t("roadmap:featureCard.external") })
+			: null;
+	const linkedSpecId = feature.linkedSpecId;
 
 	return (
 		<div
@@ -64,10 +66,8 @@ export function SortableFeatureCard({
 			style={style}
 			className={cn(
 				"touch-none transition-all duration-200",
+				// The column under the card is highlighted while it moves (RoadmapKanbanView).
 				isDragging && "dragging-placeholder opacity-40 scale-[0.98]",
-				isOver &&
-					!isDragging &&
-					"ring-2 ring-primary/30 ring-offset-2 ring-offset-background rounded-xl",
 			)}
 			{...attributes}
 			{...listeners}
@@ -87,9 +87,7 @@ export function SortableFeatureCard({
 									ROADMAP_PRIORITY_COLORS[feature.priority],
 								)}
 							>
-								{t(`roadmap:priorityLabels.${feature.priority}`, {
-									defaultValue: ROADMAP_PRIORITY_LABELS[feature.priority],
-								})}
+								{t(`roadmap:priorityLabels.${feature.priority}`)}
 							</Badge>
 							{phaseName && (
 								<Tooltip>
@@ -99,9 +97,7 @@ export function SortableFeatureCard({
 											className="text-3xs px-1.5 py-0 text-muted-foreground border-muted-foreground/30"
 										>
 											<Layers className="h-2.5 w-2.5 mr-0.5" />
-											{phaseName.length > 12
-												? `${phaseName.slice(0, 12)}...`
-												: phaseName}
+											<span className="max-w-24 truncate">{phaseName}</span>
 										</Badge>
 									</TooltipTrigger>
 									<TooltipContent>
@@ -130,15 +126,14 @@ export function SortableFeatureCard({
 						</h3>
 					</div>
 					<div className="shrink-0">
-						{feature.linkedSpecId ? (
+						{linkedSpecId ? (
 							<Button
 								variant="outline"
 								size="sm"
 								className="h-7 px-2"
 								onClick={(e) => {
 									e.stopPropagation();
-									// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-									onGoToTask?.(feature.linkedSpecId!);
+									onGoToTask?.(linkedSpecId);
 								}}
 							>
 								<ExternalLink className="h-3 w-3 mr-1" />
@@ -178,7 +173,7 @@ export function SortableFeatureCard({
 							ROADMAP_COMPLEXITY_COLORS[feature.complexity],
 						)}
 					>
-						{feature.complexity}
+						{t(`roadmap:levels.complexityBadge.${feature.complexity}`)}
 					</Badge>
 					<Badge
 						variant="outline"
@@ -187,7 +182,7 @@ export function SortableFeatureCard({
 							ROADMAP_IMPACT_COLORS[feature.impact],
 						)}
 					>
-						{feature.impact}
+						{t(`roadmap:levels.impactBadge.${feature.impact}`)}
 					</Badge>
 					{/* Show vote count if from external source */}
 					{feature.votes !== undefined && feature.votes > 0 && (
@@ -207,20 +202,18 @@ export function SortableFeatureCard({
 						</Tooltip>
 					)}
 					{/* Show external source indicator */}
-					{isExternal && (
+					{providerName && (
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<Badge
 									variant="outline"
 									className="text-3xs px-1.5 py-0 text-orange-500 border-orange-500/30"
 								>
-									{feature.source?.provider === "canny" ? "Canny" : t("roadmap:featureCard.external")}
+									{providerName}
 								</Badge>
 							</TooltipTrigger>
 							<TooltipContent>
-								{t("roadmap:featureCard.importedFrom", {
-									provider: feature.source?.provider,
-								})}
+								{t("roadmap:featureCard.importedFrom", { provider: providerName })}
 							</TooltipContent>
 						</Tooltip>
 					)}
