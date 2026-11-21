@@ -43,6 +43,19 @@ def _print_reason(operation) -> None:
         print(f"   {operation.incident.error_message}")
 
 
+def _print_outcome(operation) -> bool:
+    """Say where the incident's fix is: its card on the board, or why none."""
+    if operation.success:
+        print(
+            f"📋 Fix card {operation.incident.fix_card} filed: its build fixes the "
+            "incident in a worktree, then waits for your review."
+        )
+        return True
+    print("❌ No fix card was filed. The incident needs manual review.")
+    _print_reason(operation)
+    return False
+
+
 class SelfHealingRunner:
     """Runner for the Self-Healing Codebase + Incident Responder."""
 
@@ -64,11 +77,12 @@ class SelfHealingRunner:
 
         config = self._load_config()
         cicd_cfg = config.get("cicd", {})
+        production_cfg = config.get("production", {})
         proactive_cfg = config.get("proactive", {})
         return IncidentResponderOrchestrator(
             project_dir=self.project_dir,
             auto_fix=cicd_cfg.get("autoFixEnabled", True),
-            auto_create_pr=cicd_cfg.get("autoCreatePR", True),
+            auto_fix_production=production_cfg.get("autoFix", False) is True,
             auto_bisect=cicd_cfg.get("autoBisect", True) is not False,
             risk_threshold=float(proactive_cfg.get("riskThreshold", 40.0)),
         )
@@ -110,16 +124,7 @@ class SelfHealingRunner:
         if isinstance(bisect, dict) and bisect.get("status") == "found":
             print(f"🔎 First bad commit: {bisect['first_bad']}")
 
-        if operation.success:
-            print(
-                f"✅ Healing complete! Fix applied in branch: {operation.incident.fix_branch}"
-            )
-            if operation.incident.fix_pr_url:
-                print(f"   PR: {operation.incident.fix_pr_url}")
-            return True
-        print("❌ No fix applied. The incident needs manual review.")
-        _print_reason(operation)
-        return False
+        return _print_outcome(operation)
 
     async def run_production(
         self,
@@ -166,14 +171,7 @@ class SelfHealingRunner:
             print(f"   {steps[0].detail}")
             return True
 
-        if operation.success:
-            print(
-                f"✅ Incident resolved! Fix in branch: {operation.incident.fix_branch}"
-            )
-            return True
-        print("❌ No fix applied. The incident needs manual review.")
-        _print_reason(operation)
-        return False
+        return _print_outcome(operation)
 
     async def run_proactive(
         self, risk_threshold: float = 40.0, top_n: int = 10, json_output: bool = False

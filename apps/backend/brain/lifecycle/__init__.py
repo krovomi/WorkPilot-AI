@@ -7,6 +7,8 @@
 | `contradictions.py` | two notes that say opposite things, found without a model |
 | `arbitration.py` | after a sync: safe rules settle a pair, the rest waits for a person |
 | `advisor.py` | a model's opinion on one queued pair, asked by a person |
+| `undo.py` | take a decision back: the last automatic one within the hour, or a merge |
+| `metrics.py` | restores, pins, conflicts and their resolution time, from the journal |
 | `api.py` | ``/api/brain/memory/*`` |
 
 Everything lives under ``knowledge/projects/<project>/memory/.lifecycle/`` —

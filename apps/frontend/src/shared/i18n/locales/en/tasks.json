@@ -666,7 +666,8 @@
 			"visual-canvas": "Visual canvas",
 			"tech-debt": "Tech debt",
 			"automation": "Automation",
-			"generated": "Generated code"
+			"generated": "Generated code",
+			"self-healing": "Self-Healing"
 		},
 		"cicdRun": {
 			"triggered_pr": "{{provider}} pipeline started after the PR was opened, {{when}}",

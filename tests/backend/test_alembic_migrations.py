@@ -81,3 +81,21 @@ def test_a_database_from_before_task_tokens_gains_their_columns(alembic_config):
         )
     finally:
         engine.dispose()
+
+
+def test_the_approval_tables_come_and_go_with_their_revision(alembic_config):
+    config, db = alembic_config
+    command.upgrade(config, "head")
+    approvals = {"spec_criticality", "spec_approvals", "approval_delegations"}
+    assert approvals <= _tables(db)
+    # A table already gone (dropped by hand) does not stop the downgrade.
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(sa.text("DROP TABLE spec_criticality"))
+    finally:
+        engine.dispose()
+    command.downgrade(config, "0015_user_menu_layouts")
+    assert not approvals & _tables(db)
+    command.upgrade(config, "head")
+    assert approvals <= _tables(db)

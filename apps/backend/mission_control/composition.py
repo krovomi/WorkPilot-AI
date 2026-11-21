@@ -23,12 +23,15 @@ a role, a provider, a model and what it should cost. The steps:
    does, the composition is refused and says how much the smallest crew needs.
 
 Token counts are an order of magnitude, like ``cost_intelligence``'s own
-predictor: the point is to compare crews, not to bill one.
+predictor: the point is to compare crews, not to bill one. Once past sessions
+measured a role (``metrics.role_factors``), its estimate is scaled by what that
+role really spent over what was expected (``calibration``).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 
 from tasks.classify import TaskKind
 
@@ -127,6 +130,7 @@ class _Plan:
     context: int
     files: int
     size: str
+    calibration: Mapping[str, float] = field(default_factory=dict)
 
 
 def _capable(model: ModelPick, slot: RoleSlot, need: int) -> bool:
@@ -159,13 +163,14 @@ def _agent(plan: _Plan, slot: RoleSlot, key: str, share: int) -> PlannedAgent | 
     reads, output, _tools = ROLE_PROFILES[slot.role]
     files = max(1, plan.files // share)
     context = plan.context + files * FILE_TOKENS
+    scale = SIZE_FACTOR[plan.size] * plan.calibration.get(slot.role, 1.0)
     draft = PlannedAgent(
         key=key,
         slot=slot,
         tier=slot.tier,
         model=pick(plan.providers[0], slot.tier),
-        input_tokens=int(context * reads * SIZE_FACTOR[plan.size]),
-        output_tokens=int(output * SIZE_FACTOR[plan.size]),
+        input_tokens=int(context * reads * scale),
+        output_tokens=int(output * scale),
         context_need=context,
     )
     return _choose(plan, slot, slot.tier, draft, cheapest=False)
@@ -281,6 +286,7 @@ def suggest_composition(
     hints: Hints | None = None,
     hints_unusable: bool = False,
     refine_text: str | None = None,
+    calibration: Mapping[str, float] | None = None,
 ) -> dict[str, object]:
     """The crew for this work on these providers, within this budget.
 
@@ -321,6 +327,7 @@ def suggest_composition(
         context=BASE_CONTEXT + signals.spec_tokens,
         files=signals.touched_files or DEFAULT_FILES[size],
         size=size,
+        calibration=calibration or {},
     )
     full: list[PlannedAgent] = []
     for slot, count in _roles(TEMPLATES[key].roles, size, domains, needs_tester):
@@ -354,6 +361,7 @@ def suggest_composition(
         "complexity": size,
         "signals": {**signals.to_dict(), "domains": domains},
         "hinted": hints is not None,
+        "calibrated": sorted({a.slot.role for a in full} & set(plan.calibration)),
         "warnings": warnings,
         "budget": {"usd": budget_usd, "tokens": budget_tokens},
         "full": _summary(full, full),

@@ -306,6 +306,9 @@ export const IPC_CHANNELS = {
 	CONTEXT_MEMORY_PIN: "context:memoryPin",
 	CONTEXT_MEMORY_RESOLVE_CONFLICT: "context:memoryResolveConflict",
 	CONTEXT_MEMORY_SUGGEST_RESOLUTION: "context:memorySuggestResolution",
+	CONTEXT_MEMORY_REVERT: "context:memoryRevert",
+	CONTEXT_MEMORY_SET_SCOPE: "context:memorySetScope",
+	CONTEXT_MEMORY_SET_MAINTAINERS: "context:memorySetMaintainers",
 
 	// Environment configuration
 	ENV_GET: "env:get",
@@ -854,6 +857,8 @@ export const IPC_CHANNELS = {
 	MISSION_CONTROL_START_AGENT: "missionControl:startAgent",
 	MISSION_CONTROL_STOP_AGENT: "missionControl:stopAgent",
 	MISSION_CONTROL_SUGGEST_COMPOSITION: "missionControl:suggestComposition",
+	MISSION_CONTROL_SET_PLAN: "missionControl:setPlan",
+	MISSION_CONTROL_GET_METRICS: "missionControl:getMetrics",
 
 	// Execution waves across specs (Conflict Predictor, #358): plan by task id
 	CONFLICT_WAVES_PLAN: "conflictWaves:plan",

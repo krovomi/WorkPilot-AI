@@ -8,6 +8,7 @@ import {
 	useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { claimMicrophoneForForm } from "../../stores/voice-assistant-store";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { appendDictation, appendTranscript } from "./dictation";
@@ -108,6 +109,12 @@ export function TaskDictation({
 	const stopAudio = useRef<((discard?: boolean) => void) | null>(null);
 	const queue = useRef<Promise<void>>(Promise.resolve());
 	const queued = useRef(0);
+	// The voice assistant's background microphone gives way while this dictation runs.
+	const voiceRelease = useRef<(() => void) | null>(null);
+	const giveMicrophoneBack = useCallback(() => {
+		voiceRelease.current?.();
+		voiceRelease.current = null;
+	}, []);
 	const phaseRef = useRef<Phase>("idle");
 	const transition = useCallback((next: Phase) => {
 		phaseRef.current = next;
@@ -122,9 +129,10 @@ export function TaskDictation({
 			void window.electronAPI.dictationCancel(current).catch(() => {
 				/* The renderer may be closing. */
 			});
+		giveMicrophoneBack();
 		transition("idle");
 		setLevel(0);
-	}, [transition]);
+	}, [giveMicrophoneBack, transition]);
 	const finish = () => {
 		if (phaseRef.current !== "recording") return;
 		transition("finishing");
@@ -145,8 +153,9 @@ export function TaskDictation({
 				void window.electronAPI.dictationCancel(current).catch(() => {
 					/* The renderer may be closing. */
 				});
+			giveMicrophoneBack();
 		},
-		[],
+		[giveMicrophoneBack],
 	);
 	useEffect(() => {
 		if (disabled) cancel();
@@ -167,6 +176,8 @@ export function TaskDictation({
 		transition(download ? "downloading" : "preparing");
 		queue.current = Promise.resolve();
 		queued.current = 0;
+		giveMicrophoneBack();
+		voiceRelease.current = claimMicrophoneForForm();
 		try {
 			const result = await window.electronAPI.dictationStart(
 				current,

@@ -25,7 +25,14 @@ vi.mock("../../server-feature-files", () => ({
 }));
 
 import { registerMemoryLifecycleHandlers } from "../memory-lifecycle-handlers";
-import { conflictId, memoryId, trashId } from "../memory-lifecycle-validation";
+import {
+	conflictId,
+	entryId,
+	maintainerNames,
+	memoryId,
+	scopeText,
+	trashId,
+} from "../memory-lifecycle-validation";
 
 const MEMORY = "knowledge/projects/shop/memory/gotchas/never-push-on-friday.md";
 
@@ -150,7 +157,19 @@ describe("valid calls reach /api/brain/memory/*", () => {
 		const view = await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "p1");
 		expect(view).toEqual({
 			success: true,
-			data: { journal: [], trash: [], conflicts: [], pinned: 3, pinLimit: 50, retentionDays: 30 },
+			data: {
+				journal: [],
+				revertible: {},
+				lastUndo: null,
+				metrics: null,
+				maintainers: [],
+				canArbitrate: true,
+				trash: [],
+				conflicts: [],
+				pinned: 3,
+				pinLimit: 50,
+				retentionDays: 30,
+			},
 		});
 		state.backendFetch.mockResolvedValueOnce({ success: false, error: "pin-limit", code: "pin-limit" });
 		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_PIN, "p1", MEMORY, true)).toEqual({
@@ -250,7 +269,19 @@ describe("pins, conflicts and the arbiter's opinion", () => {
 		state.backendFetch.mockResolvedValueOnce({ success: true });
 		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "p1")).toEqual({
 			success: true,
-			data: { journal: [], trash: [], conflicts: [], pinned: 0, pinLimit: 50, retentionDays: 30 },
+			data: {
+				journal: [],
+				revertible: {},
+				lastUndo: null,
+				metrics: null,
+				maintainers: [],
+				canArbitrate: true,
+				trash: [],
+				conflicts: [],
+				pinned: 0,
+				pinLimit: 50,
+				retentionDays: 30,
+			},
 		});
 	});
 
@@ -350,5 +381,150 @@ describe("pins, conflicts and the arbiter's opinion", () => {
 			});
 		}
 		expect(state.backendFetch).not.toHaveBeenCalled();
+	});
+});
+
+describe("taking a decision back", () => {
+	const ENTRY = "0123456789ab";
+
+	it("names an entry by its journal id only", async () => {
+		expect(entryId(ENTRY)).toBe(ENTRY);
+		for (const hostile of ["../../x", "0123456789abc", "0123456789AB", 12, null]) {
+			expect(entryId(hostile)).toBeNull();
+			expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "p1", hostile)).toEqual({
+				success: false,
+				error: "invalid",
+			});
+		}
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "remote", ENTRY)).toEqual({
+			success: false,
+			error: "server-project",
+		});
+		expect(state.backendFetch).not.toHaveBeenCalled();
+	});
+
+	it("reverts with the project's own path and reads the outcome", async () => {
+		state.backendFetch.mockResolvedValueOnce({
+			success: true,
+			mode: "unmerge",
+			restored: [MEMORY],
+			conflict: "0123456789abcdef",
+		});
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "p1", ENTRY)).toEqual({
+			success: true,
+			data: { mode: "unmerge", restored: [MEMORY], conflict: "0123456789abcdef" },
+		});
+		const [path, init] = state.backendFetch.mock.calls[0];
+		expect(path).toBe("/api/brain/memory/revert");
+		expect(JSON.parse(init.body)).toEqual({ project_dir: "/work/shop", entry_id: ENTRY });
+
+		state.backendFetch.mockResolvedValueOnce({ success: true, mode: "anything" });
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "p1", ENTRY)).toEqual({
+			success: true,
+			data: { mode: "undo", restored: [], conflict: null },
+		});
+
+		state.backendFetch.mockResolvedValueOnce({
+			success: false,
+			error: "not-revertible",
+			code: "not-revertible",
+		});
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "p1", ENTRY)).toEqual({
+			success: false,
+			error: "not-revertible",
+		});
+	});
+});
+
+describe("a memory's scope and the maintainers", () => {
+	it("checks a scope and the maintainers' names in main", async () => {
+		expect(scopeText("apps/billing/")).toBe("apps/billing/");
+		expect(scopeText(undefined)).toBe("");
+		for (const hostile of ["a\nb", "x\u007f", "x".repeat(201), 3]) {
+			expect(scopeText(hostile)).toBeNull();
+			expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, "p1", MEMORY, hostile)).toEqual({
+				success: false,
+				error: "invalid",
+			});
+		}
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, "p1", "../x.md", "apps/")).toEqual({
+			success: false,
+			error: "invalid",
+		});
+		expect(maintainerNames([" Bob ", "carol@example.com"])).toEqual(["Bob", "carol@example.com"]);
+		for (const hostile of [
+			"Bob",
+			[""],
+			[" "],
+			["a\u0000b"],
+			[42],
+			["x".repeat(121)],
+			Array.from({ length: 21 }, (_, n) => `p${n}`),
+		]) {
+			expect(maintainerNames(hostile)).toBeNull();
+			expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, "p1", hostile)).toEqual({
+				success: false,
+				error: "invalid",
+			});
+		}
+		for (const [channel, args] of [
+			[IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, [MEMORY, "apps/"]],
+			[IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, [["Bob"]]],
+		] as const) {
+			expect(await call(channel, "remote", ...args)).toEqual({
+				success: false,
+				error: "server-project",
+			});
+		}
+		expect(state.backendFetch).not.toHaveBeenCalled();
+	});
+
+	it("sends a scope and the maintainers with the project's own path", async () => {
+		state.backendFetch.mockResolvedValueOnce({ success: true, applies_to: "apps/" });
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, "p1", MEMORY, "apps/")).toEqual({
+			success: true,
+			data: { appliesTo: "apps/" },
+		});
+		let [path, init] = state.backendFetch.mock.calls[0];
+		expect(path).toBe("/api/brain/memory/scope");
+		expect(JSON.parse(init.body)).toEqual({ project_dir: "/work/shop", id: MEMORY, applies_to: "apps/" });
+		state.backendFetch.mockResolvedValueOnce({ success: true });
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, "p1", MEMORY, "")).toEqual({
+			success: true,
+			data: { appliesTo: "" },
+		});
+		state.backendFetch.mockResolvedValueOnce({ success: false, error: "not-found" });
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, "p1", MEMORY, "apps/")).toEqual({
+			success: false,
+			error: "not-found",
+		});
+
+		state.backendFetch.mockResolvedValueOnce({ success: true, maintainers: ["Bob"] });
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, "p1", ["Bob"])).toEqual({
+			success: true,
+			data: ["Bob"],
+		});
+		[path, init] = state.backendFetch.mock.calls[3];
+		expect(path).toBe("/api/brain/memory/maintainers");
+		expect(JSON.parse(init.body)).toEqual({ project_dir: "/work/shop", names: ["Bob"] });
+		state.backendFetch.mockResolvedValueOnce({ success: true });
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, "p1", [])).toEqual({
+			success: true,
+			data: [],
+		});
+		state.backendFetch.mockResolvedValueOnce({ success: false, error: "invalid", code: "invalid" });
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, "p1", ["Bob"])).toEqual({
+			success: false,
+			error: "invalid",
+		});
+	});
+
+	it("says whether the person here may settle an escalated pair", async () => {
+		state.backendFetch.mockResolvedValueOnce({ success: true, maintainers: ["Bob"], can_arbitrate: false });
+		const view = (await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "p1")) as {
+			data: { maintainers: string[]; canArbitrate: boolean };
+		};
+		expect(view.data.maintainers).toEqual(["Bob"]);
+		expect(view.data.canArbitrate).toBe(false);
 	});
 });

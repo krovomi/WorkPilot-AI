@@ -25,6 +25,8 @@ import {
 import { WavesView } from "../conflict-predictor/WavesView";
 import { formatElapsed } from "./agent-format";
 import { AddAgentDialog, AgentEventLog, AgentPanel, DecisionTreeViewer } from "./index";
+import { MissionControlMetrics } from "./MissionControlMetrics";
+import { SessionHealth } from "./SessionHealth";
 
 const FEATURES = [
 	{ key: "featureMultiAgent", icon: Users },
@@ -162,6 +164,8 @@ export function MissionControlDashboard() {
 							))}
 						</div>
 					</Section>
+					{/* What past sessions measured (#344). */}
+					<MissionControlMetrics />
 					{/* The specs of the board, run wave after wave (#358). */}
 					<WavesView />
 				</Page>
@@ -191,6 +195,8 @@ export function MissionControlDashboard() {
 						<span className="font-mono">{session.session_id}</span>
 					</Chip>
 				</div>
+
+				<SessionHealth session={session} tokens={totalTokens} cost={totalCost} />
 
 				<Stats>
 					<Stat

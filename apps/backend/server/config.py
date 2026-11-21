@@ -125,6 +125,65 @@ def _self_approval(value: str) -> str:
     return value
 
 
+#: How critical a card is, lowest first (``server/authz/approval_policy.py``).
+CRITICALITIES = ("low", "medium", "high")
+#: More approvals than this for one card is a typo, not a policy.
+MAX_QUORUM = 10
+#: A role slug as ``server/authz/roles.py`` and the admin console write them.
+_ROLE_SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,79}$")
+
+
+def _per_criticality(variable: str, value: str) -> dict[str, str]:
+    """``low=1,high=3`` as ``{"low": "1", "high": "3"}``; unknown levels left out."""
+    found: dict[str, str] = {}
+    for item in value.split(","):
+        if not item.strip():
+            continue
+        level, sep, raw = item.partition("=")
+        level = level.strip().lower()
+        if not sep or level not in CRITICALITIES:
+            logger.warning("Ignoring %r in %s", item.strip()[:60], variable)
+            continue
+        found[level] = raw.strip()
+    return found
+
+
+def _approval_quorum(value: str) -> tuple[tuple[str, int], ...]:
+    """How many approvals a card of each criticality needs (1 unless set)."""
+    given = _per_criticality("WORKPILOT_APPROVAL_QUORUM", value)
+    quorum: list[tuple[str, int]] = []
+    for level in CRITICALITIES:
+        raw = given.get(level, "1")
+        needed = int(raw) if raw.isdigit() else 0
+        if not 1 <= needed <= MAX_QUORUM:
+            logger.warning(
+                "Invalid WORKPILOT_APPROVAL_QUORUM for %s: %r, using 1", level, raw[:20]
+            )
+            needed = 1
+        quorum.append((level, needed))
+    return tuple(quorum)
+
+
+def _approval_roles(value: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """The roles one of a card's approvers must hold, per criticality."""
+    given = _per_criticality("WORKPILOT_APPROVAL_ROLES", value)
+    roles: list[tuple[str, tuple[str, ...]]] = []
+    for level in CRITICALITIES:
+        slugs: list[str] = []
+        for raw in given.get(level, "").split("+"):
+            slug = raw.strip().lower()
+            if not slug:
+                continue
+            if _ROLE_SLUG.match(slug) and slug not in slugs:
+                slugs.append(slug)
+            else:
+                logger.warning(
+                    "Ignoring role %r in WORKPILOT_APPROVAL_ROLES", raw.strip()[:80]
+                )
+        roles.append((level, tuple(slugs[:5])))
+    return tuple(roles)
+
+
 def _stream_url(value: str) -> str:
     value = value.strip().rstrip("/")
     return value if value.startswith(("ws://", "wss://")) else ""
@@ -166,6 +225,13 @@ class ServerSettings:
     # Approving the spec of a card one created: "allow", "deny", or
     # "when-alone" (refused while another member of the project may approve).
     self_approval: str
+
+    # How many people approve a card, by its criticality (``low``, ``medium``,
+    # ``high``), and the roles one of them must hold. One approval of anyone
+    # who may approve unless set (``WORKPILOT_APPROVAL_QUORUM``,
+    # ``WORKPILOT_APPROVAL_ROLES``).
+    approval_quorum: tuple[tuple[str, int], ...]
+    approval_roles: tuple[tuple[str, tuple[str, ...]], ...]
 
     # Fernet key (urlsafe base64, 32 bytes) used to encrypt per-user
     # integration secrets (Azure PAT, Jira token) at rest.
@@ -273,6 +339,12 @@ class ServerSettings:
             oidc_name=_oidc_name(os.environ.get("WORKPILOT_OIDC_NAME", "")),
             oidc_scopes=_oidc_scopes(os.environ.get("WORKPILOT_OIDC_SCOPES", "")),
             self_approval=_self_approval(os.environ.get("WORKPILOT_SELF_APPROVAL", "")),
+            approval_quorum=_approval_quorum(
+                os.environ.get("WORKPILOT_APPROVAL_QUORUM", "")
+            ),
+            approval_roles=_approval_roles(
+                os.environ.get("WORKPILOT_APPROVAL_ROLES", "")
+            ),
             secrets_master_key=os.environ.get("WORKPILOT_SECRETS_MASTER_KEY", ""),
             repos_root=repos_root,
             max_concurrent_runs=_env_int("WORKPILOT_MAX_CONCURRENT_RUNS", 3),
