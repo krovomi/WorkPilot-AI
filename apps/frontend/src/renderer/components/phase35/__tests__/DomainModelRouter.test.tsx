@@ -209,7 +209,7 @@ describe("ModelRouterPanel", () => {
 		render(<ModelRouterPanel />);
 		fireEvent.change(screen.getByLabelText("Task prompt"), { target: { value: "x" } });
 		fireEvent.click(screen.getByRole("button", { name: "Run" }));
-		expect(await screen.findByText(new RegExp(words.replace(/[()]/g, "\\$&")))).toBeInTheDocument();
+		expect(await screen.findByText(new RegExp(words.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))).toBeInTheDocument();
 	});
 
 	it("shows a provider the panel does not list by its id, and an unknown tier as sent", async () => {
