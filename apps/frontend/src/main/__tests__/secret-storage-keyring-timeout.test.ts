@@ -153,6 +153,22 @@ describe("secret-storage and a keyring that does not answer", () => {
 		expect(warn).not.toHaveBeenCalled();
 	});
 
+	it("does not ask the keyring at all under basic_text: a locked one would prompt for nothing", async () => {
+		fake.state.backend = "basic_text";
+		keyring.hangs = "probe";
+		const probeAsync = vi.spyOn(fake.safeStorage, "isAsyncEncryptionAvailable");
+		const encryptAsync = vi.spyOn(fake.safeStorage, "encryptStringAsync");
+		const storage = await load();
+
+		await storage.initSecretStorage();
+
+		expect(probeAsync).not.toHaveBeenCalled();
+		expect(encryptAsync).not.toHaveBeenCalled();
+		expect(storage.getSecureStorageStatus().keyringAvailable).toBe(false);
+		await expect(storage.asyncEncryptionUsable()).resolves.toBe(false);
+		expect(warn).not.toHaveBeenCalled();
+	});
+
 	it("treats a keyring that refuses the probe as unavailable", async () => {
 		fake.state.failEncrypt = true;
 		const storage = await load();
