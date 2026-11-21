@@ -9,7 +9,10 @@ import type {
 	MissionControlAgent,
 	MissionControlComposition,
 	MissionControlCompositionRequest,
+	MissionControlMetrics,
 	MissionControlNewAgent,
+	MissionControlPlan,
+	MissionControlPlanRequest,
 	MissionControlSession,
 	MissionControlStartRequest,
 	MissionControlState,
@@ -32,6 +35,12 @@ export interface MissionControlAPI {
 	missionControlSuggestComposition: (
 		request: MissionControlCompositionRequest,
 	) => Promise<IPCResult<MissionControlComposition>>;
+	/** A crew's providers and budget, or the automatic rebalancing switch. */
+	missionControlSetPlan: (
+		request: MissionControlPlanRequest,
+	) => Promise<IPCResult<MissionControlPlan>>;
+	/** Auto-compose adoption, tokens, rebalancings and budget overruns. */
+	missionControlGetMetrics: () => Promise<IPCResult<MissionControlMetrics>>;
 }
 
 export function createMissionControlAPI(): MissionControlAPI {
@@ -49,5 +58,7 @@ export function createMissionControlAPI(): MissionControlAPI {
 			invokeIpc(IPC_CHANNELS.MISSION_CONTROL_STOP_AGENT, agentId),
 		missionControlSuggestComposition: (request) =>
 			invokeIpc(IPC_CHANNELS.MISSION_CONTROL_SUGGEST_COMPOSITION, request),
+		missionControlSetPlan: (request) => invokeIpc(IPC_CHANNELS.MISSION_CONTROL_SET_PLAN, request),
+		missionControlGetMetrics: () => invokeIpc(IPC_CHANNELS.MISSION_CONTROL_GET_METRICS),
 	};
 }

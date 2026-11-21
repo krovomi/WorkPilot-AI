@@ -16,10 +16,13 @@ import type { IPCResult } from "../../shared/types";
 import type {
 	MissionControlAgent,
 	MissionControlComposition,
+	MissionControlMetrics,
+	MissionControlPlan,
 	MissionControlSession,
 	MissionControlState,
 } from "../../shared/types/mission-control";
 import { suggestComposition } from "../mission-control/mission-control-composition";
+import { parseAgentOrigin, parsePlanRequest } from "../mission-control/mission-control-plan";
 import {
 	isAgentId,
 	MAX_TASK_CHARS,
@@ -100,12 +103,13 @@ export function registerMissionControlHandlers(
 			const provider = text(a.provider, MAX_FIELD_CHARS);
 			const model = text(a.model ?? "", MAX_FIELD_CHARS);
 			const modelLabel = text(a.modelLabel ?? "", MAX_FIELD_CHARS);
-			if (!name || role === null || !provider || model === null || modelLabel === null) {
+			const origin = parseAgentOrigin(a);
+			if (!name || role === null || !provider || model === null || modelLabel === null || !origin) {
 				return { success: false, error: "Invalid agent" };
 			}
 			const r = await call<{ agent: MissionControlAgent }>(
 				"/agents",
-				post({ name, role, provider, model, model_label: modelLabel }),
+				post({ name, role, provider, model, model_label: modelLabel, ...origin }),
 			);
 			return r.ok ? { success: true, data: r.body.agent } : { success: false, error: r.error };
 		},
@@ -144,6 +148,25 @@ export function registerMissionControlHandlers(
 		IPC_CHANNELS.MISSION_CONTROL_SUGGEST_COMPOSITION,
 		(_event, request: unknown): Promise<IPCResult<MissionControlComposition>> =>
 			suggestComposition({ ...runDeps, projectPath: projectDirFor }, request),
+	);
+
+	// Live rebalancing (#344): the crew's providers and budget, or the switch.
+	ipcMain.handle(
+		IPC_CHANNELS.MISSION_CONTROL_SET_PLAN,
+		async (_event, request: unknown): Promise<IPCResult<MissionControlPlan>> => {
+			const parsed = parsePlanRequest(request);
+			if (!parsed.ok) return { success: false, error: parsed.error };
+			const r = await call<{ plan: MissionControlPlan }>("/session/plan", post(parsed.body));
+			return r.ok ? { success: true, data: r.body.plan } : { success: false, error: r.error };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.MISSION_CONTROL_GET_METRICS,
+		async (): Promise<IPCResult<MissionControlMetrics>> => {
+			const r = await call<{ metrics: MissionControlMetrics }>("/metrics");
+			return r.ok ? { success: true, data: r.body.metrics } : { success: false, error: r.error };
+		},
 	);
 
 	ipcMain.handle(

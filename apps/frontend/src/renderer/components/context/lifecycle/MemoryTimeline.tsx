@@ -1,17 +1,26 @@
-import { History } from "lucide-react";
+import { History, Undo2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { MemoryJournalEntry } from "../../../../shared/types";
+import type { MemoryJournalEntry, MemoryRevertMode } from "../../../../shared/types";
 import { formatAppDateTime } from "../../../lib/date-format";
+import { Button } from "../../ui/button";
 import { entryLabel, shortPath } from "./lifecycle-labels";
 
 interface MemoryTimelineProps {
 	readonly entries: MemoryJournalEntry[];
 	/** Show which memory each entry is about (the project journal). */
 	readonly showNote?: boolean;
+	/** Entry id → how a person can take it back (the project journal). */
+	readonly revertible?: Record<string, MemoryRevertMode>;
+	readonly onRevert?: (entryId: string) => void;
 }
 
 /** Journal entries, newest first: one memory's timeline, or the project's. */
-export function MemoryTimeline({ entries, showNote = false }: MemoryTimelineProps) {
+export function MemoryTimeline({
+	entries,
+	showNote = false,
+	revertible = {},
+	onRevert,
+}: MemoryTimelineProps) {
 	const { t } = useTranslation(["context"]);
 	if (entries.length === 0) {
 		return (
@@ -42,6 +51,17 @@ export function MemoryTimeline({ entries, showNote = false }: MemoryTimelineProp
 							<div className="text-muted-foreground italic">{entry.reason}</div>
 						)}
 					</div>
+					{onRevert && revertible[entry.id] && (
+						<Button
+							size="sm"
+							variant="ghost"
+							className="ml-auto h-6 shrink-0 gap-1 px-2 text-xs"
+							onClick={() => onRevert(entry.id)}
+						>
+							<Undo2 className="h-3 w-3" />
+							{t(`context:lifecycle.undo.${revertible[entry.id]}`)}
+						</Button>
+					)}
 				</li>
 			))}
 		</ol>

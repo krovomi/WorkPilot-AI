@@ -16,6 +16,8 @@ import {
 	MessageSquareText,
 	MoreVertical,
 	Play,
+	Repeat,
+	Shuffle,
 	Square,
 	Trash2,
 	Wrench,
@@ -153,6 +155,24 @@ export function AgentPanel({
 						{agent.model_label || agent.model || t("missionControl:agentPanel.noModel")}
 					</span>
 				</div>
+
+				{/* Live rebalancing (#344): the agent was moved, or its answer looped */}
+				{(Boolean(agent.rebalances) || agent.loop_detected) && (
+					<div className="flex flex-wrap gap-1.5" data-testid="mission-control-agent-rebalanced">
+						{Boolean(agent.rebalances) && (
+							<Badge variant="outline" className="text-3xs px-1.5 py-0 text-warning border-warning/30">
+								<Shuffle className="h-3 w-3 mr-1" />
+								{t("missionControl:rebalance.badge", { count: agent.rebalances })}
+							</Badge>
+						)}
+						{agent.loop_detected && (
+							<Badge variant="outline" className="text-3xs px-1.5 py-0 text-warning border-warning/30">
+								<Repeat className="h-3 w-3 mr-1" />
+								{t("missionControl:rebalance.loopBadge")}
+							</Badge>
+						)}
+					</div>
+				)}
 
 				{/* Task + what the run is waiting on: one model call has no percentage */}
 				{agent.current_task && (

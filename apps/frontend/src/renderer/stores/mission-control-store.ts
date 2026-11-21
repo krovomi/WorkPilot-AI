@@ -13,6 +13,9 @@ import type {
 	MissionControlDecisionNode,
 	MissionControlDecisionTree,
 	MissionControlEvent,
+	MissionControlMetrics,
+	MissionControlNewAgent,
+	MissionControlPlanRequest,
 	MissionControlSession,
 	MissionControlTokenUsage,
 } from "../../shared/types/mission-control";
@@ -37,6 +40,8 @@ export interface MissionControlState {
 	lastPollAt: number | null;
 	isLoading: boolean;
 	error: string | null;
+	/** The measures of past sessions (#344); null until read. */
+	metrics: MissionControlMetrics | null;
 
 	startSession: () => Promise<void>;
 	stopSession: () => Promise<void>;
@@ -47,7 +52,12 @@ export interface MissionControlState {
 		provider: string,
 		model: string,
 		modelLabel: string,
+		/** A composed crew's agent: its origin and the tokens it was expected to use. */
+		composed?: Pick<MissionControlNewAgent, "origin" | "estimatedTokens">,
 	) => Promise<AgentSlot | null>;
+	/** A crew's providers and budget, or the automatic rebalancing switch. */
+	setPlan: (request: MissionControlPlanRequest) => Promise<boolean>;
+	fetchMetrics: () => Promise<void>;
 	removeAgent: (agentId: string) => Promise<void>;
 	/** Start the agent on `task`; an empty task runs its last one again. */
 	startAgent: (agentId: string, task: string) => Promise<void>;
@@ -73,6 +83,7 @@ export const useMissionControlStore = create<MissionControlState>((set, get) => 
 	lastPollAt: null,
 	isLoading: false,
 	error: null,
+	metrics: null,
 
 	startSession: async () => {
 		set({ isLoading: true, error: null });
@@ -97,6 +108,8 @@ export const useMissionControlStore = create<MissionControlState>((set, get) => 
 			// The page closes the session either way.
 		}
 		set({ session: null, isActive: false, agents: [], decisionTrees: {}, events: [] });
+		// The session just left its line in the ledger.
+		await get().fetchMetrics();
 	},
 
 	fetchState: async () => {
@@ -122,7 +135,7 @@ export const useMissionControlStore = create<MissionControlState>((set, get) => 
 		}
 	},
 
-	createAgent: async (name, role, provider, model, modelLabel) => {
+	createAgent: async (name, role, provider, model, modelLabel, composed) => {
 		set({ isLoading: true });
 		try {
 			const res = await api().missionControlCreateAgent({
@@ -131,6 +144,7 @@ export const useMissionControlStore = create<MissionControlState>((set, get) => 
 				provider,
 				model,
 				modelLabel,
+				...composed,
 			});
 			if (res.success && res.data) {
 				const agent = res.data;
@@ -143,6 +157,21 @@ export const useMissionControlStore = create<MissionControlState>((set, get) => 
 			set({ error: (e as Error).message, isLoading: false });
 			return null;
 		}
+	},
+
+	setPlan: async (request) => {
+		const res = await api().missionControlSetPlan(request);
+		if (!res.success) {
+			set({ error: res.error ?? null });
+			return false;
+		}
+		await get().fetchState();
+		return true;
+	},
+
+	fetchMetrics: async () => {
+		const res = await api().missionControlGetMetrics();
+		if (res.success && res.data) set({ metrics: res.data });
 	},
 
 	removeAgent: async (agentId) => {

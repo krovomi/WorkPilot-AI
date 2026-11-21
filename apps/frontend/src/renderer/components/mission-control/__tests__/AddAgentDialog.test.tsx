@@ -13,16 +13,25 @@ vi.mock("../../../hooks/useProviderModelCatalog", () => ({
 }));
 
 const crew = [
-	{ key: "debugger-1", role: "debugger", provider: "openai", model: "m1", model_label: "M1" },
-	{ key: "coder-2", role: "coder", provider: "pi", model: "", model_label: "" },
+	{
+		key: "debugger-1",
+		role: "debugger",
+		provider: "openai",
+		model: "m1",
+		model_label: "M1",
+		input_tokens: 900,
+		output_tokens: 100,
+	},
+	{ key: "coder-2", role: "coder", provider: "pi", model: "", model_label: "", input_tokens: 0, output_tokens: 0 },
 ] as MissionControlPlannedAgent[];
+const plan = { providers: ["openai", "pi"], budgetUsd: 2 };
 
 vi.mock("../AutoComposePanel", () => ({
 	AutoComposePanel: (props: {
 		defaultProvider: string;
-		onApply: (agents: MissionControlPlannedAgent[]) => Promise<void>;
+		onApply: (agents: MissionControlPlannedAgent[], p: typeof plan) => Promise<void>;
 	}) => (
-		<button type="button" onClick={() => void props.onApply(crew)}>
+		<button type="button" onClick={() => void props.onApply(crew, plan)}>
 			{props.defaultProvider}
 		</button>
 	),
@@ -34,7 +43,8 @@ afterEach(cleanup);
 
 it("creates the suggested crew from the Auto-compose tab and closes", async () => {
 	const createAgent = vi.fn().mockResolvedValue({ id: "agent" });
-	useMissionControlStore.setState({ createAgent });
+	const setPlan = vi.fn().mockResolvedValue(true);
+	useMissionControlStore.setState({ createAgent, setPlan });
 	const onOpenChange = vi.fn();
 	render(<AddAgentDialog open onOpenChange={onOpenChange} onAdd={vi.fn()} />);
 
@@ -46,21 +56,26 @@ it("creates the suggested crew from the Auto-compose tab and closes", async () =
 
 	fireEvent.click(screen.getByRole("button", { name: "anthropic" }));
 	await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+	// The plan first, so a stuck agent of the crew knows where it may go.
+	expect(setPlan).toHaveBeenCalledWith(plan);
 	expect(createAgent.mock.calls).toEqual([
-		["Debugger 1", "debugger", "openai", "m1", "M1"],
-		["Coder 2", "coder", "pi", "", ""],
+		["Debugger 1", "debugger", "openai", "m1", "M1", { origin: "auto", estimatedTokens: 1000 }],
+		["Coder 2", "coder", "pi", "", "", { origin: "auto", estimatedTokens: 0 }],
 	]);
 });
 
 it("stops the crew at the first refused agent and stays open", async () => {
 	const createAgent = vi.fn().mockResolvedValue(null);
-	useMissionControlStore.setState({ createAgent });
+	useMissionControlStore.setState({ createAgent, setPlan: vi.fn().mockResolvedValue(false) });
 	const onOpenChange = vi.fn();
 	render(<AddAgentDialog open onOpenChange={onOpenChange} onAdd={vi.fn()} />);
 
 	fireEvent.click(screen.getByRole("tab", { name: "Auto-compose" }));
 	fireEvent.click(screen.getByRole("button", { name: "anthropic" }));
 	await waitFor(() => expect(createAgent).toHaveBeenCalledTimes(1));
-	expect(createAgent).toHaveBeenCalledWith("Debugger 1", "debugger", "openai", "m1", "M1");
+	expect(createAgent).toHaveBeenCalledWith("Debugger 1", "debugger", "openai", "m1", "M1", {
+		origin: "auto",
+		estimatedTokens: 1000,
+	});
 	expect(onOpenChange).not.toHaveBeenCalled();
 });

@@ -76,6 +76,7 @@ ACTIONS = (
     "archive",
     "resolve",
     "conflict",
+    "designate",
 )
 
 ACTORS = ("user", "agent", "sync", "learning-loop", "lifecycle")
@@ -101,6 +102,11 @@ REASONS = (
     "person-chose",
     "person-wrote",
     "not-a-conflict",
+    "undone",
+    "unmerged",
+    "escalated",
+    "maintainers-changed",
+    "scoped",
 )
 
 _VERBS = {
@@ -116,6 +122,7 @@ _VERBS = {
     "archive": "archivée",
     "resolve": "conflit résolu",
     "conflict": "conflit détecté",
+    "designate": "mainteneurs désignés",
 }
 _WHO = {
     "user": "par la personne",
@@ -129,6 +136,7 @@ _MAX_PREVIEW = 200
 _MAX_REASON = 300
 _COMMENT = re.compile(r"<!-- wp-lifecycle (\{.*\}) -->\s*$")
 _ACTOR = re.compile(r"^agent:[a-z][a-z0-9_-]{0,39}$")
+_ID = re.compile(r"^[0-9a-f]{12}$")
 
 
 @dataclass
@@ -146,6 +154,10 @@ class JournalEntry:
     note of an archived variant, the variants of a canonical one."""
     ts: str = ""
     id: str = ""
+    undoes: str = ""
+    """The id of the entry this one takes back (`undo.revert`), if any."""
+    by: str = ""
+    """The person's name, for a person's decision (`identity.person`)."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -179,6 +191,8 @@ def _sentence(entry: JournalEntry) -> str:
     who = _WHO.get(entry.actor.split(":", 1)[0], "par un agent")
     if entry.actor.startswith("agent:"):
         who = f"par l'agent {entry.actor.split(':', 1)[1]}"
+    if entry.by:
+        who = f"{who} ({entry.by})"
     rel = entry.note.split("/memory/", 1)[-1]
     title = f" « {entry.title} »" if entry.title else ""
     why = f" — {entry.reason}" if entry.reason else ""
@@ -209,10 +223,16 @@ def append(
     entry.ts = entry.ts or moment.isoformat(timespec="seconds")
     entry.id = entry.id or uuid.uuid4().hex[:12]
     entry.actor = normalise_actor(entry.actor)
+    if entry.actor == "user" and not entry.by:
+        from .identity import person
+
+        entry.by = person(root)["name"]
+    entry.by = _short(entry.by, 80)
     entry.title = _short(entry.title, 80)
     entry.preview = _short(entry.preview, _MAX_PREVIEW)
     entry.reason = _short(entry.reason, _MAX_REASON)
     entry.related = [str(r) for r in entry.related][:10]
+    entry.undoes = entry.undoes if _ID.fullmatch(entry.undoes or "") else ""
     # `-->` would close the comment early; `>` escaped is the same JSON.
     payload = json.dumps(entry.to_dict(), ensure_ascii=False).replace(">", "\\u003e")
     line = f"{_sentence(entry)} <!-- wp-lifecycle {payload} -->\n"
@@ -255,6 +275,8 @@ def _parse(line: str) -> JournalEntry | None:
         else [],
         ts=str(data.get("ts") or ""),
         id=str(data.get("id") or ""),
+        undoes=str(data.get("undoes") or ""),
+        by=str(data.get("by") or ""),
     )
 
 

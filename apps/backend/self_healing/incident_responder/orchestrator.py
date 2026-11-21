@@ -65,6 +65,9 @@ _CLAIMED_HEALED = (HealingStatus.PR_CREATED, HealingStatus.QA_RUNNING)
 
 GROUPED_STEP = "Grouping with an open incident"
 
+# An incident in one of these states is over: a new report opens a new one.
+_CLOSED = (HealingStatus.RESOLVED, HealingStatus.FAILED)
+
 
 def _grouped_operation(group: Incident, incident: Incident) -> HealingOperation:
     """What the caller gets back for a report folded into an open incident.
@@ -317,9 +320,25 @@ class IncidentResponderOrchestrator:
         reports = await self.proactive.scan_fragility()
         self._fragility_reports = reports
 
-        # Create incidents for top risky files
+        # Create incidents for top risky files. A file that still has an open
+        # incident from an earlier scan keeps it, with today's measures.
         incidents = await self.proactive.create_incidents_from_scan(reports)
-        self._incidents.extend(incidents)
+        open_by_file = {
+            i.affected_files[0]: i
+            for i in self._incidents
+            if i.mode == IncidentMode.PROACTIVE
+            and i.affected_files
+            and i.status not in _CLOSED
+        }
+        for incident in incidents:
+            known = open_by_file.get(incident.affected_files[0])
+            if known is None:
+                self._incidents.append(incident)
+                continue
+            known.title = incident.title
+            known.description = incident.description
+            known.severity = incident.severity
+            known.source_data = incident.source_data
 
         self._save_state()
         return reports
@@ -365,7 +384,9 @@ class IncidentResponderOrchestrator:
     def cancel_operation(self, operation_id: str) -> bool:
         """Cancel an in-progress healing operation."""
         for op in self._operations:
-            if op.id == operation_id:
+            # A finished operation has nothing left to cancel, and its
+            # incident keeps the verdict it reached.
+            if op.id == operation_id and not op.completed_at:
                 op.finalize(success=False)
                 if op.incident:
                     op.incident.status = HealingStatus.FAILED
@@ -463,18 +484,13 @@ class IncidentResponderOrchestrator:
             step = operation.add_step("Analyzing incident")
             incident.status = HealingStatus.ANALYZING
 
-            # Build mode-specific agent prompt
-            if incident.mode == IncidentMode.CICD:
-                prompt = self.cicd.build_agent_prompt(incident)
-            elif incident.mode == IncidentMode.PRODUCTION:
-                prompt = self.production.build_agent_prompt(incident)
-            elif incident.mode == IncidentMode.PROACTIVE:
-                prompt = self.proactive.build_agent_prompt(incident)
-            else:
-                operation.complete_step(step, "failed", "Unknown incident mode")
-                operation.finalize(success=False)
-                incident.status = HealingStatus.FAILED
-                return
+            # Build mode-specific agent prompt (one builder per mode).
+            builder = {
+                IncidentMode.CICD: self.cicd,
+                IncidentMode.PRODUCTION: self.production,
+                IncidentMode.PROACTIVE: self.proactive,
+            }[incident.mode]
+            prompt = builder.build_agent_prompt(incident)
 
             operation.complete_step(
                 step, "completed", f"Prompt built ({len(prompt)} chars)"
@@ -661,11 +677,19 @@ class IncidentResponderOrchestrator:
         if incidents_file.exists():
             try:
                 data = json.loads(incidents_file.read_text(encoding="utf-8"))
-                self._incidents = [Incident.from_dict(d) for d in data]
-                for incident in self._incidents:
-                    _reopen_claimed_heal(incident)
-            except (json.JSONDecodeError, KeyError) as e:
+            except (OSError, ValueError) as e:
                 logger.warning(f"Failed to load incidents: {e}")
+                data = []
+            # One entry that no longer reads (a status this version does not
+            # know) is skipped; the next save would otherwise drop them all.
+            for entry in data if isinstance(data, list) else []:
+                try:
+                    incident = Incident.from_dict(entry)
+                except (AttributeError, KeyError, TypeError, ValueError) as e:
+                    logger.warning(f"Skipped an incident that does not load: {e}")
+                    continue
+                _reopen_claimed_heal(incident)
+                self._incidents.append(incident)
 
         fragility_file = self.data_dir / "fragility_reports.json"
         if fragility_file.exists():
