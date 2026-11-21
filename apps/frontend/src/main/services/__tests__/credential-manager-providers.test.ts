@@ -672,12 +672,12 @@ describe("testProvider: API-key providers", () => {
 		[
 			"google",
 			{ globalGoogleApiKey: " g-key " },
-			"https://generativelanguage.googleapis.com/v1/models?key=g-key",
+			"https://generativelanguage.googleapis.com/v1/models",
 		],
 		[
 			"gemini",
 			{ globalGoogleDeepMindApiKey: "dm-key" },
-			"https://generativelanguage.googleapis.com/v1/models?key=dm-key",
+			"https://generativelanguage.googleapis.com/v1/models",
 		],
 		["deepseek", { globalDeepSeekApiKey: "ds" }, "https://api.deepseek.com/v1/models"],
 		["grok", { globalGrokApiKey: "gk" }, "https://api.x.ai/v1/models"],
@@ -693,6 +693,15 @@ describe("testProvider: API-key providers", () => {
 			details: { method: "API Key", profileName: provider, status: 200 },
 		});
 		expect(fetchCalls.map((c) => c.url)).toEqual([url]);
+	});
+
+	it("sends a Google key in its header, never in the URL", async () => {
+		store.settings = { globalGoogleApiKey: "g-key" };
+		fetchRoutes.push(() => json({}));
+		await new CredentialManager(async () => false).testProvider("google");
+		const [call] = fetchCalls;
+		expect(call.url).not.toContain("g-key");
+		expect(call.init?.headers).toEqual({ "x-goog-api-key": "g-key" });
 	});
 
 	it("skips a placeholder profile and uses the global key", async () => {
@@ -837,7 +846,7 @@ describe("validateActiveCredentials", () => {
 		["https://api.x.ai", "https://api.x.ai/v1/models"],
 		[
 			"https://generativelanguage.googleapis.com/v1beta",
-			"https://generativelanguage.googleapis.com/v1/models?key=key-1",
+			"https://generativelanguage.googleapis.com/v1/models",
 		],
 	])("calls the models endpoint for %s", async (baseUrl, expected) => {
 		const manager = await withActive(baseUrl);
@@ -847,6 +856,15 @@ describe("validateActiveCredentials", () => {
 		await expect(manager.validateActiveCredentials()).resolves.toBe(true);
 		expect(manager.getActiveCredential()?.lastValidated).toBe(before + 1000);
 		expect(fetchCalls.map((c) => c.url)).toEqual([expected]);
+	});
+
+	it("validates an active Google key through its header", async () => {
+		const manager = await withActive("https://generativelanguage.googleapis.com/v1beta");
+		fetchRoutes.push(() => json({}));
+		await expect(manager.validateActiveCredentials()).resolves.toBe(true);
+		const [call] = fetchCalls;
+		expect(call.url).not.toContain("key-1");
+		expect(call.init?.headers).toEqual({ "x-goog-api-key": "key-1" });
 	});
 
 	it("calls Anthropic's own API when the profile names no URL", async () => {
