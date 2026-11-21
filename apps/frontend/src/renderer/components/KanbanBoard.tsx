@@ -641,9 +641,7 @@ export function KanbanBoard({
 	// Select every card of one column (header checkbox, menu, Ctrl+A).
 	const selectAllTasks = useCallback(
 		(columnStatus: string) =>
-			selectTasks(
-				tasksByStatus[columnStatus as (typeof TASK_STATUS_COLUMNS)[number]].map((t) => t.id),
-			),
+			selectTasks(tasksByStatus[columnStatus as (typeof TASK_STATUS_COLUMNS)[number]].map((t) => t.id)),
 		[tasksByStatus, selectTasks],
 	);
 
@@ -735,14 +733,7 @@ export function KanbanBoard({
 				setSelectedTaskIds(remainingIds);
 			}
 		}
-	}, [
-		selectedTaskIds,
-		deselectAllTasks,
-		handleUndoBulkDelete,
-		toast,
-		t,
-		setSelectedTaskIds,
-	]);
+	}, [selectedTaskIds, deselectAllTasks, handleUndoBulkDelete, toast, t, setSelectedTaskIds]);
 
 	const bulkEdits = useBoardBulkEdits({
 		projectId,
@@ -2247,10 +2238,7 @@ export function KanbanBoard({
 	);
 
 	return (
-		<div
-			className="flex h-full flex-col"
-			data-board-selecting={selectedTaskIds.size > 0 ? "" : undefined}
-		>
+		<div className="flex h-full flex-col" data-board-selecting={selectedTaskIds.size > 0 ? "" : undefined}>
 			{/* Screen-reader live region for drag-and-drop announcements */}
 			<div
 				aria-live="polite"
