@@ -192,6 +192,10 @@ import {
 } from "./modules/formula-matrix-api";
 import { type BenchAPI, createBenchAPI } from "./modules/bench-api";
 import { type BoardMcpAPI, createBoardMcpAPI } from "./modules/board-mcp-api";
+import {
+	createServerApprovalAPI,
+	type ServerApprovalAPI,
+} from "./modules/server-approval-api";
 import { type CicdTriggersAPI, createCicdTriggersAPI } from "./modules/cicd-triggers-api";
 import { createDebugAPI, type DebugAPI } from "./modules/debug-api";
 import { createGitHubAPI, type GitHubAPI } from "./modules/github-api";
@@ -343,6 +347,7 @@ export interface ElectronAPI
 		FormulaMatrixAPI,
 		BenchAPI,
 		BoardMcpAPI,
+		ServerApprovalAPI,
 		CicdTriggersAPI,
 		AccessibilityAPI,
 		SharedAnalysisAPI,
@@ -499,6 +504,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createFormulaMatrixAPI(),
 		...createBenchAPI(),
 		...createBoardMcpAPI(),
+		...createServerApprovalAPI(),
 		...createCicdTriggersAPI(),
 		...createAccessibilityAPI(),
 		...createSharedAnalysisAPI(),

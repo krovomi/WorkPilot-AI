@@ -120,13 +120,22 @@
 	},
 	"audit": {
 		"empty": "No administrative events recorded yet.",
-		"filter": "Filter by action or user",
+		"filter": "Filter by action, user or sign-in",
 		"export": "Export",
 		"columns": {
 			"when": "When",
 			"who": "Who",
+			"signIn": "Sign-in",
 			"action": "Action",
 			"details": "Details"
+		},
+		"signIn": "{{method}} · {{id}}",
+		"methods": {
+			"local": "Password",
+			"entra": "Microsoft Entra",
+			"oidc": "Single sign-on",
+			"invite": "Invitation",
+			"unknown": "Unknown"
 		}
 	},
 	"quotas": {

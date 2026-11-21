@@ -47,7 +47,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-EVENTS: tuple[str, ...] = ("plan_review", "review_ready", "failed")
+EVENTS: tuple[str, ...] = (
+    "plan_review",
+    "review_ready",
+    "failed",
+    "approval_escalated",
+)
 LOCALES = frozenset({"en", "fr"})
 #: What a route shows in place of a stored secret: that it is set, nothing of it.
 MASK = "********"
@@ -75,6 +80,11 @@ _STRINGS: dict[str, dict[str, tuple[str, str]]] = {
             "Task stopped on an error",
             "{project}, card {card} stopped on an error.",
         ),
+        "approval_escalated": (
+            "A plan waits for an approver",
+            "{project}, card {card}: its plan has waited for approval longer "
+            "than your team allows.",
+        ),
         "test": ("WorkPilot test", "Notifications from the server reach you here."),
     },
     "fr": {
@@ -89,6 +99,11 @@ _STRINGS: dict[str, dict[str, tuple[str, str]]] = {
         "failed": (
             "Tâche arrêtée sur une erreur",
             "{project}, carte {card} : arrêtée sur une erreur.",
+        ),
+        "approval_escalated": (
+            "Un plan attend un approbateur",
+            "{project}, carte {card} : son plan attend une approbation depuis "
+            "plus longtemps que ton équipe ne le permet.",
         ),
         "test": ("Test WorkPilot", "Les notifications du serveur t'arrivent bien ici."),
     },
@@ -424,6 +439,42 @@ async def _notify(
             return
         name = project.name if project else "WorkPilot"
     await _send_all(rows, message(event, locale, name, card_id))
+
+
+async def notify_people(
+    db: AsyncSession,
+    user_ids: list[str],
+    event: str,
+    project_name: str,
+    card_id: str,
+    client: httpx.AsyncClient | None = None,
+    resolver: channels.Resolver = channels.system_resolver,
+) -> int:
+    """Tell each of these people of ``event`` on their channels; how many were.
+
+    Each in their language, unless they muted the moment. Nothing leaves while
+    the operator has not turned sending on.
+    """
+    if not get_settings().needs_you_enabled or event not in EVENTS:
+        return 0
+    told = 0
+    for user_id in user_ids:
+        rows = list(
+            await db.scalars(
+                select(NeedsYouChannel).where(
+                    NeedsYouChannel.user_id == user_id,
+                    NeedsYouChannel.enabled.is_(True),
+                )
+            )
+        )
+        muted, locale = await _preferences(db, user_id)
+        if not rows or event in muted:
+            continue
+        results = await _send_all(
+            rows, message(event, locale, project_name, card_id), client, resolver
+        )
+        told += "sent" in results.values()
+    return told
 
 
 def notify_needs_you(

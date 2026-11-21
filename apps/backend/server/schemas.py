@@ -250,6 +250,9 @@ class AuditEntryPublic(BaseModel):
     payload: dict | None
     ip: str | None
     created_at: datetime
+    #: The sign-in the action was made under, and how the person signed in.
+    login_id: str | None = None
+    login_method: str | None = None
 
 
 class SessionPublic(BaseModel):
@@ -260,6 +263,9 @@ class SessionPublic(BaseModel):
     ip: str | None
     created_at: datetime
     expires_at: datetime
+    #: The sign-in the session comes from: its audit entries carry this id.
+    login_id: str | None = None
+    login_method: str | None = None
 
 
 class AdminOverviewResponse(BaseModel):

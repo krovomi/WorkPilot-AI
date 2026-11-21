@@ -16,6 +16,7 @@ import {
 	stopCard,
 } from "../../../../../board/actions";
 import { ACTIVE_COLUMNS } from "../../../../../board/columns";
+import { ApprovalSection } from "../../../../../card/ApprovalSection";
 import { ChangesSection } from "../../../../../card/ChangesSection";
 import { LogsSection } from "../../../../../card/LogsSection";
 import { canEditCard, EditCard } from "../../../../../card/EditCard";
@@ -43,6 +44,8 @@ export default function CardScreen() {
 	const [feedbackOpen, setFeedbackOpen] = useState(false);
 	const [feedback, setFeedback] = useState("");
 	const [editing, setEditing] = useState(false);
+	// Bumped after each action, so the approval section reads the server again.
+	const [revision, setRevision] = useState(0);
 	const working = !!data && (!!activeRun(data.runs) || ACTIVE_COLUMNS.has(data.card.column));
 
 	// While an agent works on the card, read it again: its column, runs and
@@ -80,6 +83,7 @@ export default function CardScreen() {
 			return false;
 		} finally {
 			setBusy(null);
+			setRevision((n) => n + 1);
 		}
 	};
 
@@ -230,13 +234,17 @@ export default function CardScreen() {
 			</Section>
 
 			{details.spec ? (
-				<Section title={t("card.approval")}>
-					<Text style={{ color: details.approval.approved ? theme.success : theme.textMuted }}>
-						{details.approval.approved
+				<ApprovalSection
+					// Read again after each action on the card (an approval, a change of plan).
+					key={`${cardId}-${revision}`}
+					projectId={projectId}
+					cardId={cardId}
+					fallback={
+						details.approval.approved
 							? t("card.approvedBy", { name: details.approval.approvedBy ?? "?" })
-							: t("card.notApproved")}
-					</Text>
-				</Section>
+							: t("card.notApproved")
+					}
+				/>
 			) : null}
 
 			{details.qaReport ? (

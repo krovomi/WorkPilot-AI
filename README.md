@@ -213,7 +213,7 @@ The code is then rendered, compared with the mockup and corrected until it match
 </tr>
 </table>
 
-**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, start or stop the agents, read the dashboard, Insights, roadmap and ideas.
+**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, set its criticality or lend your approval, start or stop the agents, read the dashboard, Insights, roadmap and ideas; sign in with a password, Microsoft Entra or the server's single sign-on.
 
 ![Mobile app: board, card and dashboard](.github/assets/screenshots/mobile.png)
 
@@ -265,7 +265,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - Notifications on Slack, Teams, Discord, Google Chat, webhooks, ntfy and Telegram.
 
 **Team**
-- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT, Microsoft Entra or any OpenID Connect sign-in (Okta, Google, Keycloak...), spec approval by someone other than the card's author, by as many approvers as the card's criticality needs, approvals lent for a holiday ([operations guide](docs/server-operations.md)).
+- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT, Microsoft Entra or any OpenID Connect sign-in (Okta, Google, Keycloak...), spec approval by someone other than the card's author, by as many approvers as the card's criticality needs, approvals lent for a holiday, a second group of approvers told when a plan waits too long, and each audited action tied to the sign-in it was made under ([operations guide](docs/server-operations.md)).
 - **Mobile app** for iOS and Android, team chat, invitation-only sign-up.
 
 **Cost and monitoring**
