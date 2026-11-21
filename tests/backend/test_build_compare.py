@@ -60,6 +60,7 @@ def _spec(spec_id: str, started: datetime, minutes: float, cost: float, **extra)
         cost=cost,
         qa_iterations=extra.get("qa"),
         agents=extra.get("agents"),
+        kind=extra.get("kind"),
     )
 
 
@@ -90,6 +91,38 @@ def test_qa_iterations_take_the_highest_count_of_a_spec_s_plans(tmp_path):
 
 def test_qa_iterations_without_specs_are_empty(tmp_path):
     assert build_compare.qa_iterations(tmp_path) == {}
+
+
+def _metadata(project: Path, spec: str, metadata: object, *, workspace=False):
+    base = project / ".workpilot"
+    if workspace:
+        base = base / "worktrees" / "tasks" / spec / ".workpilot"
+    _write(base / "specs" / spec / "task_metadata.json", metadata)
+
+
+def test_spec_kinds_are_the_known_kinds_the_cards_recorded(tmp_path):
+    _metadata(tmp_path, "001-login", {"kind": "feature"})
+    # The build workspace's copy is read last and wins.
+    _metadata(tmp_path, "001-login", {"kind": "bug_fix"}, workspace=True)
+    _metadata(tmp_path, "002-cart", {"kind": "refactoring", "kindSource": "user"})
+    _metadata(tmp_path, "003-help", {"kind": "rm -rf"})
+    _metadata(tmp_path, "004-docs", ["docs"])
+    assert build_compare.spec_kinds(tmp_path) == {
+        "001-login": "bug_fix",
+        "002-cart": "refactoring",
+    }
+
+
+def test_spec_kinds_stop_at_the_metadata_byte_budget(tmp_path, monkeypatch):
+    for spec in ("001-a", "002-b"):
+        _metadata(tmp_path, spec, {"kind": "test"})
+    size = len(
+        (
+            tmp_path / ".workpilot" / "specs" / "001-a" / "task_metadata.json"
+        ).read_bytes()
+    )
+    monkeypatch.setattr(build_compare, "METADATA_TOTAL", size)
+    assert build_compare.spec_kinds(tmp_path) == {"001-a": "test"}
 
 
 def test_qa_iterations_stop_at_the_plan_count_and_the_byte_budget(
@@ -138,8 +171,8 @@ def test_spec_facts_are_the_same_on_every_provider(tmp_path):
         ),
         usage_ledger.Usage("002-b", "copilot", "x", "coding", 1, 1, 1.0, start),
     ]
-    first, second = build_compare.spec_facts(usages, {"001-a": 2})
-    assert first == SpecFacts("001-a", start, 30.0, 1.0, 2, 2)
+    first, second = build_compare.spec_facts(usages, {"001-a": 2}, {"001-a": "docs"})
+    assert first == SpecFacts("001-a", start, 30.0, 1.0, 2, 2, "docs")
     # No agent named: no agent count rather than zero.
     assert second == SpecFacts("002-b", start, 0.0, 1.0, None, None)
 
@@ -178,6 +211,7 @@ def test_the_main_stack_is_the_first_language_detected(tmp_path, monkeypatch):
 def test_project_facts_read_the_ledgers_and_the_plans(tmp_path, monkeypatch):
     monkeypatch.setattr(build_compare, "main_stack", lambda _d: "go")
     monkeypatch.setattr(build_compare, "size_bucket", lambda _d: "medium")
+    monkeypatch.setattr(build_compare.segments, "team_bucket", lambda _d: "small")
     start = NOW - timedelta(days=1)
     _write(
         tmp_path / ".workpilot" / "cost_data.json",
@@ -194,9 +228,10 @@ def test_project_facts_read_the_ledgers_and_the_plans(tmp_path, monkeypatch):
         {"usages": [_usage("001-a", start + timedelta(minutes=45), 1.5)]},
     )
     _plan(tmp_path, "001-a", 2, workspace=True)
+    _metadata(tmp_path, "001-a", {"kind": "hotfix"})
     facts = build_compare.project_facts(tmp_path)
     assert facts == ProjectFacts(
-        "go", "medium", (SpecFacts("001-a", start, 45.0, 2.0, 2, 2),)
+        "go", "medium", (SpecFacts("001-a", start, 45.0, 2.0, 2, 2, "hotfix"),), "small"
     )
 
 
@@ -238,8 +273,37 @@ def test_the_trend_is_a_percent_change(recent, previous, expected):
     assert build_compare._trend(recent, previous) == expected
 
 
-def _project(stack: str, size: str, *specs: SpecFacts) -> ProjectFacts:
-    return ProjectFacts(stack, size, specs)
+def test_a_window_can_hold_one_kind_of_spec():
+    facts = ProjectFacts(
+        "python",
+        "small",
+        (
+            _spec("001-a", NOW - timedelta(days=1), 10, 1.0, kind="bug_fix"),
+            _spec("002-b", NOW - timedelta(days=2), 30, 3.0, kind="feature"),
+        ),
+    )
+    figures = build_compare.window(facts, NOW - timedelta(days=30), NOW, "bug_fix")
+    assert figures["specs"] == 1 and figures["minutes"] == 10.0
+
+
+@pytest.mark.parametrize(
+    ("values", "min_top", "expected"),
+    [
+        ([1.0, 2.0, 3.0], None, None),
+        ([1.0, 2.0, None], 3, None),
+        ([5.0], 1, None),
+        ([float(v) for v in range(1, 11)], 10, 1.9),
+    ],
+)
+def test_the_top_tenth_needs_min_top_figures(values, min_top, expected):
+    found = build_compare._top(values, min_top)
+    assert found == (None if expected is None else pytest.approx(expected))
+
+
+def _project(
+    stack: str, size: str, *specs: SpecFacts, team: str = "unknown"
+) -> ProjectFacts:
+    return ProjectFacts(stack, size, specs, team)
 
 
 def test_a_group_s_median_is_given_from_min_group_projects():
@@ -260,16 +324,98 @@ def test_a_group_s_median_is_given_from_min_group_projects():
     ]
     answer = build_compare.compare(current, peers, NOW, min_group=3)
     assert answer["window_days"] == 30 and answer["min_group"] == 3
-    assert answer["segment"] == {"stack": "csharp", "size": "medium"}
+    assert answer["segment"] == {
+        "stack": "csharp",
+        "size": "medium",
+        "team": "unknown",
+    }
     assert answer["recent"]["minutes"] == 10.0
     assert answer["previous"]["minutes"] == 20.0
     assert answer["trend"]["minutes"] == -50.0
     assert answer["trend"]["qa_iterations"] is None
-    assert answer["groups"]["segment"] == {"projects": 2, "medians": None}
+    assert answer["groups"]["segment"] == {
+        "projects": 2,
+        "medians": None,
+        "top": None,
+    }
+    assert answer["min_top"] is None
+    assert answer["groups"]["stack"]["top"] is None
     assert answer["groups"]["stack"]["projects"] == 3
     assert answer["groups"]["stack"]["medians"]["minutes"] == 50.0
     assert answer["groups"]["all"]["medians"]["cost"] == 6.0
     assert answer["groups"]["all"]["medians"]["agents"] is None
+
+
+def test_a_group_s_figure_is_given_only_when_min_group_projects_have_it():
+    recent = NOW - timedelta(days=1)
+    current = _project("go", "small", _spec("001-a", recent, 10, 1.0, qa=1))
+    peers = [
+        _project("go", "small", _spec("001-x", recent, 30, 3.0, qa=4, agents=3)),
+        _project("go", "small", _spec("001-x", recent, 50, 5.0, qa=2)),
+        _project("go", "small", _spec("001-x", recent, 70, 7.0)),
+    ]
+    medians = build_compare.compare(current, peers, NOW, min_group=2)["groups"][
+        "segment"
+    ]["medians"]
+    assert medians["minutes"] == 50.0
+    # Two projects have a QA count: enough for a median.
+    assert medians["qa_iterations"] == 3.0
+    # One project names its agents: its own figure is not given as the group's.
+    assert medians["agents"] is None
+
+
+def test_the_comparison_adds_the_team_the_top_tenth_and_the_weeks():
+    current = _project(
+        "go",
+        "small",
+        _spec("001-a", NOW - timedelta(days=1), 10, 1.0),
+        _spec("002-b", NOW - timedelta(days=9), 30, 3.0),
+        team="small",
+    )
+    peers = [
+        _project(
+            "go", "small", _spec("001-x", NOW - timedelta(days=1), m, m), team=team
+        )
+        for m, team in ((10, "small"), (20, "small"), (30, "large"), (40, "small"))
+    ]
+    answer = build_compare.compare(current, peers, NOW, min_group=2, min_top=3)
+    assert answer["segment"]["team"] == "small" and answer["min_top"] == 3
+    assert answer["groups"]["team"]["projects"] == 3
+    assert answer["groups"]["team"]["medians"]["minutes"] == 20.0
+    top = answer["groups"]["all"]["top"]
+    assert top["minutes"] == pytest.approx(13.0)
+    assert top["qa_iterations"] is None
+    weeks = answer["weeks"]
+    assert len(weeks) == build_compare.WEEKS
+    assert [w["specs"] for w in weeks[-2:]] == [1, 1]
+    assert weeks[-1]["minutes"] == 10.0 and weeks[-2]["minutes"] == 30.0
+    assert sum(w["specs"] for w in weeks) == 2
+
+
+def test_the_comparison_sets_each_kind_against_the_same_kind_elsewhere():
+    recent = NOW - timedelta(days=1)
+    current = _project(
+        "rust",
+        "small",
+        _spec("001-a", recent, 10, 1.0, kind="feature"),
+        _spec("002-b", recent, 20, 2.0, kind="feature"),
+        _spec("003-c", recent, 5, 0.5, kind="bug_fix"),
+        _spec("004-d", recent, 5, 0.5),
+        _spec("005-e", NOW - timedelta(days=40), 5, 0.5, kind="docs"),
+    )
+    peers = [
+        _project("go", "large", _spec("001-x", recent, 40, 4.0, kind="feature")),
+        _project("go", "large", _spec("001-x", recent, 60, 6.0, kind="feature")),
+        _project("go", "large", _spec("001-x", recent, 9, 9.0, kind="bug_fix")),
+    ]
+    kinds = build_compare.compare(current, peers, NOW, min_group=2)["kinds"]
+    assert [k["kind"] for k in kinds] == ["feature", "bug_fix"]
+    feature, bug_fix = kinds
+    assert feature["specs"] == 2 and feature["minutes"] == 15.0
+    assert feature["group"]["projects"] == 2
+    assert feature["group"]["medians"]["minutes"] == 50.0
+    # One other project fixed a bug: its number, not its figures.
+    assert bug_fix["group"] == {"projects": 1, "medians": None, "top": None}
 
 
 def test_compare_paths_reads_each_folder(tmp_path):
@@ -290,6 +436,7 @@ def test_a_peer_line_is_a_project_s_name_segment_and_window():
     facts = _project("dart", "large", _spec("001-a", NOW - timedelta(days=1), 5, 1))
     line = build_compare.peer_line("Mobile app", facts, NOW)
     assert line["name"] == "Mobile app" and line["stack"] == "dart"
+    assert line["team"] == "unknown"
     assert line["size"] == "large" and line["specs"] == 1
 
 
@@ -357,6 +504,7 @@ def test_the_runner_compares_with_the_person_s_other_projects(tmp_path, stubbed)
     }
     answer = runner.handle(request, datetime.now(UTC))
     assert answer["min_group"] == runner.LOCAL_MIN_GROUP
+    assert answer["min_top"] == runner.LOCAL_MIN_TOP
     assert [(p["name"], p["current"]) for p in answer["projects"]] == [
         ("Current", True),
         ("Peer", False),
@@ -418,5 +566,5 @@ def test_the_runner_runs_as_the_desktop_starts_it(tmp_path):
     )
     answer = json.loads(line.removeprefix("BUILD_COMPARE_RESULT:"))
     assert answer["recent"]["cost"] == pytest.approx(0.4)
-    assert answer["segment"] == {"stack": "other", "size": "unknown"}
+    assert answer["segment"] == {"stack": "other", "size": "unknown", "team": "unknown"}
     assert str(project) not in json.dumps(answer["groups"])

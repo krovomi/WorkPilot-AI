@@ -27,6 +27,9 @@ describe("browser mock: review feedback", () => {
 		await expect(
 			github.resetReviewFeedbackRule("p", "0123456789abcdef"),
 		).resolves.toEqual({ success: false, error: "not_found" });
+		await expect(
+			github.decideHeldReviewFeedback("p", 1, "f", true),
+		).resolves.toEqual({ success: false, error: "not_found" });
 		await expect(github.writeReviewConventions("p")).resolves.toEqual({
 			success: false,
 			error: "write_failed",

@@ -105,6 +105,29 @@ class TestParsing:
         assert gov.max_tokens_per_hour == 500_000
         assert gov.active and gov.has_schedule
 
+    def test_the_task_budget_and_the_loop_limit_are_read(self):
+        gov, errors = _parse(
+            {
+                "budget": {"max_tokens_per_task": 2_000_000},
+                "loop_detection": {"max_same_tool_call": 3},
+            }
+        )
+        assert errors == []
+        assert gov.max_tokens_per_task == 2_000_000
+        assert gov.max_same_tool_call == 3
+        assert gov.active
+        shown = gov.to_dict()
+        assert shown["budget"] == {
+            "maxTokensPerHour": None,
+            "maxTokensPerTask": 2_000_000,
+        }
+        assert shown["loopDetection"] == {"maxSameToolCall": 3}
+
+    def test_the_loop_limit_alone_is_a_policy(self):
+        gov, errors = _parse({"loop_detection": {"max_same_tool_call": 2}})
+        assert errors == [] and gov.active
+        assert gov.to_dict()["budget"] is None
+
     def test_nothing_set_is_no_limit(self):
         gov, errors = _parse({})
         assert errors == []
@@ -112,6 +135,7 @@ class TestParsing:
         assert gov.is_open()
         assert gov.to_dict()["schedule"] is None
         assert gov.to_dict()["budget"] is None
+        assert gov.to_dict()["loopDetection"] is None
 
     @pytest.mark.parametrize(
         ("doc", "expected"),
@@ -286,6 +310,17 @@ class TestParsing:
             ({"budget": {"max_tokens_per_hour": True}}, "must be a whole number"),
             ({"budget": {"max_tokens_per_hour": 10}}, "must be a whole number"),
             ({"budget": {"max_tokens_per_hour": 10**12}}, "must be a whole number"),
+            ({"budget": {"max_tokens_per_task": 999}}, "'budget.max_tokens_per_task'"),
+            ({"budget": {"max_tokens_per_task": 10**11}}, "must be a whole number"),
+            ({"budget": {"max_tokens_per_day": 5}}, "unknown key 'budget.max_tokens"),
+            ({"loop_detection": 5}, "'loop_detection' must be a mapping"),
+            (
+                {"loop_detection": {"max_same_tool_call": 1}},
+                "'loop_detection.max_same_tool_call' must be a whole number from 2 to 100",
+            ),
+            ({"loop_detection": {"max_same_tool_call": 101}}, "from 2 to 100"),
+            ({"loop_detection": {"max_same_tool_call": False}}, "from 2 to 100"),
+            ({"loop_detection": {"max_same": 3}}, "unknown key 'loop_detection."),
         ],
     )
     def test_every_mistake_is_named(self, doc: dict, expected: str):
@@ -417,7 +452,10 @@ class TestTheLoader:
             "files.requires_review:infra/**",
         ]
         assert policy.sources[0].rules == 2
-        assert policy.to_dict()["governance"]["budget"] == {"maxTokensPerHour": 2000}
+        assert policy.to_dict()["governance"]["budget"] == {
+            "maxTokensPerHour": 2000,
+            "maxTokensPerTask": None,
+        }
 
     def test_it_is_read_from_the_main_checkout_not_the_worktree(self, project: Path):
         _repo_policy(project, {"files": {"forbidden": ["secret/**"]}})
@@ -568,6 +606,7 @@ class TestTheRunner:
         assert [s["layer"] for s in report["sources"]] == ["repository"]
         assert report["tokensLastHour"] == 0
         assert [e["decision"] for e in report["events"]] == ["deny"]
+        assert report["metrics"] == {"blocked24h": 1, "breakerTrips7d": 0}
 
     def test_without_a_policy_the_panel_says_so(
         self, project: Path, monkeypatch, capsys

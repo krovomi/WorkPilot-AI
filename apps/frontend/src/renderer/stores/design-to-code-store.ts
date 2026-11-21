@@ -195,6 +195,8 @@ const initialState: DesignToCodeState = {
 		maxCostUsd: RENDER_LOOP_BOUNDS.maxCostUsd.default,
 		responsive: false,
 		states: false,
+		fixPasses: false,
+		masks: [],
 	},
 	selectedIteration: null,
 	imageData: null,
@@ -244,10 +246,21 @@ export const useDesignToCodeStore = create<
 	setLoopOptions: (options) => set((s) => ({ loopOptions: { ...s.loopOptions, ...options } })),
 	selectIteration: (index) => set({ selectedIteration: index }),
 
+	// Zones drawn on a design mean nothing on another one.
 	setImageData: (data, preview, name) =>
-		set({ imageData: data, imagePreview: preview, imageName: name }),
+		set((s) => ({
+			imageData: data,
+			imagePreview: preview,
+			imageName: name,
+			loopOptions: { ...s.loopOptions, masks: [] },
+		})),
 	clearImage: () =>
-		set({ imageData: null, imagePreview: null, imageName: null }),
+		set((s) => ({
+			imageData: null,
+			imagePreview: null,
+			imageName: null,
+			loopOptions: { ...s.loopOptions, masks: [] },
+		})),
 
 	startPipeline: () =>
 		set({

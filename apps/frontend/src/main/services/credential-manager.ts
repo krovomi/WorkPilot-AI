@@ -850,10 +850,10 @@ export class CredentialManager extends EventEmitter {
 
 				case "google":
 				case "gemini":
-					response = await fetch(
-						`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`,
-						{ signal: timeout },
-					);
+					response = await fetch("https://generativelanguage.googleapis.com/v1/models", {
+						headers: { "x-goog-api-key": apiKey },
+						signal: timeout,
+					});
 					break;
 
 				case "mistral":
@@ -1338,9 +1338,9 @@ export class CredentialManager extends EventEmitter {
 						break;
 
 					case "google":
-						response = await fetch(
-							`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`,
-						);
+						response = await fetch("https://generativelanguage.googleapis.com/v1/models", {
+							headers: { "x-goog-api-key": apiKey },
+						});
 						break;
 
 					case "mistral":

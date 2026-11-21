@@ -82,7 +82,10 @@
 			"fragile": "Zones fragiles",
 			"fragileHint": "Les fichiers que les derniers commits modifient ensemble, un dans chaque spec, s'ajoutent au score de la paire.",
 			"fragileOn": "D'après l'historique",
-			"fragileOff": "Désactivées"
+			"fragileOff": "Désactivées",
+			"code": "Liens de code",
+			"codeHint": "Un fichier d'une spec qui importe un module que l'autre modifie, ou qui utilise un symbole que l'autre supprime, s'ajoute au score de la paire.",
+			"codeOn": "Depuis le code"
 		},
 		"empty": {
 			"noProject": "Sélectionnez un projet pour planifier ses vagues.",
@@ -119,7 +122,9 @@
 			"together": "peuvent partager une vague",
 			"mergeClean": "merge de test propre",
 			"mergeConflict": "merge de test en conflit",
-			"fragile": "{{count}} liens fragiles"
+			"fragile": "{{count}} liens fragiles",
+			"imports": "{{count}} imports croisés",
+			"symbols": "{{count}} symboles supprimés encore utilisés"
 		},
 		"run": {
 			"running": "Vague {{current}} sur {{total}} en cours.",
@@ -154,6 +159,15 @@
 		"fragile": {
 			"summary": "Zones fragiles : les fichiers modifiés ensemble dans les {{commits}} derniers commits s'ajoutent aux scores.",
 			"unavailable": "Zones fragiles : git n'a pas pu lire l'historique du projet ; les scores ne comptent que les fichiers partagés."
+		},
+		"code": {
+			"summary": "Liens de code : {{count}} fichiers lus pour les imports et les symboles supprimés, quel que soit le langage.",
+			"capped": "La limite de fichiers est atteinte : certains fichiers n'ont pas été lus."
+		},
+		"history": {
+			"summary": "{{days}} derniers jours : {{runs}} exécutions terminées ({{stopped}} arrêtées), {{conflicts}} conflits évités (risque {{risk}} retiré), {{started}} specs lancées.",
+			"last": "Dernière exécution terminée le {{finishedAt}}.",
+			"ignored": "L'historique des exécutions de ce projet est illisible : il repart de la prochaine exécution."
 		}
 	}
 }

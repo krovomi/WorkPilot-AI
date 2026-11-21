@@ -1,57 +1,27 @@
 """
-Smart Rollback and Recovery System
-===================================
+Attempt history and good commits of a build, across its sessions.
 
-Automatic recovery from build failures, stuck loops, and broken builds.
-Enables true "walk away" automation by detecting and recovering from common failure modes.
-
-Key Features:
-- Automatic rollback to last working state
-- Circular fix detection (prevents infinite loops)
-- Attempt history tracking across sessions
-- Smart retry with different approaches
-- Escalation to human when stuck
+What the coder and the session loop keep between sessions: each attempt at a
+subtask (`memory/attempt_history.json`), the hints the next attempt reads,
+the subtasks marked stuck for a person, and each commit a subtask ended on
+(`memory/build_commits.json`, which the review groups by subtask).
 """
 
 import json
-import subprocess
-from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 
 from foundation.subtask_unblock import block
 
 
-class FailureType(Enum):
-    """Types of failures that can occur during autonomous builds."""
-
-    BROKEN_BUILD = "broken_build"  # Code doesn't compile/run
-    VERIFICATION_FAILED = "verification_failed"  # Subtask verification failed
-    CIRCULAR_FIX = "circular_fix"  # Same fix attempted multiple times
-    CONTEXT_EXHAUSTED = "context_exhausted"  # Ran out of context mid-subtask
-    UNKNOWN = "unknown"
-
-
-@dataclass
-class RecoveryAction:
-    """Action to take in response to a failure."""
-
-    action: str  # "rollback", "retry", "skip", "escalate"
-    target: str  # commit hash, subtask id, or message
-    reason: str
-
-
 class RecoveryManager:
     """
-    Manages recovery from build failures.
+    Keeps a build's attempts and good commits across sessions.
 
     Responsibilities:
-    - Track attempt history across sessions
-    - Classify failures and determine recovery actions
-    - Rollback to working states
-    - Detect circular fixes (same approach repeatedly)
-    - Escalate stuck subtasks for human intervention
+    - Track attempt history across sessions, and hint the next attempt
+    - Record the commit each subtask ended on
+    - Mark stuck subtasks for human intervention (and blocked in the plan)
     """
 
     def __init__(self, spec_dir: Path, project_dir: Path):
@@ -136,55 +106,6 @@ class RecoveryManager:
         with open(self.build_commits_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-    def classify_failure(self, error: str, subtask_id: str) -> FailureType:
-        """
-        Classify what type of failure occurred.
-
-        Args:
-            error: Error message or description
-            subtask_id: ID of the subtask that failed
-
-        Returns:
-            FailureType enum value
-        """
-        error_lower = error.lower()
-
-        # Check for broken build indicators
-        build_errors = [
-            "syntax error",
-            "compilation error",
-            "module not found",
-            "import error",
-            "cannot find module",
-            "unexpected token",
-            "indentation error",
-            "parse error",
-        ]
-        if any(be in error_lower for be in build_errors):
-            return FailureType.BROKEN_BUILD
-
-        # Check for verification failures
-        verification_errors = [
-            "verification failed",
-            "expected",
-            "assertion",
-            "test failed",
-            "status code",
-        ]
-        if any(ve in error_lower for ve in verification_errors):
-            return FailureType.VERIFICATION_FAILED
-
-        # Check for context exhaustion
-        context_errors = ["context", "token limit", "maximum length"]
-        if any(ce in error_lower for ce in context_errors):
-            return FailureType.CONTEXT_EXHAUSTED
-
-        # Check for circular fixes (will be determined by attempt history)
-        if self.is_circular_fix(subtask_id, error):
-            return FailureType.CIRCULAR_FIX
-
-        return FailureType.UNKNOWN
-
     def get_attempt_count(self, subtask_id: str) -> int:
         """
         Get how many times this subtask has been attempted.
@@ -241,149 +162,6 @@ class RecoveryManager:
 
         self._save_attempt_history(history)
 
-    def is_circular_fix(self, subtask_id: str, current_approach: str) -> bool:
-        """
-        Detect if we're trying the same approach repeatedly.
-
-        Args:
-            subtask_id: ID of the subtask
-            current_approach: Description of current approach
-
-        Returns:
-            True if this appears to be a circular fix attempt
-        """
-        history = self._load_attempt_history()
-        subtask_data = history["subtasks"].get(subtask_id, {})
-        attempts = subtask_data.get("attempts", [])
-
-        if len(attempts) < 2:
-            return False
-
-        # Check if last 3 attempts used similar approaches
-        # Simple similarity check: look for repeated keywords
-        recent_attempts = attempts[-3:] if len(attempts) >= 3 else attempts
-
-        # Extract key terms from current approach (ignore common words)
-        stop_words = {
-            "with",
-            "using",
-            "the",
-            "a",
-            "an",
-            "and",
-            "or",
-            "but",
-            "in",
-            "on",
-            "at",
-            "to",
-            "for",
-            "trying",
-        }
-        current_keywords = set(
-            word for word in current_approach.lower().split() if word not in stop_words
-        )
-
-        similar_count = 0
-        for attempt in recent_attempts:
-            attempt_keywords = set(
-                word
-                for word in attempt["approach"].lower().split()
-                if word not in stop_words
-            )
-
-            # Calculate Jaccard similarity (intersection over union)
-            overlap = len(current_keywords & attempt_keywords)
-            total = len(current_keywords | attempt_keywords)
-
-            if total > 0:
-                similarity = overlap / total
-                # If >30% of meaningful words overlap, consider it similar
-                # This catches key technical terms appearing repeatedly
-                # (e.g., "async await" across multiple attempts)
-                if similarity > 0.3:
-                    similar_count += 1
-
-        # If 2+ recent attempts were similar to current approach, it's circular
-        return similar_count >= 2
-
-    def determine_recovery_action(
-        self, failure_type: FailureType, subtask_id: str
-    ) -> RecoveryAction:
-        """
-        Decide what to do based on failure type and history.
-
-        Args:
-            failure_type: Type of failure that occurred
-            subtask_id: ID of the subtask that failed
-
-        Returns:
-            RecoveryAction describing what to do
-        """
-        attempt_count = self.get_attempt_count(subtask_id)
-
-        if failure_type == FailureType.BROKEN_BUILD:
-            # Broken build: rollback to last good state
-            last_good = self.get_last_good_commit()
-            if last_good:
-                return RecoveryAction(
-                    action="rollback",
-                    target=last_good,
-                    reason=f"Build broken in subtask {subtask_id}, rolling back to working state",
-                )
-            else:
-                return RecoveryAction(
-                    action="escalate",
-                    target=subtask_id,
-                    reason="Build broken and no good commit found to rollback to",
-                )
-
-        elif failure_type == FailureType.VERIFICATION_FAILED:
-            # Verification failed: retry with different approach if < 3 attempts
-            if attempt_count < 3:
-                return RecoveryAction(
-                    action="retry",
-                    target=subtask_id,
-                    reason=f"Verification failed, retry with different approach (attempt {attempt_count + 1}/3)",
-                )
-            else:
-                return RecoveryAction(
-                    action="skip",
-                    target=subtask_id,
-                    reason=f"Verification failed after {attempt_count} attempts, marking as stuck",
-                )
-
-        elif failure_type == FailureType.CIRCULAR_FIX:
-            # Circular fix detected: skip and escalate
-            return RecoveryAction(
-                action="skip",
-                target=subtask_id,
-                reason="Circular fix detected - same approach tried multiple times",
-            )
-
-        elif failure_type == FailureType.CONTEXT_EXHAUSTED:
-            # Context exhausted: commit current progress and continue
-            return RecoveryAction(
-                action="continue",
-                target=subtask_id,
-                reason="Context exhausted, will commit progress and continue in next session",
-            )
-
-        else:  # UNKNOWN
-            # Unknown error: retry once, then escalate
-            if attempt_count < 2:
-                return RecoveryAction(
-                    action="retry",
-                    target=subtask_id,
-                    reason=f"Unknown error, retrying (attempt {attempt_count + 1}/2)",
-                )
-            else:
-                return RecoveryAction(
-                    action="escalate",
-                    target=subtask_id,
-                    reason=f"Unknown error persists after {attempt_count} attempts",
-                )
-
     def get_last_good_commit(self) -> str | None:
         """
         Find the most recent commit where build was working.
@@ -423,31 +201,6 @@ class RecoveryManager:
         commits["last_good_commit"] = commit_hash
 
         self._save_build_commits(commits)
-
-    def rollback_to_commit(self, commit_hash: str) -> bool:
-        """
-        Rollback to a specific commit.
-
-        Args:
-            commit_hash: Git commit hash to rollback to
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            # Use git reset --hard to rollback. check=True raises on non-zero
-            # exit, so the CompletedProcess result is intentionally discarded.
-            subprocess.run(
-                ["git", "reset", "--hard", commit_hash],
-                cwd=self.project_dir,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            return True
-        except subprocess.CalledProcessError as e:
-            print(f"Error rolling back to {commit_hash}: {e.stderr}")
-            return False
 
     def mark_subtask_stuck(
         self, subtask_id: str, reason: str, kind: str = "max_attempts"
@@ -591,12 +344,6 @@ class RecoveryManager:
 
         return hints
 
-    def clear_stuck_subtasks(self) -> None:
-        """Clear all stuck subtasks (for manual resolution)."""
-        history = self._load_attempt_history()
-        history["stuck_subtasks"] = []
-        self._save_attempt_history(history)
-
     def reset_subtask(self, subtask_id: str) -> None:
         """
         Reset a subtask's attempt history.
@@ -616,52 +363,3 @@ class RecoveryManager:
         ]
 
         self._save_attempt_history(history)
-
-
-# Utility functions for integration with agent.py
-
-
-def check_and_recover(
-    spec_dir: Path, project_dir: Path, subtask_id: str, error: str | None = None
-) -> RecoveryAction | None:
-    """
-    Check if recovery is needed and return appropriate action.
-
-    Args:
-        spec_dir: Spec directory
-        project_dir: Project directory
-        subtask_id: Current subtask ID
-        error: Error message if any
-
-    Returns:
-        RecoveryAction if recovery needed, None otherwise
-    """
-    if not error:
-        return None
-
-    manager = RecoveryManager(spec_dir, project_dir)
-    failure_type = manager.classify_failure(error, subtask_id)
-
-    return manager.determine_recovery_action(failure_type, subtask_id)
-
-
-def get_recovery_context(spec_dir: Path, project_dir: Path, subtask_id: str) -> dict:
-    """
-    Get recovery context for a subtask (for prompt generation).
-
-    Args:
-        spec_dir: Spec directory
-        project_dir: Project directory
-        subtask_id: Subtask ID
-
-    Returns:
-        Dict with recovery hints and history
-    """
-    manager = RecoveryManager(spec_dir, project_dir)
-
-    return {
-        "attempt_count": manager.get_attempt_count(subtask_id),
-        "hints": manager.get_recovery_hints(subtask_id),
-        "subtask_history": manager.get_subtask_history(subtask_id),
-        "stuck_subtasks": manager.get_stuck_subtasks(),
-    }

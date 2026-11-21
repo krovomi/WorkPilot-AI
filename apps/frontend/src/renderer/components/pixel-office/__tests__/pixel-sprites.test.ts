@@ -59,6 +59,14 @@ describe("getCharacterSprite", () => {
 		expect(getCharacterSprite(0, "down", 0)).toBe(sprite);
 	});
 
+	it("wears a provider's shirt over the palette's own, as its own sprite", () => {
+		const shirted = getCharacterSprite(0, "down", 0, "#10A37F");
+		expect(shirted).not.toBe(getCharacterSprite(0, "down", 0));
+		expect(colours(shirted).has("#10A37F")).toBe(true);
+		expect(colours(shirted).has(CHARACTER_PALETTES[0].shirt)).toBe(false);
+		expect(colours(shirted).has(CHARACTER_PALETTES[0].hair)).toBe(true);
+	});
+
 	it("wraps the character index around the palettes", () => {
 		const wrapped = getCharacterSprite(CHARACTER_PALETTES.length + 1, "down", 0);
 		expect(colours(wrapped).has(CHARACTER_PALETTES[1].shirt)).toBe(true);

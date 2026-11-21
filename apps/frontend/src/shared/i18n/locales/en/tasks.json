@@ -703,6 +703,40 @@
 		},
 		"help": "Decided without AI from the category, the imported item or the words of the title. Change it if it is wrong: later versions will pick the workflow from it."
 	},
+	"cardType": {
+		"label": "Card type",
+		"values": {
+			"feature": "Feature",
+			"ux": "UI / UX",
+			"bug": "Bug",
+			"hotfix": "Hotfix",
+			"security": "Security",
+			"perf": "Performance",
+			"refactor": "Refactoring",
+			"test": "Tests",
+			"investigation": "Investigation",
+			"spike": "Spike / POC",
+			"docs": "Docs",
+			"run": "Operations (RUN)",
+			"upgrade": "Upgrade",
+			"infra": "Infra / chore"
+		},
+		"proposedTitle": "{{type}} (proposed, confirm it in the task detail)",
+		"also": "Also: {{type}}",
+		"basis": {
+			"user": "chosen by you",
+			"category": "from the category",
+			"import": "from the imported item",
+			"keywords": "from the title",
+			"severity": "from the security severity",
+			"origin": "from the card's origin"
+		},
+		"preview": {
+			"field": "{{label}}: {{value}}",
+			"progress": "{{status}} · {{percent}}%",
+			"blockedBy": "Waiting for: {{titles}}"
+		}
+	},
 	"images": {
 		"removeImageAriaLabel": "Remove image {{filename}}",
 		"pasteHint": "Tip: Paste screenshots directly with {{shortcut}} to add reference images."
@@ -2690,6 +2724,11 @@
 		"hoursBody": "workpilot.policy.yaml lets agents work {{hours}} ({{timezone}}). The task paused itself once its current action had finished.",
 		"budgetChip": "Token budget reached",
 		"budgetBody": "The project's agents spent {{spent}} tokens in the last hour, at or past the {{limit}} workpilot.policy.yaml allows.",
+		"taskBudgetChip": "Task token budget reached",
+		"taskBudgetBody": "This task's agents spent {{spent}} tokens, at or past the {{limit}} per task workpilot.policy.yaml allows.",
+		"invalidChip": "Invalid policy",
+		"invalidBody_one": "The guardrails policy has {{count}} error: no agent runs until it is fixed. Settings > Guardrails lists it.",
+		"invalidBody_other": "The guardrails policy has {{count}} errors: no agent runs until they are fixed. Settings > Guardrails lists them.",
 		"hint": "Resume it when the policy allows again; the decision is in the audit trail of Settings > Guardrails."
 	}
 }

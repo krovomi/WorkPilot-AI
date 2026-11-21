@@ -495,6 +495,8 @@ export const IPC_CHANNELS = {
 	GITHUB_PR_REVIEW_FEEDBACK_STATS: "github:pr:reviewFeedback:stats",
 	GITHUB_PR_REVIEW_FEEDBACK_RESET: "github:pr:reviewFeedback:reset",
 	GITHUB_PR_REVIEW_CONVENTIONS_WRITE: "github:pr:reviewConventions:write",
+	// A maintainer's decision on a held rejection (server projects)
+	GITHUB_PR_REVIEW_FEEDBACK_HELD_DECIDE: "github:pr:reviewFeedback:heldDecide",
 
 	// GitHub PR Review events (main -> renderer)
 	GITHUB_PR_REVIEW_PROGRESS: "github:pr:reviewProgress",
@@ -822,6 +824,9 @@ export const IPC_CHANNELS = {
 		"performanceProfiler:implementationComplete",
 
 	// Pipeline Generator (Feature 23) — AI-powered CI/CD pipeline generation
+	// Pixel Office: a mini-scene written by the page's model
+	PIXEL_OFFICE_NARRATE: "pixelOffice:narrate",
+
 	PIPELINE_GENERATOR_GENERATE: "pipelineGenerator:generate",
 	PIPELINE_GENERATOR_CANCEL: "pipelineGenerator:cancel",
 	// Pipeline Generator events (main -> renderer)
@@ -866,6 +871,7 @@ export const IPC_CHANNELS = {
 	CONFLICT_WAVES_RUN_LOAD: "conflictWaves:loadRun",
 	CONFLICT_WAVES_RUN_SAVE: "conflictWaves:saveRun",
 	CONFLICT_WAVES_RUN_CLEAR: "conflictWaves:clearRun",
+	CONFLICT_WAVES_HISTORY: "conflictWaves:history",
 
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",
@@ -1198,6 +1204,9 @@ export const IPC_CHANNELS = {
 	// "How you compare": a project's specs against its past and the person's
 	// other projects, read from their folders (main/build-compare.ts)
 	DASHBOARD_COMPARE: "dashboard:compare",
+	// Its team report, worded by the renderer, printed to a PDF the person
+	// saves (main/build-compare-report.ts)
+	DASHBOARD_COMPARE_EXPORT: "dashboard:compareExport",
 	DASHBOARD_GET_SNAPSHOT: "dashboard:getSnapshot",
 	DESIGN_TO_CODE_DETECT_STACK: "designToCode:detectStack",
 	DESIGN_TO_CODE_PROGRESS: "designToCode:progress",

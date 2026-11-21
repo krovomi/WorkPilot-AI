@@ -205,6 +205,28 @@ describe("backendPauseMessage", () => {
 		).toBeNull();
 	});
 
+	it("says when the task's own token budget or an invalid policy stopped it", () => {
+		const task = backendPauseMessage(
+			{
+				enabled: true,
+				reason: "policy_budget",
+				policy: { reason: "policy_budget", tokensThisTask: 5000.7, maxTokensPerTask: 4000 },
+			},
+			"Add login",
+			"fr",
+		);
+		expect(task?.title).toBe("Tâche en pause : budget de jetons atteint");
+		expect(task?.body).toContain("ont dépensé 5000 jetons, au-delà des 4000 par tâche");
+		const invalid = backendPauseMessage(
+			{ enabled: true, reason: "policy_invalid", policy: { reason: "policy_invalid", errorCount: 0 } },
+			"Add login",
+			"en",
+		);
+		expect(invalid?.title).toBe("Task paused: invalid policy");
+		expect(invalid?.body).toContain("has 1 error(s)");
+		expect(backendPauseMessage({ enabled: true, reason: "policy_invalid" }, "t", "en")).toBeNull();
+	});
+
 	it("says nothing for the user's own pause", () => {
 		expect(backendPauseMessage({ enabled: true }, "t", "en")).toBeNull();
 		expect(backendPauseMessage({ enabled: true, reason: "kill_switch" }, "t", "en")).toBeNull();

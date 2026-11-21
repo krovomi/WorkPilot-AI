@@ -234,6 +234,10 @@ import { createQualityAPI, type QualityAPI } from "./modules/quality-api";
 import type { SelfHealingAPIObject } from "./modules/self-healing-api";
 import { createSelfHealingAPI } from "./modules/self-healing-api";
 import {
+	createPixelOfficeAPI,
+	type PixelOfficeAPI,
+} from "./modules/pixel-office-api";
+import {
 	createSmartEstimationAPI,
 	type SmartEstimationAPI,
 } from "./modules/smart-estimation-api";
@@ -392,6 +396,8 @@ export interface ElectronAPI
 	quality: QualityAPI;
 	/** Self-Healing Codebase + Incident Responder API */
 	selfHealing: SelfHealingAPIObject;
+	/** Pixel Office mini-scenes written by the page's model */
+	pixelOffice: PixelOfficeAPI;
 	createClaudeProfileDirectory: (
 		profileName: string,
 	) => Promise<{ success: boolean; data?: string; error?: string }>;
@@ -541,6 +547,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
 		quality: createQualityAPI(), // Code quality analysis
 		selfHealing: createSelfHealingAPI(),
+		pixelOffice: createPixelOfficeAPI(),
 		createClaudeProfileDirectory: (profileName: string) =>
 			invokeIpc<{ success: boolean; data?: string; error?: string }>(
 				IPC_CHANNELS.CLAUDE_PROFILE_CREATE_DIR,

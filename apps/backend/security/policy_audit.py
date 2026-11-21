@@ -1,9 +1,9 @@
-"""The policy's audit trail: every decision it took, exportable (#353, lot 2).
+"""The policy's audit trail: every decision it took, exportable (#353, lots 2-3).
 
 One JSON line per decision in ``<project>/.workpilot/policy-audit.jsonl`` of the
 **main** project: a write or command refused, sent for review, approved or let
 through with a warning, the policy found invalid, agents stopped outside their
-hours or past their token budget. Each line says who ran the agent, when, which
+hours or past their token budget, an agent stopped by the circuit breaker. Each line says who ran the agent, when, which
 task, tool and file, the decision, its rules and why, and the provider and model
 when the caller knows them. Settings > Guardrails shows the last ones and
 exports them as CSV or JSON for compliance.
@@ -30,7 +30,7 @@ import json
 import os
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -54,9 +54,12 @@ DECISIONS = frozenset(
         "outside_hours",
         "budget_exceeded",
         "invalid_policy",
+        "tool_loop",
     }
 )
 _OWN_WORDS = frozenset({"outside_hours", "budget_exceeded"})
+#: The decisions that stopped an agent, counted by :func:`metrics`.
+BLOCKING = frozenset({"deny", "outside_hours", "budget_exceeded", "invalid_policy"})
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9._:/@+-]{1,80}$")
 
 
@@ -180,6 +183,30 @@ def read_events(project: Path, limit: int = KEEP_LINES) -> list[dict[str, Any]]:
     return events
 
 
+def _at(event: dict[str, Any]) -> datetime | None:
+    try:
+        moment = datetime.fromisoformat(str(event.get("at")))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+
+
+def metrics(project: Path, now: datetime | None = None) -> dict[str, int]:
+    """The issue's two counts: agents stopped in the last day, breaker trips in the week."""
+    moment = now or datetime.now(UTC)
+    day, week = moment - timedelta(days=1), moment - timedelta(days=7)
+    blocked = trips = 0
+    for event in read_events(project):
+        at = _at(event)
+        if at is None:
+            continue
+        if event["decision"] in BLOCKING and at >= day:
+            blocked += 1
+        elif event["decision"] == "tool_loop" and at >= week:
+            trips += 1
+    return {"blocked24h": blocked, "breakerTrips7d": trips}
+
+
 def task_of(root: Path | None) -> str | None:
     """The task a worktree belongs to (``.../worktrees/tasks/<task>``)."""
     if root is None:
@@ -197,6 +224,7 @@ __all__ = [
     "KEEP_LINES",
     "MAX_BYTES",
     "log_path",
+    "metrics",
     "read_events",
     "record",
     "task_of",

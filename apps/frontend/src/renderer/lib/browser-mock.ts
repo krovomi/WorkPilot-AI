@@ -322,6 +322,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 			success: false as const,
 			error: "not_found" as const,
 		}),
+		decideHeldReviewFeedback: async () => ({
+			success: false as const,
+			error: "not_found" as const,
+		}),
 		writeReviewConventions: async () => ({
 			success: false as const,
 			error: "write_failed" as const,

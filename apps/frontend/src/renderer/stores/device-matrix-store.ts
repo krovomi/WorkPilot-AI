@@ -6,8 +6,12 @@
  * démonté dès qu'on en regarde un autre, et une capture lancée doit encore
  * avoir où ranger son image au retour. Les appareils sont capturés l'un
  * après l'autre (une fenêtre cachée à la fois), dans l'ordre du catalogue,
- * sous les profils de bridage choisis. L'export nomme les appareils rendus :
- * le main assemble ses propres captures.
+ * sous les profils de bridage, le sens et la session choisis. L'export nomme
+ * les appareils rendus : le main assemble ses propres captures.
+ *
+ * `autoCapture` est la matrice d'office de la revue d'une carte du Kanban :
+ * une fois par clé (une tâche) et par session de l'app, les appareils par
+ * défaut sont capturés sans qu'on le demande.
  */
 import { create } from "zustand";
 import { DEFAULT_MATRIX_DEVICE_IDS, DEVICE_PRESETS } from "../../shared/constants/device-presets";
@@ -17,6 +21,8 @@ import type {
 	DeviceCapture,
 	DeviceCaptureError,
 	DeviceGridExportError,
+	DeviceGridExportFormat,
+	DeviceOrientation,
 	NetworkProfileId,
 } from "../../shared/types/device-matrix";
 
@@ -37,6 +43,13 @@ interface DeviceMatrixState {
 	stopRequested: boolean;
 	network: NetworkProfileId;
 	cpu: CpuProfileId;
+	orientation: DeviceOrientation;
+	/** Prêter aux captures la session (les cookies) de l'aperçu. */
+	previewSession: boolean;
+	/** Encadrer les éléments fautifs sur les captures et dans l'export. */
+	showMarkers: boolean;
+	/** Les clés déjà capturées d'office (`autoCapture`). */
+	autoCaptured: string[];
 	exporting: boolean;
 	/** Le résultat du dernier export ; `null` avant, ou quand la personne a annulé. */
 	exportStatus: DeviceGridExportStatus | null;
@@ -44,10 +57,16 @@ interface DeviceMatrixState {
 	setSelection: (ids: readonly string[]) => void;
 	setNetwork: (id: NetworkProfileId) => void;
 	setCpu: (id: CpuProfileId) => void;
-	captureSelected: (path: string) => Promise<void>;
+	setOrientation: (orientation: DeviceOrientation) => void;
+	setPreviewSession: (enabled: boolean) => void;
+	setShowMarkers: (enabled: boolean) => void;
+	/** Capture la sélection, ou les appareils `ids` quand ils sont donnés. */
+	captureSelected: (path: string, ids?: readonly string[]) => Promise<void>;
+	/** Capture les appareils par défaut une seule fois par `key` ; `false` si c'est déjà fait ou impossible. */
+	autoCapture: (key: string, path: string) => boolean;
 	stop: () => void;
 	clear: () => void;
-	exportGrid: () => Promise<void>;
+	exportGrid: (format: DeviceGridExportFormat) => Promise<void>;
 }
 
 /** Les ids connus, dans l'ordre du catalogue. */
@@ -63,6 +82,10 @@ export const useDeviceMatrixStore = create<DeviceMatrixState>((set, get) => ({
 	stopRequested: false,
 	network: DEFAULT_NETWORK_PROFILE_ID,
 	cpu: DEFAULT_CPU_PROFILE_ID,
+	orientation: "portrait",
+	previewSession: false,
+	showMarkers: true,
+	autoCaptured: [],
 	exporting: false,
 	exportStatus: null,
 
@@ -80,10 +103,16 @@ export const useDeviceMatrixStore = create<DeviceMatrixState>((set, get) => ({
 
 	setCpu: (cpu) => set({ cpu }),
 
-	captureSelected: async (path) => {
-		const { running, exporting, selected, network, cpu } = get();
-		if (running || exporting || selected.length === 0) return;
-		const queue = [...selected];
+	setOrientation: (orientation) => set({ orientation }),
+
+	setPreviewSession: (previewSession) => set({ previewSession }),
+
+	setShowMarkers: (showMarkers) => set({ showMarkers }),
+
+	captureSelected: async (path, ids) => {
+		const { running, exporting, selected, network, cpu, orientation, previewSession } = get();
+		const queue = ids ? inCatalogOrder(ids) : [...selected];
+		if (running || exporting || queue.length === 0) return;
 		const entries: Record<string, DeviceCaptureEntry> = {};
 		for (const id of queue) entries[id] = { status: "pending" };
 		set({ running: true, stopRequested: false, entries, exportStatus: null });
@@ -92,7 +121,14 @@ export const useDeviceMatrixStore = create<DeviceMatrixState>((set, get) => ({
 			setEntry(set, deviceId, { status: "capturing" });
 			let entry: DeviceCaptureEntry;
 			try {
-				const result = await globalThis.electronAPI.captureEmulatorDevice({ deviceId, path, network, cpu });
+				const result = await globalThis.electronAPI.captureEmulatorDevice({
+					deviceId,
+					path,
+					network,
+					cpu,
+					orientation,
+					previewSession,
+				});
 				entry = result.success
 					? { status: "done", capture: result.data }
 					: { status: "failed", error: result.error };
@@ -111,6 +147,14 @@ export const useDeviceMatrixStore = create<DeviceMatrixState>((set, get) => ({
 		}));
 	},
 
+	autoCapture: (key, path) => {
+		const { running, exporting, autoCaptured } = get();
+		if (running || exporting || autoCaptured.includes(key)) return false;
+		set({ autoCaptured: [...autoCaptured, key] });
+		void get().captureSelected(path, DEFAULT_MATRIX_DEVICE_IDS);
+		return true;
+	},
+
 	stop: () => {
 		if (get().running) set({ stopRequested: true });
 	},
@@ -119,8 +163,8 @@ export const useDeviceMatrixStore = create<DeviceMatrixState>((set, get) => ({
 		if (!get().running) set({ entries: {}, exportStatus: null });
 	},
 
-	exportGrid: async () => {
-		const { running, exporting, entries } = get();
+	exportGrid: async (format) => {
+		const { running, exporting, entries, showMarkers } = get();
 		const deviceIds = DEVICE_PRESETS.filter((device) => entries[device.id]?.status === "done").map(
 			(device) => device.id,
 		);
@@ -128,7 +172,11 @@ export const useDeviceMatrixStore = create<DeviceMatrixState>((set, get) => ({
 		set({ exporting: true, exportStatus: null });
 		let exportStatus: DeviceGridExportStatus | null;
 		try {
-			const result = await globalThis.electronAPI.exportEmulatorDeviceGrid({ deviceIds });
+			const result = await globalThis.electronAPI.exportEmulatorDeviceGrid({
+				deviceIds,
+				format,
+				markers: showMarkers,
+			});
 			if (!result.success) exportStatus = { status: "failed", error: result.error };
 			else exportStatus = result.data.saved ? { status: "saved", fileName: result.data.fileName } : null;
 		} catch {

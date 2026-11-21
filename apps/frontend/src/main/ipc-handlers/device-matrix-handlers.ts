@@ -2,9 +2,10 @@
  * La matrice d'appareils de l'émulateur (#383) : une capture par appel, et
  * l'export de la grille.
  *
- * Le renderer nomme un appareil de `DEVICE_PRESETS`, un chemin et deux
+ * Le renderer nomme un appareil de `DEVICE_PRESETS`, un chemin, deux
  * profils de bridage (`NETWORK_PROFILES`, `CPU_PROFILES`), jamais des débits
- * ni un facteur. Le main prend l'origine du serveur que l'émulateur a lancé
+ * ni un facteur, un sens (`DEVICE_ORIENTATIONS`), jamais une taille, et s'il
+ * veut la session de l'aperçu — le main lit lui-même ses cookies. Le main prend l'origine du serveur que l'émulateur a lancé
  * (`appEmulatorService`), jamais une URL reçue : le chemin est résolu sur
  * cette origine et refusé s'il en sort (`//hôte`, `/\hôte`, schéma). Une
  * capture à la fois : le renderer enchaîne les appareils, ce qui lui donne la
@@ -15,12 +16,20 @@
  * dernières captures du main (gardées en mémoire, une par appareil), les
  * légendes sont écrites par le main, et le fichier est écrit là où la
  * personne l'a choisi dans la boîte native — le renderer ne fournit ni pixel,
- * ni texte, ni chemin.
+ * ni texte, ni chemin. Il choisit le format (`GRID_EXPORT_FORMATS`) et si les
+ * éléments fautifs sont encadrés : les cadres viennent du rapport que le main
+ * a gardé avec la capture.
  */
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ipcMain } from "electron";
-import { DEVICE_PRESETS, findDevicePreset } from "../../shared/constants/device-presets";
+import {
+	DEVICE_PRESETS,
+	findDevicePreset,
+	findOrientation,
+	orientDevice,
+	orientationOf,
+} from "../../shared/constants/device-presets";
 import { findCpuProfile, findNetworkProfile } from "../../shared/constants/emulation-throttling";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import type {
@@ -28,9 +37,12 @@ import type {
 	DeviceCaptureRequest,
 	DeviceCaptureResult,
 	DeviceGridExportError,
+	DeviceGridExportFormat,
 	DeviceGridExportResult,
 	DevicePreset,
+	ResponsiveReport,
 } from "../../shared/types/device-matrix";
+import { issueMarkers } from "../../shared/utils/issue-markers";
 import { getAppLanguage } from "../app-language";
 import { appEmulatorService } from "../app-emulator-service";
 import { DeviceCaptureFailure, type Throttling, captureDevice } from "../device-matrix/device-capture";
@@ -39,7 +51,11 @@ import { gridCaption } from "../device-matrix/grid-labels";
 import { showSaveDialog } from "../electron-utils";
 
 const MAX_PATH = 2048;
-const EXPORT_FILE_NAME = "device-matrix.png";
+export const GRID_EXPORT_FORMATS: readonly DeviceGridExportFormat[] = ["png", "pdf"];
+const EXPORT_FILTERS: Record<DeviceGridExportFormat, { name: string; extensions: string[] }> = {
+	png: { name: "PNG", extensions: ["png"] },
+	pdf: { name: "PDF", extensions: ["pdf"] },
+};
 
 const fail = (error: DeviceCaptureError): DeviceCaptureResult => ({ success: false, error });
 const failExport = (error: DeviceGridExportError): DeviceGridExportResult => ({ success: false, error });
@@ -47,22 +63,32 @@ const failExport = (error: DeviceGridExportError): DeviceGridExportResult => ({ 
 /** La requête telle que le main l'accepte, ou `null`. */
 export function readCaptureRequest(raw: unknown): DeviceCaptureRequest | null {
 	if (!raw || typeof raw !== "object") return null;
-	const { deviceId, path: pagePath, network, cpu } = raw as Record<string, unknown>;
+	const { deviceId, path: pagePath, network, cpu, orientation, previewSession } = raw as Record<string, unknown>;
 	if (typeof deviceId !== "string" || typeof pagePath !== "string") return null;
 	if (typeof network !== "string" || typeof cpu !== "string") return null;
-	return { deviceId, path: pagePath, network, cpu };
+	if (typeof orientation !== "string" || typeof previewSession !== "boolean") return null;
+	return { deviceId, path: pagePath, network, cpu, orientation, previewSession };
+}
+
+export interface GridExportOrder {
+	readonly deviceIds: string[];
+	readonly format: DeviceGridExportFormat;
+	readonly markers: boolean;
 }
 
 /**
- * Les appareils à exporter : des ids du catalogue, sans doublon, dans l'ordre
- * reçu ; `null` pour tout autre chose (un id inconnu compris).
+ * L'export demandé : des ids du catalogue, sans doublon, dans l'ordre reçu, un
+ * format de la liste et un booléen ; `null` pour tout autre chose (un id
+ * inconnu compris).
  */
-export function readExportRequest(raw: unknown): string[] | null {
+export function readExportRequest(raw: unknown): GridExportOrder | null {
 	if (!raw || typeof raw !== "object") return null;
-	const { deviceIds } = raw as Record<string, unknown>;
+	const { deviceIds, format, markers } = raw as Record<string, unknown>;
 	if (!Array.isArray(deviceIds) || deviceIds.length === 0 || deviceIds.length > DEVICE_PRESETS.length) return null;
 	if (!deviceIds.every((id) => findDevicePreset(id) !== undefined)) return null;
-	return [...new Set(deviceIds as string[])];
+	const chosen = GRID_EXPORT_FORMATS.find((known) => known === format);
+	if (!chosen || typeof markers !== "boolean") return null;
+	return { deviceIds: [...new Set(deviceIds as string[])], format: chosen, markers };
 }
 
 /**
@@ -86,8 +112,10 @@ export function resolveCaptureUrl(serverUrl: string, pagePath: string): string |
 
 /** Une capture gardée pour l'export : l'image du main et ce qui l'a produite. */
 interface KeptCapture extends Throttling {
+	/** L'appareil dans le sens rendu. */
 	readonly device: DevicePreset;
 	readonly image: string;
+	readonly report: ResponsiveReport | null;
 }
 
 export function registerDeviceMatrixHandlers(): void {
@@ -103,6 +131,9 @@ export function registerDeviceMatrixHandlers(): void {
 		const network = findNetworkProfile(request.network);
 		const cpu = findCpuProfile(request.cpu);
 		if (!network || !cpu) return fail("unknown-throttling");
+		const orientation = findOrientation(request.orientation);
+		if (!orientation) return fail("invalid-request");
+		const turned = orientDevice(device, orientation);
 		const serverUrl = appEmulatorService.getUrl();
 		if (!serverUrl) return fail("not-running");
 		const url = resolveCaptureUrl(serverUrl, request.path);
@@ -110,9 +141,21 @@ export function registerDeviceMatrixHandlers(): void {
 		if (busy) return fail("busy");
 		busy = true;
 		try {
-			const shot = await captureDevice(device, url, { network, cpu });
-			kept.set(device.id, { device, image: shot.image, network, cpu });
-			return { success: true, data: { deviceId: device.id, ...shot, network: network.id, cpu: cpu.id } };
+			const shot = await captureDevice(turned, url, { network, cpu }, { previewSession: request.previewSession });
+			kept.set(device.id, { device: turned, image: shot.image, report: shot.report, network, cpu });
+			return {
+				success: true,
+				data: {
+					deviceId: device.id,
+					...shot,
+					network: network.id,
+					cpu: cpu.id,
+					orientation: orientationOf(turned),
+					width: turned.width,
+					height: turned.height,
+					previewSession: request.previewSession,
+				},
+			};
 		} catch (error: unknown) {
 			return fail(error instanceof DeviceCaptureFailure ? error.code : "capture-failed");
 		} finally {
@@ -123,16 +166,16 @@ export function registerDeviceMatrixHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.APP_EMULATOR_EXPORT_DEVICE_GRID,
 		async (_event, raw: unknown): Promise<DeviceGridExportResult> => {
-			const deviceIds = readExportRequest(raw);
-			if (!deviceIds) return failExport("invalid-request");
-			const captures = deviceIds.flatMap((id) => kept.get(id) ?? []);
+			const order = readExportRequest(raw);
+			if (!order) return failExport("invalid-request");
+			const captures = order.deviceIds.flatMap((id) => kept.get(id) ?? []);
 			if (captures.length === 0) return failExport("nothing-to-export");
 			if (busy) return failExport("busy");
 			busy = true;
 			try {
 				const { canceled, filePath } = await showSaveDialog({
-					defaultPath: EXPORT_FILE_NAME,
-					filters: [{ name: "PNG", extensions: ["png"] }],
+					defaultPath: `device-matrix.${order.format}`,
+					filters: [EXPORT_FILTERS[order.format]],
 				});
 				if (canceled || !filePath) return { success: true, data: { saved: false } };
 				const language = getAppLanguage();
@@ -140,15 +183,18 @@ export function registerDeviceMatrixHandlers(): void {
 					...gridCaption(capture.device, capture.network, capture.cpu, language),
 					image: capture.image,
 					aspect: capture.device.height / capture.device.width,
+					markers: order.markers
+						? issueMarkers(capture.report, capture.device.width, capture.device.height)
+						: [],
 				}));
-				let png: Buffer;
+				let file: Buffer;
 				try {
-					png = await composeGrid(tiles);
+					file = await composeGrid(tiles, order.format);
 				} catch {
 					return failExport("export-failed");
 				}
 				try {
-					await writeFile(filePath, png);
+					await writeFile(filePath, file);
 				} catch {
 					return failExport("write-failed");
 				}

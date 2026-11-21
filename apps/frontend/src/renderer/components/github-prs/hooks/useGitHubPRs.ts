@@ -176,6 +176,9 @@ export function useGitHubPRs(
 			// First check connection
 			const connectionResult =
 				await window.electronAPI.github.checkGitHubConnection(projectId);
+			// The project changed while GitHub answered: this answer is the
+			// previous project's repository and pull requests.
+			if (currentProjectIdRef.current !== projectId) return;
 			if (connectionResult.success && connectionResult.data) {
 				setIsConnected(connectionResult.data.connected);
 				setRepoFullName(connectionResult.data.repoFullName || null);
@@ -183,6 +186,7 @@ export function useGitHubPRs(
 				if (connectionResult.data.connected) {
 					// Fetch PRs (returns up to 100 open PRs at once - GitHub GraphQL limit)
 					const result = await window.electronAPI.github.listPRs(projectId);
+					if (currentProjectIdRef.current !== projectId) return;
 					if (result) {
 						// Use hasNextPage from API to determine if more PRs exist
 						setHasMore(result.hasNextPage);
@@ -227,10 +231,11 @@ export function useGitHubPRs(
 				setError(connectionResult.error || "Failed to check connection");
 			}
 		} catch (err) {
+			if (currentProjectIdRef.current !== projectId) return;
 			setError(err instanceof Error ? err.message : "Failed to fetch PRs");
 			setIsConnected(false);
 		} finally {
-			setIsLoading(false);
+			if (currentProjectIdRef.current === projectId) setIsLoading(false);
 		}
 	}, [projectId, getPRReviewState]);
 
@@ -255,6 +260,9 @@ export function useGitHubPRs(
 	useEffect(() => {
 		currentProjectIdRef.current = projectId;
 		fetchGenerationRef.current += 1;
+		// The header names the repository: never the previous project's one.
+		setRepoFullName(null);
+		setError(null);
 		setHasMore(false);
 		setEndCursor(null);
 		setPrs([]);

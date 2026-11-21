@@ -57,6 +57,12 @@ describe("selectorSummary", () => {
 		expect(selectorSummary(STEPS[4])).toBe('heading "Bienvenue"');
 		expect(selectorSummary(STEPS[1])).toBe('label "E-mail"');
 		expect(selectorSummary({ id: "s9", kind: "click", selectors: [] })).toBe("");
+		const placed: RecordedStep = {
+			id: "s8",
+			kind: "click",
+			selectors: [{ strategy: "role", role: "button", value: "Ajouter", nth: 1 }],
+		};
+		expect(selectorSummary(placed)).toBe('button "Ajouter" #2');
 	});
 });
 
@@ -106,6 +112,7 @@ describe("RecorderTab", () => {
 					waitVisible: true,
 					waitRequest: { method: "POST", path: "/api/pay" },
 					waitUrl: "http://a.test/merci",
+					waitHidden: ".spinner",
 				},
 				{ id: "s2", kind: "click", selectors: [{ strategy: "text", value: "Fin" }] },
 			],
@@ -118,9 +125,37 @@ describe("RecorderTab", () => {
 			"attend son affichage",
 			"attend POST /api/pay",
 			"attend http://a.test/merci",
+			"attend que l'indicateur de chargement disparaisse",
 		]) {
 			expect(screen.getByText(note)).toBeInTheDocument();
 		}
+	});
+
+	it("proposes checks after their action: kept, one becomes a step; set aside, it goes", () => {
+		const check = (id: string, text: string, after: string): RecordedStep => ({
+			id,
+			kind: "assert_text",
+			selectors: [{ strategy: "text", value: text }],
+			text,
+			after,
+		});
+		useBrowserRecorderStore.setState({
+			steps: STEPS.slice(0, 2),
+			suggestions: [check("s7", "Enregistré", "s2"), check("s8", "<b>Ailleurs</b>", "s99")],
+		});
+		render(<RecorderTab projectPath="/projects/app" />);
+		expect(screen.getByText("Vérifications proposées")).toBeInTheDocument();
+		expect(screen.getByText("Vérifier que « Enregistré » s'affiche")).toBeInTheDocument();
+		expect(screen.getByText("après : Saisir")).toBeInTheDocument();
+		// Page text is shown as text, and a check whose action is gone says nothing of it.
+		expect(screen.getByText("Vérifier que « <b>Ailleurs</b> » s'affiche")).toBeInTheDocument();
+		expect(screen.getAllByText(/^après :/)).toHaveLength(1);
+
+		fireEvent.click(screen.getAllByRole("button", { name: "Garder" })[0]);
+		expect(useBrowserRecorderStore.getState().steps.map((s) => s.id)).toEqual(["s1", "s2", "s7"]);
+		fireEvent.click(screen.getByRole("button", { name: "Écarter cette vérification" }));
+		expect(useBrowserRecorderStore.getState().suggestions).toEqual([]);
+		expect(screen.queryByTestId("recorder-suggestions")).not.toBeInTheDocument();
 	});
 
 	it("exports in the chosen format and shows what each export gave back", async () => {

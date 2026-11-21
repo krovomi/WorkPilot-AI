@@ -35,6 +35,7 @@ function plan(waves: string[][]): ExecutionWavePlan {
 		residualRisk: 0,
 		mergeChecks: { checked: 0, conflicts: 0, unchecked: 0, failed: 0 },
 		fragileZones: { enabled: false, commits: null },
+		codeLinks: { enabled: false, files: 0, capped: false },
 		computedAt: "2026-11-16T08:00:00.000Z",
 	};
 }
@@ -65,6 +66,7 @@ function install(overrides: Partial<Api> = {}) {
 		loadExecutionWaveRun: vi.fn(async () => ({ success: true, data: { run: null, ignored: false } })),
 		saveExecutionWaveRun: vi.fn(async () => ({ success: true })),
 		clearExecutionWaveRun: vi.fn(async () => ({ success: true })),
+		loadExecutionWaveHistory: vi.fn(async () => ({ success: true, data: { records: [], ignored: false } })),
 		...overrides,
 	};
 	(globalThis as unknown as { electronAPI: unknown }).electronAPI = api;
@@ -94,6 +96,7 @@ describe("saving the run", () => {
 			advanceWhen: "merged",
 			maxParallel: 3,
 			started: [],
+			avoided: { conflicts: 0, risk: 0 },
 		});
 		expect(saved.at(-1)).toMatchObject({ started: ["a", "b"] });
 		expect(saved.every((state) => !("status" in state))).toBe(true);
@@ -103,7 +106,7 @@ describe("saving the run", () => {
 		await flush();
 		await flush();
 		expect(store().execution?.status).toBe("done");
-		expect(api.clearExecutionWaveRun).toHaveBeenCalledWith(PROJECT);
+		expect(api.clearExecutionWaveRun).toHaveBeenCalledWith(PROJECT, "done");
 	});
 
 	it("forgets a stopped run, and saves nothing more after", async () => {
@@ -113,7 +116,7 @@ describe("saving the run", () => {
 		const saves = api.saveExecutionWaveRun.mock.calls.length;
 		store().stop();
 		await flush();
-		expect(api.clearExecutionWaveRun).toHaveBeenCalledWith(PROJECT);
+		expect(api.clearExecutionWaveRun).toHaveBeenCalledWith(PROJECT, "stopped");
 		useExecutionWavesStore.setState({ blocked: ["x"] });
 		await flush();
 		expect(api.saveExecutionWaveRun).toHaveBeenCalledTimes(saves);
@@ -244,3 +247,69 @@ describe("a run saved before a restart", () => {
 		expect(store().execution).toBe(running);
 	});
 });
+
+describe("the run history", () => {
+	const HISTORY = {
+		records: [
+			{
+				finishedAt: "2026-11-16T09:00:00.000Z",
+				outcome: "done" as const,
+				waves: 2,
+				tasks: 3,
+				started: 3,
+				conflictsAvoided: 1,
+				riskAvoided: 2,
+			},
+		],
+		ignored: false,
+	};
+
+	it("counts what the plan avoided in the run it starts", async () => {
+		const withPairs: ExecutionWavePlan = {
+			...plan([["b"], ["c"]]),
+			pairs: [
+				{ a: "b", b: "c", score: 2, level: "medium", sharedFiles: ["x"], unknown: false, blocking: true },
+				{ a: "b", b: "z", score: 1, level: "low", sharedFiles: ["y"], unknown: false, blocking: true },
+				{ a: "b", b: "c", score: 0, level: "none", sharedFiles: [], unknown: true, blocking: true },
+				{ a: "c", b: "b", score: 1, level: "low", sharedFiles: ["w"], unknown: false, blocking: false },
+			],
+			totalRisk: 4,
+			residualRisk: 1,
+		};
+		useExecutionWavesStore.setState({ plan: withPairs });
+		await store().execute();
+		expect(store().execution?.avoided).toEqual({ conflicts: 1, risk: 3 });
+	});
+
+	it("is read when its project is selected, and again once a run ended", async () => {
+		api.loadExecutionWaveHistory.mockResolvedValue({ success: true, data: HISTORY });
+		useProjectStore.setState({ selectedProjectId: PROJECT });
+		await flush();
+		expect(api.loadExecutionWaveHistory).toHaveBeenCalledWith(PROJECT);
+		expect(store().history).toEqual({ ...HISTORY, projectId: PROJECT });
+
+		useExecutionWavesStore.setState({ plan: plan([["b"]]) });
+		await store().execute();
+		await flush();
+		api.loadExecutionWaveHistory.mockClear();
+		store().stop();
+		await flush();
+		await flush();
+		expect(api.loadExecutionWaveHistory).toHaveBeenCalledWith(PROJECT);
+	});
+
+	it("drops an answer for a project no longer selected, a refusal and a bridge failure", async () => {
+		api.loadExecutionWaveHistory.mockResolvedValue({ success: true, data: HISTORY });
+		await store().loadHistory("p2");
+		expect(store().history).toBeNull();
+		api.loadExecutionWaveHistory.mockResolvedValue({ success: false, error: "Project not found" });
+		useProjectStore.setState({ selectedProjectId: PROJECT });
+		await flush();
+		await store().loadHistory(PROJECT);
+		expect(store().history).toBeNull();
+		api.loadExecutionWaveHistory.mockRejectedValue(new Error("bridge"));
+		await expect(store().loadHistory(PROJECT)).resolves.toBeUndefined();
+		expect(store().history).toBeNull();
+	});
+});
+

@@ -1,17 +1,17 @@
 ---
 feature: Enregistreur du Browser Agent
 summary: >-
-  Une session pilotée à la main devient un test Playwright (TS, Python), Cypress, Selenium
-  (Python, Java) ou WebdriverIO : étapes typées et bornées, sélecteurs robustes, iframes et
-  shadow roots, attentes déduites des transitions, secrets en variables d'environnement, texte
-  de la page en littéral échappé pour chaque langage, test proposé sur une carte de revue ou
-  dans un fichier hors projet.
+  Une session pilotée à la main devient un test Playwright, Cypress, Selenium ou WebdriverIO :
+  étapes bornées, sélecteurs robustes (place de l'élément s'ils ne sont pas uniques), iframes et
+  shadow roots, attentes déduites (dont un chargement qui disparaît), vérifications proposées,
+  secrets en variables d'environnement, texte de page en littéral échappé, test sur une carte de
+  revue.
 ---
 
 # Enregistreur du Browser Agent : une session devient un test
 
 > Pourquoi l'onglet « Enregistreur » du Browser Agent enregistre ce que fait une personne sur une
-> page et l'exporte en test E2E, et comment. Issue : #387 (lots 1 et 2). Règles :
+> page et l'exporte en test E2E, et comment. Issue : #387 (lots 1 à 3). Règles :
 > [`security.md`](../rules/security.md) (S1, S2, S4, S6, S7) ; écriture dans un projet :
 > [generated-review.md](generated-review.md).
 
@@ -39,7 +39,15 @@ l'enregistreur est posé, avec une fenêtre cette fois.
    est décrit dans sa racine (unicité et chemin comptés là) avec la liste des hôtes au-dessus
    (`shadow`) ; `change` ne sortant pas d'un shadow root, le script écoute aussi chaque racine
    ouverte que la page attache. Un `MutationObserver` note les éléments insérés après la
-   dernière action : un rapport sur l'un d'eux porte `appeared`.
+   dernière action : un rapport sur l'un d'eux porte `appeared`. Le script compte aussi, dans la
+   racine de l'élément, combien d'éléments ont le même rôle et nom, label, placeholder ou texte
+   (`matches` : nombre et place, au plus 3 000 candidats parcourus, sinon rien n'est envoyé).
+   Après une action, il note ce qu'elle a changé : un statut, une alerte, une région `aria-live`,
+   un dialogue ou un titre apparu ou modifié devient une proposition (`suggest`) au bout d'une
+   seconde ; un indicateur de chargement inséré (`progressbar`, `aria-busy`, classe `spin`,
+   `load`, `skeleton`) qui s'est montré puis a disparu est rapporté (`settled`) par ce qu'il a
+   (test id, id, rôle, `aria-busy`, classe), jamais par un sélecteur de la page. Sur la page où
+   une action a mené, le titre principal et les alertes sont proposés de même.
 3. **Les étapes** (`browser_agent/recorder.py`, `recording.py`). Un rapport est une donnée de la
    page : listes fermées (`STEP_KINDS`, `STRATEGIES`, `ROLES`, `KEYS`), chaque chaîne bornée, au
    plus 300 étapes (au-delà, la session le dit). Les saisies successives d'un même champ font
@@ -58,12 +66,27 @@ l'enregistreur est posé, avec une fenêtre cette fois.
      (`waitUrl`, sans query ni fragment) ; la première requête `fetch` ou XHR de même origine
      partie dans la seconde qui suit (`waitRequest` : méthode en liste fermée et chemin
      seulement, jamais la query, jamais un chemin qui porte une clé) ; un élément apparu après
-     l'action précédente (`waitVisible`).
+     l'action précédente (`waitVisible`) ; un indicateur de chargement disparu dans les 15 s, dans
+     la page principale (`waitHidden`). Son sélecteur est construit en Python
+     (`recorder.loader_css`) à partir de cinq formes seulement (`[data-testid="…"]`, id stable,
+     `[role="progressbar"]`, `[aria-busy="true"]`, une classe qui dit `spin`, `load`,
+     `skeleton` ou `progress`), jamais d'un chemin CSS : une fois l'indicateur parti, un chemin
+     désignerait ce qui a pris sa place.
+   - **Les vérifications proposées** : un rapport `suggest` reçu moins de 5 s après une action
+     devient une étape `assert_text` dont `after` nomme cette action, au plus 3 par action et
+     100 par session ; un texte qui contient une clé est écarté. Elle n'entre pas dans
+     l'enregistrement : le runner l'émet, le main la garde à part, et la personne la garde
+     (elle se place juste après son action) ou l'écarte. Aucun modèle n'est appelé.
 4. **Les sélecteurs** (`browser_agent/selector_builder.py`), dans l'ordre des guides Playwright
    et Testing Library : `data-testid` unique (ou `data-test`, `data-cy`, `data-qa`), rôle ARIA et
    nom accessible, label, placeholder, texte visible (pas pour un champ), puis CSS court : id
    stable unique, `name` unique, chemin. Un id qui ressemble à une génération (`btn-a1b2c3`,
-   `:r1:`, `ember123`) n'est jamais pris.
+   `:r1:`, `ember123`) n'est jamais pris. Un rôle, un label, un placeholder ou un texte que
+   le script a compté sur plusieurs éléments garde la place de l'élément (`nth`, dans l'ordre
+   du document) et passe après les CSS stables, avant le chemin CSS : un rejeu ne doit pas
+   agir par hasard sur le premier de trois boutons « Ajouter » (Playwright refuserait même,
+   en mode strict). Au-delà de 20 correspondances, ou à 0, il n'est pas gardé ; sans compte
+   (page trop grande), l'ordre reste celui du lot 1.
 5. **Les secrets.** Une valeur saisie dans un champ `password`, un champ dont le nom, l'id, le
    label ou l'autocomplete nomme un secret, ou une valeur qui a la forme d'une clé
    (`foundation/log_redaction.redact_text`) n'est jamais gardée : l'étape porte le nom d'une
@@ -91,7 +114,11 @@ l'enregistreur est posé, avec une fenêtre cette fois.
    - **Sélecteurs** : chaque framework prend le premier sélecteur qu'il sait écrire. Cypress n'a
      pas de requête par rôle ou label ; WebDriver trouve par CSS (test id, placeholder, CSS) ou
      par XPath (label, texte, rôle nommé par son texte) et, dans un shadow root, par CSS
-     seulement. Une étape sans sélecteur exprimable reste un commentaire `step skipped`.
+     seulement. Une étape sans sélecteur exprimable reste un commentaire `step skipped`. Une
+     place s'écrit `.nth(i)` (Playwright) ou `.eq(i)` (Cypress, seulement pour une requête qui
+     rend toutes les correspondances : `cy.contains` n'en rend qu'une, un rôle ou un texte placé
+     passe donc au sélecteur suivant) ; WebDriver passe au suivant, parce qu'une requête CSS ou
+     XPath ne compte pas comme la page l'a fait.
    - **Cadres et shadow roots** : `frameLocator` / `frame_locator` puis `locator(hôte)`
      (Playwright perce les shadow roots ouverts) ; `its("0.contentDocument.body")` puis
      `.shadow()` (Cypress, iframe de même origine seulement) ; `switch_to.frame` puis
@@ -100,8 +127,11 @@ l'enregistreur est posé, avec une fenêtre cette fois.
      `waitForResponse`, `expect_response`, `cy.intercept` + `cy.wait` ; pour WebDriver, un
      script du générateur (pas de la page) compte les `fetch` et XHR avant l'action et attend
      qu'un nouveau soit parti et qu'aucun ne soit en cours ; la page d'arrivée par son URL sans
-     query ni fragment (`waitForURL`, `cy.url()`, `current_url`). Selenium et WebdriverIO
-     attendent aussi chaque élément avant d'agir (`WebDriverWait`, `waitForExist`).
+     query ni fragment (`waitForURL`, `cy.url()`, `current_url`) ; l'indicateur de chargement
+     jusqu'à ce qu'aucun ne soit visible (`locator(…).locator("visible=true")` à 0, `:visible`
+     à 0 dans Cypress) ou que le premier soit caché ou parti (`invisibility_of_element_located`,
+     `isDisplayed`), dans le document principal. Selenium et WebdriverIO attendent aussi chaque
+     élément avant d'agir (`WebDriverWait`, `waitForExist`).
 8. **Les destinations** : « Aperçu » (rien n'est écrit) ; « Proposer sur une carte de revue »
    (`openReviewRun(…, "browser-recorder", …)` : le fichier va dans le worktree de la carte, sur
    sa branche, commit `test(e2e): add recorded test <nom>`) ; « Enregistrer dans un fichier… »
@@ -116,7 +146,9 @@ l'enregistreur est posé, avec une fenêtre cette fois.
 - **S6** : l'adresse (http(s) seulement, 2 048 caractères), le format (six valeurs) et la destination
   (listes fermées) et les ids d'étapes sont relus dans le main ; les cadres, hôtes et attentes
   d'une étape sont relus par `parseRecordedStep` (au plus 4 sélecteurs bornés, méthode en liste
-  fermée, chemin sans query) puis par `Recording.from_dict` ; le dossier du projet passe par
+  fermée, chemin sans query, place entière de 0 à 19, sélecteur d'indicateur dans les cinq
+  formes, `after` en id d'étape sur une vérification seulement) puis par `Recording.from_dict` ;
+  une vérification proposée n'est exportée que si le renderer la nomme, par son id ; le dossier du projet passe par
   `DIRECTORY_ARGS`. Le nom du test et l'adresse sont passés au runner en `--option=valeur` : une
   valeur qui commence par `-` n'est pas lue comme une option.
 - **S4** : sous-processus sans shell ; le chemin proposé par le générateur est résolu dans le
@@ -126,19 +158,27 @@ l'enregistreur est posé, avec une fenêtre cette fois.
 
 ## Pas encore fait
 
+- Lancer le test généré depuis la page et mesurer son taux de passage au premier essai, puis le
+  diff des sélecteurs quand il échoue (« reshoot ») : il faut le lanceur de tests du projet et
+  ses dépendances installées, et lancer le code du projet (`envWithoutCredentials`, S4) ; c'est
+  un lot à lui.
+- Un modèle léger via `create_client()` (tous providers) pour classer les vérifications
+  proposées, nommer le test et extraire en fixtures les données paramétrables (email, dates) :
+  aujourd'hui tout reste déterministe, et le runner n'a ni provider ni clé.
 - Selenium dans d'autres langages (C#, Ruby, JavaScript) ; WebdriverIO en TypeScript.
-- Shadow roots fermés ou déclaratifs (`<template shadowrootmode>`, dont `change` n'est pas
-  écouté), une iframe dans un shadow root, plus de 4 niveaux ; une iframe d'une autre origine
-  dans Cypress. `contenteditable`, liste à choix multiples, survols, défilements, boîtes de
-  dialogue, glisser-déposer.
-- Un sélecteur non unique de rôle ou de texte (`nth`) ; le diff des sélecteurs quand le test
-  généré échoue (« reshoot »).
-- La disparition d'un indicateur de chargement comme attente ; assertions proposées après une
-  action, nom de test et données paramétrables (email, dates) extraits en fixtures par un modèle
-  léger via `create_client()`, sur tous les providers.
-- Lancer le test généré depuis la page et mesurer son taux de passage au premier essai.
-- Un projet du serveur (mode serveur) : la page reste locale.
+- `contenteditable`, liste à choix multiples, survols, défilements, glisser-déposer ; les
+  boîtes de dialogue (`alert`, `confirm`) : sans écouteur, Playwright les ferme lui-même, il
+  faudrait que la personne y réponde depuis l'app.
+- Un indicateur de chargement déjà présent qu'une classe ou un attribut montre puis cache (seul
+  un indicateur inséré après l'action est suivi) ; une place (`nth`) dans un export WebDriver.
+- Shadow roots déclaratifs (`<template shadowrootmode>`, dont `change` n'est pas écouté), une
+  iframe dans un shadow root, plus de 4 niveaux. Hors de portée : un shadow root fermé, que ni le
+  script de la page ni WebDriver n'atteignent, et une iframe d'une autre origine dans Cypress, qui
+  n'y entre pas.
+- Un projet du serveur (mode serveur) : la fenêtre du navigateur s'ouvre sur cet ordinateur, la
+  page reste locale.
 
 Vérification : `pytest tests/browser_agent -q` (dont `test_codegen_text.py` : un littéral par
-langage relu par sa langue, Java selon JLS 3.3) ;
+langage relu par sa langue, Java selon JLS 3.3 ; `test_recorder_checks.py` : places, attentes
+d'indicateur, vérifications proposées) ;
 `cd apps/frontend && pnpm test -- browser-recorder RecorderTab`.

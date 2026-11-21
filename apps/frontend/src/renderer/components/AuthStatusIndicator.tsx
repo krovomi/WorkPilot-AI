@@ -3,9 +3,14 @@
  *
  * Shows how the provider the usage lens observes is signed in, as an icon
  * badge next to the lens (which already names the provider):
- * - OAuth: Lock icon, Anthropic colors (Claude Code subscription)
- * - API Profile: Key icon and provider-specific colors
+ * - Subscription (Claude Code OAuth, ChatGPT, Copilot…): Lock icon
+ * - API Profile or API key: Key icon and provider-specific colors
  * The provider's name is in the aria-label and the tooltip.
+ *
+ * The plan shown is the one the usage snapshot reports (`usage-plan-store`),
+ * which the main process asks the provider for; the plan stored with a
+ * Claude profile at login is only the fallback, because it is not updated
+ * when the account changes plan (Pro → Max).
  *
  * This component does NOT perform any authentication detection.
  * Auth type is derived purely from selectedProvider + profiles data:
@@ -16,6 +21,7 @@
  * Usage data comes from UsageMonitor via IPC push events.
  */
 
+import { claudePlanName } from "@shared/utils/plan-names";
 import {
 	type ApiProvider,
 	detectProvider,
@@ -34,6 +40,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useClaudeProfileStore } from "@/stores/claude-profile-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { usagePlanKey, useUsagePlanStore } from "@/stores/usage-plan-store";
 import { useShallow } from "zustand/react/shallow";
 import { useProviderContext } from "./ProviderContext";
 import {
@@ -42,23 +49,6 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "./ui/tooltip";
-
-/**
- * Get subscription translation key based on subscription type
- */
-function getSubscriptionTranslationKey(subscriptionType?: string): string {
-	if (!subscriptionType) return "common:usage.claudeCodeSubscriptionUnknown";
-
-	const normalizedType = subscriptionType.toLowerCase();
-
-	if (normalizedType.includes("pro")) {
-		return "common:usage.claudeCodeSubscriptionPro";
-	} else if (normalizedType.includes("max")) {
-		return "common:usage.claudeCodeSubscriptionMax";
-	} else {
-		return "common:usage.claudeCodeSubscriptionUnknown";
-	}
-}
 
 /**
  * OAuth fallback state when no API profile is active (e.g. Claude Code subscription)
@@ -117,10 +107,12 @@ export function AuthStatusIndicator() {
 	const [isLoadingWindsurfAccount, setIsLoadingWindsurfAccount] =
 		useState(false);
 
-	// Get Claude subscription info from the profile store (populated from Keychain credentials)
-	const claudeSubscriptionType = useClaudeProfileStore(
-		(s) => s.profiles.find((p) => p.id === s.activeProfileId)?.subscriptionType,
-	);
+	// The plan stored with the Claude profile at login: a fallback only, it is
+	// not updated when the account changes plan.
+	const storedClaudePlanName = useClaudeProfileStore((s) => {
+		const profile = s.profiles.find((p) => p.id === s.activeProfileId);
+		return claudePlanName(profile?.subscriptionType, profile?.rateLimitTier);
+	});
 
 	// Fetch GitHub CLI status when Copilot provider is selected. An answer that
 	// arrives after the provider changed is dropped.
@@ -231,7 +223,31 @@ export function AuthStatusIndicator() {
 		return OAUTH_FALLBACK;
 	}, [selectedProvider, profiles, activeProfileId]);
 
-	const isOAuth = authStatus.type === "oauth";
+	// The plan the usage snapshot of this provider reports, when there is one.
+	const reportedPlan = useUsagePlanStore((s) =>
+		authStatus.type === "profile"
+			? undefined
+			: s.plans[usagePlanKey(authStatus.provider)],
+	);
+	// Signed in with a subscription: a Claude Code login without an API
+	// profile, or any provider whose snapshot reports one (ChatGPT, Copilot…).
+	const isOAuth =
+		authStatus.type !== "profile" &&
+		(reportedPlan
+			? reportedPlan.billing === "subscription"
+			: authStatus.type === "oauth");
+	const isApiBilled =
+		authStatus.type === "profile" || reportedPlan?.billing === "api";
+	const isAnthropic = authStatus.provider === "anthropic";
+	let subscriptionName: string;
+	if (reportedPlan?.name) {
+		subscriptionName = reportedPlan.name;
+	} else if (isAnthropic) {
+		subscriptionName =
+			storedClaudePlanName ?? t("common:usage.claudeCodeSubscriptionUnknown");
+	} else {
+		subscriptionName = t("common:usage.planSubscription");
+	}
 	const Icon = isOAuth ? Lock : Key;
 	const badgeLabel =
 		authStatus.provider === "unknown"
@@ -441,7 +457,10 @@ export function AuthStatusIndicator() {
 			);
 		}
 
-		// Fallback when no profile configured for this provider
+		// Signed in some way (subscription or API key): nothing is missing.
+		if (isOAuth || isApiBilled) return null;
+
+		// Neither a profile nor a sign-in is known for this provider
 		return (
 			<div className="pt-2 border-t text-3xs text-muted-foreground">
 				{t("common:usage.noProfileForProvider", { provider: badgeLabel })}
@@ -449,6 +468,8 @@ export function AuthStatusIndicator() {
 		);
 	}, [
 		selectedProvider,
+		isOAuth,
+		isApiBilled,
 		isLoadingGithubStatus,
 		githubStatus,
 		isLoadingWindsurfAccount,
@@ -509,7 +530,7 @@ export function AuthStatusIndicator() {
 								<span className="font-semibold text-xs">{badgeLabel}</span>
 							</div>
 
-							{/* Claude Code subscription label for OAuth */}
+							{/* The plan of a subscription sign-in */}
 							{isOAuth && (
 								<div className="flex items-center justify-between pt-2 border-t">
 									<div className="flex items-center gap-1.5 text-muted-foreground">
@@ -519,7 +540,7 @@ export function AuthStatusIndicator() {
 										</span>
 									</div>
 									<span className="font-medium text-3xs">
-										{t(getSubscriptionTranslationKey(claudeSubscriptionType))}
+										{subscriptionName}
 									</span>
 								</div>
 							)}

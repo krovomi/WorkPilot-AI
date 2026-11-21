@@ -25,8 +25,10 @@ export const RUN_FILE = "execution-waves-run.json";
 const RUN_VERSION = 1;
 const MAX_RUN_BYTES = 256 * 1024;
 const ADVANCE = new Set(["merged", "review"]);
+/** Bound of a counter the run history keeps (pairs, risk). */
+export const MAX_COUNT = 1_000_000;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -36,6 +38,21 @@ function taskIdList(value: unknown, max: number): string[] | null {
 	return value;
 }
 
+/** A whole number from 0 to `max`, or null. */
+export function count(value: unknown, max = MAX_COUNT): number | null {
+	return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= max
+		? (value as number)
+		: null;
+}
+
+/** What the run's plan avoided, when sent: two bounded counters, nothing else. */
+function avoidedOf(value: unknown): WaveRunState["avoided"] | null {
+	if (!isRecord(value)) return null;
+	const conflicts = count(value.conflicts);
+	const risk = count(value.risk);
+	return conflicts === null || risk === null ? null : { conflicts, risk };
+}
+
 /**
  * A run state, or null. Coherent: at least one wave, no empty wave, no task
  * twice, `current` within the waves (equal to their count once the last one
@@ -43,7 +60,7 @@ function taskIdList(value: unknown, max: number): string[] | null {
  */
 export function validateRunState(raw: unknown, projectId: string): WaveRunState | null {
 	if (!isRecord(raw) || raw.projectId !== projectId || !PROJECT_ID.test(projectId)) return null;
-	const { waves, current, advanceWhen, maxParallel, started } = raw;
+	const { waves, current, advanceWhen, maxParallel, started, avoided } = raw;
 	if (!Array.isArray(waves) || waves.length === 0 || waves.length > MAX_PLAN_TASKS) return null;
 	const lists = waves.map((wave) => taskIdList(wave, MAX_PLAN_TASKS));
 	if (lists.some((wave) => wave === null || wave.length === 0)) return null;
@@ -64,6 +81,8 @@ export function validateRunState(raw: unknown, projectId: string): WaveRunState 
 	const members = new Set(all);
 	if (!startedIds || new Set(startedIds).size !== startedIds.length) return null;
 	if (!startedIds.every((id) => members.has(id))) return null;
+	const avoidedCounts = avoided === undefined ? undefined : avoidedOf(avoided);
+	if (avoidedCounts === null) return null;
 	return {
 		projectId,
 		waves: lists as string[][],
@@ -71,6 +90,7 @@ export function validateRunState(raw: unknown, projectId: string): WaveRunState 
 		advanceWhen: advanceWhen as WaveRunState["advanceWhen"],
 		maxParallel: maxParallel as number,
 		started: [...startedIds],
+		...(avoidedCounts && { avoided: avoidedCounts }),
 	};
 }
 
@@ -79,7 +99,7 @@ export function validateRunState(raw: unknown, projectId: string): WaveRunState 
  * or not a folder, or when it does not resolve inside the project root.
  * Created when `create` is set and it does not exist; null otherwise.
  */
-function workpilotDir(projectPath: string, create: boolean): string | null {
+export function workpilotDir(projectPath: string, create: boolean): string | null {
 	const root = fs.realpathSync(projectPath);
 	const dir = path.join(root, ".workpilot");
 	let stat: fs.Stats | null = null;
@@ -101,11 +121,11 @@ function workpilotDir(projectPath: string, create: boolean): string | null {
 }
 
 /**
- * The run file's text; throws otherwise. A link is refused, and the file
+ * A file's text; throws otherwise. A link is refused, and the file
  * opened must be the one checked (same device and inode), so a file swapped
  * in between the two is never read. Read up to one byte past the limit.
  */
-function readBounded(file: string): string {
+export function readBounded(file: string, maxBytes = MAX_RUN_BYTES): string {
 	let fd: number | null = null;
 	try {
 		const before = fs.lstatSync(file);
@@ -115,14 +135,14 @@ function readBounded(file: string): string {
 		if (!stat.isFile() || stat.ino !== before.ino || stat.dev !== before.dev) {
 			throw new Error("not the file checked");
 		}
-		const buffer = Buffer.alloc(MAX_RUN_BYTES + 1);
+		const buffer = Buffer.alloc(maxBytes + 1);
 		let length = 0;
 		let read: number;
 		do {
 			read = fs.readSync(fd, buffer, length, buffer.length - length, null);
 			length += read;
 		} while (read > 0 && length < buffer.length);
-		if (length > MAX_RUN_BYTES) throw new Error("oversized run file");
+		if (length > maxBytes) throw new Error("oversized file");
 		return buffer.subarray(0, length).toString("utf-8");
 	} finally {
 		if (fd !== null) fs.closeSync(fd);
@@ -174,12 +194,20 @@ function isLink(file: string): boolean {
 
 /** Writes a validated state atomically; throws when the folder or file is refused. */
 export function writeSavedRun(projectPath: string, state: WaveRunState, now: Date): void {
-	const dir = workpilotDir(projectPath, true) as string;
-	const target = path.join(dir, RUN_FILE);
-	if (isLink(target)) throw new Error("Refusing a linked run file");
 	const body = JSON.stringify({ version: RUN_VERSION, ...state, savedAt: now.toISOString() });
+	writeAtomically(projectPath, RUN_FILE, body);
+}
+
+/**
+ * Writes `<project>/.workpilot/<name>` through a fresh temporary file renamed
+ * over it; throws when the folder or the file is refused (a link).
+ */
+export function writeAtomically(projectPath: string, name: string, body: string): void {
+	const dir = workpilotDir(projectPath, true) as string;
+	const target = path.join(dir, name);
+	if (isLink(target)) throw new Error("Refusing a linked file");
 	// A fresh name, created exclusively: never a file or link already there.
-	const temp = path.join(dir, `.${RUN_FILE}.${randomUUID()}.tmp`);
+	const temp = path.join(dir, `.${name}.${randomUUID()}.tmp`);
 	try {
 		fs.writeFileSync(temp, body, { encoding: "utf-8", flag: "wx", mode: 0o600 });
 		fs.renameSync(temp, target);

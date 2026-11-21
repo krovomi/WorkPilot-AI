@@ -50,6 +50,7 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from foundation.loopback_host import LoopbackHostOnly
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -314,12 +315,8 @@ _ALLOWED_ORIGINS = [
     "file://",  # Electron file:// protocol
 ]
 
-# There used to be an `allow_origin_regex` of
-# ``^https?://(localhost|127\.0\.0\.1)(:\d+)?$`` here. Combined with
-# ``allow_credentials=True`` that trusted *any* page served from *any* local port — so
-# any other local dev server, or a page a user happened to open from a local static
-# server, could make credentialed calls to this API. The explicit list above already
-# covers the ports WorkPilot itself uses; anything else must be opted into deliberately.
+# No `allow_origin_regex` for any local port: with credentials it trusted every page of
+# every local server. The list covers WorkPilot's ports; others are opted into.
 _EXTRA_ORIGINS = [
     origin.strip()
     for origin in os.environ.get("WORKPILOT_EXTRA_CORS_ORIGINS", "").split(",")
@@ -348,6 +345,8 @@ app.add_middleware(
         "X-WorkPilot-Org",  # server mode: the org a request acts in, checked server-side
     ],
 )
+if not _SERVER_MODE_ACTIVE:  # the local API answers only what is addressed to it
+    app.add_middleware(LoopbackHostOnly, extra_origins=_EXTRA_ORIGINS)
 
 
 def _get_anthropic_token() -> str | None:
@@ -1242,7 +1241,7 @@ def get_effort_plan(provider: str = "", model: str = ""):
 # auth_style: how the API key is presented to the provider.
 #   "bearer"     → Authorization: Bearer <key>
 #   "x-api-key"  → x-api-key: <key>  (Anthropic-style)
-#   "query"      → appended as ?key=<key> (Google-style)
+#   "x-goog-api-key" → x-goog-api-key: <key>  (Google-style)
 # ok_statuses: status codes that count as a valid key (some providers return 403/404
 #   on the models endpoint even with a valid key — that still proves auth worked).
 _VALIDATION_SPECS: dict[str, dict[str, Any]] = {
@@ -1270,7 +1269,7 @@ _VALIDATION_SPECS: dict[str, dict[str, Any]] = {
     },
     "google": {
         "url": "https://generativelanguage.googleapis.com" + API_MODELS_ENDPOINT,
-        "auth_style": "query",
+        "auth_style": "x-goog-api-key",
         "ok_statuses": (200,),
     },
     "windsurf": {
@@ -1300,22 +1299,18 @@ async def _validate_key_http(provider: str, api_key: str, spec: dict[str, Any]) 
     auth_style = spec["auth_style"]
     ok_statuses = spec["ok_statuses"]
     headers: dict[str, str] = dict(spec.get("extra_headers", {}))
-    params: dict[str, str] = {}
 
     if auth_style == "bearer":
         headers["Authorization"] = f"Bearer {api_key}"
     elif auth_style == "x-api-key":
         headers["x-api-key"] = api_key
-    elif auth_style == "query":
-        # Pass the key as a real query parameter so httpx percent-encodes it.
-        # Interpolating it into the URL string lets a crafted key inject extra
-        # query/fragment components (CodeQL py/partial-ssrf); the host stays the
-        # provider's hardcoded endpoint either way.
-        params["key"] = api_key
+    elif auth_style == "x-goog-api-key":
+        # A header, not ``?key=``: a URL ends up in error messages and logs.
+        headers["x-goog-api-key"] = api_key
 
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-            resp = await client.get(url, headers=headers, params=params, timeout=10)
+            resp = await client.get(url, headers=headers, timeout=10)
         if resp.status_code not in ok_statuses:
             set_validated(provider, api_key, False)
             raise HTTPException(

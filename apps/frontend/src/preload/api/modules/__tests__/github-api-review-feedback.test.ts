@@ -54,4 +54,15 @@ describe("review feedback preload", () => {
 			[IPC_CHANNELS.GITHUB_PR_REVIEW_CONVENTIONS_WRITE, "p1"],
 		]);
 	});
+
+	it("decides a held rejection on its channel", async () => {
+		await createGitHubAPI().decideHeldReviewFeedback("p1", 3, "f-1", false);
+		expect(invoke).toHaveBeenCalledWith(
+			IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_HELD_DECIDE,
+			"p1",
+			3,
+			"f-1",
+			false,
+		);
+	});
 });
