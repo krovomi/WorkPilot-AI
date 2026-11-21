@@ -112,7 +112,6 @@ export function TaskModalLayout({
 											size="icon"
 											className="hover:bg-muted transition-colors shrink-0"
 											disabled={disabled}
-											onClick={handleClose}
 										>
 											<X className="h-5 w-5" />
 											<span className="sr-only">{t("buttons.close")}</span>

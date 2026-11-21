@@ -16,6 +16,7 @@ import { Bot, FileText, FolderOpen, Info, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
+import type { PairRoomSnapshot } from "../../../preload/api/modules/phase35-features-api";
 import { PAIR_AI_USER_ID, usePairRealtimeStore } from "../../stores/phase35-stores";
 import { Notice } from "../charter";
 import { Badge } from "../ui/badge";
@@ -23,12 +24,13 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
 import { PanelShell } from "./_panel-shell";
+import { relativeToProject } from "./_relative-to-project";
 
 const ROLES = [
 	{ value: "driver", labelKey: "pair.roleDriver" },
 	{ value: "navigator", labelKey: "pair.roleNavigator" },
 ] as const;
-const ROLE_KEYS: Record<string, string> = {
+const ROLE_KEYS: Record<PairRoomSnapshot["participants"][number]["role"], string> = {
 	driver: "pair.roleDriver",
 	navigator: "pair.roleNavigator",
 	ai: "pair.roleAi",
@@ -43,14 +45,6 @@ const PATH_MAX_LEN = 1024;
 type Role = (typeof ROLES)[number]["value"];
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
-
-/** A path picked on disk, shown relative to the project when inside it. */
-export const relativeToProject = (picked: string, projectPath: string): string => {
-	const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
-	const root = norm(projectPath);
-	const file = norm(picked);
-	return root && file.startsWith(`${root}/`) ? file.slice(root.length + 1) : picked;
-};
 
 interface PairProgrammingPanelProps {
 	readonly projectPath?: string;
@@ -93,7 +87,7 @@ export function PairProgrammingPanel({ projectPath = "" }: PairProgrammingPanelP
 	const [displayName, setDisplayName] = useState("");
 	const [role, setRole] = useState<Role>("driver");
 	const [chatText, setChatText] = useState("");
-	const [chatError, setChatError] = useState<string | null>(null);
+	const [pickFailed, setPickFailed] = useState(false);
 	const [fileInput, setFileInput] = useState("");
 	const opsScrollRef = useRef<HTMLDivElement>(null);
 
@@ -141,26 +135,23 @@ export function PairProgrammingPanel({ projectPath = "" }: PairProgrammingPanelP
 	}
 
 	const handleJoin = () => {
-		if (!canJoin) return;
 		const name = displayName.trim();
-		const userId = name.toLowerCase().replaceAll(/[^a-z0-9_-]+/g, "-").slice(0, 64) || "me";
+		// A name with no Latin letter or digit used to become the id "-".
+		const slug = name
+			.toLowerCase()
+			.replaceAll(/[^a-z0-9_-]+/g, "-")
+			.replaceAll(/^-+|-+$/g, "")
+			.slice(0, 64);
+		const userId = slug || "me";
 		void createOrJoin(roomId.trim(), userId, name, role, projectPath);
 	};
 
+	// Send is disabled while the box is blank, which also blocks Enter; the box
+	// cuts a message at MESSAGE_MAX_LEN as it is typed.
 	const handleSubmitChat = (e: React.FormEvent) => {
 		e.preventDefault();
-		const trimmed = chatText.trim();
-		if (trimmed.length === 0) {
-			setChatError(t("pair.validation.messageEmpty"));
-			return;
-		}
-		if (chatText.length > MESSAGE_MAX_LEN) {
-			setChatError(t("pair.validation.messageTooLong", { max: MESSAGE_MAX_LEN }));
-			return;
-		}
-		setChatError(null);
 		setChatText("");
-		void sendChat(trimmed);
+		void sendChat(chatText.trim());
 	};
 
 	const handleFocus = (raw: string) => {
@@ -171,15 +162,17 @@ export function PairProgrammingPanel({ projectPath = "" }: PairProgrammingPanelP
 	};
 
 	const handlePickFile = async () => {
+		setPickFailed(false);
 		try {
+			// A cancelled dialog answers an empty list: the room keeps its file.
 			const picked = await globalThis.electronAPI.selectFiles({
 				multi: false,
 				title: t("pair.pickFile"),
 				defaultPath: projectPath,
 			});
-			if (picked?.[0]) handleFocus(picked[0]);
+			if (picked.length > 0) handleFocus(picked[0]);
 		} catch {
-			// Picker cancelled or unavailable: the room keeps its file.
+			setPickFailed(true);
 		}
 	};
 
@@ -237,7 +230,7 @@ export function PairProgrammingPanel({ projectPath = "" }: PairProgrammingPanelP
 								<li key={p.user_id} className="rounded border px-2 py-1 text-xs">
 									{p.display_name}{" "}
 									<span className="text-muted-foreground">
-										({ROLE_KEYS[p.role] ? t(ROLE_KEYS[p.role] as never) : p.role})
+										({t(ROLE_KEYS[p.role] as never)})
 									</span>
 								</li>
 							))}
@@ -283,6 +276,11 @@ export function PairProgrammingPanel({ projectPath = "" }: PairProgrammingPanelP
 								{t("pair.pickFile")}
 							</Button>
 						</div>
+						{pickFailed && (
+							<p role="alert" className="text-xs text-destructive">
+								{t("common.pickerFailed")}
+							</p>
+						)}
 					</div>
 
 					<div>
@@ -336,14 +334,9 @@ export function PairProgrammingPanel({ projectPath = "" }: PairProgrammingPanelP
 						<div className="flex gap-2">
 							<Input
 								value={chatText}
-								onChange={(e) => {
-									setChatText(e.target.value.slice(0, MESSAGE_MAX_LEN));
-									if (chatError) setChatError(null);
-								}}
+								onChange={(e) => setChatText(e.target.value.slice(0, MESSAGE_MAX_LEN))}
 								maxLength={MESSAGE_MAX_LEN}
 								aria-label={t("pair.chatPlaceholder")}
-								aria-invalid={Boolean(chatError) || undefined}
-								aria-describedby={chatError ? "chat-error" : undefined}
 								placeholder={aiPresent ? t("pair.chatPlaceholderAi") : t("pair.chatPlaceholder")}
 								className="h-auto flex-1 p-2 text-sm"
 							/>
@@ -351,11 +344,6 @@ export function PairProgrammingPanel({ projectPath = "" }: PairProgrammingPanelP
 								{t("pair.send")}
 							</Button>
 						</div>
-						{chatError && (
-							<p id="chat-error" className="text-xs text-destructive">
-								{chatError}
-							</p>
-						)}
 					</form>
 				</div>
 			) : (
