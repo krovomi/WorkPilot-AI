@@ -22,8 +22,8 @@
 		"prompt": "Prompt",
 		"promptPlaceholder": "Décrivez la tâche que tous les modèles doivent réaliser…",
 		"startBattle": "Lancer le combat",
-		"model": "Modèle",
 		"voteForThis": "Voter pour celui-ci",
+		"voteForModel": "Voter pour celui-ci : {{name}}",
 		"votePrompt": "Les modèles ont terminé — quelle réponse est meilleure ?",
 		"winner": "Vainqueur",
 		"newBattle": "Nouveau combat",
@@ -52,7 +52,8 @@
 	"history": {
 		"loading": "Chargement de l'historique…",
 		"empty": "Aucun combat pour l'instant",
-		"battles": "combats",
+		"battleCount_one": "{{count}} combat",
+		"battleCount_other": "{{count}} combats",
 		"clearAll": "Tout effacer",
 		"awaitingVote": "En attente de vote"
 	},
@@ -71,7 +72,7 @@
 	},
 	"routing": {
 		"autoRouting": "Routage automatique",
-		"autoRoutingDesc": "Achemine automatiquement chaque type de tâche vers le modèle le plus performant",
+		"autoRoutingDesc": "Le modèle qui gagne le plus souvent vos votes, pour chaque type de tâche",
 		"recommendations": "Recommandations actuelles",
 		"noRecommendations": "Pas encore de recommandations",
 		"noRecommendationsHint": "Effectuez au moins 5 combats par type de tâche",
@@ -84,7 +85,10 @@
 	},
 	"errors": {
 		"startFailed": "Impossible de démarrer le combat",
-		"voteFailed": "Impossible de soumettre le vote"
+		"voteFailed": "Impossible de soumettre le vote",
+		"historyFailed": "Impossible de lire l'historique des combats",
+		"clearFailed": "Impossible d'effacer l'historique des combats",
+		"analyticsFailed": "Impossible de calculer les analytics"
 	},
 	"tokensUsed": "{{value}} tokens",
 	"modelFallback": "Modèle {{label}}"

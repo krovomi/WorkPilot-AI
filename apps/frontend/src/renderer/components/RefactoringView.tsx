@@ -12,7 +12,7 @@ import {
 	Trash2,
 	Wand2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
 	CodeLanguage,
@@ -36,10 +36,6 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 
-interface RefactoringViewProps {
-	readonly projectId: string;
-}
-
 const AUTO = "auto";
 
 const SEVERITY_TONE: Record<string, Tone> = {
@@ -56,8 +52,8 @@ const RISK_TONE: Record<string, Tone> = { high: "red", medium: "amber", low: "gr
 // Component
 // ---------------------------------------------------------------------------
 
-// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
-export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
+/** Reads a pasted snippet: no project folder is involved. */
+export function RefactoringView() {
 	const { t } = useTranslation(["refactoring"]);
 	const [source, setSource] = useState("");
 	const [smells, setSmells] = useState<CodeSmell[]>([]);
@@ -71,6 +67,8 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 	const [languages, setLanguages] = useState<CodeLanguage[]>([]);
 	const [language, setLanguage] = useState(AUTO);
 	const [readAs, setReadAs] = useState<string | null>(null);
+	// Bumped when the code is replaced: an answer for the previous code is dropped.
+	const sourceVersion = useRef(0);
 
 	useEffect(() => {
 		let alive = true;
@@ -88,8 +86,8 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 		};
 	}, []);
 
-	const labelOf = (id: string | null) =>
-		languages.find((lang) => lang.id === id)?.label ?? id ?? "";
+	const labelOf = (id: string) =>
+		languages.find((lang) => lang.id === id)?.label ?? id;
 	const chosen = language === AUTO ? null : language;
 
 	const toggleSmell = (key: string) => {
@@ -101,8 +99,9 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 		});
 	};
 
+	// Both actions are disabled while the code is empty.
 	const handleDetectSmells = useCallback(async () => {
-		if (!source.trim()) return;
+		const version = sourceVersion.current;
 		setLoading(true);
 		setError(null);
 		setSmells([]);
@@ -114,10 +113,12 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 				text: source,
 				language: chosen ?? undefined,
 			});
+			if (version !== sourceVersion.current) return;
 			setSmells(result.smells);
 			setReadAs(result.language);
 			setDetected(true);
 		} catch (e) {
+			if (version !== sourceVersion.current) return;
 			setError(e instanceof Error && e.message ? e.message : t("refactoring:errors.detectionFailed"));
 		} finally {
 			setLoading(false);
@@ -125,7 +126,7 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 	}, [source, chosen, t]);
 
 	const handleProposeRefactoring = useCallback(async () => {
-		if (!source.trim()) return;
+		const version = sourceVersion.current;
 		setLoadingProposals(true);
 		setError(null);
 		try {
@@ -134,31 +135,35 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 				text: source,
 				language: chosen ?? undefined,
 			});
+			if (version !== sourceVersion.current) return;
 			setProposals(result.proposals);
 			setReadAs(result.language);
 		} catch (e) {
+			if (version !== sourceVersion.current) return;
 			setError(e instanceof Error && e.message ? e.message : t("refactoring:errors.proposalFailed"));
 		} finally {
 			setLoadingProposals(false);
 		}
 	}, [source, chosen, t]);
 
-	const handlePaste = useCallback(async () => {
-		try {
-			const text = await navigator.clipboard.readText();
-			setSource(text);
-		} catch {
-			// clipboard access denied
-		}
-	}, []);
-
 	const handleClear = () => {
+		sourceVersion.current += 1;
 		setSource("");
 		setSmells([]);
 		setProposals([]);
 		setError(null);
 		setDetected(false);
 		setReadAs(null);
+	};
+
+	const handlePaste = async () => {
+		try {
+			const text = await navigator.clipboard.readText();
+			handleClear();
+			setSource(text);
+		} catch {
+			setError(t("refactoring:errors.pasteFailed"));
+		}
 	};
 
 	const severityCounts = smells.reduce<Record<string, number>>((acc, smell) => {

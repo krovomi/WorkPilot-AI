@@ -190,6 +190,7 @@ def get_relative_spec_path(spec_dir: Path, project_dir: Path) -> str:
         # Forward slashes on every OS: the prompt joins it with "/spec.md",
         # and a Windows "\\" in the middle gave the agent a mixed path.
         relative = spec_dir.relative_to(project_dir)
+        # Forward slashes on every OS: the prompt shows it next to `/spec.md`.
         return f"./{relative.as_posix()}"
     except ValueError:
         # Not under project_dir: where the worktree's copy of the spec lives
