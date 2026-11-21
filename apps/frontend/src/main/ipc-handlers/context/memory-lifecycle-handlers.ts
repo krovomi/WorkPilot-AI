@@ -15,8 +15,10 @@ import type {
 	IPCResult,
 	MemoryConflictOpinion,
 	MemoryJournalEntry,
+	MemoryLifecycleMetrics,
 	MemoryLifecycleView,
 	MemoryRestoreOutcome,
+	MemoryRevertOutcome,
 } from "../../../shared/types";
 import { backendFetch } from "../_backend-fetch";
 import { featureProject } from "../server-feature-files";
@@ -24,9 +26,12 @@ import {
 	boundedText,
 	conflictChoice,
 	conflictId,
+	entryId,
 	MAX_CANONICAL_LENGTH,
 	MAX_REASON_LENGTH,
+	maintainerNames,
 	memoryId,
+	scopeText,
 	trashId,
 } from "./memory-lifecycle-validation";
 
@@ -34,6 +39,11 @@ const INVALID = { success: false, error: "invalid" } as const;
 
 interface LifecycleResponse {
 	journal?: MemoryJournalEntry[];
+	revertible?: MemoryLifecycleView["revertible"];
+	last_undo?: string | null;
+	metrics?: MemoryLifecycleMetrics;
+	maintainers?: string[];
+	can_arbitrate?: boolean;
 	trash?: MemoryLifecycleView["trash"];
 	conflicts?: MemoryLifecycleView["conflicts"];
 	pinned?: number;
@@ -73,6 +83,11 @@ export async function loadMemoryLifecycle(
 		success: true,
 		data: {
 			journal: result.journal ?? [],
+			revertible: result.revertible ?? {},
+			lastUndo: result.last_undo ?? null,
+			metrics: result.metrics ?? null,
+			maintainers: result.maintainers ?? [],
+			canArbitrate: result.can_arbitrate !== false,
 			trash: result.trash ?? [],
 			conflicts: result.conflicts ?? [],
 			pinned: result.pinned ?? 0,
@@ -185,6 +200,64 @@ export function registerMemoryLifecycleHandlers(): void {
 			);
 			return result.success
 				? { success: true, data: { canonical: result.canonical ?? null } }
+				: failure(result);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.CONTEXT_MEMORY_REVERT,
+		async (_, projectId: unknown, rawEntry: unknown): Promise<IPCResult<MemoryRevertOutcome>> => {
+			const project = localProject(projectId);
+			if ("error" in project) return { success: false, error: project.error };
+			const id = entryId(rawEntry);
+			if (!id) return INVALID;
+			const result = await backendFetch<Partial<MemoryRevertOutcome>>(
+				"/api/brain/memory/revert",
+				post({ project_dir: project.path, entry_id: id }),
+			);
+			if (!result.success) return failure(result);
+			return {
+				success: true,
+				data: {
+					mode: result.mode === "unmerge" ? "unmerge" : "undo",
+					restored: result.restored ?? [],
+					conflict: result.conflict ?? null,
+				},
+			};
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE,
+		async (_, projectId: unknown, rawId: unknown, rawScope: unknown): Promise<IPCResult<{ appliesTo: string }>> => {
+			const project = localProject(projectId);
+			if ("error" in project) return { success: false, error: project.error };
+			const id = memoryId(rawId);
+			const scope = scopeText(rawScope);
+			if (!id || scope === null) return INVALID;
+			const result = await backendFetch<{ applies_to?: string }>(
+				"/api/brain/memory/scope",
+				post({ project_dir: project.path, id, applies_to: scope }),
+			);
+			return result.success
+				? { success: true, data: { appliesTo: result.applies_to ?? "" } }
+				: failure(result);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS,
+		async (_, projectId: unknown, rawNames: unknown): Promise<IPCResult<string[]>> => {
+			const project = localProject(projectId);
+			if ("error" in project) return { success: false, error: project.error };
+			const names = maintainerNames(rawNames);
+			if (!names) return INVALID;
+			const result = await backendFetch<{ maintainers?: string[] }>(
+				"/api/brain/memory/maintainers",
+				post({ project_dir: project.path, names }),
+			);
+			return result.success
+				? { success: true, data: result.maintainers ?? [] }
 				: failure(result);
 		},
 	);

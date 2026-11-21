@@ -238,8 +238,12 @@ describe("RateLimitModal", () => {
 			),
 		);
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-		expect(await screen.findByText('Profile "Side Gig" has been created.')).toBeInTheDocument();
-		expect(screen.getByText(/Go to Settings > Integrations/)).toBeInTheDocument();
+		// Radix also reads the toast out in a live region for a moment, so the
+		// texts can be there twice.
+		expect(
+			(await screen.findAllByText('Profile "Side Gig" has been created.')).length,
+		).toBeGreaterThan(0);
+		expect(screen.getAllByText(/Go to Settings > Integrations/).length).toBeGreaterThan(0);
 		expect(api.getClaudeProfiles).toHaveBeenCalledTimes(2);
 	});
 

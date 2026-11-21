@@ -53,6 +53,7 @@ __all__ = [
     "purge_expired",
     "restore",
     "retention_days",
+    "scope",
     "trash",
 ]
 
@@ -74,6 +75,8 @@ EXPIRING_DAYS = 7
 _DEFAULT_RETENTION = 30
 _PINNED_FACTOR = 3
 _LINKS = re.compile(r"\n+## Liens\n.*\Z", re.DOTALL)
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+MAX_SCOPE = 200
 
 
 def retention_days() -> int:
@@ -161,6 +164,7 @@ def _journal(
     reason_code: str,
     reason: str = "",
     related: list[str] | None = None,
+    undoes: str = "",
     now: datetime | None = None,
 ) -> None:
     title = str(note.meta.get("title") or "") if note else ""
@@ -176,6 +180,7 @@ def _journal(
             reason_code=reason_code,
             reason=reason,
             related=list(related or []),
+            undoes=undoes,
         ),
         now=now,
     )
@@ -250,6 +255,52 @@ def pin(
             now=moment,
         )
     return {"ok": True, "pinned": pinned, "count": pinned_count(root, base)}
+
+
+# -- scope ---------------------------------------------------------------------
+
+
+def scope(
+    root: Path,
+    base: Path | str,
+    memory_id: str,
+    applies_to: str,
+    *,
+    actor: str = "user",
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Say where a memory applies (``applies_to``); empty says everywhere.
+
+    Two notes scoped to different places never contradict each other
+    (`contradictions.compare`): "on ``auth/`` we do this, on ``payments/``
+    that" — the issue's memory branches, by module. ``code``: ``not-found``,
+    ``invalid``.
+    """
+    rel = memory_rel(base, memory_id)
+    value = str(applies_to or "").strip()
+    if len(value) > MAX_SCOPE or _CONTROL.search(value):
+        return {"ok": False, "code": "invalid"}
+    if not inside(root, rel).is_file():
+        return {"ok": False, "code": "not-found"}
+    note = read_note(root, rel)
+    if value != str(note.meta.get("applies_to") or ""):
+        if value:
+            note.meta["applies_to"] = value
+        else:
+            note.meta.pop("applies_to", None)
+        write_note(root, note)
+        _journal(
+            root,
+            base,
+            "update",
+            actor,
+            rel,
+            note,
+            reason_code="scoped",
+            reason=value,
+            now=now,
+        )
+    return {"ok": True, "applies_to": value}
 
 
 # -- forget / trash / restore ------------------------------------------------
@@ -414,9 +465,14 @@ def restore(
     trash_id: str,
     *,
     actor: str = "user",
+    reason_code: str = "restored",
+    undoes: str = "",
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Put a forgotten memory back. ``code``: ``not-found``, ``exists``, ``expired``.
+
+    *undoes* names the journal entry of the forget being taken back
+    (`undo.revert`), so that it is offered only once.
 
     ``contradicts`` lists the live notes the restored one disagrees with
     (`contradictions.find_for`): restoring a memory the team has since
@@ -441,7 +497,15 @@ def restore(
     write_note(root, restored)
     source.unlink()
     _journal(
-        root, base, "restore", actor, live, restored, reason_code="restored", now=moment
+        root,
+        base,
+        "restore",
+        actor,
+        live,
+        restored,
+        reason_code=reason_code,
+        undoes=undoes,
+        now=moment,
     )
     from .contradictions import find_for
 

@@ -416,7 +416,10 @@
 		"chip": "CLI {{installed}}/{{total}}",
 		"chipTooltip": "Outils CLI : {{installed}} installés sur {{total}}",
 		"checking": "Outils CLI : vérification…",
-		"title": "Outils CLI"
+		"title": "Outils CLI",
+		"updateAll": "Tout mettre à jour ({{count}})",
+		"updateAllTooltip": "Mettre à jour {{names}}, l'un après l'autre",
+		"updatingAll": "Mise à jour {{current}}/{{total}}…"
 	},
 	"rail": {
 		"label": "Espaces du menu"

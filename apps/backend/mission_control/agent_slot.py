@@ -131,6 +131,14 @@ class AgentSlot:
     # Error info
     error_message: str = ""
 
+    # Auto-compose and live rebalancing (#344): where the agent came from, the
+    # tokens its composition expected, and what rebalancing did on this task.
+    origin: str = "manual"
+    estimated_tokens: int = 0
+    rebalances: int = 0
+    tried_providers: list[str] = field(default_factory=list)
+    loop_detected: bool = False
+
     def start(self, task: str = ""):
         """Mark agent as running, on a fresh answer (tokens stay cumulative)."""
         self.status = AgentStatus.RUNNING
@@ -143,6 +151,7 @@ class AgentSlot:
         self.completed_at = None
         self.paused_at = None
         self.error_message = ""
+        self.loop_detected = False
 
     def append_output(self, text: str) -> None:
         """Add a chunk of the answer, keeping the most recent ``MAX_OUTPUT_CHARS``."""
@@ -207,4 +216,8 @@ class AgentSlot:
             "streaming_session_id": self.streaming_session_id,
             "output": self.output,
             "error_message": self.error_message,
+            "origin": self.origin,
+            "estimated_tokens": self.estimated_tokens,
+            "rebalances": self.rebalances,
+            "loop_detected": self.loop_detected,
         }

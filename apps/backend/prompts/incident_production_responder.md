@@ -78,7 +78,7 @@ Before writing the fix, write a test that:
 3. **Run the full test suite** if feasible
 4. **If tests fail**, iterate on the fix (max 3 attempts)
 5. **Commit** with message: `hotfix: {{ERROR_TYPE}} - [short description of fix]`
-6. **If unable to fix**, escalate with detailed analysis
+6. **If unable to fix**, stop and give a detailed analysis of what you tried
 
 ## OUTPUT FORMAT
 

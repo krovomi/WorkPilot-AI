@@ -18,6 +18,11 @@ rules on every machine, so two teammates settle a pair the same way:
 | ``higher-confidence`` | two learning-loop patterns ``CONFIDENCE_GAP`` apart: the more confident |
 | ``more-recent`` | two different notes, the older not touched for ``BRAIN_CONFLICT_STALE_DAYS`` days (30) before the newer: the newer |
 
+A pair decided less than ``BRAIN_CONFLICT_COOLDOWN_DAYS`` (7) ago — by a
+person or a rule — that contradicts again is not settled again: it flip-flops,
+so it is queued **escalated**, for a designated maintainer
+(`maintainers.py`; anyone when the project names none).
+
 The loser is archived and linked to the winner (`store.archive`). Anything
 else waits in the **queue** for a person, who sees both side by side and keeps
 one, writes the canonical note (``source: team-consensus-<date>``), or says it
@@ -46,8 +51,10 @@ from typing import Any
 
 from ..memories import redact
 from ..notes import Note, inside, now_iso, read_note, slugify, write_note
-from .contradictions import CHECKED_FOLDERS, find_for, statement
+from . import identity, maintainers
+from .contradictions import CHECKED_FOLDERS, compare, find_for, statement
 from .journal import JournalEntry, append, preview_of
+from .journal import read as read_journal
 from .store import FOLDER_KIND, FOLDERS, archive, link_variants, own_text
 
 logger = logging.getLogger(__name__)
@@ -56,7 +63,9 @@ __all__ = [
     "CHOICES",
     "CONFIDENCE_GAP",
     "QUEUE_FILE",
+    "earlier_decision",
     "open_conflicts",
+    "requeue",
     "resolve",
     "review_pull",
 ]
@@ -66,6 +75,8 @@ CONFIDENCE_GAP = 0.2
 CHOICES = ("a", "b", "custom", "dismiss")
 _MAX_CANONICAL = 4000
 _DEFAULT_STALE_DAYS = 30
+_DEFAULT_COOLDOWN_DAYS = 7
+_DECISIONS = ("resolve", "archive")
 
 
 def _stale_days() -> int:
@@ -73,6 +84,13 @@ def _stale_days() -> int:
         return max(1, int(os.environ.get("BRAIN_CONFLICT_STALE_DAYS", "")))
     except ValueError:
         return _DEFAULT_STALE_DAYS
+
+
+def _cooldown_days() -> int:
+    try:
+        return max(1, int(os.environ.get("BRAIN_CONFLICT_COOLDOWN_DAYS", "")))
+    except ValueError:
+        return _DEFAULT_COOLDOWN_DAYS
 
 
 def _when(value: Any) -> datetime | None:
@@ -105,6 +123,33 @@ def _original_of(rel: str) -> str | None:
         return None
     stem = name.split(".conflict-", 1)[0]
     return (PurePosixPath(rel).parent / f"{stem}.md").as_posix()
+
+
+def _note_of(rel: str) -> str:
+    return _original_of(rel) or rel
+
+
+def earlier_decision(
+    root: Path, base: str, a_rel: str, b_rel: str, *, now: datetime | None = None
+) -> JournalEntry | None:
+    """A decision on this same pair within the cooldown: the pair flip-flops.
+
+    Two versions merged because they said the same thing were not a
+    decision anyone could overturn, so they do not count.
+    """
+    since = (now or datetime.now(UTC)) - timedelta(days=_cooldown_days())
+    pair = {_note_of(a_rel), _note_of(b_rel)}
+    for entry in read_journal(root, base, limit=5000):
+        moment = _when(entry.ts)
+        if (
+            moment is not None
+            and moment >= since
+            and entry.action in _DECISIONS
+            and entry.reason_code != "same-statement"
+            and pair <= {_note_of(rel) for rel in (entry.note, *entry.related)}
+        ):
+            return entry
+    return None
 
 
 def _pair_id(a: str, b: str) -> str:
@@ -305,6 +350,31 @@ def _settle(
     return canonical
 
 
+def _item(
+    pair: str,
+    base: str,
+    folder: str,
+    a: tuple[str, Note],
+    b: tuple[str, Note],
+    textual: bool,
+    signal: str,
+    detail: str,
+) -> dict[str, Any]:
+    """One queued pair, as the Lifecycle tab shows it."""
+    return {
+        "id": pair,
+        "base": base,
+        "project": str(a[1].meta.get("project") or base.split("/")[2]),
+        "kind": FOLDER_KIND.get(folder, "note"),
+        "signal": signal,
+        "detail": detail,
+        "textual": textual,
+        "detected_at": now_iso(),
+        "a": _side(*a),
+        "b": _side(*b),
+    }
+
+
 def _consider(
     root: Path,
     data: dict[str, Any],
@@ -327,7 +397,10 @@ def _consider(
         return
     summary["checked"] += 1
     verdict = _decide(a, b, textual=textual)
-    if verdict is not None:
+    earlier = None
+    if verdict is None or verdict[1] != "same-statement":
+        earlier = earlier_decision(root, base, a_rel, b_rel)
+    if verdict is not None and earlier is None:
         winner, code = verdict
         _settle(
             root,
@@ -342,20 +415,18 @@ def _consider(
         )
         summary["auto"] += 1
         return
-    data["open"].append(
-        {
-            "id": pair,
-            "base": base,
-            "project": str(a.meta.get("project") or base.split("/")[2]),
-            "kind": FOLDER_KIND.get(folder, "note"),
-            "signal": signal,
-            "detail": detail,
-            "textual": textual,
-            "detected_at": now_iso(),
-            "a": _side(a_rel, a),
-            "b": _side(b_rel, b),
+    item = _item(pair, base, folder, (a_rel, a), (b_rel, b), textual, signal, detail)
+    code = "textual-conflict" if textual else "contradiction-detected"
+    if earlier is not None:
+        # No rule settles it again: a maintainer does (`maintainers.py`).
+        item["escalated"] = {
+            "at": earlier.ts,
+            "by": earlier.by,
+            "actor": earlier.actor,
+            "reason_code": earlier.reason_code,
         }
-    )
+        code = "escalated"
+    data["open"].append(item)
     append(
         root,
         base,
@@ -365,7 +436,7 @@ def _consider(
             note=a_rel,
             title=str(a.meta.get("title") or ""),
             preview=preview_of(own_text(a.body)),
-            reason_code="textual-conflict" if textual else "contradiction-detected",
+            reason_code=code,
             reason=detail,
             related=[b_rel],
         ),
@@ -436,6 +507,61 @@ def review_pull(
     return summary
 
 
+def requeue(
+    root: Path,
+    base: str,
+    a_rel: str,
+    b_rel: str,
+    *,
+    textual: bool,
+    actor: str = "user",
+) -> str | None:
+    """Put a pair whose decision a person took back (`undo.revert`) in the queue.
+
+    Taking a decision back is asking for a new one: the pair leaves the
+    dismissed list, and its signal is the detector's when it still flags it,
+    ``reopened`` otherwise. Returns the pair's id, ``None`` when a side is gone.
+    """
+    where = _memory_of(a_rel)
+    if where is None or not (_exists(root, a_rel) and _exists(root, b_rel)):
+        return None
+    data = _load(root)
+    pair = _pair_id(a_rel, b_rel)
+    data["dismissed"] = [d for d in data["dismissed"] if d != pair]
+    if not any(i.get("id") == pair for i in data["open"]):
+        a, b = read_note(root, a_rel), read_note(root, b_rel)
+        found = None if textual else compare(a, b)
+        signal = "textual" if textual else (found.signal if found else "reopened")
+        data["open"].append(
+            _item(
+                pair,
+                base,
+                where[1],
+                (a_rel, a),
+                (b_rel, b),
+                textual,
+                signal,
+                found.detail if found else "",
+            )
+        )
+        append(
+            root,
+            base,
+            JournalEntry(
+                action="conflict",
+                actor=actor,
+                note=a_rel,
+                title=str(a.meta.get("title") or ""),
+                preview=preview_of(own_text(a.body)),
+                reason_code="textual-conflict" if textual else "contradiction-detected",
+                reason=found.detail if found else "",
+                related=[b_rel],
+            ),
+        )
+    _save(root, data)
+    return pair
+
+
 # -- a person decides ------------------------------------------------------------
 
 
@@ -475,6 +601,10 @@ def resolve(
         or not b_rel.startswith(f"{base}/")
     ):
         return {"ok": False, "code": "invalid"}
+    if isinstance(entry.get("escalated"), dict):
+        names = maintainers.read(root, base)
+        if not maintainers.allows(names, identity.person(root)):
+            return {"ok": False, "code": "maintainer-only", "maintainers": names}
     data["open"] = [i for i in data["open"] if i.get("id") != conflict_id]
     if not (_exists(root, a_rel) and _exists(root, b_rel)):
         _save(root, data)

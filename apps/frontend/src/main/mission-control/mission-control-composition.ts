@@ -54,8 +54,12 @@ type Parsed =
 	| { ok: true; body: Record<string, unknown>; projectDir?: string }
 	| { ok: false; error: string };
 
-const isPositive = (value: unknown): value is number =>
+export const isPositive = (value: unknown): value is number =>
 	typeof value === "number" && Number.isFinite(value) && value > 0;
+
+/** A provider's name as the registry writes it, never a path or a command. */
+export const isProviderName = (value: unknown): value is string =>
+	typeof value === "string" && PROVIDER.test(value);
 
 /** Check every field the renderer sent; build the backend's body. */
 export function parseCompositionRequest(
@@ -75,7 +79,7 @@ export function parseCompositionRequest(
 		!Array.isArray(providers) ||
 		providers.length === 0 ||
 		providers.length > MAX_PROVIDERS ||
-		!providers.every((p) => typeof p === "string" && PROVIDER.test(p))
+		!providers.every(isProviderName)
 	) {
 		return { ok: false, error: "invalid_providers" };
 	}

@@ -49,6 +49,8 @@ export interface Incident {
 	fix_branch?: string;
 	fix_pr_url?: string;
 	fix_worktree?: string;
+	/** The board card whose build fixes the incident. */
+	fix_card?: string;
 	qa_result?: Record<string, unknown>;
 	error_message?: string;
 	stack_trace?: string;
@@ -224,7 +226,6 @@ export interface CICDConfig {
 	enabled: boolean;
 	watchBranches: string[];
 	autoFixEnabled: boolean;
-	autoCreatePR: boolean;
 	/** Bisect when a trigger fires and a green commit is known (#375). */
 	autoBisect?: boolean;
 }

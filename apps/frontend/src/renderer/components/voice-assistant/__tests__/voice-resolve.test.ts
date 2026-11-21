@@ -76,6 +76,45 @@ describe("reading a sentence", () => {
 	});
 });
 
+describe("reading a sentence in pair mode", () => {
+	const interpretVoiceCommand = vi.fn();
+	const thinking = vi.fn();
+	const followed = { id: "t1", title: "Export CSV" };
+	beforeEach(() => {
+		vi.clearAllMocks();
+		Object.assign(window.electronAPI, { interpretVoiceCommand });
+	});
+	const read = (said: string) => resolveSentence(said, offered, "fr-FR", "p1", thinking, followed);
+
+	it("still reads a stop and a sure command first", async () => {
+		expect(await read("stop")).toEqual({ kind: "stop" });
+		expect(await read("Ouvre le tableau kanban")).toEqual({
+			kind: "intent",
+			intent: { kind: "navigate", view: "kanban" },
+		});
+	});
+
+	it("makes « tell it… » a message, even when it reads like a command", async () => {
+		expect(await read("Dis-lui d'ouvrir le tableau kanban")).toEqual({
+			kind: "guide",
+			taskId: "t1",
+			title: "Export CSV",
+			text: "ouvrir le tableau kanban",
+		});
+	});
+
+	it("gives any other sentence to the agent, never to the model", async () => {
+		expect(await read("utilise plutôt zod pour valider")).toEqual({
+			kind: "guide",
+			taskId: "t1",
+			title: "Export CSV",
+			text: "utilise plutôt zod pour valider",
+		});
+		expect(interpretVoiceCommand).not.toHaveBeenCalled();
+		expect(thinking).not.toHaveBeenCalled();
+	});
+});
+
 describe("the confirmed stop", () => {
 	const stop = vi.fn();
 	beforeEach(() => {

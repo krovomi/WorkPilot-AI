@@ -152,7 +152,13 @@ describe("AutoComposePanel", () => {
 		expect(screen.getByText(/Estimated: \$0\.4000/)).toBeInTheDocument();
 
 		click("Create 3 agents");
-		await waitFor(() => expect(onApply).toHaveBeenCalledWith(DEGRADED.proposed?.agents));
+		// The session learns the providers in order and the budget of the crew.
+		await waitFor(() =>
+			expect(onApply).toHaveBeenCalledWith(DEGRADED.proposed?.agents, {
+				providers: ["anthropic", "openai"],
+				budgetUsd: 0.5,
+			}),
+		);
 	});
 
 	it("refuses a budget that is not a number without asking", () => {
@@ -216,5 +222,25 @@ describe("AutoComposePanel", () => {
 		click("Anthropic (Claude)");
 		expect(screen.queryByText(/Order of preference/)).toBeNull();
 		expect(screen.getByRole("button", { name: "Suggest a crew" })).toBeDisabled();
+	});
+
+	it("says which estimates history calibrated, and hands a token budget to the session", async () => {
+		suggest.mockResolvedValue({
+			success: true,
+			data: { ...DEGRADED, budget: { usd: null, tokens: 5000 }, calibrated: ["coder", "tester"] },
+		});
+		const onApply = vi.fn().mockResolvedValue(undefined);
+		render(<AutoComposePanel defaultProvider="anthropic" onApply={onApply} />);
+		click("Suggest a crew");
+		expect(await screen.findByTestId("mc-composition-calibrated")).toHaveTextContent(
+			"calibrated on your past sessions for: Coder, Tester",
+		);
+		click("Create 3 agents");
+		await waitFor(() =>
+			expect(onApply).toHaveBeenCalledWith(DEGRADED.proposed?.agents, {
+				providers: ["anthropic"],
+				budgetTokens: 5000,
+			}),
+		);
 	});
 });

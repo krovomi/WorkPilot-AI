@@ -29,8 +29,11 @@ import { useVoiceCapture } from "./use-voice-capture";
 import { voiceSensitivity } from "./voice-activity";
 import { initialLanguage, LANGUAGE_KEY, LANGUAGES } from "./voice-language";
 import { VoiceContinuous } from "./VoiceContinuous";
+import { VoiceWake } from "./VoiceWake";
 import { offeredDestinations } from "./voice-destinations";
+import { VoiceNarration } from "./voice-narration";
 import { resolveSentence, stopAgentsAfterStep } from "./voice-resolve";
+import { sayFeedback } from "./voice-speech";
 import "../charter/charter.css";
 
 
@@ -86,6 +89,8 @@ export function VoiceAssistant({
 
 	return (
 		<>
+		<VoiceNarration />
+		<VoiceWake />
 		<VoiceContinuous
 			destinations={destinations}
 			onNavigate={onNavigate}
@@ -147,8 +152,17 @@ function VoiceAssistantBody({
 	const [language, setLanguage] = useState(() => initialLanguage(appLanguage));
 	const [text, setText] = useState("");
 	const [stage, setStage] = useState<Stage>({ kind: "capture" });
+	// With « auto », the language Whisper heard: the model reads the sentence in it.
+	const [heard, setHeard] = useState<string | undefined>(undefined);
 	const textRef = useRef("");
 	textRef.current = text;
+	const heardRef = useRef<string | undefined>(undefined);
+	heardRef.current = heard;
+	const feedback = useSettingsStore((s) => s.settings.voiceAssistantFeedback);
+	const tell = useCallback(
+		(line: string) => sayFeedback(feedback, "short", line, appLanguage),
+		[feedback, appLanguage],
+	);
 	const projectId = useProjectStore((s) => s.activeProjectId ?? s.selectedProjectId);
 	const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId));
 	const sensitivity = voiceSensitivity(
@@ -173,6 +187,11 @@ function VoiceAssistantBody({
 				case "navigate":
 					onClose();
 					onNavigate(intent.view);
+					tell(
+						t("voiceAssistant:speech.opening", {
+							view: destinations.find((d) => d.id === intent.view)?.label ?? intent.view,
+						}),
+					);
 					return;
 				case "new-task":
 					onClose();
@@ -198,13 +217,17 @@ function VoiceAssistantBody({
 					setStage({ kind: "message", key: "results.unknown", text: said });
 			}
 		},
-		[onClose, onNavigate, onNewTask, onOpenSettings, projectId],
+		[destinations, onClose, onNavigate, onNewTask, onOpenSettings, projectId, t, tell],
 	);
 
 	const interpret = useCallback(
 		async (said: string) => {
-			const outcome = await resolveSentence(said, offered, language, projectId ?? undefined, () =>
-				setStage({ kind: "thinking" }),
+			const outcome = await resolveSentence(
+				said,
+				offered,
+				heardRef.current ?? language,
+				projectId ?? undefined,
+				() => setStage({ kind: "thinking" }),
 			);
 			if (outcome.kind === "intent") act(outcome.intent, said.trim());
 			else if (outcome.kind === "stop") setStage({ kind: "confirm-stop", stopping: false });
@@ -212,18 +235,47 @@ function VoiceAssistantBody({
 		},
 		[act, language, offered, projectId],
 	);
+	const interpretRef = useRef(interpret);
+	interpretRef.current = interpret;
+
+	// What the panel asks or answers is said too, with spoken feedback on.
+	const spokenStage =
+		stage.kind === "message"
+			? t(`voiceAssistant:${stage.key}`, { text: stage.text })
+			: stage.kind === "confirm"
+				? t("voiceAssistant:confirm.heading")
+				: stage.kind === "confirm-stop"
+					? t("voiceAssistant:stop.confirm")
+					: "";
+	useEffect(() => {
+		if (spokenStage) tell(spokenStage);
+	}, [spokenStage, tell]);
 
 	const capture = useVoiceCapture({
 		language,
 		sensitivity,
 		projectPath: project?.path,
-		onText: (phrase) => setText((current) => (current ? `${current} ${phrase}` : phrase)),
+		onText: (phrase, language) => {
+			if (language) setHeard(language);
+			setText((current) => (current ? `${current} ${phrase}` : phrase));
+		},
 		onDone: () => void interpret(textRef.current),
 	});
 	const { phase, start, finish, cancel } = capture;
 
-	// Opening the panel starts listening (`start` does nothing while a session runs).
+	// Opening the panel starts listening (`start` does nothing while a session
+	// runs), unless the wake word already brought the sentence.
+	const openedOn = useRef(false);
 	useEffect(() => {
+		if (!openedOn.current) {
+			openedOn.current = true;
+			const command = useVoiceAssistantStore.getState().takePendingCommand();
+			if (command) {
+				setText(command);
+				void interpretRef.current(command);
+				return;
+			}
+		}
 		void start();
 	}, [start]);
 
@@ -237,6 +289,7 @@ function VoiceAssistantBody({
 		if (phase === "listening") finish();
 		else if (phase === "idle" && stage.kind !== "confirm" && stage.kind !== "thinking") {
 			setText("");
+			setHeard(undefined);
 			setStage({ kind: "capture" });
 			void start();
 		}
@@ -253,6 +306,7 @@ function VoiceAssistantBody({
 
 	const listenAgain = () => {
 		setText("");
+		setHeard(undefined);
 		setStage({ kind: "capture" });
 		void start();
 	};
@@ -266,20 +320,21 @@ function VoiceAssistantBody({
 			toast({ variant: "destructive", title: t("voiceAssistant:results.createFailed") });
 			return;
 		}
-		toast({
-			variant: "success",
-			title: t("voiceAssistant:results.created", { title: task.title || stage.title }),
-		});
+		const created = t("voiceAssistant:results.created", { title: task.title || stage.title });
+		toast({ variant: "success", title: created });
+		tell(created);
 		onClose();
 	};
 
 	const confirmStop = async () => {
 		setStage({ kind: "confirm-stop", stopping: true });
 		const { key, count } = await stopAgentsAfterStep();
+		const said = t(`voiceAssistant:${key}`, { count });
 		toast({
 			variant: key === "stop.stopping" ? "success" : key === "stop.none" ? "default" : "destructive",
-			title: t(`voiceAssistant:${key}`, { count }),
+			title: said,
 		});
+		tell(said);
 		onClose();
 	};
 
@@ -418,6 +473,11 @@ function VoiceAssistantBody({
 					))}
 				</NativeSelect>
 			</div>
+			{language === "auto" && heard && (
+				<p className="text-xs text-muted-foreground">
+					{t("voiceAssistant:heard", { language: names.of(heard) })}
+				</p>
+			)}
 
 			<form
 				className="flex gap-2"

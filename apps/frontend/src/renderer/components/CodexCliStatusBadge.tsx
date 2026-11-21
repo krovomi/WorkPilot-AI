@@ -13,6 +13,8 @@ import { useCliStatus } from "@/contexts/CliStatusContext";
 import { refreshProviderModelCatalog } from "@/hooks/useProviderModelCatalog";
 import { cn } from "@/lib/utils";
 import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
+import { type CliUpdateReporter, useReportCliUpdate } from "./cli-update-all";
+import { CliUpdateChip } from "./CliUpdateSection";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -24,6 +26,8 @@ interface CodexCliStatusBadgeProps {
 	readonly isCollapsed?: boolean;
 	/** Where the « Outils CLI » panel places this badge, once its check answers. */
 	readonly onPresenceChange?: (presence: CliPresence) => void;
+	/** Hands this badge's update to the panel's « Tout mettre à jour ». */
+	readonly onUpdateChange?: CliUpdateReporter;
 }
 
 interface CodexIconProps {
@@ -65,6 +69,7 @@ export function CodexCliStatusBadge({
 	className,
 	isCollapsed = false,
 	onPresenceChange,
+	onUpdateChange,
 }: CodexCliStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation"]);
 	const { data, refreshCodex } = useCliStatus();
@@ -128,6 +133,8 @@ export function CodexCliStatusBadge({
 			setIsUpdating(false);
 		}
 	};
+
+	useReportCliUpdate(onUpdateChange, status === "outdated", isUpdating, performUpdate);
 
 	const getStatusColor = () => {
 		switch (status) {
@@ -219,11 +226,7 @@ export function CodexCliStatusBadge({
 											? ` (${versionInfo.installed})`
 											: ""}
 									</span>
-									{status === "outdated" && (
-										<span className="ml-auto text-3xs bg-warning/20 text-warning px-1.5 py-0.5 rounded">
-											{t("common:update", "Update")}
-										</span>
-									)}
+									{status === "outdated" && <CliUpdateChip isUpdating={isUpdating} />}
 									{(status === "not-found" || status === "error") && (
 										<span className="ml-auto text-3xs bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
 											{t("common:install", "Install")}

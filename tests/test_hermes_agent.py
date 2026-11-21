@@ -395,7 +395,7 @@ class TestSelfHealingSurface:
             IncidentResponderOrchestrator,
         )
 
-        orch = IncidentResponderOrchestrator(project_dir, auto_create_pr=False)
+        orch = IncidentResponderOrchestrator(project_dir)
         return orch, HealingOperation, Incident
 
     def test_a_finished_incident_files_what_hermes_learned(
