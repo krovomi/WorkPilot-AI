@@ -7,9 +7,12 @@ no vision route here, a missing credential or a model the catalogue records as
 text-only (``models_registry.vision_support``) is a refusal with its reason,
 which the page shows.
 
-Under a strict offline policy (``offline_policy.airgap_status``) the only
-route is a local vision model through Ollama on this machine, whatever
-provider was chosen: no picture leaves it.
+A model on this machine answers for a local provider: Ollama through
+``docintel``'s vision engine, LM Studio and llama.cpp through their
+OpenAI-compatible server. Under a strict offline policy
+(``offline_policy.airgap_status``) the only route is such a local model,
+whatever provider was chosen (Ollama unless LM Studio or llama.cpp was): no
+picture leaves the machine.
 """
 
 from __future__ import annotations
@@ -28,8 +31,18 @@ CLOUD_FAMILIES = {
     "google": "google",
     "gemini": "google",
 }
-#: Providers that run on this machine and have a vision route (Ollama's).
-LOCAL_PROVIDERS = {"ollama", "local"}
+#: Providers that run on this machine, and the route of each.
+LOCAL_PROVIDERS = {
+    "ollama": "ollama",
+    "local": "ollama",
+    "lm-studio": "lm-studio",
+    "lmstudio": "lm-studio",
+    "llama-cpp": "llama-cpp",
+    "llamacpp": "llama-cpp",
+    "llama.cpp": "llama-cpp",
+}
+#: Routes whose model runs on this machine (no per-token price).
+LOCAL_ROUTES = frozenset(LOCAL_PROVIDERS.values())
 #: The catalogue's provider name for each route's model.
 _CATALOGUE = {
     "claude_api": "anthropic",
@@ -37,6 +50,8 @@ _CATALOGUE = {
     "openai": "openai",
     "google": "google",
     "ollama": "ollama",
+    "lm-studio": "lm-studio",
+    "llama-cpp": "llama-cpp",
 }
 
 
@@ -79,8 +94,10 @@ def decide_route(
     ``model_without_vision`` (the catalogue says the model reads no image).
     """
     name = (provider or "").strip().lower()
-    if airgap_strict or name in LOCAL_PROVIDERS:
-        route: str | None = "ollama"
+    if name in LOCAL_PROVIDERS:
+        route: str | None = LOCAL_PROVIDERS[name]
+    elif airgap_strict:
+        route = "ollama"
     else:
         family = CLOUD_FAMILIES.get(name)
         if family is None:

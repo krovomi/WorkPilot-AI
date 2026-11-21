@@ -122,6 +122,13 @@ describe("IterationPanel", () => {
 		expect(screen.getByText("loop.mirror")).toBeInTheDocument();
 		expect(screen.getByText('loop.missingFonts {"fonts":"Inter, Roboto"}')).toBeInTheDocument();
 		expect(screen.getByText('loop.masked {"zones":"Avatar"}')).toBeInTheDocument();
+		expect(screen.queryByText(/loop\.drawnMasks/)).toBeNull();
+	});
+
+	it("counts the zones drawn on the design and shows the fix from the passes", () => {
+		render(<IterationPanel loop={loop({ drawn_masks: 2, pass_fix: { status: "nothing_to_fix", before: 0 } })} />);
+		expect(screen.getByText('loop.drawnMasks {"count":2}')).toBeInTheDocument();
+		expect(screen.getByTestId("design-loop-pass-fix")).toHaveAttribute("data-status", "nothing_to_fix");
 	});
 
 	it("names the budget that stopped the loop, and what it spent", () => {
