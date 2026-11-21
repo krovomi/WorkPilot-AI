@@ -109,6 +109,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
 			)}
 			{...attributes}
 			{...cardListeners}
+			data-task-id={task.id}
 		>
 			{agingLevel !== "none" && (
 				<span

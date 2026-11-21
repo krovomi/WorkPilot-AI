@@ -415,6 +415,22 @@
 			"member": "Membre",
 			"owner": "Propriétaire"
 		},
+		"bulk": {
+			"label": "Cartes sélectionnées",
+			"saveFailed_one": "{{count}} carte n'a pas pu être modifiée",
+			"saveFailed_other": "{{count}} cartes n'ont pas pu être modifiées"
+		},
+		"undoLabels": {
+			"type": "changement de type",
+			"priority": "changement de priorité",
+			"move_one": "déplacement de {{count}} carte",
+			"move_other": "déplacement de {{count}} cartes",
+			"delete_one": "suppression de {{count}} carte",
+			"delete_other": "suppression de {{count}} cartes"
+		},
+		"undone": "Annulé : {{label}}",
+		"undoStale": "Annulation incomplète ({{label}}) : une carte a changé depuis",
+		"undoNothing": "Rien à annuler",
 		"cardMenu": {
 			"label": "Actions de la carte",
 			"open": "Ouvrir",
