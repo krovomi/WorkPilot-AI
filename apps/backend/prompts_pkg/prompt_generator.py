@@ -110,13 +110,12 @@ def detect_worktree_isolation(project_dir: Path) -> tuple[bool, Path | None]:
         match = re.search(pattern, project_str)
         if match:
             # Extract the parent project path (everything before the worktree marker)
-            parent_path = project_str[: match.start()]
-            # A worktree at the filesystem root leaves nothing (POSIX) or a bare
-            # drive such as "D:" (Windows), which names the drive's current
-            # directory rather than its root: use the anchor in both cases.
-            if parent_path in ("", resolved_dir.drive):
-                parent_path = resolved_dir.anchor
-            return True, Path(parent_path)
+            # Everything before the worktree marker, from the filesystem's
+            # root: at the root of a Windows drive the text before the marker
+            # is the bare drive ("D:"), which names the drive's current
+            # folder, not its root.
+            anchor = resolved_dir.anchor
+            return True, Path(anchor) / project_str[len(anchor) : match.start()]
 
     return False, None
 
@@ -188,6 +187,8 @@ def get_relative_spec_path(spec_dir: Path, project_dir: Path) -> str:
     """
     try:
         # Try to make path relative to project_dir
+        # Forward slashes on every OS: the prompt joins it with "/spec.md",
+        # and a Windows "\\" in the middle gave the agent a mixed path.
         relative = spec_dir.relative_to(project_dir)
         # Forward slashes on every OS: the prompt shows it next to `/spec.md`.
         return f"./{relative.as_posix()}"

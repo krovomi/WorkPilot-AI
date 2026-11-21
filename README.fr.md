@@ -255,7 +255,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 **Comprendre et planifier**
 - **Insights**, **Idéation**, **Feuille de route**, visualiseur d'architecture avec la dérive d'architecture pour chaque grande stack (couches déduites des projets .NET, des modules Maven/Gradle et des paquets Go, Rust, PHP, Dart et Swift), règles de revue de code et code smells pour chaque grande stack, classificateur de risque.
 - **Migration de code** de frameworks, de versions et de langages : le plan (phases, étapes, risque) s'affiche, puis une tâche Kanban l'applique.
-- **Visuel vers Code**, **Import Design**, **générateur de pipelines** (GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket, CircleCI) et un **assistant vocal** (Ctrl+Maj+Espace).
+- **Visuel vers Code**, **Import Design**, **générateur de pipelines** (GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket, CircleCI) et un **assistant vocal** (Ctrl+Maj+Espace) qui peut écouter en continu et arrêter les agents en cours après leur étape quand on dit « stop ».
 
 **Intégrations**
 - GitHub, GitLab, Azure DevOps, Jira et Linear : importer des tickets, les investiguer, relire des pull requests.
@@ -265,7 +265,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - Notifications sur Slack, Teams, Discord, Google Chat, webhooks, ntfy et Telegram.
 
 **Équipe**
-- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT ou Microsoft Entra ([guide d'exploitation](docs/server-operations.md)).
+- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT, Microsoft Entra ou tout fournisseur OpenID Connect (Okta, Google, Keycloak…), spec approuvée par une autre personne que l'auteur de la carte ([guide d'exploitation](docs/server-operations.md)).
 - **App mobile** pour iOS et Android, chat d'équipe, inscription sur invitation uniquement.
 
 **Coûts et suivi**

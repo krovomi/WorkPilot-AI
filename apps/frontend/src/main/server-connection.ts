@@ -234,7 +234,19 @@ async function serverFetch<T>(
 export async function getServerAuthConfig(
 	url: string,
 ): Promise<
-	| { ok: true; data: { local_enabled: boolean; entra_enabled: boolean; entra_tenant_id: string | null; entra_client_id: string | null } }
+	| {
+			ok: true;
+			data: {
+				local_enabled: boolean;
+				entra_enabled: boolean;
+				entra_tenant_id: string | null;
+				entra_client_id: string | null;
+				/** Any OpenID Connect provider; read with `providerFromConfig`. */
+				sso_enabled?: boolean;
+				sso_name?: string;
+				[key: string]: unknown;
+			};
+		  }
 	| { ok: false; error: string }
 > {
 	try {
@@ -419,6 +431,18 @@ export async function loginWithEntraIdToken(
 	idToken: string,
 ): Promise<{ ok: true; user: ServerUser } | { ok: false; error: string }> {
 	const result = await serverFetch<TokenResponse>("/auth/oidc/exchange", {
+		id_token: idToken,
+	});
+	if (!result.ok) return result;
+	applyTokens(result.data);
+	return { ok: true, user: result.data.user };
+}
+
+/** Hand the id_token of the server's OpenID Connect provider to the server. */
+export async function loginWithSsoIdToken(
+	idToken: string,
+): Promise<{ ok: true; user: ServerUser } | { ok: false; error: string }> {
+	const result = await serverFetch<TokenResponse>("/auth/sso/exchange", {
 		id_token: idToken,
 	});
 	if (!result.ok) return result;

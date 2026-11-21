@@ -24,7 +24,8 @@ class LoginRequest(BaseModel):
 
 
 class OidcExchangeRequest(BaseModel):
-    id_token: str
+    # An id_token is a few kilobytes; nothing near this size is one.
+    id_token: str = Field(min_length=1, max_length=16_384)
 
 
 class RefreshRequest(BaseModel):

@@ -409,6 +409,9 @@ npm run test:coverage
 npm run build
 npm run test:e2e
 
+# Only the journeys that cross several features (e2e/journeys/, docs/architecture/cross-feature-journeys.md)
+npm run test:e2e:journeys
+
 # Run linting
 npm run lint
 

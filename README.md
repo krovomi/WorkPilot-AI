@@ -253,7 +253,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 **Understand and plan**
 - **Insights**, **Ideation**, **Roadmap**, architecture visualizer with architecture drift for every major stack (layers inferred from .NET projects, Maven/Gradle modules, Go, Rust, PHP, Dart and Swift packages), code review rules and code smells for every major stack, risk classifier.
 - **Code migration** for frameworks, versions and languages: the plan (phases, steps, risk) is shown, then a Kanban task applies it.
-- **Visual to Code**, **Import Design**, **pipeline generator** (GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket, CircleCI) and a **voice assistant** (Ctrl+Shift+Space).
+- **Visual to Code**, **Import Design**, **pipeline generator** (GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket, CircleCI) and a **voice assistant** (Ctrl+Shift+Space) that can listen continuously and stop the running agents after their current step when you say “stop”.
 
 **Integrations**
 - GitHub, GitLab, Azure DevOps, Jira and Linear: import issues, investigate them, review pull requests.
@@ -263,7 +263,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - Notifications on Slack, Teams, Discord, Google Chat, webhooks, ntfy and Telegram.
 
 **Team**
-- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT or Microsoft Entra sign-in ([operations guide](docs/server-operations.md)).
+- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT, Microsoft Entra or any OpenID Connect sign-in (Okta, Google, Keycloak...), spec approval by someone other than the card's author ([operations guide](docs/server-operations.md)).
 - **Mobile app** for iOS and Android, team chat, invitation-only sign-up.
 
 **Cost and monitoring**

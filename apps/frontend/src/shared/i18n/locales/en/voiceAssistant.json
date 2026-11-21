@@ -45,7 +45,8 @@
 		"createTask": "“Create a task to add a CSV export”",
 		"open": "“Open the Kanban board”",
 		"draw": "“Open the feature that lets me draw an architecture”",
-		"settings": "“Open settings”"
+		"settings": "“Open settings”",
+		"stop": "“Stop” (the running agents stop after their current step)"
 	},
 	"errors": {
 		"model": "The speech model is not on this computer yet.",
@@ -75,6 +76,44 @@
 		"systemWideHelp": "Registers the shortcut with the operating system: pressing it brings WorkPilot forward and opens the assistant. Takes effect when you save.",
 		"systemWideRefused": "The system refused this shortcut (another app may use it, or the desktop does not allow it). It still works inside WorkPilot.",
 		"speech": "Speech is transcribed on this computer (Whisper). No audio is kept.",
-		"model": "Simple commands are understood without a model. Other sentences use the “Voice assistant” model of Settings → Agent."
+		"model": "Simple commands are understood without a model. Other sentences use the “Voice assistant” model of Settings → Agent.",
+		"sensitivity": "Microphone sensitivity",
+		"sensitivityHelp": "How far above the room's noise your voice must be to count as speech. The first moments of each session measure the room; choose Low in a noisy place.",
+		"sensitivityLevels": {
+			"low": "Low (noisy room)",
+			"medium": "Medium",
+			"high": "High (quiet room, soft voice)"
+		}
+	},
+	"stop": {
+		"confirm": "Stop the running agents after their current step?",
+		"explain": "Each running task finishes the tool call it is in, does not start the next one, and waits for you to resume it from its card.",
+		"yes": "Stop after this step",
+		"no": "Keep going",
+		"stopping_one": "{{count}} task stops after its current step.",
+		"stopping_other": "{{count}} tasks stop after their current step.",
+		"none": "No task is running.",
+		"failed": "A running task could not be asked to stop. Use Stop all agents."
+	},
+	"continuous": {
+		"offer": "Keep the microphone on between commands, with a pulsing light and a mute button.",
+		"start": "Listen continuously",
+		"title": "Voice assistant, continuous mode",
+		"phase": {
+			"listening": "Listening",
+			"preparing": "Starting the microphone…",
+			"thinking": "Understanding…",
+			"muted": "Microphone muted",
+			"paused": "Paused while the panel is open",
+			"off": "Microphone off"
+		},
+		"mute": "Mute the microphone",
+		"unmute": "Turn the microphone back on",
+		"close": "Stop listening",
+		"hint": "Speak a command. Pause when you are done.",
+		"question": "Waiting for your answer",
+		"createQuestion": "Create the task “{{title}}”?",
+		"sayYes": "Say “yes” or “no”, or use the buttons.",
+		"cancelled": "Cancelled."
 	}
 }
