@@ -13,6 +13,7 @@ import {
 	detectedGitHubRepo,
 	listGitRemotes,
 } from "../../forge/project-forge-binding";
+import { withForgeAccounts } from "../../forge/forge-credentials";
 import { getProjectEnvPath, readProjectEnvFile } from "../../project-env-file";
 import { isServerHandle, relayGitHubFetch, serverGitHubConfig } from "./server-relay";
 import type { GitHubConfig } from "./types";
@@ -80,7 +81,7 @@ export function getGitHubConfig(project: Project): GitHubConfig | null {
 	if (!envPath || !existsSync(envPath)) return null;
 
 	// Neither reading the file nor asking gh throws: each answers "nothing".
-	const vars = readProjectEnvFile(envPath);
+	const vars = withForgeAccounts(readProjectEnvFile(envPath));
 	// Saved as typed: a clone URL becomes the `owner/repo` of every API path.
 	const repo =
 		normalizeRepoReference(vars.GITHUB_REPO ?? "") ||

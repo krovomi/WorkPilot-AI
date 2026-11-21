@@ -13,6 +13,7 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult, ProjectForgeBindings } from "../../shared/types";
 import { listGitRemotes, projectForgeBindings } from "../forge/project-forge-binding";
+import { withForgeAccounts } from "../forge/forge-credentials";
 import { getProjectEnvPath, readProjectEnvFile } from "../project-env-file";
 import { projectStore } from "../project-store";
 import { normalizeRepoReference } from "./github/utils";
@@ -34,6 +35,11 @@ const CURRENT_KEYS = {
 	azureDevOpsOrgUrl: "AZURE_DEVOPS_ORG_URL",
 	azureDevOpsProject: "AZURE_DEVOPS_PROJECT",
 	azureDevOpsRepository: "AZURE_DEVOPS_REPOSITORY",
+	// The account picked on the page: its address (never its token) is the
+	// instance or organization the repository is compared on.
+	githubAccountId: "GITHUB_ACCOUNT_ID",
+	gitlabAccountId: "GITLAB_ACCOUNT_ID",
+	azureDevOpsAccountId: "AZURE_DEVOPS_ACCOUNT_ID",
 } as const;
 
 export function currentValues(current: unknown): Record<string, string> {
@@ -62,7 +68,10 @@ export function forgeBindingsFor(
 	// A server project's forge is the server's; its checkout is not here.
 	if (project.remote) return { success: false, error: "Not a local project" };
 	const envPath = getProjectEnvPath(project);
-	const vars = { ...(envPath ? readProjectEnvFile(envPath) : {}), ...currentValues(current) };
+	const vars = withForgeAccounts({
+		...(envPath ? readProjectEnvFile(envPath) : {}),
+		...currentValues(current),
+	});
 	return {
 		success: true,
 		data: projectForgeBindings(vars, listGitRemotes(project.path), {
