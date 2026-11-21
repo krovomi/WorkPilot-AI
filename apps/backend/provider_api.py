@@ -1963,14 +1963,6 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import dashboard router: {e}")
 
-# --- Agent feature endpoints (extracted from this file) ---
-try:
-    from agent_endpoints.api import router as agent_endpoints_router
-
-    _mount(agent_endpoints_router, "agent_endpoints")
-except ImportError as e:
-    print(f"Warning: Could not import agent_endpoints router: {e}")
-
 # --- Event-Driven Hooks System API (extracted from this file) ---
 try:
     from event_hooks.api import router as event_hooks_router
