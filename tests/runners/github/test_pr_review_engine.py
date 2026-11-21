@@ -372,9 +372,7 @@ def test_an_ai_triage_without_ai_comments_asks_nothing(engine, model):
     assert model.clients == []
 
 
-def test_a_review_started_from_the_backend_folder_reads_the_repository_root(
-    tmp_path, model
-):
+def test_a_project_folder_named_backend_is_reviewed_as_it_is(tmp_path, model):
     backend = tmp_path / "apps" / "backend"
     backend.mkdir(parents=True)
     config = GitHubRunnerConfig(
@@ -389,7 +387,7 @@ def test_a_review_started_from_the_backend_folder_reads_the_repository_root(
 
     asyncio.run(engine.run_multi_pass_review(pr(ai_bot_comments=[bot])))
 
-    assert {c.options["project_dir"] for c in model.clients} == {tmp_path}
+    assert {c.options["project_dir"] for c in model.clients} == {backend}
 
 
 def test_with_the_parallel_orchestrator_on_the_specialists_review_instead(

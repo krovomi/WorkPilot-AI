@@ -680,9 +680,11 @@ export interface TaskMetadata {
 		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
 		 * "tool_loop" when the circuit breaker stopped an agent repeating the
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
-		 * when the person stopped every agent at once. "anomaly" / "sandbox"
-		 * when the session watch stopped an agent (`agents/safety_watch.py`),
-		 * with `anomaly` / `sandbox`. "policy_hours" / "policy_budget" when
+		 * when the person stopped every agent at once, "voice_stop" when they
+		 * said « stop » to the voice assistant (after the current step).
+		 * "anomaly" / "sandbox" when the session watch stopped an agent
+		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
+		 * "policy_hours" / "policy_budget" when
 		 * workpilot.policy.yaml said agents must stop (`agents/policy_watch.py`),
 		 * with `policy`.
 		 */
@@ -841,9 +843,11 @@ export interface ImplementationPlan {
 		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
 		 * "tool_loop" when the circuit breaker stopped an agent repeating the
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
-		 * when the person stopped every agent at once. "anomaly" / "sandbox"
-		 * when the session watch stopped an agent (`agents/safety_watch.py`),
-		 * with `anomaly` / `sandbox`. "policy_hours" / "policy_budget" when
+		 * when the person stopped every agent at once, "voice_stop" when they
+		 * said « stop » to the voice assistant (after the current step).
+		 * "anomaly" / "sandbox" when the session watch stopped an agent
+		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
+		 * "policy_hours" / "policy_budget" when
 		 * workpilot.policy.yaml said agents must stop (`agents/policy_watch.py`),
 		 * with `policy`.
 		 */

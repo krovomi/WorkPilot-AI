@@ -45,33 +45,6 @@ _UNPARSED_SUMMARY = (
 )
 
 
-def sanitize_user_content(content: str, max_length: int = 100000) -> str:
-    """
-    Sanitize user-provided content to prevent prompt injection.
-
-    - Strips null bytes and control characters (except newlines/tabs)
-    - Truncates excessive length
-    """
-    if not content:
-        return ""
-
-    # Remove null bytes and control characters (except newline, tab, carriage return)
-    sanitized = "".join(
-        char
-        for char in content
-        if char == "\n"
-        or char == "\t"
-        or char == "\r"
-        or (ord(char) >= 32 and ord(char) != 127)
-    )
-
-    # Truncate if too long
-    if len(sanitized) > max_length:
-        sanitized = sanitized[:max_length] + "\n\n... (content truncated for length)"
-
-    return sanitized
-
-
 class MRReviewEngine:
     """Handles MR review workflow using Claude AI."""
 
