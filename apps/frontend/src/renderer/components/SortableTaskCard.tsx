@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { memo, useCallback } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { Task, TaskStatus } from "../../shared/types";
 import {
@@ -9,6 +9,7 @@ import {
 	getTaskAgingLevel,
 } from "../lib/kanban-aging";
 import { cn } from "../lib/utils";
+import { withoutPortalEvents } from "./kanban/PointerMenu";
 import { TaskCard } from "./TaskCard";
 
 interface SortableTaskCardProps {
@@ -69,6 +70,10 @@ export const SortableTaskCard = memo(function SortableTaskCard({
 		isOver,
 	} = useSortable({ id: task.id });
 
+	// The card's menus and dialogs live in portals, yet their events bubble
+	// up here: a drag only starts from the card itself.
+	const cardListeners = useMemo(() => withoutPortalEvents(listeners), [listeners]);
+
 	const style = {
 		transform: CSS.Transform.toString(transform),
 		transition,
@@ -103,7 +108,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
 					"ring-2 ring-primary/30 ring-offset-2 ring-offset-background rounded-xl",
 			)}
 			{...attributes}
-			{...listeners}
+			{...cardListeners}
 		>
 			{agingLevel !== "none" && (
 				<span

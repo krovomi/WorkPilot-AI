@@ -21,6 +21,7 @@ import type { PRReviewProgress } from "./pr-ci-wait";
 import { getGitHubDir, PRLogCollector, sanitizeNetworkData } from "./pr-logs";
 import { reviewFromJson } from "./review-result";
 import type { PRReviewResult } from "./review-result";
+import { githubRunnerTarget } from "./runner-target";
 import { getGitHubConfig, githubFetch } from "./utils";
 import { createIPCCommunicators } from "./utils/ipc-communicator";
 import { createContextLogger } from "./utils/logger";
@@ -176,18 +177,19 @@ async function runPRReview(
 	const { sendProgress } = reviewSenders(mainWindow, project.id);
 
 	const { model, thinkingLevel } = getGitHubPRSettings();
+	const target = githubRunnerTarget(project);
 	const args = buildRunnerArgs(
 		getRunnerPath(backendPath),
 		project.path,
 		command,
 		[prNumber.toString()],
-		{ model, thinkingLevel },
+		{ model, thinkingLevel, repo: target.repo },
 	);
 	debugLog(`Spawning PR ${label} process`, { args, model, thinkingLevel });
 
 	const repo = getGitHubConfig(project)?.repo || project.name || "unknown";
 	const logCollector = new PRLogCollector(project, prNumber, repo, kind === "followup");
-	const env = await getRunnerEnv(getClaudeMdEnv(project), {
+	const env = await getRunnerEnv({ ...target.env, ...getClaudeMdEnv(project) }, {
 		jevWorkflow: "github-review",
 		page: "github-prs",
 	});

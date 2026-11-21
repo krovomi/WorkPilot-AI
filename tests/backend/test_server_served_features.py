@@ -187,8 +187,7 @@ class TestAServerMountsOnlyProjectFeatures:
             for path in (
                 "/api/costs/summary/p-1",
                 "/api/costs/budget/p-1",
-                "/api/feedback/stats/p-1",
-                "/api/dashboard/stats",
+                "/api/sessions/p-1",
                 "/providers",
             ):
                 assert client.get(path).status_code == 404, path
