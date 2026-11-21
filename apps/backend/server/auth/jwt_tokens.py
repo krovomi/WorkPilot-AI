@@ -5,6 +5,9 @@
 - Refresh token: opaque random string. Only its SHA-256 hash is persisted
   (``auth_sessions.refresh_token_hash``). Each successful refresh revokes
   the old session row and issues a new pair (rotation).
+- A sign-in: each one gets an id (``sid``) and its method (``amr``), carried
+  by every access token and refresh session that follow from it, so the audit
+  log names the sign-in each action was made under (``services/audit.py``).
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import secrets
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -28,11 +32,50 @@ class TokenError(Exception):
     """Invalid, expired or revoked token."""
 
 
+#: How a person signed in: a password, Microsoft Entra, the server's OpenID
+#: Connect provider, or accepting an invitation.
+LOGIN_METHODS = frozenset({"local", "entra", "oidc", "invite"})
+
+
+@dataclass(frozen=True)
+class Login:
+    """The sign-in a session comes from."""
+
+    id: str
+    method: str | None
+
+
+def new_login(method: str) -> Login:
+    if method not in LOGIN_METHODS:
+        raise ValueError(f"Unknown sign-in method: {method}")
+    return Login(id=str(uuid.uuid4()), method=method)
+
+
+def continued(login: Login | None) -> Login:
+    """The sign-in a new session continues: ``login``, or for a session from
+    before sign-ins had ids, a new id with no known method."""
+    return login or Login(id=str(uuid.uuid4()), method=None)
+
+
+def login_of(claims: dict) -> Login | None:
+    """The sign-in an access token names; None for a token minted before them.
+
+    The claims are signature-checked: these values were written by this
+    server. They are still bounded, since they go to the audit log.
+    """
+    sid, method = claims.get("sid"), claims.get("amr")
+    if not isinstance(sid, str) or not 0 < len(sid) <= 36:
+        return None
+    return Login(id=sid, method=method if method in LOGIN_METHODS else None)
+
+
 @dataclass(frozen=True)
 class TokenPair:
     access_token: str
     refresh_token: str
     expires_in: int  # access token lifetime, seconds
+    login: Login
+    org_id: str | None = None
 
 
 def _utcnow() -> datetime:
@@ -43,7 +86,9 @@ def hash_refresh_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def create_access_token(user: User, org_id: str | None = None) -> tuple[str, int]:
+def create_access_token(
+    user: User, org_id: str | None = None, login: Login | None = None
+) -> tuple[str, int]:
     """Mint an access token.
 
     ``org`` names the organization the holder was last acting in. It is a
@@ -68,6 +113,10 @@ def create_access_token(user: User, org_id: str | None = None) -> tuple[str, int
     }
     if org_id:
         payload["org"] = org_id
+    if login is not None:
+        payload["sid"] = login.id
+        if login.method:
+            payload["amr"] = login.method
     return (
         pyjwt.encode(payload, settings.jwt_secret, algorithm="HS256"),
         int(ttl.total_seconds()),
@@ -95,13 +144,16 @@ async def issue_token_pair(
     user_agent: str | None = None,
     ip: str | None = None,
     org_id: str | None = None,
+    *,
+    login: Login,
 ) -> TokenPair:
     """Create a new refresh session and return access+refresh tokens.
 
     ``org_id`` defaults to the user's organization when they belong to exactly
     one, so the common single-tenant case needs no extra round trip. With
     several memberships the choice is left to the client, which calls
-    ``POST /auth/switch-org``.
+    ``POST /auth/switch-org``. ``login`` is the sign-in the session comes from:
+    :func:`new_login` for a sign-in, the current one for a refresh.
     """
     settings = get_settings()
     if org_id is None:
@@ -117,12 +169,18 @@ async def issue_token_pair(
             user_agent=(user_agent or "")[:400] or None,
             ip=(ip or "")[:64] or None,
             expires_at=_utcnow() + timedelta(days=settings.refresh_token_ttl_days),
+            login_id=login.id,
+            login_method=login.method,
         )
     )
     await db.commit()
-    access_token, expires_in = create_access_token(user, org_id=org_id)
+    access_token, expires_in = create_access_token(user, org_id=org_id, login=login)
     return TokenPair(
-        access_token=access_token, refresh_token=refresh_token, expires_in=expires_in
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=expires_in,
+        login=login,
+        org_id=org_id,
     )
 
 
@@ -188,7 +246,14 @@ async def rotate_refresh_token(
         raise TokenError("User is disabled or gone")
 
     session.revoked_at = _utcnow()
-    pair = await issue_token_pair(db, user, user_agent=user_agent, ip=ip)
+    login = (
+        Login(id=session.login_id, method=session.login_method)
+        if session.login_id
+        else None
+    )
+    pair = await issue_token_pair(
+        db, user, user_agent=user_agent, ip=ip, login=continued(login)
+    )
     return pair, user
 
 

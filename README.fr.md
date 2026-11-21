@@ -215,7 +215,7 @@ Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ress
 </tr>
 </table>
 
-**App mobile (iOS et Android)** : avec un serveur d'équipe, le tableau partagé dans votre poche : ouvrir une carte, approuver un plan, lancer ou arrêter les agents, lire le tableau de bord, les Insights, la feuille de route et les idées.
+**App mobile (iOS et Android)** : avec un serveur d'équipe, le tableau partagé dans votre poche : ouvrir une carte, approuver un plan, régler sa criticité ou prêter son approbation, lancer ou arrêter les agents, lire le tableau de bord, les Insights, la feuille de route et les idées ; se connecter par mot de passe, Microsoft Entra ou l'authentification unique du serveur.
 
 ![App mobile : tableau, carte et tableau de bord](.github/assets/screenshots/mobile.png)
 
@@ -267,7 +267,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - Notifications sur Slack, Teams, Discord, Google Chat, webhooks, ntfy et Telegram.
 
 **Équipe**
-- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT, Microsoft Entra ou tout fournisseur OpenID Connect (Okta, Google, Keycloak…), spec approuvée par une autre personne que l'auteur de la carte, par autant d'approbateurs que sa criticité en demande, approbations prêtées pendant une absence ([guide d'exploitation](docs/server-operations.md)).
+- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT, Microsoft Entra ou tout fournisseur OpenID Connect (Okta, Google, Keycloak…), spec approuvée par une autre personne que l'auteur de la carte, par autant d'approbateurs que sa criticité en demande, approbations prêtées pendant une absence, un second groupe d'approbateurs prévenu quand un plan attend trop, et chaque action du journal rattachée à la connexion sous laquelle elle a été faite ([guide d'exploitation](docs/server-operations.md)).
 - **App mobile** pour iOS et Android, chat d'équipe, inscription sur invitation uniquement.
 
 **Coûts et suivi**

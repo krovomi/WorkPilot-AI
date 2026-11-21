@@ -169,6 +169,14 @@ describe("actionable notifications", () => {
 		expect(api.cards).not.toHaveBeenCalled();
 	});
 
+	it("approves without building while the plan waits for other approvers", async () => {
+		const api = planApi();
+		api.approve.mockResolvedValueOnce({ approved: false, approvedBy: null, approval: { count: 1, needed: 3 } });
+		await expect(approveAndBuild(api, plan, async () => true)).rejects.toThrow("approval_waiting");
+		expect(api.approve).toHaveBeenCalledWith("p", "012-x");
+		expect(api.startRun).not.toHaveBeenCalled();
+	});
+
 	it("sends nothing when the person cancels the lock", async () => {
 		const api = planApi();
 		await expect(approveAndBuild(api, plan, async () => false)).resolves.toBe(false);

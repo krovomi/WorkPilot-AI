@@ -10,6 +10,8 @@ from server.auth import oidc_generic
 from server.auth.deps import CurrentUser, get_current_user, require_admin
 from server.auth.jwt_tokens import (
     TokenError,
+    TokenPair,
+    continued,
     issue_token_pair,
     revoke_refresh_token,
     rotate_refresh_token,
@@ -21,6 +23,7 @@ from server.auth.local import (
     create_local_user,
 )
 from server.auth.oidc import OidcError, provision_entra_user, validate_id_token
+from server.auth.sign_in import signed_in
 from server.authz.engine import user_organizations
 from server.authz.principal import get_principal
 from server.authz.tenancy import can_act_in
@@ -55,17 +58,21 @@ def _client_meta(request: Request) -> tuple[str | None, str | None]:
     return ua, ip
 
 
-async def _token_response(
-    db: AsyncSession, user: User, request: Request
-) -> TokenResponse:
-    ua, ip = _client_meta(request)
-    pair = await issue_token_pair(db, user, user_agent=ua, ip=ip)
+def _token_response(pair: TokenPair, user: User) -> TokenResponse:
     return TokenResponse(
         access_token=pair.access_token,
         refresh_token=pair.refresh_token,
         expires_in=pair.expires_in,
         user=UserPublic.model_validate(user),
     )
+
+
+async def _signed_in(
+    db: AsyncSession, user: User, request: Request, method: str
+) -> TokenResponse:
+    ua, ip = _client_meta(request)
+    pair = await signed_in(db, user, method=method, user_agent=ua, ip=ip)
+    return _token_response(pair, user)
 
 
 @router.get("/config")
@@ -115,9 +122,7 @@ async def login(
         user = await authenticate_local(db, body.email, body.password)
     except LocalAuthError as e:
         raise HTTPException(status_code=401, detail=str(e))
-    db.add(AuditLog(user_id=user.id, action="auth.login.local"))
-    await db.commit()
-    return await _token_response(db, user, request)
+    return await _signed_in(db, user, request, "local")
 
 
 @router.post("/oidc/exchange", response_model=TokenResponse)
@@ -130,9 +135,7 @@ async def oidc_exchange(
         user = await provision_entra_user(db, claims)
     except OidcError as e:
         raise HTTPException(status_code=401, detail=str(e))
-    db.add(AuditLog(user_id=user.id, action="auth.login.entra"))
-    await db.commit()
-    return await _token_response(db, user, request)
+    return await _signed_in(db, user, request, "entra")
 
 
 @router.post("/sso/exchange", response_model=TokenResponse)
@@ -146,9 +149,7 @@ async def sso_exchange(
         user = await oidc_generic.provision_oidc_user(db, claims)
     except OidcError as e:
         raise HTTPException(status_code=401, detail=str(e))
-    db.add(AuditLog(user_id=user.id, action="auth.login.oidc"))
-    await db.commit()
-    return await _token_response(db, user, request)
+    return await _signed_in(db, user, request, "oidc")
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -162,12 +163,7 @@ async def refresh(
         )
     except TokenError as e:
         raise HTTPException(status_code=401, detail=str(e))
-    return TokenResponse(
-        access_token=pair.access_token,
-        refresh_token=pair.refresh_token,
-        expires_in=pair.expires_in,
-        user=UserPublic.model_validate(user),
-    )
+    return _token_response(pair, user)
 
 
 @router.post("/logout")
@@ -246,13 +242,12 @@ async def switch_org(
         raise HTTPException(status_code=403, detail="Not a member of that organization")
 
     ua, ip = _client_meta(request)
-    pair = await issue_token_pair(db, db_user, user_agent=ua, ip=ip, org_id=body.org_id)
-    return TokenResponse(
-        access_token=pair.access_token,
-        refresh_token=pair.refresh_token,
-        expires_in=pair.expires_in,
-        user=UserPublic.model_validate(db_user),
+    # The same sign-in, acting in another organization.
+    login = continued(getattr(request.state, "login", None))
+    pair = await issue_token_pair(
+        db, db_user, user_agent=ua, ip=ip, org_id=body.org_id, login=login
     )
+    return _token_response(pair, db_user)
 
 
 @router.post("/users", response_model=UserPublic, status_code=201)

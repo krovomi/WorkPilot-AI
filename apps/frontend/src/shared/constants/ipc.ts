@@ -1452,6 +1452,14 @@ export const IPC_CHANNELS = {
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",
 	SMART_ESTIMATION_RESET_CALIBRATION: "smartEstimation:resetCalibration",
 	SPEC_APPROVAL_GET_SPEC: "specApproval:getSpec",
+	// Server mode: a server card's approval (criticality, who approved) and the
+	// approvals lent on a server project (main/server-card-approvals.ts)
+	SPEC_APPROVAL_SERVER_GET: "specApproval:serverGet",
+	SPEC_APPROVAL_SERVER_SET_CRITICALITY: "specApproval:serverSetCriticality",
+	SPEC_APPROVAL_DELEGATIONS_LIST: "specApproval:delegationsList",
+	SPEC_APPROVAL_DELEGATION_CREATE: "specApproval:delegationCreate",
+	SPEC_APPROVAL_DELEGATION_REVOKE: "specApproval:delegationRevoke",
+	SPEC_APPROVAL_DELEGATES_LIST: "specApproval:delegatesList",
 	SWARM_ANALYZE: "swarm:analyze",
 	SWARM_CANCEL: "swarm:cancel",
 	SWARM_EVENT: "swarm:event",

@@ -80,14 +80,15 @@ async def test_password_change_revokes_every_live_session():
     from server.auth.jwt_tokens import (
         TokenError,
         issue_token_pair,
+        new_login,
         rotate_refresh_token,
     )
     from server.auth.local import change_password
 
     async with await _fresh_db() as db:
         user = await _make_user(db)
-        laptop = await issue_token_pair(db, user)
-        phone = await issue_token_pair(db, user)
+        laptop = await issue_token_pair(db, user, login=new_login("local"))
+        phone = await issue_token_pair(db, user, login=new_login("local"))
         assert await _live_session_count(db, user.id) == 2
 
         await change_password(db, user, _PASSWORD, _NEW_PASSWORD)
@@ -103,12 +104,13 @@ async def test_replaying_a_rotated_refresh_token_kills_the_family():
     from server.auth.jwt_tokens import (
         TokenError,
         issue_token_pair,
+        new_login,
         rotate_refresh_token,
     )
 
     async with await _fresh_db() as db:
         user = await _make_user(db)
-        first = await issue_token_pair(db, user)
+        first = await issue_token_pair(db, user, login=new_login("local"))
         second, _ = await rotate_refresh_token(db, first.refresh_token)
 
         # The attacker replays the token the legitimate client already used.

@@ -17,7 +17,10 @@
 		"nothing_to_stop": "Nothing was running on this card any more. Pull to refresh.",
 		"entra_disabled": "This server doesn't offer Microsoft sign-in.",
 		"entra_failed": "Microsoft sign-in didn't complete.",
-		"entra_misconfigured": "The server's Microsoft sign-in settings are invalid."
+		"entra_misconfigured": "The server's Microsoft sign-in settings are invalid.",
+		"approval_waiting": "Your approval is recorded: {{given}} of {{needed}}. The build starts once the card has every approval it needs.",
+		"sso_disabled": "This server doesn't offer single sign-on.",
+		"sso_failed": "Single sign-on didn't complete."
 	},
 	"signIn": {
 		"title": "WorkPilot AI",
@@ -29,13 +32,15 @@
 		"submit": "Sign in",
 		"invalidUrl": "This isn't a valid server address.",
 		"insecureUrl": "Use an https:// address. Plain http is only allowed on your local network.",
-		"localDisabled": "This server only accepts Microsoft sign-in: use Sign in with Microsoft.",
+		"localDisabled": "This server doesn't accept passwords: sign in with Microsoft or with single sign-on.",
 		"failed": "Sign-in failed: {{message}}",
 		"badCredentials": "Wrong email or password.",
 		"or": "or",
 		"microsoft": "Sign in with Microsoft",
 		"entraDisabled": "This server doesn't offer Microsoft sign-in.",
-		"entraRefused": "The server refused this Microsoft account."
+		"entraRefused": "The server refused this Microsoft account.",
+		"sso": "Sign in with single sign-on",
+		"ssoRefused": "The server refused this account."
 	},
 	"unreachable": {
 		"title": "Server unreachable",
@@ -621,5 +626,36 @@
 		"operator": "Operator",
 		"analyst": "Analyst",
 		"viewer": "Viewer"
+	},
+	"approval": {
+		"count": "{{given}} of {{needed}} approvals",
+		"criticality": "Criticality",
+		"levels": {
+			"low": "Low",
+			"medium": "Medium",
+			"high": "High"
+		},
+		"sources": {
+			"set": "Set by a person",
+			"assessed": "Assessed from the plan",
+			"default": "The server's default"
+		},
+		"missingRoles": "Still missing: {{roles}}",
+		"by": "{{by}}, {{at}}",
+		"byFor": "{{by}} for {{for}}, {{at}}"
+	},
+	"delegations": {
+		"title": "Lent approvals",
+		"hint": "Lend your approval to a colleague while you are away. They approve in your name until the end date.",
+		"current": "Current and planned",
+		"item": "{{from}} → {{to}}, {{start}} to {{end}}",
+		"active": "Active",
+		"planned": "Planned",
+		"end": "End",
+		"empty": "No approval is lent on this project.",
+		"lendTitle": "Lend my approval",
+		"noColleague": "No colleague can approve on this project.",
+		"days": "For how many days (1 to 90)",
+		"lend": "Lend"
 	}
 }

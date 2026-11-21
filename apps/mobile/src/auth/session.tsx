@@ -9,7 +9,7 @@
  */
 
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, ServerClient } from "../api/client";
+import { ApiError, type IdProvider, ServerClient } from "../api/client";
 import { type Api, api } from "../api/endpoints";
 import type { MyPermissions, ServerUser, TokenResponse } from "../api/types";
 import { unregisterFromPush } from "../push/push";
@@ -25,8 +25,8 @@ export interface Session {
 	client: ServerClient | null;
 	api: Api | null;
 	signIn(serverUrl: string, email: string, password: string): Promise<void>;
-	/** Sign in with the id_token of a Microsoft Entra account (`auth/entra.ts`). */
-	signInWithEntra(serverUrl: string, idToken: string): Promise<void>;
+	/** Sign in with the id_token of an Entra account (`auth/entra.ts`) or of the server's provider (`auth/sso.ts`). */
+	signInWithIdToken(serverUrl: string, idToken: string, provider: IdProvider): Promise<void>;
 	signOut(): Promise<void>;
 	switchOrg(orgId: string): Promise<void>;
 	retry(): Promise<void>;
@@ -124,10 +124,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 		[makeClient, loadPermissions],
 	);
 
-	const signInWithEntra = useCallback(
-		async (url: string, idToken: string) => {
+	const signInWithIdToken = useCallback(
+		async (url: string, idToken: string, provider: IdProvider) => {
 			const current = makeClient(url, null, null);
-			await current.loginWithEntra(idToken);
+			await current.loginWithIdToken(idToken, provider);
 			await saveSession({ serverUrl: url, orgId: null });
 			setServerUrl(url);
 			await loadPermissions(current);
@@ -167,13 +167,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 			client,
 			api: client ? api(client) : null,
 			signIn,
-			signInWithEntra,
+			signInWithIdToken,
 			signOut,
 			switchOrg,
 			retry: resume,
 			can: (permission) => !!permissions?.is_platform_admin || !!permissions?.permissions.includes(permission),
 		}),
-		[status, serverUrl, user, permissions, client, signIn, signInWithEntra, signOut, switchOrg, resume],
+		[status, serverUrl, user, permissions, client, signIn, signInWithIdToken, signOut, switchOrg, resume],
 	);
 
 	return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

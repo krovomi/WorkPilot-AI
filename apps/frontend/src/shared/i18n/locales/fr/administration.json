@@ -120,13 +120,22 @@
 	},
 	"audit": {
 		"empty": "Aucun événement d'administration enregistré pour l'instant.",
-		"filter": "Filtrer par action ou utilisateur",
+		"filter": "Filtrer par action, personne ou connexion",
 		"export": "Exporter",
 		"columns": {
 			"when": "Quand",
 			"who": "Qui",
+			"signIn": "Connexion",
 			"action": "Action",
 			"details": "Détails"
+		},
+		"signIn": "{{method}} · {{id}}",
+		"methods": {
+			"local": "Mot de passe",
+			"entra": "Microsoft Entra",
+			"oidc": "Authentification unique",
+			"invite": "Invitation",
+			"unknown": "Inconnue"
 		}
 	},
 	"quotas": {
