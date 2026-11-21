@@ -166,6 +166,45 @@ describe("backendPauseMessage", () => {
 		expect(backendPauseMessage({ enabled: true, reason: "tool_loop" }, "t", "en")).toBeNull();
 	});
 
+	it("says why workpilot.policy.yaml stopped the task", () => {
+		const hours = backendPauseMessage(
+			{
+				enabled: true,
+				reason: "policy_hours",
+				policy: { reason: "policy_hours", timezone: "Europe/Paris", allowedHours: ["08:00-19:00"] },
+			},
+			"Add login",
+			"fr",
+		);
+		expect(hours?.title).toBe("Tâche en pause : hors des heures permises");
+		expect(hours?.body).toContain("08:00-19:00 (Europe/Paris)");
+		const noZone = backendPauseMessage(
+			{ enabled: true, reason: "policy_hours", policy: { reason: "policy_hours", allowedHours: [] } },
+			"t",
+			"en",
+		);
+		expect(noZone?.body).toContain("work  ()");
+		const budget = backendPauseMessage(
+			{
+				enabled: true,
+				reason: "policy_budget",
+				policy: { reason: "policy_budget", tokensLastHour: 1200.5, maxTokensPerHour: 1000 },
+			},
+			"Add login",
+			"en",
+		);
+		expect(budget?.title).toBe("Task paused: token budget reached");
+		expect(budget?.body).toContain("spent 1200 tokens");
+		expect(backendPauseMessage({ enabled: true, reason: "policy_budget" }, "t", "en")).toBeNull();
+		expect(
+			backendPauseMessage(
+				{ enabled: true, reason: "policy_hours", policy: { reason: "policy_budget" } },
+				"t",
+				"en",
+			),
+		).toBeNull();
+	});
+
 	it("says nothing for the user's own pause", () => {
 		expect(backendPauseMessage({ enabled: true }, "t", "en")).toBeNull();
 		expect(backendPauseMessage({ enabled: true, reason: "kill_switch" }, "t", "en")).toBeNull();

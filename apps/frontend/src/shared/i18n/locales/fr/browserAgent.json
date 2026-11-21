@@ -77,7 +77,7 @@
 	},
 	"recorder": {
 		"title": "Enregistrer un test",
-		"description": "Ouvrez une page dans une fenêtre de navigateur, faites ce que le test doit faire, puis exportez les étapes en test Playwright ou Cypress. Alt+clic sur un élément pour vérifier son texte visible.",
+		"description": "Ouvrez une page dans une fenêtre de navigateur, faites ce que le test doit faire, puis exportez les étapes en test Playwright, Cypress, Selenium ou WebdriverIO. Alt+clic sur un élément pour vérifier son texte visible. Les iframes et les shadow roots ouverts sont enregistrés ; le test attend ce que chaque action a provoqué (une page, une requête, un élément) au lieu de marquer une pause.",
 		"urlLabel": "Adresse de départ de l'enregistrement",
 		"start": "Enregistrer",
 		"stop": "Arrêter",
@@ -97,6 +97,15 @@
 			"press": "Appuyer",
 			"assert_text": "Vérifier le texte"
 		},
+		"place": {
+			"frame": "dans un cadre",
+			"shadow": "dans un shadow root"
+		},
+		"waits": {
+			"visible": "attend son affichage",
+			"request": "attend {{method}} {{path}}",
+			"url": "attend {{url}}"
+		},
 		"exportTitle": "Exporter",
 		"nameLabel": "Nom du test",
 		"namePlaceholder": "parcours enregistré",
@@ -104,7 +113,10 @@
 		"formats": {
 			"playwright-ts": "Playwright (TypeScript)",
 			"playwright-python": "Playwright (Python)",
-			"cypress": "Cypress"
+			"cypress": "Cypress",
+			"selenium-python": "Selenium (Python)",
+			"selenium-java": "Selenium (Java)",
+			"webdriverio": "WebdriverIO"
 		},
 		"preview": "Aperçu",
 		"review": "Proposer sur une carte de revue",

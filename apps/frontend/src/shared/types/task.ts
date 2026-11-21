@@ -16,6 +16,7 @@ import type {
 	ThinkingLevel,
 } from "./settings";
 import type { AnomalyPauseDetail, SandboxPauseDetail } from "./agent-safety";
+import type { PolicyPauseDetail } from "./governance";
 import type { TaskGoalSummary } from "./goal";
 import type { MobileBootstrapMark, MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
@@ -683,12 +684,16 @@ export interface TaskMetadata {
 		 * said « stop » to the voice assistant (after the current step).
 		 * "anomaly" / "sandbox" when the session watch stopped an agent
 		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
+		 * "policy_hours" / "policy_budget" when
+		 * workpilot.policy.yaml said agents must stop (`agents/policy_watch.py`),
+		 * with `policy`.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;
 		breaker?: BreakerPauseDetail;
 		anomaly?: AnomalyPauseDetail;
 		sandbox?: SandboxPauseDetail;
+		policy?: PolicyPauseDetail;
 	};
 
 	// Abandon status — the task was set aside (e.g. the product owner no longer
@@ -729,6 +734,8 @@ export interface Task {
 	goal?: TaskGoalSummary;
 	/** The second engine's verdict (`apps/backend/cross_review/`), from the plan. */
 	crossReview?: TaskCrossReviewSummary;
+	/** The QA reviewer's last sign-off and the QA session it came from. */
+	qaSignoff?: TaskQaSignoff;
 	subtasks: Subtask[];
 	qaReport?: QAReport;
 	logs: string[];
@@ -756,6 +763,16 @@ export interface TaskCrossReviewSummary {
 	blockers: number;
 	summary?: string;
 	at?: string;
+}
+
+/**
+ * The QA reviewer's last sign-off (`qa_signoff` in the plan). `session` is the
+ * QA session that wrote it, counted from 1: an approval on session 1 passed QA
+ * on its first try.
+ */
+export interface TaskQaSignoff {
+	status: "approved" | "rejected";
+	session: number;
 }
 
 /** What the card needs to know about the task's last verification. */
@@ -789,6 +806,8 @@ export interface ImplementationPlan {
 	goal?: TaskGoalSummary;
 	/** Written by the cross review (`cross_review/review.py::write_verdict`). */
 	crossReview?: TaskCrossReviewSummary;
+	/** Written by the QA reviewer (`qa/reviewer.py`); read, never trusted as typed. */
+	qa_signoff?: { status?: unknown; qa_session?: unknown };
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
 	lastEvent?: {
 		eventId: string;
@@ -828,12 +847,16 @@ export interface ImplementationPlan {
 		 * said « stop » to the voice assistant (after the current step).
 		 * "anomaly" / "sandbox" when the session watch stopped an agent
 		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
+		 * "policy_hours" / "policy_budget" when
+		 * workpilot.policy.yaml said agents must stop (`agents/policy_watch.py`),
+		 * with `policy`.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;
 		breaker?: BreakerPauseDetail;
 		anomaly?: AnomalyPauseDetail;
 		sandbox?: SandboxPauseDetail;
+		policy?: PolicyPauseDetail;
 	};
 }
 

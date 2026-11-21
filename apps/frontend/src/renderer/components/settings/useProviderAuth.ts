@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { MASKED_SECRET } from "../../../shared/constants";
 
 interface AuthTerminalState {
 	terminalId: string;
@@ -167,8 +168,9 @@ export function useProviderAuth() {
 		setIsAuthenticating(true);
 		try {
 			const result = await globalThis.electronAPI.detectWindsurfToken();
-			if (result.success && result.apiKey) {
-				setWindsurfSsoToken(result.apiKey);
+			if (result.success) {
+				// The key stays in the main process: the form shows the mask.
+				setWindsurfSsoToken(MASKED_SECRET);
 				if (result.userName || result.planName) {
 					setWindsurfAccountInfo({
 						userName: result.userName,
@@ -197,24 +199,31 @@ export function useProviderAuth() {
 		}
 	}, []);
 
+	/**
+	 * Save the detected key: the main process reads it again and stores it, the
+	 * settings sent from here keep the mask. False when the main could not save it.
+	 */
 	const handleWindsurfSave = useCallback(
-		(
-			windsurfSsoToken: string,
-			providerConfig: { apiKey?: string },
+		async (
 			onSettingsChange: (settings: Record<string, unknown>) => void,
 			settings: Record<string, unknown>,
 			onProviderActivated?: (providerId: string) => void,
 			providerId?: string,
 			onOpenChange?: (open: boolean) => void,
-		) => {
-			if (!providerConfig?.apiKey) return;
+		): Promise<boolean> => {
+			const saved = await globalThis.electronAPI
+				.saveDetectedWindsurfToken()
+				.catch(() => ({ success: false }));
+			if (!saved.success) return false;
 
-			const newSettings = { ...settings };
-			newSettings[providerConfig.apiKey] = windsurfSsoToken.trim();
-			newSettings[`${providerConfig.apiKey}Enabled`] = true;
-			onSettingsChange(newSettings);
+			onSettingsChange({
+				...settings,
+				globalWindsurfApiKey: MASKED_SECRET,
+				globalWindsurfApiKeyEnabled: true,
+			});
 			onProviderActivated?.(providerId || "");
 			onOpenChange?.(false);
+			return true;
 		},
 		[],
 	);

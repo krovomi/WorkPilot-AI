@@ -488,6 +488,10 @@ export const IPC_CHANNELS = {
 	// Accept / reject / not applicable on a review finding (#361)
 	GITHUB_PR_REVIEW_FEEDBACK_SET: "github:pr:reviewFeedback:set",
 	GITHUB_PR_REVIEW_FEEDBACK_GET: "github:pr:reviewFeedback:get",
+	// The project's acceptance rate, a learned rule reset, the conventions file
+	GITHUB_PR_REVIEW_FEEDBACK_STATS: "github:pr:reviewFeedback:stats",
+	GITHUB_PR_REVIEW_FEEDBACK_RESET: "github:pr:reviewFeedback:reset",
+	GITHUB_PR_REVIEW_CONVENTIONS_WRITE: "github:pr:reviewConventions:write",
 
 	// GitHub PR Review events (main -> renderer)
 	GITHUB_PR_REVIEW_PROGRESS: "github:pr:reviewProgress",
@@ -847,6 +851,7 @@ export const IPC_CHANNELS = {
 	MISSION_CONTROL_REMOVE_AGENT: "missionControl:removeAgent",
 	MISSION_CONTROL_START_AGENT: "missionControl:startAgent",
 	MISSION_CONTROL_STOP_AGENT: "missionControl:stopAgent",
+	MISSION_CONTROL_SUGGEST_COMPOSITION: "missionControl:suggestComposition",
 
 	// Execution waves across specs (Conflict Predictor, #358): plan by task id
 	CONFLICT_WAVES_PLAN: "conflictWaves:plan",
@@ -1070,6 +1075,8 @@ export const IPC_CHANNELS = {
 	APP_EMULATOR_CONFIG: "app-emulator:config",
 	APP_EMULATOR_DETECT: "app-emulator:detect",
 	APP_EMULATOR_ERROR: "app-emulator:error",
+	// Device matrix: the grid of the main's last captures, saved where the person chooses (#383)
+	APP_EMULATOR_EXPORT_DEVICE_GRID: "app-emulator:export-device-grid",
 	APP_EMULATOR_OUTPUT: "app-emulator:output",
 	APP_EMULATOR_READY: "app-emulator:ready",
 	APP_EMULATOR_START: "app-emulator:start",
@@ -1155,6 +1162,7 @@ export const IPC_CHANNELS = {
 	CREDENTIAL_CHECK_CLAUDE_OAUTH: "credential:checkClaudeOAuth",
 	CREDENTIAL_CHECK_OPENAI_CODEX_OAUTH: "credential:checkOpenAICodexOAuth",
 	CREDENTIAL_DETECT_WINDSURF_TOKEN: "credential:detectWindsurfToken",
+	CREDENTIAL_SAVE_DETECTED_WINDSURF_TOKEN: "credential:saveDetectedWindsurfToken",
 	CREDENTIAL_GET_ACTIVE: "credential:getActive",
 	CREDENTIAL_SET_ACTIVE: "credential:setActive",
 	CREDENTIAL_TEST_PROVIDER: "credential:testProvider",
@@ -1166,6 +1174,9 @@ export const IPC_CHANNELS = {
 	CROSS_LANG_TRANSLATION_GET_SUPPORTED_LANGUAGES: "crossLangTranslation:getSupportedLanguages",
 	CROSS_LANG_TRANSLATION_STREAM_CHUNK: "crossLangTranslation:streamChunk",
 	CROSS_LANG_TRANSLATION_TRANSLATE: "crossLangTranslation:translate",
+	// "How you compare": a project's specs against its past and the person's
+	// other projects, read from their folders (main/build-compare.ts)
+	DASHBOARD_COMPARE: "dashboard:compare",
 	DASHBOARD_GET_SNAPSHOT: "dashboard:getSnapshot",
 	DESIGN_TO_CODE_DETECT_STACK: "designToCode:detectStack",
 	DESIGN_TO_CODE_PROGRESS: "designToCode:progress",
@@ -1222,6 +1233,8 @@ export const IPC_CHANNELS = {
 	GUARDRAILS_ACTIVITY: "guardrails:activity",
 	GUARDRAILS_ANSWER: "guardrails:answer",
 	GUARDRAILS_CHECK_DIFF: "guardrails:checkDiff",
+	GOVERNANCE_REPORT: "governance:report",
+	GOVERNANCE_EXPORT_AUDIT: "governance:exportAudit",
 	I18N_AGENT_CANCEL: "i18nAgent:cancel",
 	I18N_AGENT_ERROR: "i18n-agent-error",
 	I18N_AGENT_EVENT: "i18n-agent-event",
@@ -1339,6 +1352,7 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_LIST_INVITES: "server-auth:list-invites",
 	SERVER_AUTH_LOGIN_ENTRA: "server-auth:login-entra",
 	SERVER_AUTH_LOGIN_LOCAL: "server-auth:login-local",
+	SERVER_AUTH_LOGIN_SSO: "server-auth:login-sso",
 	SERVER_AUTH_LOGOUT: "server-auth:logout",
 	SERVER_AUTH_LOOKUP_INVITE: "server-auth:lookup-invite",
 	SERVER_AUTH_RESTORE: "server-auth:restore",
@@ -1383,6 +1397,7 @@ export const IPC_CHANNELS = {
 	SERVER_VIEW_CHANGED: "server-view:changed",
 	// Server mode: a server project's dashboard, analytics, costs and session
 	// history, computed by the server (main/server-workspace.ts)
+	SERVER_WORKSPACE_COMPARE: "server-workspace:compare",
 	SERVER_WORKSPACE_COSTS: "server-workspace:costs",
 	SERVER_WORKSPACE_DASHBOARD: "server-workspace:dashboard",
 	SERVER_WORKSPACE_SESSIONS: "server-workspace:sessions",

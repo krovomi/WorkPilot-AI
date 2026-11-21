@@ -489,9 +489,7 @@ class TestWhereTheReviewReads:
 
         assert "DEBUG: Creating worktree" in capsys.readouterr().out
 
-    def test_started_from_the_backend_folder_it_reads_the_repository_root(
-        self, tmp_path, model, gh
-    ):
+    def test_a_project_folder_named_backend_is_read_as_it_is(self, tmp_path, model, gh):
         backend = tmp_path / "apps" / "backend"
         backend.mkdir(parents=True)
         reviewer = ParallelFollowupReviewer(
@@ -508,7 +506,7 @@ class TestWhereTheReviewReads:
 
         review(reviewer, context(""))
 
-        assert model.clients[0].options["project_dir"] == tmp_path
+        assert model.clients[0].options["project_dir"] == backend
 
     def test_progress_goes_through_the_runner_s_orchestrator_when_it_has_one(
         self, reviewer, model, gh, head, events, monkeypatch

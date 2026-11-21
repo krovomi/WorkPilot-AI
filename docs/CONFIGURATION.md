@@ -337,6 +337,22 @@ optional `xms_edov` claim says its domain is verified. Guests (`idp` from anothe
 directory) need `xms_edov` in the app registration's optional claims. An account
 keeps the Entra sign-in it was first linked to.
 
+Any other OpenID Connect provider (Okta, Google, Keycloak, Auth0...) signs in
+the same way, next to Entra. The server reads the provider's discovery document
+(`<issuer>/.well-known/openid-configuration`) and checks it before use; see
+[architecture/spec-approval-sso.md](architecture/spec-approval-sso.md).
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_OIDC_ISSUER` | — | The provider's issuer, an https URL without query or fragment (http only on loopback). It must equal the `issuer` of the discovery document. |
+| `WORKPILOT_OIDC_CLIENT_ID` | — | The client ID of a **public** client (native or desktop app, PKCE, no secret), checked as the token audience. Register the redirect URI `http://localhost` (any port, path `/callback`). |
+| `WORKPILOT_OIDC_NAME` | `SSO` | The provider's name on the button, "Sign in with {name}" (40 printable characters at most). |
+| `WORKPILOT_OIDC_SCOPES` | `openid profile email` | The scopes asked for; `openid` is always added. The provider must return a verified `email` (`email_verified`) for a person it has not signed in before. |
+| `WORKPILOT_SELF_APPROVAL` | `when-alone` | Whether the author of a card approves its own spec: `allow`, `deny`, or `when-alone` (only when nobody else on the project may approve). Any other value is logged and replaced by the default. |
+
+The provider sign-in is on only when both `WORKPILOT_OIDC_ISSUER` and
+`WORKPILOT_OIDC_CLIENT_ID` are set; neither is a secret.
+
 The phone app signs in with the same app registration, as a public client
 (authorization code with PKCE, no secret on the phone). Add a **Mobile and
 desktop applications** platform to the registration with the redirect URI

@@ -29,16 +29,47 @@ export interface DevicePreset {
 	readonly userAgent: string;
 }
 
+/** Un profil de bridage réseau : la liste fermée de `NETWORK_PROFILES`. */
+export type NetworkProfileId = "none" | "4g" | "fast-3g" | "slow-3g";
+
+/** Un ralentissement du processeur : la liste fermée de `CPU_PROFILES`. */
+export type CpuProfileId = "1x" | "2x" | "4x" | "6x";
+
+export interface NetworkProfile {
+	readonly id: NetworkProfileId;
+	/** `null` : aucun bridage, le protocole des DevTools n'est pas appelé. */
+	readonly conditions: {
+		/** Latence ajoutée à chaque requête, en millisecondes. */
+		readonly latencyMs: number;
+		/** Débits, en octets par seconde. */
+		readonly downloadBytesPerSecond: number;
+		readonly uploadBytesPerSecond: number;
+	} | null;
+	/** Le temps laissé au chargement : un réseau lent en demande plus. */
+	readonly loadTimeoutMs: number;
+}
+
+export interface CpuProfile {
+	readonly id: CpuProfileId;
+	/** Facteur de ralentissement (`Emulation.setCPUThrottlingRate`) ; 1 = aucun. */
+	readonly rate: number;
+}
+
 /** Les bugs responsive que la lecture de la page sait reconnaître. */
 export type ResponsiveIssueKind =
 	| "horizontal-overflow"
 	| "overflowing-media"
 	| "small-touch-target"
-	| "small-text";
+	| "small-text"
+	| "overlapping-elements"
+	| "truncated-text";
 
 /** Un élément fautif, décrit sans son contenu. */
 export interface ResponsiveIssueSample {
-	/** `balise#id.classe` tronqué : de quoi le retrouver, rien de ce qu'il dit. */
+	/**
+	 * `balise#id.classe` tronqué : de quoi le retrouver, rien de ce qu'il dit.
+	 * Deux éléments qui se chevauchent : `a / b`, et la boîte est leur intersection.
+	 */
 	readonly selector: string;
 	readonly x: number;
 	readonly y: number;
@@ -64,11 +95,15 @@ export interface ResponsiveReport {
 	readonly issues: readonly ResponsiveIssue[];
 }
 
-/** Ce que le renderer envoie : un appareil connu et un chemin du serveur lancé. */
+/** Ce que le renderer envoie : un appareil connu, un chemin du serveur lancé, deux profils nommés. */
 export interface DeviceCaptureRequest {
 	readonly deviceId: string;
 	/** Chemin absolu (`/compte?onglet=2`), résolu par le main sur l'origine du serveur. */
 	readonly path: string;
+	/** Un id de `NETWORK_PROFILES`, jamais des débits. */
+	readonly network: string;
+	/** Un id de `CPU_PROFILES`, jamais un facteur. */
+	readonly cpu: string;
 }
 
 export interface DeviceCapture {
@@ -79,18 +114,42 @@ export interface DeviceCapture {
 	readonly image: string;
 	/** `null` quand la page n'a pas pu être lue (la capture reste valable). */
 	readonly report: ResponsiveReport | null;
+	/** Les profils appliqués à ce rendu. */
+	readonly network: NetworkProfileId;
+	readonly cpu: CpuProfileId;
+	/** Durée du chargement (jusqu'à `load`), en millisecondes, sous ces profils. */
+	readonly loadMs: number;
 }
 
 /** Les refus et les échecs, en liste fermée : le renderer en fait un texte traduit. */
 export type DeviceCaptureError =
 	| "invalid-request"
 	| "unknown-device"
+	| "unknown-throttling"
 	| "not-running"
 	| "invalid-path"
 	| "busy"
+	| "throttling-failed"
 	| "load-failed"
 	| "capture-failed";
 
 export type DeviceCaptureResult =
 	| { readonly success: true; readonly data: DeviceCapture }
 	| { readonly success: false; readonly error: DeviceCaptureError };
+
+/** L'export de la grille : le renderer nomme les appareils affichés, rien d'autre. */
+export interface DeviceGridExportRequest {
+	readonly deviceIds: readonly string[];
+}
+
+export type DeviceGridExportError =
+	| "invalid-request"
+	| "nothing-to-export"
+	| "busy"
+	| "export-failed"
+	| "write-failed";
+
+/** `saved: false` : la personne a fermé la boîte de dialogue. Le chemin choisi n'est jamais renvoyé, seul son nom. */
+export type DeviceGridExportResult =
+	| { readonly success: true; readonly data: { readonly saved: false } | { readonly saved: true; readonly fileName: string } }
+	| { readonly success: false; readonly error: DeviceGridExportError };

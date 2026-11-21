@@ -59,3 +59,4 @@ export * from "./workspace";
 // Cost budgets (project, task) enforced by the backend
 export * from "./cost-budget";
 export * from "./agent-safety";
+export * from "./governance";

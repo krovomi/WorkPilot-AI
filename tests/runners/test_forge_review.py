@@ -18,7 +18,7 @@ import pytest
 import runners.azure_devops.services.pr_review_engine as azdo_engine
 import runners.forge_review_prompt as forge_prompt
 import security.untrusted as untrusted
-from core.agent_client import ContentBlockType
+from core.agent_client import ContentBlockType, MessageRole
 from runners.azure_devops.azdo_client import AzDOClient
 from runners.azure_devops.models import AzDOPRContext, AzureDevOpsRunnerConfig
 from runners.azure_devops.services.pr_review_engine import PRReviewEngine
@@ -164,7 +164,11 @@ class _StreamingClient:
             (),
             {"type": ContentBlockType.TEXT, "text": '```json\n{"summary": "ok"}\n```'},
         )()
-        message = type("AssistantMessage", (), {"content": [block]})()
+        message = type(
+            "AssistantMessage",
+            (),
+            {"role": MessageRole.ASSISTANT, "content": [block]},
+        )()
         yield message
 
 

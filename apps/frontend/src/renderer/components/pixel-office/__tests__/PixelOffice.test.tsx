@@ -236,16 +236,16 @@ describe("PixelOffice room", () => {
 		expect(screen.queryByText(/subtask/)).toBeNull();
 	});
 
-	it("sizes the canvas to the room below the toolbar", () => {
+	it("sizes the canvas to the room area it is drawn in", () => {
 		room({ terminals: [terminal({})] });
 		const view = mount();
 		expect([canvasProbe.props?.width, canvasProbe.props?.height]).toEqual([800, 500]);
 		act(() =>
 			resize?.([{ contentRect: { width: 640.7, height: 452.9 } } as ResizeObserverEntry], {} as ResizeObserver),
 		);
-		expect([canvasProbe.props?.width, canvasProbe.props?.height]).toEqual([640, 400]);
+		expect([canvasProbe.props?.width, canvasProbe.props?.height]).toEqual([640, 452]);
 		act(() =>
-			resize?.([{ contentRect: { width: -3, height: 30 } } as ResizeObserverEntry], {} as ResizeObserver),
+			resize?.([{ contentRect: { width: -3, height: -30 } } as ResizeObserverEntry], {} as ResizeObserver),
 		);
 		expect([canvasProbe.props?.width, canvasProbe.props?.height]).toEqual([0, 0]);
 		view.unmount();
