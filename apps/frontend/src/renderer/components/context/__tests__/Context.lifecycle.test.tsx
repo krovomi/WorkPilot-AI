@@ -62,7 +62,19 @@ beforeEach(async () => {
 	state.loadRecentMemories.mockReset();
 	api.getMemoryLifecycle.mockResolvedValue({
 		success: true,
-		data: { journal: [], trash: [], conflicts: [], pinned: 0, pinLimit: 50, retentionDays: 30 },
+		data: {
+			journal: [],
+			revertible: {},
+			lastUndo: null,
+			metrics: null,
+			maintainers: [],
+			canArbitrate: true,
+			trash: [],
+			conflicts: [],
+			pinned: 0,
+			pinLimit: 50,
+			retentionDays: 30,
+		},
 	});
 	(globalThis as { electronAPI?: unknown }).electronAPI = api;
 	storeWith({ enabled: true, available: true });

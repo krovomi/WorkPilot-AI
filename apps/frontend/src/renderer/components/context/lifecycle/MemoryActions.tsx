@@ -1,4 +1,4 @@
-import { History, Pin, PinOff, Trash2 } from "lucide-react";
+import { History, MapPin, Pin, PinOff, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MemoryJournalEntry } from "../../../../shared/types";
@@ -13,7 +13,9 @@ interface MemoryActionsProps {
 	/** The memory's vault path. */
 	readonly memoryId: string;
 	readonly pinned: boolean;
-	/** After a pin or a forget: the list is read again. */
+	/** Where it applies (`applies_to`); empty: everywhere. */
+	readonly appliesTo?: string;
+	/** After a pin, a forget or a scope: the list is read again. */
 	readonly onChanged: () => void;
 }
 
@@ -22,6 +24,7 @@ export function MemoryActions({
 	projectId,
 	memoryId,
 	pinned,
+	appliesTo = "",
 	onChanged,
 }: MemoryActionsProps) {
 	const { t } = useTranslation(["context"]);
@@ -30,6 +33,7 @@ export function MemoryActions({
 	const [confirming, setConfirming] = useState(false);
 	const [reason, setReason] = useState("");
 	const [history, setHistory] = useState<MemoryJournalEntry[] | null>(null);
+	const [scope, setScope] = useState<string | null>(null);
 
 	const run = async (action: () => Promise<{ success: boolean; error?: string }>) => {
 		setBusy(true);
@@ -56,6 +60,12 @@ export function MemoryActions({
 		if (await run(() => window.electronAPI.forgetMemory(projectId, memoryId, reason))) {
 			setConfirming(false);
 			setReason("");
+		}
+	};
+
+	const saveScope = async (value: string) => {
+		if (await run(() => window.electronAPI.setMemoryScope(projectId, memoryId, value))) {
+			setScope(null);
 		}
 	};
 
@@ -92,6 +102,21 @@ export function MemoryActions({
 					<Trash2 className="h-3.5 w-3.5" />
 					{t("context:lifecycle.actions.forget")}
 				</Button>
+				{appliesTo && (
+					<Badge variant="outline" className="text-xs">
+						{t("context:lifecycle.actions.scopeBadge", { scope: appliesTo })}
+					</Badge>
+				)}
+				<Button
+					variant="ghost"
+					size="sm"
+					className="h-7 gap-1"
+					disabled={busy}
+					onClick={() => setScope(scope === null ? appliesTo : null)}
+				>
+					<MapPin className="h-3.5 w-3.5" />
+					{t("context:lifecycle.actions.scope")}
+				</Button>
 				<Button variant="ghost" size="sm" className="h-7 gap-1" onClick={toggleHistory}>
 					<History className="h-3.5 w-3.5" />
 					{history ? t("context:lifecycle.actions.hideHistory") : t("context:lifecycle.actions.history")}
@@ -108,6 +133,20 @@ export function MemoryActions({
 					/>
 					<Button size="sm" variant="destructive" disabled={busy} onClick={forget}>
 						{t("context:lifecycle.actions.confirmForget")}
+					</Button>
+				</div>
+			)}
+			{scope !== null && (
+				<div className="flex gap-2">
+					<Input
+						value={scope}
+						maxLength={200}
+						placeholder={t("context:lifecycle.actions.scopePlaceholder")}
+						aria-label={t("context:lifecycle.actions.scopePlaceholder")}
+						onChange={(event) => setScope(event.target.value)}
+					/>
+					<Button size="sm" disabled={busy} onClick={() => saveScope(scope)}>
+						{t("context:lifecycle.actions.saveScope")}
 					</Button>
 				</div>
 			)}

@@ -269,6 +269,8 @@ export interface MemoryEpisode {
 	path?: string;
 	/** Pinned: no automatic removal (`brain/lifecycle/store.py`). */
 	pinned?: boolean;
+	/** Where the memory applies (a part of the code); empty: everywhere. */
+	applies_to?: string;
 	// For PR reviews - extracted from content for quick access
 	prNumber?: number;
 	repo?: string;
