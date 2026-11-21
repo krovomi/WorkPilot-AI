@@ -265,7 +265,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - Notifications sur Slack, Teams, Discord, Google Chat, webhooks, ntfy et Telegram.
 
 **Équipe**
-- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT ou Microsoft Entra ([guide d'exploitation](docs/server-operations.md)).
+- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT, Microsoft Entra ou tout fournisseur OpenID Connect (Okta, Google, Keycloak…), spec approuvée par une autre personne que l'auteur de la carte ([guide d'exploitation](docs/server-operations.md)).
 - **App mobile** pour iOS et Android, chat d'équipe, inscription sur invitation uniquement.
 
 **Coûts et suivi**

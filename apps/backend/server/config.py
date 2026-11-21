@@ -63,6 +63,68 @@ def _gitlab_hosts(value: str) -> tuple[str, ...]:
     return _hosts(value, "gitlab.com", "WORKPILOT_GITLAB_HOSTS")
 
 
+_LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+
+
+def oidc_url(value: str, *, issuer: bool = False) -> str:
+    """``value`` when it is an https URL (http only on loopback), else "".
+
+    No user name or password in it, no fragment, and an issuer has no query
+    either (OpenID Connect Discovery 1.0, section 3). A trailing slash of an
+    issuer is dropped: the issuer is compared as a string.
+    """
+    from urllib.parse import urlsplit
+
+    value = value.strip()
+    if not value or len(value) > 2000:
+        return ""
+    try:
+        parts = urlsplit(value)
+        host = parts.hostname or ""
+    except ValueError:
+        return ""
+    secure = parts.scheme == "https" or (parts.scheme == "http" and host in _LOOPBACK)
+    if not secure or not host or parts.username or parts.password:
+        return ""
+    if parts.fragment or (issuer and parts.query):
+        return ""
+    return value.rstrip("/") if issuer else value
+
+
+def _oidc_name(value: str) -> str:
+    """The sign-in button's name for the identity provider: short, plain."""
+    name = " ".join(value.split())[:40]
+    return name if name.isprintable() and name else "SSO"
+
+
+#: A scope token as RFC 6749 (section 3.3) spells it.
+_SCOPE_TOKEN = re.compile(r"^[\x21\x23-\x5B\x5D-\x7E]{1,100}$")
+
+
+def _oidc_scopes(value: str) -> str:
+    """The scopes asked for, ``openid`` first; the default is the usual three."""
+    scopes = [t for t in value.split() if _SCOPE_TOKEN.match(t)][:20]
+    if not scopes:
+        scopes = ["openid", "profile", "email"]
+    return " ".join(["openid", *(t for t in scopes if t != "openid")])
+
+
+#: Who may approve the spec of a card they created (``WORKPILOT_SELF_APPROVAL``).
+SELF_APPROVAL_POLICIES = ("allow", "deny", "when-alone")
+
+
+def _self_approval(value: str) -> str:
+    value = value.strip().lower()
+    if not value:
+        return "when-alone"
+    if value not in SELF_APPROVAL_POLICIES:
+        logger.warning(
+            "Invalid WORKPILOT_SELF_APPROVAL=%r, using 'when-alone'", value[:40]
+        )
+        return "when-alone"
+    return value
+
+
 def _stream_url(value: str) -> str:
     value = value.strip().rstrip("/")
     return value if value.startswith(("ws://", "wss://")) else ""
@@ -91,6 +153,19 @@ class ServerSettings:
     # only local accounts work.
     entra_tenant_id: str
     entra_client_id: str
+
+    # Any OpenID Connect provider (Okta, Google, Keycloak, Auth0...), by its
+    # issuer URL, whose discovery document gives the endpoints and keys.
+    # Empty issuer or client => this sign-in is off. Public client with PKCE:
+    # no client secret.
+    oidc_issuer: str
+    oidc_client_id: str
+    oidc_name: str
+    oidc_scopes: str
+
+    # Approving the spec of a card one created: "allow", "deny", or
+    # "when-alone" (refused while another member of the project may approve).
+    self_approval: str
 
     # Fernet key (urlsafe base64, 32 bytes) used to encrypt per-user
     # integration secrets (Azure PAT, Jira token) at rest.
@@ -154,6 +229,10 @@ class ServerSettings:
         return bool(self.entra_tenant_id and self.entra_client_id)
 
     @property
+    def oidc_enabled(self) -> bool:
+        return bool(self.oidc_issuer and self.oidc_client_id)
+
+    @property
     def email_enabled(self) -> bool:
         return bool(self.smtp_host and self.smtp_from)
 
@@ -187,6 +266,13 @@ class ServerSettings:
             refresh_token_ttl_days=_env_int("WORKPILOT_REFRESH_TOKEN_TTL_DAYS", 14),
             entra_tenant_id=os.environ.get("WORKPILOT_ENTRA_TENANT_ID", ""),
             entra_client_id=os.environ.get("WORKPILOT_ENTRA_CLIENT_ID", ""),
+            oidc_issuer=oidc_url(
+                os.environ.get("WORKPILOT_OIDC_ISSUER", ""), issuer=True
+            ),
+            oidc_client_id=os.environ.get("WORKPILOT_OIDC_CLIENT_ID", "").strip(),
+            oidc_name=_oidc_name(os.environ.get("WORKPILOT_OIDC_NAME", "")),
+            oidc_scopes=_oidc_scopes(os.environ.get("WORKPILOT_OIDC_SCOPES", "")),
+            self_approval=_self_approval(os.environ.get("WORKPILOT_SELF_APPROVAL", "")),
             secrets_master_key=os.environ.get("WORKPILOT_SECRETS_MASTER_KEY", ""),
             repos_root=repos_root,
             max_concurrent_runs=_env_int("WORKPILOT_MAX_CONCURRENT_RUNS", 3),

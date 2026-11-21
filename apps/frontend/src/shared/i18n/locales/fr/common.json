@@ -1450,6 +1450,7 @@
 		"description": "Connectez-vous à un serveur partagé, ou continuez en mode local.",
 		"serverUrl": "URL du serveur",
 		"entraButton": "Se connecter avec Microsoft",
+		"ssoButton": "Se connecter avec {{name}}",
 		"email": "Email",
 		"password": "Mot de passe",
 		"localAccountButton": "Connexion",
