@@ -1083,6 +1083,22 @@
 		"official": "Officiel",
 		"community": "Communauté",
 		"noProject": "Sélectionnez un projet : les serveurs s'installent par projet.",
+		"failures": {
+			"builderSaveFailed": "Le fichier du constructeur n'a pas pu être écrit.",
+			"builderDeleteFailed": "Le fichier du constructeur n'a pas pu être écrit.",
+			"invalidBuilderRequest": "La demande envoyée à l'application n'était pas valide.",
+			"securityServerRequired": "Aucun serveur du catalogue n'a été indiqué.",
+			"securityInvalidProject": "Le projet indiqué n'est pas valide.",
+			"securityUnknownServer": "Ce serveur n'est pas dans le catalogue.",
+			"securityFailed": "Le score de sécurité n'a pas pu être calculé.",
+			"tooManyBuilderProjects": "Le constructeur contient déjà autant de serveurs qu'il peut en garder.",
+			"watchProjectRequired": "Aucun projet n'a été indiqué.",
+			"watchServerRequired": "Aucun serveur du catalogue n'a été indiqué.",
+			"watchUnknownProject": "Ce projet n'est pas enregistré dans l'application.",
+			"policyReadFailed": "La politique MCP du projet n'a pas pu être lue.",
+			"watchReadFailed": "Les alertes des serveurs installés n'ont pas pu être lues.",
+			"acknowledgeFailed": "Les alertes n'ont pas pu être marquées comme vues."
+		},
 		"errors": {
 			"loadCatalog": "Le catalogue n'a pas pu être chargé.",
 			"loadBuilder": "Vos serveurs du constructeur n'ont pas pu être chargés.",
@@ -1411,6 +1427,7 @@
 		}
 	},
 	"modelCatalog": {
+		"freeText": "Autre (saisie libre)",
 		"live": "À jour (fournisseur)",
 		"registry": "À jour (registre public)",
 		"cache": "En cache · {{when}}",

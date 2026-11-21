@@ -3,7 +3,7 @@
  * Includes status, categories, complexity, priority, and execution phases
  */
 
-import type { TaskStatus } from "@shared/types/task";
+import type { ExecutionPhase, TaskStatus } from "@shared/types/task";
 
 // ============================================
 // Task Status (Kanban columns)
@@ -88,17 +88,21 @@ export const SUBTASK_STATUS_COLORS: Record<string, string> = {
 // Execution Phases
 // ============================================
 
-// Execution phase labels
-export const EXECUTION_PHASE_LABELS: Record<string, string> = {
-	idle: "Idle",
-	planning: "Planning",
-	coding: "Coding",
-	rate_limit_paused: "Rate Limited",
-	auth_failure_paused: "Auth Required",
-	qa_review: "AI Review",
-	qa_fixing: "Fixing Issues",
-	complete: "Complete",
-	failed: "Failed",
+/**
+ * i18n key of each execution phase's label (`tasks:execution.phases.*`), the
+ * same wording as the phase indicator: the card badge and the task panel show
+ * the phase in the app's language.
+ */
+export const EXECUTION_PHASE_LABEL_KEYS: Record<ExecutionPhase, string> = {
+	idle: "tasks:execution.phases.idle",
+	planning: "tasks:execution.phases.planning",
+	coding: "tasks:execution.phases.coding",
+	rate_limit_paused: "tasks:execution.phases.rate_limit_paused",
+	auth_failure_paused: "tasks:execution.phases.auth_failure_paused",
+	qa_review: "tasks:execution.phases.reviewing",
+	qa_fixing: "tasks:execution.phases.fixing",
+	complete: "tasks:execution.phases.complete",
+	failed: "tasks:execution.phases.failed",
 };
 
 // Execution phase colors (for progress bars and indicators)

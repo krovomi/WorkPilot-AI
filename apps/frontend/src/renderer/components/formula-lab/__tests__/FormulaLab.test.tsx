@@ -331,14 +331,14 @@ describe("FormulaLab", () => {
 		await openWithMatrix();
 		const best = pickCard(/Best value/);
 		expect(best).toHaveTextContent("gpt-5.5");
-		expect(best).toHaveTextContent("openai · Low");
+		expect(best).toHaveTextContent("OpenAI (ChatGPT) · Low");
 		expect(best).toHaveTextContent("€0.23–€0.92");
 		expect(best).toHaveTextContent("4k tok");
 		expect(within(best).getByRole("img", { name: "70% success" })).toBeInTheDocument();
 
 		const safest = pickCard(/Safest/);
 		expect(safest).toHaveTextContent("opus-5");
-		expect(safest).toHaveTextContent("anthropic · High");
+		expect(safest).toHaveTextContent("Anthropic (Claude) · High");
 
 		const cheapest = pickCard(/Cheapest/);
 		expect(cheapest).toHaveTextContent("llama3");
@@ -352,7 +352,7 @@ describe("FormulaLab", () => {
 
 		const fastest = pickCard(/Fastest/);
 		expect(fastest).toHaveTextContent("qwen");
-		expect(fastest).toHaveTextContent("ollama · Med");
+		expect(fastest).toHaveTextContent("Ollama (Local) · Med");
 		expect(within(fastest).getByText("Not downloaded")).toBeInTheDocument();
 		expect(best).not.toHaveTextContent("Flat-rate");
 	});
@@ -371,7 +371,7 @@ describe("FormulaLab", () => {
 
 		// The footer sums up the selection.
 		expect(screen.getByText("gpt-5.5 · Low")).toBeInTheDocument();
-		expect(screen.getByText("openai · €0.23–€0.92")).toBeInTheDocument();
+		expect(screen.getByText("OpenAI (ChatGPT) · €0.23–€0.92")).toBeInTheDocument();
 	});
 
 	it("marks the formula the task already runs on as applied, whatever its pick", async () => {
@@ -452,7 +452,7 @@ describe("FormulaLab", () => {
 		api.updateTask.mockResolvedValueOnce({ success: false, error: "disk full" });
 		vi.spyOn(console, "error").mockImplementation(() => undefined);
 		await openWithMatrix();
-		fireEvent.click(screen.getByRole("button", { name: "Apply openai gpt-5.5 · Low" }));
+		fireEvent.click(screen.getByRole("button", { name: "Apply OpenAI (ChatGPT) gpt-5.5 · Low" }));
 
 		expect(await screen.findByText("Could not apply formula", TOAST)).toBeInTheDocument();
 		expect(
@@ -465,11 +465,11 @@ describe("FormulaLab", () => {
 		const saving = deferred<unknown>();
 		api.updateTask.mockReturnValueOnce(saving.promise);
 		await openWithMatrix();
-		fireEvent.click(screen.getByRole("button", { name: "Select openai gpt-5.5 · Low" }));
+		fireEvent.click(screen.getByRole("button", { name: "Select OpenAI (ChatGPT) gpt-5.5 · Low" }));
 		fireEvent.click(screen.getByRole("button", { name: "Apply this formula" }));
 
 		expect(screen.getByRole("button", { name: "Apply this formula" })).toBeDisabled();
-		expect(screen.getByRole("button", { name: "Apply openai gpt-5.5 · Low" })).toBeDisabled();
+		expect(screen.getByRole("button", { name: "Apply OpenAI (ChatGPT) gpt-5.5 · Low" })).toBeDisabled();
 		for (const b of screen.getAllByRole("button", { name: "Apply" })) {
 			expect(b).toBeDisabled();
 		}
@@ -483,7 +483,7 @@ describe("FormulaLab", () => {
 		const saving = deferred<unknown>();
 		api.updateTask.mockReturnValueOnce(saving.promise);
 		await openWithMatrix();
-		fireEvent.click(screen.getByRole("button", { name: "Apply openai gpt-5.5 · Low" }));
+		fireEvent.click(screen.getByRole("button", { name: "Apply OpenAI (ChatGPT) gpt-5.5 · Low" }));
 		openLab({ ticketId: "task-2", ticketTitle: "Fix logout" });
 		await screen.findByRole("table");
 
@@ -545,7 +545,7 @@ describe("FormulaLab", () => {
 		const row = (name: string) =>
 			screen.getByRole("button", { name: `Select ${name}` }).closest("tr") as HTMLElement;
 
-		const gemini = row("google gemini · Ultra");
+		const gemini = row("Google (Gemini) gemini · Ultra");
 		expect(gemini).toHaveTextContent("Ultra");
 		expect(gemini).toHaveTextContent("50k");
 		expect(gemini).toHaveTextContent("€3.68–€5.52");
@@ -559,11 +559,11 @@ describe("FormulaLab", () => {
 			"Large refactor across modules",
 		);
 
-		const llama = row("ollama llama3 · None");
+		const llama = row("Ollama (Local) llama3 · None");
 		expect(within(llama).getByText("Downloaded")).toBeInTheDocument();
 		expect(within(llama).queryByRole("img", { name: "AI-refined estimate" })).toBeNull();
-		expect(within(row("ollama qwen · Med")).getByText("Not downloaded")).toBeInTheDocument();
-		expect(within(row("anthropic opus-5 · High")).queryByText(/Downloaded/)).toBeNull();
+		expect(within(row("Ollama (Local) qwen · Med")).getByText("Not downloaded")).toBeInTheDocument();
+		expect(within(row("Anthropic (Claude) opus-5 · High")).queryByText(/Downloaded/)).toBeNull();
 	});
 
 	it("names an AI-refined formula even without a reason", async () => {
@@ -579,12 +579,12 @@ describe("FormulaLab", () => {
 
 	it("selects a row by clicking it or its name", async () => {
 		await openWithMatrix();
-		const name = screen.getByRole("button", { name: "Select google gemini · Ultra" });
+		const name = screen.getByRole("button", { name: "Select Google (Gemini) gemini · Ultra" });
 		fireEvent.click(name.closest("tr")?.querySelector("td:nth-child(3)") as HTMLElement);
 		expect(name).toHaveAttribute("aria-pressed", "true");
 		expect(screen.getByText("gemini · Ultra")).toBeInTheDocument();
 
-		const other = screen.getByRole("button", { name: "Select ollama qwen · Med" });
+		const other = screen.getByRole("button", { name: "Select Ollama (Local) qwen · Med" });
 		fireEvent.click(other);
 		expect(other).toHaveAttribute("aria-pressed", "true");
 		expect(name).toHaveAttribute("aria-pressed", "false");
@@ -592,9 +592,9 @@ describe("FormulaLab", () => {
 
 	it("applies a row without selecting it first", async () => {
 		await openWithMatrix();
-		fireEvent.click(screen.getByRole("button", { name: "Apply google gemini · Ultra" }));
+		fireEvent.click(screen.getByRole("button", { name: "Apply Google (Gemini) gemini · Ultra" }));
 		expect(await screen.findByText("Formula applied", TOAST)).toBeInTheDocument();
-		expect(screen.getByRole("button", { name: "Select google gemini · Ultra" })).toHaveAttribute(
+		expect(screen.getByRole("button", { name: "Select Google (Gemini) gemini · Ultra" })).toHaveAttribute(
 			"aria-pressed",
 			"true",
 		);
@@ -608,6 +608,9 @@ describe("FormulaLab", () => {
 		expect(rowModels()).toEqual(["gpt-5.5"]);
 		fireEvent.change(search, { target: { value: "OLLAMA" } });
 		expect(rowModels()).toEqual(["llama3", "qwen"]);
+		// The provider is searched by the name the person reads.
+		fireEvent.change(search, { target: { value: "chatgpt" } });
+		expect(rowModels()).toEqual(["gpt-5.5"]);
 		fireEvent.change(search, { target: { value: "" } });
 
 		const provider = screen.getByRole("combobox", { name: "Provider" });
@@ -615,7 +618,13 @@ describe("FormulaLab", () => {
 			within(provider)
 				.getAllByRole("option")
 				.map((o) => o.textContent),
-		).toEqual(["All providers", "anthropic", "google", "ollama", "openai"]);
+		).toEqual([
+			"All providers",
+			"Anthropic (Claude)",
+			"Google (Gemini)",
+			"Ollama (Local)",
+			"OpenAI (ChatGPT)",
+		]);
 		fireEvent.change(provider, { target: { value: "ollama" } });
 		expect(rowModels()).toEqual(["llama3", "qwen"]);
 		fireEvent.change(provider, { target: { value: "all" } });
@@ -687,16 +696,16 @@ describe("FormulaLab", () => {
 		});
 		const point = (name: RegExp) => within(chart).getByRole("button", { name });
 
-		fireEvent.click(point(/^google gemini · Ultra/));
+		fireEvent.click(point(/^Google \(Gemini\) gemini · Ultra/));
 		expect(screen.getByText("gemini · Ultra")).toBeInTheDocument();
 
-		fireEvent.keyDown(point(/^ollama qwen · Med/), { key: "Enter" });
+		fireEvent.keyDown(point(/^Ollama \(Local\) qwen · Med/), { key: "Enter" });
 		expect(screen.getByText("qwen · Med")).toBeInTheDocument();
 
-		fireEvent.keyDown(point(/^openai gpt-5\.5 · Low/), { key: " " });
+		fireEvent.keyDown(point(/^OpenAI \(ChatGPT\) gpt-5\.5 · Low/), { key: " " });
 		expect(screen.getByText("gpt-5.5 · Low")).toBeInTheDocument();
 
-		fireEvent.keyDown(point(/^anthropic opus-5 · High/), { key: "Tab" });
+		fireEvent.keyDown(point(/^Anthropic \(Claude\) opus-5 · High/), { key: "Tab" });
 		expect(screen.getByText("gpt-5.5 · Low")).toBeInTheDocument();
 	});
 
@@ -727,7 +736,7 @@ describe("FormulaLab", () => {
 		);
 		expect(screen.getByRole("button", { name: "Refine with AI" })).toBeEnabled();
 		const opusRow = screen
-			.getByRole("button", { name: "Select anthropic opus-5 · High" })
+			.getByRole("button", { name: "Select Anthropic (Claude) opus-5 · High" })
 			.closest("tr") as HTMLElement;
 		expect(within(opusRow).getByRole("img", { name: "97% success" })).toBeInTheDocument();
 		expect(within(opusRow).getByRole("img", { name: "AI-refined estimate" })).toHaveAttribute(
@@ -799,12 +808,12 @@ describe("FormulaLab", () => {
 		await i18n.changeLanguage("fr");
 		await openWithMatrix();
 		expect(screen.getByRole("button", { name: /Meilleur rapport/ })).toHaveTextContent(
-			"openai · Faible",
+			"OpenAI (ChatGPT) · Faible",
 		);
 		expect(screen.getAllByRole("img", { name: "70 % de réussite" }).length).toBeGreaterThan(0);
 		expect(screen.getByRole("combobox", { name: "Fournisseur" })).toBeInTheDocument();
 		expect(
-			screen.getByRole("button", { name: "Appliquer google gemini · Ultra" }),
+			screen.getByRole("button", { name: "Appliquer Google (Gemini) gemini · Ultra" }),
 		).toBeInTheDocument();
 	});
 });

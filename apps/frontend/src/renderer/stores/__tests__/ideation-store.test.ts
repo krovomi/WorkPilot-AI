@@ -6,6 +6,7 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import i18n from "../../../shared/i18n";
 import type {
 	Idea,
 	IdeationSession,
@@ -86,7 +87,8 @@ function session(ideas: Idea[]): IdeationSession {
 const state = () => useIdeationStore.getState();
 const statuses = () => state().session?.ideas.map((i) => [i.id, i.status]);
 
-beforeEach(() => {
+beforeEach(async () => {
+	await i18n.changeLanguage("en");
 	for (const fn of Object.values(api)) fn.mockClear();
 	api.getIdeation.mockResolvedValue({ success: true, data: undefined });
 	api.stopIdeation.mockResolvedValue({ success: true });
@@ -293,7 +295,8 @@ describe("generation", () => {
 		expect(state().isGenerating).toBe(true);
 		expect(state().generationStatus.phase).toBe("generating");
 		expect(state().typeStates.code_improvements).toBe("generating");
-		expect(state().logs).toEqual(["Starting ideation generation in parallel..."]);
+		expect(state().logs).toEqual(["Starting ideation generation in parallel…"]);
+		expect(state().generationStatus.message).toBe("Generating 3 ideation types in parallel…");
 
 		vi.advanceTimersByTime(5 * 60 * 1000);
 		expect(state().isGenerating).toBe(false);
@@ -383,7 +386,7 @@ describe("writes that the server can refuse", () => {
 		expect(await deleteMultipleIdeasForProject("p1", ["b"])).toBe(true);
 		expect(state().session?.ideas).toEqual([]);
 		expect(state().selectedIds.size).toBe(0);
-		expect(state().logs.at(-1)).toBe("1 ideas deleted");
+		expect(state().logs.at(-1)).toBe("1 idea deleted");
 		expect(api.getIdeation).not.toHaveBeenCalled();
 	});
 
@@ -494,7 +497,38 @@ describe("setupIdeationListeners", () => {
 		expect(state().typeStates.security_hardening).toBe("failed");
 		listeners.typeComplete("p1", "ui_ux_improvements", []);
 		expect(state().generationStatus.progress).toBe(100);
-		expect(state().logs).toContain("✗ security_hardening failed");
+		expect(state().logs).toContain("✗ Security failed");
+		expect(state().logs).toContain("✓ Code Improvements completed with 1 idea");
+		expect(state().logs).toContain("✓ UI/UX Improvements completed with 0 ideas");
+	});
+
+	it("writes what it says in the app's language", async () => {
+		await i18n.changeLanguage("fr");
+		vi.useFakeTimers();
+		generateIdeation("p1");
+		expect(state().logs).toEqual(["Lancement de la génération d'idées en parallèle…"]);
+		expect(state().generationStatus.message).toBe("Génération de 3 types d'idées en parallèle…");
+		listeners.typeComplete("p1", "security_hardening", [idea("s1"), idea("s2")]);
+		expect(state().logs.at(-1)).toBe("✓ Sécurité terminé avec 2 idées");
+		expect(state().generationStatus.message).toBe("1/3 types d'idées terminés");
+		vi.advanceTimersByTime(5 * 60 * 1000);
+		expect(state().generationStatus.error).toBe(
+			"La génération a dépassé le délai. Des idées ont peut-être été produites : vérifiez les résultats.",
+		);
+		expect(state().logs.at(-1)).toBe("⚠ Délai de génération dépassé");
+
+		appendIdeation("p1", ["code_quality"]);
+		expect(state().logs).toEqual(["Ajout de 1 nouveau type d'idées…"]);
+		expect(state().generationStatus.message).toBe("Génération de 1 type d'idées supplémentaire…");
+		listeners.complete("p1", session([]));
+		expect(state().generationStatus.message).toBe("Idées générées");
+		expect(state().logs.at(-1)).toBe("Génération d'idées terminée !");
+		listeners.error("p1", "boom");
+		expect(state().logs.at(-1)).toBe("Erreur : boom");
+
+		expect(await stopIdeation("p1")).toBe(true);
+		expect(state().generationStatus.message).toBe("Génération arrêtée");
+		expect(state().logs.slice(-2)).toEqual(["Arrêt de la génération d'idées…", "Génération d'idées arrêtée"]);
 	});
 
 	it("finishes, fails or stops the generation and its timeout", () => {

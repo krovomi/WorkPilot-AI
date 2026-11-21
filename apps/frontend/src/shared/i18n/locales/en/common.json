@@ -1083,6 +1083,22 @@
 		"official": "Official",
 		"community": "Community",
 		"noProject": "Select a project: servers are installed per project.",
+		"failures": {
+			"builderSaveFailed": "The builder file could not be written.",
+			"builderDeleteFailed": "The builder file could not be written.",
+			"invalidBuilderRequest": "The request sent to the app was not valid.",
+			"securityServerRequired": "No catalog server was named.",
+			"securityInvalidProject": "The project named is not valid.",
+			"securityUnknownServer": "This server is not in the catalog.",
+			"securityFailed": "The security score could not be computed.",
+			"tooManyBuilderProjects": "The builder already holds as many servers as it can keep.",
+			"watchProjectRequired": "No project was named.",
+			"watchServerRequired": "No catalog server was named.",
+			"watchUnknownProject": "This project is not registered in the app.",
+			"policyReadFailed": "The project's MCP policy could not be read.",
+			"watchReadFailed": "The alerts of the installed servers could not be read.",
+			"acknowledgeFailed": "The alerts could not be marked as seen."
+		},
 		"errors": {
 			"loadCatalog": "The catalog could not be loaded.",
 			"loadBuilder": "Your builder servers could not be loaded.",
@@ -1411,6 +1427,7 @@
 		}
 	},
 	"modelCatalog": {
+		"freeText": "Other (free text)",
 		"live": "Up to date (provider)",
 		"registry": "Up to date (public registry)",
 		"cache": "Cached · {{when}}",

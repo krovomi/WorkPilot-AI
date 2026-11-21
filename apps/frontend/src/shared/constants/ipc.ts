@@ -661,7 +661,6 @@ export const IPC_CHANNELS = {
 
 	// MCP Marketplace operations
 	MCP_MARKETPLACE_GET_CATALOG: "mcpMarketplace:getCatalog", // Get full server catalog
-	MCP_MARKETPLACE_GET_SERVER: "mcpMarketplace:getServer", // Get single server details
 	MCP_MARKETPLACE_GET_SECURITY: "mcpMarketplace:getSecurity", // Security score of a catalog server (#369)
 	MCP_MARKETPLACE_GET_POLICY: "mcpMarketplace:getPolicy", // The project's MCP install policy (#369)
 	MCP_MARKETPLACE_GET_INSTALLED_WATCH: "mcpMarketplace:getInstalledWatch", // Alerts on installed servers (#369)

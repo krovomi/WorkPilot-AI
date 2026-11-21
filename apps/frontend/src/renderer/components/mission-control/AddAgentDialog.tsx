@@ -15,7 +15,8 @@ import type {
 	MissionControlPlannedAgent,
 	MissionControlPlanRequest,
 } from "../../../shared/types/mission-control";
-import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
+import { isCustomModelSentinel } from "../../../shared/utils/local-models";
+import { type CatalogModel, useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { useMissionControlStore } from "../../stores/mission-control-store";
 import { Notice, Tabs } from "../charter";
 import { Button } from "../ui/button";
@@ -102,10 +103,13 @@ export function AddAgentDialog({ open, onOpenChange, onAdd, error }: AddAgentDia
 	}, [model, models, role]);
 
 	const modelData = models.find((m) => m.value === model);
+	// The catalog's free-text row carries a French label: it is worded here.
+	const modelLabel = (m: CatalogModel) =>
+		isCustomModelSentinel(m.value) ? t("common:modelCatalog.freeText") : m.label;
 
 	const handleSubmit = async () => {
 		setSubmitting(true);
-		const created = await onAdd(name.trim(), role, provider, model, modelData?.label ?? model);
+		const created = await onAdd(name.trim(), role, provider, model, modelData ? modelLabel(modelData) : model);
 		setSubmitting(false);
 		if (!created) return;
 		setCustomName(null);
@@ -238,7 +242,7 @@ export function AddAgentDialog({ open, onOpenChange, onAdd, error }: AddAgentDia
 								{models.map((m) => (
 									<SelectItem key={m.value} value={m.value}>
 										<div className="flex items-center gap-2">
-											<span>{m.label}</span>
+											<span>{modelLabel(m)}</span>
 											{m.tier && (
 												<span
 													className={`text-3xs px-1 rounded ${TIER_CLASSES[m.tier] ?? "bg-blue-500/10 text-blue-600"}`}

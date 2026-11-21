@@ -5,6 +5,34 @@
  * Supports catalog browsing, one-click install, and no-code MCP server building.
  */
 
+/**
+ * Why the main process refused or failed a marketplace call. It is sent as the
+ * `error` of the answer, and the renderer words it
+ * (`mcpMarketplace.failures.<code>`): no English sentence crosses the bridge.
+ */
+export const MCP_MARKETPLACE_FAILURES = [
+	"builderSaveFailed",
+	"builderDeleteFailed",
+	"invalidBuilderRequest",
+	"tooManyBuilderProjects",
+	"securityServerRequired",
+	"securityInvalidProject",
+	"securityUnknownServer",
+	"securityFailed",
+	"watchProjectRequired",
+	"watchServerRequired",
+	"watchUnknownProject",
+	"policyReadFailed",
+	"watchReadFailed",
+	"acknowledgeFailed",
+] as const;
+
+export type McpMarketplaceFailure = (typeof MCP_MARKETPLACE_FAILURES)[number];
+
+export function isMcpMarketplaceFailure(value: unknown): value is McpMarketplaceFailure {
+	return (MCP_MARKETPLACE_FAILURES as readonly unknown[]).includes(value);
+}
+
 /** MCP server categories for marketplace organization */
 export type McpCategory =
 	| "communication"

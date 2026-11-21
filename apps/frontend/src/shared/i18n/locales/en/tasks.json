@@ -92,6 +92,7 @@
 		"stuck": "Stuck",
 		"incomplete": "Incomplete",
 		"recovering": "Recovering...",
+		"recoverFailed": "Could not recover the task",
 		"needsRecovery": "Needs Recovery",
 		"needsResume": "Needs Resume",
 		"tdd": "TDD",
