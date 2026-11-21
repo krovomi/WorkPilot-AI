@@ -1,3 +1,4 @@
+import i18n from "i18next";
 import { create } from "zustand";
 import { DEFAULT_IDEATION_CONFIG } from "../../shared/constants";
 import type {
@@ -9,6 +10,13 @@ import type {
 	IdeationSummary,
 	IdeationType,
 } from "../../shared/types";
+
+/** A text this store writes for the person, in the app's language. */
+const say = (key: string, values?: Record<string, unknown>): string =>
+	i18n.t(`ideation:progress.${key}`, values);
+
+/** An ideation type by its name, as the page shows it. */
+const typeName = (type: string): string => i18n.t(`ideation:types.${type}`, { defaultValue: type });
 
 const GENERATION_TIMEOUT_MS = 5 * 60 * 1000;
 /** Maximum number of log entries to retain in memory for debugging */
@@ -432,11 +440,11 @@ export function generateIdeation(projectId: string): void {
 	store.clearSession();
 	store.setIsGenerating(true);
 	store.initializeTypeStates(config.enabledTypes);
-	store.addLog("Starting ideation generation in parallel...");
+	store.addLog(say("logStarting"));
 	store.setGenerationStatus({
 		phase: "generating",
 		progress: 0,
-		message: `Generating ${config.enabledTypes.length} ideation types in parallel...`,
+		message: say("generating", { count: config.enabledTypes.length }),
 	});
 
 	const timeoutId = setTimeout(() => {
@@ -456,10 +464,9 @@ export function generateIdeation(projectId: string): void {
 				phase: "error",
 				progress: 0,
 				message: "",
-				error:
-					"Generation timed out. Some ideas may have been generated - check the results.",
+				error: say("timedOut"),
 			});
-			currentState.addLog("⚠ Generation timed out");
+			currentState.addLog(say("logTimedOut"));
 		}
 	}, GENERATION_TIMEOUT_MS);
 	generationTimeoutIds.set(projectId, timeoutId);
@@ -471,20 +478,20 @@ export async function stopIdeation(projectId: string): Promise<boolean> {
 	const store = useIdeationStore.getState();
 
 	store.setIsGenerating(false);
-	store.addLog("Stopping ideation generation...");
+	store.addLog(say("logStopping"));
 	store.setGenerationStatus({
 		phase: "idle",
 		progress: 0,
-		message: "Generation stopped",
+		message: say("stopped"),
 	});
 
 	const result = await window.electronAPI.stopIdeation(projectId);
 
 	if (!result.success) {
 		// Backend couldn't find/stop the process (likely already finished/crashed)
-		store.addLog("Process already stopped");
+		store.addLog(say("logAlreadyStopped"));
 	} else {
-		store.addLog("Ideation generation stopped");
+		store.addLog(say("logStopped"));
 	}
 
 	return result.success;
@@ -500,11 +507,11 @@ export async function refreshIdeation(projectId: string): Promise<void> {
 	store.clearSession();
 	store.setIsGenerating(true);
 	store.initializeTypeStates(config.enabledTypes);
-	store.addLog("Refreshing ideation in parallel...");
+	store.addLog(say("logRefreshing"));
 	store.setGenerationStatus({
 		phase: "generating",
 		progress: 0,
-		message: `Refreshing ${config.enabledTypes.length} ideation types in parallel...`,
+		message: say("refreshing", { count: config.enabledTypes.length }),
 	});
 	window.electronAPI.refreshIdeation(projectId, config);
 }
@@ -516,7 +523,7 @@ export async function dismissAllIdeasForProject(
 	const result = await window.electronAPI.dismissAllIdeas(projectId);
 	if (result.success) {
 		store.dismissAllIdeas();
-		store.addLog("All ideas dismissed");
+		store.addLog(say("logAllDismissed"));
 	} else {
 		// Refused (a server project changed since it was read): show it as it is.
 		await loadIdeation(projectId);
@@ -532,7 +539,7 @@ export async function archiveIdeaForProject(
 	const result = await window.electronAPI.archiveIdea(projectId, ideaId);
 	if (result.success) {
 		store.archiveIdea(ideaId);
-		store.addLog("Idea archived");
+		store.addLog(say("logArchived"));
 	} else {
 		// Refused (a server project changed since it was read): show it as it is.
 		await loadIdeation(projectId);
@@ -548,7 +555,7 @@ export async function deleteIdeaForProject(
 	const result = await window.electronAPI.deleteIdea(projectId, ideaId);
 	if (result.success) {
 		store.deleteIdea(ideaId);
-		store.addLog("Idea deleted");
+		store.addLog(say("logDeleted"));
 	} else {
 		// Refused (a server project changed since it was read): show it as it is.
 		await loadIdeation(projectId);
@@ -568,7 +575,7 @@ export async function deleteMultipleIdeasForProject(
 	if (result.success) {
 		store.deleteMultipleIdeas(ideaIds);
 		store.clearSelection();
-		store.addLog(`${ideaIds.length} ideas deleted`);
+		store.addLog(say("logManyDeleted", { count: ideaIds.length }));
 	} else {
 		// Refused (a server project changed since it was read): show it as it is.
 		await loadIdeation(projectId);
@@ -597,11 +604,11 @@ export function appendIdeation(
 		store.setTypeState(type, "generating");
 	}
 
-	store.addLog(`Adding ${typesToAdd.length} new ideation types...`);
+	store.addLog(say("logAdding", { count: typesToAdd.length }));
 	store.setGenerationStatus({
 		phase: "generating",
 		progress: 0,
-		message: `Generating ${typesToAdd.length} additional ideation types...`,
+		message: say("generatingMore", { count: typesToAdd.length }),
 	});
 
 	const appendConfig = {
@@ -724,7 +731,7 @@ export function setupIdeationListeners(): () => void {
 			}
 
 			store().addIdeasForType(ideationType, ideas);
-			store().addLog(`✓ ${ideationType} completed with ${ideas.length} ideas`);
+			store().addLog(say("logTypeComplete", { type: typeName(ideationType), count: ideas.length }));
 
 			// Update progress based on completed types
 			// Calculate with the expected state since React 18 batches state updates.
@@ -747,7 +754,7 @@ export function setupIdeationListeners(): () => void {
 			store().setGenerationStatus({
 				phase: "generating",
 				progress,
-				message: `${completedCount}/${totalTypes} ideation types complete`,
+				message: say("typesComplete", { completed: completedCount, total: totalTypes }),
 			});
 		},
 	);
@@ -764,7 +771,7 @@ export function setupIdeationListeners(): () => void {
 			}
 
 			store().setTypeState(ideationType as IdeationType, "failed");
-			store().addLog(`✗ ${ideationType} failed`);
+			store().addLog(say("logTypeFailed", { type: typeName(ideationType) }));
 		},
 	);
 
@@ -783,9 +790,9 @@ export function setupIdeationListeners(): () => void {
 			store().setGenerationStatus({
 				phase: "complete",
 				progress: 100,
-				message: "Ideation complete",
+				message: say("complete"),
 			});
-			store().addLog("Ideation generation complete!");
+			store().addLog(say("logComplete"));
 		},
 	);
 
@@ -807,7 +814,7 @@ export function setupIdeationListeners(): () => void {
 			message: "",
 			error,
 		});
-		store().addLog(`Error: ${error}`);
+		store().addLog(say("logError", { error }));
 	});
 
 	const unsubStopped = window.electronAPI.onIdeationStopped((projectId) => {
@@ -821,9 +828,9 @@ export function setupIdeationListeners(): () => void {
 		store().setGenerationStatus({
 			phase: "idle",
 			progress: 0,
-			message: "Generation stopped",
+			message: say("stopped"),
 		});
-		store().addLog("Ideation generation stopped");
+		store().addLog(say("logStopped"));
 	});
 
 	return () => {

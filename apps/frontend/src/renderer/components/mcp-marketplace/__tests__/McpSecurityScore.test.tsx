@@ -104,10 +104,12 @@ describe("McpSecurityDetails", () => {
 		expect(await screen.findByText(/^Low score: install it only on projects you trust/)).toBeInTheDocument();
 	});
 
-	it("keeps the catalog score and says why when the read fails", async () => {
-		api.getMcpServerSecurity.mockResolvedValue({ success: false, error: "Unknown catalog server" });
+	it("keeps the catalog score and says why when the read fails, in the app's language", async () => {
+		api.getMcpServerSecurity.mockResolvedValue({ success: false, error: "securityUnknownServer" });
 		render(<Harness server={local} />);
-		expect(await screen.findByRole("alert")).toHaveTextContent("Unknown catalog server");
+		const alert = await screen.findByRole("alert");
+		expect(alert).toHaveTextContent("This server is not in the catalog.");
+		expect(alert).not.toHaveTextContent("securityUnknownServer");
 		expect(screen.getByText(/^From the catalog only/)).toBeInTheDocument();
 		expect(screen.queryByText(/^Maintainers changed/)).toBeNull();
 	});
