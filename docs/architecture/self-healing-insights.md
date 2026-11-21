@@ -90,6 +90,16 @@ module) : les `__init__.py` des nouveaux paquets n'importent rien, ce qui évite
   de projet passe par `DIRECTORY_ARGS`, le runner reçoit `pythonRunnerEnv` et chaque commit testé
   est renvoyé à la fenêtre (`selfHealing:bisectProgress`) après validation.
 
+## Ce que les handlers acceptent
+
+`main/ipc-handlers/self-healing-inputs.ts` vérifie ce que la page envoie avant que le runner
+parte ou que `.workpilot/self-healing/config.json` soit écrit : un id d'incident ou d'opération
+qui commence par une lettre ou un chiffre, un mode et une source en listes fermées, des réglages
+plats (booléens, nombres, textes courts, listes de textes). Une source de production ne garde
+que les quatre champs que le runner lit, son URL en http(s), et sa configuration passe au runner
+sur stdin (`--config -`), pas dans ses arguments. Le lien vers la PR d'un incident n'est rendu
+que pour une URL http(s) (`shared/utils/web-link.ts`).
+
 ## Ce qui reste
 
 - #370 : explication en langage naturel d'une trajectoire, notification à l'entrée dans la liste

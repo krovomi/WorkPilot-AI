@@ -29,6 +29,7 @@ import {
 	type PairMessage,
 	type PairStatus,
 	type StartSessionParams,
+	loadPairSession,
 	sendPairMessage,
 	startPairSession,
 	stopPairSession,
@@ -245,6 +246,11 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 
 	const chatEndRef = useRef<HTMLDivElement>(null);
 	const streamEndRef = useRef<HTMLDivElement>(null);
+
+	// The store holds one project's session: show this project's.
+	useEffect(() => {
+		void loadPairSession(projectId);
+	}, [projectId]);
 
 	// Auto-scroll chat
 	useEffect(() => {
