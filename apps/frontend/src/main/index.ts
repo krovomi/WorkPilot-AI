@@ -128,6 +128,7 @@ import {
 	markLocalBackendReady,
 	markLocalBackendStarting,
 } from "./local-backend-readiness";
+import { watchSpawnedBackend } from "./local-backend-launch";
 import { migrateSourceEnvSecrets } from "./source-env";
 import { TerminalManager } from "./terminal-manager";
 import { guardMainWindow } from "./window-recovery";
@@ -661,15 +662,6 @@ async function waitForBackendReady(url: string, timeoutMs = 10000) {
  */
 const BACKEND_START_TIMEOUT_MS = 90_000;
 
-/** Rejects as soon as the spawned backend exits: no point waiting for it then. */
-function rejectOnExit(child: ChildProcessWithoutNullStreams): Promise<never> {
-	return new Promise<never>((_resolve, reject) => {
-		child.once("exit", (code) =>
-			reject(new Error(`Le backend s'est arrêté au démarrage (code ${code}).`)),
-		);
-	});
-}
-
 // Fonction pour lancer le backend si nécessaire
 async function launchBackendIfNeeded() {
 	try {
@@ -724,10 +716,21 @@ async function startBackend() {
 			env: { ...process.env, UVICORN_CMD: "1" },
 		},
 	);
-	// Attend qu'il soit prêt
+	const spawned = backendProcess;
+	spawned.once("exit", () => {
+		if (backendProcess === spawned) backendProcess = null;
+	});
+	// Attend qu'il soit prêt. S'il s'arrête avant, un autre backend a pu prendre
+	// le port entre-temps (celui de `pnpm run dev`) : local-backend-launch.ts.
+	const { exited } = watchSpawnedBackend(spawned, 9000, () =>
+		waitForBackendReady("http://127.0.0.1:9000/providers", 1500).then(
+			() => true,
+			() => false,
+		),
+	);
 	await Promise.race([
 		waitForBackendReady("http://127.0.0.1:9000/providers", BACKEND_START_TIMEOUT_MS),
-		rejectOnExit(backendProcess),
+		exited,
 	]);
 }
 

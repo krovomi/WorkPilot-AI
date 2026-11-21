@@ -101,7 +101,6 @@ const defaultCICDConfig: CICDConfig = {
 	enabled: false,
 	watchBranches: ["main", "develop"],
 	autoFixEnabled: true,
-	autoCreatePR: true,
 };
 
 const defaultProductionConfig: ProductionConfig = {

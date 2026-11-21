@@ -15,6 +15,12 @@ Workflow:
       merge conflicts stays pending for the task's own coder
 4. Report final status
 
+Before each wave and each retry (the first wave included), the orchestrator
+asks whether it may go on (``halt.stop_reason``): a task paused in any copy of
+its spec directory, or a ``workpilot.policy.yaml`` that says stop (outside the
+hours, past a token budget, invalid), ends the swarm there, phase ``paused``.
+Nothing new starts; the coder loop then stops the build at that pause.
+
 Outside a git checkout (the standalone runner's dry runs, tests) the
 subtasks run in the project itself and nothing is merged.
 
@@ -33,7 +39,7 @@ from typing import Any
 from core.workflow_logger import workflow_logger
 from foundation.phase_event import ExecutionPhase, emit_phase
 
-from . import subtask_worktree
+from . import halt, subtask_worktree
 from .dependency_analyzer import DependencyAnalyzer
 from .types import (
     SubtaskNode,
@@ -195,6 +201,8 @@ class SwarmOrchestrator:
 
         # ── Phase 2: Execute waves ───────────────────────────────────
         for wave_idx, wave in enumerate(waves):
+            if self._halted(f"before wave {wave_idx + 1}"):
+                return self.status
             self.status.current_wave = wave_idx
             self.status.phase = SwarmPhase.EXECUTING_WAVE
 
@@ -251,6 +259,12 @@ class SwarmOrchestrator:
 
                 # Retry failed subtasks that haven't exceeded max retries
                 await self._retry_failed_subtasks(wave, wave_result, nodes)
+                if self.status.phase == SwarmPhase.PAUSED:
+                    # What the wave finished is kept: the task's coder resumes on it.
+                    if self._isolated:
+                        self._merge_wave(wave, wave_result)
+                        self.status.phase = SwarmPhase.PAUSED
+                    return self.status
 
             # ── Phase 2b: Merge wave results ─────────────────────────
             # The next wave starts from the task's branch: it has to hold
@@ -281,6 +295,20 @@ class SwarmOrchestrator:
         )
 
         return self.status
+
+    def _halted(self, where: str) -> bool:
+        """Whether the swarm stops here, the task paused or its policy saying so."""
+        if self.status.phase == SwarmPhase.PAUSED:
+            return True
+        reason = halt.stop_reason(self.spec_dir)
+        if reason is None:
+            return False
+        self.status.phase = SwarmPhase.PAUSED
+        self.status.error = f"paused {where} ({reason})"
+        self.status.completed_at = time.time()
+        print(f"Swarm stopped {where}: the task is paused ({reason}).", flush=True)
+        emit_swarm_event("swarm_cancelled", {"reason": reason, "where": where})
+        return True
 
     def _load_plan(self) -> dict | None:
         """Load the implementation plan from spec directory."""
@@ -332,6 +360,8 @@ class SwarmOrchestrator:
             node = nodes[sr.subtask_id]
 
             while node.retry_count < self.config.max_retries_per_subtask:
+                if self._halted(f"before retrying {node.id}"):
+                    break
                 node.retry_count += 1
                 node.state = SubtaskState.RETRYING
 

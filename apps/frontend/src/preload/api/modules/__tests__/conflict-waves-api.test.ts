@@ -24,6 +24,10 @@ describe("createConflictWavesAPI", () => {
 		await api.saveExecutionWaveRun(state);
 		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_RUN_SAVE, state);
 		await api.clearExecutionWaveRun("p1");
-		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_RUN_CLEAR, "p1");
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_RUN_CLEAR, "p1", undefined);
+		await api.clearExecutionWaveRun("p1", "done");
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_RUN_CLEAR, "p1", "done");
+		await api.loadExecutionWaveHistory("p1");
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_HISTORY, "p1");
 	});
 });

@@ -95,6 +95,8 @@ class Incident:
     fix_branch: str | None = None
     fix_pr_url: str | None = None
     fix_worktree: str | None = None
+    #: The board card whose build fixes the incident (`fix_card.py`).
+    fix_card: str | None = None
     qa_result: dict[str, Any] | None = None
     # Error info
     error_message: str | None = None
@@ -118,6 +120,7 @@ class Incident:
             "fix_branch": self.fix_branch,
             "fix_pr_url": self.fix_pr_url,
             "fix_worktree": self.fix_worktree,
+            "fix_card": self.fix_card,
             "qa_result": self.qa_result,
             "error_message": self.error_message,
             "stack_trace": self.stack_trace,
@@ -142,6 +145,7 @@ class Incident:
             fix_branch=data.get("fix_branch"),
             fix_pr_url=data.get("fix_pr_url"),
             fix_worktree=data.get("fix_worktree"),
+            fix_card=data.get("fix_card"),
             qa_result=data.get("qa_result"),
             error_message=data.get("error_message"),
             stack_trace=data.get("stack_trace"),

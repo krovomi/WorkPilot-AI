@@ -1,6 +1,6 @@
-"""The governance sections of ``workpilot.policy.yaml`` (#353, lot 2).
+"""The governance sections of ``workpilot.policy.yaml`` (#353, lots 2 and 3).
 
-Beside its ``rules``, the repository's policy file may say three things about
+Beside its ``rules``, the repository's policy file may say four things about
 every agent, on every provider:
 
 .. code-block:: yaml
@@ -15,6 +15,9 @@ every agent, on every provider:
       requires_review: ["infra/**"]              # one-time approval first
     budget:
       max_tokens_per_hour: 500000     # every session of the project, last 60 min
+      max_tokens_per_task: 2000000    # every session of one task, all along
+    loop_detection:
+      max_same_tool_call: 5           # identical calls before the breaker trips
 
 Only the repository layer carries them: the file is versioned and reviewed like
 code, and it is read from the main checkout, never from the task's worktree
@@ -27,7 +30,8 @@ command until it is fixed: a typo never turns a limit off in silence.
 ``files`` become ordinary guardrail rules (``deny`` / ``require_approval`` on a
 path glob), judged where the other rules are. The schedule is judged before
 every write or command by the same hook, and with the budget on the stream of
-every session (``agents.policy_watch``), which pauses the task.
+every session (``agents.policy_watch``), which pauses the task. The loop
+limit replaces the circuit breaker's own (``agents.tool_breaker``).
 """
 
 from __future__ import annotations
@@ -40,17 +44,23 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .guardrails import GuardrailAction, GuardrailRule, glob_to_regex
 
-SECTIONS = ("schedule", "files", "budget")
+SECTIONS = ("schedule", "files", "budget", "loop_detection")
 
 _SCHEDULE_KEYS = frozenset({"timezone", "allowed_hours", "days"})
 _FILES_KEYS = frozenset({"forbidden", "requires_review"})
-_BUDGET_KEYS = frozenset({"max_tokens_per_hour"})
+_BUDGET_KEYS = frozenset({"max_tokens_per_hour", "max_tokens_per_task"})
+_LOOP_KEYS = frozenset({"max_same_tool_call"})
 
 MAX_WINDOWS = 8
 MAX_GLOBS = 200
 MAX_GLOB_CHARS = 256
 MIN_TOKENS_PER_HOUR = 1_000
 MAX_TOKENS_PER_HOUR = 1_000_000_000
+MIN_TOKENS_PER_TASK = 1_000
+MAX_TOKENS_PER_TASK = 10_000_000_000
+#: Fewer than 2 would stop an agent at its first call; past 100 nothing is caught.
+MIN_SAME_TOOL_CALL = 2
+MAX_SAME_TOOL_CALL = 100
 
 DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 _FULL_DAYS = (
@@ -91,6 +101,8 @@ class Governance:
     forbidden: list[str] = field(default_factory=list)
     requires_review: list[str] = field(default_factory=list)
     max_tokens_per_hour: int | None = None
+    max_tokens_per_task: int | None = None
+    max_same_tool_call: int | None = None
     _zone: tzinfo | None = None
 
     @property
@@ -104,6 +116,8 @@ class Governance:
             or self.forbidden
             or self.requires_review
             or self.max_tokens_per_hour
+            or self.max_tokens_per_task
+            or self.max_same_tool_call
         )
 
     def local(self, now: datetime | None = None) -> datetime:
@@ -170,8 +184,14 @@ class Governance:
                 "forbidden": list(self.forbidden),
                 "requiresReview": list(self.requires_review),
             },
-            "budget": {"maxTokensPerHour": self.max_tokens_per_hour}
-            if self.max_tokens_per_hour
+            "budget": {
+                "maxTokensPerHour": self.max_tokens_per_hour,
+                "maxTokensPerTask": self.max_tokens_per_task,
+            }
+            if self.max_tokens_per_hour or self.max_tokens_per_task
+            else None,
+            "loopDetection": {"maxSameToolCall": self.max_same_tool_call}
+            if self.max_same_tool_call
             else None,
         }
 
@@ -291,6 +311,31 @@ def _section(
     return raw
 
 
+def _bounded(
+    section: dict[str, Any],
+    dotted: str,
+    bounds: tuple[int, int],
+    errors: list[str],
+    label: str,
+) -> int | None:
+    """A whole number of ``section`` within ``bounds``; ``None`` when absent or wrong."""
+    key = dotted.rsplit(".", 1)[1]
+    if key not in section:
+        return None
+    value = section[key]
+    low, high = bounds
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not low <= value <= high
+    ):
+        errors.append(
+            f"{label}: '{dotted}' must be a whole number from {low:,} to {high:,}"
+        )
+        return None
+    return value
+
+
 def parse_governance(
     data: dict[str, Any], label: str, source: str = ""
 ) -> tuple[Governance, list[str]]:
@@ -316,19 +361,28 @@ def parse_governance(
     )
 
     budget = _section(data, "budget", _BUDGET_KEYS, errors, label)
-    if "max_tokens_per_hour" in budget:
-        value = budget["max_tokens_per_hour"]
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or not MIN_TOKENS_PER_HOUR <= value <= MAX_TOKENS_PER_HOUR
-        ):
-            errors.append(
-                f"{label}: 'budget.max_tokens_per_hour' must be a whole number from "
-                f"{MIN_TOKENS_PER_HOUR:,} to {MAX_TOKENS_PER_HOUR:,}"
-            )
-        else:
-            governance.max_tokens_per_hour = value
+    governance.max_tokens_per_hour = _bounded(
+        budget,
+        "budget.max_tokens_per_hour",
+        (MIN_TOKENS_PER_HOUR, MAX_TOKENS_PER_HOUR),
+        errors,
+        label,
+    )
+    governance.max_tokens_per_task = _bounded(
+        budget,
+        "budget.max_tokens_per_task",
+        (MIN_TOKENS_PER_TASK, MAX_TOKENS_PER_TASK),
+        errors,
+        label,
+    )
+    loop = _section(data, "loop_detection", _LOOP_KEYS, errors, label)
+    governance.max_same_tool_call = _bounded(
+        loop,
+        "loop_detection.max_same_tool_call",
+        (MIN_SAME_TOOL_CALL, MAX_SAME_TOOL_CALL),
+        errors,
+        label,
+    )
     return governance, errors
 
 

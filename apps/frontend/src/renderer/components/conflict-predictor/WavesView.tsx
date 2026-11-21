@@ -26,7 +26,7 @@ import {
 	Stats,
 	type Tone,
 } from "../charter";
-import { MergeCheckNotices, RunWavesList, SavedRunNotice } from "./WavesNotices";
+import { MergeCheckNotices, RunHistorySummary, RunWavesList, SavedRunNotice } from "./WavesNotices";
 
 const TOLERANCES = [0, 1, 2, 4] as const;
 const MAX_PAIRS = 10;
@@ -52,7 +52,7 @@ function useTitles(plan: ExecutionWavePlan | null): (id: string) => string {
 export function WavesView() {
 	const { t } = useTranslation(["conflictPredictor", "common"]);
 	const projectId = useProjectStore((s) => s.selectedProjectId);
-	const { plan, isPlanning, error, options, execution, blocked, startFailures, savedRun, savedRunIgnoredFor } =
+	const { plan, isPlanning, error, options, execution, blocked, startFailures, savedRun, savedRunIgnoredFor, history } =
 		useExecutionWavesStore(
 			useShallow((s) => ({
 				plan: s.plan,
@@ -64,6 +64,7 @@ export function WavesView() {
 				startFailures: s.startFailures,
 				savedRun: s.savedRun,
 				savedRunIgnoredFor: s.savedRunIgnoredFor,
+				history: s.history,
 			})),
 		);
 	const { setOptions, computePlan, execute, stop, resumeSavedRun, abandonSavedRun } = useExecutionWavesStore(
@@ -161,6 +162,20 @@ export function WavesView() {
 							{t("conflictPredictor:waves.options.fragileOff")}
 						</Chip>
 					</Chips>
+					<span className="wp-meta">{t("conflictPredictor:waves.options.code")}</span>
+					<Chips>
+						<Chip
+							dot={false}
+							pressed={options.codeLinks}
+							title={t("conflictPredictor:waves.options.codeHint")}
+							onClick={() => setOptions({ codeLinks: true })}
+						>
+							{t("conflictPredictor:waves.options.codeOn")}
+						</Chip>
+						<Chip dot={false} pressed={!options.codeLinks} onClick={() => setOptions({ codeLinks: false })}>
+							{t("conflictPredictor:waves.options.fragileOff")}
+						</Chip>
+					</Chips>
 					<span className="wp-meta">{t("conflictPredictor:waves.options.advance")}</span>
 					<Chips>
 						<Chip
@@ -188,6 +203,8 @@ export function WavesView() {
 						onAbandon={() => void abandonSavedRun()}
 					/>
 				)}
+
+				{history && history.projectId === projectId && <RunHistorySummary history={history} />}
 
 				{error && (
 					<Notice tone="red" icon={AlertTriangle} role="alert">
@@ -389,6 +406,16 @@ function PlanBody({ plan, title, execution }: PlanBodyProps) {
 								{pair.fragileLinks && (
 									<Chip tone="violet" title={pair.fragileLinks.join("\n")}>
 										{t("conflictPredictor:waves.pairs.fragile", { count: pair.fragileLinks.length })}
+									</Chip>
+								)}
+								{pair.importLinks && (
+									<Chip tone="violet" title={pair.importLinks.join("\n")}>
+										{t("conflictPredictor:waves.pairs.imports", { count: pair.importLinks.length })}
+									</Chip>
+								)}
+								{pair.symbolLinks && (
+									<Chip tone="violet" title={pair.symbolLinks.join("\n")}>
+										{t("conflictPredictor:waves.pairs.symbols", { count: pair.symbolLinks.length })}
 									</Chip>
 								)}
 								{pair.mergeCheck && (

@@ -244,4 +244,8 @@ export const taskMock = {
 	loadExecutionWaveRun: async () => ({ success: true as const, data: { run: null, ignored: false } }),
 	saveExecutionWaveRun: async () => ({ success: true as const }),
 	clearExecutionWaveRun: async () => ({ success: true as const }),
+	loadExecutionWaveHistory: async () => ({
+		success: true as const,
+		data: { records: [], ignored: false },
+	}),
 };

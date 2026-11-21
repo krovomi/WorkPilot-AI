@@ -142,8 +142,9 @@ def resolve_candidates(
         except (OSError, ValueError):
             refused.append(Refusal(text, "missing"))
             continue
-        if real != base and not real.startswith(prefix):
-            refused.append(Refusal(text, "outside"))
+        # The root itself is a folder, not a file: refused like a missing file.
+        if not real.startswith(prefix):
+            refused.append(Refusal(text, "missing" if real == base else "outside"))
             continue
         resolved = Path(real)
         try:
