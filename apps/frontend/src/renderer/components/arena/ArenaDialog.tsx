@@ -28,6 +28,16 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { ScrollArea } from "@/components/ui";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -122,7 +132,7 @@ function ParticipantCard({
 	readonly onVote: (label: ArenaLabel) => void;
 	readonly canVote: boolean;
 }) {
-	const { t } = useTranslation("arena");
+	const { t, i18n } = useTranslation("arena");
 	// A winner is only ever recorded with the identities revealed (the vote
 	// sets both), so being the winner is enough to be shown as one.
 	const isWinner = battle.winnerLabel === participant.label;
@@ -226,7 +236,7 @@ function ParticipantCard({
 						}
 					>
 						{participant.tokensUsed > 0
-							? `${participant.usageEstimated ? "~" : ""}${t("arena:tokensUsed", { value: participant.tokensUsed.toLocaleString() })}`
+							? `${participant.usageEstimated ? "~" : ""}${t("arena:tokensUsed", { value: participant.tokensUsed.toLocaleString(i18n.language) })}`
 							: "—"}
 					</span>
 					{/* A cost the provider did not report is shown as unknown, never
@@ -800,6 +810,7 @@ function HistoryTab() {
 				clearHistory: s.clearHistory,
 			})),
 		);
+	const [confirmingClear, setConfirmingClear] = useState(false);
 
 	useEffect(() => {
 		loadHistory();
@@ -836,13 +847,32 @@ function HistoryTab() {
 				<Button
 					variant="ghost"
 					size="sm"
-					onClick={() => void clearHistory()}
+					onClick={() => setConfirmingClear(true)}
 					className="gap-1.5 text-muted-foreground hover:text-destructive"
 				>
 					<Trash2 className="h-3.5 w-3.5" />
 					{t("history.clearAll")}
 				</Button>
 			</div>
+			<AlertDialog open={confirmingClear} onOpenChange={setConfirmingClear}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>{t("history.clearConfirm.title")}</AlertDialogTitle>
+						<AlertDialogDescription>
+							{t("history.clearConfirm.description", { count: battles.length })}
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>{t("history.clearConfirm.cancel")}</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+							onClick={() => void clearHistory()}
+						>
+							{t("history.clearConfirm.confirm")}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 
 			<ScrollArea className="max-h-[500px]">
 				<div className="flex flex-col gap-2 pr-2">
@@ -856,7 +886,7 @@ function HistoryTab() {
 }
 
 function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
-	const { t } = useTranslation("arena");
+	const { t, i18n } = useTranslation("arena");
 	const [expanded, setExpanded] = useState(false);
 	const winner = battle.participants.find(
 		(p) => p.label === battle.winnerLabel,
@@ -938,7 +968,7 @@ function BattleHistoryRow({ battle }: { readonly battle: ArenaBattle }) {
 							</p>
 							<p className="font-mono text-muted-foreground/70 mt-0.5">
 								{p.usageEstimated ? "~" : ""}
-								{t("arena:tokensUsed", { value: p.tokensUsed.toLocaleString() })}
+								{t("arena:tokensUsed", { value: p.tokensUsed.toLocaleString(i18n.language) })}
 								{p.costUsd === undefined
 									? ""
 									: ` · $${p.costUsd.toFixed(5)}`}
