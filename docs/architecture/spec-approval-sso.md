@@ -1,10 +1,10 @@
 ---
 feature: Approbation de spec et SSO (mode serveur)
 summary: >-
-  Connexion par n'importe quel fournisseur OpenID Connect lu dans son document de découverte, à
-  côté d'Entra ; une spec s'approuve avec `review.approve`, par autant de personnes que sa
-  criticité en demande, l'auteur d'une carte seulement si la règle du déploiement
-  (`WORKPILOT_SELF_APPROVAL`) le permet, et un approbateur prête son approbation pour un temps.
+  Connexion par tout fournisseur OpenID Connect, à côté d'Entra, sur le bureau et le téléphone ;
+  une spec s'approuve avec `review.approve`, par autant de personnes que sa criticité en demande,
+  l'auteur selon `WORKPILOT_SELF_APPROVAL` ; délégations, escalade d'un plan qui attend trop, et
+  connexion nommée dans le journal.
 ---
 
 # Approbation de spec et connexion SSO en mode serveur
@@ -12,7 +12,9 @@ summary: >-
 Issue #363. Lot 1 : se connecter au serveur avec le fournisseur d'identité de l'entreprise, quel
 qu'il soit, et rendre l'approbation d'une spec réelle côté serveur, y compris quand c'est l'auteur
 de la carte qui voudrait l'approuver. Lot 3 : plusieurs approbateurs selon la criticité d'une
-carte, et la délégation d'une approbation.
+carte, et la délégation d'une approbation. Lot 4 : l'escalade d'un plan qui attend trop, les écrans
+de l'app de bureau et de l'app mobile, la connexion SSO sur le téléphone, la connexion nommée dans
+le journal, et les délégations d'une personne qui part.
 
 ## Un fournisseur OpenID Connect quelconque
 
@@ -166,21 +168,98 @@ compte et le quorum), chaque criticité (`review.criticality.set`) et chaque dé
 (`review.delegation.created`, `review.delegation.revoked`) entrent au journal de l'organisation,
 lu et filtré par action par `GET /admin/audit` (`audit.read`).
 
+## Escalader un plan qui attend trop (lot 4)
+
+Un plan qui attend ses approbations plus longtemps que l'équipe ne le permet prévient un second
+groupe d'approbateurs (`server/services/approval_escalation.py`) :
+
+| Variable | Exemple | Défaut |
+|---|---|---|
+| `WORKPILOT_APPROVAL_ESCALATION_HOURS` | `24`, ou `low=72,medium=24,high=4` | jamais (un niveau absent ne s'escalade pas ; 720 heures au plus) |
+| `WORKPILOT_APPROVAL_ESCALATION_ROLES` | `tech-lead+security` | `owner+admin` |
+
+**Le second groupe** : les membres actifs de l'organisation qui tiennent l'un de ces rôles
+(`role_slugs`) et pourraient approuver sur le projet (`holds_approval`), hors l'auteur de la carte et
+ceux qui ont déjà approuvé cette version ; vingt au plus. Ils en sont prévenus sur leurs canaux
+« Besoin de toi » (ntfy, Telegram, Teams) par l'événement `approval_escalated`, qu'une personne coupe
+comme les autres dans ses préférences.
+
+**D'où part l'attente.** De la fin du run de spec qui a laissé le plan à approuver : une heure que
+le serveur a écrite (`agent_runs.finished_at`), qu'aucun client ni aucun run ne déplace. Une carte
+s'escalade une fois par run de spec (table `approval_escalations`, migration `0018`) ; un nouveau run
+de spec ouvre une nouvelle attente. Une carte qui a déjà ses approbations, ou dont le build n'attend
+plus d'approbation (`push.awaits_approval`, installé par le tableau : le serveur n'importe aucune
+unité de feature), ne s'escalade pas. Chaque escalade entre au journal (`review.escalated`, avec la
+criticité, l'attente, le compte, le quorum et le nombre de personnes prévenues).
+
+**Pourquoi une tâche périodique, et comment elle reste bornée.** Le serveur n'en avait aucune. Celle-ci
+tourne dans la boucle d'événements du serveur tant que le mode serveur est monté et que l'escalade
+est allumée (enveloppe du `lifespan` de l'app, `server/integration.py`), toutes les cinq minutes.
+Chaque passe regarde au plus cent cartes, des soixante derniers jours ; une passe qui échoue est
+journalisée par son type et reprise au tour suivant : une notification n'arrête jamais le serveur.
+
+## Les écrans (lot 4)
+
+| App | Où | Ce qu'on y fait |
+|---|---|---|
+| Bureau | `components/spec-approval/ServerApprovalPanel.tsx`, `ServerDelegationsPanel.tsx`, dans Spec Approval pour un projet du serveur | régler la criticité, voir les approbations et les rôles qui manquent ; lister, prêter (dates de début et de fin) et terminer les délégations |
+| Mobile | `src/card/ApprovalSection.tsx` sur la carte, la page « Approbations prêtées » du tableau | les mêmes, la délégation pour un nombre de jours |
+
+Les appels du bureau passent par le main (`src/main/server-card-approvals.ts`), qui revérifie chaque
+argument du renderer (identifiants, dates ISO avec fuseau) avant la requête et ne garde des réponses
+que des champs bornés. Le serveur décide de tout : qui peut régler une criticité, prêter ou terminer.
+
+Le téléphone ne lance plus le build après une approbation partielle : quand `POST .../approve`
+répond `approved: false`, ni le bouton Démarrer ni « Valider et construire » d'une notification ne
+démarrent rien, et l'app dit combien d'approbations la carte a.
+
+## La connexion SSO sur le téléphone (lot 4)
+
+L'app mobile mène le flux du fournisseur générique comme celui d'Entra : PKCE dans le navigateur du
+système, retour sur `workpilot://auth`, `id_token` remis à `POST /auth/sso/exchange`. Elle revérifie
+le fournisseur décrit par `/auth/config` comme le main du bureau, et un `nonce` lie l'`id_token` à
+la tentative, pour les deux fournisseurs (`src/auth/code-flow.ts`). Détails :
+[mobile-app.md](mobile-app.md).
+
+**Entra garde sa propre vérification côté serveur.** Une identité Entra est retrouvée par son `oid`,
+stable dans le tenant ; le `sub` d'Entra est propre à chaque application : passer Entra par le
+fournisseur générique (`<issuer>|<sub>`) délierait chaque compte déjà relié. Entra n'émet pas
+`email_verified` : une adresse ne compte que si le tenant l'a vérifiée (son nom d'utilisateur
+principal, ou `xms_edov`), règle de `verified_email` dans `server/auth/oidc.py`.
+
+## La connexion nommée dans le journal (lot 4)
+
+Chaque connexion (mot de passe, Entra, fournisseur OpenID Connect, invitation acceptée) reçoit un
+identifiant (`server/auth/sign_in.py`). Le jeton d'accès le porte (`sid`) avec la méthode (`amr`) ;
+la session de rafraîchissement les garde, si bien qu'un rafraîchissement ou un changement
+d'organisation reste la même connexion. Le middleware les lit dans le jeton signé, et chaque entrée
+du journal écrite avec la requête les nomme (colonnes `login_id` et `login_method`, migration `0019`).
+
+La ligne de la connexion elle-même est écrite dans l'organisation où ses jetons agissent :
+`GET /admin/audit` dit qui s'est connecté, comment et d'où ; `?login_id=` liste ce qui a été fait
+sous une connexion, et `GET /admin/sessions` nomme la connexion de chaque session ouverte. Les
+entrées et sessions d'avant n'ont pas d'identifiant ; une session d'avant en reçoit un à son
+prochain rafraîchissement. Un jeton personnel (`/mcp`) ne vient d'aucune connexion et n'en nomme pas.
+
+## Une personne qui part (lot 4)
+
+Désactiver un compte termine toutes les délégations ouvertes que la personne a prêtées ou reçues ;
+la retirer de l'organisation, celles de l'organisation ; la retirer d'un projet, celles du projet
+(`end_delegations_of` de `server/authz/delegation.py`), dans la même transaction, avec leur nombre
+dans l'entrée du journal (`delegations_ended`). Rien d'autre ne l'attend : le quorum d'une carte
+compte des places que n'importe quel approbateur remplit, jamais des personnes nommées, et les
+approbations qu'elle a données restent la trace de qui a approuvé quoi.
+
 ## Pas encore fait
 
 Reste de l'issue #363 :
 
 - SAML 2.0 : il faut vérifier des signatures XML (XML-DSig, canonicalisation), donc une nouvelle
   dépendance native (`xmlsec`) à justifier et à construire sur les trois OS ; un lot à lui ;
-- l'escalade quand une spec attend trop : le serveur n'a pas de tâche périodique, et prévenir un
-  second groupe d'approbateurs demande un événement de plus aux canaux « Besoin de toi » ;
-- dans l'app de bureau et l'app mobile, l'écran qui règle la criticité et gère les délégations
-  (l'API est là) ; l'app mobile lance encore le build après une approbation partielle (le build
-  s'arrête alors sur « revue requise ») : ses dépendances ne sont pas installées ici, ses tests ne
-  tournent pas ;
-- la connexion SSO générique dans l'app mobile (elle ne connaît qu'Entra et les comptes locaux) ;
-- faire passer Entra par le flux générique (découverte, `nonce`, `email_verified`) ;
-- l'audit par session SSO : le jeton d'accès ne porte ni la session ni le fournisseur de connexion,
-  il faut les ajouter à chaque chemin de connexion ;
-- redistribuer les approbations en attente d'un approbateur qui quitte l'organisation, et le SCIM
-  (groupes du fournisseur vers les rôles).
+- le SCIM 2.0 (comptes et groupes poussés par le fournisseur vers les rôles) : un protocole de
+  provisionnement entier (ressources `Users` et `Groups`, filtres, `PATCH`), avec son propre jeton
+  par fournisseur, une surface publique nouvelle à concevoir et sécuriser à part ;
+- le bouton Entra de l'app de bureau mène encore son propre flux : le faire passer par celui du
+  fournisseur générique (`src/main/oidc-pkce.ts`, `state` et `nonce` partagés), comme le téléphone ;
+- l'app de bureau ne montre pas encore la connexion d'une entrée du journal ni d'une session (l'API
+  la donne).

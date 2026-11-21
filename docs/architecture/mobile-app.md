@@ -43,13 +43,22 @@ Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
 
 | Action | Au serveur |
 |---|---|
-| Démarrer | sans spec : phase `spec` ; avec : phase `build`, précédée de l'approbation si la carte demande une revue |
+| Démarrer | sans spec : phase `spec` ; avec : phase `build`, précédée de l'approbation si la carte demande une revue ; si le serveur répond que la carte attend d'autres approbateurs (`approved: false`), rien ne démarre et l'app dit combien d'approbations la carte a (`ApprovalWaiting`) |
 | Approuver la spec | `POST /api/board/cards/{id}/approve` |
 | Arrêter | annule le run en file ou en cours de la carte |
 | Demander des changements | `POST .../request-changes`, puis phase `build` |
 | Fusionner, créer la PR, relancer le build | phases `merge`, `pr`, `build` |
 | Supprimer | `DELETE /api/board/cards/{id}`, après confirmation |
 | Modifier le titre et la description | `PATCH /api/board/cards/{id}`, tant qu'aucune spec n'est écrite (le serveur refuse ensuite, 409) |
+
+L'écran d'une carte montre son approbation telle que le serveur la tient (`GET .../approvals`,
+`src/card/ApprovalSection.tsx`) : sa criticité, que règle une personne qui a `review.approve`
+(`PUT .../criticality`), le compte d'approbations sur le quorum, qui les a données (et pour qui) et
+les rôles qui manquent ; un serveur plus ancien sans cette route garde la ligne de la carte. La page
+« Approbations prêtées » du tableau (`review.approve`, `src/app/(app)/projects/[projectId]/delegations.tsx`)
+liste les délégations du projet, en termine une et prête la sienne à un autre membre du projet qui
+écrit, pour 1 à 90 jours ; le serveur revérifie le collègue, la période et qui peut terminer
+(voir [spec-approval-sso.md](spec-approval-sso.md#prêter-son-approbation-lot-3)).
 
 L'écran d'une carte montre aussi avec quoi elle tourne (moteur, priorité, objectif, `src/card/SettingsSection.tsx`), en lecture seule : l'app de bureau les règle.
 
@@ -211,6 +220,15 @@ id_token et le remet au serveur, qui en vérifie la signature, l'audience et l'�
 (`src/auth/entra.ts`). L'enregistrement Entra doit déclarer cette URI de redirection pour une
 plateforme « Applications mobiles et de bureau » (voir [CONFIGURATION.md](../CONFIGURATION.md)).
 
+« Se connecter par authentification unique » mène le même flux avec le fournisseur OpenID Connect
+du serveur (`src/auth/sso.ts`) : `/auth/config` donne ses adresses, que le serveur a lues dans le
+document de découverte du fournisseur, et l'`id_token` part à `POST /auth/sso/exchange`. Cette
+réponse vient du réseau : l'app revérifie chaque adresse (https, ou http sur la boucle locale, sans
+identifiants ni fragment), l'identifiant du client et les scopes (`openid` compris) avant d'ouvrir
+le navigateur, comme le main du bureau. Le client du fournisseur doit déclarer `workpilot://auth`.
+Les deux fournisseurs partagent `src/auth/code-flow.ts` : PKCE, le `state` que vérifie
+`expo-auth-session`, et un `nonce` que l'`id_token` doit porter avant d'être envoyé.
+
 ## Administration
 
 Les Réglages ouvrent l'administration de l'organisation où la personne agit, comme la vue du bureau :
@@ -254,7 +272,7 @@ n'est pas encore validé, lu dans `review_state.json` comme le fait le build) n'
 terminé » mais « Plan prêt à valider », avec la catégorie `plan_review`. « Valider et construire »
 ouvre l'app (sur iOS, l'appareil doit d'abord être déverrouillé : `isAuthenticationRequired`), demande
 le verrouillage de l'app, puis appelle les routes du bouton Démarrer : `POST …/approve`, puis un run
-`build`. Le serveur revérifie les droits sur les deux ; un refus s'affiche et la carte s'ouvre. Il
+`build`, seulement si l'approbation suffit. Le serveur revérifie les droits sur les deux ; un refus s'affiche et la carte s'ouvre. Il
 n'y a pas de bouton « Arrêter » : le serveur ne notifie que la fin d'un run, il n'y a alors rien à
 arrêter.
 
