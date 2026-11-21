@@ -213,6 +213,26 @@ describe("the session of the project on screen", () => {
 		expect(state().session?.id).toBe("s9");
 	});
 
+	it("drops a late stop or failed start of the project left behind", async () => {
+		state().setSession(session("s1"));
+		state().setStatus("active");
+		let stopped: (value: unknown) => void = vi.fn();
+		api.stopPairSession.mockReturnValueOnce(new Promise((resolve) => (stopped = resolve)));
+		const stopping = stopPairSession("p1", "s1");
+		await loadPairSession("p2");
+		stopped({ success: false, error: "No active session" });
+		await stopping;
+		expect(state()).toMatchObject({ session: null, status: "idle", statusMessage: "" });
+
+		let failed: (reason: unknown) => void = vi.fn();
+		api.startPairSession.mockReturnValueOnce(new Promise((_, reject) => (failed = reject)));
+		const starting = startPairSession({ projectId: "p2" } as never);
+		await loadPairSession("p3");
+		failed(new Error("IPC down"));
+		await starting;
+		expect(state()).toMatchObject({ session: null, status: "idle", statusMessage: "" });
+	});
+
 	it("shows the project of its page, whichever project is selected", async () => {
 		useProjectStore.setState({ selectedProjectId: "p2" });
 		api.getPairSession.mockResolvedValueOnce({ success: true, data: session("s1") });

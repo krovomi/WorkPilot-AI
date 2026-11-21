@@ -7,7 +7,7 @@ import {
 	Loader2,
 	Terminal,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -58,6 +58,13 @@ export function GitSetupModal({
 	// Store remoteConfig in local state to prevent it from being lost
 	const [storedRemoteConfig, setStoredRemoteConfig] = useState(remoteConfig);
 
+	// The parent hears of the outcome once this modal has closed; not after unmount.
+	const notifyTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+	useEffect(() => () => clearTimeout(notifyTimerRef.current), []);
+	const notifyAfterClose = (callback: () => void) => {
+		notifyTimerRef.current = setTimeout(callback, 100);
+	};
+
 	// Update stored remoteConfig when prop changes
 	useEffect(() => {
 		if (remoteConfig) {
@@ -93,43 +100,33 @@ export function GitSetupModal({
 				onOpenChange(false);
 
 				// Then call the parent callback after a short delay
-				setTimeout(() => {
-					onGitInitialized();
-				}, 100);
+				notifyAfterClose(onGitInitialized);
 			} else {
-				setError(result.error || "Failed to initialize git");
-				toast({
-					title: t("gitSetup.errorTitle", "Erreur lors de l'initialisation"),
-					description:
-						result.error ||
-						t("gitSetup.errorDesc", "Impossible d'initialiser le dépôt Git."),
-					variant: "destructive",
-				});
-				setStep("info");
+				reportFailure(result.error);
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to initialize git");
-			toast({
-				title: t("gitSetup.errorTitle", "Erreur lors de l'initialisation"),
-				description:
-					err instanceof Error
-						? err.message
-						: t("gitSetup.errorDesc", "Impossible d'initialiser le dépôt Git."),
-				variant: "destructive",
-			});
-			setStep("info");
+			reportFailure(err instanceof Error ? err.message : undefined);
 		} finally {
 			setIsInitializing(false);
 		}
 	};
 
+	// The reason shown in the modal was English text when git gave none.
+	const reportFailure = (reason: string | undefined) => {
+		const message = reason || t("gitSetup.errorDesc");
+		setError(message);
+		toast({
+			title: t("gitSetup.errorTitle"),
+			description: message,
+			variant: "destructive",
+		});
+		setStep("info");
+	};
+
 	const handleSkip = () => {
 		toast({
-			title: t("gitSetup.skipTitle", "Dépôt Git ignoré"),
-			description: t(
-				"gitSetup.skipDesc",
-				"Vous pourrez initialiser Git plus tard.",
-			),
+			title: t("gitSetup.skipTitle"),
+			description: t("gitSetup.skipDesc"),
 			variant: "default",
 		});
 
@@ -137,9 +134,7 @@ export function GitSetupModal({
 		onOpenChange(false);
 
 		// Then call the parent callback after a short delay
-		setTimeout(() => {
-			onSkip?.();
-		}, 100);
+		if (onSkip) notifyAfterClose(onSkip);
 	};
 
 	const renderInfoStep = () => (
@@ -189,7 +184,7 @@ export function GitSetupModal({
 						{storedRemoteConfig?.url && (
 							<li className="flex items-center gap-2 text-sm text-muted-foreground">
 								<CheckCircle2 className="h-4 w-4 text-primary" />
-								{t("gitSetup.setupRemote", "Configurer le remote")}
+								{t("gitSetup.setupRemote")}
 							</li>
 						)}
 					</ul>

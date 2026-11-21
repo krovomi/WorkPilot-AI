@@ -44,8 +44,8 @@ export default defineConfig({
 			thresholds: {
 				statements: 73.3,
 				lines: 73.7,
-				functions: 71.2,
-				branches: 67.9,
+				functions: 71.4,
+				branches: 68,
 			},
 		},
 		// Mock Electron modules for unit tests

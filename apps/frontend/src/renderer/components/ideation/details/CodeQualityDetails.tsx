@@ -8,7 +8,6 @@ import {
 	TrendingUp,
 } from "lucide-react";
 import {
-	CODE_QUALITY_CATEGORY_LABELS,
 	CODE_QUALITY_SEVERITY_COLORS,
 	IDEATION_EFFORT_COLORS,
 } from "../../../../shared/constants";
@@ -16,6 +15,7 @@ import type { CodeQualityIdea } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
 import { Card } from "../../ui/card";
 import { useTranslation } from "react-i18next";
+import { useIdeaLabels } from "../hooks/useIdeaLabels";
 
 interface CodeQualityDetailsProps {
 	readonly idea: CodeQualityIdea;
@@ -23,6 +23,10 @@ interface CodeQualityDetailsProps {
 
 export function CodeQualityDetails({ idea }: CodeQualityDetailsProps) {
 	const { t } = useTranslation();
+	const labels = useIdeaLabels();
+	// The main process stores `{}` for an idea without metrics.
+	const metrics = idea.metrics ?? {};
+	const hasMetrics = Object.values(metrics).some((value) => value !== undefined);
 	return (
 		<>
 			{/* Metrics */}
@@ -31,7 +35,7 @@ export function CodeQualityDetails({ idea }: CodeQualityDetailsProps) {
 					<div
 						className={`text-lg font-semibold ${CODE_QUALITY_SEVERITY_COLORS[idea.severity]}`}
 					>
-						{idea.severity}
+						{labels.level(idea.severity)}
 					</div>
 					<div className="text-xs text-muted-foreground">{t("ideation:details.severity")}</div>
 				</Card>
@@ -39,7 +43,7 @@ export function CodeQualityDetails({ idea }: CodeQualityDetailsProps) {
 					<div
 						className={`text-lg font-semibold ${IDEATION_EFFORT_COLORS[idea.estimatedEffort]}`}
 					>
-						{idea.estimatedEffort}
+						{labels.level(idea.estimatedEffort)}
 					</div>
 					<div className="text-xs text-muted-foreground">{t("ideation:performanceDetails.effort")}</div>
 				</Card>
@@ -52,7 +56,7 @@ export function CodeQualityDetails({ idea }: CodeQualityDetailsProps) {
 					{t("ideation:performanceDetails.category")}
 				</h3>
 				<Badge variant="outline">
-					{CODE_QUALITY_CATEGORY_LABELS[idea.category]}
+					{labels.category(idea.type, idea.category)}
 				</Badge>
 			</div>
 
@@ -105,40 +109,40 @@ export function CodeQualityDetails({ idea }: CodeQualityDetailsProps) {
 			)}
 
 			{/* Metrics (if available) */}
-			{idea.metrics && (
+			{hasMetrics && (
 				<div>
 					<h3 className="text-sm font-medium mb-2">{t("ideation:details.metrics")}</h3>
 					<div className="grid grid-cols-2 gap-2">
-						{idea.metrics.lineCount && (
+						{metrics.lineCount !== undefined && (
 							<Card className="p-2 text-center">
 								<div className="text-sm font-semibold">
-									{idea.metrics.lineCount}
+									{metrics.lineCount}
 								</div>
 								<div className="text-xs text-muted-foreground">{t("ideation:details.lines")}</div>
 							</Card>
 						)}
-						{idea.metrics.complexity && (
+						{metrics.complexity !== undefined && (
 							<Card className="p-2 text-center">
 								<div className="text-sm font-semibold">
-									{idea.metrics.complexity}
+									{metrics.complexity}
 								</div>
 								<div className="text-xs text-muted-foreground">{t("ideation:details.complexity")}</div>
 							</Card>
 						)}
-						{idea.metrics.duplicateLines && (
+						{metrics.duplicateLines !== undefined && (
 							<Card className="p-2 text-center">
 								<div className="text-sm font-semibold">
-									{idea.metrics.duplicateLines}
+									{metrics.duplicateLines}
 								</div>
 								<div className="text-xs text-muted-foreground">
 									{t("ideation:details.duplicateLines")}
 								</div>
 							</Card>
 						)}
-						{idea.metrics.testCoverage !== undefined && (
+						{metrics.testCoverage !== undefined && (
 							<Card className="p-2 text-center">
 								<div className="text-sm font-semibold">
-									{idea.metrics.testCoverage}%
+									{metrics.testCoverage}%
 								</div>
 								<div className="text-xs text-muted-foreground">
 									{t("ideation:details.testCoverage")}
@@ -150,7 +154,7 @@ export function CodeQualityDetails({ idea }: CodeQualityDetailsProps) {
 			)}
 
 			{/* Affected Files */}
-			{idea.affectedFiles && idea.affectedFiles.length > 0 && (
+			{idea.affectedFiles.length > 0 && (
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<FileCode className="h-4 w-4" />
