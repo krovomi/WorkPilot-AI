@@ -1398,6 +1398,91 @@ body {
   display: none;
 }
 
+/* Card type colours (docs/architecture/kanban-card-colors.md). The left rail
+   above stays the column's; the type owns the background: a glow from the
+   top-right corner and a thin top edge. Every --ct-* value is written per
+   theme by lib/card-type-tokens.ts (AA-checked); without it a card is neutral. */
+.kanban-card[data-card-type] {
+  background:
+    radial-gradient(130% 95% at 100% 0%, var(--ct-halo, transparent) 0%, transparent 62%),
+    var(--card);
+  border-color: var(--ct-line, var(--border));
+}
+
+.kanban-card[data-card-type]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0.9rem;
+  right: 0;
+  height: 2px;
+  border-top-right-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--ct-edge, transparent));
+  pointer-events: none;
+}
+
+.kanban-card[data-card-type] .kanban-card-desc {
+  color: var(--ct-desc, var(--muted-foreground));
+}
+
+/* Blocked by an unfinished dependency: fine amber hatching over the tint. */
+.kanban-card[data-card-blocked] {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--warning) 9%, transparent) 0 6px,
+    transparent 6px 14px
+  );
+}
+
+.kanban-card[data-card-type][data-card-blocked] {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--warning) 9%, transparent) 0 6px,
+      transparent 6px 14px
+    ),
+    radial-gradient(130% 95% at 100% 0%, var(--ct-halo, transparent) 0%, transparent 62%),
+    var(--card);
+}
+
+.card-type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 9999px;
+  border: 1px solid var(--ct-chip-border, var(--border));
+  background-color: var(--ct-chip-bg, var(--muted));
+  color: var(--ct-chip-fg, var(--foreground));
+  padding: 0 0.375rem;
+  font-size: var(--text-3xs, 0.625rem);
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.card-type-chip--proposed {
+  border-style: dashed;
+  background-color: transparent;
+}
+
+.card-type-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 2px var(--card);
+}
+
+@media (forced-colors: active) {
+  .kanban-card[data-card-type],
+  .kanban-card[data-card-blocked] {
+    background: Canvas;
+  }
+  .kanban-card[data-card-type]::after {
+    display: none;
+  }
+}
+
 /* Progress bar working animation - subtle glow sweep */
 @keyframes progress-glow-sweep {
   0% {
