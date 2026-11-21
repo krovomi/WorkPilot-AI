@@ -1157,6 +1157,45 @@
 		color: var(--di-muted);
 	}
 
+	.di-loop-warn {
+		color: var(--di-tokens);
+		font-weight: 600;
+	}
+
+	.di-loop-breakpoint img {
+		max-height: 240px;
+		object-fit: contain;
+		object-position: top;
+	}
+
+	.di-loop-states {
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+		font-size: 0.72rem;
+	}
+
+	.di-loop-states li {
+		display: grid;
+		grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.di-loop-states img {
+		max-width: 100%;
+		max-height: 48px;
+		border: 1px solid var(--di-border);
+		border-radius: 4px;
+		background: var(--di-code-bg);
+	}
+
+	.di-loop-state {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+	}
+
 	.di-loop-issues {
 		display: flex;
 		flex-direction: column;

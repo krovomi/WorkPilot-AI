@@ -4,10 +4,12 @@
  *
  * Secrets and local folders are always masked before a file is written
  * (`apps/backend/replay/bundle.py`); the dialog only offers what may be taken
- * out on top. A bookmark note is Markdown and is shown as text.
+ * out on top. The video is that same masked page, played step by step by the
+ * backend (`apps/backend/replay/video.py`). A bookmark note is Markdown and
+ * is shown as text.
  */
 
-import { Bookmark, Download, Share2, Trash2, Upload } from "lucide-react";
+import { Bookmark, Download, Film, Share2, Trash2, Upload } from "lucide-react";
 import type React from "react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -30,6 +32,8 @@ import { Textarea } from "../ui/textarea";
 
 const MAX_NOTE = 4000;
 
+const NOTICE_TONES = { ok: "green", error: "red", info: "amber" } as const;
+
 type Option = "stripReasoning" | "stripTokens" | "includeFileContents";
 const OPTIONS: Option[] = ["stripReasoning", "stripTokens", "includeFileContents"];
 
@@ -41,13 +45,27 @@ export const ReplayShareButton: React.FC<{ sessionId: string }> = ({ sessionId }
 		stripTokens: false,
 		includeFileContents: false,
 	});
-	const { exporting, exportSession } = useReplayShareStore(
-		useShallow((s) => ({ exporting: s.exporting, exportSession: s.exportSession })),
+	const { exporting, exportSession, recordingVideo, exportVideo } = useReplayShareStore(
+		useShallow((s) => ({
+			exporting: s.exporting,
+			exportSession: s.exportSession,
+			recordingVideo: s.recordingVideo,
+			exportVideo: s.exportVideo,
+		})),
 	);
+	const busy = exporting || recordingVideo;
 	const idPrefix = useId();
 
 	const run = async (format: ReplayExportFormat) => {
 		await exportSession(sessionId, { format, ...options });
+		setOpen(false);
+	};
+
+	const record = async () => {
+		await exportVideo(sessionId, {
+			stripReasoning: options.stripReasoning,
+			stripTokens: options.stripTokens,
+		});
 		setOpen(false);
 	};
 
@@ -84,11 +102,16 @@ export const ReplayShareButton: React.FC<{ sessionId: string }> = ({ sessionId }
 							</div>
 						))}
 					</div>
+					<p className="text-xs text-muted-foreground">{t("replay:share.video.hint")}</p>
 					<div className="flex flex-wrap justify-end gap-2 pt-2">
-						<Button variant="outline" disabled={exporting} onClick={() => run("html")}>
+						<Button variant="outline" disabled={busy} onClick={record}>
+							<Film className="h-4 w-4 mr-1" />
+							{t(recordingVideo ? "replay:share.video.recording" : "replay:share.video.export")}
+						</Button>
+						<Button variant="outline" disabled={busy} onClick={() => run("html")}>
 							{t("replay:share.exportPage")}
 						</Button>
-						<Button disabled={exporting} onClick={() => run("wpreplay")}>
+						<Button disabled={busy} onClick={() => run("wpreplay")}>
 							<Download className="h-4 w-4 mr-1" />
 							{t("replay:share.exportBundle")}
 						</Button>
@@ -119,7 +142,7 @@ export const ReplayShareNotice: React.FC = () => {
 	);
 	if (!notice) return null;
 	return (
-		<Notice tone={notice.tone === "ok" ? "green" : "red"} role="status">
+		<Notice tone={NOTICE_TONES[notice.tone]} role="status">
 			<span>{t(notice.key, notice.values)}</span>
 			<Button variant="ghost" size="sm" className="ml-2" onClick={clearNotice}>
 				{t("replay:share.dismiss")}

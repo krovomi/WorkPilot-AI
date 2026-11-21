@@ -5,7 +5,8 @@ It is written here, from the bundle already masked by `bundle.build_bundle`,
 and it carries no script at all: every text of the session is escaped, the
 steps fold with ``<details>``, and a bookmark is a link to its step. Its
 Content-Security-Policy allows only its own style sheet, by hash, so a text
-that slipped through as markup would still run nothing.
+that slipped through as markup would still run nothing. A summary a model
+wrote of the steps is shown above them, said to be a model's.
 
 The page speaks English or French, as the app that wrote it.
 """
@@ -45,6 +46,8 @@ LABELS: dict[str, dict[str, str]] = {
         "tokens_removed": "Token counts and costs were removed before export.",
         "no_steps": "This session has no steps.",
         "exported": "Exported by WorkPilot AI",
+        "summary": "Summary of the steps",
+        "summary_by": "Written by a model ({model}) from the recorded steps.",
     },
     "fr": {
         "title": "Rejeu d'agent",
@@ -71,6 +74,8 @@ LABELS: dict[str, dict[str, str]] = {
         "tokens_removed": "Les tokens et les coûts ont été retirés avant l'export.",
         "no_steps": "Cette session n'a aucune étape.",
         "exported": "Exporté par WorkPilot AI",
+        "summary": "Résumé des étapes",
+        "summary_by": "Écrit par un modèle ({model}) à partir des étapes enregistrées.",
     },
 }
 
@@ -184,6 +189,19 @@ def _bookmarks(bookmarks: list[dict[str, Any]], t: dict[str, str]) -> str:
     return f"<h2>{_e(t['bookmarks'])}</h2><ol class=marks>{items}</ol>"
 
 
+def _summary(summary: Any, t: dict[str, str]) -> str:
+    if not isinstance(summary, dict) or not summary.get("text"):
+        return ""
+    model = " · ".join(
+        str(part) for part in (summary.get("provider"), summary.get("model")) if part
+    )
+    by = t["summary_by"].format(model=model or "?")
+    return (
+        f'<h2 id="summary">{_e(t["summary"])}</h2><p class=note>{_e(by)}</p>'
+        f"<pre>{_e(summary['text'])}</pre>"
+    )
+
+
 def _notes(bundle: dict[str, Any], t: dict[str, str]) -> str:
     notes = [t["redacted"]]
     if bundle.get("thinking") == "removed":
@@ -234,6 +252,6 @@ def render_viewer(bundle: dict[str, Any], language: str = "en") -> str:
         '<meta name="referrer" content="no-referrer">'
         f"<title>{_e(t['title'])}</title><style>{STYLE}</style></head><body><main>"
         f"<h1>{_e(t['title'])}</h1><dl>{facts}</dl>{_notes(bundle, t)}"
-        f"{_bookmarks(bookmarks, t)}<h2>{_e(t['steps'])}</h2>{timeline}"
+        f"{_summary(session.get('summary'), t)}{_bookmarks(bookmarks, t)}<h2>{_e(t['steps'])}</h2>{timeline}"
         f"<footer>{_e(t['exported'])}</footer></main></body></html>"
     )

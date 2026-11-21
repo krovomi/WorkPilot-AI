@@ -124,6 +124,43 @@ describe("IterationPanel", () => {
 		expect(screen.getByText('loop.masked {"zones":"Avatar"}')).toBeInTheDocument();
 	});
 
+	it("names the budget that stopped the loop, and what it spent", () => {
+		const spend = {
+			input_tokens: 9,
+			output_tokens: 1,
+			tokens: 10,
+			estimated: false,
+			cost_status: "priced" as const,
+			cost_usd: 0.004,
+			max_tokens: 100,
+			max_cost_usd: 2,
+			cost_budget_checked: true,
+		};
+		const { rerender } = render(<IterationPanel loop={loop({ status: "budget", budget_kind: "tokens", spend })} />);
+		expect(screen.getByText('loop.status.budget_tokens {"score":"95.1"}')).toBeInTheDocument();
+		expect(screen.getByTestId("design-loop-spend")).toHaveTextContent('loop.spend.cost {"cost":"0.0040","max":"2.00"}');
+
+		rerender(<IterationPanel loop={loop({ status: "budget", budget_kind: "cost" })} />);
+		expect(screen.getByText('loop.status.budget_cost {"score":"95.1"}')).toBeInTheDocument();
+		expect(screen.queryByTestId("design-loop-spend")).toBeNull();
+
+		rerender(<IterationPanel loop={loop({ status: "budget", budget_kind: "time" })} />);
+		expect(screen.getByText('loop.status.budget {"score":"95.1"}')).toBeInTheDocument();
+	});
+
+	it("shows the passes asked for under the differences", () => {
+		const { rerender } = render(<IterationPanel loop={loop()} />);
+		expect(screen.queryByTestId("design-loop-responsive")).toBeNull();
+		expect(screen.queryByTestId("design-loop-states")).toBeNull();
+		rerender(
+			<IterationPanel
+				loop={loop({ responsive: { status: "failed", detail: "no_browser" }, states: { status: "done", elements: [] } })}
+			/>,
+		);
+		expect(screen.getByTestId("design-loop-responsive")).toBeInTheDocument();
+		expect(screen.getByTestId("design-loop-states")).toBeInTheDocument();
+	});
+
 	it("lists every difference with what became of it", () => {
 		render(
 			<IterationPanel

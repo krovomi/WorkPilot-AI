@@ -22,7 +22,11 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ScreenshotSource } from "../../shared/types/screenshot";
+import {
+	SCREENSHOT_ERROR_CODES,
+	type ScreenshotErrorCode,
+	type ScreenshotSource,
+} from "../../shared/types/screenshot";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -59,9 +63,13 @@ const getPasteShortcut = (): string => {
 const isScreenSource = (source: ScreenshotSource): boolean =>
 	source.id.startsWith("screen:");
 
-/** The translated failure, then what the main process said, if anything. */
+/** The translated failure, then why, if anything says so. */
 const withDetail = (message: string, detail?: string): string =>
 	detail ? `${message}\n${detail}` : message;
+
+/** The main process answers a stable code; anything else is not shown. */
+const isErrorCode = (value: unknown): value is ScreenshotErrorCode =>
+	SCREENSHOT_ERROR_CODES.includes(value as ScreenshotErrorCode);
 
 export function ScreenshotCapture({
 	open,
@@ -69,6 +77,11 @@ export function ScreenshotCapture({
 	onCapture,
 }: ScreenshotCaptureProps) {
 	const { t } = useTranslation(["tasks", "common"]);
+	const reason = useCallback(
+		(code: unknown) =>
+			isErrorCode(code) ? t(`tasks:screenshot.errors.codes.${code}`) : undefined,
+		[t],
+	);
 	const [sources, setSources] = useState<ScreenshotSource[]>([]);
 	const [selectedSource, setSelectedSource] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
@@ -96,7 +109,7 @@ export function ScreenshotCapture({
 			if (result.success && result.data) {
 				setSources(result.data);
 			} else {
-				setError(withDetail(t("tasks:screenshot.errors.getSources"), result.error));
+				setError(withDetail(t("tasks:screenshot.errors.getSources"), reason(result.error)));
 			}
 		} catch (err) {
 			console.error("Failed to fetch screenshot sources:", err);
@@ -109,7 +122,7 @@ export function ScreenshotCapture({
 		} finally {
 			setIsLoading(false);
 		}
-	}, [t]);
+	}, [t, reason]);
 
 	// Fetch sources when dialog opens
 	useEffect(() => {
@@ -131,7 +144,7 @@ export function ScreenshotCapture({
 				onOpenChange(false);
 				setSelectedSource(null);
 			} else {
-				setError(withDetail(t("tasks:screenshot.errors.capture"), result.error));
+				setError(withDetail(t("tasks:screenshot.errors.capture"), reason(result.error)));
 			}
 		} catch (err) {
 			console.error("Failed to capture screenshot:", err);

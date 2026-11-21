@@ -18,6 +18,7 @@ from self_healing.incident_responder import mcp_connector
 from self_healing.incident_responder.mcp_connector import MCPSourceConfig
 from self_healing.incident_responder.models import (
     FragilityReport,
+    HealingOperation,
     HealingStatus,
     Incident,
     IncidentMode,
@@ -123,6 +124,26 @@ def test_a_disconnected_source_leaves_the_status(project):
     assert asyncio.run(orch.disconnect_production_source(IncidentSource.SENTRY))
 
     assert orch.get_dashboard_data()["productionStatus"]["connected_sources"] == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        IncidentSource.SENTRY,
+        IncidentSource.DATADOG,
+        IncidentSource.CLOUDWATCH,
+        IncidentSource.NEW_RELIC,
+        IncidentSource.PAGERDUTY,
+    ],
+)
+def test_a_connected_source_without_a_reader_reports_nothing(project, source):
+    orch = _orch(project)
+    config = MCPSourceConfig(source=source, server_url="https://mcp.invalid")
+
+    assert asyncio.run(orch.connect_production_source(config))
+
+    assert asyncio.run(orch.poll_production_incidents()) == []
+    assert orch.production.get_status()["connected_sources"] == [source.value]
 
 
 def test_an_unknown_source_has_no_adapter(project):
@@ -324,6 +345,24 @@ def test_only_an_operation_in_progress_is_cancelled(project):
     assert orch.cancel_operation(running.id)
     assert running.incident.status == HealingStatus.FAILED
     assert not orch.cancel_operation("no-such-id")
+
+
+def test_an_operation_without_an_incident_is_cancelled(project):
+    orch = _orch(project)
+    orphan = HealingOperation()
+    orch._operations.append(orphan)
+
+    assert orch.cancel_operation(orphan.id)
+    assert orphan.completed_at and not orphan.success
+
+
+def test_a_step_completed_without_detail_keeps_its_own():
+    operation = HealingOperation()
+    step = operation.add_step("Reading", detail="started from the log")
+
+    operation.complete_step(step, "completed")
+
+    assert (step.status, step.detail) == ("completed", "started from the log")
 
 
 def test_a_pipeline_that_breaks_fails_the_incident(project, monkeypatch):

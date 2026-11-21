@@ -19,6 +19,7 @@
 		"all": "All"
 	},
 	"empty": {
+		"noIssues": "No issues found",
 		"noMatch": "No issues match your search",
 		"selectIssue": "Select an issue to view details"
 	},
@@ -56,7 +57,20 @@
 		"cancel": "Cancel",
 		"done": "Done",
 		"close": "Close",
-		"investigateAria": "Investigate issue"
+		"investigateAria": "Investigate issue",
+		"failed": "The task could not be created",
+		"phases": {
+			"fetching": "Reading the issue...",
+			"analyzing": "Analyzing the issue...",
+			"creating_task": "Creating the task...",
+			"complete": "Task created"
+		}
+	},
+	"errors": {
+		"loadIssues": "Failed to load GitLab issues",
+		"checkConnection": "Failed to check GitLab connection",
+		"createCard": "Failed to create the card",
+		"unknown": "Unknown error"
 	},
 	"settings": {
 		"enableIssues": "Enable GitLab Issues",

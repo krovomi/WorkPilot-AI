@@ -261,10 +261,8 @@ class FragilityAnalyzer:
                 timeout=30,
             )
             if result.returncode == 0:
-                for line in result.stdout.splitlines():
-                    line = line.strip()
-                    if line:
-                        churn[line] = churn.get(line, 0) + 1
+                for name in filter(None, map(str.strip, result.stdout.splitlines())):
+                    churn[name] = churn.get(name, 0) + 1
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
             logger.warning(f"Git churn analysis failed: {e}")
 

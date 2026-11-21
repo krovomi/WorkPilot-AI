@@ -17,6 +17,7 @@ import {
 import { useProjectStore } from "../../../stores/project-store";
 import { createTask } from "../../../stores/task-store";
 import { buildDesignTaskDescription } from "./design-task";
+import { LoopOptions } from "./LoopOptions";
 
 const GROUPS: DesignStackGroup[] = ["web", "mobile", "desktop"];
 
@@ -117,6 +118,7 @@ export function DesignComposer() {
 	const sourceType = useDesignToCodeStore((s) => s.sourceType);
 	const designSystemPath = useDesignToCodeStore((s) => s.designSystemPath);
 	const customInstructions = useDesignToCodeStore((s) => s.customInstructions);
+	const renderLoop = useDesignToCodeStore((s) => s.renderLoop);
 	const writing = useDesignToCodeStore((s) => s.writing);
 	const writeOutcome = useDesignToCodeStore((s) => s.writeOutcome);
 	const setSourceType = useDesignToCodeStore((s) => s.setSourceType);
@@ -302,6 +304,8 @@ export function DesignComposer() {
 							size={Math.max(12, Math.min(figmaUrl.length, 32))}
 						/>
 					</label>
+
+					{renderLoop && <LoopOptions disabled={running} />}
 
 				</div>
 			</div>

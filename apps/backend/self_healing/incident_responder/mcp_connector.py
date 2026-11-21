@@ -78,21 +78,19 @@ class MCPSourceAdapter:
         logger.info(f"MCP adapter connected: {self.source.value}")
         return True
 
-    async def disconnect(self) -> bool:
+    async def disconnect(self) -> None:
         """Disconnect from the MCP server."""
         self._connected = False
         logger.info(f"MCP adapter disconnected: {self.source.value}")
-        return True
 
     async def poll_incidents(self) -> list[ProductionIncidentData]:
         """Poll for new incidents from this source.
 
         In practice, this calls the MCP server's tools to list recent errors.
         The specific tool names depend on the MCP server implementation.
-        """
-        if not self._connected:
-            return []
 
+        Only a connected adapter is ever polled: the connector keeps no other.
+        """
         # This is a framework method. Actual implementation would use
         # the MCP server tools via the Claude SDK runtime.
         return []
@@ -179,11 +177,10 @@ class MCPConnector:
         if not adapter:
             return False
 
-        success = await adapter.disconnect()
-        if success:
-            del self._adapters[source]
-            self._configs.pop(source, None)
-        return success
+        await adapter.disconnect()
+        del self._adapters[source]
+        self._configs.pop(source, None)
+        return True
 
     async def poll_all(self) -> list[tuple[IncidentSource, ProductionIncidentData]]:
         """Poll all connected sources for new incidents, each with its source."""

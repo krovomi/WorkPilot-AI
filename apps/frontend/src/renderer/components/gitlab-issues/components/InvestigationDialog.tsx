@@ -44,7 +44,7 @@ export function InvestigationDialog({
 
 			window.electronAPI
 				.getGitLabIssueNotes(projectId, selectedIssue.iid)
-				.then((result: { success: boolean; data?: GitLabNote[] }) => {
+				.then((result: { success: boolean; data?: GitLabNote[]; error?: string }) => {
 					if (!isMounted) return;
 					if (result.success && result.data) {
 						// Filter out system notes
@@ -52,14 +52,16 @@ export function InvestigationDialog({
 						setNotes(userNotes);
 						// By default, select all notes
 						setSelectedNoteIds(userNotes.map((n: GitLabNote) => n.id));
+					} else {
+						// Not "no notes": the task would leave out what they say.
+						setFetchNotesError(result.error ?? "");
 					}
 				})
 				.catch((err: unknown) => {
 					if (!isMounted) return;
 					console.error("Failed to fetch notes:", err);
-					setFetchNotesError(
-						err instanceof Error ? err.message : "Failed to load notes",
-					);
+					// The heading says it failed; the detail is what the error said, if anything.
+					setFetchNotesError(err instanceof Error ? err.message : "");
 				})
 				.finally(() => {
 					if (isMounted) {
@@ -122,14 +124,16 @@ export function InvestigationDialog({
 							<div className="flex items-center justify-center py-8">
 								<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
 							</div>
-						) : fetchNotesError ? (
+						) : fetchNotesError !== null ? (
 							<div className="rounded-lg bg-destructive/10 border border-destructive/30 p-4">
 								<p className="text-sm text-destructive font-medium">
 									{t("investigation.failedToLoadNotes")}
 								</p>
-								<p className="text-xs text-destructive/80 mt-1">
-									{fetchNotesError}
-								</p>
+								{fetchNotesError && (
+									<p className="text-xs text-destructive/80 mt-1">
+										{fetchNotesError}
+									</p>
+								)}
 							</div>
 						) : notes.length > 0 ? (
 							<div className="space-y-2 flex-1 min-h-0 flex flex-col">
@@ -200,21 +204,31 @@ export function InvestigationDialog({
 					</div>
 				) : (
 					<div className="space-y-4">
-						<div className="space-y-2">
-							<div className="flex items-center justify-between text-sm">
-								<span className="text-muted-foreground">
-									{investigationStatus.message}
-								</span>
-								<span className="text-foreground">
-									{investigationStatus.progress}%
-								</span>
+						{investigationStatus.phase === "error" ? (
+							<div
+								role="alert"
+								className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive"
+							>
+								<p className="font-medium">{t("investigation.failed")}</p>
+								{/* What the main process said, when it said anything */}
+								{(investigationStatus.error || investigationStatus.message) && (
+									<p className="mt-1 text-xs text-destructive/80">
+										{investigationStatus.error || investigationStatus.message}
+									</p>
+								)}
 							</div>
-							<Progress value={investigationStatus.progress} className="h-2" />
-						</div>
-
-						{investigationStatus.phase === "error" && (
-							<div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
-								{investigationStatus.error}
+						) : (
+							<div className="space-y-2">
+								<div className="flex items-center justify-between text-sm">
+									{/* The phase, not the main process's English message */}
+									<span className="text-muted-foreground">
+										{t(`investigation.phases.${investigationStatus.phase}`)}
+									</span>
+									<span className="text-foreground">
+										{investigationStatus.progress}%
+									</span>
+								</div>
+								<Progress value={investigationStatus.progress} className="h-2" />
 							</div>
 						)}
 

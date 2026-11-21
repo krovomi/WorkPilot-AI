@@ -25,7 +25,7 @@ const api = {
 	dictationTranscribe: vi.fn(),
 	dictationCancel: vi.fn(),
 };
-const stop = vi.fn();
+const stop = Object.assign(vi.fn(), { flush: vi.fn() });
 let chunk: (audio: ArrayBuffer) => void;
 let ended: () => void;
 const originalApi = window.electronAPI;

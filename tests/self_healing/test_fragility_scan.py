@@ -198,6 +198,7 @@ def test_coverage_is_read_from_istanbul_summary_and_final_reports(tmp_path):
                 "total": {"lines": {"pct": 50}},
                 str(tmp_path / "src" / "a.ts"): {"lines": {"pct": 80}},
                 "src/d.ts": {"lines": {"pct": "Unknown"}},
+                "src/e.ts": "not an entry",
             }
         ),
     )
