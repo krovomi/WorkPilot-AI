@@ -3,7 +3,7 @@
  * language from the renderer's own texts, never sent by the renderer.
  */
 import { describe, expect, it } from "vitest";
-import { findDevicePreset } from "../../../shared/constants/device-presets";
+import { findDevicePreset, orientDevice } from "../../../shared/constants/device-presets";
 import { findCpuProfile, findNetworkProfile } from "../../../shared/constants/emulation-throttling";
 import type { CpuProfile, DevicePreset, NetworkProfile } from "../../../shared/types/device-matrix";
 import { gridCaption } from "../grid-labels";
@@ -34,5 +34,19 @@ describe("gridCaption", () => {
 			label: "prototype",
 			detail: "1920 × 1080 @1x · CPU 2× slower",
 		});
+	});
+
+	it("says when the device was turned", () => {
+		const phone = findDevicePreset("pixel-8") as DevicePreset;
+		expect(gridCaption(orientDevice(phone, "landscape"), network("none"), cpu("1x"), "fr").detail).toBe(
+			"915 × 412 @2.625x · Paysage",
+		);
+		const tablet = findDevicePreset("ipad-mini") as DevicePreset;
+		expect(gridCaption(orientDevice(tablet, "landscape"), network("none"), cpu("1x"), "en").detail).toBe(
+			"1024 × 768 @2x · Landscape",
+		);
+		expect(gridCaption({ ...device, width: 1080, height: 1920 }, network("none"), cpu("1x"), "en").detail).toBe(
+			"1080 × 1920 @1x · Portrait",
+		);
 	});
 });

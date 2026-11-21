@@ -8,7 +8,7 @@
  * l'appareil, pour que le serveur réponde ce qu'il répondrait à un vrai
  * téléphone.
  */
-import type { DevicePreset } from "../types/device-matrix";
+import type { DeviceOrientation, DevicePreset } from "../types/device-matrix";
 
 const IOS_PHONE_UA =
 	"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
@@ -46,4 +46,32 @@ export const DEFAULT_MATRIX_DEVICE_IDS: readonly string[] = [
 export function findDevicePreset(id: unknown): DevicePreset | undefined {
 	if (typeof id !== "string") return undefined;
 	return DEVICE_PRESETS.find((device) => device.id === id);
+}
+
+export const DEVICE_ORIENTATIONS: readonly DeviceOrientation[] = ["portrait", "landscape"];
+
+/** Le sens d'un identifiant reçu, ou `undefined`. */
+export function findOrientation(value: unknown): DeviceOrientation | undefined {
+	return DEVICE_ORIENTATIONS.find((orientation) => orientation === value);
+}
+
+/** Le sens d'une fenêtre : plus large que haute, c'est un paysage. */
+export function orientationOf(device: Pick<DevicePreset, "width" | "height">): DeviceOrientation {
+	return device.width > device.height ? "landscape" : "portrait";
+}
+
+/**
+ * L'appareil tourné dans `orientation` : largeur et hauteur échangées quand ce
+ * n'est pas son sens naturel (un téléphone ou une tablette en paysage). Un
+ * ordinateur ou un téléviseur ne se tourne pas : il garde sa fenêtre.
+ */
+export function orientDevice(device: DevicePreset, orientation: DeviceOrientation): DevicePreset {
+	if (!device.mobile || orientationOf(device) === orientation) return device;
+	return { ...device, width: device.height, height: device.width };
+}
+
+/** L'appareil n'est pas dans le sens de son preset : il a été tourné. */
+export function isRotated(device: DevicePreset): boolean {
+	const preset = findDevicePreset(device.id) ?? device;
+	return orientationOf(preset) !== orientationOf(device);
 }
