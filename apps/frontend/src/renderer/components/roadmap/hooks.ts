@@ -92,18 +92,23 @@ export function useFeatureActions() {
 }
 
 /**
- * Writes the roadmap as the store holds it now. A refusal (on a server
- * project, a teammate saved first) shows what is saved rather than an edit
- * that is not; a failure is said.
+ * Writes the roadmap as the store holds it now. A save that does not land
+ * (on a server project, a teammate saved first; or the file could not be
+ * written) shows what is saved rather than an edit that is not, and says so.
  */
 async function persistRoadmap(projectId: string) {
 	const roadmap = useRoadmapStore.getState().roadmap;
 	if (!roadmap) return;
+	const saveFailed = () =>
+		toast({ variant: "destructive", title: i18n.t("roadmap:save.saveError") });
 	try {
 		const result = await window.electronAPI.saveRoadmap(projectId, roadmap);
-		if (!result.success) await loadRoadmap(projectId);
+		if (!result.success) {
+			saveFailed();
+			await loadRoadmap(projectId);
+		}
 	} catch {
-		toast({ variant: "destructive", title: i18n.t("roadmap:save.saveError") });
+		saveFailed();
 	}
 }
 

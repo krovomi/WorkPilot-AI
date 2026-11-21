@@ -687,10 +687,7 @@ function PRDetailPage({
 				{/* Code Quality Score - show after review completes */}
 				{qualityScore.score && reviewResult?.success && (
 					<div className="animate-in fade-in slide-in-from-top-2 duration-300">
-						<QualityScorePanel
-							score={qualityScore.score}
-							isLoading={qualityScore.isLoading}
-						/>
+						<QualityScorePanel score={qualityScore.score} />
 					</div>
 				)}
 

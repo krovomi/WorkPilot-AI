@@ -280,6 +280,18 @@ describe("usePtyProcess, recreation", () => {
 		expect(isRecreatingRef.current).toBe(false);
 	});
 
+	it("reports a recreation whose every attempt fails, after thirty retries", async () => {
+		vi.useFakeTimers();
+		api.createTerminal.mockResolvedValue({ success: false, error: "busy" });
+		const isRecreatingRef = { current: true };
+		pty({ isRecreatingRef });
+		await elapse(4_000);
+		expect(api.createTerminal).toHaveBeenCalledTimes(31);
+		expect(onError).toHaveBeenCalledOnce();
+		expect(onError).toHaveBeenCalledWith("busy");
+		expect(isRecreatingRef.current).toBe(false);
+	});
+
 	it("retries a failed recreation, and stops retrying once unmounted", async () => {
 		vi.useFakeTimers();
 		api.createTerminal.mockResolvedValueOnce({ success: false, error: "busy" });

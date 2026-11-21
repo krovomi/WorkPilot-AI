@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -71,6 +72,37 @@ def validate_endpoint(endpoint: str) -> None:
         )
 
 
+class GitLabAPIError(Exception):
+    """A GitLab request that failed.
+
+    ``status`` is the HTTP status GitLab answered with, or ``None`` when the
+    instance could not be reached at all.
+    """
+
+    def __init__(self, status: int | None, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+def _retry_wait(retry_after: str | None, attempt: int) -> int:
+    """Seconds to wait before retrying a rate-limited request.
+
+    ``Retry-After`` is either whole seconds or an HTTP date; without a usable
+    one the wait doubles with each attempt (1s, 2s, 4s).
+    """
+    if retry_after:
+        try:
+            return max(0, int(retry_after))
+        except ValueError:
+            try:
+                retry_date = parsedate_to_datetime(retry_after)
+                delta = (retry_date - datetime.now(UTC)).total_seconds()
+                return max(1, int(delta))
+            except (ValueError, TypeError):
+                pass
+    return 2**attempt
+
+
 class GitLabClient:
     """Client for GitLab API operations."""
 
@@ -87,8 +119,6 @@ class GitLabClient:
     def _api_url(self, endpoint: str) -> str:
         """Build full API URL."""
         base = self.config.instance_url.rstrip("/")
-        if not endpoint.startswith("/"):
-            endpoint = f"/{endpoint}"
         return f"{base}/api/v4{endpoint}"
 
     def _fetch(
@@ -111,8 +141,9 @@ class GitLabClient:
         if data:
             request_data = json.dumps(data).encode("utf-8")
 
-        last_error = None
-        for attempt in range(max_retries):
+        attempts = max(1, max_retries)
+        attempt = 0
+        while True:
             req = urllib.request.Request(
                 url,
                 data=request_data,
@@ -126,52 +157,31 @@ class GitLabClient:
                 ) as response:
                     if response.status == 204:
                         return None
-                    response_body = response.read().decode("utf-8")
-                    try:
-                        return json.loads(response_body)
-                    except json.JSONDecodeError as e:
-                        raise Exception(
-                            f"Invalid JSON response from GitLab: {e}"
-                        ) from e
+                    return json.loads(response.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
-                error_body = e.read().decode("utf-8") if e.fp else ""
-                last_error = e
+                error_body = e.read().decode("utf-8", errors="replace")
 
-                # Handle rate limit (429) with exponential backoff
-                if e.code == 429:
-                    # Default to exponential backoff: 1s, 2s, 4s
-                    wait_time = 2**attempt
+                # Rate limited (429): wait, then try again while attempts remain
+                if e.code == 429 and attempt < attempts - 1:
+                    wait_time = _retry_wait(e.headers.get("Retry-After"), attempt)
+                    print(
+                        f"[GitLab] Rate limited (429). Retrying in {wait_time}s "
+                        f"(attempt {attempt + 1}/{attempts})...",
+                        flush=True,
+                    )
+                    time.sleep(wait_time)
+                    attempt += 1
+                    continue
 
-                    # Check for Retry-After header (can be integer seconds or HTTP-date)
-                    retry_after = e.headers.get("Retry-After")
-                    if retry_after:
-                        try:
-                            # Try parsing as integer seconds first
-                            wait_time = int(retry_after)
-                        except ValueError:
-                            # Try parsing as HTTP-date (e.g., "Wed, 21 Oct 2015 07:28:00 GMT")
-                            try:
-                                retry_date = parsedate_to_datetime(retry_after)
-                                now = datetime.now(UTC)
-                                delta = (retry_date - now).total_seconds()
-                                wait_time = max(1, int(delta))  # At least 1 second
-                            except (ValueError, TypeError):
-                                # Parsing failed, keep exponential backoff default
-                                pass
-
-                    if attempt < max_retries - 1:
-                        print(
-                            f"[GitLab] Rate limited (429). Retrying in {wait_time}s "
-                            f"(attempt {attempt + 1}/{max_retries})...",
-                            flush=True,
-                        )
-                        time.sleep(wait_time)
-                        continue
-
-                raise Exception(f"GitLab API error {e.code}: {error_body}") from e
-
-        # Should not reach here, but just in case
-        raise Exception(f"GitLab API error after {max_retries} retries") from last_error
+                raise GitLabAPIError(
+                    e.code, f"GitLab API error {e.code}: {error_body}"
+                ) from e
+            except (urllib.error.URLError, TimeoutError) as e:
+                reason = getattr(e, "reason", e)
+                raise GitLabAPIError(
+                    None,
+                    f"Could not reach GitLab at {self.config.instance_url}: {reason}",
+                ) from e
 
     def get_mr(self, mr_iid: int) -> dict:
         """Get MR details."""

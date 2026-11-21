@@ -316,7 +316,16 @@
 	"prFiles": {
 		"renamedFrom": "(anciennement : {{name}})",
 		"loadingTitle": "Chargement des fichiers de la PR",
-		"loading": "Chargement des fichiers de la pull request..."
+		"loading": "Chargement des fichiers de la pull request...",
+		"states": {
+			"open": "Ouverte",
+			"closed": "Fermée"
+		},
+		"errors": {
+			"invalidUrl": "Ce lien n'est pas une pull request GitHub ou Azure DevOps.",
+			"fetchFailed": "La pull request n'a pas pu être chargée.",
+			"noData": "La pull request est revenue vide."
+		}
 	},
 	"taskPanel": {
 		"noFilesInSubtask": "Aucun fichier dans cette sous-tâche",
