@@ -106,6 +106,9 @@
 		"sessionCompaction": "Session Compaction",
 		"criticalPhases": "Key steps",
 		"lastError": "Last error",
+		"compactionSummaryClean": "{{completed}}/{{total}} phases completed, no failures.",
+		"compactionSummaryFailed_one": "{{completed}}/{{total}} phases completed, {{count}} needs attention. Last issue at phase {{index}}: {{title}}",
+		"compactionSummaryFailed_other": "{{completed}}/{{total}} phases completed, {{count}} need attention. Last issue at phase {{index}}: {{title}}",
 		"automation": "Automations",
 		"automationTooltip": "Created by the automation rule “{{rule}}”"
 	},
@@ -273,7 +276,10 @@
 		"bulkRestoreSuccess": "{{count}} task(s) restored",
 		"sortActiveDragHint": "Manual reordering is disabled while a sort is active. Switch back to \"Manual order\" to drag and drop.",
 		"aging": {
-			"idleFor": "Idle for {{duration}}"
+			"idleFor": "Idle for {{duration}}",
+			"days": "{{count}}d",
+			"hours": "{{count}}h",
+			"minutes": "{{count}}min"
 		},
 		"stale": {
 			"chip": "{{count}} idle",
@@ -833,8 +839,8 @@
 		},
 		"errors": {
 			"descriptionRequired": "Please provide a description",
-			"maxImagesReached": "Maximum of 5 images allowed",
-			"invalidImageType": "Invalid image type. Allowed: PNG, JPEG, GIF, WebP",
+			"maxImagesReached": "Maximum of {{max}} images allowed",
+			"invalidImageType": "Invalid image type. Allowed: {{types}}",
 			"processPasteFailed": "Failed to process pasted image",
 			"processDropFailed": "Failed to process dropped image"
 		},
@@ -1066,6 +1072,10 @@
 		"capture": "Capture",
 		"capturing": "Capturing...",
 		"noSources": "No screens or windows found",
+		"kind": {
+			"screen": "Screen",
+			"window": "Window"
+		},
 		"errors": {
 			"getSources": "Failed to get screenshot sources",
 			"fetchSources": "Failed to fetch screenshot sources",
@@ -2614,7 +2624,8 @@
 		"chip": "Circuit breaker: {{tool}}",
 		"body": "The agent called {{tool}} {{repeats}} times with the same arguments and got the same result each time, with no file changed in between. The task paused itself rather than pay for a loop.",
 		"hint": "Read its logs. Resume restarts the phase with the same conversation; if it loops again, switch the model or make the task more precise.",
-		"killSwitch": "Stopped by Stop all agents"
+		"killSwitch": "Stopped by Stop all agents",
+		"voiceStop": "Stopped by voice after its step"
 	},
 	"safetyPause": {
 		"anomalyChip": "Trust score: {{score}}/100",
@@ -2665,5 +2676,12 @@
 		},
 		"anomalyLine_one": "{{label}}",
 		"anomalyLine_other": "{{label}} (×{{count}})"
+	},
+	"policyPause": {
+		"hoursChip": "Outside allowed hours",
+		"hoursBody": "workpilot.policy.yaml lets agents work {{hours}} ({{timezone}}). The task paused itself once its current action had finished.",
+		"budgetChip": "Token budget reached",
+		"budgetBody": "The project's agents spent {{spent}} tokens in the last hour, at or past the {{limit}} workpilot.policy.yaml allows.",
+		"hint": "Resume it when the policy allows again; the decision is in the audit trail of Settings > Guardrails."
 	}
 }

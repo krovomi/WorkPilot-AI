@@ -25,6 +25,7 @@ vi.mock("electron", () => ({
 
 import { registerServerWorkspaceHandlers } from "../ipc-handlers/server-workspace-handlers";
 import {
+	fetchServerComparison,
 	fetchServerCostSummary,
 	fetchServerDashboard,
 	fetchServerSessions,
@@ -186,12 +187,46 @@ describe("a server project's workspace", () => {
 	});
 });
 
+describe("a server project's comparison", () => {
+	it("reads medians from the server and never lists another project", async () => {
+		answered({
+			window_days: 30,
+			min_group: 5,
+			segment: { stack: "python", size: "small" },
+			recent: { specs: 1, minutes: 12, cost: 0.5, qa_iterations: null, agents: 2 },
+			previous: { specs: 0 },
+			trend: {},
+			groups: { all: { projects: 6, medians: { minutes: 20, cost: 1 } } },
+			// A server that sent names anyway: they are not shown.
+			projects: [{ name: "Someone else's project", specs: 3 }],
+		});
+		const result = await fetchServerComparison(project);
+		expect(mocks.authedFetch).toHaveBeenCalledWith(
+			"/api/features/workspace/compare?project_id=p%201",
+			"GET",
+		);
+		expect(result.success).toBe(true);
+		expect(result.data?.projects).toEqual([]);
+		expect(result.data?.min_group).toBe(5);
+		expect(result.data?.groups.all.medians?.minutes).toBe(20);
+		expect(result.data?.groups.segment.medians).toBeNull();
+	});
+
+	it("passes a refusal on and refuses an answer that is not one", async () => {
+		mocks.authedFetch.mockResolvedValueOnce({ ok: false, error: "Forbidden" });
+		expect(await fetchServerComparison(project)).toEqual({ success: false, error: "Forbidden" });
+		answered([]);
+		expect((await fetchServerComparison(project)).success).toBe(false);
+	});
+});
+
 describe("the workspace channels", () => {
 	registerServerWorkspaceHandlers();
 
 	it("answer only for a server project the app listed", async () => {
 		mocks.getServerProject.mockReturnValue(undefined);
 		for (const channel of [
+			IPC_CHANNELS.SERVER_WORKSPACE_COMPARE,
 			IPC_CHANNELS.SERVER_WORKSPACE_COSTS,
 			IPC_CHANNELS.SERVER_WORKSPACE_DASHBOARD,
 			IPC_CHANNELS.SERVER_WORKSPACE_SESSIONS,

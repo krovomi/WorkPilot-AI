@@ -20,6 +20,10 @@ from typing import Literal
 
 logger = logging.getLogger(__name__)
 
+#: Issue events read per request, and the most pages read for one issue.
+EVENTS_PER_PAGE = 100
+MAX_EVENT_PAGES = 50
+
 
 # GitHub permission roles
 GitHubRole = Literal["OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR", "NONE"]
@@ -170,10 +174,8 @@ class GitHubPermissionChecker:
         logger.info(f"Checking who added label '{label}' to issue #{issue_number}")
 
         try:
-            # Get issue timeline events
-            events = await self.gh_client.api_get(
-                f"/repos/{self.repo}/issues/{issue_number}/events"
-            )
+            # Every page of the issue's events, oldest first
+            events = await self._issue_events(issue_number)
 
             # Find most recent label addition event
             for event in reversed(events):
@@ -204,6 +206,27 @@ class GitHubPermissionChecker:
         except Exception as e:
             logger.error(f"Failed to check label adder: {e}")
             raise PermissionError(f"Could not verify label adder: {e}")
+
+    async def _issue_events(self, issue_number: int) -> list[dict]:
+        """All of an issue's events, page by page, oldest first.
+
+        The most recent `labeled` event is on the last page, so a list that
+        stops short of it cannot answer who added the label: past
+        `MAX_EVENT_PAGES` this raises rather than answer from older events.
+        """
+        events: list[dict] = []
+        for page in range(1, MAX_EVENT_PAGES + 1):
+            batch = await self.gh_client.api_get(
+                f"/repos/{self.repo}/issues/{issue_number}/events",
+                params={"per_page": str(EVENTS_PER_PAGE), "page": str(page)},
+            )
+            batch = batch or []
+            events.extend(batch)
+            if len(batch) < EVENTS_PER_PAGE:
+                return events
+        raise PermissionError(
+            f"Issue #{issue_number} has more than {MAX_EVENT_PAGES} pages of events"
+        )
 
     async def get_user_role(self, username: str) -> GitHubRole:
         """

@@ -9,7 +9,7 @@
 		"backendUnreachable": "Backend unreachable. Is the backend running on port 9000?",
 		"noData": "No data yet — run the analysis to see results.",
 		"required": "Required",
-		"invalidNumber": "Invalid number",
+		"pickerFailed": "The file dialog could not open.",
 		"invalidPath": "Invalid path",
 		"selectAtLeastOne": "Select at least one option",
 		"tooLong": "Text too long (limit: {{max}} characters)",
@@ -247,8 +247,7 @@
 		"recommendations": "Suggested fixes",
 		"hasCritical": "Critical issues present",
 		"validation": {
-			"logRequired": "Paste a non-empty log",
-			"logTooLarge": "Log too large (limit: {{max}} characters)"
+			"logRequired": "Paste a non-empty log"
 		},
 		"kinds": {
 			"timeout": "Timeout",
@@ -526,6 +525,7 @@
 		"sourceLocaleCustom": "Other (manual entry)…",
 		"sourceLocaleCustomPlaceholder": "e.g. pt-BR",
 		"sourceLocaleCustomLabel": "Custom locale code",
+		"sourceLocaleCustomCancel": "Back to the list of locales",
 		"strategy": "Placeholder strategy",
 		"runReport": "Run report",
 		"scannedDir": "Read from {{dir}}",
@@ -654,8 +654,7 @@
 			"promptRequired": "Enter a prompt",
 			"budgetTooSmall": "Budget must be ≥ 100 tokens",
 			"budgetTooLarge": "Budget must be ≤ 200,000 tokens",
-			"duplicatePath": "This file is already in the list",
-			"pathTooLong": "Path too long (limit: {{max}} characters)"
+			"duplicatePath": "This file is already in the list"
 		},
 		"estimatedCost": "Estimated cost",
 		"costFor": "for {{provider}} / {{model}}",
@@ -671,6 +670,7 @@
 		"keywords": "Keywords read in the task: {{list}}",
 		"copy": "Copy the context",
 		"copied": "Context copied",
+		"copyFailed": "The clipboard refused the copy.",
 		"refusedTitle": "Files not read",
 		"refused": {
 			"outside": "outside the project",
@@ -697,6 +697,9 @@
 		"tampered": "Chain has been tampered with",
 		"eventsChecked": "events checked",
 		"replayLabel": "Replay",
+		"brokenAt": "The chain breaks at event #{{sequence}}.",
+		"noEvents": "This trail holds no event yet.",
+		"noReplayEvents": "No event carries this correlation ID.",
 		"validation": {
 			"storageDirRequired": "Enter a storage directory",
 			"trailNameRequired": "Enter a trail name",
@@ -738,9 +741,7 @@
 		"validation": {
 			"roomIdRequired": "Enter a room ID",
 			"roomIdInvalid": "Invalid room ID (letters, digits, _ and -, 1–64 chars)",
-			"nameRequired": "Enter your display name",
-			"messageEmpty": "Message is empty",
-			"messageTooLong": "Message too long (limit: {{max}} characters)"
+			"nameRequired": "Enter your display name"
 		},
 		"opKinds": {
 			"edit": "edit",

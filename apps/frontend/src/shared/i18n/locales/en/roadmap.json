@@ -86,6 +86,7 @@
 		}
 	},
 	"competitorAnalysis": {
+		"recently": "recently",
 		"title": "Competitor Analysis",
 		"noAnalysis": "No competitor analysis available",
 		"lastUpdated": "Last updated: {{date}}",
@@ -196,7 +197,17 @@
 		"task": "Task",
 		"build": "Build",
 		"competitorInsightTitle": "Competitor Insight",
-		"external": "External"
+		"external": "External",
+		"complexityLevel": {
+			"low": "Low complexity",
+			"medium": "Medium complexity",
+			"high": "High complexity"
+		},
+		"impactLevel": {
+			"low": "Low impact",
+			"medium": "Medium impact",
+			"high": "High impact"
+		}
 	},
 	"featureDetail": {
 		"deleteDescription": "This will permanently remove \"{{title}}\" from your roadmap.",
@@ -254,5 +265,9 @@
 	"errors": {
 		"convertFailed": "The feature could not be turned into a task: {{error}}",
 		"unknown": "unknown error"
+	},
+	"providers": {
+		"canny": "Canny",
+		"github_issue": "GitHub Issues"
 	}
 }

@@ -1,16 +1,20 @@
 /**
  * AddAgentDialog — Dialog for creating a new agent slot in Mission Control.
  *
- * Allows selecting: name, role, provider, and model. The dialog stays open,
- * with what was typed, until the agent exists; a refusal is shown in it.
+ * Allows selecting: name, role, provider, and model — or, under
+ * "Auto-compose", a whole crew suggested from the work (#344). The dialog
+ * stays open, with what was typed, until the agent exists; a refusal is shown
+ * in it.
  */
 
-import { AlertTriangle, Brain, Cpu, Rocket, User } from "lucide-react";
+import { AlertTriangle, Brain, Cpu, Rocket, User, Wand2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { providerRegistry } from "../../../shared/services/providerRegistry";
+import type { MissionControlPlannedAgent } from "../../../shared/types/mission-control";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
-import { Notice } from "../charter";
+import { useMissionControlStore } from "../../stores/mission-control-store";
+import { Notice, Tabs } from "../charter";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import "../charter/charter.css";
@@ -18,6 +22,9 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { AGENT_ROLES } from "./agent-format";
+import { AutoComposePanel } from "./AutoComposePanel";
+
+type Mode = "manual" | "auto";
 
 interface AddAgentDialogProps {
 	readonly open: boolean;
@@ -56,6 +63,25 @@ export function AddAgentDialog({ open, onOpenChange, onAdd, error }: AddAgentDia
 	const [model, setModel] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const { models } = useProviderModelCatalog(provider);
+	const [mode, setMode] = useState<Mode>("manual");
+	const createAgent = useMissionControlStore((s) => s.createAgent);
+
+	// One agent per role of the crew, in its order; the dialog closes once all
+	// exist, and stays open on the first refusal.
+	const applyCrew = async (agents: MissionControlPlannedAgent[]) => {
+		for (const agent of agents) {
+			const roleName = t(`missionControl:roles.${agent.role}`);
+			const created = await createAgent(
+				t("missionControl:compose.agentName", { role: roleName, n: agent.key.split("-").pop() }),
+				agent.role,
+				agent.provider,
+				agent.model,
+				agent.model_label,
+			);
+			if (!created) return;
+		}
+		onOpenChange(false);
+	};
 
 	const name = customName ?? t("missionControl:defaultAgentName", { role: t(`missionControl:roles.${role}`) });
 
@@ -82,7 +108,7 @@ export function AddAgentDialog({ open, onOpenChange, onAdd, error }: AddAgentDia
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="wp-scope sm:max-w-md">
+			<DialogContent className={mode === "auto" ? "wp-scope sm:max-w-2xl" : "wp-scope sm:max-w-md"}>
 				<DialogHeader>
 					<span className="wp-kicker">{t("navigation:items.missionControl")}</span>
 					<DialogTitle className="flex items-center gap-2">
@@ -91,7 +117,20 @@ export function AddAgentDialog({ open, onOpenChange, onAdd, error }: AddAgentDia
 					</DialogTitle>
 				</DialogHeader>
 
-				<div className="space-y-4 py-2">
+				<Tabs<Mode>
+					label={t("missionControl:compose.tabsLabel")}
+					value={mode}
+					onChange={setMode}
+					tabs={[
+						{ id: "manual", label: t("missionControl:compose.tabManual"), icon: User },
+						{ id: "auto", label: t("missionControl:compose.tabAuto"), icon: Wand2 },
+					]}
+				/>
+
+				{mode === "auto" && <AutoComposePanel defaultProvider={provider} onApply={applyCrew} />}
+
+				{/* The manual form stays mounted under Auto-compose: back on its tab, nothing is lost. */}
+				<div className={mode === "auto" ? "hidden" : "space-y-4 py-2"}>
 					{error != null && (
 						<Notice tone="red" icon={AlertTriangle} role="alert">
 							{error ? t("missionControl:createError", { error }) : t("missionControl:createFailed")}
@@ -207,7 +246,7 @@ export function AddAgentDialog({ open, onOpenChange, onAdd, error }: AddAgentDia
 					</div>
 				</div>
 
-				<DialogFooter>
+				<DialogFooter className={mode === "auto" ? "hidden" : undefined}>
 					<Button variant="outline" onClick={() => onOpenChange(false)}>
 						{t("common:cancel")}
 					</Button>

@@ -42,6 +42,10 @@ passer serait pire qu'une politique absente.
 Le chargement est mis en cache par date de modification des fichiers : une modification
 s'applique au prochain appel d'outil, sans relancer la tâche.
 
+À côté de ses `rules`, `workpilot.policy.yaml` (et lui seul) peut fixer des heures permises, des
+fichiers interdits ou soumis à revue et un budget de jetons par heure : voir
+[governance-policy.md](governance-policy.md). Les fichiers y deviennent des règles comme celles-ci.
+
 ## Une règle
 
 ```yaml

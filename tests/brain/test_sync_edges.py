@@ -122,14 +122,64 @@ class TestRepositoryFiles:
         assert (tmp_path / ".gitignore").read_text(encoding="utf-8") == "mine\n"
 
     def test_an_ignore_file_that_cannot_be_written_is_logged(self, tmp_path, caplog):
-        # A read-only share, or a folder in its place: the brain still opens,
-        # it only goes on without its ignore lines.
+        # A read-only share, or a folder in its place, outside any repository:
+        # the brain still opens, and says the files cannot be kept out.
         (tmp_path / ".gitignore").mkdir()
 
         with caplog.at_level("DEBUG", logger="brain.sync"):
             ensure_ignored(tmp_path)
 
         assert "ignore file not written" in caplog.text
+        assert "no repository to keep machine-local files out of" in caplog.text
+
+    @pytest.mark.parametrize("how", ["unwritable", "unreadable"])
+    def test_machine_local_files_stay_out_when_the_ignore_file_is_locked(
+        self, tmp_path, monkeypatch, how
+    ):
+        root = tmp_path / "vault"
+        root.mkdir()
+        git(root, "init", "-q")
+        if how == "unwritable":
+            (root / ".gitignore").mkdir()
+        else:
+            (root / ".gitignore").write_text("mine\n", encoding="utf-8")
+            real = Path.read_text
+
+            def unreadable(self, *args, **kwargs):
+                if self.name == ".gitignore":
+                    raise PermissionError("denied")
+                return real(self, *args, **kwargs)
+
+            monkeypatch.setattr(Path, "read_text", unreadable)
+
+        ensure_ignored(root)
+        ensure_ignored(root)  # a second pass adds nothing twice
+        monkeypatch.undo()
+
+        exclude = (root / ".git" / "info" / "exclude").read_text(encoding="utf-8")
+        assert exclude.count(".trash/") == 1
+        (root / ".trash").mkdir()
+        (root / ".trash" / "old.md").write_text("gone", encoding="utf-8")
+        (root / "note.md").write_text("kept", encoding="utf-8")
+        git(root, "add", "-A")
+        staged = git(root, "diff", "--cached", "--name-only")
+        assert "note.md" in staged and ".trash" not in staged
+
+    def test_an_exclude_file_that_cannot_be_written_is_a_warning(
+        self, tmp_path, caplog
+    ):
+        root = tmp_path / "vault"
+        root.mkdir()
+        git(root, "init", "-q")
+        (root / ".gitignore").mkdir()
+        exclude = root / ".git" / "info" / "exclude"
+        exclude.unlink(missing_ok=True)
+        exclude.mkdir(parents=True)
+
+        with caplog.at_level("WARNING", logger="brain.sync"):
+            ensure_ignored(root)
+
+        assert "machine-local files not excluded" in caplog.text
 
     def test_without_git_there_is_no_repository(self, tmp_path, monkeypatch):
         monkeypatch.setattr(brain_sync, "git_available", lambda: False)

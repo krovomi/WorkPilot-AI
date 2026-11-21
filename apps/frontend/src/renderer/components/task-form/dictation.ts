@@ -23,10 +23,3 @@ export function appendDictation(
 			: before,
 	};
 }
-
-export function undoDictation(
-	current: string,
-	insertion: { before: string; after: string },
-): string | null {
-	return current === insertion.after ? insertion.before : null;
-}

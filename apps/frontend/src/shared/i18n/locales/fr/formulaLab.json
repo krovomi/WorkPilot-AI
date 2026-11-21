@@ -48,6 +48,7 @@
 	},
 	"filters": {
 		"allProviders": "Tous les fournisseurs",
+		"provider": "Fournisseur",
 		"perTokenOnly": "Payés au token",
 		"searchPlaceholder": "Rechercher un LLM…",
 		"count": "{{count}} formules"
@@ -71,6 +72,18 @@
 		"failedTitle": "Impossible d'appliquer la formule",
 		"failedDesc": "La configuration de la tâche n'a pas été enregistrée. Réessayez."
 	},
+	"effort": {
+		"none": "Aucun",
+		"low": "Faible",
+		"medium": "Moyen",
+		"high": "Élevé",
+		"ultrathink": "Ultra"
+	},
+	"ring": {
+		"aria": "{{percent}} % de réussite"
+	},
+	"applyFormula": "Appliquer {{formula}}",
+	"selectFormula": "Sélectionner {{formula}}",
 	"frontier": {
 		"success": "de réussite"
 	}

@@ -90,6 +90,7 @@ import { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 import { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 import { registerGithubHandlers } from "./github-handlers";
 import { registerGitlabHandlers } from "./gitlab";
+import { registerGovernanceHandlers } from "./governance-handlers";
 import { registerGuardrailsHandlers } from "./guardrails-handlers";
 import { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 import { registerIdeationHandlers } from "./ideation-handlers";
@@ -130,8 +131,10 @@ import { registerSelfHealingBisectHandlers } from "./self-healing-bisect-handler
 import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
+import { registerServerSsoHandlers } from "./server-sso-handlers";
 import { registerServerProjectHandlers } from "./server-project-handlers";
 import { registerServerWorkspaceHandlers } from "./server-workspace-handlers";
+import { registerBuildCompareHandlers } from "./build-compare-handlers";
 import { registerTeamRoomHandlers } from "./team-room-handlers";
 import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
@@ -222,6 +225,7 @@ export { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 export { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 export { registerGithubHandlers } from "./github-handlers";
 export { registerGitlabHandlers } from "./gitlab";
+export { registerGovernanceHandlers } from "./governance-handlers";
 export { registerGuardrailsHandlers } from "./guardrails-handlers";
 export { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 export { registerIdeationHandlers } from "./ideation-handlers";
@@ -344,12 +348,15 @@ export function setupIpcHandlers(
 	registerJevHandlers();
 	registerSecureStorageHandlers();
 
-	// Multi-user server mode: connection + login (local / Entra ID)
+	// Multi-user server mode: connection + login (local / Entra ID / any OIDC)
 	registerServerAuthHandlers(getMainWindow);
+	registerServerSsoHandlers(getMainWindow);
 	// Multi-tenant administration console (orgs, roles, members, quotas, audit)
 	registerServerAdminHandlers();
 	registerServerProjectHandlers();
 	registerServerWorkspaceHandlers();
+	// Build Analytics, "How you compare": a project of this computer
+	registerBuildCompareHandlers();
 	registerTeamRoomHandlers();
 
 	// File explorer handlers
@@ -631,6 +638,8 @@ export function setupIpcHandlers(
 
 	// Guardrails handlers (user-defined agent guardrails)
 	registerGuardrailsHandlers();
+	// Governance panel: hours, files and token budget of workpilot.policy.yaml, audit export
+	registerGovernanceHandlers();
 
 	// Cost Predictor handlers (ex-ante spec cost prediction)
 	registerCostPredictorHandlers();

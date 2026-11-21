@@ -34,6 +34,15 @@ import {
 	type ReviewFeedbackVerdict,
 } from "../../../shared/types/review-feedback";
 import { resolveUnder, resolveWritableUnder } from "../../security/renderer-path";
+import {
+	type FeedbackRecord,
+	parseDataset,
+	RESET_KIND,
+	readTail,
+	resetSignature,
+	SIGNATURE,
+	validRecord,
+} from "./review-feedback-dataset";
 
 export const FEEDBACK_RELATIVE_PATH = path.join(
 	".workpilot",
@@ -170,20 +179,28 @@ export function findReviewedFinding(
 	return null;
 }
 
-/** The dataset's path in the project, or `null` when it would leave it or is a link. */
-export function feedbackFilePath(projectPath: string): string | null {
-	// The link is refused before it is resolved: resolving it would name its
-	// target, which may be any file of the project.
+/**
+ * `relative` resolved inside the project, or `null` when it would leave it or
+ * is a link. The link is refused before it is resolved: resolving it would
+ * name its target, which may be any file of the project.
+ */
+export function writableFileUnder(
+	projectPath: string,
+	relative: string,
+): string | null {
 	try {
-		if (
-			lstatSync(path.join(projectPath, FEEDBACK_RELATIVE_PATH)).isSymbolicLink()
-		) {
+		if (lstatSync(path.join(projectPath, relative)).isSymbolicLink()) {
 			return null;
 		}
 	} catch {
 		// Not created yet.
 	}
-	return resolveWritableUnder(projectPath, FEEDBACK_RELATIVE_PATH);
+	return resolveWritableUnder(projectPath, relative);
+}
+
+/** The dataset's path in the project, or `null` when it would leave it or is a link. */
+export function feedbackFilePath(projectPath: string): string | null {
+	return writableFileUnder(projectPath, FEEDBACK_RELATIVE_PATH);
 }
 
 function compact(file: string): void {
@@ -223,15 +240,62 @@ export function recordFeedback(
 		severity: finding.severity,
 		title: finding.title,
 	});
+	if (!appendLine(file, line)) return { success: false, error: "write_failed" };
+	return { success: true, feedback: readFeedback(projectPath, feedback.prNumber) };
+}
+
+/** One line at the end of the dataset, compacted past its bound. */
+function appendLine(file: string, line: string): boolean {
 	try {
-		// `.workpilot` was resolved above: a link out of the project is refused.
+		// `.workpilot` was resolved by the caller: a link out of the project is refused.
 		mkdirSync(path.dirname(file), { recursive: true });
 		appendFileSync(file, `${line}\n`, "utf-8");
 		if (lstatSync(file).size > MAX_FILE_BYTES) compact(file);
 	} catch {
-		return { success: false, error: "write_failed" };
+		return false;
 	}
-	return { success: true, feedback: readFeedback(projectPath, feedback.prNumber) };
+	return true;
+}
+
+/** The dataset's valid records, the latest per finding; empty on anything unreadable. */
+export function readRecords(projectPath: string): FeedbackRecord[] {
+	const file = feedbackFilePath(projectPath);
+	if (!file) return [];
+	try {
+		return parseDataset(readTail(file));
+	} catch {
+		return [];
+	}
+}
+
+export type ResetOutcome = "reset" | "invalid" | "not_found" | "write_failed";
+
+/**
+ * Forget what the project said about one kind of remark (#361, lot 2): a
+ * reset line, which the backend reads as "the votes before it no longer
+ * count". The signature comes from the renderer, so it must have the shape
+ * of one and be a kind of remark the dataset holds.
+ */
+export function recordReset(
+	projectPath: string,
+	signature: unknown,
+	now: () => Date = () => new Date(),
+): ResetOutcome {
+	if (typeof signature !== "string" || !SIGNATURE.test(signature)) {
+		return "invalid";
+	}
+	const file = feedbackFilePath(projectPath);
+	if (!file) return "write_failed";
+	if (!readRecords(projectPath).some((r) => r.signature === signature)) {
+		return "not_found";
+	}
+	const line = JSON.stringify({
+		v: SCHEMA_VERSION,
+		at: now().toISOString(),
+		kind: RESET_KIND,
+		signature,
+	});
+	return appendLine(file, line) ? "reset" : "write_failed";
 }
 
 /** The latest verdict per finding of `prNumber`. Empty on anything unreadable. */
@@ -244,16 +308,28 @@ export function readFeedback(
 	if (!file) return result;
 	let text: string;
 	try {
-		text = readFileSync(file, "utf-8");
+		text = readTail(file);
 	} catch {
 		return result;
 	}
+	// A reset forgets the verdicts given before it on its kind of remark.
+	const kinds = new Map<string, string>();
 	for (const line of text.split("\n")) {
 		if (!line.trim()) continue;
 		let record: Record<string, unknown>;
 		try {
 			record = JSON.parse(line);
 		} catch {
+			continue;
+		}
+		const reset = resetSignature(record);
+		if (reset) {
+			for (const [id, kind] of kinds) {
+				if (kind === reset) {
+					delete result[id];
+					kinds.delete(id);
+				}
+			}
 			continue;
 		}
 		if (
@@ -264,6 +340,9 @@ export function readFeedback(
 			isVerdict(record.verdict)
 		) {
 			result[record.finding_id] = record.verdict;
+			const kind = validRecord(record)?.signature;
+			if (kind) kinds.set(record.finding_id, kind);
+			else kinds.delete(record.finding_id);
 		}
 	}
 	return result;

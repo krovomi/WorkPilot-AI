@@ -9,8 +9,10 @@ import {
 	shortcutConflict,
 } from "@shared/utils/voice-shortcut";
 import { isMacOS } from "../../lib/os-detection";
+import { VOICE_SENSITIVITIES, voiceSensitivity } from "../voice-assistant/voice-activity";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
+import { NativeSelect } from "../ui/native-select";
 import { Switch } from "../ui/switch";
 import { SettingsSection } from "./SettingsSection";
 
@@ -137,6 +139,28 @@ export function VoiceAssistantSettings({ settings, onSettingsChange }: VoiceAssi
 							onSettingsChange({ ...settings, voiceAssistantSystemWide: checked })
 						}
 					/>
+				</div>
+
+				<div className="space-y-2">
+					<Label htmlFor="voice-assistant-sensitivity">{t("settings.sensitivity")}</Label>
+					<NativeSelect
+						id="voice-assistant-sensitivity"
+						className="w-auto"
+						value={voiceSensitivity(settings.voiceAssistantSensitivity)}
+						onChange={(event) =>
+							onSettingsChange({
+								...settings,
+								voiceAssistantSensitivity: voiceSensitivity(event.target.value),
+							})
+						}
+					>
+						{VOICE_SENSITIVITIES.map((level) => (
+							<option key={level} value={level}>
+								{t(`settings.sensitivityLevels.${level}`)}
+							</option>
+						))}
+					</NativeSelect>
+					<p className="text-xs text-muted-foreground">{t("settings.sensitivityHelp")}</p>
 				</div>
 
 				<div className="space-y-1 text-xs text-muted-foreground">

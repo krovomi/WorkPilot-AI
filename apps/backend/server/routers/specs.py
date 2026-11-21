@@ -18,6 +18,7 @@ from server.auth.deps import (
     require_project_role,
 )
 from server.authz.principal import get_principal
+from server.authz.self_approval import may_approve_own
 from server.db.engine import get_db
 from server.db.models import (
     AgentRun,
@@ -228,6 +229,16 @@ async def start_run(
     spec = await _get_spec_or_404(db, project_id, spec_id)
     ensure_can_act_on_spec(spec, user, None)
 
+    # A card without a review approves its own plan: the approval right's,
+    # within the deployment's rule on approving one's own card. Read before
+    # the claim below is written, which holds the database until committed.
+    may_skip_review = principal.has("review.approve") and await may_approve_own(
+        db,
+        project_id=project_id,
+        org_id=project.org_id,
+        user_id=user.id,
+        author_id=spec.created_by,
+    )
     if spec.claimed_by is None:
         spec.claimed_by = user.id
         spec.claimed_at = datetime.now(UTC)
@@ -242,7 +253,7 @@ async def start_run(
             model=body.model,
             org_id=project.org_id,
             pr=body.pr.model_dump() if body.pr else None,
-            may_skip_review=principal.has("review.approve"),
+            may_skip_review=may_skip_review,
         )
     except RunManagerError as e:
         raise HTTPException(status_code=409, detail=str(e))

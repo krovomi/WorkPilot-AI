@@ -7,6 +7,8 @@ import { IPC_CHANNELS } from "../../../shared/constants";
 import type { IPCResult } from "../../../shared/types";
 import type {
 	MissionControlAgent,
+	MissionControlComposition,
+	MissionControlCompositionRequest,
 	MissionControlNewAgent,
 	MissionControlSession,
 	MissionControlStartRequest,
@@ -26,6 +28,10 @@ export interface MissionControlAPI {
 	/** Resolves once the agent has started; its answer arrives in the state. */
 	missionControlStartAgent: (request: MissionControlStartRequest) => Promise<IPCResult>;
 	missionControlStopAgent: (agentId: string) => Promise<IPCResult>;
+	/** A suggested crew for a description, a spec or a template, within a budget. */
+	missionControlSuggestComposition: (
+		request: MissionControlCompositionRequest,
+	) => Promise<IPCResult<MissionControlComposition>>;
 }
 
 export function createMissionControlAPI(): MissionControlAPI {
@@ -41,5 +47,7 @@ export function createMissionControlAPI(): MissionControlAPI {
 			invokeIpc(IPC_CHANNELS.MISSION_CONTROL_START_AGENT, request),
 		missionControlStopAgent: (agentId) =>
 			invokeIpc(IPC_CHANNELS.MISSION_CONTROL_STOP_AGENT, agentId),
+		missionControlSuggestComposition: (request) =>
+			invokeIpc(IPC_CHANNELS.MISSION_CONTROL_SUGGEST_COMPOSITION, request),
 	};
 }

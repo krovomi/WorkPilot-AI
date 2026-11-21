@@ -16,7 +16,6 @@ Responsibilities:
 
 from __future__ import annotations
 
-import ast
 import asyncio
 import json
 import re
@@ -36,23 +35,10 @@ except (ImportError, ValueError, SystemError):
     from gh_client import GHClient, PRTooLargeError
 
 # Validation patterns for git refs and paths (defense-in-depth)
-# These patterns allow common valid characters while rejecting potentially dangerous ones
-SAFE_REF_PATTERN = re.compile(r"^[a-zA-Z0-9._/\-]+$")
+# These patterns allow common valid characters while rejecting potentially dangerous ones;
+# a ref starts with an alphanumeric character, so git never reads it as an option
+SAFE_REF_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/\-]*$")
 SAFE_PATH_PATTERN = re.compile(r"^[a-zA-Z0-9._/\-@]+$")
-
-# Common config file names to search for in project directories
-# Used by both _find_config_files() and find_related_files_for_root()
-CONFIG_FILE_NAMES = [
-    "tsconfig.json",
-    "package.json",
-    "pyproject.toml",
-    "setup.py",
-    ".eslintrc",
-    ".prettierrc",
-    "jest.config.js",
-    "vitest.config.ts",
-    "vite.config.ts",
-]
 
 
 def _validate_git_ref(ref: str) -> bool:
@@ -102,11 +88,14 @@ async def _communicate_with_timeout(
         return await asyncio.wait_for(proc.communicate(), timeout=timeout)
     except TimeoutError:
         proc.kill()
-        try:
-            await proc.wait()
-        except Exception:
-            pass
+        await proc.wait()
         raise
+
+
+# How long a local git command may take: a fetch reaches the remote, a read
+# (`git show`, `git diff`) stays in the clone.
+GIT_FETCH_TIMEOUT = 30.0
+GIT_READ_TIMEOUT = 10.0
 
 
 if TYPE_CHECKING:
@@ -381,24 +370,6 @@ class PRContextGatherer:
             merge_state_status=merge_state_status,
         )
 
-    def _get_file_extension(self, file_path: str) -> str:
-        """Return the syntax highlighting language for a file."""
-        extension = Path(file_path).suffix.lower()
-
-        extensions = {
-            ".ts": "typescript",
-            ".tsx": "typescript",
-            ".js": "javascript",
-            ".jsx": "javascript",
-            ".py": "python",
-            ".json": "json",
-            ".md": "markdown",
-            ".yml": "yaml",
-            ".yaml": "yaml",
-        }
-
-        return extensions.get(extension, "")
-
     async def _fetch_pr_metadata(self) -> dict:
         """Fetch PR metadata from GitHub API via gh CLI."""
         return await self.gh_client.pr_get(
@@ -449,56 +420,59 @@ class PRContextGatherer:
             )
             return False
 
+        # Fetch the specific commits - this works even for fork PRs
+        what = "fetching PR refs"
+        fetched = await self._run_git(
+            ["fetch", "origin", head_sha, base_sha], GIT_FETCH_TIMEOUT, what
+        )
+        if fetched is None:
+            return False
+        returncode, _stdout, stderr = fetched
+        if returncode == 0:
+            safe_print(
+                f"[Context] Fetched PR refs: base={base_sha[:8]} → head={head_sha[:8]}",
+                flush=True,
+            )
+            return True
+
+        # If direct SHA fetch fails, try fetching the PR ref
+        safe_print("[Context] Direct SHA fetch failed, trying PR ref...")
+        pr_ref = f"pull/{self.pr_number}/head:refs/pr/{self.pr_number}"
+        fetched = await self._run_git(
+            ["fetch", "origin", pr_ref], GIT_FETCH_TIMEOUT, what
+        )
+        if fetched is not None and fetched[0] == 0:
+            safe_print(
+                f"[Context] Fetched PR ref: refs/pr/{self.pr_number}",
+                flush=True,
+            )
+            return True
+        safe_print(
+            f"[Context] Failed to fetch PR refs: {stderr.decode('utf-8', 'replace')}",
+            flush=True,
+        )
+        return False
+
+    async def _run_git(
+        self, args: list[str], timeout: float, what: str
+    ) -> tuple[int, bytes, bytes] | None:
+        """Run `git <args>` in the project; None (and a note) if it could not finish."""
         try:
-            # Fetch the specific commits - this works even for fork PRs
             proc = await asyncio.create_subprocess_exec(
                 "git",
-                "fetch",
-                "origin",
-                head_sha,
-                base_sha,
+                *args,
                 cwd=self.project_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await _communicate_with_timeout(proc, 30.0)
-
-            if proc.returncode == 0:
-                safe_print(
-                    f"[Context] Fetched PR refs: base={base_sha[:8]} → head={head_sha[:8]}",
-                    flush=True,
-                )
-                return True
-            else:
-                # If direct SHA fetch fails, try fetching the PR ref
-                safe_print("[Context] Direct SHA fetch failed, trying PR ref...")
-                proc2 = await asyncio.create_subprocess_exec(
-                    "git",
-                    "fetch",
-                    "origin",
-                    f"pull/{self.pr_number}/head:refs/pr/{self.pr_number}",
-                    cwd=self.project_dir,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                await _communicate_with_timeout(proc2, 30.0)
-                if proc2.returncode == 0:
-                    safe_print(
-                        f"[Context] Fetched PR ref: refs/pr/{self.pr_number}",
-                        flush=True,
-                    )
-                    return True
-                safe_print(
-                    f"[Context] Failed to fetch PR refs: {stderr.decode('utf-8')}",
-                    flush=True,
-                )
-                return False
+            stdout, stderr = await _communicate_with_timeout(proc, timeout)
         except TimeoutError:
-            safe_print("[Context] Timeout fetching PR refs")
-            return False
-        except Exception as e:
-            safe_print(f"[Context] Error fetching PR refs: {e}")
-            return False
+            safe_print(f"[Context] Timeout {what}")
+            return None
+        except OSError as e:
+            safe_print(f"[Context] Error {what}: {e}")
+            return None
+        return proc.returncode or 0, stdout, stderr
 
     async def _fetch_changed_files(self, pr_data: dict) -> list[ChangedFile]:
         """
@@ -580,28 +554,16 @@ class PRContextGatherer:
             safe_print(f"[Context] Invalid git ref rejected: {ref[:50]}...")
             return ""
 
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "git",
-                "show",
-                f"{ref}:{path}",
-                cwd=self.project_dir,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            stdout, stderr = await _communicate_with_timeout(proc, 10.0)
-
-            # File might not exist in base branch (new file)
-            if proc.returncode != 0:
-                return ""
-
-            return stdout.decode("utf-8")
-        except TimeoutError:
-            safe_print(f"[Context] Timeout reading {path} from {ref}")
+        what = f"reading {path} from {ref}"
+        shown = await self._run_git(["show", f"{ref}:{path}"], GIT_READ_TIMEOUT, what)
+        # File might not exist in base branch (new file)
+        if shown is None or shown[0] != 0:
             return ""
-        except Exception as e:
-            safe_print(f"[Context] Error reading {path} from {ref}: {e}")
+        try:
+            return shown[1].decode("utf-8")
+        except UnicodeDecodeError as e:
+            # A binary file: there is no text to show the reviewer
+            safe_print(f"[Context] Error {what}: {e}")
             return ""
 
     async def _get_file_patch(self, path: str, base_ref: str, head_ref: str) -> str:
@@ -631,34 +593,22 @@ class PRContextGatherer:
             )
             return ""
 
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "git",
-                "diff",
-                f"{base_ref}...{head_ref}",
-                "--",
-                path,
-                cwd=self.project_dir,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+        diffed = await self._run_git(
+            ["diff", f"{base_ref}...{head_ref}", "--", path],
+            GIT_READ_TIMEOUT,
+            f"getting patch for {path}",
+        )
+        if diffed is None:
+            return ""
+        returncode, stdout, stderr = diffed
+        if returncode != 0:
+            safe_print(
+                f"[Context] Failed to get patch for {path}: {stderr.decode('utf-8', 'replace')}",
+                flush=True,
             )
-
-            stdout, stderr = await _communicate_with_timeout(proc, 10.0)
-
-            if proc.returncode != 0:
-                safe_print(
-                    f"[Context] Failed to get patch for {path}: {stderr.decode('utf-8')}",
-                    flush=True,
-                )
-                return ""
-
-            return stdout.decode("utf-8")
-        except TimeoutError:
-            safe_print(f"[Context] Timeout getting patch for {path}")
             return ""
-        except Exception as e:
-            safe_print(f"[Context] Error getting patch for {path}: {e}")
-            return ""
+
+        return stdout.decode("utf-8", "replace")
 
     async def _fetch_pr_diff(self) -> str:
         """
@@ -890,485 +840,6 @@ class PRContextGatherer:
 
         DEPRECATED: LLM agents now discover related files themselves using Read, Grep, and Glob tools.
         This method returns an empty list - agents have domain expertise to find what's relevant.
-        """
-        # Return empty list - LLM agents will discover files via their tools
-        return []
-
-    def _find_test_files(self, source_path: Path) -> set[str]:
-        """Find test files related to a source file."""
-        test_patterns = [
-            # Jest/Vitest patterns
-            source_path.parent / f"{source_path.stem}.test{source_path.suffix}",
-            source_path.parent / f"{source_path.stem}.spec{source_path.suffix}",
-            source_path.parent / "__tests__" / f"{source_path.name}",
-            # Python patterns
-            source_path.parent / f"test_{source_path.stem}.py",
-            source_path.parent / f"{source_path.stem}_test.py",
-            # Go patterns
-            source_path.parent / f"{source_path.stem}_test.go",
-        ]
-
-        found = set()
-        for test_path in test_patterns:
-            full_path = self.project_dir / test_path
-            if full_path.exists() and full_path.is_file():
-                found.add(str(test_path))
-
-        return found
-
-    def _find_imports(self, content: str, source_path: Path) -> set[str]:
-        """
-        Find imported files from source code.
-
-        Supports:
-        - JavaScript/TypeScript: ES6 imports, path aliases, CommonJS, re-exports
-        - Python: import statements via AST
-        """
-        imports = set()
-
-        if source_path.suffix in [".ts", ".tsx", ".js", ".jsx"]:
-            # Load tsconfig paths once for this file (for alias resolution)
-            ts_paths = self._load_tsconfig_paths()
-
-            # Pattern 1: ES6 relative imports (existing)
-            # Matches: from './file', from '../file'
-            relative_pattern = r"from\s+['\"](\.[^'\"]+)['\"]"
-            for match in re.finditer(relative_pattern, content):
-                import_path = match.group(1)
-                resolved = self._resolve_import_path(import_path, source_path)
-                if resolved:
-                    imports.add(resolved)
-
-            # Pattern 2: Path alias imports (NEW)
-            # Matches: from '@/utils', from '~/config', from '@shared/types'
-            alias_pattern = r"from\s+['\"](@[^'\"]+|~[^'\"]+)['\"]"
-            if ts_paths:
-                for match in re.finditer(alias_pattern, content):
-                    import_path = match.group(1)
-                    resolved = self._resolve_alias_import(import_path, ts_paths)
-                    if resolved:
-                        imports.add(resolved)
-
-            # Pattern 3: CommonJS require (NEW)
-            # Matches: require('./utils'), require('@/config')
-            require_pattern = r"require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)"
-            for match in re.finditer(require_pattern, content):
-                import_path = match.group(1)
-                resolved = self._resolve_any_import(import_path, source_path, ts_paths)
-                if resolved:
-                    imports.add(resolved)
-
-            # Pattern 4: Re-exports (NEW)
-            # Matches: export * from './module', export { x } from './module'
-            reexport_pattern = r"export\s+(?:\*|\{[^}]*\})\s+from\s+['\"]([^'\"]+)['\"]"
-            for match in re.finditer(reexport_pattern, content):
-                import_path = match.group(1)
-                resolved = self._resolve_any_import(import_path, source_path, ts_paths)
-                if resolved:
-                    imports.add(resolved)
-
-        elif source_path.suffix == ".py":
-            # Python imports via AST
-            imports.update(self._find_python_imports(content, source_path))
-
-        return imports
-
-    def _resolve_alias_import(
-        self, import_path: str, ts_paths: dict[str, list[str]]
-    ) -> str | None:
-        """
-        Resolve a path alias import to an actual file path.
-
-        Path aliases (e.g., @/utils, ~/config) are project-root relative,
-        not relative to the importing file.
-
-        Args:
-            import_path: Path alias import like '@/utils' or '~/config'
-            ts_paths: tsconfig paths mapping
-
-        Returns:
-            Resolved path relative to project root, or None if not found
-        """
-        resolved_alias = self._resolve_path_alias(import_path, ts_paths)
-        if not resolved_alias:
-            return None
-
-        # Path aliases are project-root relative, so resolve from root
-        # by using an empty base path (Path(".").parent = Path("."))
-        return self._resolve_import_path("./" + resolved_alias, Path("."))
-
-    def _resolve_any_import(
-        self, import_path: str, source_path: Path, ts_paths: dict[str, list[str]] | None
-    ) -> str | None:
-        """
-        Resolve any import path (relative, alias, or node_modules).
-
-        Handles all import types:
-        - Relative: './utils', '../config'
-        - Path aliases: '@/utils', '~/config'
-        - Node modules: 'lodash' (returns None - not project files)
-
-        Args:
-            import_path: The import path from the source code
-            source_path: Path of the file doing the importing
-            ts_paths: tsconfig paths mapping, or None
-
-        Returns:
-            Resolved path relative to project root, or None if not found/external
-        """
-        if import_path.startswith("."):
-            # Relative import
-            return self._resolve_import_path(import_path, source_path)
-        elif import_path.startswith("@") or import_path.startswith("~"):
-            # Path alias import
-            if ts_paths:
-                return self._resolve_alias_import(import_path, ts_paths)
-            return None
-        else:
-            # Node modules package - skip
-            return None
-
-    def _resolve_import_path(self, import_path: str, source_path: Path) -> str | None:
-        """
-        Resolve a relative import path to an absolute file path.
-
-        Args:
-            import_path: Relative import like './utils' or '../config'
-            source_path: Path of the file doing the importing
-
-        Returns:
-            Absolute path relative to project root, or None if not found
-        """
-        # Start from the directory containing the source file
-        base_dir = source_path.parent
-
-        # Resolve relative path - MUST prepend project_dir to resolve correctly
-        # when CWD is different from project root (e.g., running from apps/backend/)
-        resolved = (self.project_dir / base_dir / import_path).resolve()
-
-        # Try common extensions if no extension provided
-        if not resolved.suffix:
-            for ext in [".ts", ".tsx", ".js", ".jsx"]:
-                candidate = resolved.with_suffix(ext)
-                if candidate.exists() and candidate.is_file():
-                    try:
-                        rel_path = candidate.relative_to(self.project_dir)
-                        return rel_path.as_posix()
-                    except ValueError:
-                        # File is outside project directory
-                        return None
-
-            # Also check for index files
-            for ext in [".ts", ".tsx", ".js", ".jsx"]:
-                index_file = resolved / f"index{ext}"
-                if index_file.exists() and index_file.is_file():
-                    try:
-                        rel_path = index_file.relative_to(self.project_dir)
-                        return rel_path.as_posix()
-                    except ValueError:
-                        return None
-
-        # File with extension
-        if resolved.exists() and resolved.is_file():
-            try:
-                rel_path = resolved.relative_to(self.project_dir)
-                return rel_path.as_posix()
-            except ValueError:
-                return None
-
-        return None
-
-    def _find_config_files(self, directory: Path) -> set[str]:
-        """Find configuration files in a directory."""
-        found = set()
-        for name in CONFIG_FILE_NAMES:
-            config_path = directory / name
-            full_path = self.project_dir / config_path
-            if full_path.exists() and full_path.is_file():
-                found.add(str(config_path))
-
-        return found
-
-    def _find_type_definitions(self, source_path: Path) -> set[str]:
-        """Find TypeScript type definition files."""
-        # Look for .d.ts files with same name
-        type_def = source_path.parent / f"{source_path.stem}.d.ts"
-        full_path = self.project_dir / type_def
-
-        if full_path.exists() and full_path.is_file():
-            return {str(type_def)}
-
-        return set()
-
-    def _find_dependents(self, file_path: str, max_results: int = 15) -> set[str]:
-        """
-        Find files that import the given file (reverse dependencies).
-
-        DEPRECATED: LLM agents now discover reverse dependencies themselves using Grep and Read tools.
-        Returns empty set - agents can search the codebase with their domain expertise.
-
-        Args:
-            file_path: Path of the file to find dependents for
-            max_results: Maximum number of dependents to return
-
-        Returns:
-            Empty set - LLM agents will discover dependents via Grep tool.
-        """
-        # Return empty set - LLM agents will use Grep to find importers when needed
-        return set()
-
-    def _prioritize_related_files(self, files: set[str], limit: int = 50) -> list[str]:
-        """
-        Prioritize related files by relevance.
-
-        DEPRECATED: LLM agents now prioritize exploration based on their domain expertise.
-        Returns empty list since _find_related_files no longer populates files.
-
-        Args:
-            files: Set of file paths to prioritize
-            limit: Maximum number of files to return
-
-        Returns:
-            Empty list - LLM agents handle prioritization via their tools.
-        """
-        # Return empty list - LLM agents will prioritize exploration themselves
-        return []
-
-    def _load_json_safe(self, filename: str) -> dict | None:
-        """
-        Load JSON file from project_dir, handling tsconfig-style comments.
-
-        tsconfig.json allows // and /* */ comments, which standard JSON
-        parsers reject. This method first tries standard parsing (most
-        tsconfigs don't have comments), then falls back to comment stripping.
-
-        Note: Comment stripping only handles comments outside strings to
-        avoid mangling path patterns like "@/*" which contain "/*".
-
-        Args:
-            filename: JSON filename relative to project_dir
-
-        Returns:
-            Parsed JSON as dict, or None on error
-        """
-        try:
-            file_path = self.project_dir / filename
-            if not file_path.exists():
-                return None
-
-            content = file_path.read_text(encoding="utf-8")
-
-            # Try standard JSON parse first (most tsconfigs don't have comments)
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                pass
-
-            # Fall back to comment stripping (outside strings only)
-            # First, remove block comments /* ... */
-            # Simple approach: remove everything between /* and */
-            # This handles multi-line block comments
-            while "/*" in content:
-                start = content.find("/*")
-                end = content.find("*/", start)
-                if end == -1:
-                    # Unclosed block comment - remove to end
-                    content = content[:start]
-                    break
-                content = content[:start] + content[end + 2 :]
-
-            # Then handle single-line comments
-            # This regex-based approach handles // comments
-            # outside of strings by checking for quotes
-            lines = content.split("\n")
-            cleaned_lines = []
-            for line in lines:
-                # Strip single-line comments, but not inside strings
-                # Simple heuristic: if '//' appears and there's an even
-                # number of quotes before it, strip from there
-                comment_pos = line.find("//")
-                if comment_pos != -1:
-                    # Count quotes before the //
-                    before_comment = line[:comment_pos]
-                    if before_comment.count('"') % 2 == 0:
-                        line = before_comment
-                cleaned_lines.append(line)
-            content = "\n".join(cleaned_lines)
-
-            return json.loads(content)
-        except (json.JSONDecodeError, OSError) as e:
-            safe_print(f"[Context] Could not load {filename}: {e}", style="dim")
-            return None
-
-    def _load_tsconfig_paths(self) -> dict[str, list[str]] | None:
-        """
-        Load path mappings from tsconfig.json.
-
-        Handles the 'extends' field to merge paths from base configs.
-
-        Returns:
-            Dict mapping path aliases to target paths, e.g.:
-            {"@/*": ["src/*"], "@shared/*": ["src/shared/*"]}
-            Returns None if no paths configured.
-        """
-        config = self._load_json_safe("tsconfig.json")
-        if not config:
-            return None
-
-        paths: dict[str, list[str]] = {}
-
-        # Handle extends field - load base config first
-        if "extends" in config:
-            extends_path = config["extends"]
-            # Handle relative paths like "./tsconfig.base.json"
-            if extends_path.startswith("./"):
-                extends_path = extends_path[2:]
-            base_config = self._load_json_safe(extends_path)
-            if base_config:
-                base_paths = base_config.get("compilerOptions", {}).get("paths", {})
-                paths.update(base_paths)
-
-        # Override with current config's paths
-        current_paths = config.get("compilerOptions", {}).get("paths", {})
-        paths.update(current_paths)
-
-        return paths if paths else None
-
-    def _resolve_path_alias(
-        self, import_path: str, paths: dict[str, list[str]]
-    ) -> str | None:
-        """
-        Resolve a path alias import to an actual file path.
-
-        Args:
-            import_path: Import path like '@/utils/helpers' or '~/config'
-            paths: tsconfig paths mapping from _load_tsconfig_paths()
-
-        Returns:
-            Resolved path like 'src/utils/helpers', or None if no match
-        """
-        for alias_pattern, target_paths in paths.items():
-            # Skip empty target_paths (malformed tsconfig entry)
-            if not target_paths:
-                continue
-            # Convert '@/*' to regex pattern '^@/(.*)$'
-            regex_pattern = "^" + alias_pattern.replace("*", "(.*)") + "$"
-            match = re.match(regex_pattern, import_path)
-            if match:
-                suffix = match.group(1) if match.lastindex else ""
-                # Use first target path, replace * with suffix
-                target = target_paths[0].replace("*", suffix)
-                return target
-        return None
-
-    def _resolve_python_import(
-        self, module_name: str, level: int, source_path: Path
-    ) -> str | None:
-        """
-        Resolve a Python import to an actual file path.
-
-        Args:
-            module_name: Module name like 'utils' or 'utils.helpers'
-            level: Import level (0=absolute, 1=from ., 2=from .., etc.)
-            source_path: Path of file doing the importing
-
-        Returns:
-            Resolved path relative to project root, or None if not found.
-        """
-        if level > 0:
-            # Relative import: from . or from ..
-            base_dir = source_path.parent
-            # level=1 means same package (.), level=2 means parent (..), etc.
-            for _ in range(level - 1):
-                base_dir = base_dir.parent
-
-            if module_name:
-                # from .module import x -> look for module.py or module/__init__.py
-                parts = module_name.split(".")
-                candidate = base_dir / Path(*parts)
-            else:
-                # from . import x -> can't resolve without knowing what x is
-                return None
-        else:
-            # Absolute import - check if it's project-internal
-            parts = module_name.split(".")
-            candidate = Path(*parts)
-
-        # Try as module file (e.g., utils.py)
-        file_path = self.project_dir / candidate.with_suffix(".py")
-        if file_path.exists() and file_path.is_file():
-            try:
-                return str(file_path.relative_to(self.project_dir))
-            except ValueError:
-                return None
-
-        # Try as package directory (e.g., utils/__init__.py)
-        init_path = self.project_dir / candidate / "__init__.py"
-        if init_path.exists() and init_path.is_file():
-            try:
-                return str(init_path.relative_to(self.project_dir))
-            except ValueError:
-                return None
-
-        return None
-
-    def _find_python_imports(self, content: str, source_path: Path) -> set[str]:
-        """
-        Find imported files from Python source code using AST.
-
-        Uses ast.parse to extract Import and ImportFrom nodes, then resolves
-        them to actual file paths within the project.
-
-        Args:
-            content: Python source code
-            source_path: Path of the file being analyzed
-
-        Returns:
-            Set of resolved file paths relative to project root.
-        """
-        imports: set[str] = set()
-
-        try:
-            tree = ast.parse(content)
-        except SyntaxError:
-            # Invalid Python syntax - skip gracefully
-            return imports
-
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                # import module, import module.submodule
-                for alias in node.names:
-                    resolved = self._resolve_python_import(alias.name, 0, source_path)
-                    if resolved:
-                        imports.add(resolved)
-
-            elif isinstance(node, ast.ImportFrom):
-                # from module import x, from . import x, from ..module import x
-                module = node.module or ""
-                level = node.level  # 0=absolute, 1=from ., 2=from .., etc.
-                resolved = self._resolve_python_import(module, level, source_path)
-                if resolved:
-                    imports.add(resolved)
-
-        return imports
-
-    @staticmethod
-    def find_related_files_for_root(
-        changed_files: list[ChangedFile],
-        project_root: Path,
-    ) -> list[str]:
-        """
-        Find files related to the changes using a specific project root.
-
-        DEPRECATED: LLM agents now discover related files themselves using Read, Grep, and Glob tools.
-        This method returns an empty list - agents have domain expertise to find what's relevant.
-
-        Args:
-            changed_files: List of changed files from the PR
-            project_root: Path to search for related files (e.g., worktree path)
-
-        Returns:
-            Empty list - LLM agents will discover files via their tools.
         """
         # Return empty list - LLM agents will discover files via their tools
         return []

@@ -2363,7 +2363,7 @@ export function KanbanBoard({
 															column:
 																getColumnLabel(getVisualColumn(task.status)) ??
 																"",
-															duration: formatAgingDuration(hours),
+															duration: formatAgingDuration(hours, t),
 														})}
 													</span>
 												</span>
@@ -3069,16 +3069,6 @@ export function KanbanBoard({
 					onOpenChange={setAzureDevOpsPanelOpen}
 					projectId={projectId}
 					onOpenSettings={onOpenAzureDevOpsSettings}
-					onWorkItemsImported={async (workItems, targetStatus) => {
-						// Show the import confirmation dialog
-						setImportConfirmDialog({
-							open: true,
-							workItems,
-							targetColumn: targetStatus,
-							isImporting: false,
-							source: "azure-devops",
-						});
-					}}
 				/>
 			)}
 
@@ -3089,16 +3079,6 @@ export function KanbanBoard({
 					onOpenChange={setJiraPanelOpen}
 					projectId={projectId}
 					onOpenSettings={onOpenJiraSettings}
-					onWorkItemsImported={async (workItems, targetStatus) => {
-						// Show the import confirmation dialog
-						setImportConfirmDialog({
-							open: true,
-							workItems,
-							targetColumn: targetStatus,
-							isImporting: false,
-							source: "jira",
-						});
-					}}
 				/>
 			)}
 
@@ -3120,6 +3100,7 @@ export function KanbanBoard({
 				targetColumn={importConfirmDialog.targetColumn}
 				isImporting={importConfirmDialog.isImporting}
 				onConfirm={handleImportConfirm}
+				source={importConfirmDialog.source}
 				onCancel={() => {
 					// Close the side panel when user cancels the import dialog
 					setAzureDevOpsPanelOpen(false);

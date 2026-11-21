@@ -56,7 +56,7 @@ export function FormulaBadge({ task, projectPath, specDir }: FormulaBadgeProps) 
 					showLabel={false}
 				/>
 				<span className="max-w-[90px] truncate">
-					{shortModel(applied.model)}·{effortLabel(applied.effort)}
+					{shortModel(applied.model)}·{effortLabel(applied.effort, t)}
 				</span>
 				<span className="text-muted-foreground">
 					{formatCost(applied.expectedCostUsd)}
