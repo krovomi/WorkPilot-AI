@@ -1,7 +1,7 @@
 /**
  * The marketplace's security channel (#369): the renderer names a catalog
- * server, the main scores it; a bad request is refused with its reason, any
- * other failure with a fixed message.
+ * server, the main scores it; a bad request is refused with the code of its
+ * reason, any other failure with a fixed code (the renderer words both).
  */
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -75,10 +75,10 @@ describe("mcpMarketplace:getSecurity", () => {
 	});
 
 	it("says why a request is refused", async () => {
-		serverSecurity.mockRejectedValue(new McpSecurityRequestError("Unknown catalog server"));
+		serverSecurity.mockRejectedValue(new McpSecurityRequestError("securityUnknownServer"));
 		expect(await call({ serverId: "x" })).toEqual({
 			success: false,
-			error: "Unknown catalog server",
+			error: "securityUnknownServer",
 		});
 	});
 
@@ -86,7 +86,7 @@ describe("mcpMarketplace:getSecurity", () => {
 		serverSecurity.mockRejectedValue(new Error("disk /secret/path"));
 		expect(await call({ serverId: "x" })).toEqual({
 			success: false,
-			error: "Failed to score the server",
+			error: "securityFailed",
 		});
 	});
 });

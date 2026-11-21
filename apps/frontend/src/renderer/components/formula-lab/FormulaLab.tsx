@@ -42,6 +42,7 @@ import {
 	formatCostBand,
 	formatTokens,
 	providerColor,
+	providerName,
 	shortModel,
 	totalTokens,
 } from "./formula-utils";
@@ -145,7 +146,7 @@ export function FormulaLab() {
 	const providers = useMemo(
 		() =>
 			Array.from(new Set(allFormulas.map((f) => f.provider))).sort((a, b) =>
-				a.localeCompare(b),
+				providerName(a).localeCompare(providerName(b)),
 			),
 		[allFormulas],
 	);
@@ -159,7 +160,7 @@ export function FormulaLab() {
 				(!perTokenOnly || f.per_token_billed) &&
 				(!q ||
 					f.model.toLowerCase().includes(q) ||
-					f.provider.toLowerCase().includes(q)),
+					providerName(f.provider).toLowerCase().includes(q)),
 		);
 	}, [allFormulas, providerFilter, effortFilter, perTokenOnly, search]);
 
@@ -409,7 +410,7 @@ export function FormulaLab() {
 									<option value="all">{t("formulaLab:filters.allProviders")}</option>
 									{providers.map((p) => (
 										<option key={p} value={p}>
-											{p}
+											{providerName(p)}
 										</option>
 									))}
 								</NativeSelect>
@@ -484,14 +485,14 @@ export function FormulaLab() {
 																onClick={() => setSelectedKey(key)}
 																aria-pressed={isSel}
 																aria-label={t("formulaLab:selectFormula", {
-																	formula: `${f.provider} ${name}`,
+																	formula: `${providerName(f.provider)} ${name}`,
 																})}
 																className="font-medium hover:underline"
 															>
 																{shortModel(f.model)}
 															</button>
 															<span className="text-muted-foreground">
-																{f.provider}
+																{providerName(f.provider)}
 															</span>
 															{f.provider === "ollama" &&
 																(f.installed ? (
@@ -561,7 +562,7 @@ export function FormulaLab() {
 															className="h-7 text-2xs"
 															disabled={applying}
 															aria-label={t("formulaLab:applyFormula", {
-																formula: `${f.provider} ${name}`,
+																formula: `${providerName(f.provider)} ${name}`,
 															})}
 															onClick={(e) => {
 																e.stopPropagation();
@@ -602,7 +603,7 @@ export function FormulaLab() {
 									{effortLabel(selectedFormula.effort, t)}
 								</div>
 								<div className="text-xs text-muted-foreground">
-									{selectedFormula.provider} · {formatCostBand(selectedFormula)}
+									{providerName(selectedFormula.provider)} · {formatCostBand(selectedFormula)}
 								</div>
 							</div>
 						</div>

@@ -9,7 +9,10 @@
 
 import { loadMcpCatalog } from "../../shared/mcp-catalog/install";
 import { scoreServer } from "../../shared/mcp-catalog/security-score";
-import type { McpMarketplaceServer } from "../../shared/types/mcp-marketplace";
+import type {
+	McpMarketplaceFailure,
+	McpMarketplaceServer,
+} from "../../shared/types/mcp-marketplace";
 import type {
 	McpSecurityRequest,
 	McpSecurityScore,
@@ -24,16 +27,21 @@ export interface ServerSecurityDeps {
 	catalog?: () => McpMarketplaceServer[];
 }
 
-export class McpSecurityRequestError extends Error {}
+/** A request refused for a reason the renderer words (`code`). */
+export class McpSecurityRequestError extends Error {
+	constructor(readonly code: McpMarketplaceFailure) {
+		super(code);
+	}
+}
 
 function parseRequest(raw: unknown): McpSecurityRequest {
 	const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
 	const { serverId, projectId, refresh } = value;
 	if (typeof serverId !== "string" || !serverId) {
-		throw new McpSecurityRequestError("A catalog server id is required");
+		throw new McpSecurityRequestError("securityServerRequired");
 	}
 	if (projectId !== undefined && projectId !== null && typeof projectId !== "string") {
-		throw new McpSecurityRequestError("Invalid project id");
+		throw new McpSecurityRequestError("securityInvalidProject");
 	}
 	return { serverId, projectId: projectId ?? null, refresh: refresh === true };
 }
@@ -76,7 +84,7 @@ export async function serverSecurity(
 ): Promise<McpSecurityScore> {
 	const request = parseRequest(raw);
 	const entry = (deps.catalog ?? loadMcpCatalog)().find((s) => s.id === request.serverId);
-	if (!entry) throw new McpSecurityRequestError("Unknown catalog server");
+	if (!entry) throw new McpSecurityRequestError("securityUnknownServer");
 	const projectPath = request.projectId ? deps.projectPath(request.projectId) : undefined;
 	return scoreCatalogEntry(entry, projectPath, deps, request.refresh);
 }

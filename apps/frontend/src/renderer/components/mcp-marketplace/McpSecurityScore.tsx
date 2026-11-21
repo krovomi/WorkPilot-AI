@@ -20,6 +20,7 @@ import { formatAppDateTime } from "../../lib/date-format";
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { mainFailureText } from "./main-failure";
 
 export interface McpServerSecurity {
 	score: McpSecurityScore;
@@ -145,7 +146,7 @@ export function McpSecurityDetails({ security }: { readonly security: McpServerS
 			{checking && <p>{t("mcpMarketplace.security.checking")}</p>}
 			{error !== null && (
 				<p role="alert" className="text-destructive">
-					{error || t("mcpMarketplace.security.readFailed")}
+					{error ? mainFailureText(t, error) : t("mcpMarketplace.security.readFailed")}
 				</p>
 			)}
 			{note && !checking && <p>{t(note)}</p>}

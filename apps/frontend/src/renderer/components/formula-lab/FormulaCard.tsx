@@ -8,6 +8,7 @@ import {
 	formatCostBand,
 	formatTokens,
 	providerColor,
+	providerName,
 	shortModel,
 	totalTokens,
 } from "./formula-utils";
@@ -80,7 +81,7 @@ export function FormulaCard({
 					</div>
 					<div className="mt-0.5 flex items-center gap-1.5 text-2xs capitalize text-muted-foreground">
 						<span>
-							{formula.provider} · {effortLabel(formula.effort, t)}
+							{providerName(formula.provider)} · {effortLabel(formula.effort, t)}
 						</span>
 						{formula.provider === "ollama" &&
 							(formula.installed ? (
