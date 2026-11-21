@@ -79,7 +79,8 @@ vi.mock("../../utils/python-runner-env", () => ({
 		...options.extra,
 	}),
 }));
-vi.mock("../../app-language", () => ({ getAppLanguage: () => "en" }));
+const language = vi.hoisted(() => ({ current: "en" }));
+vi.mock("../../app-language", () => ({ getAppLanguage: () => language.current }));
 vi.mock("../../notification-service", () => ({
 	notificationService: {
 		announce: (projectId: string, text: { title: string; body: string }) =>
@@ -149,7 +150,18 @@ describe("CI/CD deployment watch", () => {
 		const watchArgs = state.spawned[1];
 		expect(watchArgs.some((a) => a.endsWith(RUNNER))).toBe(true);
 		const runId = watchArgs[watchArgs.indexOf("--run-id") + 1];
-		expect(watchArgs.slice(-6)).toEqual(["--action", "watch", "--project", projectDir, "--run-id", runId]);
+		expect(watchArgs.slice(-10)).toEqual([
+			"--action",
+			"watch",
+			"--project",
+			projectDir,
+			"--run-id",
+			runId,
+			"--project-name",
+			"Shop",
+			"--language",
+			"en",
+		]);
 
 		writeWatch(runId, { run_id: runId, phase: "watching", verdict: "ok" });
 		const listed = (await invoke(IPC_CHANNELS.CICD_TRIGGERS_LIST_RUNS, projectDir)) as {
@@ -207,6 +219,24 @@ describe("CI/CD deployment watch", () => {
 				},
 			},
 		]);
+	});
+
+	it("passes the app's language to the runner, English for any other", async () => {
+		configure(["CICD_PROVIDER=github", "CICD_MONITOR_HEALTH_URL=https://app.example/health"]);
+		for (const [app, sent] of [
+			["fr", "fr"],
+			["de", "en"],
+		]) {
+			language.current = app;
+			state.spawned = [];
+			state.answers = [{ code: 0, stdout: "{}" }, { code: 0, stdout: "{}" }];
+			await invoke(IPC_CHANNELS.CICD_TRIGGERS_TRIGGER, projectDir, { provider: "github" });
+			await tick();
+			await tick();
+			const args = state.spawned[1];
+			expect(args[args.indexOf("--language") + 1]).toBe(sent);
+		}
+		language.current = "en";
 	});
 
 	it("announces nothing for a healthy watch", async () => {
@@ -271,6 +301,37 @@ describe("CI/CD deployment watch", () => {
 		};
 		expect(blank.data).toMatchObject({ monitor_prometheus_token: "", auto_rollback: false });
 		rmSync(empty, { recursive: true, force: true });
+	});
+
+	it("masks the keys of the other sources and the alert channels, and keeps them on a masked save", async () => {
+		configure([
+			"CICD_MONITOR_SOURCE=datadog",
+			"CICD_MONITOR_DATADOG_SITE=datadoghq.eu",
+			"CICD_MONITOR_DATADOG_API_KEY=dd-api-0000",
+			"CICD_ALERT_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/test0000",
+			"CICD_ALERT_EMAIL_TO=oncall@example.com",
+		]);
+		const config = (await invoke(IPC_CHANNELS.CICD_TRIGGERS_GET_CONFIG, projectDir)) as {
+			data: Record<string, unknown>;
+		};
+		expect(config.data).toMatchObject({
+			monitor_source: "datadog",
+			monitor_datadog_site: "datadoghq.eu",
+			monitor_datadog_api_key: "***",
+			monitor_datadog_app_key: "",
+			alert_slack_webhook_url: "***",
+			alert_smtp_password: "",
+			alert_email_to: "oncall@example.com",
+		});
+		expect(JSON.stringify(config.data)).not.toContain("test0000");
+		const { toCicdEnvUpdate } = await import("../cicd-triggers-handlers");
+		expect(
+			toCicdEnvUpdate({
+				alert_slack_webhook_url: "***",
+				monitor_datadog_api_key: "***",
+				alert_smtp_port: "465",
+			}),
+		).toEqual({ ok: true, update: { CICD_ALERT_SMTP_PORT: "465" } });
 	});
 
 	describe("rollback", () => {

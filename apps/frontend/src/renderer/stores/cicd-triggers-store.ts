@@ -34,6 +34,28 @@ export interface CICDConfig {
 	monitor_window_minutes: string;
 	monitor_deploy_wait_minutes: string;
 	auto_rollback: boolean;
+	/** prometheus (default) | datadog | newrelic | cloudwatch, and their settings. */
+	monitor_source: string;
+	monitor_datadog_site: string;
+	monitor_datadog_api_key: string;
+	monitor_datadog_app_key: string;
+	monitor_newrelic_region: string;
+	monitor_newrelic_account_id: string;
+	monitor_newrelic_api_key: string;
+	monitor_aws_region: string;
+	monitor_aws_access_key_id: string;
+	monitor_aws_secret_access_key: string;
+	monitor_aws_session_token: string;
+	/** Where the alert of a bad verdict goes. Secrets come back masked. */
+	alert_slack_webhook_url: string;
+	alert_pagerduty_routing_key: string;
+	alert_pagerduty_region: string;
+	alert_email_to: string;
+	alert_email_from: string;
+	alert_smtp_host: string;
+	alert_smtp_port: string;
+	alert_smtp_user: string;
+	alert_smtp_password: string;
 }
 
 export interface PipelineRun {

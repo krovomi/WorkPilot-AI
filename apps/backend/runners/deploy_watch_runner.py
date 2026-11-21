@@ -2,7 +2,8 @@
 """Watch a deployment WorkPilot triggered, or roll it back (#366).
 
 Usage:
-    python deploy_watch_runner.py --action watch --project /path --run-id <id>
+    python deploy_watch_runner.py --action watch --project /path --run-id <id> \
+        [--project-name <name>] [--language en|fr]
     python deploy_watch_runner.py --action rollback --project /path --run-id <id>
 
 The run id names a record of `.workpilot/cicd_runs.json`; the endpoints and
@@ -32,6 +33,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--action", choices=["watch", "rollback"], required=True)
     parser.add_argument("--project", required=True)
     parser.add_argument("--run-id", required=True)
+    # For the alerts sent to Slack, PagerDuty and e-mail.
+    parser.add_argument("--project-name", default="")
+    parser.add_argument("--language", choices=["en", "fr"], default="en")
     args = parser.parse_args(argv)
 
     project = Path(args.project).resolve()
@@ -42,7 +46,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.action == "watch":
             state = run_watch(
-                project, args.run_id, env, revert_opener=open_revert_pr(project)
+                project,
+                args.run_id,
+                env,
+                revert_opener=open_revert_pr(project),
+                project_name=args.project_name[:100],
+                language=args.language,
             )
         else:
             state = run_rollback(project, args.run_id, env)

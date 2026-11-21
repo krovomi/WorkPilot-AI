@@ -3,11 +3,13 @@
 Two sources, kept apart on purpose:
 
 * the project's CI/CD settings (environment of the runner, from the encrypted
-  `.workpilot/.env`): the health check URL, the Prometheus URL and token, the
-  automatic rollback switch. A repository cannot choose where a token goes or
+  `.workpilot/.env`): the health check URL, the metric source and its
+  credentials (`sources`), the alert channels (`alerts`), the automatic
+  rollback switch. A repository cannot choose where a token goes or
   turn a rollback on by committing a file;
 * `.workpilot/deploy-monitors.yaml`, which a team may commit: the window, the
-  pauses and the metrics (a PromQL query, a kind, thresholds), and what follows
+  pauses and the metrics (a query in the source's language, a kind,
+  thresholds), and what follows
   a bad verdict (`revert_pr`, `explain_incident`). Bounded and validated; a bad
   entry is dropped and named in `problems`. A revert PR goes to the forge the
   project already pushes to, with its own credentials: the file only says yes.
@@ -16,12 +18,16 @@ Two sources, kept apart on purpose:
 from __future__ import annotations
 
 import ipaddress
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 import yaml
+
+if TYPE_CHECKING:
+    from .sources import MetricSource
 
 CONFIG_FILE = Path(".workpilot") / "deploy-monitors.yaml"
 MAX_CONFIG_BYTES = 64 * 1024
@@ -81,8 +87,8 @@ class MetricRule:
 @dataclass(frozen=True)
 class WatchSettings:
     health_url: str = ""
-    prometheus_url: str = ""
-    prometheus_token: str = field(default="", repr=False)
+    # Prometheus, Datadog, New Relic or CloudWatch, with its credentials.
+    source: MetricSource | None = None
     auto_rollback: bool = False
     window_minutes: int = DEFAULT_WINDOW_MINUTES
     deploy_wait_minutes: int = DEFAULT_DEPLOY_WAIT_MINUTES
@@ -97,8 +103,8 @@ class WatchSettings:
 
     @property
     def configured(self) -> bool:
-        """Something to watch: a health check, or Prometheus with metrics."""
-        return bool(self.health_url or (self.prometheus_url and self.metrics))
+        """Something to watch: a health check, or a metric source with metrics."""
+        return bool(self.health_url or (self.source and self.metrics))
 
 
 def valid_url(value: str) -> bool:
@@ -212,15 +218,15 @@ def _flag(data: dict, key: str, default: bool, problems: list[str]) -> bool:
 
 
 def load_settings(project_dir: Path, env: dict) -> WatchSettings:
+    # Imported here: `sources` reads this module's URL checks.
+    from .sources import source_from_env
+
     data, problems = read_monitor_file(project_dir)
     health = str(env.get("CICD_MONITOR_HEALTH_URL") or "").strip()
-    prometheus = str(env.get("CICD_MONITOR_PROMETHEUS_URL") or "").strip().rstrip("/")
     if health and not valid_url(health):
         problems.append("CICD_MONITOR_HEALTH_URL: not an http(s) URL")
         health = ""
-    if prometheus and not valid_url(prometheus):
-        problems.append("CICD_MONITOR_PROMETHEUS_URL: not an http(s) URL")
-        prometheus = ""
+    source = source_from_env(env, problems)
     raw_metrics = data.get("metrics") or []
     if not isinstance(raw_metrics, list):
         problems.append("metrics: not a list")
@@ -236,8 +242,7 @@ def load_settings(project_dir: Path, env: dict) -> WatchSettings:
             metrics.append(rule)
     return WatchSettings(
         health_url=health,
-        prometheus_url=prometheus,
-        prometheus_token=str(env.get("CICD_MONITOR_PROMETHEUS_TOKEN") or ""),
+        source=source,
         auto_rollback=str(env.get("CICD_AUTO_ROLLBACK") or "") == "true",
         window_minutes=_duration(
             data,
