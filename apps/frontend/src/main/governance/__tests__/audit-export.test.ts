@@ -20,6 +20,7 @@ const event = {
 	reason: 'Guardrail triggered: "no", really',
 	provider: "openai",
 	model: "gpt-5",
+	approvedBy: null,
 };
 
 describe("auditFormat", () => {
@@ -50,6 +51,19 @@ describe("auditEvents", () => {
 		expect(events[1].reason).toHaveLength(1000);
 		expect(events[2].rules).toEqual([]);
 		expect(events[2].targetKind).toBeNull();
+	});
+
+	it("keeps who approved an approved call, and only there", () => {
+		const approver = "Ada <u-1> [security]";
+		const [approved, denied] = auditEvents({
+			events: [
+				{ ...event, decision: "approved", approvedBy: approver },
+				{ ...event, approvedBy: "forged" },
+			],
+		});
+		expect(approved.approvedBy).toBe(approver);
+		expect(denied.approvedBy).toBeNull();
+		expect(toCsv([approved]).split("\r\n")[1].endsWith(approver)).toBe(true);
 	});
 
 	it("reads nothing from an answer without events", () => {

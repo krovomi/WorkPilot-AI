@@ -35,6 +35,10 @@ export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarVie
 	// Built on the server from its board and its clone, shared like an
 	// analysis (`ipc-handlers/server-changelog.ts`).
 	"changelog",
+	// Its workpilot.policy.yaml, audit trail, approvals and kill switch, read
+	// and run by the server (`main/server-governance.ts`); the rules editor of
+	// this computer is not shown for it.
+	"guardrails",
 	"administration",
 ]);
 

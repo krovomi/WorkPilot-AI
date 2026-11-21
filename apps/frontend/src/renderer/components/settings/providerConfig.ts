@@ -1,5 +1,6 @@
 import { Key, Server } from "lucide-react";
 import React from "react";
+import { gatewayMap } from "@shared/constants/gateway-providers";
 
 export interface ProviderConfig {
 	apiKey?: string;
@@ -85,6 +86,14 @@ export const getProviderFields = (t: any): Record<string, ProviderConfig> => ({
 		placeholder: "xai-...",
 		icon: React.createElement(Key, { className: "w-4 h-4" }),
 	},
+	...gatewayMap((gateway) => ({
+		apiKey: gateway.settingsKey,
+		model: gateway.modelSettingsKey,
+		description: t(`sections.accounts.providers.${gateway.id}`),
+		requiresApiKey: true,
+		placeholder: gateway.keyPlaceholder,
+		icon: React.createElement(Key, { className: "w-4 h-4" }),
+	})),
 	windsurf: {
 		apiKey: "globalWindsurfApiKey",
 		description: t("sections.accounts.providers.windsurf"),

@@ -220,6 +220,34 @@ grok:
     mcp: bridged
     instructions: injected
 
+# Gateways to many vendors' models through one key (gateway_providers.py).
+# The effort reaches the gateway as OpenRouter's `reasoning.effort`, which it
+# maps onto each model's own setting, or drops for a model without one.
+
+openrouter:
+  adapter: CompatibleProviderAgentClient
+  subagents: emulated
+  effort: reasoning_effort
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
+
+huggingface:
+  adapter: CompatibleProviderAgentClient
+  subagents: emulated
+  effort: reasoning_effort
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
+
 # ---------------------------------------------------------------------------
 # Coding-agent CLIs driven as subprocesses (core/agent_clients/cli_subprocess.py).
 # They bring their own tools, sessions and login; WorkPilot hands the prompt

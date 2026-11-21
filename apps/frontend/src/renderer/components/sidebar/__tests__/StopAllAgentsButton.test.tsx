@@ -99,6 +99,40 @@ describe("StopAllAgentsButton", () => {
 		);
 	});
 
+	it("says what it stopped on the server, and which projects it could not reach", async () => {
+		const stopAllAgents = vi.fn().mockResolvedValue({
+			success: true,
+			data: { pausedTasks: ["t1"], stoppedProcesses: 0, failedTasks: [], serverAgents: 2, serverFailed: 1 },
+		});
+		vi.stubGlobal("electronAPI", { stopAllAgents });
+		view();
+		act(() => {
+			globalThis.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true, shiftKey: true, code: "Period" }));
+		});
+		await waitFor(() => expect(toast).toHaveBeenCalled());
+		const { description } = toast.mock.calls[0][0] as { description: string };
+		expect(description).toContain("2 of your agents stopped on the server.");
+		expect(description).toContain("1 server project could not be reached");
+	});
+
+	it("names an unreachable server project even when nothing ran here", async () => {
+		const stopAllAgents = vi.fn().mockResolvedValue({
+			success: true,
+			data: { pausedTasks: [], stoppedProcesses: 0, failedTasks: [], serverAgents: 0, serverFailed: 2 },
+		});
+		vi.stubGlobal("electronAPI", { stopAllAgents });
+		view();
+		act(() => {
+			globalThis.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true, shiftKey: true, code: "Period" }));
+		});
+		await waitFor(() =>
+			expect(toast).toHaveBeenCalledWith({
+				title: "No agent was running",
+				description: expect.stringContaining("2 server projects could not be reached"),
+			}),
+		);
+	});
+
 	it("says so when the agents could not be stopped", async () => {
 		tasks = [running()];
 		vi.stubGlobal("electronAPI", { stopAllAgents: vi.fn().mockResolvedValue({ success: false }) });

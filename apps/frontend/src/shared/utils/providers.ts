@@ -11,6 +11,7 @@ import { providerRegistry } from "../services/providerRegistry";
 import { type AgentCliTool, isAgentCliTool } from "../types/agent-cli";
 import type { APIProfile } from "../types/profile";
 import { detectProvider } from "./provider-detection";
+import { gatewayMap } from "../constants/gateway-providers";
 
 export interface CanonicalProvider {
 	name: string;
@@ -123,6 +124,7 @@ export async function getStaticProviders(
 				mistral: "globalMistralApiKey",
 				deepseek: "globalDeepSeekApiKey",
 				grok: "globalGrokApiKey",
+				...gatewayMap((gateway) => gateway.settingsKey),
 				cursor: "globalCursorApiKey",
 				aws: "globalAwsAccessKey",
 				ollama: "globalOllamaApiUrl",

@@ -13,6 +13,7 @@ every agent, on every provider:
     files:
       forbidden: ["**/migrations/**", ".env*"]   # an agent never writes these
       requires_review: ["infra/**"]              # one-time approval first
+      reviewers: [maintainer]                    # on a server: who may give it
     budget:
       max_tokens_per_hour: 500000     # every session of the project, last 60 min
       max_tokens_per_task: 2000000    # every session of one task, all along
@@ -28,7 +29,10 @@ makes the whole policy invalid, and an invalid policy refuses every write and
 command until it is fixed: a typo never turns a limit off in silence.
 
 ``files`` become ordinary guardrail rules (``deny`` / ``require_approval`` on a
-path glob), judged where the other rules are. The schedule is judged before
+path glob), judged where the other rules are. ``files.reviewers`` names the
+server roles one of which the person approving such a call must hold; the
+desktop app has no verified identity to check it against, so it applies on a
+server only (``shared_features.governance``). The schedule is judged before
 every write or command by the same hook, and with the budget on the stream of
 every session (``agents.policy_watch``), which pauses the task. The loop
 limit replaces the circuit breaker's own (``agents.tool_breaker``).
@@ -47,13 +51,16 @@ from .guardrails import GuardrailAction, GuardrailRule, glob_to_regex
 SECTIONS = ("schedule", "files", "budget", "loop_detection")
 
 _SCHEDULE_KEYS = frozenset({"timezone", "allowed_hours", "days"})
-_FILES_KEYS = frozenset({"forbidden", "requires_review"})
+_FILES_KEYS = frozenset({"forbidden", "requires_review", "reviewers"})
 _BUDGET_KEYS = frozenset({"max_tokens_per_hour", "max_tokens_per_task"})
 _LOOP_KEYS = frozenset({"max_same_tool_call"})
 
 MAX_WINDOWS = 8
 MAX_GLOBS = 200
 MAX_GLOB_CHARS = 256
+#: Role slugs ``files.reviewers`` may name, as the server writes them.
+MAX_REVIEWERS = 20
+_ROLE_SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 MIN_TOKENS_PER_HOUR = 1_000
 MAX_TOKENS_PER_HOUR = 1_000_000_000
 MIN_TOKENS_PER_TASK = 1_000
@@ -100,6 +107,7 @@ class Governance:
     days: tuple[int, ...] = tuple(range(7))
     forbidden: list[str] = field(default_factory=list)
     requires_review: list[str] = field(default_factory=list)
+    reviewers: list[str] = field(default_factory=list)
     max_tokens_per_hour: int | None = None
     max_tokens_per_task: int | None = None
     max_same_tool_call: int | None = None
@@ -183,6 +191,7 @@ class Governance:
             "files": {
                 "forbidden": list(self.forbidden),
                 "requiresReview": list(self.requires_review),
+                "reviewers": list(self.reviewers),
             },
             "budget": {
                 "maxTokensPerHour": self.max_tokens_per_hour,
@@ -297,6 +306,29 @@ def _globs(raw: Any, key: str, errors: list[str], label: str) -> list[str]:
     return globs
 
 
+def _reviewers(raw: Any, errors: list[str], label: str) -> list[str]:
+    """The role slugs of ``files.reviewers``; a wrong one is an error, never dropped."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > MAX_REVIEWERS:
+        errors.append(
+            f"{label}: 'files.reviewers' must be a list of at most {MAX_REVIEWERS} "
+            "role names"
+        )
+        return []
+    roles: list[str] = []
+    for item in raw:
+        if not isinstance(item, str) or not _ROLE_SLUG.match(item):
+            errors.append(
+                f"{label}: '{str(item)[:60]}' in 'files.reviewers' is not a role name "
+                "(lowercase letters, digits, '-' or '_')"
+            )
+            continue
+        if item not in roles:
+            roles.append(item)
+    return roles
+
+
 def _section(
     data: dict[str, Any], key: str, known: frozenset[str], errors: list[str], label: str
 ) -> dict[str, Any]:
@@ -359,6 +391,7 @@ def parse_governance(
     governance.requires_review = _globs(
         files.get("requires_review"), "requires_review", errors, label
     )
+    governance.reviewers = _reviewers(files.get("reviewers"), errors, label)
 
     budget = _section(data, "budget", _BUDGET_KEYS, errors, label)
     governance.max_tokens_per_hour = _bounded(
@@ -404,6 +437,7 @@ def schedule_refusal(
 
 __all__ = [
     "FORBIDDEN_PREFIX",
+    "MAX_REVIEWERS",
     "Governance",
     "REVIEW_PREFIX",
     "SECTIONS",

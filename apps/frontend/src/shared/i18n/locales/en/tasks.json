@@ -415,6 +415,14 @@
 			"member": "Member",
 			"owner": "Owner"
 		},
+		"cardMenu": {
+			"label": "Card actions",
+			"open": "Open",
+			"edit": "Edit…",
+			"type": "Type",
+			"priority": "Priority",
+			"saveFailed": "The change could not be saved"
+		},
 		"quickAdd": {
 			"addCard": "Add a card",
 			"addQueued": "Add and queue",

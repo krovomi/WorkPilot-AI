@@ -238,7 +238,16 @@
 					"unverified": "● Tool-calling à vérifier",
 					"unverifiedDetail": "— non confirmé d'après le nom ; ouvrez la carte du modèle. Les tailles « ~Go » sont estimées (quant 4-bit)."
 				},
-				"estimatedSize": " · ~{{size}} Go"
+				"estimatedSize": " · ~{{size}} Go",
+				"cloudBadge": "Cloud",
+				"cloudBadgeTitle": "Servi par le routeur Hugging Face, avec appel d’outils",
+				"cloudPrice": "{{price}} par M de jetons",
+				"tryInCloud": "Essayer dans le cloud",
+				"tryInCloudTooltip": "Faire de {{id}} le modèle cloud de Hugging Face, sans rien télécharger",
+				"cloudDefault": "Modèle cloud",
+				"cloudChosen": "{{id}} est maintenant le modèle cloud de Hugging Face. Choisissez le moteur Hugging Face sur une tâche pour l’essayer, sans rien télécharger.",
+				"cloudNeedsToken": "Ajoutez d’abord un jeton Hugging Face dans la page du provider Hugging Face.",
+				"cloudSaveFailed": "Le modèle cloud n’a pas pu être enregistré."
 			},
 			"providers": {
 				"anthropic": "Modèles Anthropic Claude",
@@ -248,6 +257,8 @@
 				"deepseek": "Modèles DeepSeek (DeepSeek-Coder, etc.)",
 				"google": "Accès API Google et Google DeepMind",
 				"grok": "Modèles Grok xAI",
+				"openrouter": "Des centaines de modèles de nombreux éditeurs (Kimi, GLM, DeepSeek, Claude, GPT…) avec une seule clé OpenRouter",
+				"huggingface": "Les modèles ouverts du Hub Hugging Face via Inference Providers, facturés sur votre compte Hugging Face",
 				"loadError": "Échec du chargement de la liste des fournisseurs",
 				"meta": "Modèles officiels Meta AI",
 				"mistral": "Modèles Mistral AI (Mistral, Codéal, etc.)",
@@ -259,7 +270,50 @@
 				"pi": "Agent de code minimaliste, piloté via le CLI pi",
 				"gemini-cli": "Gemini CLI, l'agent open source de Google, piloté via le protocole ACP"
 			},
-			"title": "Comptes"
+			"title": "Comptes",
+			"gatewayCatalog": {
+				"title": "Modèles de {{name}}",
+				"description": "La liste en direct des modèles que {{name}} sert avec appel d’outils, avec leur prix. Cliquez sur l’un d’eux pour en faire le modèle par défaut.",
+				"searchPlaceholder": "Filtrer les modèles…",
+				"empty": "Aucun modèle ne correspond.",
+				"more": "Encore {{count}} : affinez le filtre.",
+				"price": "{{price}} par M de jetons",
+				"context": "contexte de {{size}}",
+				"providers_one": "{{count}} fournisseur",
+				"providers_other": "{{count}} fournisseurs",
+				"default": "Par défaut",
+				"setDefault": "Faire de {{id}} le modèle par défaut",
+				"offline": "Liste hors ligne : {{name}} n’a pas pu être joint.",
+				"loading": "Chargement des modèles…"
+			},
+			"gatewayRouting": {
+				"title": "Routage",
+				"description": {
+					"openrouter": "Comment OpenRouter choisit le fournisseur qui répond, et ce que ce fournisseur peut faire de vos prompts.",
+					"huggingface": "Comment le routeur Hugging Face choisit le fournisseur d’inférence qui répond."
+				},
+				"sort": "Ordre des fournisseurs",
+				"sortDefault": "Choix d’OpenRouter (répartition de charge)",
+				"sorts": {
+					"price": "Le moins cher d’abord",
+					"throughput": "Le débit le plus rapide d’abord",
+					"latency": "La latence la plus basse d’abord"
+				},
+				"denyDataCollection": "Seulement les fournisseurs qui ne conservent pas les prompts et n’entraînent pas dessus",
+				"zeroRetention": "Seulement les fournisseurs sans conservation des données",
+				"fallbacks": "Modèles de secours",
+				"fallbacksHint": "Essayés dans l’ordre quand le modèle par défaut est indisponible, limité ou refuse la requête. {{count}} au plus.",
+				"fallbackAria": "Modèle de secours {{index}}",
+				"fallbackPlaceholder": "éditeur/modèle",
+				"invalidModel": "Pas un identifiant de modèle : {{id}}",
+				"policy": "Politique du routeur",
+				"policyDefault": "Par défaut de Hugging Face",
+				"policies": {
+					"fastest": "Le fournisseur le plus rapide",
+					"cheapest": "Le fournisseur le moins cher"
+				},
+				"saveFailed": "Le routage n’a pas pu être enregistré."
+			}
 		},
 		"agent": {
 			"description": "Modèle par défaut et framework",
@@ -678,7 +732,9 @@
 		"phaseConfiguration": "Configuration des Phases",
 		"phaseConfigurationDescription": "Configurez les modèles et les niveaux de réflexion pour chaque phase du pipeline de développement",
 		"presets": {
-			"auto": { "name": "Auto (Optimisé)" },
+			"auto": {
+				"name": "Auto (Optimisé)"
+			},
 			"complex": {
 				"name": "Tâches complexes",
 				"description": "Pour les implémentations délicates en plusieurs étapes, qui demandent une analyse approfondie"
@@ -3096,6 +3152,29 @@
 		"exported_one": "{{count}} décision exportée dans {{path}}",
 		"exported_other": "{{count}} décisions exportées dans {{path}}",
 		"exportFailed": "L'export a échoué : {{error}}",
+		"approvedBy": "approuvé par {{name}}",
+		"localApprover": "Sur cet ordinateur, une approbation est donnée en votre nom, sans identité vérifiée. Sur un serveur, le compte qui approuve et ses rôles sont enregistrés.",
+		"serverApprover": "Tout membre du projet qui peut approuver répond, sous son compte du serveur.",
+		"serverReviewers": "Approuvé par un membre qui a l'un de ces rôles : {{roles}}. Quiconque peut approuver peut refuser.",
+		"serverTitle": "Gouvernance du projet du serveur",
+		"serverHint": "Les agents de ce projet tournent sur le serveur : son workpilot.policy.yaml, son journal d'audit, les appels qu'attendent ses agents et son arrêt d'urgence sont lus et exécutés là-bas. Le serveur revérifie vos droits à chaque action.",
+		"agentsLine": "Agents en cours sur le serveur : {{mine}} à vous, {{project}} en tout",
+		"stopMine": "Arrêter mes agents",
+		"stopProject": "Arrêter tous les agents du projet",
+		"stopProjectConfirm_one": "Confirmer : arrêter {{count}} agent, quel que soit qui l'a lancé",
+		"stopProjectConfirm_other": "Confirmer : arrêter {{count}} agents, quel que soit qui les a lancés",
+		"stopped_one": "{{count}} agent arrêté. Sa carte peut être relancée.",
+		"stopped_other": "{{count}} agents arrêtés. Leurs cartes peuvent être relancées.",
+		"stopFailed": "Les agents n'ont pas pu être arrêtés : {{error}}",
+		"pendingTitle_one": "{{count}} appel attend une approbation",
+		"pendingTitle_other": "{{count}} appels attendent une approbation",
+		"approve": "Approuver",
+		"refuse": "Refuser",
+		"answered": {
+			"approved": "Approuvé en votre nom : le prochain appel identique de l'agent passe, une fois.",
+			"refused": "Refusé : l'agent reste refusé sur cet appel."
+		},
+		"answerFailed": "La réponse n'a pas été enregistrée : {{error}}",
 		"decisions": {
 			"deny": "Refusé",
 			"review": "Revue",
