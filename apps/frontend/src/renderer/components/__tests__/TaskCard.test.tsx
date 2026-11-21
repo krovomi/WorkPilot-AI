@@ -37,6 +37,7 @@ import { useKanbanBlockerStore } from "../../stores/kanban-blocker-store";
 import { useKanbanConflictStore } from "../../stores/kanban-conflict-store";
 import { useProjectStore } from "../../stores/project-store";
 import { useSmartEstimationStore } from "../../stores/smart-estimation-store";
+import { resetHoverPreviewWarmthForTests } from "../../hooks/useHoverPreview";
 import { recordTaskActivity, useTaskStore } from "../../stores/task-store";
 import { TaskCard } from "../TaskCard";
 import { Toaster } from "../ui/toaster";
@@ -1114,5 +1115,153 @@ describe("TaskCard — fallbacks", () => {
 		expect(screen.getByText("The worktree is locked")).toBeInTheDocument();
 		expect(screen.getByText("Stuck")).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: /Recover/ })).toBeEnabled();
+	});
+});
+
+describe("TaskCard — type colour and hover preview", () => {
+	beforeEach(() => resetHoverPreviewWarmthForTests());
+
+	const cardOf = (title: string) =>
+		screen.getByRole("option", { name: title });
+
+	it("shows one type chip, resolved from the kind and the category", () => {
+		renderCard({
+			task: makeTask({
+				metadata: {
+					kind: "bug_fix",
+					kindSource: "keywords",
+					kindConfidence: 0.9,
+					category: "bug_fix",
+					securitySeverity: undefined,
+				} as never,
+			}),
+		});
+		const card = cardOf("Add login page");
+		expect(card).toHaveAttribute("data-card-type", "bug");
+		expect(card).not.toHaveAttribute("data-card-faded");
+		expect(within(card).getAllByText("Bug")).toHaveLength(1);
+		// The old category badge is gone: the type says it once.
+		expect(within(card).queryByText("Bug Fix")).not.toBeInTheDocument();
+	});
+
+	it("draws a proposed type dashed and paler", () => {
+		renderCard({
+			task: makeTask({
+				metadata: {
+					kind: "spike",
+					kindSource: "keywords",
+					kindConfidence: 0.4,
+				} as never,
+			}),
+		});
+		const card = cardOf("Add login page");
+		expect(card).toHaveAttribute("data-card-type", "spike");
+		expect(card).toHaveAttribute("data-card-faded", "");
+		const chip = card.querySelector("[data-card-type-chip]");
+		expect(chip).toHaveClass("card-type-chip--proposed");
+		expect(chip).toHaveAttribute(
+			"title",
+			"Spike / POC (proposed, confirm it in the task detail)",
+		);
+	});
+
+	it("leaves a card with only a defaulted kind neutral", () => {
+		renderCard({
+			task: makeTask({
+				metadata: {
+					kind: "feature",
+					kindSource: "default",
+					kindConfidence: 0.3,
+				} as never,
+			}),
+		});
+		const card = cardOf("Add login page");
+		expect(card).not.toHaveAttribute("data-card-type");
+		expect(card.querySelector("[data-card-type-chip]")).toBeNull();
+	});
+
+	it("hatches a card blocked by an unfinished dependency", () => {
+		useKanbanBlockerStore.setState({
+			blockers: {
+				"task-1": {
+					pending: [{ id: "t0", title: "Schema first", status: "queue" }],
+					resolvedCount: 0,
+					missing: [],
+				},
+			},
+		});
+		renderCard({ task: makeTask({ metadata: { category: "feature" } as never }) });
+		expect(cardOf("Add login page")).toHaveAttribute("data-card-blocked", "");
+	});
+
+	it("opens the preview after the pointer rests 700 ms on the card", () => {
+		vi.useFakeTimers();
+		useKanbanBlockerStore.setState({
+			blockers: {
+				"task-1": {
+					pending: [{ id: "t0", title: "Schema first", status: "queue" }],
+					resolvedCount: 0,
+					missing: [],
+				},
+			},
+		});
+		renderCard({
+			task: makeTask({
+				description: "Build the login form with a remember-me box",
+				metadata: {
+					kind: "bug_fix",
+					kindSource: "keywords",
+					kindConfidence: 0.9,
+					priority: "high",
+					model: "opus",
+				} as never,
+			}),
+		});
+		const card = cardOf("Add login page");
+		fireEvent.pointerMove(card);
+		act(() => {
+			vi.advanceTimersByTime(699);
+		});
+		expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+		act(() => {
+			vi.advanceTimersByTime(1);
+		});
+		const tip = screen.getByRole("tooltip");
+		expect(tip).toHaveTextContent("from the title");
+		expect(tip).toHaveTextContent("Priority: High");
+		expect(tip).toHaveTextContent("Waiting for: Schema first");
+		expect(tip).toHaveTextContent("opus");
+
+		// A press (a drag starts with one) closes it.
+		fireEvent.pointerDown(card);
+		expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+	});
+
+	it("does not open over a button of the card", () => {
+		vi.useFakeTimers();
+		renderCard({ task: makeTask({ metadata: { category: "feature" } as never }) });
+		const card = cardOf("Add login page");
+		const button = within(card).getAllByRole("button")[0];
+		fireEvent.pointerMove(button);
+		act(() => {
+			vi.advanceTimersByTime(1000);
+		});
+		expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+	});
+
+	it("closes shortly after the pointer leaves", () => {
+		vi.useFakeTimers();
+		renderCard({ task: makeTask({ metadata: { category: "docs" } as never }) });
+		const card = cardOf("Add login page");
+		fireEvent.pointerMove(card);
+		act(() => {
+			vi.advanceTimersByTime(700);
+		});
+		expect(screen.getByRole("tooltip")).toBeInTheDocument();
+		fireEvent.pointerLeave(card);
+		act(() => {
+			vi.advanceTimersByTime(200);
+		});
+		expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 	});
 });

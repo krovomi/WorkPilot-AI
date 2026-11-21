@@ -197,7 +197,7 @@ Multi-profile credential management for switching between Claude accounts:
 - **`credential-utils.ts`** — OS credential storage (Keychain/Windows Credential Manager)
 - **`token-refresh.ts`** — OAuth token lifecycle and automatic refresh
 - **`usage-monitor.ts`** — API usage tracking and rate limiting per profile
-- **`usage-plan.ts`** — the plan of the account each usage snapshot shows (Claude Max 20x, ChatGPT Plus, Copilot Pro+, an API key billed per use…), added on the way to the renderer by `terminal-handlers.ts`; local sources only, a plan the provider does not name stays unnamed. Names are built by `shared/utils/plan-names.ts`
+- **`usage-plan.ts`** — the plan of the account each usage snapshot shows (Claude Max 20x, ChatGPT Plus, Copilot Pro+, an API key billed per use…), added on the way to the renderer by `terminal-handlers.ts`; local sources, except the Claude plan, asked to Anthropic's OAuth profile endpoint (`claude-account-plan.ts`) because the copy Claude Code stores at login is never updated (Pro → Max), then written back to the profile; a plan the provider does not name stays unnamed. Names are built by `shared/utils/plan-names.ts`. The usage indicator publishes each snapshot's plan to `renderer/stores/usage-plan-store.ts`, which the authentication details (`AuthStatusIndicator.tsx`) read
 - **`profile-scorer.ts`** — Scores profiles by usage and availability
 
 ## Terminal System (`src/main/terminal/`)
