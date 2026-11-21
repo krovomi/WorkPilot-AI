@@ -45,7 +45,7 @@ export default defineConfig({
 				statements: 73.1,
 				lines: 73.4,
 				functions: 71,
-				branches: 67.7,
+				branches: 67.8,
 			},
 		},
 		// Mock Electron modules for unit tests
