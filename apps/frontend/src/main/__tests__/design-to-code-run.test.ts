@@ -30,6 +30,7 @@ vi.mock("../generated-review/review-run", () => ({
 	openReviewRun: () => Promise.reject(new Error("no review run in this test")),
 }));
 
+import { renderLoopArgs } from "../design-render-loop-args";
 import { DesignToCodeService } from "../design-to-code-service";
 
 let source: string;
@@ -72,5 +73,56 @@ describe("DesignToCodeService.run", () => {
 		expect(await argsFor({ renderLoop: false })).not.toContain("--render-loop");
 		expect(await argsFor({ renderLoop: "yes" })).not.toContain("--render-loop");
 		expect(await argsFor({})).not.toContain("--render-loop");
+	});
+
+	it("passes the loop's options only with the loop, and only within bounds", async () => {
+		const options = {
+			maxIterations: 3,
+			threshold: 0.9,
+			maxTokens: 200_000,
+			maxCostUsd: 1,
+			responsive: true,
+			states: true,
+		};
+		const args = await argsFor({ renderLoop: true, renderLoopOptions: options });
+		expect(args.slice(args.indexOf("--render-loop"))).toEqual(
+			expect.arrayContaining([
+				"--loop-max-iterations",
+				"3",
+				"--loop-threshold",
+				"0.9",
+				"--loop-max-tokens",
+				"200000",
+				"--loop-max-cost",
+				"1",
+				"--loop-responsive",
+				"--loop-states",
+			]),
+		);
+		expect(await argsFor({ renderLoopOptions: options })).not.toContain("--loop-states");
+	});
+});
+
+describe("renderLoopArgs", () => {
+	it("drops what is not a bounded number or a strict true", () => {
+		expect(renderLoopArgs(undefined)).toEqual([]);
+		expect(renderLoopArgs("--loop-states")).toEqual([]);
+		expect(
+			renderLoopArgs({
+				maxIterations: 2.5,
+				threshold: 1.2,
+				maxTokens: "400000",
+				maxCostUsd: Number.NaN,
+				responsive: "true",
+				states: 1,
+			}),
+		).toEqual([]);
+		expect(renderLoopArgs({ maxIterations: 0, maxTokens: 9_000_000, maxCostUsd: 0 })).toEqual([]);
+		expect(renderLoopArgs({ maxIterations: 10, threshold: 0.5 })).toEqual([
+			"--loop-max-iterations",
+			"10",
+			"--loop-threshold",
+			"0.5",
+		]);
 	});
 });

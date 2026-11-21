@@ -510,9 +510,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		success: true,
 		data: [],
 	}),
+	// No desktop to capture in browser mode: a code the picker translates
 	capture: async (_options: { sourceId: string }) => ({
 		success: false,
-		error: "Screenshot capture not available in browser mode",
+		error: "capture_failed" as const,
 	}),
 
 	// Debug Operations

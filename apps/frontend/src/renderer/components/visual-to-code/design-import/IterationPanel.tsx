@@ -4,6 +4,7 @@ import type {
 	DesignRenderLoop,
 } from "../../../../shared/types/design-to-code";
 import { useDesignToCodeStore } from "../../../stores/design-to-code-store";
+import { ResponsivePanel, SpendLine, StatesPanel } from "./LoopReport";
 
 /** A 0..1 score as a percentage with one decimal. */
 export function percent(score: number | null | undefined): string {
@@ -57,6 +58,11 @@ export function IterationPanel({ loop }: { loop: DesignRenderLoop }) {
 	}
 
 	const best = loop.iterations[loop.best_iteration];
+	// A token or cost budget says which; the time budget keeps its own words.
+	const statusKey =
+		loop.status === "budget" && (loop.budget_kind === "tokens" || loop.budget_kind === "cost")
+			? `budget_${loop.budget_kind}`
+			: loop.status;
 	const shown =
 		loop.iterations.find((it) => it.index === selected) ?? best ?? loop.iterations[0];
 
@@ -66,11 +72,12 @@ export function IterationPanel({ loop }: { loop: DesignRenderLoop }) {
 				{t("loop.kicker")}
 			</div>
 			<strong className="di-loop-title" data-status={loop.status}>
-				{t(`loop.status.${loop.status}`, { score: percent(best?.score) })}
+				{t(`loop.status.${statusKey}`, { score: percent(best?.score) })}
 			</strong>
 			{loop.status === "failed" && loop.detail && (
 				<div className="di-muted di-mono text-2xs">{loop.detail}</div>
 			)}
+			{loop.spend && <SpendLine spend={loop.spend} />}
 			{loop.mirror && <div className="di-muted text-xs">{t("loop.mirror")}</div>}
 			{Boolean(loop.missing_fonts?.length) && (
 				<div className="di-muted text-xs">
@@ -139,6 +146,8 @@ export function IterationPanel({ loop }: { loop: DesignRenderLoop }) {
 					))}
 				</ul>
 			)}
+			{loop.responsive && <ResponsivePanel pass={loop.responsive} />}
+			{loop.states && <StatesPanel pass={loop.states} />}
 		</div>
 	);
 }

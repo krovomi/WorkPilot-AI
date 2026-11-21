@@ -62,6 +62,10 @@ class DesignToCodeRunner:
         loop_max_iterations: int = 5,
         loop_threshold: float = 0.95,
         loop_budget_seconds: float = 600.0,
+        loop_max_tokens: int = 400_000,
+        loop_max_cost_usd: float = 2.0,
+        loop_responsive: bool = False,
+        loop_states: bool = False,
     ):
         self.project_dir = Path(project_dir)
         self.image_path = image_path
@@ -83,6 +87,10 @@ class DesignToCodeRunner:
         self.loop_max_iterations = loop_max_iterations
         self.loop_threshold = loop_threshold
         self.loop_budget_seconds = loop_budget_seconds
+        self.loop_max_tokens = loop_max_tokens
+        self.loop_max_cost_usd = loop_max_cost_usd
+        self.loop_responsive = loop_responsive
+        self.loop_states = loop_states
 
     async def run(self) -> dict:
         """Run the complete design-to-code pipeline."""
@@ -182,6 +190,10 @@ class DesignToCodeRunner:
             max_iterations=self.loop_max_iterations,
             threshold=self.loop_threshold,
             budget_seconds=self.loop_budget_seconds,
+            max_tokens=self.loop_max_tokens,
+            max_cost_usd=self.loop_max_cost_usd,
+            responsive=self.loop_responsive,
+            states=self.loop_states,
         )
         return await run_render_loop(
             service,
@@ -417,6 +429,29 @@ async def main():
         default=600.0,
         help="Time the render loop may spend (30-3600 s, default 600)",
     )
+    parser.add_argument(
+        "--loop-max-tokens",
+        type=_bounded_int(10_000, 5_000_000),
+        default=400_000,
+        help="Tokens the corrections may spend (10000-5000000, default 400000)",
+    )
+    parser.add_argument(
+        "--loop-max-cost",
+        type=_bounded_float(0.01, 100),
+        default=2.0,
+        help="US dollars the corrections may spend, when the model is priced "
+        "(0.01-100, default 2)",
+    )
+    parser.add_argument(
+        "--loop-responsive",
+        action="store_true",
+        help="Render the version kept at the mobile, tablet and desktop widths",
+    )
+    parser.add_argument(
+        "--loop-states",
+        action="store_true",
+        help="Capture hover and focus of the first interactive elements",
+    )
     parser.add_argument("--json", action="store_true", help="Output result as JSON")
 
     args = parser.parse_args()
@@ -439,6 +474,10 @@ async def main():
         loop_max_iterations=args.loop_max_iterations,
         loop_threshold=args.loop_threshold,
         loop_budget_seconds=args.loop_budget_seconds,
+        loop_max_tokens=args.loop_max_tokens,
+        loop_max_cost_usd=args.loop_max_cost,
+        loop_responsive=args.loop_responsive,
+        loop_states=args.loop_states,
     )
 
     try:

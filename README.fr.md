@@ -159,7 +159,7 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 <td valign="top">
 
 **Import Design** : une maquette, une capture ou un export Figma devient des composants de la stack du projet, en six étapes visibles.
-Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ressembler, avec le score de chaque itération et les écarts restants ([boucle de rendu](docs/architecture/design-render-loop.md)).
+Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ressembler, dans les itérations, le seuil et le budget en jetons ou en coût choisis, avec le score de chaque itération et les écarts restants ; sur demande, la version retenue est aussi contrôlée en mobile, tablette et bureau, et au survol et au focus ([boucle de rendu](docs/architecture/design-render-loop.md)).
 
 ![Import Design : les six étapes d'une image aux composants du projet](.github/assets/showcase/import-design.png)
 
@@ -241,7 +241,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - **Failles de sécurité classées par ce qui tourne** : le scan de sécurité de la QA range ses trouvailles en critiques et exposées, critiques mais dormantes, moyennes et informatives, d'après ce que vos points d'entrée atteignent (tout langage) et les incidents de production des 30 derniers jours dans `.workpilot/incidents/` (Sentry, Datadog, CloudWatch, New Relic…) ; le fixer voit d'abord les exposées, et ce qui bloque un build suit toujours la gravité.
 
 **Agents et orchestration**
-- **Vagues d'exécution** (Mission Control) : les specs en attente sont regroupées en vagues qui ne partagent aucun fichier, d'après leurs plans et leurs worktrees, puis lancées vague après vague dans l'ordre de merge, avec le parallélisme du projet ; aucun modèle n'est appelé.
+- **Vagues d'exécution** (Mission Control) : les specs en attente sont regroupées en vagues qui ne partagent aucun fichier, d'après leurs plans, leurs worktrees et les fichiers que l'historique git modifie ensemble, vérifiées par un merge de test, puis lancées vague après vague dans l'ordre de merge, avec le parallélisme du projet ; une exécution interrompue par un redémarrage peut être reprise ; aucun modèle n'est appelé.
 - **Composition automatique** (Mission Control) : une équipe d'agents proposée d'après une description, la spec d'une tâche ou un modèle de session (bug, fonctionnalité, refonte, incident), sur les providers choisis et mélangés, modèles filtrés par leurs capacités, coûts du catalogue Cost Intelligence, équipe moins chère sous un budget.
 - **Mission Control** pour lancer plusieurs agents sur un même objectif, **terminaux d'agents**, **Arène** et **Bounty Board** pour comparer les moteurs, **Repo bench** pour les mesurer sur vos propres tâches passées.
 - **Pixel Office** montre vos agents en personnages pixel art à leur bureau, gagne des succès à partir de ce que le projet livre (tâches livrées, QA passée à la première revue, incidents résolus, accord d'un second moteur) sur tous les providers, et propose un **mode TV** pour l'écran d'une équipe, avec un mode calme qui arrête les animations.

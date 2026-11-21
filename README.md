@@ -157,7 +157,7 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 <td valign="top">
 
 **Import Design**: a mockup, screenshot or Figma export becomes components of the project's stack, in six visible steps.
-The code is then rendered, compared with the mockup and corrected until it matches, with each iteration's score and the remaining differences shown ([render loop](docs/architecture/design-render-loop.md)).
+The code is then rendered, compared with the mockup and corrected until it matches, within the iterations, threshold and token or cost budget you pick, with each iteration's score and the remaining differences shown; on request, the version kept is also checked at mobile, tablet and desktop widths and in its hover and focus states ([render loop](docs/architecture/design-render-loop.md)).
 
 ![Import Design: the six steps from an image to the project's components](.github/assets/showcase/import-design.png)
 
@@ -239,7 +239,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - **Security findings ranked by what runs**: the QA security scan sorts its findings into critical & exposed, critical but dormant, medium and informational, from what your entry points reach (any language) and from the production incidents of the last 30 days in `.workpilot/incidents/` (Sentry, Datadog, CloudWatch, New Relic…); the fixer sees the exposed ones first, and what blocks a build still follows severity.
 
 **Agents and orchestration**
-- **Execution waves** (Mission Control): the specs waiting in the backlog are grouped into waves that share no file, from their plans and worktrees, then run wave after wave in merge order with the project's parallelism; no model is called.
+- **Execution waves** (Mission Control): the specs waiting in the backlog are grouped into waves that share no file, from their plans, their worktrees and the files the git history changes together, checked by a test merge, then run wave after wave in merge order with the project's parallelism; a run interrupted by a restart can be resumed; no model is called.
 - **Mission Control auto-compose**: a crew of agents suggested from a description, a task's spec or a session template (bug fix, new feature, refactor, incident), mixing the providers you pick, models filtered by their capabilities, priced by the Cost Intelligence catalog, and a cheaper crew under a budget.
 - **Mission Control** to run several agents on one goal, **agent terminals**, **Arena** and **Bounty Board** to compare engines, **Repo bench** to measure them on your own past tasks.
 - **Pixel Office** shows your agents as pixel-art characters at their desks, earns achievements from what the project delivers (tasks shipped, QA passed on the first review, incidents resolved, a second engine agreeing) on every provider, and has a **TV mode** for a team screen, with a calm mode that stops the animations.

@@ -80,6 +80,20 @@ export interface DesignToCodeRequest {
 	customInstructions?: string;
 	/** Render the generated code, compare it with the design and correct it (#379). */
 	renderLoop?: boolean;
+	/** The loop's limits and passes; the runner bounds every value again. */
+	renderLoopOptions?: RenderLoopOptions;
+}
+
+/** What the person chose for the render loop (`RENDER_LOOP_BOUNDS`). */
+export interface RenderLoopOptions {
+	maxIterations: number;
+	threshold: number;
+	maxTokens: number;
+	maxCostUsd: number;
+	/** Render the version kept at the mobile, tablet and desktop widths. */
+	responsive: boolean;
+	/** Capture hover and focus of the first interactive elements. */
+	states: boolean;
 }
 
 /** Where a component sits on the design, as fractions of the image. */
@@ -178,7 +192,7 @@ export interface DesignToCodeProgress {
 
 /** A step of the render loop, as the runner reports it live. */
 export interface DesignLoopProgress {
-	stage: "render" | "correct";
+	stage: "render" | "correct" | "responsive" | "states";
 	iteration: number;
 	max_iterations: number;
 	score: number | null;
@@ -214,6 +228,67 @@ export interface DesignLoopIteration {
 	refused_edits: { path: string; reason: string }[];
 	notes: string[];
 	duration_seconds: number;
+	/** Tokens of the correction that led to this version (0 for v0). */
+	tokens?: number;
+	/** Its cost in USD, or null when the catalogue has no price for the model. */
+	cost_usd?: number | null;
+}
+
+/** What the corrections spent (`design_to_code.budget.Spend`). */
+export interface DesignLoopSpend {
+	input_tokens: number;
+	output_tokens: number;
+	tokens: number;
+	/** Some provider reported no tokens: they were estimated. */
+	estimated: boolean;
+	cost_status: "priced" | "flat_rate" | "unknown";
+	cost_usd: number | null;
+	max_tokens: number;
+	max_cost_usd: number;
+	cost_budget_checked: boolean;
+}
+
+/** One width of the responsive pass. */
+export interface DesignBreakpointCheck {
+	name: "mobile" | "tablet" | "desktop";
+	width: number;
+	height: number;
+	/** The design's width falls here: the render was compared with it. */
+	compared: boolean;
+	render_image: string;
+	overflow_px: number;
+	overflowing: string[];
+	clipped: string[];
+	overlaps: [string, string][];
+	score?: number;
+	passed?: boolean;
+	issues?: Omit<DesignLoopIssue, "id" | "status" | "first_seen" | "last_seen">[];
+}
+
+export interface DesignResponsivePass {
+	status: "done" | "failed";
+	detail?: string;
+	breakpoints?: DesignBreakpointCheck[];
+}
+
+/** An interactive element in its states; a state is null when it was not reached. */
+export interface DesignStateCheck {
+	/** Its rank among the elements captured. */
+	id: number;
+	label: string;
+	rest_image: string;
+	hover: { changed: boolean; image: string } | null;
+	focus: { changed: boolean; image: string } | null;
+}
+
+export interface DesignStatesPass {
+	status: "done" | "failed";
+	detail?: string;
+	limit?: number;
+	elements?: DesignStateCheck[];
+	without_hover?: number;
+	without_focus?: number;
+	unreached?: number;
 }
 
 export type DesignLoopStatus =
@@ -241,6 +316,11 @@ export interface DesignRenderLoop {
 	model?: string;
 	masked?: string[];
 	missing_fonts?: string[];
+	/** Which budget stopped the loop, when `status` is `budget`. */
+	budget_kind?: "" | "time" | "tokens" | "cost";
+	spend?: DesignLoopSpend;
+	responsive?: DesignResponsivePass;
+	states?: DesignStatesPass;
 }
 
 export interface DesignStackDetection {
