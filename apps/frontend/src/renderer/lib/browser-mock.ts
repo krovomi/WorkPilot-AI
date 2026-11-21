@@ -704,6 +704,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		success: false,
 		error: "Not available in browser mode",
 	}),
+	saveDetectedWindsurfToken: async () => ({
+		success: false,
+		error: "Not available in browser mode",
+	}),
 	checkClaudeOAuth: async () => ({ isAuthenticated: false }),
 	checkOpenAICodexOAuth: async () => ({ isAuthenticated: false }),
 	checkAgentCli: async (tool) => ({ tool, installed: false }),

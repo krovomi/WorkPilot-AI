@@ -15,9 +15,11 @@ import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
 import type {
 	MissionControlAgent,
+	MissionControlComposition,
 	MissionControlSession,
 	MissionControlState,
 } from "../../shared/types/mission-control";
+import { suggestComposition } from "../mission-control/mission-control-composition";
 import {
 	isAgentId,
 	MAX_TASK_CHARS,
@@ -134,6 +136,14 @@ export function registerMissionControlHandlers(
 			);
 			return result.success ? { success: true } : { success: false, error: result.error };
 		},
+	);
+
+	// Auto-compose (#344): the request is checked in suggestComposition, the
+	// project id turned into its folder here; the renderer names no folder.
+	ipcMain.handle(
+		IPC_CHANNELS.MISSION_CONTROL_SUGGEST_COMPOSITION,
+		(_event, request: unknown): Promise<IPCResult<MissionControlComposition>> =>
+			suggestComposition({ ...runDeps, projectPath: projectDirFor }, request),
 	);
 
 	ipcMain.handle(

@@ -24,6 +24,7 @@ PUBLIC_PATHS = {
     "/auth/refresh",
     "/auth/logout",
     "/auth/oidc/exchange",
+    "/auth/sso/exchange",
     "/auth/config",
     "/auth/invitations/lookup",
     "/auth/invitations/accept",

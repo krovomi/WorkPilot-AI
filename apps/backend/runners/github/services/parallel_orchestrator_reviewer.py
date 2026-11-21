@@ -634,12 +634,8 @@ Report findings with specific file paths, line numbers, and code evidence.
                 logger.warning(
                     "[ParallelOrchestrator] No head_sha available, using current checkout"
                 )
-                # Fallback to original behavior if no SHA available
-                project_root = (
-                    self.project_dir.parent.parent
-                    if self.project_dir.name == "backend"
-                    else self.project_dir
-                )
+                # No SHA: the project checkout itself
+                project_root = self.project_dir
             else:
                 if DEBUG_MODE:
                     safe_print(
@@ -683,12 +679,8 @@ Report findings with specific file paths, line numbers, and code evidence.
                         f"[ParallelOrchestrator] Worktree creation failed, "
                         f"using current checkout: {e}"
                     )
-                    # Fallback to original behavior if worktree creation fails
-                    project_root = (
-                        self.project_dir.parent.parent
-                        if self.project_dir.name == "backend"
-                        else self.project_dir
-                    )
+                    # No worktree: the project checkout itself
+                    project_root = self.project_dir
 
             # Removed: Related files rescanning
             # LLM agents now discover relevant files themselves via Read, Grep, Glob tools

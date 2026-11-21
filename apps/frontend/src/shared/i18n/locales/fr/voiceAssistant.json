@@ -45,7 +45,8 @@
 		"createTask": "« Crée une tâche pour ajouter un export CSV »",
 		"open": "« Ouvre le Kanban »",
 		"draw": "« Ouvre la fonctionnalité qui me permet de dessiner une architecture »",
-		"settings": "« Ouvre les paramètres »"
+		"settings": "« Ouvre les paramètres »",
+		"stop": "« Stop » (les agents en cours s'arrêtent après leur étape)"
 	},
 	"errors": {
 		"model": "Le modèle vocal n'est pas encore sur cet ordinateur.",
@@ -75,6 +76,44 @@
 		"systemWideHelp": "Enregistre le raccourci auprès du système : il ramène WorkPilot au premier plan et ouvre l'assistant. Prend effet à l'enregistrement.",
 		"systemWideRefused": "Le système a refusé ce raccourci (une autre app l'utilise peut-être, ou le bureau ne le permet pas). Il fonctionne toujours dans WorkPilot.",
 		"speech": "La voix est transcrite sur cet ordinateur (Whisper). Aucun audio n'est conservé.",
-		"model": "Les commandes simples sont comprises sans modèle. Les autres phrases utilisent le modèle « Assistant vocal » de Paramètres → Agent."
+		"model": "Les commandes simples sont comprises sans modèle. Les autres phrases utilisent le modèle « Assistant vocal » de Paramètres → Agent.",
+		"sensitivity": "Sensibilité du micro",
+		"sensitivityHelp": "De combien votre voix doit dépasser le bruit de la pièce pour compter comme de la parole. Les premiers instants de chaque session mesurent la pièce ; choisissez Faible dans un endroit bruyant.",
+		"sensitivityLevels": {
+			"low": "Faible (pièce bruyante)",
+			"medium": "Moyenne",
+			"high": "Élevée (pièce calme, voix douce)"
+		}
+	},
+	"stop": {
+		"confirm": "Arrêter les agents en cours après leur étape actuelle ?",
+		"explain": "Chaque tâche en cours termine l'appel d'outil en cours, ne lance pas le suivant, et attend que vous la repreniez depuis sa carte.",
+		"yes": "Arrêter après cette étape",
+		"no": "Continuer",
+		"stopping_one": "{{count}} tâche s'arrête après son étape en cours.",
+		"stopping_other": "{{count}} tâches s'arrêtent après leur étape en cours.",
+		"none": "Aucune tâche ne tourne.",
+		"failed": "Une tâche en cours n'a pas pu recevoir l'arrêt. Utilisez « Arrêter tous les agents »."
+	},
+	"continuous": {
+		"offer": "Garder le micro ouvert entre les commandes, avec un voyant qui pulse et un bouton pour le couper.",
+		"start": "Écoute continue",
+		"title": "Assistant vocal, écoute continue",
+		"phase": {
+			"listening": "J'écoute",
+			"preparing": "Démarrage du micro…",
+			"thinking": "Je réfléchis…",
+			"muted": "Micro coupé",
+			"paused": "En pause pendant que le panneau est ouvert",
+			"off": "Micro éteint"
+		},
+		"mute": "Couper le micro",
+		"unmute": "Rallumer le micro",
+		"close": "Arrêter l'écoute",
+		"hint": "Dites une commande. Marquez une pause quand vous avez fini.",
+		"question": "En attente de votre réponse",
+		"createQuestion": "Créer la tâche « {{title}} » ?",
+		"sayYes": "Dites « oui » ou « non », ou utilisez les boutons.",
+		"cancelled": "Annulé."
 	}
 }

@@ -391,6 +391,95 @@ async def test_the_dashboard_counts_the_cards_and_reads_qa_and_merges(server):
     assert theirs["total_cost"] == pytest.approx(100.0)
 
 
+async def _peers(server, tmp_path, count: int, *, member_of: int) -> list[str]:
+    """`count` more projects in org A, each with one spec of 20 minutes and
+    $2; Ada is a member of the first `member_of`."""
+    from server.db.engine import get_session_factory
+    from server.db.models import Project, ProjectMember
+
+    ids = []
+    async with get_session_factory()() as db:
+        for index in range(count):
+            clone = tmp_path / "repos" / f"peer-{index}"
+            start = NOW - timedelta(days=3)
+            _write(
+                clone / ".workpilot" / "cost_data.json",
+                {
+                    "usages": [
+                        _usage(clone, "001-x", start, "coding", (1, 1), 1.0),
+                        _usage(
+                            clone,
+                            "001-x",
+                            start + timedelta(minutes=20),
+                            "qa_review",
+                            (1, 1),
+                            1.0,
+                        ),
+                    ]
+                },
+            )
+            project = Project(
+                org_id=server["ids"]["org_a"],
+                name=f"Secret peer {index}",
+                repo_url=f"https://x/peer-{index}.git",
+                server_path=str(clone),
+            )
+            db.add(project)
+            await db.flush()
+            if index < member_of:
+                db.add(
+                    ProjectMember(project_id=project.id, user_id="u-ada", role="viewer")
+                )
+            ids.append(project.id)
+        await db.commit()
+    return ids
+
+
+async def _compare(server, scope):
+    from server.authz.principal import Principal
+    from shared_features.workspace import compare
+
+    principal = Principal(
+        id="u-ada", email="u-ada@x.test", org_id=server["ids"]["org_a"]
+    )
+    return await _call(compare, scope, principal=principal)
+
+
+@pytest.mark.asyncio
+async def test_the_comparison_reads_only_the_peers_the_person_may_read(
+    server, tmp_path
+):
+    peers = await _peers(server, tmp_path, 5, member_of=4)
+    scope = await _scope(server, "u-ada", "org_a", "a")
+    answer = await _compare(server, scope)
+    # The project's own spec: from its planning to its QA, $9.60.
+    assert answer["recent"]["specs"] == 1
+    assert answer["recent"]["cost"] == pytest.approx(9.6)
+    assert answer["recent"]["minutes"] == pytest.approx(4 * 60 + 5)
+    assert answer["previous"]["specs"] == 0
+    assert answer["min_group"] == 5
+    # Four readable peers: their number, never their median.
+    assert answer["groups"]["all"] == {"projects": 4, "medians": None}
+    served = json.dumps(answer)
+    for name in ("Secret peer", "Shop", str(tmp_path)):
+        assert name not in served
+    for project_id in [*peers, server["ids"]["b"]]:
+        assert project_id not in served
+
+
+@pytest.mark.asyncio
+async def test_the_comparison_gives_a_median_from_five_readable_peers(server, tmp_path):
+    await _peers(server, tmp_path, 5, member_of=5)
+    scope = await _scope(server, "u-ada", "org_a", "a")
+    groups = (await _compare(server, scope))["groups"]
+    # Org B's project, of a larger spend, is not one of them.
+    assert groups["all"]["projects"] == 5
+    assert groups["all"]["medians"]["cost"] == pytest.approx(2.0)
+    assert groups["all"]["medians"]["minutes"] == pytest.approx(20.0)
+    assert groups["all"]["medians"]["agents"] == pytest.approx(1.0)
+    assert groups["all"]["medians"]["qa_iterations"] is None
+
+
 def test_a_ledger_out_of_the_clone_or_too_large_is_not_read(tmp_path):
     from shared_features import usage_ledger
 
@@ -477,13 +566,13 @@ def test_a_ledger_s_numbers_too_large_or_its_garbage_count_but_never_break_it(
         garbage.write_text("x" * 500, encoding="utf-8")
     monkeypatch.setattr(usage_ledger, "MAX_TOTAL_BYTES", 1500)
     seen: list[str] = []
-    real_read = usage_ledger._read
+    real_read = usage_ledger.read_json
 
     def counting(path, root, limit):
         seen.append(path.parent.parent.name)
         return real_read(path, root, limit)
 
-    monkeypatch.setattr(usage_ledger, "_read", counting)
+    monkeypatch.setattr(usage_ledger, "read_json", counting)
     usage_ledger.read_ledgers(clone)
     assert "002-y" not in seen and "001-x" not in seen
 
@@ -519,6 +608,7 @@ def test_the_workspace_is_read_with_the_analytics_permission():
         ("GET", "/api/features/workspace/sessions"),
         ("GET", "/api/features/workspace/costs"),
         ("GET", "/api/features/workspace/dashboard"),
+        ("GET", "/api/features/workspace/compare"),
     }
     for method, path in paths:
         assert permission_for(method, path, domain) == "analytics.read"

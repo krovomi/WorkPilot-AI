@@ -24,7 +24,6 @@ import type {
 	Task,
 	TaskMetadata,
 	TaskStatus,
-	WorktreeCreatePROptions,
 } from "../../../shared/types";
 import { useToast } from "../../hooks/use-toast";
 import {
@@ -52,7 +51,6 @@ import {
 	stopTask,
 	submitReview,
 	updatePlanSubtasks,
-	useTaskStore,
 } from "../../stores/task-store";
 import { StreamingSessionButton } from "../streaming/StreamingSessionButton";
 import { TaskEditDialog } from "../TaskEditDialog";
@@ -817,48 +815,6 @@ function TaskDetailModalContent({
 		}
 	};
 
-	const handleCreatePR = async (options: WorktreeCreatePROptions) => {
-		state.setIsCreatingPR(true);
-		try {
-			const result = await globalThis.electronAPI.createWorktreePR(
-				task.id,
-				options,
-			);
-			if (result.success && result.data) {
-				// Update single task in store with new status and prUrl (more efficient than reloading all tasks)
-				if (
-					result.data.success &&
-					result.data.prUrl &&
-					!result.data.alreadyExists
-				) {
-					useTaskStore.getState().updateTask(task.id, {
-						status: "done",
-						metadata: { ...task.metadata, prUrl: result.data.prUrl },
-					});
-				}
-				return result.data;
-			}
-			// Propagate IPC error; let CreatePRDialog use its i18n fallback
-			return {
-				success: false,
-				error: result.error,
-				prUrl: undefined,
-				alreadyExists: false,
-				crossReviewBlocked: result.data?.crossReviewBlocked === true,
-			};
-		} catch (error) {
-			// Propagate actual error message; let CreatePRDialog handle i18n fallback for undefined
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : undefined,
-				prUrl: undefined,
-				alreadyExists: false,
-			};
-		} finally {
-			state.setIsCreatingPR(false);
-		}
-	};
-
 	/**
 	 * Déplace la tâche vers une autre colonne depuis le header de la modale.
 	 * Réutilise la même persistance que le Kanban ; un échec (worktree, IO) est
@@ -1393,7 +1349,7 @@ function TaskDetailModalContent({
 												showPRDialog={state.showPRDialog}
 												isCreatingPR={state.isCreatingPR}
 												onShowPRDialog={state.setShowPRDialog}
-												onCreatePR={handleCreatePR}
+												onCreatePR={state.handleCreatePR}
 												onRefreshDiff={state.refreshWorktreeDiff}
 												isCompleting={state.isCompleting}
 												onComplete={handleComplete}

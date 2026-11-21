@@ -397,11 +397,7 @@ The SDK will run invoked agents in parallel automatically.
                 prompt += "\n\n" + advice
 
             # Get project root - default to local checkout
-            project_root = (
-                self.project_dir.parent.parent
-                if self.project_dir.name == "backend"
-                else self.project_dir
-            )
+            project_root = self.project_dir
 
             # Create temporary worktree at PR head commit for isolated review
             # This ensures agents read from the correct PR state, not the current checkout

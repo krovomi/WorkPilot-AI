@@ -7,8 +7,10 @@ Two sources, kept apart on purpose:
   automatic rollback switch. A repository cannot choose where a token goes or
   turn a rollback on by committing a file;
 * `.workpilot/deploy-monitors.yaml`, which a team may commit: the window, the
-  pauses and the metrics (a PromQL query, a kind, thresholds). Bounded and
-  validated; a bad entry is dropped and named in `problems`.
+  pauses and the metrics (a PromQL query, a kind, thresholds), and what follows
+  a bad verdict (`revert_pr`, `explain_incident`). Bounded and validated; a bad
+  entry is dropped and named in `problems`. A revert PR goes to the forge the
+  project already pushes to, with its own credentials: the file only says yes.
 """
 
 from __future__ import annotations
@@ -88,6 +90,10 @@ class WatchSettings:
     interval_seconds: int = DEFAULT_INTERVAL_SECONDS
     metrics: tuple[MetricRule, ...] = ()
     problems: tuple[str, ...] = ()
+    # After a critical verdict: open a PR that reverts the deployed commit.
+    revert_pr: bool = False
+    # After a warning or critical verdict: a short explanation by the model.
+    explain_incident: bool = True
 
     @property
     def configured(self) -> bool:
@@ -197,6 +203,14 @@ def _duration(data: dict, env: dict, key: str, env_key: str, default: int) -> in
     return min(max(value, low), high)
 
 
+def _flag(data: dict, key: str, default: bool, problems: list[str]) -> bool:
+    value = data.get(key, default)
+    if isinstance(value, bool):
+        return value
+    problems.append(f"{key}: not true or false")
+    return default
+
+
 def load_settings(project_dir: Path, env: dict) -> WatchSettings:
     data, problems = read_monitor_file(project_dir)
     health = str(env.get("CICD_MONITOR_HEALTH_URL") or "").strip()
@@ -214,6 +228,8 @@ def load_settings(project_dir: Path, env: dict) -> WatchSettings:
     if len(raw_metrics) > MAX_METRICS:
         problems.append(f"metrics: only the first {MAX_METRICS} are read")
     metrics: list[MetricRule] = []
+    revert_pr = _flag(data, "revert_pr", False, problems)
+    explain_incident = _flag(data, "explain_incident", True, problems)
     for raw in raw_metrics[:MAX_METRICS]:
         rule = _metric(raw, problems)
         if rule and all(m.name != rule.name for m in metrics):
@@ -245,4 +261,6 @@ def load_settings(project_dir: Path, env: dict) -> WatchSettings:
         ),
         metrics=tuple(metrics),
         problems=tuple(problems),
+        revert_pr=revert_pr,
+        explain_incident=explain_incident,
     )
