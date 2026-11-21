@@ -161,6 +161,7 @@ describe("the video button", () => {
 			expect(api.exportReplayVideo).toHaveBeenCalledWith("s1", {
 				stripReasoning: false,
 				stripTokens: true,
+				format: "webm",
 				language: "en",
 			}),
 		);

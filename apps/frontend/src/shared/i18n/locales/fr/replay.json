@@ -250,8 +250,13 @@
 			"refused": {
 				"no_playwright": "Une vidéo demande Playwright, que le backend de cette machine n'a pas. Installez-le avec les dépendances du backend, puis réessayez.",
 				"no_browser": "Une vidéo demande Chromium ou Chrome, et aucun n'a été trouvé sur cette machine. Installez-en un (par exemple avec « playwright install chromium »), puis réessayez.",
-				"no_encoder": "Une vidéo demande l'encodeur vidéo de Playwright, qui n'est pas installé. Lancez « playwright install ffmpeg », puis réessayez."
-			}
+				"no_encoder": "Une vidéo demande l'encodeur vidéo de Playwright, qui n'est pas installé. Lancez « playwright install ffmpeg », puis réessayez.",
+				"no_mp4_encoder": "Un MP4 demande ffmpeg sur cette machine, et aucun n'a été trouvé. Installez ffmpeg, ou exportez le WebM, qui n'en a pas besoin."
+			},
+			"exportMp4": "Exporter une vidéo (MP4)",
+			"exportCompare": "Vidéo côte à côte (WebM)",
+			"compareHint": "Les deux sessions, masquées, jouées étape par étape l'une à côté de l'autre.",
+			"exportCompareMp4": "Vidéo côte à côte (MP4)"
 		},
 		"team": {
 			"title": "Lien d'équipe",

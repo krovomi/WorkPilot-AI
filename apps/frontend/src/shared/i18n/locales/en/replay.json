@@ -250,8 +250,13 @@
 			"refused": {
 				"no_playwright": "A video needs Playwright, which this machine's backend does not have. Install it with the backend's requirements, then try again.",
 				"no_browser": "A video needs Chromium or Chrome, and none was found on this machine. Install one (for instance with “playwright install chromium”), then try again.",
-				"no_encoder": "A video needs Playwright's video encoder, which is not installed. Run “playwright install ffmpeg”, then try again."
-			}
+				"no_encoder": "A video needs Playwright's video encoder, which is not installed. Run “playwright install ffmpeg”, then try again.",
+				"no_mp4_encoder": "An MP4 needs ffmpeg on this machine, and none was found. Install ffmpeg, or export the WebM, which needs nothing more."
+			},
+			"exportMp4": "Export a video (MP4)",
+			"exportCompare": "Side-by-side video (WebM)",
+			"compareHint": "Both sessions, masked, played step by step next to each other.",
+			"exportCompareMp4": "Side-by-side video (MP4)"
 		},
 		"team": {
 			"title": "Team link",

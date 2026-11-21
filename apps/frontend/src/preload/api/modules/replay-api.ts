@@ -84,6 +84,12 @@ export interface ReplayAPI {
 		sessionId: string,
 		options: ReplayVideoOptions,
 	) => Promise<ReplayVideoResult>;
+	/** Two sessions side by side, their steps played at once. */
+	exportReplayComparisonVideo: (
+		sessionAId: string,
+		sessionBId: string,
+		options: ReplayVideoOptions,
+	) => Promise<ReplayVideoResult>;
 	/** A model's summary of the steps, for a session with no thinking trace. */
 	summarizeReplaySession: (
 		sessionId: string,
@@ -132,6 +138,8 @@ export const createReplayAPI = (): ReplayAPI => ({
 		invokeIpc(IPC_CHANNELS.REPLAY_REMOVE_BOOKMARK_REPLY, sessionId, bookmarkId, replyId),
 	exportReplayVideo: (sessionId, options) =>
 		invokeIpc(IPC_CHANNELS.REPLAY_EXPORT_VIDEO, sessionId, options),
+	exportReplayComparisonVideo: (sessionAId, sessionBId, options) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_EXPORT_COMPARISON_VIDEO, sessionAId, sessionBId, options),
 	summarizeReplaySession: (sessionId, request) =>
 		invokeIpc(IPC_CHANNELS.REPLAY_SUMMARIZE_SESSION, sessionId, request),
 	shareReplayToTeam: (sessionId, request) =>

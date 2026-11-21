@@ -104,8 +104,8 @@ STYLE = (
 )
 
 
-def _csp() -> str:
-    digest = base64.b64encode(hashlib.sha256(STYLE.encode("utf-8")).digest())
+def _csp(style: str = STYLE) -> str:
+    digest = base64.b64encode(hashlib.sha256(style.encode("utf-8")).digest())
     return f"default-src 'none'; style-src 'sha256-{digest.decode('ascii')}'"
 
 

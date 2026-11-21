@@ -922,6 +922,7 @@ export const IPC_CHANNELS = {
 	REPLAY_ADD_BOOKMARK_REPLY: "replay:addBookmarkReply",
 	REPLAY_REMOVE_BOOKMARK_REPLY: "replay:removeBookmarkReply",
 	REPLAY_EXPORT_VIDEO: "replay:exportVideo",
+	REPLAY_EXPORT_COMPARISON_VIDEO: "replay:exportComparisonVideo",
 	REPLAY_SUMMARIZE_SESSION: "replay:summarizeSession",
 	// A replay left with a server project's team, behind a link (#347)
 	REPLAY_SHARE_TO_TEAM: "replay:shareToTeam",

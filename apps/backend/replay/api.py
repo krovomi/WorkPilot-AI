@@ -21,6 +21,7 @@ from foundation.platform.browser import chrome_executable
 from pydantic import BaseModel, Field
 
 from . import bookmarks as bookmark_store
+from . import mp4 as mp4_module
 from . import summary as summary_module
 from . import video as video_module
 from .bundle import (
@@ -33,6 +34,7 @@ from .bundle import (
     file_name,
     session_from_bundle,
 )
+from .compare_page import render_comparison
 from .models import BreakpointType
 from .recorder import compare, get_replay_recorder
 from .time_travel import get_time_travel_engine
@@ -95,6 +97,13 @@ class ExportVideoRequest(BaseModel):
     strip_reasoning: bool = False
     strip_tokens: bool = False
     language: Literal["en", "fr"] = "en"
+    # WebM is Playwright's own; MP4 is a second encoding by this machine's ffmpeg.
+    format: Literal["webm", "mp4"] = "webm"
+
+
+class CompareVideoRequest(ExportVideoRequest):
+    session_a_id: str
+    session_b_id: str
 
 
 class SummarizeRequest(BaseModel):
@@ -490,34 +499,23 @@ _SUMMARY_REFUSALS = {
 }
 
 
-@router.post(
-    "/sessions/{session_id}/video",
-    responses={
-        404: {"description": SESSION_NOT_FOUND},
-        409: {"description": "A video is already being recorded"},
-        422: {"description": "The recording failed"},
-    },
-)
-async def export_video(session_id: str, req: ExportVideoRequest):
-    """The session's page, masked, played step by step as a WebM video.
+async def _video_answer(page: str, name: str, video_format: str) -> dict:
+    """Record ``page`` (one recording at a time), as WebM or MP4.
 
     No Playwright, browser or encoder here is an answer (``available`` false,
     with the ``refusal``), not an error.
     """
-    session = get_replay_recorder().load_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=SESSION_NOT_FOUND)
     if _VIDEO_LOCK.locked():
         raise HTTPException(status_code=409, detail="video_busy")
     async with _VIDEO_LOCK:
-        options = ExportOptions(
-            strip_reasoning=req.strip_reasoning, strip_tokens=req.strip_tokens
-        )
-        page = render_viewer(build_bundle(session, options), req.language)
         try:
             content, played, total = await video_module.record_video(
                 page, executable=chrome_executable()
             )
+            extension = video_module.EXTENSION
+            if video_format == "mp4":
+                content = await mp4_module.to_mp4(content)
+                extension = mp4_module.EXTENSION
         except video_module.VideoUnavailable as refusal:
             return {"success": True, "available": False, "refusal": refusal.code}
         except video_module.VideoError as error:
@@ -527,11 +525,55 @@ async def export_video(session_id: str, req: ExportVideoRequest):
     return {
         "success": True,
         "available": True,
-        "file_name": file_name(session, video_module.EXTENSION),
+        "file_name": f"{name}{extension}",
         "content_base64": base64.b64encode(content).decode("ascii"),
         "steps_played": played,
         "steps_total": total,
     }
+
+
+@router.post(
+    "/sessions/{session_id}/video",
+    responses={
+        404: {"description": SESSION_NOT_FOUND},
+        409: {"description": "A video is already being recorded"},
+        422: {"description": "The recording failed"},
+    },
+)
+async def export_video(session_id: str, req: ExportVideoRequest):
+    """The session's page, masked, played step by step as a video."""
+    session = get_replay_recorder().load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=SESSION_NOT_FOUND)
+    options = ExportOptions(
+        strip_reasoning=req.strip_reasoning, strip_tokens=req.strip_tokens
+    )
+    page = render_viewer(build_bundle(session, options), req.language)
+    return await _video_answer(page, file_name(session, ""), req.format)
+
+
+@router.post(
+    "/compare/video",
+    responses={
+        404: {"description": "Session A or B not found"},
+        409: {"description": "A video is already being recorded"},
+        422: {"description": "The recording failed"},
+    },
+)
+async def export_comparison_video(req: CompareVideoRequest):
+    """Two sessions side by side, masked, their steps played at once."""
+    recorder = get_replay_recorder()
+    session_a = recorder.load_session(req.session_a_id)
+    session_b = recorder.load_session(req.session_b_id)
+    if not session_a or not session_b:
+        raise HTTPException(status_code=404, detail="Session A or B not found")
+    options = ExportOptions(
+        strip_reasoning=req.strip_reasoning, strip_tokens=req.strip_tokens
+    )
+    page = render_comparison(
+        build_bundle(session_a, options), build_bundle(session_b, options), req.language
+    )
+    return await _video_answer(page, file_name(session_a, "-compare"), req.format)
 
 
 @router.post(

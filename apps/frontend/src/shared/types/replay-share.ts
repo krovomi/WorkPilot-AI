@@ -21,10 +21,18 @@ export interface ReplayVideoOptions {
 	stripReasoning: boolean;
 	stripTokens: boolean;
 	language: "en" | "fr";
+	/** WebM by default; MP4 is encoded again by the machine's ffmpeg. */
+	format?: ReplayVideoFormat;
 }
 
+export type ReplayVideoFormat = "webm" | "mp4";
+
 /** What this machine lacks to record a video: an answer, not an error. */
-export type ReplayVideoRefusal = "no_playwright" | "no_browser" | "no_encoder";
+export type ReplayVideoRefusal =
+	| "no_playwright"
+	| "no_browser"
+	| "no_encoder"
+	| "no_mp4_encoder";
 
 export type ReplayVideoResult =
 	| { success: true; canceled: true }

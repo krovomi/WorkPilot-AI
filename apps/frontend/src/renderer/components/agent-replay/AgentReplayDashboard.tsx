@@ -74,6 +74,7 @@ import {
 	ReplayShareButton,
 	ReplayShareNotice,
 } from "./ReplaySharing";
+import { ReplayComparisonVideo } from "./ReplayComparisonVideo";
 import { ReplayStepsSummary } from "./ReplayStepsSummary";
 import { ReplayOpenLinkButton } from "./ReplayTeamShare";
 import { TimeTravelPanel } from "./TimeTravelPanel";
@@ -419,6 +420,12 @@ const ComparisonPanel: React.FC<{
 				</div>
 			</CardHeader>
 			<CardContent className="space-y-4">
+				{sessionA && sessionB && (
+					<ReplayComparisonVideo
+						sessionAId={sessionA.session_id}
+						sessionBId={sessionB.session_id}
+					/>
+				)}
 				{/* Header row */}
 				<div className="grid grid-cols-4 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
 					<span>{t("replay:metric")}</span>

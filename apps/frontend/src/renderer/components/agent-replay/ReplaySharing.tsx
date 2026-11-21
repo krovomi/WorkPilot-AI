@@ -16,7 +16,10 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import type { ReplaySessionFull, ReplayStep } from "../../stores/agent-replay-store";
 import { useReplayShareStore } from "../../stores/replay-share-store";
-import type { ReplayExportFormat } from "../../../shared/types/replay-share";
+import type {
+	ReplayExportFormat,
+	ReplayVideoFormat,
+} from "../../../shared/types/replay-share";
 import { Notice } from "../charter";
 import { Button } from "../ui/button";
 import {
@@ -63,10 +66,11 @@ export const ReplayShareButton: React.FC<{ sessionId: string }> = ({ sessionId }
 		setOpen(false);
 	};
 
-	const record = async () => {
+	const record = async (format: ReplayVideoFormat) => {
 		await exportVideo(sessionId, {
 			stripReasoning: options.stripReasoning,
 			stripTokens: options.stripTokens,
+			format,
 		});
 		setOpen(false);
 	};
@@ -106,9 +110,12 @@ export const ReplayShareButton: React.FC<{ sessionId: string }> = ({ sessionId }
 					</div>
 					<p className="text-xs text-muted-foreground">{t("replay:share.video.hint")}</p>
 					<div className="flex flex-wrap justify-end gap-2 pt-2">
-						<Button variant="outline" disabled={busy} onClick={record}>
+						<Button variant="outline" disabled={busy} onClick={() => record("webm")}>
 							<Film className="h-4 w-4 mr-1" />
 							{t(recordingVideo ? "replay:share.video.recording" : "replay:share.video.export")}
+						</Button>
+						<Button variant="outline" disabled={busy} onClick={() => record("mp4")}>
+							{t("replay:share.video.exportMp4")}
 						</Button>
 						<Button variant="outline" disabled={busy} onClick={() => run("html")}>
 							{t("replay:share.exportPage")}
