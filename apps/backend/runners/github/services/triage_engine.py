@@ -46,8 +46,19 @@ class TriageEngine:
         from core.agent_client import ContentBlockType, MessageRole
         from core.client import create_agent_client
 
-        # Build context with issue and potential duplicates
-        context = self.build_triage_context(issue, all_issues)
+        # Build context with issue and potential duplicates: the closest in
+        # meaning when an embedding service is set, else shared title words.
+        # Relative under both layouts: this module and it share a package.
+        from .duplicate_candidates import potential_duplicates
+
+        dupes = await potential_duplicates(
+            issue,
+            all_issues,
+            repo=self.config.repo,
+            cache_dir=self.github_dir / "embeddings",
+            project_dir=self.project_dir,
+        )
+        context = self.build_triage_context(issue, all_issues, potential_dupes=dupes)
 
         # Load prompt
         prompt = self.prompt_manager.get_triage_prompt()
@@ -90,19 +101,23 @@ class TriageEngine:
                 confidence=0.0,
             )
 
-    def build_triage_context(self, issue: dict, all_issues: list[dict]) -> str:
-        """Build context for triage including potential duplicates."""
-        # Find potential duplicates by title similarity
-        potential_dupes = []
-        for other in all_issues:
-            if other["number"] == issue["number"]:
-                continue
-            # Simple word overlap check
-            title_words = set(issue["title"].lower().split())
-            other_words = set(other["title"].lower().split())
-            overlap = len(title_words & other_words) / max(len(title_words), 1)
-            if overlap > 0.3:
-                potential_dupes.append(other)
+    def build_triage_context(
+        self,
+        issue: dict,
+        all_issues: list[dict],
+        potential_dupes: list[dict] | None = None,
+    ) -> str:
+        """Build context for triage including potential duplicates.
+
+        Without `potential_dupes`, they are the issues whose titles share
+        words with this one (`duplicate_candidates`).
+        """
+        if potential_dupes is None:
+            from .duplicate_candidates import _shared_words
+
+            potential_dupes = _shared_words(
+                issue, [o for o in all_issues if o["number"] != issue["number"]]
+            )
 
         # Issue text is quoted with the shared helpers (rule S2).
         from runners.forge_review_prompt import one_line
@@ -136,11 +151,24 @@ class TriageEngine:
         ]
 
         if potential_dupes:
+
+            def score(d: dict) -> str:
+                value = d.get("similarity")
+                if isinstance(value, int | float) and not isinstance(value, bool):
+                    return f" (similarity {float(value):.2f})"
+                return ""
+
             dupes = "\n".join(
-                f"- #{int(d['number'])}: {one_line(d['title'], 'comment', source)}"
+                f"- #{int(d['number'])}{score(d)}: "
+                f"{one_line(d['title'], 'comment', source)}"
                 for d in potential_dupes[:5]
             )
-            lines.append("### Potential Duplicates (similar titles)")
+            by_meaning = any("similarity" in d for d in potential_dupes)
+            lines.append(
+                "### Potential Duplicates (closest in meaning)"
+                if by_meaning
+                else "### Potential Duplicates (similar titles)"
+            )
             lines.append(quoted(dupes, "comment"))
             lines.append("")
 

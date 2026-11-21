@@ -22,6 +22,7 @@ BACKEND = Path(__file__).resolve().parents[3] / "apps" / "backend"
 
 PROGRAM = """
 import sys
+from pathlib import Path
 sys.path.insert(0, {backend!r})
 sys.path.insert(0, {runner!r})
 
@@ -39,6 +40,26 @@ parsed = response_parsers.ResponseParser.parse_triage_result(
 assert parsed.category is models.TriageCategory.BUG
 assert triage_engine.TriageEngine.__name__ == "TriageEngine"
 assert autofix_processor.AutoFixProcessor.__name__ == "AutoFixProcessor"
+
+import asyncio, os, tempfile, types
+from services import duplicate_candidates
+
+class _Model:
+    def __init__(self, name):
+        pass
+
+    def encode(self, text):
+        return types.SimpleNamespace(tolist=lambda: [float("crash" in text.lower()), 1.0])
+
+sys.modules["sentence_transformers"] = types.SimpleNamespace(SentenceTransformer=_Model)
+os.environ["ISSUE_EMBEDDINGS_PROVIDER"] = "local"
+found = asyncio.run(duplicate_candidates.potential_duplicates(
+    {{"number": 1, "title": "Crash"}},
+    [{{"number": 2, "title": "Crash again"}}],
+    repo="o/r",
+    cache_dir=Path(tempfile.mkdtemp()),
+))
+assert [(d["number"], d["similarity"]) for d in found] == [(2, 1.0)], found
 print("flat layout ok")
 """
 
