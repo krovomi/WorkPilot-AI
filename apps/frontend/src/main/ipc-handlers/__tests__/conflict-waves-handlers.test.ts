@@ -21,12 +21,23 @@ vi.mock("../../project-store", () => ({
 }));
 vi.mock("../../conflict-waves/worktree-files", () => ({
 	readWorktreeChangedFiles: (...args: unknown[]) => worktreeFiles(...args),
+	readWorktreeDiff: async () => ({ worktree: null, diff: null }),
+	keepDiffSections: (diff: string) => diff,
 }));
 const runStore = {
 	readSavedRun: vi.fn(),
 	writeSavedRun: vi.fn(),
 	clearSavedRun: vi.fn(),
 };
+const runHistory = {
+	appendRunRecord: vi.fn(),
+	readRunHistory: vi.fn(),
+};
+vi.mock("../../conflict-waves/run-history", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../../conflict-waves/run-history")>()),
+	appendRunRecord: (...args: unknown[]) => runHistory.appendRunRecord(...args),
+	readRunHistory: (...args: unknown[]) => runHistory.readRunHistory(...args),
+}));
 vi.mock("../../conflict-waves/run-store", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../../conflict-waves/run-store")>()),
 	readSavedRun: (...args: unknown[]) => runStore.readSavedRun(...args),
@@ -58,6 +69,8 @@ describe("conflictWaves:plan", () => {
 			worktreeHead: vi.fn(async () => null),
 			testMerge: vi.fn(async () => null),
 			readCoChanges: vi.fn(async () => null),
+			readCodeSource: vi.fn(async () => ({ worktree: null, diff: null })),
+			readSpecCode: vi.fn(async () => ({ imports: new Map(), symbols: new Map(), removed: [] })),
 		};
 		registerConflictWavesHandlers(deps);
 	});
@@ -114,6 +127,7 @@ describe("the saved run channels", () => {
 	beforeEach(() => {
 		handlers.clear();
 		for (const fn of Object.values(runStore)) fn.mockReset();
+		for (const fn of Object.values(runHistory)) fn.mockReset();
 		deps = {
 			getProject: vi.fn((id: string) => (id === "p1" ? PROJECT : undefined)),
 			getTasks: vi.fn(() => [{ id: "001-a" }] as never),
@@ -121,6 +135,8 @@ describe("the saved run channels", () => {
 			worktreeHead: vi.fn(async () => null),
 			testMerge: vi.fn(async () => null),
 			readCoChanges: vi.fn(async () => null),
+			readCodeSource: vi.fn(async () => ({ worktree: null, diff: null })),
+			readSpecCode: vi.fn(async () => ({ imports: new Map(), symbols: new Map(), removed: [] })),
 			now: () => new Date("2026-11-16T09:30:00Z"),
 		};
 		registerConflictWavesHandlers(deps);
@@ -132,7 +148,11 @@ describe("the saved run channels", () => {
 		["not a string", { id: "p1" }],
 		["an unknown project", "p2"],
 	])("refuses %s as project, before touching the disk", async (_name, projectId) => {
-		for (const channel of [IPC_CHANNELS.CONFLICT_WAVES_RUN_LOAD, IPC_CHANNELS.CONFLICT_WAVES_RUN_CLEAR]) {
+		for (const channel of [
+			IPC_CHANNELS.CONFLICT_WAVES_RUN_LOAD,
+			IPC_CHANNELS.CONFLICT_WAVES_RUN_CLEAR,
+			IPC_CHANNELS.CONFLICT_WAVES_HISTORY,
+		]) {
 			expect(await invoke(projectId, channel)).toEqual({ success: false, error: "Project not found" });
 		}
 		expect(await invoke({ ...STATE, projectId }, IPC_CHANNELS.CONFLICT_WAVES_RUN_SAVE)).toEqual({
@@ -143,6 +163,7 @@ describe("the saved run channels", () => {
 		expect(runStore.readSavedRun).not.toHaveBeenCalled();
 		expect(runStore.writeSavedRun).not.toHaveBeenCalled();
 		expect(runStore.clearSavedRun).not.toHaveBeenCalled();
+		expect(runHistory.readRunHistory).not.toHaveBeenCalled();
 	});
 
 	it("reads the run of the project's own path, checked against its tasks", async () => {
@@ -204,5 +225,82 @@ describe("the saved run channels", () => {
 		registerConflictWavesHandlers(rest);
 		expect(await invoke(STATE, IPC_CHANNELS.CONFLICT_WAVES_RUN_SAVE)).toEqual({ success: true });
 		expect(runStore.writeSavedRun.mock.calls[0][2]).toBeInstanceOf(Date);
+	});
+
+	const SAVED = { ...STATE, started: ["001-a"], avoided: { conflicts: 2, risk: 5 }, savedAt: "2026-11-16T09:00:00.000Z" };
+	const clear = (...args: unknown[]) => {
+		const handler = handlers.get(IPC_CHANNELS.CONFLICT_WAVES_RUN_CLEAR);
+		if (!handler) throw new Error("not registered");
+		return handler({}, ...args);
+	};
+
+	it("refuses an outcome outside the closed list, and clears nothing", async () => {
+		expect(await clear("p1", "rm -rf")).toEqual({ success: false, error: "Invalid outcome" });
+		expect(runStore.clearSavedRun).not.toHaveBeenCalled();
+		expect(runHistory.appendRunRecord).not.toHaveBeenCalled();
+	});
+
+	it("records the run saved here when it ends, then clears it", async () => {
+		runStore.readSavedRun.mockReturnValue({ run: SAVED, ignored: false });
+		expect(await clear("p1", "done")).toEqual({ success: true });
+		expect(runStore.readSavedRun).toHaveBeenCalledWith("/projects/p1", "p1", new Set(["001-a"]));
+		expect(runHistory.appendRunRecord).toHaveBeenCalledWith("/projects/p1", {
+			finishedAt: "2026-11-16T09:30:00.000Z",
+			outcome: "done",
+			waves: 1,
+			tasks: 1,
+			started: 1,
+			conflictsAvoided: 2,
+			riskAvoided: 5,
+		});
+		expect(runStore.clearSavedRun).toHaveBeenCalledWith("/projects/p1");
+	});
+
+	it("records nothing when no run is saved, and still clears", async () => {
+		runStore.readSavedRun.mockReturnValue({ run: null, ignored: true });
+		expect(await clear("p1", "stopped")).toEqual({ success: true });
+		expect(runHistory.appendRunRecord).not.toHaveBeenCalled();
+		expect(runStore.clearSavedRun).toHaveBeenCalled();
+	});
+
+	it("clears the run even when recording it fails", async () => {
+		const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+		runStore.readSavedRun.mockReturnValue({ run: SAVED, ignored: false });
+		runHistory.appendRunRecord.mockImplementation(() => {
+			throw new Error("Refusing a linked file at /secret");
+		});
+		expect(await clear("p1", "done")).toEqual({ success: true });
+		expect(runStore.clearSavedRun).toHaveBeenCalled();
+		errors.mockRestore();
+	});
+
+	it("stamps the record with the current time when no clock is given", async () => {
+		handlers.clear();
+		const { now: _unused, ...rest } = deps;
+		registerConflictWavesHandlers(rest);
+		runStore.readSavedRun.mockReturnValue({ run: SAVED, ignored: false });
+		await clear("p1", "stopped");
+		expect(Date.parse(runHistory.appendRunRecord.mock.calls[0][1].finishedAt)).not.toBeNaN();
+	});
+
+	it("reads the history of the project's own path", async () => {
+		runHistory.readRunHistory.mockReturnValue({ records: [], ignored: false });
+		expect(await invoke("p1", IPC_CHANNELS.CONFLICT_WAVES_HISTORY)).toEqual({
+			success: true,
+			data: { records: [], ignored: false },
+		});
+		expect(runHistory.readRunHistory).toHaveBeenCalledWith("/projects/p1");
+	});
+
+	it("answers an ignored history when reading it fails", async () => {
+		const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+		runHistory.readRunHistory.mockImplementation(() => {
+			throw new Error("EACCES /secret/path");
+		});
+		expect(await invoke("p1", IPC_CHANNELS.CONFLICT_WAVES_HISTORY)).toEqual({
+			success: true,
+			data: { records: [], ignored: true },
+		});
+		errors.mockRestore();
 	});
 });

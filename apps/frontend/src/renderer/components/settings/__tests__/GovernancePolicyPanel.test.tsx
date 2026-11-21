@@ -27,11 +27,12 @@ const full: GovernanceReport = {
 			localTime: "2026-06-01T20:00:00+02:00",
 		},
 		files: { forbidden: ["**/migrations/**"], requiresReview: [] },
-		budget: { maxTokensPerHour: 500000 },
+		budget: { maxTokensPerHour: 500000, maxTokensPerTask: null },
 	},
 	errors: [],
 	sources: [{ layer: "repository", path: "/p/workpilot.policy.yaml", rules: 1 }],
 	tokensLastHour: 1200,
+	metrics: { blocked24h: 0, breakerTrips7d: 0 },
 	events: [
 		{
 			id: "e1",
@@ -82,6 +83,28 @@ describe("GovernancePolicyPanel", () => {
 		expect(screen.getByText("Refused")).toBeInTheDocument();
 		expect(screen.getByText("Budget reached")).toBeInTheDocument();
 		expect(screen.getByText("Write · db/migrations/1.sql")).toBeInTheDocument();
+		expect(screen.getByText("0 agent actions stopped in the last 24 h")).toBeInTheDocument();
+		expect(screen.getByText("0 circuit-breaker trips in the last 7 days")).toBeInTheDocument();
+	});
+
+	it("shows the task budget, the loop limit, the breaker's trips and the counts", async () => {
+		getGovernanceReport.mockResolvedValue({
+			...full,
+			governance: {
+				...full.governance,
+				budget: { maxTokensPerHour: null, maxTokensPerTask: 2000000 },
+				loopDetection: { maxSameToolCall: 3 },
+			},
+			metrics: { blocked24h: 1, breakerTrips7d: 2 },
+			events: [{ ...full.events[0], decision: "tool_loop", rules: [] }],
+		});
+		render(<GovernancePolicyPanel projectPath="/p" />);
+		expect(await screen.findByText("At most 2,000,000 tokens per task")).toBeInTheDocument();
+		expect(screen.queryByText(/in the last hour/)).not.toBeInTheDocument();
+		expect(screen.getByText("Pauses an agent after 3 identical tool calls")).toBeInTheDocument();
+		expect(screen.getByText("1 agent action stopped in the last 24 h")).toBeInTheDocument();
+		expect(screen.getByText("2 circuit-breaker trips in the last 7 days")).toBeInTheDocument();
+		expect(screen.getAllByText("Circuit breaker").length).toBeGreaterThan(1);
 	});
 
 	it("says when a section is not set", async () => {
@@ -98,7 +121,8 @@ describe("GovernancePolicyPanel", () => {
 		render(<GovernancePolicyPanel projectPath="/p" />);
 		expect(await screen.findByText("Open now")).toBeInTheDocument();
 		expect(screen.getByText("No file rule")).toBeInTheDocument();
-		expect(screen.getByText("No hourly limit")).toBeInTheDocument();
+		expect(screen.getByText("No token limit")).toBeInTheDocument();
+		expect(screen.getByText("The app's own limit")).toBeInTheDocument();
 		expect(screen.getByText("x")).toBeInTheDocument();
 	});
 

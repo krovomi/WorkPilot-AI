@@ -44,6 +44,13 @@ import {
 	watchConfigured,
 } from "../cicd/deploy-watch";
 import {
+	isCicdSecret,
+	MASKED_TOKEN,
+	WATCH_ALERT_KEYS,
+	WATCH_SOURCE_KEYS,
+	watchSettingsView,
+} from "../cicd/watch-settings";
+import {
 	CICD_PROVIDERS,
 	isProviderRunId,
 	runsLimit,
@@ -111,10 +118,12 @@ export const CICD_CONFIG_KEYS: Readonly<Record<string, string>> = {
 	monitor_window_minutes: "CICD_MONITOR_WINDOW_MINUTES",
 	monitor_deploy_wait_minutes: "CICD_MONITOR_DEPLOY_WAIT_MINUTES",
 	auto_rollback: "CICD_AUTO_ROLLBACK",
+	// Other metric sources and the alert channels (#366, lot 3).
+	...WATCH_SOURCE_KEYS,
+	...WATCH_ALERT_KEYS,
 };
 
-/** What getConfig shows for a token that is set; sent back, it means "unchanged". */
-export const MASKED_TOKEN = "***";
+export { MASKED_TOKEN };
 
 /** The CI/CD settings of a project, tokens decrypted — main process only. */
 function readCicdConfig(project: Project): Record<string, string> {
@@ -141,7 +150,7 @@ export function toCicdEnvUpdate(
 		if (!key) continue;
 		const value = String(raw ?? "");
 		if (/[\r\n\0]/.test(value)) return { ok: false, error: "invalid-value" };
-		if (key.endsWith("_TOKEN") && value === MASKED_TOKEN) continue;
+		if ((key.endsWith("_TOKEN") || isCicdSecret(key)) && value === MASKED_TOKEN) continue;
 		update[key] = value;
 	}
 	return { ok: true, update };
@@ -275,9 +284,23 @@ function startDeployWatch(project: Project, runId: string): void {
 		// for the incident report) plus the CI/CD settings: no more than any
 		// view runner gets (docs/rules/security.md, S4).
 		const env = await pythonRunnerEnv(getBackendPath(), { extra: config });
+		// The project's name and the app's language, for the alerts sent to
+		// Slack, PagerDuty and e-mail; argv, never a shell.
+		const language = getAppLanguage() === "fr" ? "fr" : "en";
 		await runRunner(
 			project,
-			["--action", "watch", "--project", project.path, "--run-id", runId],
+			[
+				"--action",
+				"watch",
+				"--project",
+				project.path,
+				"--run-id",
+				runId,
+				"--project-name",
+				project.name.slice(0, 100),
+				"--language",
+				language,
+			],
 			DEPLOY_WATCH_RUNNER,
 			env,
 		);
@@ -453,6 +476,7 @@ export function registerCICDTriggersHandlers(): void {
 					monitor_window_minutes: cfg.CICD_MONITOR_WINDOW_MINUTES ?? "",
 					monitor_deploy_wait_minutes: cfg.CICD_MONITOR_DEPLOY_WAIT_MINUTES ?? "",
 					auto_rollback: cfg.CICD_AUTO_ROLLBACK === "true",
+					...watchSettingsView(cfg),
 				},
 			};
 		} catch (err) {

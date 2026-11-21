@@ -13,10 +13,13 @@ from agents import iteration_guards
 from agents.policy_watch import (
     BUDGET_REASON,
     HOURS_REASON,
+    INVALID_REASON,
     PolicyWatch,
     _identity,
     policy_pause_before_session,
+    stop_verdict,
     tokens_last_hour,
+    tokens_of_task,
     verdict,
 )
 from agents.session_guards import SessionGuards
@@ -67,10 +70,12 @@ def _closed(project: Path) -> None:
     )
 
 
-def _usage(project: Path, *rows: tuple[int, datetime | None]) -> None:
+def _usage(
+    project: Path, *rows: tuple[int, datetime | None], task: str = "001-x"
+) -> None:
     usages = [
         {
-            "spec_id": "001-x",
+            "spec_id": task,
             "cost": 0.0,
             "input_tokens": tokens,
             "output_tokens": 0,
@@ -210,3 +215,77 @@ def test_a_client_that_cannot_name_itself_is_unnamed():
         raise TypeError("no")
 
     assert _identity(SimpleNamespace(provider_name=broken, model="m")) == (None, "m")
+
+
+def test_the_task_budget_counts_the_task_all_along(project: Path, spec: Path):
+    long_ago = datetime.now(UTC) - timedelta(days=3)
+    _policy(project, {"budget": {"max_tokens_per_task": 1000}})
+    _usage(project, (600, long_ago), (300, None))
+    assert tokens_of_task(project, "001-x") == 900
+    assert not PolicyWatch(spec, "coding").tripped
+    _usage(project, (600, long_ago), (500, None))
+    watch = PolicyWatch(spec, "coding")
+    assert watch.tripped
+    assert read_pause_state(spec)["policy"] == {
+        "reason": BUDGET_REASON,
+        "tokensThisTask": 1100,
+        "maxTokensPerTask": 1000,
+    }
+    [event] = read_events(project)
+    assert event["decision"] == "budget_exceeded"
+    assert event["rules"] == ["budget.max_tokens_per_task"]
+    assert "1,100 tokens" in event["reason"]
+
+
+def test_another_task_spending_does_not_stop_this_one(project: Path, spec: Path):
+    _policy(project, {"budget": {"max_tokens_per_task": 1000}})
+    _usage(project, (5000, None), task="002-other")
+    assert tokens_of_task(project, "001-x") == 0
+    assert policy_pause_before_session(spec, "coding") is None
+
+
+def test_the_task_budget_needs_a_task(project: Path):
+    _policy(project, {"budget": {"max_tokens_per_task": 1000}})
+    _usage(project, (5000, None))
+    assert verdict(project, load_policy(project).governance) is None
+
+
+def test_the_hourly_budget_is_still_named_by_its_rule(project: Path, spec: Path):
+    _policy(project, {"budget": {"max_tokens_per_hour": 1000}})
+    _usage(project, (5000, datetime.now(UTC)))
+    assert policy_pause_before_session(spec, "coding") == BUDGET_REASON
+    assert read_events(project)[0]["rules"] == ["budget.max_tokens_per_hour"]
+
+
+def test_an_invalid_policy_stops_the_task_before_its_session(
+    project: Path, spec: Path, capsys: pytest.CaptureFixture[str]
+):
+    _policy(project, {"budget": {"max_tokens_per_hour": -1, "max_tokens_per_task": 5}})
+    assert policy_pause_before_session(spec, "coding") == INVALID_REASON
+    state = read_pause_state(spec)
+    assert state["reason"] == INVALID_REASON
+    assert state["policy"] == {"reason": INVALID_REASON, "errorCount": 2}
+    out = capsys.readouterr().out
+    assert "The guardrails policy is invalid (2 error(s))" in out
+    assert "'budget.max_tokens_per_task'" in out and "No agent runs" in out
+    [event] = read_events(project)
+    assert event["decision"] == "invalid_policy" and event["rules"] == []
+
+
+def test_an_invalid_policy_stops_a_running_session_too(project: Path, spec: Path):
+    guards = SessionGuards(spec, "coding")
+    assert not guards.tripped
+    _policy(project, {"loop_detection": {"max_same_tool_call": 0}})
+    load_policy(project)
+    guards.call("Read", {"file_path": "a.py"}, "c1")
+    assert guards.tripped
+    assert read_pause_state(spec)["reason"] == INVALID_REASON
+
+
+def test_past_five_errors_the_rest_is_counted(project: Path):
+    _policy(project, {f"key{i}": 1 for i in range(7)})
+    found = stop_verdict(project, load_policy(project))
+    assert found is not None
+    reason, message, detail = found
+    assert reason == INVALID_REASON and detail == {"errorCount": 7}
+    assert message.count("unknown key") == 5 and "and 2 more" in message

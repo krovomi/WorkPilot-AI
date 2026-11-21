@@ -12,13 +12,17 @@ becomes one of those (:func:`webdriver_locator`): a test id or a placeholder
 as a CSS attribute selector, a label, a text or a role named by its text as
 an XPath, the XPath string built by ``xpath_string``. Inside a shadow root
 WebDriver only finds by CSS, so those steps take their first CSS selector
-(the recorder always gives one, its CSS path last).
+(the recorder always gives one, its CSS path last). A selector that matches
+several elements (``nth``) is passed over too: the page counted its matches
+the way Playwright does, which a CSS or XPath query does not reproduce, and
+the CSS path after it is unique.
 
 Nothing pauses for a fixed time: each lookup waits until the element is there
 (and shows, when it appeared after the previous action); a request the action
 started is waited for by counting the page's ``fetch`` and XHR calls (a
-script of this module, not of the page); the page an action led to, by its
-URL without query or fragment.
+script of this module, not of the page); a loading indicator, until the
+first element its selector matches in the top document is gone or hidden;
+the page an action led to, by its URL without query or fragment.
 """
 
 from __future__ import annotations
@@ -74,6 +78,8 @@ _FIELD = "self::input or self::select or self::textarea"
 
 def webdriver_locator(s: Selector, in_shadow: bool = False) -> tuple[str, str] | None:
     """``("css" | "xpath", selector)`` for WebDriver, or None when it has none."""
+    if s.nth is not None:
+        return None
     if s.strategy == "testid":
         return "css", f'[data-testid="{css_string(s.value)}"]'
     if s.strategy == "placeholder":
@@ -126,6 +132,7 @@ class _Dialect:
     seen: str
     wait_network: str
     wait_page: Callable[[str], str]
+    wait_hidden: Callable[[str], str]
     skip: str
     #: Open and close a block around a step that binds a name, if any.
     block: tuple[str, str] | None = None
@@ -157,6 +164,8 @@ def _steps(steps: list[RecordedStep], d: _Dialect) -> tuple[list[str], int]:
                 lines += body
         else:
             lines.append(d.action(step, d.use(found)))
+        if step.wait_hidden:
+            lines.append(d.wait_hidden(step.wait_hidden))
         if step.wait_url:
             lines.append(d.wait_page(step.wait_url))
     return lines, skipped
@@ -205,6 +214,7 @@ _PYTHON = _Dialect(
     seen="seen = network_seen(driver)",
     wait_network="wait_for_network(driver, seen)",
     wait_page=lambda url: f"wait_for_page(driver, {py_literal(url)})",
+    wait_hidden=lambda css: f"wait_for_hidden(driver, {py_literal(css)})",
     skip="# step skipped: no selector Selenium can express",
 )
 
@@ -263,6 +273,14 @@ def wait_for_network(driver, seen):
 def wait_for_page(driver, url):
     WebDriverWait(driver, TIMEOUT).until(
         lambda d: d.current_url.split("#")[0].split("?")[0] == url
+    )
+
+
+def wait_for_hidden(driver, css):
+    """The loading indicator is gone or hidden, in the top document."""
+    driver.switch_to.default_content()
+    WebDriverWait(driver, TIMEOUT).until(
+        EC.invisibility_of_element_located((By.CSS_SELECTOR, css))
     )
 '''
 
@@ -336,6 +354,7 @@ _JAVA = _Dialect(
     seen="long seen = networkSeen();",
     wait_network="waitForNetwork(seen);",
     wait_page=lambda url: f"waitForPage({java_literal(url)});",
+    wait_hidden=lambda css: f"waitForHidden({java_literal(css)});",
     skip="// step skipped: no selector Selenium can express",
     block=("{", "}"),
 )
@@ -416,6 +435,12 @@ _JAVA_HELPERS = f"""\tprivate static final String NETWORK_WATCH = {java_literal(
 
 \tprivate void waitForPage(String url) {{
 \t\twait.until(d -> url.equals(d.getCurrentUrl().split("[?#]", 2)[0]));
+\t}}
+
+\t/** The loading indicator is gone or hidden, in the top document. */
+\tprivate void waitForHidden(String css) {{
+\t\tdriver.switchTo().defaultContent();
+\t\twait.until(ExpectedConditions.invisibilityOfElementLocated(By.cssSelector(css)));
 \t}}
 """
 
@@ -500,6 +525,7 @@ _JAVASCRIPT = _Dialect(
     seen="const seen = await networkSeen();",
     wait_network="await waitForNetwork(seen);",
     wait_page=lambda url: f"await waitForPage({literal(url)});",
+    wait_hidden=lambda css: f"await waitForHidden({literal(css)});",
     skip="// step skipped: no selector WebdriverIO can express",
     block=("{", "}"),
 )
@@ -540,6 +566,12 @@ async function waitForPage(url) {{
 \tawait browser.waitUntil(async () => (await browser.getUrl()).split(/[?#]/)[0] === url, {{
 \t\ttimeout: TIMEOUT,
 \t}});
+}}
+
+/** The loading indicator is gone or hidden, in the top document. */
+async function waitForHidden(css) {{
+\tawait browser.switchToFrame(null);
+\tawait browser.waitUntil(async () => !(await $(css).isDisplayed()), {{ timeout: TIMEOUT }});
 }}
 """
 

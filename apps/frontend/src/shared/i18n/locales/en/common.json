@@ -501,6 +501,7 @@
 			"notePlaceholder": "Why this does not apply here",
 			"save": "Save",
 			"cancel": "Cancel",
+			"held": "Waiting for a maintainer: the reviewer learns from this rejection once a project owner approves it.",
 			"show": "Show",
 			"hide": "Hide",
 			"learnedBadge_one": "Rejected {{count}} time on this project",

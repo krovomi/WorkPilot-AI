@@ -59,17 +59,6 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 					<label className="flex items-center gap-2 text-sm text-muted-foreground">
 						<input
 							type="checkbox"
-							checked={cicdConfig.autoCreatePR}
-							onChange={(e) =>
-								setCICDConfig(projectPath, { autoCreatePR: e.target.checked })
-							}
-							className="rounded"
-						/>
-						{t("selfHealing:autoCreatePR")}
-					</label>
-					<label className="flex items-center gap-2 text-sm text-muted-foreground">
-						<input
-							type="checkbox"
 							checked={cicdConfig.autoBisect !== false}
 							onChange={(e) =>
 								setCICDConfig(projectPath, { autoBisect: e.target.checked })

@@ -4,7 +4,10 @@
  * test. A step also says where its element lives (the iframes and open shadow
  * roots above it, each a CSS selector) and what its action caused (the page
  * it led to, the request it started, an element that appeared), which the
- * exports wait for instead of pausing.
+ * exports wait for instead of pausing. A selector that matches several
+ * elements carries the element's place among them (`nth`). A step with
+ * `after` is a check the recorder proposes after that action: the person
+ * keeps it or not.
  *
  * Steps are made by the Python recorder (`apps/backend/browser_agent/`) from
  * what the page reported, so their text is page content: data, shown as text,
@@ -43,11 +46,20 @@ const MAX_SELECTOR = 300;
 export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 const REQUEST_PATH = /^\/[^\s?#]{0,299}$/;
+/** A selector matching more elements than this is not kept, even with a place. */
+const MAX_MATCHES = 20;
+/** The selectors a loading indicator is waited for by (built by the recorder from these patterns only). */
+const LOADER =
+	/^(?:\[data-testid="(?:[^"\\]|\\.)+"\]|#[A-Za-z][A-Za-z0-9_-]*|\[role="progressbar"\]|\[aria-busy="true"\]|\.[A-Za-z_-][A-Za-z0-9_-]*)$/;
+/** At most this many proposed checks per session. */
+export const MAX_SUGGESTIONS = 100;
 
 export interface RecordedSelector {
 	readonly strategy: SelectorStrategy;
 	readonly value: string;
 	readonly role?: string;
+	/** The element's place among those the selector matches, when not unique. */
+	readonly nth?: number;
 }
 
 export interface RecordedStep {
@@ -70,6 +82,10 @@ export interface RecordedStep {
 	readonly waitUrl?: string;
 	/** The first same-origin request the action started. */
 	readonly waitRequest?: { readonly method: HttpMethod; readonly path: string };
+	/** A loading indicator the action showed: the replay waits until none shows. */
+	readonly waitHidden?: string;
+	/** A proposed check (`assert_text`): the id of the action it follows. */
+	readonly after?: string;
 }
 
 export type RecorderStatus = "idle" | "starting" | "recording" | "stopping";
@@ -136,7 +152,14 @@ export function parseRecordedStep(raw: unknown): RecordedStep | null {
 		const s = (item ?? {}) as Record<string, unknown>;
 		const value = text(s.value, 300);
 		if (!isOneOf(SELECTOR_STRATEGIES, s.strategy) || !value) continue;
-		selectors.push(s.strategy === "role" ? { strategy: s.strategy, value, role: text(s.role, 20) } : { strategy: s.strategy, value });
+		const placed = typeof s.nth === "number" && Number.isInteger(s.nth) && s.nth >= 0 && s.nth < MAX_MATCHES;
+		if (s.nth !== undefined && !placed) continue;
+		selectors.push({
+			strategy: s.strategy,
+			value,
+			...(s.strategy === "role" && { role: text(s.role, 20) }),
+			...(placed && { nth: s.nth as number }),
+		});
 	}
 	const frames = cssChain(r.frames);
 	const shadow = cssChain(r.shadow);
@@ -156,6 +179,10 @@ export function parseRecordedStep(raw: unknown): RecordedStep | null {
 		...(r.waitVisible === true && { waitVisible: true }),
 		...(/^https?:\/\/[^\s?#]+$/.test(text(r.waitUrl)) && { waitUrl: text(r.waitUrl) }),
 		...(waitRequest && { waitRequest }),
+		...(typeof r.waitHidden === "string" &&
+			r.waitHidden.length <= MAX_SELECTOR &&
+			LOADER.test(r.waitHidden) && { waitHidden: r.waitHidden }),
+		...(r.kind === "assert_text" && typeof r.after === "string" && STEP_ID.test(r.after) && { after: r.after }),
 	};
 	if (step.kind === "navigate") return step.url ? step : null;
 	return selectors.length ? step : null;

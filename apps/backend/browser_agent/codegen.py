@@ -18,13 +18,16 @@ no role or label query without an extra library, so it falls through to the
 placeholder, the text or the CSS; Selenium and WebdriverIO find by CSS or
 XPath, and only by CSS inside a shadow root (``codegen_webdriver``). A step
 none of its selectors fit is written as a ``step skipped`` comment, never
-guessed.
+guessed. A selector that matches several elements names the element's place
+among them (``nth``): Playwright writes ``.nth(i)``; Cypress ``.eq(i)`` on a
+query that returns them all (``cy.contains`` returns one, so a role or a text
+with a place falls through); WebDriver falls through to the next selector.
 
 Where the element lives and what the action caused come from the recording:
 each framework goes down the step's iframes and shadow hosts, and waits for
 the element to show when it appeared after the previous action, for the
-response to the request the action started, and for the page it led to.
-Nothing waits for a fixed time.
+response to the request the action started, for the loading indicator it
+showed to go, and for the page it led to. Nothing waits for a fixed time.
 """
 
 from __future__ import annotations
@@ -139,7 +142,16 @@ def _pw_ts_scope(step: RecordedStep) -> str:
     return scope
 
 
+def _nth(locator: str, s: Selector) -> str:
+    """A Playwright locator narrowed to the element's place, when not unique."""
+    return locator if s.nth is None else f"{locator}.nth({s.nth})"
+
+
 def _pw_ts_locator(scope: str, s: Selector) -> str:
+    return _nth(_pw_ts_query(scope, s), s)
+
+
+def _pw_ts_query(scope: str, s: Selector) -> str:
     if s.strategy == "testid":
         return f"{scope}.getByTestId({literal(s.value)})"
     if s.strategy == "role":
@@ -187,6 +199,11 @@ def _pw_ts_step(step: RecordedStep) -> list[str]:
     lines.append(_pw_ts_action(step, loc))
     if step.wait_request:
         lines.append(f"await {response};")
+    if step.wait_hidden:
+        lines.append(
+            f"await expect(page.locator({literal(step.wait_hidden)})"
+            '.locator("visible=true")).toHaveCount(0);'
+        )
     if step.wait_url:
         lines.append(
             "await page.waitForURL((url) => url.href.split(/[?#]/)[0] === "
@@ -226,6 +243,10 @@ def _pw_py_scope(step: RecordedStep) -> str:
 
 
 def _pw_py_locator(scope: str, s: Selector) -> str:
+    return _nth(_pw_py_query(scope, s), s)
+
+
+def _pw_py_query(scope: str, s: Selector) -> str:
     q = py_literal
     if s.strategy == "testid":
         return f"{scope}.get_by_test_id({q(s.value)})"
@@ -271,6 +292,11 @@ def _pw_py_step(step: RecordedStep) -> list[str]:
         ]
     else:
         lines.append(action)
+    if step.wait_hidden:
+        lines.append(
+            f"expect(page.locator({py_literal(step.wait_hidden)})"
+            '.locator("visible=true")).to_have_count(0)'
+        )
     if step.wait_url:
         lines.append(
             'page.wait_for_url(lambda url: url.split("#")[0].split("?")[0] == '
@@ -316,6 +342,15 @@ def _cy_scope(step: RecordedStep) -> str:
 
 
 def _cy_query(scope: str, s: Selector) -> str | None:
+    if s.nth is None:
+        return _cy_first(scope, s)
+    if s.strategy in ("role", "text"):
+        return None  # cy.contains yields one element: no place to pick
+    query = _cy_first(scope, s)
+    return None if query is None else f"{query}.eq({s.nth})"
+
+
+def _cy_first(scope: str, s: Selector) -> str | None:
     get = "cy.get" if scope == "cy" else f"{scope}.find"
     contains = f"{scope}.contains"
     if s.strategy == "testid":
@@ -377,6 +412,11 @@ def _cy_step(step: RecordedStep) -> list[str] | None:
     lines.append(_cy_action(step, query))
     if step.wait_request:
         lines.append(f"cy.wait({literal('@' + step.id)});")
+    if step.wait_hidden:
+        lines.append(
+            'cy.get("body").should((body) => expect(body.find('
+            f'{literal(step.wait_hidden)}).filter(":visible")).to.have.length(0));'
+        )
     if step.wait_url:
         lines.append(
             "cy.url().should((url) => expect(url.split(/[?#]/)[0]).to.equal("
