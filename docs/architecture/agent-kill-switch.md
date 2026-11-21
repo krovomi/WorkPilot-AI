@@ -65,12 +65,17 @@ l'appel d'outil en cours, que `tool_breaker.py` voit passer
 
 **Où.** Le bouton rouge apparaît dans le rail de la barre latérale tant qu'une tâche tourne ; le
 raccourci Ctrl+Maj+. (Cmd+Maj+. sur macOS) marche toujours, même dans un champ de saisie. Le
-canal `AGENTS_STOP_ALL` ne prend aucun argument : ce qui tourne est lu dans le main.
+canal `AGENTS_STOP_ALL` ne prend aucun argument : ce qui tourne est lu dans le main. En mode
+serveur, le même appui arrête aussi les agents de la personne sur le serveur
+(`main/server-governance.ts`).
 
 ## Pas encore fait (lots suivants de #353)
 
 - ~~Les politiques versionnées et le journal d'audit exportable~~ : faits au lot 2,
   [governance-policy.md](governance-policy.md) (heures, fichiers interdits ou soumis à revue,
   jetons par heure, journal `.workpilot/policy-audit.jsonl`, panneau et export CSV/JSON).
-- Les tâches d'un projet du mode serveur : leurs runs tournent sur le serveur, l'arrêt d'urgence
-  de l'app ne les atteint pas.
+- ~~Les tâches d'un projet du mode serveur~~ : fait au lot 4. « Arrêter tous les agents » demande
+  aussi à chaque projet du serveur où la personne est membre d'arrêter les runs et les jobs
+  qu'elle y a lancés, jamais ceux d'un collègue ; le propriétaire d'un projet peut tout y arrêter
+  depuis Garde-fous ou le téléphone. Le délai est mesuré sur de vrais processus (moins de 2 s
+  exigé) : [governance-policy.md](governance-policy.md#un-projet-du-mode-serveur-shared_featuresgovernancepy).
