@@ -25,6 +25,7 @@ export default function Board() {
 		...(can("insight.read") ? (["insights", "roadmap", "ideas", "context"] as const) : []),
 		...(forge && can("vcs.read") ? (["forge"] as const) : []),
 		...(can("analytics.read") ? (["dashboard"] as const) : []),
+		...(can("audit.read") ? (["governance"] as const) : []),
 	];
 	// One split group shown alone, from a tap on a part's mark.
 	const [splitGroup, setSplitGroup] = useState<string | null>(null);
@@ -229,7 +230,7 @@ function GroupMark({ group, onPress }: { group: NonNullable<BoardCard["group"]>;
 
 const styles = StyleSheet.create({
 	links: { flexDirection: "row", flexWrap: "wrap", gap: SPACE.sm, paddingHorizontal: SPACE.lg, paddingTop: SPACE.sm },
-	// Three a row: up to six links, which one row would squeeze on a phone.
+	// Three a row: up to seven links, which one row would squeeze on a phone.
 	link: { flexGrow: 1, flexBasis: "30%", alignItems: "center", borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.md, paddingVertical: SPACE.sm },
 	status: {
 		flexDirection: "row",
