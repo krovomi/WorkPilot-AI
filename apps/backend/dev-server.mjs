@@ -5,6 +5,12 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	checkDevPort,
+	DEV_HOST,
+	DEV_PORT,
+	exitCodeAfterUvicorn,
+} from "./dev-port.mjs";
 import { devReloadArgs } from "./dev-reload-args.mjs";
 
 const isWin = process.platform === "win32";
@@ -52,9 +58,9 @@ function runUvicorn() {
 		"uvicorn",
 		"provider_api:app",
 		"--host",
-		"127.0.0.1",
+		DEV_HOST,
 		"--port",
-		"9000",
+		String(DEV_PORT),
 		// Watch only the backend source directory; the shared virtualenv lives at
 		// the repo root (../../.venv). Why the .venv exclude is conditional:
 		// dev-reload-args.mjs.
@@ -64,7 +70,11 @@ function runUvicorn() {
 		stdio: "inherit",
 		cwd: __dirname,
 	});
-	proc.on("exit", (code) => process.exit(code));
+	// A busy port fails uvicorn with exit code 3; why that is not always a
+	// failure of `pnpm run dev`: dev-port.mjs.
+	proc.on("exit", async (code) => process.exit(await exitCodeAfterUvicorn(code)));
 }
 
-ensureVenv(() => ensureDeps(runUvicorn));
+const port = await checkDevPort();
+if (port.start) ensureVenv(() => ensureDeps(runUvicorn));
+else process.exit(port.exitCode);
