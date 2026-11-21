@@ -17,9 +17,11 @@ from fastapi import APIRouter, HTTPException
 from foundation.api_safety import SpecAddressError, resolve_spec_dir, validated_dir
 from pydantic import BaseModel, Field
 
+from . import metrics
 from .composition import CompositionError, suggest_composition
 from .orchestrator import get_mission_control
 from .refine import parse_hints
+from .session_plan import MAX_PLAN_PROVIDERS
 from .signals import read_signals, read_spec_text
 from .templates import TEMPLATES
 
@@ -42,6 +44,9 @@ class CreateAgentRequest(BaseModel):
     provider: str = ""
     model: str = ""
     model_label: str = ""
+    # A composed crew's agent: ``auto``, with the tokens its composition expected.
+    origin: str = Field(default="manual", pattern="^(manual|auto)$")
+    estimated_tokens: int = Field(default=0, ge=0, le=10_000_000_000)
 
 
 class UpdateAgentConfigRequest(BaseModel):
@@ -54,6 +59,28 @@ class UpdateAgentConfigRequest(BaseModel):
 
 class StartAgentRequest(BaseModel):
     task: str = ""
+    # The same task again after a rebalancing (``/rebalance``).
+    rebalanced: bool = False
+
+
+class RebalanceRequest(BaseModel):
+    """How a run ended; the error is classified, never acted on."""
+
+    error: str = Field(default="", max_length=2_000)
+    rate_limited: bool = False
+    # The Claude profile system has another profile to run on.
+    alternate_profile: bool = False
+
+
+class SessionPlanRequest(BaseModel):
+    """A crew's providers and budget, or the automatic rebalancing switch."""
+
+    providers: list[Annotated[str, Field(max_length=64)]] | None = Field(
+        default=None, max_length=MAX_PLAN_PROVIDERS
+    )
+    budget_usd: float | None = Field(default=None, gt=0, le=1_000_000)
+    budget_tokens: int | None = Field(default=None, gt=0, le=10_000_000_000)
+    auto_rebalance: bool | None = None
 
 
 class AgentStateUpdateRequest(BaseModel):
@@ -118,6 +145,25 @@ async def stop_session():
     return {"success": True}
 
 
+@router.post("/session/plan")
+async def set_session_plan(req: SessionPlanRequest):
+    """Where rebalanced agents may go and the budget the session holds to."""
+    mc = get_mission_control()
+    plan = mc.set_plan(
+        providers=req.providers,
+        budget_usd=req.budget_usd,
+        budget_tokens=req.budget_tokens,
+        auto_rebalance=req.auto_rebalance,
+    )
+    return {"success": True, "plan": plan}
+
+
+@router.get("/metrics")
+async def get_metrics():
+    """Auto-compose adoption, tokens, rebalancings and budget overruns."""
+    return {"success": True, "metrics": metrics.summary()}
+
+
 @router.get("/session")
 async def get_session():
     """Get current session info."""
@@ -152,6 +198,8 @@ async def create_agent(req: CreateAgentRequest):
         provider=req.provider,
         model=req.model,
         model_label=req.model_label,
+        origin=req.origin,
+        estimated_tokens=req.estimated_tokens,
     )
     return {"success": True, "agent": slot.to_dict()}
 
@@ -211,7 +259,7 @@ async def remove_agent(agent_id: str):
 async def start_agent(agent_id: str, req: StartAgentRequest):
     """Start an agent with a task."""
     mc = get_mission_control()
-    ok = mc.start_agent(agent_id, req.task)
+    ok = mc.start_agent(agent_id, req.task, rebalanced=req.rebalanced)
     if not ok:
         raise HTTPException(status_code=404, detail=AGENT_NOT_FOUND)
     return {"success": True}
@@ -289,6 +337,24 @@ async def update_agent_state(agent_id: str, req: AgentStateUpdateRequest):
         mc.update_agent_status(agent_id, req.status, req.error or "")
 
     return {"success": True, "agent": slot.to_dict()}
+
+
+@router.post(
+    "/agents/{agent_id}/rebalance", responses={404: {"description": AGENT_NOT_FOUND}}
+)
+async def rebalance_agent(agent_id: str, req: RebalanceRequest):
+    """What to do with a run that went wrong (``rebalance.py``), applied."""
+    mc = get_mission_control()
+    decision = mc.rebalance_agent(
+        agent_id,
+        error=req.error,
+        rate_limited=req.rate_limited,
+        alternate_profile=req.alternate_profile,
+    )
+    if decision is None:
+        raise HTTPException(status_code=404, detail=AGENT_NOT_FOUND)
+    slot = mc.get_agent(agent_id)
+    return {"success": True, "rebalance": decision, "agent": slot and slot.to_dict()}
 
 
 # ---------------------------------------------------------------------------
@@ -383,6 +449,7 @@ async def suggest(req: CompositionRequest):
             hints=hints,
             hints_unusable=bool(req.model_hints) and hints is None,
             refine_text=text if req.refine and not req.model_hints else None,
+            calibration=metrics.role_factors(),
         )
     except CompositionError as exc:
         return {"success": False, "error": exc.code}

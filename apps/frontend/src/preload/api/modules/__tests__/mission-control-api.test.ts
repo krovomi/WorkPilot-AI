@@ -18,4 +18,12 @@ describe("createMissionControlAPI", () => {
 			request,
 		);
 	});
+
+	it("invokes the plan and metrics channels", async () => {
+		const api = createMissionControlAPI();
+		await api.missionControlSetPlan({ autoRebalance: false });
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.MISSION_CONTROL_SET_PLAN, { autoRebalance: false });
+		await api.missionControlGetMetrics();
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.MISSION_CONTROL_GET_METRICS);
+	});
 });

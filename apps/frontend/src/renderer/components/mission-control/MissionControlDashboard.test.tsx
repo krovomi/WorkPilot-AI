@@ -90,6 +90,9 @@ beforeEach(async () => {
 		}),
 		missionControlStartAgent: vi.fn().mockResolvedValue(ok()),
 		missionControlStopAgent: vi.fn().mockResolvedValue(ok()),
+		missionControlSetPlan: vi.fn().mockResolvedValue(ok()),
+		// No session ran before: the history stays hidden.
+		missionControlGetMetrics: vi.fn().mockResolvedValue(ok({ sessions: 0 })),
 		// The model catalog of the add dialog: the backend's answer is not needed.
 		localBackendRequest: vi.fn().mockResolvedValue({ unreachable: true }),
 	};

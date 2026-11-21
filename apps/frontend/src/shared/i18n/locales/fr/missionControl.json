@@ -104,7 +104,10 @@
 		"agent_stopped": "Agent arrêté",
 		"agent_config_updated": "Réglages de l'agent modifiés",
 		"agent_completed": "Agent a répondu",
-		"agent_failed": "Agent en échec"
+		"agent_failed": "Agent en échec",
+		"agent_rebalanced": "Agent rééquilibré",
+		"agent_rebalance_skipped": "Agent non rééquilibré",
+		"agent_loop_detected": "Réponse en boucle"
 	},
 	"compose": {
 		"tabManual": "Manuel",
@@ -198,6 +201,56 @@
 			"no_provider": "Aucun des providers choisis ne peut faire tourner un agent seul.",
 			"no_capable_model": "Aucun des providers choisis n'a de modèle adapté à ces rôles.",
 			"generic": "Impossible de proposer une équipe : {{error}}"
+		},
+		"calibrated": "Estimations de tokens calibrées sur vos sessions passées pour : {{roles}}.",
+		"rebalanceHint": "Pendant que l'équipe travaille, un agent qui échoue ou tourne en boucle passe à un autre de ces providers ou à un modèle plus puissant, dans le budget."
+	},
+	"rebalance": {
+		"badge_one": "Rééquilibré une fois",
+		"badge_other": "Rééquilibré {{count}} fois",
+		"loopBadge": "Réponse en boucle",
+		"moved": "{{reason}} : {{action}}, {{from}} → {{to}}",
+		"notMoved": "{{reason}} : {{skipped}}",
+		"reasons": {
+			"loop": "La réponse se répétait",
+			"rate_limited": "Limite de débit ou quota du provider",
+			"provider_failed": "Provider indisponible",
+			"failed": "Le run a échoué"
+		},
+		"actions": {
+			"retry_profile": "relancé sur un autre profil Claude",
+			"reroute": "passé à un autre provider",
+			"escalate": "passé à un modèle plus puissant"
+		},
+		"skipped": {
+			"limit": "déjà rééquilibré autant de fois que permis pour cette tâche",
+			"over_budget": "la session a dépassé son budget",
+			"no_alternative": "aucun autre provider ni modèle plus puissant ne peut tenir le rôle",
+			"disabled": "le rééquilibrage automatique est coupé"
 		}
+	},
+	"health": {
+		"budgetUsd": "{{spent}} $ dépensés sur {{budget}} $",
+		"budgetTokens": "{{spent}} tokens dépensés sur {{budget}}",
+		"rebalances_one": "{{count}} rééquilibrage",
+		"rebalances_other": "{{count}} rééquilibrages",
+		"autoRebalance": "Rééquilibrer automatiquement les agents bloqués",
+		"overBudget": "Cette session a épuisé son budget : les agents ne passent plus à des modèles plus puissants, et chaque nouveau run creuse le dépassement."
+	},
+	"metrics": {
+		"kicker": "Historique",
+		"title": "Sessions passées",
+		"sessions_one": "{{count}} session",
+		"sessions_other": "{{count}} sessions",
+		"none": "—",
+		"percent": "{{value}} %",
+		"autoShare": "Lancées par la composition automatique",
+		"tokensAutoManual": "Tokens par session, auto / manuelle",
+		"tokensPair": "{{auto}} / {{manual}} ({{delta}})",
+		"delta": "Δ {{value}}",
+		"estimateRatio": "Dépensé / estimé (auto)",
+		"ratio": "× {{value}}",
+		"rebalances": "Rééquilibrages par session",
+		"overrun": "Budgets dépassés"
 	}
 }

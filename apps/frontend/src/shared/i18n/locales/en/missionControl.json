@@ -104,7 +104,10 @@
 		"agent_stopped": "Agent stopped",
 		"agent_config_updated": "Agent settings changed",
 		"agent_completed": "Agent answered",
-		"agent_failed": "Agent failed"
+		"agent_failed": "Agent failed",
+		"agent_rebalanced": "Agent rebalanced",
+		"agent_rebalance_skipped": "Agent not rebalanced",
+		"agent_loop_detected": "Answer is looping"
 	},
 	"compose": {
 		"tabManual": "Manual",
@@ -198,6 +201,56 @@
 			"no_provider": "None of the chosen providers can run an agent on its own.",
 			"no_capable_model": "None of the chosen providers has a model fit for these roles.",
 			"generic": "Could not suggest a crew: {{error}}"
+		},
+		"calibrated": "Token estimates calibrated on your past sessions for: {{roles}}.",
+		"rebalanceHint": "While the crew runs, an agent that fails or loops is moved to another of these providers or to a bigger model, within the budget."
+	},
+	"rebalance": {
+		"badge_one": "Rebalanced once",
+		"badge_other": "Rebalanced {{count}} times",
+		"loopBadge": "Answer looped",
+		"moved": "{{reason}}: {{action}}, {{from}} → {{to}}",
+		"notMoved": "{{reason}}: {{skipped}}",
+		"reasons": {
+			"loop": "The answer kept repeating itself",
+			"rate_limited": "Provider rate limit or quota",
+			"provider_failed": "Provider unavailable",
+			"failed": "The run failed"
+		},
+		"actions": {
+			"retry_profile": "retried on another Claude profile",
+			"reroute": "moved to another provider",
+			"escalate": "moved to a bigger model"
+		},
+		"skipped": {
+			"limit": "already rebalanced as many times as allowed for this task",
+			"over_budget": "the session is over its budget",
+			"no_alternative": "no other provider or bigger model can take the role",
+			"disabled": "automatic rebalancing is off"
 		}
+	},
+	"health": {
+		"budgetUsd": "Spent ${{spent}} of ${{budget}}",
+		"budgetTokens": "Spent {{spent}} of {{budget}} tokens",
+		"rebalances_one": "{{count}} rebalancing",
+		"rebalances_other": "{{count}} rebalancings",
+		"autoRebalance": "Rebalance stuck agents automatically",
+		"overBudget": "This session has used up its budget: agents are no longer moved to bigger models, and new runs add to the overrun."
+	},
+	"metrics": {
+		"kicker": "History",
+		"title": "Past sessions",
+		"sessions_one": "{{count}} session",
+		"sessions_other": "{{count}} sessions",
+		"none": "—",
+		"percent": "{{value}}%",
+		"autoShare": "Started from auto-compose",
+		"tokensAutoManual": "Tokens per session, auto / manual",
+		"tokensPair": "{{auto}} / {{manual}} ({{delta}})",
+		"delta": "Δ {{value}}",
+		"estimateRatio": "Spent vs. estimated (auto)",
+		"ratio": "× {{value}}",
+		"rebalances": "Rebalancings per session",
+		"overrun": "Budgets exceeded"
 	}
 }
