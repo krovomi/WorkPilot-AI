@@ -9,6 +9,11 @@ import { setupBrowserRecorderListeners, useBrowserRecorderStore } from "../brows
 const api = {
 	startBrowserRecording: vi.fn(),
 	stopBrowserRecording: vi.fn(),
+	answerBrowserRecorderDialog: vi.fn(async () => ({ success: true })),
+	runBrowserRecordedTest: vi.fn(),
+	reshootBrowserRecording: vi.fn(),
+	applyBrowserReshoot: vi.fn(),
+	assistBrowserRecording: vi.fn(),
 	exportBrowserRecording: vi.fn(),
 	onBrowserRecorderEvent: vi.fn(),
 };
@@ -77,6 +82,95 @@ describe("browser recorder store", () => {
 		expect(store()).toMatchObject({ status: "idle", truncated: true });
 		store().handleEvent({ type: "error", message: "No display" });
 		expect(store().error).toBe("No display");
+	});
+
+	it("holds a dialog the page opened until the person answers it", async () => {
+		await store().answerDialog(true, "");
+		expect(api.answerBrowserRecorderDialog).not.toHaveBeenCalled();
+		const dialog = { id: 4, type: "prompt", message: "Name?", defaultValue: "" } as const;
+		store().handleEvent({ type: "dialog", dialog });
+		expect(store().pendingDialog).toEqual(dialog);
+		await store().answerDialog(true, "Neo");
+		expect(api.answerBrowserRecorderDialog).toHaveBeenCalledWith({ id: 4, accept: true, text: "Neo" });
+		expect(store().pendingDialog).toBeNull();
+		// A recording that ends takes its dialog with it.
+		for (const end of [
+			{ type: "stopped", reason: "closed", truncated: false },
+			{ type: "error", message: "gone" },
+		] as const) {
+			store().handleEvent({ type: "dialog", dialog });
+			store().handleEvent(end);
+			expect(store().pendingDialog).toBeNull();
+		}
+	});
+
+	it("runs the reviewed test, and says why it could not", async () => {
+		const run = { passed: true, exitCode: 0, durationMs: 1, output: "", setup: "", firstRun: true, firstRuns: 1, firstPassed: 1 };
+		api.runBrowserRecordedTest.mockResolvedValueOnce({ success: true, run });
+		await store().runTest("/p");
+		expect(store()).toMatchObject({ run, running: false, error: null });
+		api.runBrowserRecordedTest.mockResolvedValueOnce({ success: false, error: "no card" });
+		await store().runTest("/p");
+		expect(store()).toMatchObject({ run: null, error: "no card" });
+		api.runBrowserRecordedTest.mockResolvedValueOnce({ success: false });
+		await store().runTest("/p");
+		expect(store().error).toBeNull();
+		api.runBrowserRecordedTest.mockRejectedValueOnce(new Error("ipc"));
+		await store().runTest("/p");
+		expect(store()).toMatchObject({ error: "ipc", running: false });
+	});
+
+	it("takes the assistant's name and ranks the proposed checks", async () => {
+		store().handleEvent({ type: "step", step: click("s1") });
+		for (const id of ["s2", "s3", "s4"]) store().handleEvent({ type: "step", step: check(id, "s1", id) });
+		api.assistBrowserRecording.mockResolvedValueOnce({
+			success: true,
+			assist: { name: "log in", checks: ["s4", "s2"], source: "model" },
+		});
+		await store().assist("/p");
+		expect(store()).toMatchObject({ name: "log in", assistSource: "model", assisting: false });
+		expect(store().suggestions.map((s) => s.id)).toEqual(["s4", "s2", "s3"]);
+		store().setName("mine");
+		api.assistBrowserRecording.mockResolvedValueOnce({
+			success: true,
+			assist: { name: "", checks: [], source: "rules" },
+		});
+		await store().assist("/p");
+		expect(store()).toMatchObject({ name: "mine", assistSource: "rules" });
+		api.assistBrowserRecording.mockResolvedValueOnce({ success: false, error: "stop first" });
+		await store().assist("/p");
+		expect(store().error).toBe("stop first");
+		api.assistBrowserRecording.mockResolvedValueOnce({ success: true });
+		await store().assist("/p");
+		expect(store().error).toBeNull();
+		api.assistBrowserRecording.mockRejectedValueOnce(new Error("ipc"));
+		await store().assist("/p");
+		expect(store()).toMatchObject({ error: "ipc", assisting: false });
+	});
+
+	it("reshoots the steps and applies the proposals picked", async () => {
+		const steps = [{ id: "s2", status: "changed", selectors: [{ strategy: "css", value: "#a" }] }] as const;
+		api.reshootBrowserRecording.mockResolvedValueOnce({ success: true, steps });
+		await store().reshootSteps("/p");
+		expect(store()).toMatchObject({ reshoot: steps, reshooting: false });
+		api.applyBrowserReshoot.mockResolvedValueOnce({ success: false, applied: 0 });
+		await store().applyReshoot("/p", ["s9"]);
+		expect(store().applied).toEqual([]);
+		api.applyBrowserReshoot.mockResolvedValueOnce({ success: true, applied: 1 });
+		await store().applyReshoot("/p", ["s2"]);
+		expect(store().applied).toEqual(["s2"]);
+		api.reshootBrowserRecording.mockResolvedValueOnce({ success: true });
+		await store().reshootSteps("/p");
+		expect(store()).toMatchObject({ reshoot: [], applied: [] });
+		api.reshootBrowserRecording.mockResolvedValueOnce({ success: false, error: "no browser" });
+		await store().reshootSteps("/p");
+		expect(store()).toMatchObject({ reshoot: null, error: "no browser" });
+		api.reshootBrowserRecording.mockResolvedValueOnce({ success: false });
+		await store().reshootSteps("/p");
+		expect(store().error).toBeNull();
+		api.reshootBrowserRecording.mockRejectedValueOnce("odd");
+		await store().reshootSteps("/p");
+		expect(store()).toMatchObject({ error: "odd", reshooting: false });
 	});
 
 	it("starts a fresh recording, or says why it could not", async () => {

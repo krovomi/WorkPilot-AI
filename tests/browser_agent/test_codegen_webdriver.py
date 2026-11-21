@@ -161,7 +161,9 @@ def test_selenium_java() -> None:
 def test_webdriverio() -> None:
     test = export_recording(_recording(), "webdriverio", "Log in")
     assert test.path == "test/specs/log-in.e2e.js" and test.skipped == 1
-    assert test.code.startswith('import { $, browser, expect } from "@wdio/globals";')
+    assert test.code.startswith(
+        'import { $, $$, browser, expect } from "@wdio/globals";'
+    )
     assert "browser.pause" not in test.code
     lines = test.code.splitlines()
     body = lines[

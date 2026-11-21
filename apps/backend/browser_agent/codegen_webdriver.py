@@ -1,10 +1,11 @@
 """
 A recording as a WebDriver test: Selenium (Python with pytest, Java with
-JUnit 5) and WebdriverIO (JavaScript, Mocha).
+JUnit 5) and WebdriverIO (JavaScript, Mocha) here; Selenium in C#, Ruby and
+JavaScript and WebdriverIO in TypeScript in ``codegen_webdriver_langs``.
 
-The three share one walk over the steps (:func:`_steps`) and differ only by
-their :class:`_Dialect`: how a literal is written, how an element is found,
-how an action, a binding and a wait are spelled. Page text enters through the
+They share one walk over the steps (:func:`walk`) and differ only by their
+:class:`Dialect`: how a literal is written, how an element is found, how an
+action, a binding and a wait are spelled. Page text enters through the
 dialect's literal function only (``codegen_text``).
 
 WebDriver finds an element by CSS or XPath. A selector of the recording
@@ -13,9 +14,18 @@ as a CSS attribute selector, a label, a text or a role named by its text as
 an XPath, the XPath string built by ``xpath_string``. Inside a shadow root
 WebDriver only finds by CSS, so those steps take their first CSS selector
 (the recorder always gives one, its CSS path last). A selector that matches
-several elements (``nth``) is passed over too: the page counted its matches
-the way Playwright does, which a CSS or XPath query does not reproduce, and
-the CSS path after it is unique.
+several elements (``nth``) keeps its place when the query finds the same
+elements in the same order as the page counted them: a placeholder (the CSS
+attribute selector matches exactly those) and a text (the XPath keeps the
+innermost element holding it, as the page did; both in document order). A
+role or a label is counted by its accessible name, which XPath does not
+compute: those pass to the next selector, and the CSS path last is unique.
+
+A hover, a drag (W3C actions; drag events dispatched by a script of this
+module when the page listened to those, which Chrome does not fire for W3C
+actions), a scroll (a script with the two numbers), the options of a
+multiple list and the answer to a dialog (the alert is waited for after the
+action) are each one call of the dialect.
 
 Nothing pauses for a fixed time: each lookup waits until the element is there
 (and shows, when it appeared after the previous action); a request the action
@@ -27,6 +37,7 @@ the page an action led to, by its URL without query or fragment.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -42,6 +53,25 @@ from .codegen_text import (
 from .recording import RecordedStep, Selector
 
 TIMEOUT_S = 10
+
+#: Fires the drag events of the HTML drag and drop API, from arguments[0] to [1].
+DRAG_HTML5 = (
+    "const [source, target] = arguments; const data = new DataTransfer(); "
+    "const fire = (el, type) => el.dispatchEvent(new DragEvent(type, "
+    "{ bubbles: true, cancelable: true, dataTransfer: data })); "
+    'fire(source, "dragstart"); fire(target, "dragenter"); '
+    'fire(target, "dragover"); fire(target, "drop"); fire(source, "dragend");'
+)
+#: Scrolls arguments[0] (an element) to arguments[1], arguments[2].
+SCROLL_ELEMENT = "arguments[0].scrollTo(arguments[1], arguments[2]);"
+SCROLL_WINDOW = "window.scrollTo(arguments[0], arguments[1]);"
+#: Picks exactly the options whose values are in arguments[1], as a person does.
+SELECT_VALUES = (
+    "const [list, values] = arguments; "
+    "for (const option of list.options) option.selected = values.includes(option.value); "
+    'list.dispatchEvent(new Event("input", { bubbles: true })); '
+    'list.dispatchEvent(new Event("change", { bubbles: true }));'
+)
 
 #: Counts the page's fetch and XHR calls; returns how many started so far.
 NETWORK_WATCH = (
@@ -76,10 +106,30 @@ _ROLE_XPATH = {
 _FIELD = "self::input or self::select or self::textarea"
 
 
+#: The strategies whose place WebDriver finds as the page counted it.
+_PLACED = ("placeholder", "text")
+
+Locator = tuple[str, str, int | None]
+
+
 def webdriver_locator(s: Selector, in_shadow: bool = False) -> tuple[str, str] | None:
-    """``("css" | "xpath", selector)`` for WebDriver, or None when it has none."""
-    if s.nth is not None:
+    """``("css" | "xpath", selector)`` for WebDriver, or None when it has none.
+
+    A selector with a place (``nth``) has none here: see :func:`placed_locator`.
+    """
+    found = placed_locator(s, in_shadow)
+    return None if found is None or found[2] is not None else found[:2]
+
+
+def placed_locator(s: Selector, in_shadow: bool = False) -> Locator | None:
+    """``(how, selector, nth)``: the element is the ``nth`` match when set."""
+    if s.nth is not None and s.strategy not in _PLACED:
         return None
+    base = _query(s, in_shadow)
+    return None if base is None else (base[0], base[1], s.nth)
+
+
+def _query(s: Selector, in_shadow: bool) -> tuple[str, str] | None:
     if s.strategy == "testid":
         return "css", f'[data-testid="{css_string(s.value)}"]'
     if s.strategy == "placeholder":
@@ -108,54 +158,96 @@ def webdriver_locator(s: Selector, in_shadow: bool = False) -> tuple[str, str] |
     )
 
 
-def _locator(step: RecordedStep) -> tuple[str, str] | None:
+def first_locator(step: RecordedStep, selectors: list[Selector]) -> Locator | None:
     return next(
         (
             loc
-            for loc in (webdriver_locator(s, bool(step.shadow)) for s in step.selectors)
+            for loc in (placed_locator(s, bool(step.shadow)) for s in selectors)
             if loc is not None
         ),
         None,
     )
 
 
+def frame_hops(step: RecordedStep) -> list[list[str]]:
+    """Each iframe as the shadow hosts it sits in, then its own CSS."""
+    hosts = step.frame_shadow or [[] for _ in step.frames]
+    return [[*above, frame] for above, frame in zip(hosts, step.frames, strict=True)]
+
+
+def uses(steps: list[RecordedStep]) -> set[str]:
+    """What the steps need beyond the base helpers: drag, dialog, scroll, values."""
+    needs: set[str] = set()
+    for step in steps:
+        if step.kind == "drag":
+            needs.add("drag-" + step.drag_mode)
+        if step.kind == "scroll":
+            needs.add("scroll-element" if step.selectors else "scroll-window")
+        if step.kind == "hover":
+            needs.add("hover")
+        if step.values and not step.secret_env:
+            needs.add("values")
+        if step.dialog:
+            needs.add("dialog")
+    return needs
+
+
 @dataclass(frozen=True)
-class _Dialect:
+class Dialect:
     """How one language spells each piece of a WebDriver test."""
 
     navigate: Callable[[str], str]
-    locate: Callable[[RecordedStep, tuple[str, str]], str]
+    locate: Callable[[RecordedStep, Locator], str]
     #: The located element (the ``locate`` call) as an expression.
     use: Callable[[str], str]
-    action: Callable[[RecordedStep, str], str]
+    #: The action on the element, and on the element dropped onto (``drag``).
+    action: Callable[[RecordedStep, str, str], str]
     bind: Callable[[str], str]
     seen: str
     wait_network: str
     wait_page: Callable[[str], str]
     wait_hidden: Callable[[str], str]
     skip: str
+    scroll_window: Callable[[int, int], str]
+    #: Answers the dialog the action opened: accept, and the text of a prompt.
+    dialog: Callable[[bool, str | None], str]
     #: Open and close a block around a step that binds a name, if any.
     block: tuple[str, str] | None = None
 
 
-def _steps(steps: list[RecordedStep], d: _Dialect) -> tuple[list[str], int]:
+def _dialog(step: RecordedStep, d: Dialect) -> list[str]:
+    answer = step.dialog
+    if answer is None:
+        return []
+    text = answer.text if answer.accept and answer.type == "prompt" else None
+    return [d.dialog(answer.accept, text)]
+
+
+def walk(steps: list[RecordedStep], d: Dialect) -> tuple[list[str], int]:
+    """The body of the test in dialect ``d``, and how many steps it skipped."""
     lines: list[str] = []
     skipped = 0
     for step in steps:
         if step.kind == "navigate":
             lines.append(d.navigate(step.url))
             continue
-        loc = _locator(step)
-        if loc is None:
+        if step.kind == "scroll" and not step.selectors:
+            lines += [d.scroll_window(step.scroll_x, step.scroll_y), *_dialog(step, d)]
+            continue
+        loc = first_locator(step, step.selectors)
+        drop = first_locator(step, step.drop) if step.kind == "drag" else None
+        if loc is None or (step.kind == "drag" and drop is None):
             skipped += 1
             lines.append(d.skip)
             continue
         found = d.locate(step, loc)
+        target = d.use(d.locate(_dropped(step), drop)) if drop else ""
         if step.wait_request:
             body = [
                 d.bind(found),
                 d.seen,
-                d.action(step, "element"),
+                d.action(step, "element", target),
+                *_dialog(step, d),
                 d.wait_network,
             ]
             if d.block:
@@ -163,12 +255,24 @@ def _steps(steps: list[RecordedStep], d: _Dialect) -> tuple[list[str], int]:
             else:
                 lines += body
         else:
-            lines.append(d.action(step, d.use(found)))
+            lines += [d.action(step, d.use(found), target), *_dialog(step, d)]
         if step.wait_hidden:
             lines.append(d.wait_hidden(step.wait_hidden))
         if step.wait_url:
             lines.append(d.wait_page(step.wait_url))
     return lines, skipped
+
+
+def _dropped(step: RecordedStep) -> RecordedStep:
+    """The element a drag drops onto: in the same frame and shadow roots."""
+    return RecordedStep(
+        step.id,
+        "click",
+        step.drop,
+        frames=step.frames,
+        shadow=step.shadow,
+        frame_shadow=step.frame_shadow,
+    )
 
 
 def _value(step: RecordedStep, quote: Callable[[str], str], secret: str) -> str:
@@ -180,22 +284,43 @@ def _value(step: RecordedStep, quote: Callable[[str], str], secret: str) -> str:
 # --- Selenium, Python --------------------------------------------------------------
 
 
-def _py_locate(step: RecordedStep, loc: tuple[str, str]) -> str:
+def _py_list(items: list[str]) -> str:
+    return "[" + ", ".join(map(py_literal, items)) + "]"
+
+
+def _py_locate(step: RecordedStep, loc: Locator) -> str:
     by = "By.CSS_SELECTOR" if loc[0] == "css" else "By.XPATH"
     args = ["driver", by, py_literal(loc[1])]
-    if step.frames:
+    if step.frame_shadow:
+        args.append("frames=[" + ", ".join(map(_py_list, frame_hops(step))) + "]")
+    elif step.frames:
         args.append("frames=[" + ", ".join(map(py_literal, step.frames)) + "]")
     if step.shadow:
         args.append("hosts=[" + ", ".join(map(py_literal, step.shadow)) + "]")
     if step.wait_visible:
         args.append("visible=True")
+    if loc[2] is not None:
+        args.append(f"nth={loc[2]}")
     return f"locate({', '.join(args)})"
 
 
-def _py_action(step: RecordedStep, el: str) -> str:
+def _py_action(step: RecordedStep, el: str, target: str) -> str:
     value = _value(step, py_literal, "os.environ[{}]")
     if step.kind == "click":
         return f"{el}.click()"
+    if step.kind == "hover":
+        return f"ActionChains(driver).move_to_element({el}).perform()"
+    if step.kind == "scroll":
+        return (
+            f"driver.execute_script(SCROLL_ELEMENT, {el}, "
+            f"{step.scroll_x}, {step.scroll_y})"
+        )
+    if step.kind == "drag" and step.drag_mode == "html5":
+        return f"driver.execute_script(DRAG_HTML5, {el}, {target})"
+    if step.kind == "drag":
+        return f"ActionChains(driver).drag_and_drop({el}, {target}).perform()"
+    if step.kind == "select" and step.values and not step.secret_env:
+        return f"driver.execute_script(SELECT_VALUES, {el}, {_py_list(step.values)})"
     if step.kind == "fill":
         return f"fill({el}, {value})"
     if step.kind == "select":
@@ -205,7 +330,7 @@ def _py_action(step: RecordedStep, el: str) -> str:
     return f"expect_text(driver, {el}, {py_literal(step.text)})"
 
 
-_PYTHON = _Dialect(
+_PYTHON = Dialect(
     navigate=lambda url: f"driver.get({py_literal(url)})",
     locate=_py_locate,
     use=lambda found: found,
@@ -216,6 +341,12 @@ _PYTHON = _Dialect(
     wait_page=lambda url: f"wait_for_page(driver, {py_literal(url)})",
     wait_hidden=lambda css: f"wait_for_hidden(driver, {py_literal(css)})",
     skip="# step skipped: no selector Selenium can express",
+    scroll_window=lambda x, y: f"scroll_window(driver, {x}, {y})",
+    dialog=lambda accept, text: (
+        f"answer_dialog(driver, {accept}"
+        + ("" if text is None else f", {py_literal(text)}")
+        + ")"
+    ),
 )
 
 _PYTHON_HELPERS = f'''TIMEOUT = {TIMEOUT_S}
@@ -231,21 +362,34 @@ def driver():
     browser.quit()
 
 
-def locate(driver, by, value, frames=(), hosts=(), visible=False):
-    """The element, once it is there: down its frames, then its shadow roots."""
-    driver.switch_to.default_content()
-    for frame in frames:
-        WebDriverWait(driver, TIMEOUT).until(
-            EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR, frame))
-        )
+def shadow_scope(driver, hosts):
+    """The innermost of the open shadow roots of hosts, outermost first."""
     context = driver
     for host in hosts:
         context = WebDriverWait(driver, TIMEOUT).until(
             lambda _, scope=context, css=host: scope.find_element(By.CSS_SELECTOR, css)
         ).shadow_root
+    return context
+
+
+def locate(driver, by, value, frames=(), hosts=(), visible=False, nth=None):
+    """The element (the nth match), once it is there: down its frames,
+    each in the shadow roots it sits in, then its own shadow roots."""
+    driver.switch_to.default_content()
+    for frame in frames:
+        hops = [frame] if isinstance(frame, str) else list(frame)
+        scope = shadow_scope(driver, hops[:-1])
+        element = WebDriverWait(driver, TIMEOUT).until(
+            lambda _, s=scope, css=hops[-1]: s.find_element(By.CSS_SELECTOR, css)
+        )
+        driver.switch_to.frame(element)
+    context = shadow_scope(driver, hosts)
 
     def found(_):
-        element = context.find_element(by, value)
+        matches = context.find_elements(by, value)
+        if len(matches) <= (nth or 0):
+            return False
+        element = matches[nth or 0]
         return element if element.is_displayed() or not visible else False
 
     return WebDriverWait(driver, TIMEOUT).until(found)
@@ -284,11 +428,44 @@ def wait_for_hidden(driver, css):
     )
 '''
 
+_PYTHON_EXTRA = {
+    "drag-html5": f"\n\nDRAG_HTML5 = {py_literal(DRAG_HTML5)}",
+    "scroll-element": f"\n\nSCROLL_ELEMENT = {py_literal(SCROLL_ELEMENT)}",
+    "values": f"\n\nSELECT_VALUES = {py_literal(SELECT_VALUES)}",
+    "scroll-window": f"""
+
+def scroll_window(driver, x, y):
+    driver.switch_to.default_content()
+    driver.execute_script({py_literal(SCROLL_WINDOW)}, x, y)""",
+    "dialog": '''
+
+def answer_dialog(driver, accept, text=None):
+    """Answers the dialog the last action opened, as it was answered when recorded."""
+    alert = WebDriverWait(driver, TIMEOUT).until(EC.alert_is_present())
+    if text is not None:
+        alert.send_keys(text)
+    if accept:
+        alert.accept()
+    else:
+        alert.dismiss()''',
+}
+
+
+def extras(table: dict[str, str], needs: set[str]) -> list[str]:
+    """The helper lines ``needs`` asks for, in the table's order."""
+    return [
+        line
+        for key, code in table.items()
+        if key in needs
+        for line in code.splitlines()
+    ]
+
 
 def selenium_python(
     name: str, steps: list[RecordedStep], env: list[str]
 ) -> tuple[str, int]:
-    body, skipped = _steps(steps, _PYTHON)
+    body, skipped = walk(steps, _PYTHON)
+    needs = uses(steps)
     lines = [
         f'"""Recorded with the WorkPilot Browser Agent: {slug(name, " ")}."""',
         "",
@@ -298,6 +475,11 @@ def selenium_python(
     lines += [
         "import pytest",
         "from selenium import webdriver",
+        *(
+            ["from selenium.webdriver.common.action_chains import ActionChains"]
+            if needs & {"hover", "drag-pointer"}
+            else []
+        ),
         "from selenium.webdriver.common.by import By",
         "from selenium.webdriver.common.keys import Keys",
         "from selenium.webdriver.support import expected_conditions as EC",
@@ -305,6 +487,7 @@ def selenium_python(
         "from selenium.webdriver.support.ui import WebDriverWait",
         "",
         *_PYTHON_HELPERS.splitlines(),
+        *extras(_PYTHON_EXTRA, needs),
         "",
         "",
     ]
@@ -322,8 +505,17 @@ def _java_array(items: list[str]) -> str:
     return "new String[] {" + ", ".join(map(java_literal, items)) + "}"
 
 
-def _java_locate(step: RecordedStep, loc: tuple[str, str]) -> str:
+def _java_locate(step: RecordedStep, loc: Locator) -> str:
     by = f"By.{'cssSelector' if loc[0] == 'css' else 'xpath'}({java_literal(loc[1])})"
+    if loc[2] is not None or step.frame_shadow:
+        hops = ", ".join(
+            "{" + ", ".join(map(java_literal, hop)) + "}" for hop in frame_hops(step)
+        )
+        return (
+            f"locate({by}, new String[][] {{{hops}}}, {_java_array(step.shadow)}, "
+            f"{'true' if step.wait_visible else 'false'}, "
+            f"{-1 if loc[2] is None else loc[2]})"
+        )
     if not (step.frames or step.shadow or step.wait_visible):
         return f"locate({by})"
     return (
@@ -332,10 +524,21 @@ def _java_locate(step: RecordedStep, loc: tuple[str, str]) -> str:
     )
 
 
-def _java_action(step: RecordedStep, el: str) -> str:
+def _java_action(step: RecordedStep, el: str, target: str) -> str:
     value = _value(step, java_literal, "secret({})")
     if step.kind == "click":
         return f"{el}.click();"
+    if step.kind == "hover":
+        return f"new Actions(driver).moveToElement({el}).perform();"
+    if step.kind == "scroll":
+        return f"script(SCROLL_ELEMENT, {el}, {step.scroll_x}, {step.scroll_y});"
+    if step.kind == "drag" and step.drag_mode == "html5":
+        return f"script(DRAG_HTML5, {el}, {target});"
+    if step.kind == "drag":
+        return f"new Actions(driver).dragAndDrop({el}, {target}).perform();"
+    if step.kind == "select" and step.values and not step.secret_env:
+        values = "List.of(" + ", ".join(map(java_literal, step.values)) + ")"
+        return f"script(SELECT_VALUES, {el}, {values});"
     if step.kind == "fill":
         return f"fill({el}, {value});"
     if step.kind == "select":
@@ -345,7 +548,7 @@ def _java_action(step: RecordedStep, el: str) -> str:
     return f"expectText({el}, {java_literal(step.text)});"
 
 
-_JAVA = _Dialect(
+_JAVA = Dialect(
     navigate=lambda url: f"driver.get({java_literal(url)});",
     locate=_java_locate,
     use=lambda found: found,
@@ -356,11 +559,18 @@ _JAVA = _Dialect(
     wait_page=lambda url: f"waitForPage({java_literal(url)});",
     wait_hidden=lambda css: f"waitForHidden({java_literal(css)});",
     skip="// step skipped: no selector Selenium can express",
+    scroll_window=lambda x, y: f"scrollWindow({x}, {y});",
+    dialog=lambda accept, text: (
+        f"answerDialog({'true' if accept else 'false'}, "
+        f"{'null' if text is None else java_literal(text)});"
+    ),
     block=("{", "}"),
 )
 
 _JAVA_IMPORTS = [
     "import java.time.Duration;",
+    "import java.util.Arrays;",
+    "import java.util.List;",
     "import org.junit.jupiter.api.AfterEach;",
     "import org.junit.jupiter.api.BeforeEach;",
     "import org.junit.jupiter.api.DisplayName;",
@@ -376,6 +586,10 @@ _JAVA_IMPORTS = [
     "import org.openqa.selenium.support.ui.Select;",
     "import org.openqa.selenium.support.ui.WebDriverWait;",
 ]
+
+_ALERT = "import org.openqa.selenium.Alert;"
+_CHROME = "import org.openqa.selenium.chrome.ChromeDriver;"
+_ACTIONS = "import org.openqa.selenium.interactions.Actions;"
 
 _JAVA_HELPERS = f"""\tprivate static final String NETWORK_WATCH = {java_literal(NETWORK_WATCH)};
 \tprivate static final String NETWORK_DONE = {java_literal(NETWORK_DONE)};
@@ -398,22 +612,43 @@ _JAVA_HELPERS = f"""\tprivate static final String NETWORK_WATCH = {java_literal(
 \t\treturn locate(by, new String[0], new String[0], false);
 \t}}
 
-\t/** The element, once it is there: down its frames, then its shadow roots. */
 \tprivate WebElement locate(By by, String[] frames, String[] hosts, boolean visible) {{
-\t\tdriver.switchTo().defaultContent();
-\t\tfor (String frame : frames) {{
-\t\t\twait.until(ExpectedConditions.frameToBeAvailableAndSwitchToIt(By.cssSelector(frame)));
+\t\tString[][] hops = new String[frames.length][];
+\t\tfor (int i = 0; i < frames.length; i++) {{
+\t\t\thops[i] = new String[] {{frames[i]}};
 \t\t}}
+\t\treturn locate(by, hops, hosts, visible, -1);
+\t}}
+
+\t/**
+\t * The element (the nth match, unless nth is -1), once it is there: down its frames,
+\t * each in the shadow roots it sits in, then its own shadow roots.
+\t */
+\tprivate WebElement locate(By by, String[][] frames, String[] hosts, boolean visible, int nth) {{
+\t\tdriver.switchTo().defaultContent();
+\t\tfor (String[] hops : frames) {{
+\t\t\tSearchContext scope = shadowScope(Arrays.copyOf(hops, hops.length - 1));
+\t\t\tString css = hops[hops.length - 1];
+\t\t\tWebElement frame = wait.until(d -> scope.findElement(By.cssSelector(css)));
+\t\t\tdriver.switchTo().frame(frame);
+\t\t}}
+\t\tSearchContext root = shadowScope(hosts);
+\t\tint index = Math.max(nth, 0);
+\t\treturn wait.until(d -> {{
+\t\t\tList<WebElement> matches = root.findElements(by);
+\t\t\tif (matches.size() <= index) return null;
+\t\t\tWebElement element = matches.get(index);
+\t\t\treturn visible && !element.isDisplayed() ? null : element;
+\t\t}});
+\t}}
+
+\tprivate SearchContext shadowScope(String[] hosts) {{
 \t\tSearchContext context = driver;
 \t\tfor (String host : hosts) {{
 \t\t\tSearchContext scope = context;
 \t\t\tcontext = wait.until(d -> scope.findElement(By.cssSelector(host))).getShadowRoot();
 \t\t}}
-\t\tSearchContext root = context;
-\t\treturn wait.until(d -> {{
-\t\t\tWebElement element = root.findElement(by);
-\t\t\treturn visible && !element.isDisplayed() ? null : element;
-\t\t}});
+\t\treturn context;
 \t}}
 
 \tprivate static void fill(WebElement element, String value) {{
@@ -444,6 +679,31 @@ _JAVA_HELPERS = f"""\tprivate static final String NETWORK_WATCH = {java_literal(
 \t}}
 """
 
+_JAVA_EXTRA = {
+    "drag-html5": f"\tprivate static final String DRAG_HTML5 = {java_literal(DRAG_HTML5)};",
+    "scroll-element": (
+        f"\tprivate static final String SCROLL_ELEMENT = {java_literal(SCROLL_ELEMENT)};"
+    ),
+    "values": f"\tprivate static final String SELECT_VALUES = {java_literal(SELECT_VALUES)};",
+    "script": """
+\tprivate Object script(String code, Object... args) {
+\t\treturn ((JavascriptExecutor) driver).executeScript(code, args);
+\t}""",
+    "scroll-window": f"""
+\tprivate void scrollWindow(long x, long y) {{
+\t\tdriver.switchTo().defaultContent();
+\t\t((JavascriptExecutor) driver).executeScript({java_literal(SCROLL_WINDOW)}, x, y);
+\t}}""",
+    "dialog": """
+\t/** Answers the dialog the last action opened, as it was answered when recorded. */
+\tprivate void answerDialog(boolean accept, String text) {
+\t\tAlert alert = wait.until(ExpectedConditions.alertIsPresent());
+\t\tif (text != null) alert.sendKeys(text);
+\t\tif (accept) alert.accept();
+\t\telse alert.dismiss();
+\t}""",
+}
+
 _JAVA_SECRET = """
 \t// Secrets are read from the environment: {names}.
 \tprivate static String secret(String name) {{
@@ -459,15 +719,24 @@ _JAVA_SECRET = """
 def selenium_java(
     name: str, steps: list[RecordedStep], env: list[str]
 ) -> tuple[str, int]:
-    body, skipped = _steps(steps, _JAVA)
+    body, skipped = walk(steps, _JAVA)
+    needs = uses(steps)
+    if needs & {"drag-html5", "scroll-element", "values"}:
+        needs.add("script")
+    imports = [*_JAVA_IMPORTS]
+    if "dialog" in needs:
+        imports.insert(imports.index("import org.openqa.selenium.By;"), _ALERT)
+    if needs & {"hover", "drag-pointer"}:
+        imports.insert(imports.index(_CHROME) + 1, _ACTIONS)
     lines = [
         "package e2e;",
         "",
-        *_JAVA_IMPORTS,
+        *imports,
         "",
         "/** Recorded with the WorkPilot Browser Agent. */",
         f"class {pascal(name)}Test {{",
         *_JAVA_HELPERS.splitlines(),
+        *extras(_JAVA_EXTRA, needs),
     ]
     if env:
         lines += _JAVA_SECRET.format(names=", ".join(env)).splitlines()
@@ -483,28 +752,55 @@ def selenium_java(
     return "\n".join(lines) + "\n", skipped
 
 
-# --- WebdriverIO -------------------------------------------------------------------
+# --- WebdriverIO (JavaScript, TypeScript) -------------------------------------------
 
 #: WebDriver key codes (W3C): Enter, Escape.
 _WDIO_KEYS = {"Enter": "", "Escape": ""}
+_TYPED = re.compile(r"<<(.*?)>>", re.DOTALL)
 
 
-def _js_locate(step: RecordedStep, loc: tuple[str, str]) -> str:
+def typed(code: str, ts: bool) -> str:
+    """``code`` with its ``<<…>>`` parts kept (TypeScript) or dropped (JavaScript)."""
+    return _TYPED.sub(lambda m: m.group(1) if ts else "", code)
+
+
+def _js_list(items: list[str]) -> str:
+    return "[" + ", ".join(map(literal, items)) + "]"
+
+
+def _js_locate(step: RecordedStep, loc: Locator) -> str:
     options = []
-    if step.frames:
-        options.append("frames: [" + ", ".join(map(literal, step.frames)) + "]")
+    if step.frame_shadow:
+        options.append("frames: [" + ", ".join(map(_js_list, frame_hops(step))) + "]")
+    elif step.frames:
+        options.append("frames: " + _js_list(step.frames))
     if step.shadow:
-        options.append("hosts: [" + ", ".join(map(literal, step.shadow)) + "]")
+        options.append("hosts: " + _js_list(step.shadow))
     if step.wait_visible:
         options.append("visible: true")
+    if loc[2] is not None:
+        options.append(f"nth: {loc[2]}")
     extra = f", {{ {', '.join(options)} }}" if options else ""
     return f"locate({literal(loc[1])}{extra})"
 
 
-def _js_action(step: RecordedStep, el: str) -> str:
+def _js_action(step: RecordedStep, el: str, target: str) -> str:
     value = _value(step, literal, "secret({})")
     if step.kind == "click":
         return f"await {el}.click();"
+    if step.kind == "hover":
+        return f"await {el}.moveTo();"
+    if step.kind == "scroll":
+        return (
+            f"await browser.execute(SCROLL_ELEMENT, {el}, "
+            f"{step.scroll_x}, {step.scroll_y});"
+        )
+    if step.kind == "drag" and step.drag_mode == "html5":
+        return f"await browser.execute(DRAG_HTML5, {el}, {target});"
+    if step.kind == "drag":
+        return f"await {el}.dragAndDrop({target});"
+    if step.kind == "select" and step.values and not step.secret_env:
+        return f"await browser.execute(SELECT_VALUES, {el}, {_js_list(step.values)});"
     if step.kind == "fill":
         return f"await {el}.setValue({value});"
     if step.kind == "select":
@@ -516,7 +812,7 @@ def _js_action(step: RecordedStep, el: str) -> str:
     )
 
 
-_JAVASCRIPT = _Dialect(
+WDIO = Dialect(
     navigate=lambda url: f"await browser.url({literal(url)});",
     locate=_js_locate,
     use=lambda found: f"(await {found})",
@@ -527,6 +823,12 @@ _JAVASCRIPT = _Dialect(
     wait_page=lambda url: f"await waitForPage({literal(url)});",
     wait_hidden=lambda css: f"await waitForHidden({literal(css)});",
     skip="// step skipped: no selector WebdriverIO can express",
+    scroll_window=lambda x, y: f"await scrollWindow({x}, {y});",
+    dialog=lambda accept, text: (
+        f"await answerDialog({'true' if accept else 'false'}"
+        + ("" if text is None else f", {literal(text)}")
+        + ");"
+    ),
     block=("{", "}"),
 )
 
@@ -534,23 +836,42 @@ _JS_HELPERS = f"""const TIMEOUT = {TIMEOUT_S * 1000};
 // Counts the page's fetch and XHR calls, to wait for the ones an action starts.
 const NETWORK_WATCH = {literal(NETWORK_WATCH)};
 const NETWORK_DONE = {literal(NETWORK_DONE)};
-
-/** The element, once it is there: down its frames, then its shadow roots. */
-async function locate(selector, {{ frames = [], hosts = [], visible = false }} = {{}}) {{
-\tawait browser.switchToFrame(null);
-\tfor (const frame of frames) {{
-\t\tconst element = await $(frame);
-\t\tawait element.waitForExist({{ timeout: TIMEOUT }});
-\t\tawait browser.switchToFrame(element);
-\t}}
-\tlet scope = null;
+<<
+/** An iframe: its CSS, or the shadow hosts it sits in and then its CSS. */
+type Frame = string | string[];
+>>
+/** The innermost of the open shadow roots of hosts, outermost first (null: the document). */
+async function shadowScope(hosts<<: string[]>>) {{
+\tlet scope<<: WebdriverIO.Element | null>> = null;
 \tfor (const host of hosts) {{
 \t\tscope = scope ? await scope.shadow$(host) : await $(host);
 \t\tawait scope.waitForExist({{ timeout: TIMEOUT }});
 \t}}
-\tconst element = scope ? await scope.shadow$(selector) : await $(selector);
+\treturn scope;
+}}
+
+/**
+ * The element (the nth match), once it is there: down its frames, each in the
+ * shadow roots it sits in, then its own shadow roots.
+ */
+async function locate(
+\tselector<<: string>>,
+\t{{ frames = [], hosts = [], visible = false, nth = 0 }}<<: {{ frames?: Frame[]; hosts?: string[]; visible?: boolean; nth?: number }}>> = {{}},
+) {{
+\tawait browser.switchToFrame(null);
+\tfor (const frame of frames) {{
+\t\tconst hops = typeof frame === "string" ? [frame] : frame;
+\t\tconst scope = await shadowScope(hops.slice(0, -1));
+\t\tconst css = hops[hops.length - 1];
+\t\tconst element = scope ? await scope.shadow$(css) : await $(css);
+\t\tawait element.waitForExist({{ timeout: TIMEOUT }});
+\t\tawait browser.switchToFrame(element);
+\t}}
+\tconst scope = await shadowScope(hosts);
+\tconst matches = async () => (scope ? await scope.shadow$$(selector) : await $$(selector));
+\tawait browser.waitUntil(async () => (await matches()).length > nth, {{ timeout: TIMEOUT }});
+\tconst element = (await matches())[nth];
 \tif (visible) await element.waitForDisplayed({{ timeout: TIMEOUT }});
-\telse await element.waitForExist({{ timeout: TIMEOUT }});
 \treturn element;
 }}
 
@@ -558,26 +879,45 @@ async function networkSeen() {{
 \treturn browser.execute(NETWORK_WATCH);
 }}
 
-async function waitForNetwork(seen) {{
+async function waitForNetwork(seen<<: number>>) {{
 \tawait browser.waitUntil(() => browser.execute(NETWORK_DONE, seen), {{ timeout: TIMEOUT }});
 }}
 
-async function waitForPage(url) {{
+async function waitForPage(url<<: string>>) {{
 \tawait browser.waitUntil(async () => (await browser.getUrl()).split(/[?#]/)[0] === url, {{
 \t\ttimeout: TIMEOUT,
 \t}});
 }}
 
 /** The loading indicator is gone or hidden, in the top document. */
-async function waitForHidden(css) {{
+async function waitForHidden(css<<: string>>) {{
 \tawait browser.switchToFrame(null);
 \tawait browser.waitUntil(async () => !(await $(css).isDisplayed()), {{ timeout: TIMEOUT }});
 }}
 """
 
+_JS_EXTRA = {
+    "drag-html5": f"const DRAG_HTML5 = {literal(DRAG_HTML5)};",
+    "scroll-element": f"const SCROLL_ELEMENT = {literal(SCROLL_ELEMENT)};",
+    "values": f"const SELECT_VALUES = {literal(SELECT_VALUES)};",
+    "scroll-window": f"""
+async function scrollWindow(x<<: number>>, y<<: number>>) {{
+\tawait browser.switchToFrame(null);
+\tawait browser.execute({literal(SCROLL_WINDOW)}, x, y);
+}}""",
+    "dialog": """
+/** Answers the dialog the last action opened, as it was answered when recorded. */
+async function answerDialog(accept<<: boolean>>, text<<?: string>>) {
+\tawait browser.waitUntil(() => browser.isAlertOpen(), { timeout: TIMEOUT });
+\tif (text !== undefined) await browser.sendAlertText(text);
+\tif (accept) await browser.acceptAlert();
+\telse await browser.dismissAlert();
+}""",
+}
+
 _JS_SECRET = """
 // Secrets are read from the environment: {names}.
-function secret(name) {{
+function secret(name<<: string>>)<<: string>> {{
 \tconst value = process.env[name];
 \tif (!value) throw new Error("Set " + name + " to run this test");
 \treturn value;
@@ -585,14 +925,16 @@ function secret(name) {{
 """
 
 
-def webdriverio(
-    name: str, steps: list[RecordedStep], env: list[str]
+def wdio_code(
+    name: str, steps: list[RecordedStep], env: list[str], ts: bool
 ) -> tuple[str, int]:
-    body, skipped = _steps(steps, _JAVASCRIPT)
+    """WebdriverIO with Mocha, in JavaScript or (``ts``) TypeScript."""
+    body, skipped = walk(steps, WDIO)
     lines = [
-        'import { $, browser, expect } from "@wdio/globals";',
+        'import { $, $$, browser, expect } from "@wdio/globals";',
         "",
         *_JS_HELPERS.splitlines(),
+        *extras(_JS_EXTRA, uses(steps)),
     ]
     if env:
         lines += _JS_SECRET.format(names=", ".join(env)).splitlines()
@@ -604,4 +946,10 @@ def webdriverio(
         "\t});",
         "});",
     ]
-    return "\n".join(lines) + "\n", skipped
+    return typed("\n".join(lines), ts) + "\n", skipped
+
+
+def webdriverio(
+    name: str, steps: list[RecordedStep], env: list[str]
+) -> tuple[str, int]:
+    return wdio_code(name, steps, env, ts=False)

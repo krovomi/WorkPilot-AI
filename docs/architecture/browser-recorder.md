@@ -1,11 +1,10 @@
 ---
 feature: Enregistreur du Browser Agent
 summary: >-
-  Une session pilotée à la main devient un test Playwright, Cypress, Selenium ou WebdriverIO :
-  étapes bornées, sélecteurs robustes (place de l'élément s'ils ne sont pas uniques), iframes et
-  shadow roots, attentes déduites (dont un chargement qui disparaît), vérifications proposées,
-  secrets en variables d'environnement, texte de page en littéral échappé, test sur une carte de
-  revue.
+  Une session pilotée à la main (survols, défilements, glisser-déposer, dialogues répondus dans
+  l'app) devient un test Playwright, Cypress, Selenium (Python, Java, C#, Ruby, JS) ou
+  WebdriverIO : étapes bornées, sélecteurs robustes, attentes déduites, secrets en variables,
+  texte de page en littéral, test sur une carte de revue, lancé là, rejoué sans fenêtre.
 ---
 
 # Enregistreur du Browser Agent : une session devient un test
@@ -32,13 +31,20 @@ l'enregistreur est posé, avec une fenêtre cette fois.
    écrit sur son stdin (bouton « Arrêter »), ou quand la personne ferme la fenêtre.
 2. **Ce que la page rapporte** (`browser_agent/recorder_script.js`, script d'init de chaque
    frame, liaison `__workpilotRecord`) : clic, saisie, choix dans une liste, Entrée ou Échap, et
-   Alt+clic, qui vérifie le texte visible de l'élément au lieu de cliquer. Le script décrit
+   Alt+clic, qui vérifie le texte visible de l'élément au lieu de cliquer. S'y ajoutent : le
+   texte d'un `contenteditable` (une étape `fill`, son texte n'entre pas dans le nom de
+   l'élément) ; les options d'une liste à choix multiples (`values`, de 2 à 20) ; un survol qui
+   révèle quelque chose (une règle CSS `:hover` de la page ou une mutation près de l'élément en
+   400 ms) ; un défilement voulu (molette, toucher, touches, barre) de la fenêtre ou d'une boîte,
+   rapporté au repos (500 ms) ; un glisser-déposer HTML5 (`dragstart` → `drop`) ou au pointeur
+   (plus de 16 px, cible sous le pointeur, dans la même racine). Le script décrit
    l'élément (test id, rôle et nom accessible, label, placeholder, texte, id et `name` avec leur
    unicité, chemin CSS court) ; il n'envoie jamais la valeur d'un champ mot de passe ou nommé
    comme un secret. L'élément est celui de `composedPath()[0]` : dans un shadow root ouvert, il
    est décrit dans sa racine (unicité et chemin comptés là) avec la liste des hôtes au-dessus
    (`shadow`) ; `change` ne sortant pas d'un shadow root, le script écoute aussi chaque racine
-   ouverte que la page attache. Un `MutationObserver` note les éléments insérés après la
+   ouverte que la page attache, et chaque shadow root déclaratif (`<template shadowrootmode>`)
+   qu'un événement composé traverse. Un `MutationObserver` note les éléments insérés après la
    dernière action : un rapport sur l'un d'eux porte `appeared`. Le script compte aussi, dans la
    racine de l'élément, combien d'éléments ont le même rôle et nom, label, placeholder ou texte
    (`matches` : nombre et place, au plus 3 000 candidats parcourus, sinon rien n'est envoyé).
@@ -46,7 +52,8 @@ l'enregistreur est posé, avec une fenêtre cette fois.
    un dialogue ou un titre apparu ou modifié devient une proposition (`suggest`) au bout d'une
    seconde ; un indicateur de chargement inséré (`progressbar`, `aria-busy`, classe `spin`,
    `load`, `skeleton`) qui s'est montré puis a disparu est rapporté (`settled`) par ce qu'il a
-   (test id, id, rôle, `aria-busy`, classe), jamais par un sélecteur de la page. Sur la page où
+   (test id, id, rôle, `aria-busy`, classe), jamais par un sélecteur de la page ; un indicateur
+   déjà présent qu'une classe, `hidden`, `style` ou `aria-busy` montre puis cache l'est aussi. Sur la page où
    une action a mené, le titre principal et les alertes sont proposés de même.
 3. **Les étapes** (`browser_agent/recorder.py`, `recording.py`). Un rapport est une donnée de la
    page : listes fermées (`STEP_KINDS`, `STRATEGIES`, `ROLES`, `KEYS`), chaque chaîne bornée, au
@@ -58,8 +65,18 @@ l'enregistreur est posé, avec une fenêtre cette fois.
      décrire l'élément `<iframe>` (`frame_element()`, puis `__workpilotDescribe`, même hors
      origine). Chaque iframe et chaque hôte shadow devient **un** sélecteur CSS
      (`selector_builder.css_selector` : test id, id stable, `name`, chemin), parce que WebDriver
-     n'entre dans un cadre ou un shadow root que par CSS. Au-delà de 4 niveaux, ou pour une
-     iframe elle-même dans un shadow root, l'action n'est pas enregistrée plutôt que mal située.
+     n'entre dans un cadre ou un shadow root que par CSS. Une iframe dans des shadow roots ouverts
+     garde leurs hôtes (`frameShadow`, une liste par cadre). Au-delà de 8 niveaux, l'action
+     n'est pas enregistrée plutôt que mal située.
+   - **Les dialogues.** `page.on("dialog")` (sans écouteur, Playwright les ferme lui-même) : le
+     runner demande à l'app (`RECORDER_DIALOG:{id,type,message,defaultValue}`), la personne
+     répond dans l'onglet, le main n'écrit la réponse (`dialog {"id","accept","text"}`) sur le
+     stdin du runner que pour l'id du dialogue en attente. Sans réponse en 5 min, le dialogue est
+     fermé. La réponse reste sur l'action qui l'a ouvert (moins de 5 s avant, une par action) et
+     l'export la rejoue ; un message ou un texte saisi qui a la forme d'une clé n'est pas gardé.
+   - **Survols et défilements** : un survol répété du même élément reste une étape ; les
+     défilements successifs d'une même cible n'en font qu'une, à la position finale (entiers de
+     0 à 10 000 000). Une boîte défilée n'est jamais trouvée par son texte (c'est toute sa liste).
      Les rapports sont traités un par un, dans l'ordre (un verrou) ; la description d'une frame
      est gardée jusqu'à son détachement.
    - **Ce que l'action a causé** (les attentes, jamais une pause) : la page où elle a mené
@@ -100,15 +117,23 @@ l'enregistreur est posé, avec une fenêtre cette fois.
    Playwright Python (`tests/e2e/test_*.py`), Cypress (`cypress/e2e/*.cy.js`), Selenium Python
    avec pytest (`tests/e2e/test_*.py`), Selenium Java avec JUnit 5
    (`src/test/java/e2e/*Test.java`, `package e2e`) ou WebdriverIO avec Mocha
-   (`test/specs/*.e2e.js`), dans le dossier de tests que le projet a déjà quand il en a un. Un
-   seul modèle d'étapes pour les six ; les trois WebDriver partagent un parcours et ne
-   diffèrent que par leur dialecte.
+   (`test/specs/*.e2e.js`), Selenium C# avec NUnit (`tests/E2E/*Tests.cs`), Ruby avec RSpec
+   (`spec/e2e/*_spec.rb`), JavaScript avec Mocha (`test/e2e/*.e2e.cjs`) ou WebdriverIO en
+   TypeScript (`test/specs/*.e2e.ts`), dans le dossier de tests que le projet a déjà quand il en
+   a un. Un seul modèle d'étapes pour les dix ; les WebDriver partagent un parcours
+   (`codegen_webdriver.py`, langues dans `codegen_webdriver_langs.py`) et ne diffèrent que par
+   leur dialecte. Un survol, un défilement, un glisser-déposer et une liste multiple passent par
+   l'API du framework (`hover`, `dragTo`, `selectOption([…])`, `ActionChains`, `moveTo`…) ou par
+   un script du générateur (défilement, drag HTML5, options multiples en WebDriver) ; un
+   dialogue est répondu avant l'action (`page.once("dialog")`, `cy.on("window:confirm")`) ou
+   après elle (`switch_to.alert`, `acceptAlert`).
    - **Littéraux** (`codegen_text.py`) : tout texte de la page entre par le littéral de la
      langue cible, qui se relit exactement : JSON non-ASCII échappé (JS, TS) ; `\x`, `\u`, `\U`
      (Python : un caractère hors BMP reste un caractère) ; Java avec `\"`, `\\`, `\n`… et
      `\uXXXX` pour le reste, jamais pour un guillemet, un antislash ou un saut de ligne, que
      javac décode avant de lire le source (JLS 3.3). Aucun gabarit, f-string ni interpolation :
-     `${}` reste du texte. Une chaîne XPath passe par `xpath_string` (`concat()` quand elle a
+     `${}` reste du texte. C# : `\"`, `\\`, `\uXXXX` ; Ruby entre guillemets doubles, `\#`
+     seulement devant `{`, `@` et `$`. Une chaîne XPath passe par `xpath_string` (`concat()` quand elle a
      les deux guillemets). Cypress `type` reçoit `parseSpecialCharSequences: false`. Aucun texte
      de page dans un commentaire.
    - **Sélecteurs** : chaque framework prend le premier sélecteur qu'il sait écrire. Cypress n'a
@@ -117,8 +142,8 @@ l'enregistreur est posé, avec une fenêtre cette fois.
      seulement. Une étape sans sélecteur exprimable reste un commentaire `step skipped`. Une
      place s'écrit `.nth(i)` (Playwright) ou `.eq(i)` (Cypress, seulement pour une requête qui
      rend toutes les correspondances : `cy.contains` n'en rend qu'une, un rôle ou un texte placé
-     passe donc au sélecteur suivant) ; WebDriver passe au suivant, parce qu'une requête CSS ou
-     XPath ne compte pas comme la page l'a fait.
+     passe donc au sélecteur suivant) ; WebDriver la garde pour un placeholder ou un texte, qu'il
+     trouve dans le même ordre que la page (`locate(…, nth)`), et passe au suivant pour le reste.
    - **Cadres et shadow roots** : `frameLocator` / `frame_locator` puis `locator(hôte)`
      (Playwright perce les shadow roots ouverts) ; `its("0.contentDocument.body")` puis
      `.shadow()` (Cypress, iframe de même origine seulement) ; `switch_to.frame` puis
@@ -138,47 +163,71 @@ l'enregistreur est posé, avec une fenêtre cette fois.
    (boîte native ouverte sur Téléchargements ; un chemin dans un projet de cet ordinateur est
    refusé : c'est le rôle de la carte). Jamais dans le dossier du projet.
 
+9. **Après l'export** (`main/browser-recorder/recorder-run.ts`, `recorder-assist.ts`) :
+   - **Lancer** le dernier test proposé sur une carte de revue, dans le worktree de la carte
+     (`runner run`, `browser_agent/recorder_run.py`) : la recette du worktree d'abord
+     (`prepare_worktree`, qui garde son approbation), puis le lanceur du format (`npx playwright
+     test`, `pytest`, `npx cypress run`, `npx mocha`, `npx wdio run`, `dotnet test`, Maven ou
+     Gradle, `bundle exec rspec`), environnement statique, sans shell, 10 min au plus. Un test qui
+     lit un secret dans l'environnement n'est pas lancé : la personne le lance avec ses
+     variables. La sortie (fin, clés masquées) est montrée en texte. Le premier lancement de
+     chaque test (empreinte de son code) est compté dans `.workpilot/browser-agent/recorder-runs.json`
+     (500 au plus) : combien de tests enregistrés passent au premier essai.
+   - **Revérifier** (`runner reshoot`, `browser_agent/recorder_replay.py`) : l'enregistrement
+     arrêté est rejoué sans fenêtre ; chaque étape essaie ses sélecteurs dans l'ordre : trouvé,
+     changé (seul un suivant trouve l'élément, qui est redécrit dans la page et reçoit de
+     nouveaux sélecteurs par `build_selectors`), introuvable ou action en échec (le rejeu
+     s'arrête, la suite est « non atteinte »). Les dialogues sont répondus comme enregistré. Le
+     main garde les propositions ; une étape ne change que quand la personne les applique, par
+     id.
+   - **Nommer et classer** (`runner assist`, `browser_agent/recorder_assist.py`) : le modèle
+     rapide du provider choisi, par `agent_runtime` (`create_agent_client`), type d'agent
+     `recorder_assist` sans outil ni roster, nomme le test et classe les vérifications
+     proposées. Il reçoit ce que les étapes disent de la page, cité comme donnée
+     (`quote_untrusted`), jamais une valeur saisie ; sa réponse JSON est relue (nom masqué de
+     80 caractères, ids de l'enregistrement). Sans provider, ou si le modèle échoue, des règles
+     donnent la même réponse. C'est le seul runner de l'enregistreur qui reçoit l'environnement
+     d'un provider (`pythonRunnerEnv`).
+
 ## Frontières
 
 - **S2** : texte, labels, URL et valeurs de la page sont des données : bornés, en listes fermées,
   écrits en littéral échappé. Une page peut appeler la liaison elle-même et inventer des étapes ;
   elles restent des données que la personne relit dans la liste et dans le diff de la carte.
-- **S6** : l'adresse (http(s) seulement, 2 048 caractères), le format (six valeurs) et la destination
+- **S6** : l'adresse (http(s) seulement, 2 048 caractères), le format (dix valeurs) et la destination
   (listes fermées) et les ids d'étapes sont relus dans le main ; les cadres, hôtes et attentes
   d'une étape sont relus par `parseRecordedStep` (au plus 4 sélecteurs bornés, méthode en liste
   fermée, chemin sans query, place entière de 0 à 19, sélecteur d'indicateur dans les cinq
   formes, `after` en id d'étape sur une vérification seulement) puis par `Recording.from_dict` ;
   une vérification proposée n'est exportée que si le renderer la nomme, par son id ; le dossier du projet passe par
-  `DIRECTORY_ARGS`. Le nom du test et l'adresse sont passés au runner en `--option=valeur` : une
+  `DIRECTORY_ARGS`. Une réponse à un dialogue (`readDialogAnswer`) ne part que pour l'id en
+  attente ; lancer, revérifier et nommer ne prennent que le projet, appliquer des ids d'étapes :
+  worktree, fichier, format et étapes restent ceux du main. Le nom du test et l'adresse sont passés au runner en `--option=valeur` : une
   valeur qui commence par `-` n'est pas lue comme une option.
 - **S4** : sous-processus sans shell ; le chemin proposé par le générateur est résolu dans le
-  worktree et doit garder l'extension du format.
+  worktree et doit garder l'extension du format ; le test lancé est relu dans le worktree de la
+  carte avec la même règle.
+- **S1** : seul `assist` a un provider et sa clé ; il n'envoie aucune valeur saisie.
 - **S7** : un projet en hors-ligne strict n'enregistre qu'une page de cet ordinateur
   (`localhost`, boucle locale).
 
 ## Pas encore fait
 
-- Lancer le test généré depuis la page et mesurer son taux de passage au premier essai, puis le
-  diff des sélecteurs quand il échoue (« reshoot ») : il faut le lanceur de tests du projet et
-  ses dépendances installées, et lancer le code du projet (`envWithoutCredentials`, S4) ; c'est
-  un lot à lui.
-- Un modèle léger via `create_client()` (tous providers) pour classer les vérifications
-  proposées, nommer le test et extraire en fixtures les données paramétrables (email, dates) :
-  aujourd'hui tout reste déterministe, et le runner n'a ni provider ni clé.
-- Selenium dans d'autres langages (C#, Ruby, JavaScript) ; WebdriverIO en TypeScript.
-- `contenteditable`, liste à choix multiples, survols, défilements, glisser-déposer ; les
-  boîtes de dialogue (`alert`, `confirm`) : sans écouteur, Playwright les ferme lui-même, il
-  faudrait que la personne y réponde depuis l'app.
-- Un indicateur de chargement déjà présent qu'une classe ou un attribut montre puis cache (seul
-  un indicateur inséré après l'action est suivi) ; une place (`nth`) dans un export WebDriver.
-- Shadow roots déclaratifs (`<template shadowrootmode>`, dont `change` n'est pas écouté), une
-  iframe dans un shadow root, plus de 4 niveaux. Hors de portée : un shadow root fermé, que ni le
-  script de la page ni WebDriver n'atteignent, et une iframe d'une autre origine dans Cypress, qui
-  n'y entre pas.
-- Un projet du serveur (mode serveur) : la fenêtre du navigateur s'ouvre sur cet ordinateur, la
-  page reste locale.
+- Extraire en fixtures les données paramétrables (emails, dates) : l'assistant nomme et classe,
+  mais les valeurs saisies restent dans le test, et ne sont pas envoyées au modèle.
+- Lancer un test qui lit des secrets : l'app lance sans identifiants, la personne le lance avec
+  ses variables. Un test proposé dans un fichier (hors projet) n'est pas lancé non plus : seul
+  le worktree d'une carte a la recette du projet.
+- Cypress : un survol est un `mouseover` (Cypress n'a pas de vrai survol, une règle `:hover`
+  n'est pas appliquée) ; un glisser au pointeur dans Selenium et WebdriverIO passe par les
+  actions W3C, qu'une page HTML5 n'entend pas toujours.
+- Hors de portée : un shadow root fermé, que ni le script de la page ni WebDriver n'atteignent ;
+  une iframe d'une autre origine dans Cypress, qui n'y entre pas ; un projet du serveur (mode
+  serveur), car la fenêtre du navigateur s'ouvre sur cet ordinateur.
 
 Vérification : `pytest tests/browser_agent -q` (dont `test_codegen_text.py` : un littéral par
 langage relu par sa langue, Java selon JLS 3.3 ; `test_recorder_checks.py` : places, attentes
-d'indicateur, vérifications proposées) ;
-`cd apps/frontend && pnpm test -- browser-recorder RecorderTab`.
+d'indicateur, vérifications proposées ; `test_recorder_actions.py`, `test_codegen_actions.py` :
+survols, défilements, glisser, dialogues, nouvelles langues ; `test_recorder_run.py`,
+`test_recorder_replay.py`, `test_recorder_assist.py`) ;
+`cd apps/frontend && pnpm test -- browser-recorder Recorder`.

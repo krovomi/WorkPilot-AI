@@ -12,7 +12,14 @@
 // (`matches`), so a selector that is not unique keeps the element's place.
 // After an action, a status, an alert or a heading that showed up is proposed
 // as a check (`suggest`), and a loading indicator that showed and went away
-// is reported (`settled`) by what it has, never by a selector of the page.
+// is reported (`settled`) by what it has, never by a selector of the page,
+// whether the page inserted it or showed one it had (a class, `hidden`, a
+// style, `aria-busy`). A hover is reported only when it showed something; a
+// scroll the person made, once it rests; a drag with the element it was
+// dropped on (drag events, or a pointer pressed on one element and released
+// on another); a contenteditable as a typed value; every option picked in a
+// multiple list. Shadow roots the parser attached (`<template shadowrootmode>`)
+// are listened to once an event comes out of them.
 // Everything sent is plain data that Python bounds and checks again.
 (() => {
 	if (window.__workpilotRecorder) return;
@@ -44,6 +51,12 @@
 	const SUGGEST_AFTER_MS = 1000;
 	const SETTLE_POLL_MS = 200;
 	const SETTLE_FOR_MS = 15000;
+	// Shadow hosts above an element, at most: deeper is not recorded.
+	const MAX_DEPTH = 9;
+	const HOVER_MS = 400;
+	const SCROLL_REST_MS = 500;
+	const DRAG_MIN_PX = 16;
+	const SCROLL_KEYS = /^(PageDown|PageUp|ArrowDown|ArrowUp|Home|End| )$/;
 
 	const send = (report) => {
 		try {
@@ -94,16 +107,32 @@
 			if (loader.matches(LOADER) && loaders.size < 10) loaders.add(loader);
 		}
 	};
-	new MutationObserver((records) => {
+	// A loader the page had and now shows (a class, `hidden`, a style, `aria-busy`).
+	const noteShown = (el) => {
+		if (el.nodeType !== 1 || loaders.size >= 10) return;
+		if (el.matches(LOADER)) loaders.add(el);
+		for (const inner of el.querySelectorAll(LOADER)) if (loaders.size < 10) loaders.add(inner);
+	};
+	const observer = new MutationObserver((records) => {
+		for (const record of records) noteHoverChange(record);
 		if (!actions) return;
 		for (const record of records) {
 			if (record.type === "characterData") noteChange(record.target);
+			if (record.type === "attributes") noteShown(record.target);
 			for (const node of record.addedNodes) {
 				if (node.nodeType === 1) inserted.set(node, actions);
 				noteChange(node);
 			}
 		}
-	}).observe(document, { childList: true, subtree: true, characterData: true });
+	});
+	const OBSERVED = {
+		childList: true,
+		subtree: true,
+		characterData: true,
+		attributes: true,
+		attributeFilter: ["class", "style", "hidden", "aria-busy"],
+	};
+	observer.observe(document, OBSERVED);
 
 	const appeared = (el) => {
 		for (let node = el; node; node = node.parentElement || hostOf(node)) {
@@ -182,6 +211,8 @@
 		}
 		if (tag === "img") return line(el.getAttribute("alt") || "");
 		if (["select", "textarea"].includes(tag)) return line(el.getAttribute("title") || "");
+		// What is typed into an editor is its value, never its name.
+		if (el.isContentEditable) return line(el.getAttribute("title") || "");
 		return textOf(el) || line(el.getAttribute("title") || "");
 	};
 
@@ -244,7 +275,7 @@
 				(c) => line(c.getAttribute("placeholder") || "") === placeholder,
 			);
 		}
-		const text = line(el.textContent || "");
+		const text = el.isContentEditable ? "" : line(el.textContent || "");
 		if (text && ownText(el, text)) matches.text = matchesOf(root, "*", el, (c) => ownText(c, text));
 		for (const key of Object.keys(matches)) if (!matches[key]) delete matches[key];
 		return matches;
@@ -269,7 +300,7 @@
 			label,
 			placeholder,
 			matches: countMatches(el, root, role, name, label, placeholder),
-			text: ["input", "textarea", "select"].includes(tag) ? "" : textOf(el),
+			text: ["input", "textarea", "select"].includes(tag) || el.isContentEditable ? "" : textOf(el),
 			testId: line(testId),
 			testIdUnique: Boolean(testId) && count(root, `[data-testid="${CSS.escape(testId)}"]`) === 1,
 			testAttr: attr
@@ -293,7 +324,7 @@
 	// The element, the shadow hosts above it (outermost first), and whether it is new.
 	const describe = (el) => {
 		const hosts = [];
-		for (let host = hostOf(el); host && hosts.length < 5; host = hostOf(host)) {
+		for (let host = hostOf(el); host && hosts.length < MAX_DEPTH; host = hostOf(host)) {
 			hosts.unshift(describeElement(host));
 		}
 		return { ...describeElement(el), shadow: hosts, appeared: appeared(el) };
@@ -333,7 +364,7 @@
 			}
 			for (const loader of loaders) {
 				if (hostOf(loader)) continue;
-				if (shows(loader)) seen.set(loader, loaderOf(loader));
+				if (shows(loader) && loader.matches(LOADER)) seen.set(loader, loaderOf(loader));
 				else if (seen.has(loader)) {
 					clearInterval(timer);
 					send({ kind: "settled", loader: seen.get(loader) });
@@ -367,7 +398,7 @@
 	};
 
 	const ACTIONABLE =
-		'button, a[href], input, select, textarea, summary, label, [role], [data-testid], [data-test], [data-cy], [data-qa], [onclick], [tabindex]';
+		'button, a[href], input, select, textarea, summary, label, [role], [data-testid], [data-test], [data-cy], [data-qa], [onclick], [tabindex], [draggable="true"]';
 
 	const actionable = (node) => {
 		const el = node && node.nodeType === 1 ? node : node && node.parentElement;
@@ -375,15 +406,27 @@
 		return el.closest(ACTIONABLE) || el;
 	};
 
+	// The editing host of a contenteditable element, or null.
+	const editable = (el) => {
+		if (!el || el.nodeType !== 1 || !el.isContentEditable) return null;
+		let host = el;
+		while (host.parentElement && host.parentElement.isContentEditable) host = host.parentElement;
+		return host;
+	};
+
 	const isTextField = (el) => {
+		if (editable(el)) return true;
 		const tag = el.tagName.toLowerCase();
 		if (tag === "textarea") return true;
 		return tag === "input" && TEXT_INPUTS.test((el.getAttribute("type") || "").toLowerCase());
 	};
 
+	// A pointer drag ends on another element: its click is not an action.
+	let skipClickUntil = 0;
 	document.addEventListener(
 		"click",
 		(event) => {
+			if (Date.now() < skipClickUntil) return;
 			const el = actionable(origin(event));
 			if (!el) return;
 			if (event.altKey) {
@@ -405,10 +448,13 @@
 	document.addEventListener(
 		"input",
 		(event) => {
-			const el = origin(event);
-			if (!el || el.nodeType !== 1 || !isTextField(el)) return;
+			const field = origin(event);
+			if (!field || field.nodeType !== 1 || !isTextField(field)) return;
+			const host = editable(field);
+			const el = host || field;
 			const target = describe(el);
-			act({ kind: "fill", target, value: target.secret ? "" : String(el.value || "") });
+			const value = host ? el.innerText || "" : el.value || "";
+			act({ kind: "fill", target, value: target.secret ? "" : String(value) });
 		},
 		true,
 	);
@@ -416,7 +462,8 @@
 	const onChange = (event) => {
 		const el = origin(event);
 		if (!el || el.nodeType !== 1 || el.tagName.toLowerCase() !== "select") return;
-		act({ kind: "select", target: describe(el), value: String(el.value || "") });
+		const values = el.multiple ? Array.from(el.selectedOptions, (o) => String(o.value)).slice(0, 21) : [];
+		act({ kind: "select", target: describe(el), value: String(el.value || ""), values });
 	};
 	document.addEventListener("change", onChange, true);
 	// `change` does not leave a shadow root: listen in each open one the page attaches.
@@ -424,10 +471,186 @@
 	if (typeof attachShadow === "function") {
 		Element.prototype.attachShadow = function (init) {
 			const root = attachShadow.call(this, init);
-			if (init && init.mode === "open") root.addEventListener("change", onChange, true);
+			if (init && init.mode === "open") listenIn(root);
 			return root;
 		};
 	}
+	// A shadow root the parser attached (declarative): found on the way out of an event.
+	const listened = new WeakSet();
+	function listenIn(root) {
+		if (listened.has(root)) return;
+		listened.add(root);
+		root.addEventListener("change", onChange, true);
+		observer.observe(root, OBSERVED);
+	}
+	const findRoots = (event) => {
+		const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+		for (const node of path) if (node instanceof ShadowRoot && node.mode === "open") listenIn(node);
+	};
+	for (const name of ["focusin", "pointerdown", "mouseover"]) document.addEventListener(name, findRoots, true);
+
+	// Hover: the pointer rests on an element that shows something while hovered:
+	// a CSS rule `X:hover Y` whose X is the element or holds it, or the page
+	// inserting an element, or changing one near it, meanwhile.
+	const MAX_RULES = 3000;
+	let hoverRules = null;
+	const collectRules = (rules, out) => {
+		for (const rule of rules) {
+			if (out.length >= MAX_RULES) return;
+			if (rule.cssRules) collectRules(rule.cssRules, out);
+			const text = typeof rule.selectorText === "string" ? rule.selectorText : "";
+			for (const part of text.includes(":hover") ? text.split(",") : []) {
+				const at = part.indexOf(":hover");
+				const trigger = part.slice(0, at).trim();
+				const shown = part.slice(at + ":hover".length).trim();
+				// `X:hover Y` or `X:hover > Y`: hovering X shows Y, which is not X.
+				if (trigger && shown && !shown.startsWith(":")) out.push(trigger);
+			}
+		}
+	};
+	const triggers = () => {
+		if (hoverRules) return hoverRules;
+		const out = [];
+		for (const sheet of Array.from(document.styleSheets)) {
+			try {
+				collectRules(sheet.cssRules, out);
+			} catch (_error) {
+				// A sheet of another origin cannot be read.
+			}
+		}
+		hoverRules = out;
+		return out;
+	};
+	const revealsByCss = (el) =>
+		triggers().some((trigger) => {
+			try {
+				return Boolean(el.closest(trigger));
+			} catch (_error) {
+				return false;
+			}
+		});
+	let hovered = null;
+	let lastHover = null;
+	let hoverWatch = null;
+	const noteHoverChange = (record) => {
+		if (!hoverWatch || hoverWatch.changed) return;
+		if (record.type === "attributes" && hoverWatch.scope.contains(record.target)) hoverWatch.changed = true;
+		for (const node of record.addedNodes || []) if (node.nodeType === 1) hoverWatch.changed = true;
+	};
+	document.addEventListener(
+		"mouseover",
+		(event) => {
+			const el = actionable(origin(event));
+			if (!el || el === hovered) return;
+			hovered = el;
+			const watch = { scope: el.parentElement || el, changed: false };
+			hoverWatch = watch;
+			const at = actions;
+			setTimeout(() => {
+				if (hoverWatch === watch) hoverWatch = null;
+				if (hovered !== el || actions !== at || lastHover === el) return;
+				if (!watch.changed && !revealsByCss(el)) return;
+				lastHover = el;
+				act({ kind: "hover", target: describe(el) });
+			}, HOVER_MS);
+		},
+		true,
+	);
+	document.addEventListener(
+		"mouseout",
+		(event) => {
+			if (actionable(origin(event)) === hovered) hovered = null;
+		},
+		true,
+	);
+
+	// Scroll: only one the person made (wheel, touch, keys, scrollbar), once it rests.
+	let intentAt = 0;
+	const intent = () => {
+		intentAt = Date.now();
+	};
+	for (const name of ["wheel", "touchmove"]) document.addEventListener(name, intent, true);
+	// A press on a scrollbar (past the content box of what was pressed).
+	document.addEventListener(
+		"mousedown",
+		(event) => {
+			const el = event.target;
+			if (!el || el.nodeType !== 1) return;
+			if (el === document.documentElement || event.offsetX > el.clientWidth || event.offsetY > el.clientHeight) intent();
+		},
+		true,
+	);
+	document.addEventListener("keydown", (event) => SCROLL_KEYS.test(event.key) && intent(), true);
+	const resting = new Map();
+	document.addEventListener(
+		"scroll",
+		(event) => {
+			if (Date.now() - intentAt > 1000) return;
+			const node = origin(event);
+			const el = node === document || node === document.documentElement || !node || node.nodeType !== 1 ? null : node;
+			clearTimeout(resting.get(el));
+			resting.set(
+				el,
+				setTimeout(() => {
+					resting.delete(el);
+					const x = Math.round(el ? el.scrollLeft : window.scrollX);
+					const y = Math.round(el ? el.scrollTop : window.scrollY);
+					act({ kind: "scroll", target: el ? describe(el) : null, x: Math.max(0, x), y: Math.max(0, y) });
+				}, SCROLL_REST_MS),
+			);
+		},
+		true,
+	);
+
+	// Drag and drop: drag events, or a pointer pressed on one element and released on another.
+	let dragged = null;
+	let pressed = null;
+	document.addEventListener(
+		"dragstart",
+		(event) => {
+			dragged = actionable(origin(event));
+			pressed = null;
+		},
+		true,
+	);
+	document.addEventListener(
+		"drop",
+		(event) => {
+			const source = dragged;
+			dragged = null;
+			const target = actionable(origin(event));
+			if (!source || !target || source === target || source.contains(target)) return;
+			act({ kind: "drag", target: describe(source), drop: describe(target), mode: "html5" });
+		},
+		true,
+	);
+	document.addEventListener(
+		"pointerdown",
+		(event) => {
+			pressed = event.button === 0 ? { el: actionable(origin(event)), x: event.clientX, y: event.clientY } : null;
+		},
+		true,
+	);
+	document.addEventListener(
+		"pointerup",
+		(event) => {
+			const start = pressed;
+			pressed = null;
+			if (!start || !start.el || dragged) return;
+			if (Math.hypot(event.clientX - start.x, event.clientY - start.y) < DRAG_MIN_PX) return;
+			const selection = window.getSelection ? String(window.getSelection() || "") : "";
+			// Under the pointer, past the dragged element (a library may move it along).
+			const under = (document.elementsFromPoint ? document.elementsFromPoint(event.clientX, event.clientY) : []).find(
+				(node) => !start.el.contains(node),
+			);
+			const target = actionable(under);
+			const field = /^(input|select|textarea)$/i.test(start.el.tagName) || isTextField(start.el);
+			if (selection || field || !target || target === start.el || target.contains(start.el)) return;
+			skipClickUntil = Date.now() + 300;
+			act({ kind: "drag", target: describe(start.el), drop: describe(target), mode: "pointer" });
+		},
+		true,
+	);
 
 	document.addEventListener(
 		"keydown",
