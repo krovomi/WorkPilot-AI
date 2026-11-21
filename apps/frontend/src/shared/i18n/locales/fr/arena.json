@@ -55,6 +55,13 @@
 		"battleCount_one": "{{count}} combat",
 		"battleCount_other": "{{count}} combats",
 		"clearAll": "Tout effacer",
+		"clearConfirm": {
+			"title": "Effacer l'historique des combats ?",
+			"description_one": "{{count}} combat et ses votes seront supprimés. Cette action est irréversible.",
+			"description_other": "{{count}} combats et leurs votes seront supprimés. Cette action est irréversible.",
+			"cancel": "Annuler",
+			"confirm": "Tout effacer"
+		},
 		"awaitingVote": "En attente de vote"
 	},
 	"analytics": {

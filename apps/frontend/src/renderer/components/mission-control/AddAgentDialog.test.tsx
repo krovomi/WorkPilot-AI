@@ -118,6 +118,21 @@ describe("AddAgentDialog", () => {
 		expect(onAdd.mock.calls[0].slice(2)).toEqual(["custom", fast?.value, fast?.label]);
 	});
 
+	it("words the catalog's free-text row in the app's language", async () => {
+		const user = userEvent.setup();
+		const { onAdd } = dialog();
+		await choose(/Provider/, "Custom/Enterprise");
+		await choose(/^Model/, "Other (free text)Local");
+		expect(screen.queryByText("Autre (saisie libre)")).not.toBeInTheDocument();
+		await user.click(screen.getByRole("button", { name: "Create Agent" }));
+		expect(onAdd.mock.calls[0].slice(2)).toEqual(["custom", "custom", "Other (free text)"]);
+
+		await i18n.changeLanguage("fr");
+		await choose(/Fournisseur/, "Custom/Enterprise");
+		await choose(/^Modèle/, "Autre (saisie libre)Local");
+		expect(screen.getByRole("combobox", { name: /^Modèle/ })).toHaveTextContent("Autre (saisie libre)");
+	});
+
 	it("keeps the form and says why when the agent is refused, then resets once created", async () => {
 		const user = userEvent.setup();
 		let finish: (created: boolean) => void = () => undefined;

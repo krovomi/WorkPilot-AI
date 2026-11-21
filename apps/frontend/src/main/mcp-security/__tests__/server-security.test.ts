@@ -56,13 +56,14 @@ describe("serverSecurity", () => {
 	it("refuses a request without a catalog server id", async () => {
 		const { deps: d } = deps();
 		for (const raw of [null, "local", {}, { serverId: "" }, { serverId: 3 }]) {
+			await expect(serverSecurity(raw, d)).rejects.toMatchObject({ code: "securityServerRequired" });
 			await expect(serverSecurity(raw, d)).rejects.toBeInstanceOf(McpSecurityRequestError);
 		}
 		await expect(serverSecurity({ serverId: "local", projectId: 7 }, d)).rejects.toThrow(
-			"Invalid project id",
+			"securityInvalidProject",
 		);
 		await expect(serverSecurity({ serverId: "nope" }, d)).rejects.toThrow(
-			"Unknown catalog server",
+			"securityUnknownServer",
 		);
 	});
 
@@ -122,7 +123,7 @@ describe("serverSecurity", () => {
 		const { deps: d } = deps();
 		const { catalog: _catalog, ...rest } = d;
 		await expect(serverSecurity({ serverId: "no-such-server" }, rest)).rejects.toThrow(
-			"Unknown catalog server",
+			"securityUnknownServer",
 		);
 	});
 });

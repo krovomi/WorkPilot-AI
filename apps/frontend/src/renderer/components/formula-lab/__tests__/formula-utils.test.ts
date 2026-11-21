@@ -11,10 +11,17 @@ import {
 	formatCostBand,
 	formatTokens,
 	providerColor,
+	providerName,
 	shortModel,
 } from "../formula-utils";
 
 describe("formula-utils", () => {
+	it("names a provider as the Settings do, else by its id", () => {
+		expect(providerName("anthropic")).toBe("Anthropic (Claude)");
+		expect(providerName("claude")).toBe("Anthropic (Claude)");
+		expect(providerName("lm-studio")).toBe("lm-studio");
+	});
+
 	it("writes a USD cost in euros, with more digits under a cent", () => {
 		expect(formatCost(0)).toBe("€0");
 		expect(formatCost(-1)).toBe("€0");
