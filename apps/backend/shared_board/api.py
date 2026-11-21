@@ -1,4 +1,4 @@
-"""Cards of a shared board, in server mode: create, read, edit, delete, approve.
+"""Cards of a shared board, in server mode: create, read, edit, delete.
 
 A server-mode project is a clone on the server, and its board is that clone's
 ``.workpilot/specs/``, the same files the desktop app and the agents read. The
@@ -15,6 +15,8 @@ caller's tenant's, and the caller one of its members. On top of the
 permission the mount derives (``task.read`` / ``task.write``, ``task.delete``
 and ``review.approve`` for the two routes raised in ``ROUTE_OVERRIDES``),
 changing a card needs a project role of ``member`` or more; a ``viewer`` reads.
+Approving a card, by as many people as its criticality asks, and lending
+one's approval are ``shared_board/approvals.py``.
 
 A card's text is what a person wrote. It is stored and shown as such; the
 agents that later read it get it through the pipeline's own handling of the
@@ -31,9 +33,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from server.authz.approvals import may_approve_alone
 from server.authz.principal import get_principal
 from server.authz.scope import ProjectScope, resolve_project_scope
-from server.authz.self_approval import may_approve_own
 from server.db.engine import get_db
 from server.db.models import ProjectRole
 from server.services import push
@@ -197,13 +199,13 @@ async def create_card(
         raise HTTPException(status_code=422, detail=f"kind must be one of {KINDS}")
 
     title = " ".join(body.title.split())
-    # Going without a review is approving: the approval right's to choose,
-    # within the deployment's rule on approving one's own card.
-    may_skip_review = principal.has("review.approve") and await may_approve_own(
+    # Going without a review is approving: only for someone whose approval
+    # alone is enough, within the deployment's rule on one's own card.
+    may_skip_review = await may_approve_alone(
         db,
+        principal=principal,
         project_id=scope.project_id,
         org_id=scope.org_id,
-        user_id=principal.id,
         author_id=principal.id,
     )
     metadata: dict[str, Any] = {
@@ -390,49 +392,6 @@ async def delete_card(
         scope.project_id, "spec_deleted", {"spec": card_id, "by": principal.id}
     )
     return {"deleted": card_id}
-
-
-#: Why the author of a card may not approve it (``server/authz/self_approval``).
-OWN_CARD = "Someone else approves the spec of a card you created"
-
-
-@router.post("/cards/{card_id}/approve")
-async def approve_card(
-    card_id: str,
-    request: Request,
-    scope: ProjectScope = Depends(resolve_project_scope),
-    db: AsyncSession = Depends(get_db),
-) -> dict[str, Any]:
-    """Approve the card's spec and plan, so a build may start on them.
-
-    The approval is the one the build checks (``review_state.json``, with the
-    hash of ``spec.md`` and the plan): editing either afterwards voids it.
-    The card's author approves it only as the deployment allows
-    (``WORKPILOT_SELF_APPROVAL``).
-    """
-    from review.state import ReviewState
-
-    principal = get_principal(request)
-    _require_writer(scope, principal)
-    directory = _card_or_404(scope, card_id)
-    if not (directory / "spec.md").is_file():
-        raise HTTPException(status_code=409, detail="No spec to approve yet")
-    row = await _index_row(db, scope, card_id)
-    if not await may_approve_own(
-        db,
-        project_id=scope.project_id,
-        org_id=scope.org_id,
-        user_id=principal.id,
-        author_id=row.created_by if row is not None else None,
-    ):
-        raise HTTPException(status_code=403, detail=OWN_CARD)
-
-    review = ReviewState.load(directory)
-    review.approve(directory, approved_by=principal.email or principal.id)
-    emit_board_event(
-        scope.project_id, "spec_approved", {"spec": card_id, "by": principal.id}
-    )
-    return {"approved": True, "approvedBy": review.approved_by}
 
 
 def _approval_pending(directory: Path) -> bool:
