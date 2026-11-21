@@ -7,6 +7,7 @@ import type {
 	ArenaLabel,
 	ArenaParticipant,
 } from "@shared/types/arena";
+import i18n from "i18next";
 import { create } from "zustand";
 
 // ─── Store State ────────────────────────────────────────────────────────────
@@ -28,10 +29,12 @@ interface ArenaState {
 	isLoadingHistory: boolean;
 	isLoadingAnalytics: boolean;
 
-	/** Auto-routing enabled */
-	autoRoutingEnabled: boolean;
-
+	/** Why the battle could not start, run or be voted on. */
 	error: string | null;
+	/** Why the history could not be read or cleared. */
+	historyError: string | null;
+	/** Why the analytics could not be read. */
+	analyticsError: string | null;
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -42,7 +45,6 @@ interface ArenaActions {
 
 	setActiveBattle: (battle: ArenaBattle | null) => void;
 	setIsStartingBattle: (v: boolean) => void;
-	setAutoRoutingEnabled: (v: boolean) => void;
 	setError: (error: string | null) => void;
 
 	/** Handle streaming chunk from a participant */
@@ -65,6 +67,9 @@ interface ArenaActions {
 
 	/** Load analytics from main process */
 	loadAnalytics: () => Promise<void>;
+
+	/** Delete every battle and vote, then read the (empty) history again */
+	clearHistory: () => Promise<void>;
 }
 
 // ─── Initial State ────────────────────────────────────────────────────────────
@@ -77,8 +82,9 @@ const initialState: ArenaState = {
 	isStartingBattle: false,
 	isLoadingHistory: false,
 	isLoadingAnalytics: false,
-	autoRoutingEnabled: false,
 	error: null,
+	historyError: null,
+	analyticsError: null,
 };
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -91,7 +97,6 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 
 	setActiveBattle: (battle) => set({ activeBattle: battle }),
 	setIsStartingBattle: (v) => set({ isStartingBattle: v }),
-	setAutoRoutingEnabled: (v) => set({ autoRoutingEnabled: v }),
 	setError: (error) => set({ error }),
 
 	handleBattleProgress: (event) => {
@@ -168,13 +173,8 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 		);
 		if (!winner) return;
 
+		set({ error: null });
 		try {
-			if (typeof globalThis.electronAPI?.arenaVote !== "function") {
-				set({
-					error: "Arena API not available — please restart the application.",
-				});
-				return;
-			}
 			const result = await globalThis.electronAPI.arenaVote({
 				battleId,
 				winnerLabel,
@@ -200,16 +200,21 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 
 				// Refresh analytics after vote
 				get().loadAnalytics();
+			} else {
+				// The main process refuses some votes (a model that failed cannot
+				// win): the person is told, instead of the button doing nothing.
+				set({ error: result.error || i18n.t("arena:errors.voteFailed") });
 			}
 		} catch (err) {
 			set({
-				error: err instanceof Error ? err.message : "Failed to submit vote",
+				error:
+					err instanceof Error ? err.message : i18n.t("arena:errors.voteFailed"),
 			});
 		}
 	},
 
 	loadHistory: async () => {
-		set({ isLoadingHistory: true, error: null });
+		set({ isLoadingHistory: true, historyError: null });
 		try {
 			if (typeof globalThis.electronAPI?.arenaGetBattles !== "function") {
 				return;
@@ -217,10 +222,17 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 			const result = await globalThis.electronAPI.arenaGetBattles();
 			if (result.success && result.data) {
 				set({ battles: result.data });
+			} else {
+				set({
+					historyError: result.error || i18n.t("arena:errors.historyFailed"),
+				});
 			}
 		} catch (err) {
 			set({
-				error: err instanceof Error ? err.message : "Failed to load history",
+				historyError:
+					err instanceof Error
+						? err.message
+						: i18n.t("arena:errors.historyFailed"),
 			});
 		} finally {
 			set({ isLoadingHistory: false });
@@ -228,7 +240,7 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 	},
 
 	loadAnalytics: async () => {
-		set({ isLoadingAnalytics: true });
+		set({ isLoadingAnalytics: true, analyticsError: null });
 		try {
 			if (typeof globalThis.electronAPI?.arenaGetAnalytics !== "function") {
 				return;
@@ -236,35 +248,67 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 			const result = await globalThis.electronAPI.arenaGetAnalytics();
 			if (result.success && result.data) {
 				set({ analytics: result.data });
+			} else {
+				set({
+					analyticsError:
+						result.error || i18n.t("arena:errors.analyticsFailed"),
+				});
 			}
-		} catch {
-			// Silently fail analytics
+		} catch (err) {
+			// Said, not swallowed: "no data yet" would read as "vote more".
+			set({
+				analyticsError:
+					err instanceof Error
+						? err.message
+						: i18n.t("arena:errors.analyticsFailed"),
+			});
 		} finally {
 			set({ isLoadingAnalytics: false });
 		}
+	},
+
+	clearHistory: async () => {
+		try {
+			const result = await globalThis.electronAPI.arenaClearHistory();
+			if (!result.success) {
+				set({
+					historyError: result.error || i18n.t("arena:errors.clearFailed"),
+				});
+				return;
+			}
+		} catch (err) {
+			set({
+				historyError:
+					err instanceof Error ? err.message : i18n.t("arena:errors.clearFailed"),
+			});
+			return;
+		}
+		await get().loadHistory();
+		get().loadAnalytics();
 	},
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export const openArenaDialog = () => {
-	useArenaStore.getState().openDialog();
-};
-
 /**
- * Battle events, followed for the life of the window: a battle keeps running
- * in the main process when the dialog closes or another tab is shown.
+ * The battle events, for the life of the window (`global-listeners.ts`). The
+ * dialog used to subscribe from its Battle tab, so leaving the tab or closing
+ * the dialog mid-battle lost every answer and left the battle running for ever.
  */
 export function setupArenaListeners(): () => void {
 	const api = globalThis.electronAPI;
-	const store = () => useArenaStore.getState();
+	const state = () => useArenaStore.getState();
 	const cleanups = [
-		api.onArenaBattleProgress((event) => store().handleBattleProgress(event)),
-		api.onArenaBattleResult((event) => store().handleBattleResult(event)),
-		api.onArenaBattleComplete((event) => store().handleBattleComplete(event)),
-		api.onArenaBattleError((event) => store().handleBattleError(event)),
+		api.onArenaBattleProgress((event) => state().handleBattleProgress(event)),
+		api.onArenaBattleResult((event) => state().handleBattleResult(event)),
+		api.onArenaBattleComplete((event) => state().handleBattleComplete(event)),
+		api.onArenaBattleError((event) => state().handleBattleError(event)),
 	];
 	return () => {
 		for (const cleanup of cleanups) cleanup();
 	};
 }
+
+export const openArenaDialog = () => {
+	useArenaStore.getState().openDialog();
+};

@@ -12,98 +12,13 @@ pipeline works correctly for both Claude and Copilot paths:
 """
 
 import asyncio
-import importlib.util
+import importlib
 import os
-import sys
-import types as _types
 from pathlib import Path
-from pathlib import Path as _Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-# Mock claude_agent_sdk before any imports that transitively need it
-_mock_sdk = MagicMock()
-_mock_sdk.ClaudeSDKClient = MagicMock()
-_mock_sdk.ClaudeAgentOptions = MagicMock()
-_mock_sdk.AgentDefinition = MagicMock()
-_mock_sdk.types = MagicMock()
-_mock_sdk.types.HookMatcher = MagicMock()
-sys.modules["claude_agent_sdk"] = _mock_sdk
-sys.modules["claude_agent_sdk.types"] = _mock_sdk.types
-
-# Create runners package hierarchy WITHOUT triggering runners/__init__.py
-_BACKEND = _Path(__file__).parent.parent / "apps" / "backend"
-
-# Ensure backend is in sys.path so 'core' and other modules are importable
-if str(_BACKEND) not in sys.path:
-    sys.path.insert(0, str(_BACKEND))
-
-# Also add runners/github to sys.path so fallback imports like
-# 'from context_gatherer import ...' work when relative imports fail. Appended,
-# not prepended: its ``services/`` package would otherwise shadow
-# apps/backend/services for every test collected after this one.
-_RUNNERS_GITHUB = _BACKEND / "runners" / "github"
-if str(_RUNNERS_GITHUB) not in sys.path:
-    sys.path.append(str(_RUNNERS_GITHUB))
-
-# Pre-load specific services.* modules so imports resolve correctly regardless
-# of whether sys.modules["services"] is set to apps/backend/services or not.
-# - services.recovery comes from apps/backend/services/ (used by agents.session)
-# - services.agent_utils, services.category_utils, etc. come from runners/github/services/
-#   (used by parallel_orchestrator_reviewer and parallel_followup_reviewer)
-import importlib.util as _ilu
-
-
-def _load_service_mod(name: str, path: str) -> None:
-    if name not in sys.modules:
-        _spec = _ilu.spec_from_file_location(name, path, submodule_search_locations=[])
-        _mod = _ilu.module_from_spec(_spec)
-        sys.modules[name] = _mod
-        _spec.loader.exec_module(_mod)
-
-
-_load_service_mod("services.recovery", str(_BACKEND / "services" / "recovery.py"))
-
-_GH_SERVICES = _BACKEND / "runners" / "github" / "services"
-for _svc_mod in [
-    "agent_utils",
-    "category_utils",
-    "io_utils",
-    "pydantic_models",
-    "pr_worktree_manager",
-    "sdk_utils",
-    "response_parsers",
-]:
-    _load_service_mod(f"services.{_svc_mod}", str(_GH_SERVICES / f"{_svc_mod}.py"))
-
-for _pkg, _subpath in [
-    ("runners", "runners"),
-    ("runners.github", "runners/github"),
-    ("runners.github.services", "runners/github/services"),
-]:
-    if _pkg not in sys.modules:
-        _m = _types.ModuleType(_pkg)
-        _m.__path__ = [str(_BACKEND / _subpath)]
-        _m.__package__ = _pkg
-        sys.modules[_pkg] = _m
-
-_sdk_utils_path = _BACKEND / "runners" / "github" / "services" / "sdk_utils.py"
-if "runners.github.services.sdk_utils" not in sys.modules:
-    _spec = importlib.util.spec_from_file_location(
-        "runners.github.services.sdk_utils",
-        _sdk_utils_path,
-        submodule_search_locations=[],
-    )
-    _sdk_utils_mod = importlib.util.module_from_spec(_spec)
-    sys.modules["runners.github.services.sdk_utils"] = _sdk_utils_mod
-    _spec.loader.exec_module(_sdk_utils_mod)
-
-process_agent_stream = sys.modules[
-    "runners.github.services.sdk_utils"
-].process_agent_stream
-
 from core.agent_client import (
     AgentClient,
     AgentMessage,
@@ -114,6 +29,7 @@ from core.agent_client import (
     MessageRole,
     SubagentDefinition,
 )
+from runners.github.services.sdk_utils import process_agent_stream
 
 # =============================================================================
 # Integration: Full Claude Path
@@ -411,7 +327,6 @@ class TestProcessAgentStreamIntegration:
     @pytest.mark.asyncio
     async def test_claude_client_through_process_agent_stream(self):
         """ClaudeAgentClient messages should be processed by process_agent_stream."""
-        from runners.github.services.sdk_utils import process_agent_stream
 
         # Create a ClaudeAgentClient with mock SDK
         # Use proper named classes since SimpleNamespace.__class__ assignment is
@@ -461,8 +376,6 @@ class TestProcessAgentStreamIntegration:
     async def test_copilot_client_through_process_agent_stream(self):
         """CopilotAgentClient messages should be processed by process_agent_stream."""
         import time
-
-        from runners.github.services.sdk_utils import process_agent_stream
 
         client = CopilotAgentClient(model="gpt-4o", github_token="gho_test_oauth")
         # Pre-set a valid copilot token to avoid real HTTP token exchange
@@ -1159,3 +1072,15 @@ class TestCopilotEmptyToolCallsGuard:
         # Reached the natural 'stop', not the guard abort.
         assert any("all done" in t for t in texts)
         assert not any("infinite loop" in t.lower() for t in texts)
+
+
+def test_these_tests_leave_the_real_github_services_package_behind():
+    """The orchestrator imports `AutoFixProcessor` from the services package.
+
+    An empty stand-in package installed here used to stay in `sys.modules`, and
+    every test file collected after this one that imports the orchestrator
+    failed at collection.
+    """
+    services = importlib.import_module("runners.github.services")
+
+    assert services.AutoFixProcessor.__name__ == "AutoFixProcessor"

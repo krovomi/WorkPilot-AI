@@ -141,14 +141,18 @@ def _new_id(label: str) -> str:
 
 
 class _ScratchIndex:
-    """A throwaway copy of the worktree's index (its stat cache keeps it fast)."""
+    """A throwaway index: a copy of the worktree's (its stat cache keeps a
+    snapshot fast), or an empty one."""
 
-    def __init__(self, worktree: Path) -> None:
+    def __init__(self, worktree: Path, *, copy: bool = True) -> None:
         self.worktree = worktree
+        self.copy = copy
         self.folder = Path(tempfile.mkdtemp(prefix="workpilot-snapshot-"))
         self.path = self.folder / "index"
 
     def __enter__(self) -> Path:
+        if not self.copy:
+            return self.path
         real = Path(_git(self.worktree, "rev-parse", "--git-path", "index"))
         if not real.is_absolute():
             real = self.worktree / real
@@ -278,7 +282,9 @@ def rollback(worktree: Path, task: str, snapshot_id: str) -> dict[str, str]:
 
     _git(worktree, "reset", "--quiet", "--hard", target.head, timeout=300)
     _git(worktree, "clean", "-f", "-d", "-q", "-e", ".workpilot", timeout=300)
-    with _ScratchIndex(worktree) as index:
+    # An empty index: no stat cache to tell checkout-index that a file
+    # already holds what it should, so every file of the snapshot is written.
+    with _ScratchIndex(worktree, copy=False) as index:
         env = _env(index)
         _git(worktree, "read-tree", f"{target.commit}^{{tree}}", env=env)
         _git(worktree, "checkout-index", "-a", "-f", env=env, timeout=300)

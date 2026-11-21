@@ -47,7 +47,8 @@ export function IdeaDetailPanel({
 }: IdeaDetailPanelProps) {
 	const { t } = useTranslation(["common", "ideation"]);
 	const isDismissed = idea.status === "dismissed";
-	const isConverted = idea.status === "converted";
+	// A converted idea is archived once its task exists: neither offers to convert again.
+	const isConverted = idea.status === "converted" || idea.status === "archived";
 
 	const taskId = idea.taskId;
 

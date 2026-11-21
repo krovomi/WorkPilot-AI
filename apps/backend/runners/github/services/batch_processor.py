@@ -271,13 +271,10 @@ class BatchProcessor:
 
                     # Get Claude's actual reasoning from comparisons
                     claude_reasoning = "No similar issues found."
-                    if issue_num in reasoning_dict and reasoning_dict[issue_num]:
+                    comparisons = reasoning_dict.get(issue_num)
+                    if comparisons:
                         # Get reasoning from any comparison
-                        other_issues = list(reasoning_dict[issue_num].keys())
-                        if other_issues:
-                            claude_reasoning = reasoning_dict[issue_num][
-                                other_issues[0]
-                            ]
+                        claude_reasoning = next(iter(comparisons.values()))
 
                     single_issues.append(
                         {
@@ -326,29 +323,19 @@ class BatchProcessor:
 
                 items.sort(key=lambda x: x["similarity_to_primary"], reverse=True)
 
-                # Validate with AI
-                validated = False
-                confidence = 0.0
-                reasoning = ""
-                refined_theme = themes[0] if themes else ""
-
-                if batcher.validator:
-                    try:
-                        result = await batcher.validator.validate_batch(
-                            batch_id=f"preview_{primary}",
-                            primary_issue=primary,
-                            issues=items,
-                            themes=themes,
-                        )
-                        validated = result.is_valid
-                        confidence = result.confidence
-                        reasoning = result.reasoning
-                        refined_theme = result.common_theme or refined_theme
-                    except Exception as e:
-                        safe_print(f"[PREVIEW] Validation error: {e}")
-                        validated = True
-                        confidence = 0.5
-                        reasoning = "Validation skipped due to error"
+                # Validate with AI (the batcher above is built with validation
+                # on). The validator never raises: a check that cannot run
+                # answers "valid" with a confidence of 0.5.
+                result = await batcher.validator.validate_batch(
+                    batch_id=f"preview_{primary}",
+                    primary_issue=primary,
+                    issues=items,
+                    themes=themes,
+                )
+                validated = result.is_valid
+                confidence = result.confidence
+                reasoning = result.reasoning
+                refined_theme = result.common_theme or (themes[0] if themes else "")
 
                 proposed_batches.append(
                     {
@@ -468,7 +455,7 @@ class BatchProcessor:
                 batcher._batch_index[item.issue_number] = batch.batch_id
 
             # Save batch
-            batch.save(self.github_dir)
+            await batch.save(self.github_dir)
             created_batches.append(batch)
 
             # Create AutoFixState for primary issue
@@ -516,7 +503,7 @@ class BatchProcessor:
                 {
                     "batch_id": b.batch_id,
                     "primary_issue": b.primary_issue,
-                    "issue_count": len(b.items),
+                    "issue_count": len(b.issues),
                     "status": b.status.value,
                     "created_at": b.created_at,
                 }
@@ -542,6 +529,6 @@ class BatchProcessor:
 
         for batch in pending:
             batch.update_status(BatchStatus.ANALYZING)
-            batch.save(self.github_dir)
+            await batch.save(self.github_dir)
 
         return len(pending)
