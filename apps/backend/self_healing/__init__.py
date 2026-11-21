@@ -1,77 +1,32 @@
 """
-Self-Healing Codebase Module
-============================
+Self-Healing
+============
 
-Feature #11 from Killing Features Roadmap - Tier 3
+The Incident Responder: three modes that turn a signal into an incident and
+the facts a fixer needs.
 
-Autonomous code health monitoring and self-repair system.
+- CI/CD (`cicd/`): a failed pipeline, the first bad commit by bisect.
+- Production (`production/`): a monitoring report, its fingerprint and group,
+  the suspect commits.
+- Proactive (`proactive/`): fragile files and the trend of their risk.
 
-Key Features:
-- Continuous health monitoring
-- Proactive degradation detection (code smells, performance)
-- Auto-refactoring with automated PRs
-- Technical debt tracking and resolution
-- Predictive alerts before issues become critical
+`incident_responder.IncidentResponderOrchestrator` drives them; the runner is
+`runners/self_healing_runner.py`, which the app's Self-Healing view calls.
 
 Usage:
-    from self_healing import SelfHealingMonitor, HealthCheckScheduler
+    from self_healing.incident_responder import IncidentResponderOrchestrator
 
-    monitor = SelfHealingMonitor(project_dir)
-    health = await monitor.check_health()
-
-    scheduler = HealthCheckScheduler(project_dir)
-    await scheduler.start_monitoring()
+    orchestrator = IncidentResponderOrchestrator(project_dir)
+    operation = await orchestrator.handle_cicd_failure(commit_sha, branch, output)
 """
 
-from .alert_manager import Alert, AlertLevel, AlertManager
-from .config import (
-    HealingConfig,
-    HealingMode,
-    HealingPriority,
-    MonitoringFrequency,
-)
-from .debt_tracker import DebtItem, TechnicalDebtTracker
-from .health_checker import HealthChecker, HealthReport, HealthStatus
-from .monitor import SelfHealingMonitor
-from .refactoring_engine import RefactoringEngine, RefactoringPlan
-from .scheduler import HealthCheckScheduler
-
-__all__ = [
-    # Config
-    "HealingConfig",
-    "HealingMode",
-    "HealingPriority",
-    "MonitoringFrequency",
-    # Health Check
-    "HealthChecker",
-    "HealthReport",
-    "HealthStatus",
-    # Monitor
-    "SelfHealingMonitor",
-    # Scheduler
-    "HealthCheckScheduler",
-    # Debt Tracking
-    "TechnicalDebtTracker",
-    "DebtItem",
-    # Refactoring
-    "RefactoringEngine",
-    "RefactoringPlan",
-    # Alerts
-    "AlertManager",
-    "Alert",
-    "AlertLevel",
-    # Incident Responder (Feature #3 S+)
-    "IncidentResponderOrchestrator",
-]
+__all__ = ["IncidentResponderOrchestrator"]
 
 
-# Incident Responder - lazy import to avoid circular dependencies
+# Lazy import: the subpackages import `incident_responder.models`.
 def __getattr__(name):
     if name == "IncidentResponderOrchestrator":
         from .incident_responder import IncidentResponderOrchestrator
 
         return IncidentResponderOrchestrator
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-__version__ = "1.1.0"

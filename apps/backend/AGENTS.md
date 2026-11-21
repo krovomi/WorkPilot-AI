@@ -97,7 +97,7 @@ génération de tests ;
 | `hermes/` | hermes-agent : doctor, persona `SOUL.md`, cycle d'apprentissage |
 | `core/merge_event.py` | un merge publié une fois ; mémoire, apprentissage et `uiux` s'y abonnent |
 | `foundation/workpilot_layout.py` | un dossier par feature sous `.workpilot/` |
-| `self_healing/` | boucle autonome avec plafond de coût ; surveillance et remédiation (les automatisations, qui créent des cartes sur un événement, vivent côté Electron : `apps/frontend/src/main/automations/`) |
+| `self_healing/` | Incident Responder : CI, production et fichiers fragiles en incidents (les automatisations, qui créent des cartes sur un événement, vivent côté Electron : `apps/frontend/src/main/automations/`) |
 
 ## Préparer et vérifier un build
 

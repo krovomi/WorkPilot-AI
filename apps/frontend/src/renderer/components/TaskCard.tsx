@@ -40,11 +40,12 @@ import { AutomationBadge } from "./kanban/AutomationBadge";
 import { ReviewLoadBadge, SplitPartBadge } from "./kanban/SplitPartBadge";
 import { TaskLockBadge } from "./collaboration/TaskLockBadge";
 import { useFormatRelativeTime } from "@/hooks/useFormatRelativeTime";
+import { toast } from "../hooks/use-toast";
 import AzureDevOpsLogo from "../assets/logos/azure-devops.svg";
 import JiraLogo from "../assets/logos/jira.svg";
 import {
 	EXECUTION_PHASE_BADGE_COLORS,
-	EXECUTION_PHASE_LABELS,
+	EXECUTION_PHASE_LABEL_KEYS,
 	isExecutionPhaseActive,
 	JSON_ERROR_PREFIX,
 	JSON_ERROR_TITLE_SUFFIX,
@@ -55,6 +56,7 @@ import {
 	TASK_STATUS_LABELS,
 } from "../../shared/constants";
 import type {
+	ExecutionPhase,
 	ReviewReason,
 	Task,
 	TaskCategory,
@@ -263,13 +265,14 @@ const TrackerBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 		return null;
 	}
 
-	const open = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		if (url) {
-			// biome-ignore lint/suspicious/noExplicitAny: electronAPI shape is dynamic
-			(globalThis as any).electronAPI?.openExternal?.(url);
-		}
-	};
+	const href = url;
+	const open = href
+		? (e: React.MouseEvent) => {
+				e.stopPropagation();
+				// biome-ignore lint/suspicious/noExplicitAny: electronAPI shape is dynamic
+				(globalThis as any).electronAPI?.openExternal?.(href);
+			}
+		: undefined;
 
 	return (
 		<Badge
@@ -278,7 +281,7 @@ const TrackerBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 				"text-3xs px-1.5 py-0.5 flex w-fit items-center gap-1 bg-muted/40 text-muted-foreground border-border font-mono",
 				url && "cursor-pointer hover:bg-muted hover:text-foreground",
 			)}
-			onClick={url ? open : undefined}
+			onClick={open}
 			title={t("labels.openInTracker", { tracker: alt })}
 		>
 			<img src={logo} alt={alt} className="h-3 w-3" />
@@ -293,7 +296,7 @@ interface MetadataBadgesProps {
 	isStuck: boolean;
 	isIncomplete: boolean;
 	hasActiveExecution?: boolean;
-	executionPhase?: string;
+	executionPhase?: ExecutionPhase;
 	reviewReasonInfo: {
 		label: string;
 		variant: "success" | "destructive" | "warning";
@@ -545,7 +548,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					)}
 				>
 					<Loader2 className="h-2.5 w-2.5 animate-spin" />
-					{EXECUTION_PHASE_LABELS[executionPhase]}
+					{t(EXECUTION_PHASE_LABEL_KEYS[executionPhase])}
 				</Badge>
 			)}
 
@@ -759,7 +762,7 @@ interface ActionButtonsProps {
 	handleStartStop: (e: React.MouseEvent) => void;
 	handlePause: (e: React.MouseEvent) => void;
 	handleResume: (e: React.MouseEvent) => void;
-	handleViewPR: (e: React.MouseEvent) => void;
+	handleViewPR: (e: React.MouseEvent, prUrl: string) => void;
 	handleArchive: (e: React.MouseEvent) => void;
 	statusMenuItems: React.ReactNode;
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
@@ -785,6 +788,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 	statusMenuItems,
 	t,
 }) => {
+	const prUrl = task.metadata?.prUrl;
 	// A cooperatively-paused task (flag on disk) shows Reprendre instead of Pause.
 	const isPaused = task.metadata?.paused?.enabled === true;
 	// Compact Pause / Reprendre toggle reused by the active-task branches below.
@@ -841,7 +845,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 
 	if (
 		(task.status === "done" || task.status === "pr_created") &&
-		task.metadata?.prUrl
+		prUrl
 	) {
 		return (
 			<div className="flex gap-1">
@@ -859,26 +863,21 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 						<Monitor className="h-3 w-3" />
 					</Button>
 				)}
-				{task.metadata?.prUrl && (
-					<Button
-						variant="ghost"
-						size="sm"
-						className="h-7 w-7 p-0 cursor-pointer"
-						onClick={handleViewPR}
-						title={t("tooltips.viewPR")}
-					>
-						<GitPullRequest className="h-3 w-3" />
-					</Button>
-				)}
-				{task.metadata?.prUrl && onViewPRFiles && (
+				<Button
+					variant="ghost"
+					size="sm"
+					className="h-7 w-7 p-0 cursor-pointer"
+					onClick={(e) => handleViewPR(e, prUrl)}
+					title={t("tooltips.viewPR")}
+				>
+					<GitPullRequest className="h-3 w-3" />
+				</Button>
+				{onViewPRFiles && (
 					<Button
 						variant="outline"
 						size="sm"
 						className="h-7 w-7 p-0 hover:bg-primary/10 transition-colors"
-						onClick={() =>
-							task.metadata?.prUrl &&
-							onViewPRFiles(task.metadata.prUrl, task.id)
-						}
+						onClick={() => onViewPRFiles(prUrl, task.id)}
 						title={t("tooltips.viewPRFiles")}
 						aria-label={t("tooltips.viewPRFiles")}
 					>
@@ -1155,32 +1154,25 @@ function taskCardPropsAreEqual(
 	prevProps: TaskCardProps,
 	nextProps: TaskCardProps,
 ): boolean {
-	const prevTask = prevProps.task;
-	const nextTask = nextProps.task;
-
-	// Fast path: same reference (include selectable props)
+	// Every prop other than the task is a flag or a handler: a new one must
+	// re-render, or the card keeps calling the handler of an earlier render.
 	if (
-		prevTask === nextTask &&
-		prevProps.onClick === nextProps.onClick &&
-		prevProps.onStatusChange === nextProps.onStatusChange &&
-		prevProps.isSelectable === nextProps.isSelectable &&
-		prevProps.isSelected === nextProps.isSelected &&
-		prevProps.onToggleSelect === nextProps.onToggleSelect &&
-		prevProps.onViewPRFiles === nextProps.onViewPRFiles &&
-		prevProps.onDelete === nextProps.onDelete &&
-		prevProps.onDuplicate === nextProps.onDuplicate &&
-		prevProps.onPreviewApp === nextProps.onPreviewApp
-	) {
-		return true;
-	}
-
-	// Check selectable props first (cheap comparison)
-	if (
+		prevProps.onClick !== nextProps.onClick ||
+		prevProps.onStatusChange !== nextProps.onStatusChange ||
 		prevProps.isSelectable !== nextProps.isSelectable ||
-		prevProps.isSelected !== nextProps.isSelected
+		prevProps.isSelected !== nextProps.isSelected ||
+		prevProps.onToggleSelect !== nextProps.onToggleSelect ||
+		prevProps.onViewPRFiles !== nextProps.onViewPRFiles ||
+		prevProps.onDelete !== nextProps.onDelete ||
+		prevProps.onDuplicate !== nextProps.onDuplicate ||
+		prevProps.onPreviewApp !== nextProps.onPreviewApp
 	) {
 		return false;
 	}
+
+	const prevTask = prevProps.task;
+	const nextTask = nextProps.task;
+	if (prevTask === nextTask) return true;
 
 	// Compare only the fields that affect rendering
 	const isEqual =
@@ -1235,7 +1227,6 @@ export const TaskCard = memo(function TaskCard({
 	const [isStuck, setIsStuck] = useState(false);
 	const [isRecovering, setIsRecovering] = useState(false);
 	const [showSyncDialog, setShowSyncDialog] = useState(false);
-	const stuckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
 	const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -1340,14 +1331,10 @@ export const TaskCard = memo(function TaskCard({
 	useEffect(() => {
 		if (!isRunning) {
 			setIsStuck(false);
-			if (stuckIntervalRef.current) {
-				clearInterval(stuckIntervalRef.current);
-				stuckIntervalRef.current = null;
-			}
 			return;
 		}
 
-		stuckIntervalRef.current = setInterval(() => {
+		const stuckInterval = setInterval(() => {
 			// If any activity (status, progress, logs) was recorded recently, task is alive
 			if (hasRecentActivity(task.id)) {
 				setIsStuck(false);
@@ -1365,11 +1352,7 @@ export const TaskCard = memo(function TaskCard({
 			});
 		}, STUCK_CHECK_INTERVAL_MS);
 
-		return () => {
-			if (stuckIntervalRef.current) {
-				clearInterval(stuckIntervalRef.current);
-			}
-		};
+		return () => clearInterval(stuckInterval);
 	}, [task.id, isRunning]);
 
 	const handleStartStop = (e: React.MouseEvent) => {
@@ -1390,6 +1373,13 @@ export const TaskCard = memo(function TaskCard({
 		const result = await recoverStuckTask(task.id, { autoRestart: true });
 		if (result.success) {
 			setIsStuck(false);
+		} else {
+			// The card stays stuck: say why instead of only re-enabling the button.
+			toast({
+				variant: "destructive",
+				title: t("labels.recoverFailed"),
+				description: result.message,
+			});
 		}
 		setIsRecovering(false);
 	};
@@ -1406,13 +1396,9 @@ export const TaskCard = memo(function TaskCard({
 		}
 	};
 
-	const handleViewPR = (e: React.MouseEvent) => {
+	const handleViewPR = (e: React.MouseEvent, url: string) => {
 		e.stopPropagation();
-		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		if (task.metadata?.prUrl && (globalThis as any).electronAPI?.openExternal) {
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-			(globalThis as any).electronAPI.openExternal(task.metadata.prUrl);
-		}
+		void globalThis.electronAPI.openExternal(url);
 	};
 
 	const handlePause = async (e: React.MouseEvent) => {
@@ -1425,11 +1411,9 @@ export const TaskCard = memo(function TaskCard({
 		await resumeTask(task.id);
 	};
 
-	const handleDelete = async (e: React.MouseEvent) => {
+	const handleDelete = (e: React.MouseEvent) => {
 		e.stopPropagation();
-		if (onDelete) {
-			onDelete();
-		}
+		onDelete?.();
 	};
 
 	const handleDuplicate = (e: React.MouseEvent) => {
@@ -1724,10 +1708,10 @@ export const TaskCard = memo(function TaskCard({
 											<DropdownMenuItem
 												onClick={(e) => {
 													e.stopPropagation();
+													// A description with no text (empty, or only
+													// markup) says less than the title.
 													openSmartEstimation(
-														extractTextFromHtml(task.description) ||
-															task.description ||
-															task.title,
+														extractTextFromHtml(task.description) || task.title,
 														task.id,
 													);
 												}}
