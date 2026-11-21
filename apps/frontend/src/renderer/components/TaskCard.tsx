@@ -5,7 +5,6 @@ import {
 	Ban,
 	CheckCircle2,
 	Clock,
-	Copy,
 	FileText,
 	FlaskConical,
 	Gauge,
@@ -14,7 +13,6 @@ import {
 	Loader2,
 	Lock,
 	Monitor,
-	MoreVertical,
 	Pause,
 	Play,
 	RotateCcw,
@@ -28,7 +26,7 @@ import {
 	X,
 	XCircle,
 } from "lucide-react";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AutomationBadge } from "./kanban/AutomationBadge";
 import { ReviewLoadBadge, SplitPartBadge } from "./kanban/SplitPartBadge";
@@ -46,7 +44,6 @@ import {
 	TASK_COMPLEXITY_COLORS,
 	TASK_IMPACT_COLORS,
 	TASK_PRIORITY_COLORS,
-	TASK_STATUS_LABELS,
 } from "../../shared/constants";
 import type {
 	ExecutionPhase,
@@ -78,6 +75,12 @@ import { SessionCompactionBadge } from "./SessionCompactionBadge";
 import { StreamingSessionButton } from "./streaming/StreamingSessionButton";
 import { CardTypeChip } from "./kanban/CardTypeChip";
 import { TaskCardPreview } from "./kanban/TaskCardPreview";
+import {
+	contextMenuPoint,
+	isFromPortal,
+	type MenuPoint,
+} from "./kanban/PointerMenu";
+import { TaskCardMenus } from "./kanban/TaskCardMenus";
 import { TaskPermissionPrompt } from "./task-permission/TaskPermissionPrompt";
 import { SyncFromBranchDialog } from "./task-detail/task-review/SyncFromBranchDialog";
 import { Badge } from "./ui/badge";
@@ -86,23 +89,13 @@ import { Card, CardContent } from "./ui/card";
 import { TaskEngineChip } from "./task-engine/TaskEngineChip";
 import { ContextGaugeMini } from "./task-detail/ContextGauge";
 import { FormulaBadge } from "./formula-lab/FormulaBadge";
-import { manualMoveTargets } from "../lib/kanban-columns";
 import { Checkbox } from "./ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { resolveCardType } from "../../shared/constants/card-types";
 import { installCardTypeStylesheet } from "../lib/card-type-tokens";
 import { useHoverPreview } from "../hooks/useHoverPreview";
 import { useKanbanBlockerStore } from "../stores/kanban-blocker-store";
-import { openSmartEstimation } from "../stores/smart-estimation-store";
 import { useKanbanConflictStore } from "../stores/kanban-conflict-store";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
 
 
 // Catastrophic stuck detection interval (ms).
@@ -731,7 +724,6 @@ interface ActionButtonsProps {
 	handleResume: (e: React.MouseEvent) => void;
 	handleViewPR: (e: React.MouseEvent, prUrl: string) => void;
 	handleArchive: (e: React.MouseEvent) => void;
-	statusMenuItems: React.ReactNode;
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 	t: any;
 }
@@ -751,8 +743,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 	handleResume,
 	handleViewPR,
 	handleArchive,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
-	statusMenuItems,
 	t,
 }) => {
 	const prUrl = task.metadata?.prUrl;
@@ -1194,6 +1184,10 @@ export const TaskCard = memo(function TaskCard({
 	const [isStuck, setIsStuck] = useState(false);
 	const [isRecovering, setIsRecovering] = useState(false);
 	const [showSyncDialog, setShowSyncDialog] = useState(false);
+	const [menuAt, setMenuAt] = useState<MenuPoint | null>(null);
+	const [isEditOpen, setIsEditOpen] = useState(false);
+	const closeMenu = useCallback(() => setMenuAt(null), []);
+	const openSyncDialog = useCallback(() => setShowSyncDialog(true), []);
 	const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
 	const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -1280,17 +1274,6 @@ export const TaskCard = memo(function TaskCard({
 		[task.updatedAt, formatRelativeTime],
 	);
 
-	// Memoize status menu items to avoid recreating on every render
-	const prUrl = task.metadata?.prUrl;
-	const statusMenuItems = useMemo(() => {
-		if (!onStatusChange) return null;
-		const targets = manualMoveTargets({ status: task.status, metadata: { prUrl } });
-		return targets.map((status) => (
-			<DropdownMenuItem key={status} onClick={() => onStatusChange(status)}>
-				{t(TASK_STATUS_LABELS[status])}
-			</DropdownMenuItem>
-		));
-	}, [task.status, prUrl, onStatusChange, t]);
 
 	// Catastrophic stuck detection — last-resort safety net.
 	// XState handles all normal transitions via PROCESS_EXITED events.
@@ -1383,14 +1366,10 @@ export const TaskCard = memo(function TaskCard({
 		onDelete?.();
 	};
 
-	const handleDuplicate = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		onDuplicate?.();
-	};
-
 	const handleCardClick = (e: React.MouseEvent) => {
-		// Don't open task modal while sync dialog is open (prevents portal event leak)
-		if (showSyncDialog) return;
+		// Don't open task modal while a dialog or menu of the card is open
+		// (prevents portal event leak)
+		if (showSyncDialog || isEditOpen || menuAt || isFromPortal(e)) return;
 		// If delete functionality is available, don't open the task when clicking near the delete button
 		if (onDelete) {
 			// Get the click coordinates relative to the card
@@ -1429,7 +1408,7 @@ export const TaskCard = memo(function TaskCard({
 		(s) => (s.blockers[task.id]?.pending.length ?? 0) > 0,
 	);
 	const isFaded = !!cardType && (cardType.proposed || task.status === "done");
-	const preview = useHoverPreview(!showSyncDialog);
+	const preview = useHoverPreview(!showSyncDialog && !menuAt && !isEditOpen);
 	useEffect(() => {
 		installCardTypeStylesheet();
 	}, []);
@@ -1451,6 +1430,9 @@ export const TaskCard = memo(function TaskCard({
 			aria-selected={isSelectable ? isSelected : undefined}
 			tabIndex={0}
 			onKeyDown={(e) => {
+				// Only the card itself: a key typed in one of its buttons, menus
+				// or dialogs is theirs.
+				if (e.target !== e.currentTarget) return;
 				if (e.key === "Enter" || e.key === " ") {
 					e.preventDefault();
 					onClick();
@@ -1473,9 +1455,15 @@ export const TaskCard = memo(function TaskCard({
 				isSpotlit && "ring-2 task-spotlight", // violet spotlight on jump-to
 			)}
 			onClick={handleCardClick}
+			onContextMenu={(e) => {
+				if (isFromPortal(e)) return;
+				e.preventDefault();
+				e.stopPropagation();
+				setMenuAt(contextMenuPoint(e, cardRef.current));
+			}}
 			onMouseDown={(e) => {
 				// Additional mouse down handler to catch events early
-				if (onDelete) {
+				if (onDelete && !isFromPortal(e)) {
 					const rect = cardRef.current?.getBoundingClientRect();
 					if (rect && isDeleteAreaMouseDown(e, rect)) {
 						e.preventDefault();
@@ -1664,118 +1652,27 @@ export const TaskCard = memo(function TaskCard({
 									handleResume={handleResume}
 									handleViewPR={handleViewPR}
 									handleArchive={handleArchive}
-									statusMenuItems={statusMenuItems}
 									t={t}
 								/>
 
-								{/* More options menu - includes duplicate, pause/resume and status changes */}
-								{(statusMenuItems ||
-									isRunning ||
-									onDuplicate ||
-									task.metadata?.paused?.enabled) && (
-									<DropdownMenu>
-										<DropdownMenuTrigger asChild>
-											<Button
-												variant="ghost"
-												size="sm"
-												className="h-7 w-7 p-0"
-												onClick={(e) => e.stopPropagation()}
-												aria-label={t("actions.taskActions")}
-											>
-												<MoreVertical className="h-4 w-4" />
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent
-											align="end"
-											onClick={(e) => e.stopPropagation()}
-										>
-											{/* Smart estimation - complexity score from build history,
-											    written back onto the task when it completes */}
-											<DropdownMenuItem
-												onClick={(e) => {
-													e.stopPropagation();
-													// A description with no text (empty, or only
-													// markup) says less than the title.
-													openSmartEstimation(
-														extractTextFromHtml(task.description) || task.title,
-														task.id,
-													);
-												}}
-											>
-												<Gauge className="mr-2 h-4 w-4" />
-												{t("actions.estimate")}
-											</DropdownMenuItem>
-											<DropdownMenuSeparator />
-
-											{/* Duplicate - clone the task into a fresh backlog ticket */}
-											{onDuplicate && (
-												<>
-													<DropdownMenuItem
-														onClick={(e) => {
-															e.stopPropagation();
-															handleDuplicate(e as React.MouseEvent);
-														}}
-													>
-														<Copy className="mr-2 h-4 w-4" />
-														{t("actions.duplicate")}
-													</DropdownMenuItem>
-													<DropdownMenuSeparator />
-												</>
-											)}
-											{/* Pause/Resume - show when task is running or paused */}
-											{(isRunning || task.metadata?.paused?.enabled) && (
-												<>
-													{task.metadata?.paused?.enabled ? (
-														<DropdownMenuItem
-															onClick={(e) => {
-																e.stopPropagation();
-																handleResume(e as React.MouseEvent);
-															}}
-														>
-															<Play className="mr-2 h-4 w-4" />
-															{t("actions.resume")}
-														</DropdownMenuItem>
-													) : (
-														<DropdownMenuItem
-															onClick={(e) => {
-																e.stopPropagation();
-																handlePause(e as React.MouseEvent);
-															}}
-														>
-															<Pause className="mr-2 h-4 w-4" />
-															{t("actions.pause")}
-														</DropdownMenuItem>
-													)}
-													<DropdownMenuSeparator />
-												</>
-											)}
-											{task.status !== "done" && (
-												<>
-													<DropdownMenuItem
-														onClick={(e) => {
-															e.stopPropagation();
-															e.preventDefault();
-															setShowSyncDialog(true);
-														}}
-													>
-														<GitMerge className="mr-2 h-4 w-4" />
-														{t("tasks:actions.syncFromBranch")}
-													</DropdownMenuItem>
-													<DropdownMenuSeparator />
-												</>
-											)}
-											{statusMenuItems && (
-												<>
-													<DropdownMenuLabel>
-														{t("actions.moveTo")}
-													</DropdownMenuLabel>
-													<DropdownMenuSeparator />
-													{statusMenuItems}
-												</>
-											)}
-										</DropdownMenuContent>
-									</DropdownMenu>
-								)}
+								<TaskCardMenus
+									task={task}
+									isRunning={isRunning}
+									isLocked={isRunning && !isStuck}
+									onOpen={onClick}
+									onStatusChange={onStatusChange}
+									onDuplicate={onDuplicate}
+									onDelete={onDelete}
+									onSync={
+										task.status !== "done" && currentProject?.path
+											? openSyncDialog
+											: undefined
+									}
+									contextMenuAt={menuAt}
+									onContextMenuClose={closeMenu}
+									editOpen={isEditOpen}
+									onEditOpenChange={setIsEditOpen}
+								/>
 							</div>
 						</div>
 						{/* Close content wrapper for selectable mode */}

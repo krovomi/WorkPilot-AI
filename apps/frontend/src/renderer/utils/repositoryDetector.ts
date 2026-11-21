@@ -8,7 +8,7 @@
 import type { Project } from "@shared/types";
 
 export interface RepositoryDetectionResult {
-	provider: "github" | "azure_devops" | "unknown";
+	provider: "github" | "gitlab" | "azure_devops" | "unknown";
 	remoteUrl?: string;
 	detectedAt: Date;
 }
@@ -126,6 +126,11 @@ export async function autoDetectAndUpdateProject(project: Project): Promise<{
 
 		if (detection.provider === "github") {
 			updates.githubEnabled = true;
+			updates.azureDevOpsEnabled = false;
+			updates.jiraEnabled = false;
+		} else if (detection.provider === "gitlab") {
+			updates.githubEnabled = false;
+			updates.gitlabEnabled = true;
 			updates.azureDevOpsEnabled = false;
 			updates.jiraEnabled = false;
 		} else if (detection.provider === "azure_devops") {

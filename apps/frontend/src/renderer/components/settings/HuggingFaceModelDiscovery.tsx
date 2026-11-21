@@ -7,7 +7,9 @@
  *
  * Click a row to set the provider's default model to `hf.co/<id>`; "Download &
  * start" launches Ollama and pulls the GGUF repo locally. A copy button yields
- * the equivalent `ollama pull` command.
+ * the equivalent `ollama pull` command. A repo the Hugging Face router serves
+ * (`cloudIndex`) shows its price and « Try in the cloud », which makes it the
+ * Hugging Face provider's model: run it there before downloading gigabytes.
  *
  * The filter bar mirrors the facets on https://huggingface.co/models (task,
  * library, language, license, sort). Parameter-size filtering is intentionally
@@ -18,6 +20,7 @@ import {
 	AlertCircle,
 	Check,
 	CircleCheck,
+	Cloud,
 	Copy,
 	Download,
 	ExternalLink,
@@ -28,6 +31,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { HuggingFaceModelInfo } from "../../../shared/types/mcp-marketplace";
+import type { CatalogModel } from "../../hooks/useProviderModelCatalog";
 import {
 	assessHfModel,
 	estimateGbFromParams,
@@ -35,6 +39,7 @@ import {
 } from "../../../shared/utils/hf-model-suitability";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
+import { catalogEntry, priceLabel } from "./gateway-model-catalog";
 
 import { Input } from "../ui/input";
 interface HuggingFaceModelDiscoveryProps {
@@ -54,6 +59,12 @@ interface HuggingFaceModelDiscoveryProps {
 	 * the parent stores as the provider's default model.
 	 */
 	onSelectModel?: (model: string) => void;
+	/** The Hugging Face router's catalogue, by lower-cased id (`indexCatalog`). */
+	cloudIndex?: ReadonlyMap<string, CatalogModel>;
+	/** The Hugging Face provider's current model, to mark its row. */
+	cloudModel?: string;
+	/** Makes a router-served repo the Hugging Face provider's model. */
+	onTryInCloud?: (id: string) => void;
 }
 
 /** Stages of the "make this model actually runnable locally" pipeline. */
@@ -196,6 +207,9 @@ export function HuggingFaceModelDiscovery({
 	selectedModel,
 	baseUrl,
 	onSelectModel,
+	cloudIndex,
+	cloudModel,
+	onTryInCloud,
 }: HuggingFaceModelDiscoveryProps) {
 	const { t } = useTranslation("settings");
 	/** Shorthand for the model-discovery namespace. */
@@ -712,6 +726,10 @@ export function HuggingFaceModelDiscovery({
 						isActiveProvision && provision.model === localName;
 					const isBusyElsewhere =
 						isActiveProvision && provision.model !== localName;
+					const cloud = cloudIndex ? catalogEntry(cloudIndex, m.id) : undefined;
+					const cloudPrice = priceLabel(cloud);
+					const isCloudModel =
+						!!cloud && cloudModel?.trim().toLowerCase() === m.id.toLowerCase();
 					return (
 						// biome-ignore lint/a11y/useSemanticElements: row wraps action <button>s, so it cannot itself be a <button>
 						<div
@@ -770,6 +788,16 @@ export function HuggingFaceModelDiscovery({
 										<Heart className="h-3 w-3" />
 										{formatCount(m.likes)}
 									</span>
+									{cloud && (
+										<span
+											className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-info/15 text-info text-3xs font-medium"
+											title={td("cloudBadgeTitle")}
+										>
+											<Cloud className="h-3 w-3" />
+											{td("cloudBadge")}
+											{cloudPrice ? ` · ${td("cloudPrice", { price: cloudPrice })}` : ""}
+										</span>
+									)}
 									{m.pipelineTag && (
 										<span className="px-1.5 py-0.5 rounded bg-muted text-3xs">
 											{m.pipelineTag}
@@ -783,6 +811,27 @@ export function HuggingFaceModelDiscovery({
 								</div>
 							</div>
 							<div className="flex shrink-0 items-center gap-2">
+								{cloud && onTryInCloud && (
+									<Button
+										type="button"
+										variant={isCloudModel ? "default" : "outline"}
+										size="sm"
+										onClick={(e) => {
+											e.stopPropagation();
+											onTryInCloud(cloud.value);
+										}}
+										title={td("tryInCloudTooltip", { id: cloud.value })}
+									>
+										{isCloudModel ? (
+											<Check className="h-4 w-4" />
+										) : (
+											<Cloud className="h-4 w-4" />
+										)}
+										<span className="ml-1.5 hidden sm:inline">
+											{isCloudModel ? td("cloudDefault") : td("tryInCloud")}
+										</span>
+									</Button>
+								)}
 								<Button
 									type="button"
 									variant={isSelected ? "default" : "outline"}

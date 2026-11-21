@@ -575,9 +575,9 @@ moyen par complexité n'est enregistré nulle part, sur l'ordinateur non plus.
 Dans l'app, ces vues reconnaissent un projet du serveur (`useServerProjectId`) et demandent au main
 ses données par son id (`main/server-workspace.ts`, canaux `SERVER_WORKSPACE_*`), qui ne répond que
 pour un projet du serveur listé et revérifie chaque nombre et chaque libellé ; ni le miroir, ni le
-backend local, ni les fichiers de l'ordinateur ne sont lus pour lui. Les routes du tableau de bord
-écrites pour l'ordinateur (`dashboard/api.py` : `/api/dashboard/*`, `/api/sessions/*`), qui lisent
-la machine et non un projet, ne répondent qu'en mode local (404 sur un serveur).
+backend local, ni les fichiers de l'ordinateur ne sont lus pour lui. La route de l'historique
+écrite pour l'ordinateur (`dashboard/api.py` : `/api/sessions/*`), qui lit la machine et non un
+projet, ne répond qu'en mode local (404 sur un serveur).
 
 | Action | Route | Il faut |
 |---|---|---|

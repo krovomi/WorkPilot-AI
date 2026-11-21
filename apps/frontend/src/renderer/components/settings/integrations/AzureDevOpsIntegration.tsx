@@ -30,6 +30,7 @@ import {
 } from "../../ui/select";
 import { Separator } from "../../ui/separator";
 import { Switch } from "../../ui/switch";
+import { ForgeBindingNotice } from "./ForgeBindingNotice";
 
 interface AzureDevOpsIntegrationProps {
 	readonly envConfig: ProjectEnvConfig | null;
@@ -340,6 +341,17 @@ export function AzureDevOpsIntegration({
 							t={t}
 						/>
 					</div>
+
+					<ForgeBindingNotice
+						projectId={projectId}
+						forge="azureDevOps"
+						current={{
+							azureDevOpsOrgUrl: envConfig.azureDevOpsOrgUrl ?? "",
+							azureDevOpsProject: envConfig.azureDevOpsProject ?? "",
+							azureDevOpsRepository: envConfig.azureDevOpsRepository ?? "",
+						}}
+						onApply={updateEnvConfig}
+					/>
 
 					{/* Connection Status */}
 					{envConfig.azureDevOpsPat && envConfig.azureDevOpsOrgUrl && (

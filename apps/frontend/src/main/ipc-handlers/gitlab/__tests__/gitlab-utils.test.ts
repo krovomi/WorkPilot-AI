@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
 	glab: new Map<string, string | Error>(),
 	glabCalls: [] as { command: string; args: string[] }[],
+	remotes: [] as { name: string; url: string }[],
 }));
 
 vi.mock("node:child_process", () => {
@@ -36,6 +37,10 @@ vi.mock("../../../cli-tool-manager", () => ({
 	getToolPath: (tool: string) => `/tools/${tool}`,
 }));
 vi.mock("../../../env-utils", () => ({ getAugmentedEnv: () => ({}) }));
+vi.mock("../../../forge/project-forge-binding", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../../../forge/project-forge-binding")>()),
+	listGitRemotes: () => state.remotes,
+}));
 vi.mock("../../../project-env-file", async () => {
 	const fs = await import("node:fs");
 	const nodePath = await import("node:path");
@@ -84,6 +89,7 @@ beforeEach(() => {
 	dir = mkdtempSync(path.join(tmpdir(), "gitlab-utils-"));
 	state.glab.clear();
 	state.glabCalls = [];
+	state.remotes = [];
 });
 
 afterEach(() => {
@@ -126,6 +132,22 @@ describe("the GitLab config of a project", () => {
 			project: "7",
 		});
 		expect(state.glabCalls[0].command).toBe("/tools/glab");
+	});
+
+	it("takes the project's own remote on the instance when no project is saved", async () => {
+		state.remotes = [
+			{ name: "origin", url: "git@github.com:acme/mirror.git" },
+			{ name: "gl", url: "https://gitlab.acme.dev/team/shop.git" },
+		];
+		await expect(
+			getGitLabConfig(
+				projectWith("GITLAB_TOKEN=pat-test-0000\nGITLAB_INSTANCE_URL=https://gitlab.acme.dev"),
+			),
+		).resolves.toMatchObject({ project: "team/shop" });
+		// A remote on another instance is not this project's GitLab project.
+		await expect(
+			getGitLabConfig(projectWith("GITLAB_TOKEN=pat-test-0000")),
+		).resolves.toBeNull();
 	});
 
 	it("is null without a token anywhere, without a project, or turned off", async () => {
