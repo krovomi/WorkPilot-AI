@@ -3,7 +3,9 @@
  * in-memory session that grants nothing, the device emulated before the page
  * loads, no way off the server's origin, and the window always destroyed.
  * Network and CPU throttling, when a profile asks for it, is set the same
- * way, before the page loads, and the load is timed under it.
+ * way, before the page loads, and the load is timed under it. A turned
+ * device announces its orientation, and the preview's cookies are lent only
+ * when asked for.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,6 +19,7 @@ const state = vi.hoisted(() => ({
 	attachThrows: false,
 	detachThrows: false,
 	refuse: null as string | null,
+	share: vi.fn(async (..._args: unknown[]) => 2),
 }));
 
 interface FakeSession {
@@ -95,7 +98,9 @@ vi.mock("electron", () => {
 	return { BrowserWindow, session: { fromPartition: vi.fn(() => fakeSession) } };
 });
 
-import { findDevicePreset } from "../../../shared/constants/device-presets";
+vi.mock("../preview-session", () => ({ sharePreviewCookies: (...args: unknown[]) => state.share(...args) }));
+
+import { findDevicePreset, orientDevice } from "../../../shared/constants/device-presets";
 import {
 	BASE_LOAD_TIMEOUT_MS,
 	MAX_LOAD_TIMEOUT_MS,
@@ -136,6 +141,8 @@ describe("captureDevice", () => {
 		state.attachThrows = false;
 		state.detachThrows = false;
 		state.refuse = null;
+		state.share.mockClear();
+		state.share.mockImplementation(async () => 2);
 	});
 
 	it("renders in a hidden sandboxed window that grants nothing", async () => {
@@ -179,7 +186,13 @@ describe("captureDevice", () => {
 			"Emulation.setUserAgentOverride",
 			"Page.captureScreenshot",
 		]);
-		expect(window.commands[0].params).toMatchObject({ width: 393, height: 852, deviceScaleFactor: 3, mobile: true });
+		expect(window.commands[0].params).toMatchObject({
+			width: 393,
+			height: 852,
+			deviceScaleFactor: 3,
+			mobile: true,
+			screenOrientation: { type: "portraitPrimary", angle: 0 },
+		});
 		expect(window.commands[1].params).toEqual({ enabled: true, maxTouchPoints: 5 });
 		expect(window.userAgent).toContain("iPhone");
 		expect(window.probeCode).toContain('"touch":true');
@@ -314,6 +327,44 @@ describe("captureDevice", () => {
 		state.attachThrows = false;
 		state.detachThrows = true;
 		await run();
+		expect(lastWindow().destroy).toHaveBeenCalled();
+	});
+
+	it("renders a turned device in its new orientation, a quarter turn from its own", async () => {
+		await run(orientDevice(iphone, "landscape"));
+		expect(lastWindow().options).toMatchObject({ width: 852, height: 393 });
+		expect(lastWindow().commands[0].params).toMatchObject({
+			width: 852,
+			height: 393,
+			screenOrientation: { type: "landscapePrimary", angle: 90 },
+		});
+		await run(desktop);
+		expect(lastWindow().commands[0].params).toMatchObject({
+			screenOrientation: { type: "landscapePrimary", angle: 0 },
+		});
+	});
+
+	it("lends the preview's cookies for the rendered origin only when asked, before loading", async () => {
+		await run();
+		expect(state.share).not.toHaveBeenCalled();
+		let loadedAfterShare = false;
+		state.loadURL = () => {
+			loadedAfterShare = state.share.mock.calls.length > 0;
+			return Promise.resolve();
+		};
+		const done = captureDevice(iphone, "http://localhost:5173/account", undefined, { previewSession: true });
+		await vi.advanceTimersByTimeAsync(SETTLE_MS);
+		await done;
+		expect(state.share).toHaveBeenCalledWith(state.session, "http://localhost:5173");
+		expect(loadedAfterShare).toBe(true);
+	});
+
+	it("names a preview session that cannot be read, rather than capture signed out", async () => {
+		state.share.mockImplementation(async () => {
+			throw new Error("cookie store gone");
+		});
+		const done = captureDevice(iphone, "http://localhost:5173/", undefined, { previewSession: true });
+		await expect(done).rejects.toEqual(new DeviceCaptureFailure("session-failed"));
 		expect(lastWindow().destroy).toHaveBeenCalled();
 	});
 });

@@ -17,7 +17,8 @@ import {
 	sameAddress,
 } from "../../../shared/utils/emulator-landing";
 import { Button } from "../ui/button";
-import { DeviceMatrix } from "./DeviceMatrix";
+import { useDeviceMatrixStore } from "../../stores/device-matrix-store";
+import { DeviceMatrix, matrixPath } from "./DeviceMatrix";
 
 const FORMATS = [
 	{ id: "phone", width: 390, height: 844 },
@@ -133,6 +134,11 @@ interface ResponsivePreviewProps {
 	/** Le sélecteur attend un clic dans la page : le bouton l'annule. */
 	pointing?: boolean;
 	onCancelPoint?: (webContentsId: number) => void;
+	/**
+	 * La revue d'une tâche qui touche l'interface : la matrice s'ouvre d'office
+	 * et capture les appareils par défaut, une fois par clé (la tâche).
+	 */
+	autoMatrixKey?: string | null;
 }
 
 /** CSS viewport simulation: dimensions change media queries, zoom only scales the preview. */
@@ -148,6 +154,7 @@ export function ResponsivePreview({
 	onPoint,
 	pointing = false,
 	onCancelPoint,
+	autoMatrixKey = null,
 }: ResponsivePreviewProps) {
 	const { t } = useTranslation("appEmulator");
 	const viewRef = useRef<Electron.WebviewTag>(null);
@@ -158,6 +165,7 @@ export function ResponsivePreview({
 	const [failure, setFailure] = useState<string | null>(null);
 	/** La matrice d'appareils remplace l'aperçu sans démonter le `<webview>`, qui garde son historique. */
 	const [matrix, setMatrix] = useState(false);
+	const [autoMatrix, setAutoMatrix] = useState(false);
 	// The key replaces the webview DOM node, so each replacement needs fresh listeners.
 
 	const homeUrl = useMemo(
@@ -209,6 +217,17 @@ export function ResponsivePreview({
 
 	/** L'adresse du moment, lisible depuis les écouteurs du `<webview>`. */
 	const currentUrlRef = useRef(currentUrl);
+
+	// La matrice d'office de la revue : la page que l'aperçu ouvre, sur les appareils par défaut.
+	// Une fois par clé : le store refuse une clé déjà capturée, même si le serveur change.
+	useEffect(() => {
+		if (!autoMatrixKey) return;
+		const { path } = matrixPath(url, currentUrlRef.current);
+		if (!useDeviceMatrixStore.getState().autoCapture(autoMatrixKey, path)) return;
+		setMatrix(true);
+		setAutoMatrix(true);
+	}, [autoMatrixKey, url]);
+
 	useEffect(() => {
 		currentUrlRef.current = currentUrl;
 		onNavigate?.(currentUrl, restoredRef.current);
@@ -552,7 +571,7 @@ export function ResponsivePreview({
 			</div>
 			{matrix && (
 				<div className="min-h-0 flex-1">
-					<DeviceMatrix serverUrl={url} currentUrl={currentUrl} onCapture={onCapture} />
+					<DeviceMatrix serverUrl={url} currentUrl={currentUrl} onCapture={onCapture} auto={autoMatrix} />
 				</div>
 			)}
 			{loading && (

@@ -6,6 +6,7 @@
  */
 import en from "../../shared/i18n/locales/en/appEmulator.json";
 import fr from "../../shared/i18n/locales/fr/appEmulator.json";
+import { isRotated, orientationOf } from "../../shared/constants/device-presets";
 import type { CpuProfile, DevicePreset, NetworkProfile } from "../../shared/types/device-matrix";
 
 type Texts = typeof en;
@@ -24,7 +25,7 @@ export interface GridCaption {
 	readonly detail: string;
 }
 
-/** Le nom de l'appareil, puis sa fenêtre et le bridage appliqué s'il y en a un. */
+/** Le nom de l'appareil, puis sa fenêtre, son sens s'il a été tourné, et le bridage appliqué s'il y en a un. */
 export function gridCaption(
 	device: DevicePreset,
 	network: NetworkProfile,
@@ -39,6 +40,7 @@ export function gridCaption(
 			dpr: device.deviceScaleFactor,
 		}),
 	];
+	if (isRotated(device)) parts.push(matrix.orientation[orientationOf(device)]);
 	if (network.conditions) parts.push(matrix.network[network.id]);
 	if (cpu.rate > 1) parts.push(interpolate(matrix.cpuSlowdown, { rate: cpu.rate }));
 	return {

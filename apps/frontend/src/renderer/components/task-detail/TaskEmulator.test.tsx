@@ -13,7 +13,9 @@ import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../shared/i18n";
 import type { Project } from "../../../shared/types";
+import { DEFAULT_MATRIX_DEVICE_IDS } from "../../../shared/constants/device-presets";
 import { useAppEmulatorStore } from "../../stores/app-emulator-store";
+import { useDeviceMatrixStore } from "../../stores/device-matrix-store";
 import { TaskEmulator } from "./TaskEmulator";
 
 const project: Project = {
@@ -645,4 +647,65 @@ it("points an element of the preview, then sends what to change about it", async
 		await screen.findByText("Sent: the next session of the task gets it."),
 	).toBeInTheDocument();
 	expect(screen.queryByText("button.pay-cta")).not.toBeInTheDocument();
+});
+
+describe("TaskEmulator — la matrice d'appareils d'office à la revue", () => {
+	const worktreePath = "C:\\Repos\\Demo\\.worktrees\\spec-1";
+	const mockCaptureEmulatorDevice = vi.fn();
+	const uiDiff = (path: string) => ({
+		success: true,
+		data: { summary: "", files: [{ path, status: "modified", additions: 1, deletions: 0 }] },
+	});
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(window.electronAPI as unknown as Record<string, unknown>).captureEmulatorDevice = mockCaptureEmulatorDevice;
+		mockCaptureEmulatorDevice.mockResolvedValue({ success: false, error: "load-failed" });
+		mockGetWorktreeStatus.mockResolvedValue({ success: true, data: { exists: true, worktreePath } });
+		useDeviceMatrixStore.setState({ autoCaptured: [], running: false, exporting: false, entries: {} });
+		useAppEmulatorStore.setState({
+			phase: "running",
+			url: "http://localhost:5000",
+			output: "",
+			config: { type: "web", framework: "vite", startCommand: "pnpm dev", port: 5000, isWeb: true, projectDir: worktreePath },
+			previewUrls: {},
+		});
+	});
+
+	it("capture les appareils par défaut quand la tâche en revue touche l'interface", async () => {
+		mockGetWorktreeDiff.mockResolvedValue(uiDiff("src/components/Cart.tsx"));
+		render(<TaskEmulator taskId="task-ui" project={project} inReview />);
+		expect(
+			await screen.findByText("Shown for the review of this task: its changes touch the interface."),
+		).toBeInTheDocument();
+		await waitFor(() =>
+			expect(mockCaptureEmulatorDevice).toHaveBeenCalledTimes(DEFAULT_MATRIX_DEVICE_IDS.length),
+		);
+		expect(mockCaptureEmulatorDevice.mock.calls.map(([request]) => request.deviceId)).toEqual([
+			...DEFAULT_MATRIX_DEVICE_IDS,
+		]);
+		expect(screen.getByRole("button", { name: "Device matrix" })).toHaveAttribute("aria-pressed", "true");
+	});
+
+	it("ne capture rien hors revue, ni pour une tâche qui ne touche pas l'interface", async () => {
+		mockGetWorktreeDiff.mockResolvedValue(uiDiff("src/components/Cart.tsx"));
+		const { unmount } = render(<TaskEmulator taskId="task-ui" project={project} />);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		unmount();
+		mockGetWorktreeDiff.mockResolvedValue(uiDiff("api/cart.py"));
+		render(<TaskEmulator taskId="task-api" project={project} inReview />);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalledTimes(2));
+		expect(mockCaptureEmulatorDevice).not.toHaveBeenCalled();
+	});
+
+	it("ne capture rien quand le serveur ne tourne pas depuis le worktree de la tâche", async () => {
+		mockGetWorktreeDiff.mockResolvedValue(uiDiff("src/components/Cart.tsx"));
+		useAppEmulatorStore.setState({
+			config: { type: "web", framework: "vite", startCommand: "pnpm dev", port: 5000, isWeb: true, projectDir: "C:\\Other" },
+		});
+		render(<TaskEmulator taskId="task-ui" project={project} inReview />);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		expect(mockCaptureEmulatorDevice).not.toHaveBeenCalled();
+		expect(screen.getByRole("button", { name: "Device matrix" })).toHaveAttribute("aria-pressed", "false");
+	});
 });
