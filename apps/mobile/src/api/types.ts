@@ -26,6 +26,13 @@ export interface AuthConfig {
 	entra_enabled: boolean;
 	entra_tenant_id?: string | null;
 	entra_client_id?: string | null;
+	/** The server's OpenID Connect provider (`auth/sso.ts` checks every field again). */
+	sso_enabled?: boolean;
+	sso_name?: string;
+	sso_client_id?: unknown;
+	sso_scopes?: unknown;
+	sso_authorization_endpoint?: unknown;
+	sso_token_endpoint?: unknown;
 }
 
 export interface Organization {

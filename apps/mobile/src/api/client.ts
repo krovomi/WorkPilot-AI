@@ -30,6 +30,9 @@ export class ApiError extends Error {
 	}
 }
 
+/** Who vouches for an id_token: Microsoft Entra or the server's OpenID Connect provider. */
+export type IdProvider = "entra" | "sso";
+
 export interface ClientOptions {
 	baseUrl: string;
 	refreshToken?: string | null;
@@ -158,9 +161,14 @@ export class ServerClient {
 		return tokens;
 	}
 
-	/** Sign in with a Microsoft Entra id_token, which the server checks against its own app registration. */
-	async loginWithEntra(idToken: string): Promise<TokenResponse> {
-		const tokens = await this.publicRequest<TokenResponse>("POST", "/auth/oidc/exchange", { id_token: idToken });
+	/**
+	 * Sign in with an id_token, which the server checks: Microsoft Entra's
+	 * against its own app registration, its OpenID Connect provider's
+	 * against that provider's keys.
+	 */
+	async loginWithIdToken(idToken: string, provider: IdProvider): Promise<TokenResponse> {
+		const path = provider === "entra" ? "/auth/oidc/exchange" : "/auth/sso/exchange";
+		const tokens = await this.publicRequest<TokenResponse>("POST", path, { id_token: idToken });
 		this.orgId = null;
 		this.adopt(tokens);
 		return tokens;

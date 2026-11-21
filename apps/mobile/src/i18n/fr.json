@@ -18,7 +18,9 @@
 		"entra_disabled": "Ce serveur ne propose pas la connexion Microsoft.",
 		"entra_failed": "La connexion Microsoft n'a pas abouti.",
 		"entra_misconfigured": "Les réglages de connexion Microsoft du serveur sont invalides.",
-		"approval_waiting": "Votre approbation est enregistrée : {{given}} sur {{needed}}. Le build démarre quand la carte a toutes les approbations qu'il lui faut."
+		"approval_waiting": "Votre approbation est enregistrée : {{given}} sur {{needed}}. Le build démarre quand la carte a toutes les approbations qu'il lui faut.",
+		"sso_disabled": "Ce serveur ne propose pas l'authentification unique.",
+		"sso_failed": "L'authentification unique n'a pas abouti."
 	},
 	"signIn": {
 		"title": "WorkPilot AI",
@@ -30,13 +32,15 @@
 		"submit": "Se connecter",
 		"invalidUrl": "Cette adresse de serveur n'est pas valide.",
 		"insecureUrl": "Utilisez une adresse https://. Le http simple n'est permis que sur votre réseau local.",
-		"localDisabled": "Ce serveur n'accepte que la connexion Microsoft : utilisez Se connecter avec Microsoft.",
+		"localDisabled": "Ce serveur n'accepte pas les mots de passe : connectez-vous avec Microsoft ou par authentification unique.",
 		"failed": "Connexion impossible : {{message}}",
 		"badCredentials": "E-mail ou mot de passe incorrect.",
 		"or": "ou",
 		"microsoft": "Se connecter avec Microsoft",
 		"entraDisabled": "Ce serveur ne propose pas la connexion Microsoft.",
-		"entraRefused": "Le serveur a refusé ce compte Microsoft."
+		"entraRefused": "Le serveur a refusé ce compte Microsoft.",
+		"sso": "Se connecter par authentification unique (SSO)",
+		"ssoRefused": "Le serveur a refusé ce compte."
 	},
 	"unreachable": {
 		"title": "Serveur injoignable",
