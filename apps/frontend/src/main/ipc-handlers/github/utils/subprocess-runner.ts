@@ -680,9 +680,15 @@ export function buildRunnerArgs(
 		thinkingLevel?: string;
 		/** The flag that names the project folder (the GitLab runner's is `--project-dir`). */
 		projectFlag?: string;
+		/** The GitHub runner's `--repo` (`owner/repo`, checked by the caller). */
+		repo?: string;
 	},
 ): string[] {
 	const args = [runnerPath, options?.projectFlag ?? "--project", projectPath];
+
+	if (options?.repo) {
+		args.push("--repo", options.repo);
+	}
 
 	if (options?.model) {
 		args.push("--model", options.model);

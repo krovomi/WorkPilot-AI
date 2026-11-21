@@ -1,4 +1,4 @@
-import type { Project } from "@shared/types/project";
+import type { Project, RepoProviderDetectionResult } from "@shared/types/project";
 import {
 	joinProjectPath,
 	sanitizeProjectFolderName,
@@ -37,7 +37,7 @@ interface AddProjectModalProps {
 
 type RemoteType = "github" | "azure" | "jira" | null;
 type RemoteConfigType = "github" | "azure" | null;
-type DetectedProvider = "github" | "azure_devops" | "unknown";
+type DetectedProvider = RepoProviderDetectionResult["provider"];
 
 interface RemoteConfig {
 	githubToken?: string;

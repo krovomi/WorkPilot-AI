@@ -3134,5 +3134,13 @@
 			"invalid_policy": "Politique invalide",
 			"tool_loop": "Coupe-circuit"
 		}
+	},
+	"forgeBinding": {
+		"mismatchTitle": "Ce projet pointe sur {{saved}}, qui n'est aucun de ses remotes",
+		"mismatchDescription": "Ce dépôt vient peut-être d'un autre projet. Utiliser le dépôt du remote de ce projet :",
+		"mismatchNoRemote": "Aucun remote de ce projet n'est sur cette forge : ce dépôt appartient sans doute à un autre projet. Vérifiez-le, ou désactivez cette intégration pour ce projet.",
+		"useRemote": "Utiliser {{repo}}",
+		"detected": "Aucun dépôt enregistré : ce projet utilise celui de son remote git, {{repo}}.",
+		"saveDetected": "L'enregistrer dans les réglages"
 	}
 }

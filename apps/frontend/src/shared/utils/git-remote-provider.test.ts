@@ -17,6 +17,8 @@ describe("gitRemoteHost", () => {
 describe("providerFromRemoteUrl", () => {
 	it("names the forge from the host", () => {
 		expect(providerFromRemoteUrl("git@github.com:o/r.git")).toBe("github");
+		expect(providerFromRemoteUrl("git@gitlab.com:g/p.git")).toBe("gitlab");
+		expect(providerFromRemoteUrl("https://gitlab.com/g/s/p")).toBe("gitlab");
 		expect(providerFromRemoteUrl("https://dev.azure.com/o/p/_git/r")).toBe(
 			"azure_devops",
 		);
@@ -36,6 +38,7 @@ describe("providerFromRemoteUrl", () => {
 			"unknown",
 		);
 		expect(providerFromRemoteUrl("https://notgithub.com/o/r")).toBe("unknown");
+		expect(providerFromRemoteUrl("https://gitlab.com.evil.example/g/p")).toBe("unknown");
 		expect(
 			providerFromRemoteUrl("https://evil.example/?dev.azure.com/o/p"),
 		).toBe("unknown");
