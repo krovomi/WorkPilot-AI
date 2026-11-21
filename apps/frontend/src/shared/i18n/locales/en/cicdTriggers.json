@@ -54,7 +54,7 @@
 	},
 	"monitor": {
 		"heading": "Watch after a deployment",
-		"description": "After a pipeline starts from WorkPilot, the health check and the Prometheus metrics are compared with what they were before it, for a window of observation.",
+		"description": "After a pipeline starts from WorkPilot, the health check and the metrics of the chosen source are compared with what they were before it, for a window of observation.",
 		"monitor_health_url": "Health check URL",
 		"monitor_prometheus_url": "Prometheus URL",
 		"monitor_prometheus_token": "Prometheus token (optional)",
@@ -62,7 +62,30 @@
 		"monitor_deploy_wait_minutes": "Wait for the deployment to land (minutes)",
 		"auto_rollback": "Roll back by itself on a critical verdict",
 		"autoRollbackHint": "Off: the rollback is offered here. On: GitHub Actions and Azure Pipelines go back to the last run that succeeded, unless the change holds a database migration.",
-		"fileHint": "Metrics and thresholds: .workpilot/deploy-monitors.yaml (PromQL query, kind error_rate, latency, throughput or custom, warning and critical in percent). revert_pr: true opens a PR that reverts the deployed commit after a critical verdict; explain_incident: false keeps the model out of the incident report."
+		"fileHint": "Metrics and thresholds: .workpilot/deploy-monitors.yaml (query in the source's language, kind error_rate, latency, throughput or custom, warning and critical in percent). revert_pr: true opens a PR that reverts the deployed commit after a critical verdict; explain_incident: false keeps the model out of the incident report.",
+		"monitor_source": "Metric source",
+		"sources": {
+			"prometheus": "Prometheus",
+			"datadog": "Datadog",
+			"newrelic": "New Relic",
+			"cloudwatch": "Amazon CloudWatch"
+		},
+		"monitor_datadog_site": "Datadog site",
+		"monitor_datadog_api_key": "Datadog API key",
+		"monitor_datadog_app_key": "Datadog application key",
+		"monitor_newrelic_region": "New Relic region",
+		"monitor_newrelic_account_id": "New Relic account id",
+		"monitor_newrelic_api_key": "New Relic user API key",
+		"monitor_aws_region": "AWS region",
+		"monitor_aws_access_key_id": "AWS access key id",
+		"monitor_aws_secret_access_key": "AWS secret access key",
+		"monitor_aws_session_token": "AWS session token (optional)",
+		"queryHint": {
+			"prometheus": "Each metric's query is PromQL; a vector is summed.",
+			"datadog": "Each metric's query is a Datadog metric query; the newest point of each series over the last five minutes is summed.",
+			"newrelic": "Each metric's query is NRQL with its SINCE clause; the numbers of the result are summed.",
+			"cloudwatch": "Each metric's query is a Metrics Insights query or metric math; the newest value of each result over the last five minutes is summed."
+		}
 	},
 	"watch": {
 		"notConfigured": "Not watched: no health check or metric is configured.",
@@ -126,6 +149,32 @@
 			"health": "health check failed {{failed}} of {{checks}} times",
 			"metric": "{{name}}: {{baseline}} before, {{worst}} at worst ({{change}} %, {{level}})",
 			"explanation": "The project's model:"
+		},
+		"alerts": {
+			"line": "Alerts: {{list}}",
+			"sent": "{{channel}} sent",
+			"failed": "{{channel}} not delivered",
+			"invalid": "{{channel}} settings refused",
+			"offline": "{{channel}} skipped (strict offline)",
+			"channels": {
+				"slack": "Slack",
+				"pagerduty": "PagerDuty",
+				"email": "e-mail"
+			}
 		}
+	},
+	"alerts": {
+		"heading": "Alerts after a bad deployment",
+		"description": "A degraded verdict goes to Slack and e-mail; a critical one also pages the on-call person through PagerDuty. Only the facts of the watch are sent, never the model's text.",
+		"alert_slack_webhook_url": "Slack incoming webhook URL",
+		"alert_pagerduty_routing_key": "PagerDuty integration (routing) key",
+		"alert_pagerduty_region": "PagerDuty region",
+		"alert_email_to": "E-mail recipients (comma-separated)",
+		"alert_email_from": "E-mail sender",
+		"alert_smtp_host": "SMTP server",
+		"alert_smtp_port": "SMTP port (465: TLS, otherwise STARTTLS)",
+		"alert_smtp_user": "SMTP user (optional)",
+		"alert_smtp_password": "SMTP password (optional)",
+		"offlineHint": "Strict offline mode: only a webhook or an SMTP server on this machine or a private address is used; PagerDuty is not called."
 	}
 }

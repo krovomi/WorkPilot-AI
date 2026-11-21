@@ -297,6 +297,30 @@ class TestRunWatch:
             "manual",
         )
 
+    def test_datadog_is_read_and_skipped_offline(self, tmp_path, fake_fetch):
+        project = _project(tmp_path, monitors=MONITORS)
+        series = {"series": [{"pointlist": [[1, 0.01]]}]}
+        fetch = fake_fetch({"https://api.datadoghq.com/api/v1/query": (200, series)})
+        env = {
+            "CICD_MONITOR_SOURCE": "datadog",
+            "CICD_MONITOR_DATADOG_API_KEY": "dd-api-0000",
+            "CICD_MONITOR_DATADOG_APP_KEY": "dd-app-0000",
+        }
+        clock = Clock()
+        state = run_watch(
+            project, RUN_ID, env, fetch=fetch, sleep=clock.sleep, now=clock
+        )
+        assert (state["verdict"], state["baseline"]) == ("ok", {"errors": 0.01})
+        (project / ".workpilot" / "offline-mode.json").write_text(
+            '{"airgapStrict": true}', encoding="utf-8"
+        )
+        offline = fake_fetch()
+        state = run_watch(
+            project, RUN_ID, env, fetch=offline, sleep=clock.sleep, now=clock
+        )
+        assert "offline: Datadog skipped" in state["problems"]
+        assert (state["reason"], offline.requests) == ("not_configured", [])
+
     def test_unreadable_policy_counts_as_strict(self, tmp_path, fake_fetch):
         project = _project(tmp_path, monitors=MONITORS)
         (project / ".workpilot" / "offline-mode.json").write_text(
@@ -434,6 +458,34 @@ class TestIncident:
         assert "revert_pr" not in state
         assert state["incident"]["summary"]["verdict"] == "warning"
 
+    def test_alerts_go_to_the_configured_channels(self, tmp_path, fake_fetch):
+        project = _project(tmp_path, monitors=MONITORS)
+        slack = "https://hooks.slack.com/services/T0/B0/test0000"
+        codes = iter([500, 200, 200])
+        fetch = fake_fetch({HEALTH: lambda _r: (next(codes), b""), slack: (200, b"ok")})
+        clock = Clock()
+        state = run_watch(
+            project,
+            RUN_ID,
+            _env(CICD_MONITOR_PROMETHEUS_URL="", CICD_ALERT_SLACK_WEBHOOK_URL=slack),
+            fetch=fetch,
+            sleep=clock.sleep,
+            now=clock,
+            project_name="Boutique",
+            language="fr",
+            smtp=lambda *a: pytest.fail("no e-mail configured"),
+        )
+        assert state["alerts"] == {"slack": "sent"}
+        assert read_state(project, RUN_ID)["alerts"] == {"slack": "sent"}
+        text = json.loads(fetch.requests[-1].data)["text"]
+        assert text.startswith("*Déploiement dégradé : Boutique*")
+
+    def test_no_channel_no_alerts(self, tmp_path, fake_fetch):
+        project = _project(tmp_path, monitors=MONITORS)
+        state = self._run(project, fake_fetch, health=500)
+        assert state["verdict"] == "critical"
+        assert "alerts" not in state
+
     def test_a_healthy_run_has_no_report(self, tmp_path, fake_fetch):
         project = _project(tmp_path, monitors=MONITORS)
         state = self._run(project, fake_fetch, health=200)
@@ -476,6 +528,20 @@ class TestRunner:
             == 0
         )
         assert json.loads(capsys.readouterr().out)["reason"] == "not_configured"
+        named = [
+            "--action",
+            "watch",
+            "--project",
+            str(project),
+            "--run-id",
+            RUN_ID,
+            "--project-name",
+            "Shop",
+            "--language",
+            "fr",
+        ]
+        assert deploy_watch_runner.main(named) == 0
+        capsys.readouterr()
         assert (
             deploy_watch_runner.main(
                 ["--action", "rollback", "--project", str(project), "--run-id", "9"]
