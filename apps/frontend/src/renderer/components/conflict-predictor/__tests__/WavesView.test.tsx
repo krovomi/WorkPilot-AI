@@ -10,6 +10,7 @@ import { setupExecutionWavesListeners, useExecutionWavesStore } from "../../../s
 import { useProjectStore } from "../../../stores/project-store";
 import { useTaskStore } from "../../../stores/task-store";
 import { WavesView } from "../WavesView";
+import { RunHistorySummary } from "../WavesNotices";
 
 const PROJECT = "p1";
 
@@ -36,6 +37,7 @@ function plan(waves: string[][], extra: Partial<ExecutionWavePlan> = {}): Execut
 		residualRisk: 0,
 		mergeChecks: { checked: 0, conflicts: 0, unchecked: 0, failed: 0 },
 		fragileZones: { enabled: false, commits: null },
+		codeLinks: { enabled: false, files: 0, capped: false },
 		computedAt: "2026-11-14T08:00:00.000Z",
 		...extra,
 	};
@@ -83,7 +85,7 @@ describe("WavesView", () => {
 		await screen.findByTestId("wave-1");
 		expect(api.planExecutionWaves).toHaveBeenCalledWith({
 			projectId: PROJECT,
-			options: { tolerance: 0, unplannedPolicy: "isolate", fragileZones: true },
+			options: { tolerance: 0, unplannedPolicy: "isolate", fragileZones: true, codeLinks: true },
 		});
 		expect(screen.getByRole("table", { name: "Plan" })).toBeInTheDocument();
 		expect(screen.getAllByText("Wave 2").length).toBeGreaterThan(0);
@@ -130,7 +132,7 @@ describe("WavesView", () => {
 		expect(api.planExecutionWaves).toHaveBeenLastCalledWith({
 			projectId: PROJECT,
 			taskIds: ["c"],
-			options: { tolerance: 0, unplannedPolicy: "isolate", fragileZones: true },
+			options: { tolerance: 0, unplannedPolicy: "isolate", fragileZones: true, codeLinks: true },
 		});
 
 		await act(async () => {
@@ -171,7 +173,7 @@ describe("WavesView", () => {
 		expect(await screen.findByText("No spec is waiting in the backlog or queue.")).toBeInTheDocument();
 		expect(api.planExecutionWaves).toHaveBeenCalledWith({
 			projectId: PROJECT,
-			options: { tolerance: 1, unplannedPolicy: "independent", fragileZones: true },
+			options: { tolerance: 1, unplannedPolicy: "independent", fragileZones: true, codeLinks: true },
 		});
 		expect(useExecutionWavesStore.getState().options.advanceWhen).toBe("review");
 		expect(screen.getByRole("button", { name: "Execute in optimal order" })).toBeDisabled();
@@ -397,14 +399,118 @@ describe("WavesView, fragile zones", () => {
 
 	it("turns them off and on for the next plan", async () => {
 		render(<WavesView />);
-		fireEvent.click(screen.getByRole("button", { name: "Off" }));
+		// The first "Off" turns fragile zones off, the second code links.
+		fireEvent.click(screen.getAllByRole("button", { name: "Off" })[0]);
 		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
 		await screen.findByTestId("wave-1");
 		expect(api.planExecutionWaves).toHaveBeenLastCalledWith({
 			projectId: PROJECT,
-			options: { tolerance: 0, unplannedPolicy: "isolate", fragileZones: false },
+			options: { tolerance: 0, unplannedPolicy: "isolate", fragileZones: false, codeLinks: true },
 		});
 		fireEvent.click(screen.getByRole("button", { name: "From the history" }));
 		expect(useExecutionWavesStore.getState().options.fragileZones).toBe(true);
 	});
 });
+
+describe("WavesView, code links", () => {
+	it("shows the cross imports and removed symbols of a pair and how much code was read", async () => {
+		api.planExecutionWaves.mockReset().mockResolvedValue({
+			success: true,
+			data: plan([["a"], ["b"]], {
+				pairs: [
+					{
+						a: "a",
+						b: "b",
+						score: 2,
+						level: "medium",
+						sharedFiles: [],
+						unknown: false,
+						blocking: true,
+						importLinks: ["web/page.ts → lib/cart.ts"],
+						symbolLinks: ["web/page.ts → loadCart"],
+					},
+				],
+				codeLinks: { enabled: true, files: 12, capped: true },
+			}),
+		});
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		expect(await screen.findByText("1 cross imports")).toBeInTheDocument();
+		expect(screen.getByText("1 removed symbols still used")).toBeInTheDocument();
+		expect(screen.getByText(/12 files read for imports and removed symbols/)).toBeInTheDocument();
+		expect(screen.getByText(/The file limit was reached/)).toBeInTheDocument();
+	});
+
+	it("says nothing of code links when they are off", async () => {
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		await screen.findByTestId("wave-1");
+		expect(screen.queryByText(/files read for imports/)).toBeNull();
+	});
+
+	it("turns them off and on for the next plan", async () => {
+		render(<WavesView />);
+		fireEvent.click(screen.getAllByRole("button", { name: "Off" })[1]);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		await screen.findByTestId("wave-1");
+		expect(api.planExecutionWaves).toHaveBeenLastCalledWith({
+			projectId: PROJECT,
+			options: { tolerance: 0, unplannedPolicy: "isolate", fragileZones: true, codeLinks: false },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "From the code" }));
+		expect(useExecutionWavesStore.getState().options.codeLinks).toBe(true);
+	});
+});
+
+describe("WavesView, sprint metrics", () => {
+	const NOW = Date.parse("2026-11-20T12:00:00.000Z");
+	const record = (finishedAt: string, outcome: "done" | "stopped", conflictsAvoided: number) => ({
+		finishedAt,
+		outcome,
+		waves: 2,
+		tasks: 3,
+		started: 3,
+		conflictsAvoided,
+		riskAvoided: 2,
+	});
+
+	it("sums the runs of the last 14 days only, counted, never timed", () => {
+		render(
+			<RunHistorySummary
+				now={NOW}
+				history={{
+					records: [
+						record("2026-11-19T10:00:00.000Z", "stopped", 1),
+						record("2026-11-10T10:00:00.000Z", "done", 2),
+						record("2026-10-01T10:00:00.000Z", "done", 9),
+					],
+					ignored: false,
+				}}
+			/>,
+		);
+		const text = screen.getByTestId("wave-run-history").textContent ?? "";
+		expect(text).toContain("Last 14 days: 2 runs ended (1 stopped), 3 conflicts avoided (risk 4 taken out), 6 specs started.");
+		expect(text).toContain("Last run ended");
+	});
+
+	it("shows nothing without a recent run, and says when the history was ignored", () => {
+		const { container } = render(
+			<RunHistorySummary now={NOW} history={{ records: [record("2026-10-01T10:00:00.000Z", "done", 1)], ignored: false }} />,
+		);
+		expect(container).toBeEmptyDOMElement();
+		render(<RunHistorySummary history={{ records: [], ignored: true }} />);
+		expect(screen.getByText(/could not be read/)).toBeInTheDocument();
+	});
+
+	it("shows the selected project's history in the view, and no other project's", () => {
+		const history = { records: [record(new Date().toISOString(), "done", 1)], ignored: false };
+		useExecutionWavesStore.setState({ history: { ...history, projectId: "p2" } });
+		const { unmount } = render(<WavesView />);
+		expect(screen.queryByTestId("wave-run-history")).toBeNull();
+		unmount();
+		useExecutionWavesStore.setState({ history: { ...history, projectId: PROJECT } });
+		render(<WavesView />);
+		expect(screen.getByTestId("wave-run-history")).toBeInTheDocument();
+	});
+});
+

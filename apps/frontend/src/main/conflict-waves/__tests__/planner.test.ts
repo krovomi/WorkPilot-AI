@@ -2,6 +2,7 @@
  * The wave planner (#358), table-tested: pure, deterministic, any language.
  */
 import { describe, expect, it } from "vitest";
+import { buildSpecCode, MAX_CODE_WEIGHT } from "../code-links";
 import { type PlannerOptions, type PlannerTask, pairKey, planExecutionWaves } from "../planner";
 import { buildFootprint, fileWeight, riskLevel } from "../scorer";
 
@@ -313,5 +314,34 @@ describe("planExecutionWaves", () => {
 			expect.objectContaining({ score: 0, blocking: true, mergeCheck: "conflict" }),
 		]);
 		expect(result.pairs[0].conflictFiles).toHaveLength(20);
+	});
+});
+
+describe("code links in the score", () => {
+	it("adds one per link, capped, and lists them on the pair", () => {
+		const used = Array.from({ length: 5 }, (_, i) => `lib/module_${i}.ex`);
+		const editor = task("editor", used, {
+			code: buildSpecCode([], "@@ -1 +1 @@\n-def old_helper do\n"),
+		});
+		const user = task("user", ["web/page.ex"], {
+			code: buildSpecCode(
+				[{ path: "web/page.ex", text: `${used.map((_, i) => `alias Lib.Module_${i}`).join("\n")}\nold_helper()\n` }],
+				null,
+			),
+		});
+		const result = planExecutionWaves([editor, user], [], OPTIONS);
+		expect(result.pairs[0]).toMatchObject({ score: MAX_CODE_WEIGHT, blocking: true, sharedFiles: [] });
+		expect(result.pairs[0].importLinks).toHaveLength(5);
+		expect(result.pairs[0].symbolLinks).toEqual(["web/page.ex → old_helper"]);
+		expect(waves(result)).toEqual([["editor"], ["user"]]);
+	});
+
+	it("adds nothing when a spec's code was not read", () => {
+		const result = planExecutionWaves(
+			[task("a", ["lib/billing.ex"], { code: null }), task("b", ["web/page.ex"])],
+			[],
+			OPTIONS,
+		);
+		expect(result.pairs).toEqual([]);
 	});
 });
