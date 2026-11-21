@@ -4,7 +4,6 @@ import type {
 	ArenaBattleCompleteEvent,
 	ArenaBattleProgressEvent,
 	ArenaBattleResultEvent,
-	ArenaBattleStatus,
 	ArenaLabel,
 	ArenaParticipant,
 } from "@shared/types/arena";
@@ -42,11 +41,7 @@ interface ArenaActions {
 	closeDialog: () => void;
 
 	setActiveBattle: (battle: ArenaBattle | null) => void;
-	setBattles: (battles: ArenaBattle[]) => void;
-	setAnalytics: (analytics: ArenaAnalytics) => void;
 	setIsStartingBattle: (v: boolean) => void;
-	setIsLoadingHistory: (v: boolean) => void;
-	setIsLoadingAnalytics: (v: boolean) => void;
 	setAutoRoutingEnabled: (v: boolean) => void;
 	setError: (error: string | null) => void;
 
@@ -59,8 +54,8 @@ interface ArenaActions {
 	/** Handle full battle completion */
 	handleBattleComplete: (event: ArenaBattleCompleteEvent) => void;
 
-	/** Update battle status */
-	updateBattleStatus: (battleId: string, status: ArenaBattleStatus) => void;
+	/** Handle a battle that stopped on an error */
+	handleBattleError: (event: { battleId: string; error: string }) => void;
 
 	/** Submit a vote for a battle */
 	submitVote: (battleId: string, winnerLabel: ArenaLabel) => void;
@@ -95,11 +90,7 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 	closeDialog: () => set({ isOpen: false }),
 
 	setActiveBattle: (battle) => set({ activeBattle: battle }),
-	setBattles: (battles) => set({ battles }),
-	setAnalytics: (analytics) => set({ analytics }),
 	setIsStartingBattle: (v) => set({ isStartingBattle: v }),
-	setIsLoadingHistory: (v) => set({ isLoadingHistory: v }),
-	setIsLoadingAnalytics: (v) => set({ isLoadingAnalytics: v }),
 	setAutoRoutingEnabled: (v) => set({ autoRoutingEnabled: v }),
 	setError: (error) => set({ error }),
 
@@ -161,11 +152,11 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 		set({ activeBattle: updatedBattle });
 	},
 
-	updateBattleStatus: (battleId, status) => {
+	handleBattleError: ({ battleId, error }) => {
 		const { activeBattle } = get();
-		if (activeBattle?.id === battleId) {
-			set({ activeBattle: { ...activeBattle, status } });
-		}
+		if (!activeBattle || activeBattle.id !== battleId) return;
+		// The battle is over: left on "running", it would spin for ever.
+		set({ activeBattle: { ...activeBattle, status: "error" }, error });
 	},
 
 	submitVote: async (battleId, winnerLabel) => {
@@ -259,3 +250,21 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 export const openArenaDialog = () => {
 	useArenaStore.getState().openDialog();
 };
+
+/**
+ * Battle events, followed for the life of the window: a battle keeps running
+ * in the main process when the dialog closes or another tab is shown.
+ */
+export function setupArenaListeners(): () => void {
+	const api = globalThis.electronAPI;
+	const store = () => useArenaStore.getState();
+	const cleanups = [
+		api.onArenaBattleProgress((event) => store().handleBattleProgress(event)),
+		api.onArenaBattleResult((event) => store().handleBattleResult(event)),
+		api.onArenaBattleComplete((event) => store().handleBattleComplete(event)),
+		api.onArenaBattleError((event) => store().handleBattleError(event)),
+	];
+	return () => {
+		for (const cleanup of cleanups) cleanup();
+	};
+}

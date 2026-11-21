@@ -230,7 +230,12 @@ what an agent writes during a build shows up on that task's card."""
 
 
 def _line_arg(value: Any) -> int | None:
-    """A line number or count sent by a model, or None when absent or unreadable."""
+    """A line number or count sent by a model, or None when absent or unreadable.
+
+    Models send ``null``, ``true`` or ``{}`` for an argument they mean to leave
+    out; read with ``int()``, those failed the whole call (``null`` even
+    outside the tool errors, as an internal error of the server).
+    """
     if isinstance(value, bool):
         return None
     try:
@@ -271,7 +276,7 @@ def _call(
         task = os.environ.get(TASK_ENV, "").strip() or None
     graph_tools: dict[str, Callable[[], Any]] = {
         "query_graph": lambda: brain.graph().query(
-            args["query"], limit=int(args.get("limit", 8))
+            args["query"], limit=_line_arg(args.get("limit")) or 8
         ),
         "get_node": lambda: brain.graph().get_node(args["id"]),
         "shortest_path": lambda: brain.graph().shortest_path(
@@ -282,7 +287,7 @@ def _call(
         brain.before_read()
         return graph_tools[name]()
     if name == "brain_recall":
-        return brain.recall(args["query"], limit=int(args.get("limit", 5)))
+        return brain.recall(args["query"], limit=_line_arg(args.get("limit")) or 5)
     if name == "brain_read_note":
         note = brain.read(args["path"])
         return {**note, "body": _page(note["body"], args, max_chars)}

@@ -6,11 +6,13 @@
 		"addFeature": "Ajouter une Fonctionnalité",
 		"addNewFeature": "Ajouter une nouvelle fonctionnalité à la roadmap",
 		"regenerateRoadmap": "Régénérer la Roadmap",
-		"target": "Cible",
+		"targetAudience": "Cible : {{audience}}",
 		"morePersonas": "+{{count}} personas supplémentaires",
 		"secondaryPersonas": "Personas Secondaires:",
-		"features": "fonctionnalités",
-		"phases": "phases"
+		"featureCount_one": "{{count}} fonctionnalité",
+		"featureCount_other": "{{count}} fonctionnalités",
+		"phaseCount_one": "{{count}} phase",
+		"phaseCount_other": "{{count}} phases"
 	},
 	"emptyState": {
 		"title": "Aucune Roadmap",
@@ -193,7 +195,6 @@
 		"competitorInsight": "Cette fonctionnalité répond à des points de friction des concurrents",
 		"task": "Tâche",
 		"build": "Construire",
-		"impact": "impact {{impact}}",
 		"competitorInsightTitle": "Info concurrentielle",
 		"external": "Externe",
 		"complexityLevel": {
@@ -208,7 +209,6 @@
 		}
 	},
 	"featureDetail": {
-		"severity": "gravité {{severity}}",
 		"deleteDescription": "« {{title}} » sera définitivement retirée de votre roadmap.",
 		"rationale": "Justification",
 		"complexity": "Complexité",
@@ -243,5 +243,26 @@
 		"planned": "Planifiées",
 		"in_progress": "En cours",
 		"done": "Terminées"
+	},
+	"levels": {
+		"complexity": { "low": "Faible", "medium": "Moyenne", "high": "Élevée" },
+		"impact": { "low": "Faible", "medium": "Moyen", "high": "Élevé" },
+		"complexityBadge": { "low": "Complexité faible", "medium": "Complexité moyenne", "high": "Complexité élevée" },
+		"impactBadge": { "low": "Impact faible", "medium": "Impact moyen", "high": "Impact élevé" },
+		"severity": { "low": "Gravité faible", "medium": "Gravité moyenne", "high": "Gravité élevée" }
+	},
+	"phaseStatus": {
+		"planned": "Planifiée",
+		"in_progress": "En cours",
+		"completed": "Terminée"
+	},
+	"roadmapStatus": {
+		"draft": "Brouillon",
+		"active": "Active",
+		"archived": "Archivée"
+	},
+	"errors": {
+		"convertFailed": "La fonctionnalité n'a pas pu devenir une tâche : {{error}}",
+		"unknown": "erreur inconnue"
 	}
 }

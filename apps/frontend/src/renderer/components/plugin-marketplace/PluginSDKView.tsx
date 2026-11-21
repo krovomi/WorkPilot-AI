@@ -180,7 +180,7 @@ export function PluginSDKView() {
 									style={{ backgroundColor: color }}
 								/>
 								<div>
-									<p className="text-xs font-medium font-mono">{type}</p>
+									<code className="block text-xs font-medium font-mono">{type}</code>
 									<p className="text-3xs text-muted-foreground mt-0.5">
 										{t(descKey)}
 									</p>

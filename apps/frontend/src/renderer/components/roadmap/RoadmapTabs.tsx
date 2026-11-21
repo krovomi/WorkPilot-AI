@@ -56,12 +56,11 @@ export function RoadmapTabs({
 
 			{tab === "phases" && (
 				<div className="relative z-[1] min-h-0 flex-1 space-y-4 overflow-auto px-5 pb-4">
-					{roadmap.phases.map((phase: RoadmapPhase, index: number) => (
+					{roadmap.phases.map((phase: RoadmapPhase) => (
 						<PhaseCard
 							key={phase.id}
 							phase={phase}
 							features={getFeaturesByPhase(roadmap, phase.id)}
-							isFirst={index === 0}
 							onFeatureSelect={onFeatureSelect}
 							onConvertToSpec={onConvertToSpec}
 							onGoToTask={onGoToTask}
@@ -106,10 +105,10 @@ export function RoadmapTabs({
 										<div className="wp-title text-sm">{feature.title}</div>
 										<div className="wp-chips mt-1">
 											<Chip tone="muted" dot={false}>
-												{feature.complexity}
+												{t(`levels.complexityBadge.${feature.complexity}`)}
 											</Chip>
 											<Chip tone="muted" dot={false}>
-												{t("featureCard.impact", { impact: feature.impact })}
+												{t(`levels.impactBadge.${feature.impact}`)}
 											</Chip>
 											{hasCompetitorInsight(feature) && (
 												<Chip tone="accent" dot={false}>
