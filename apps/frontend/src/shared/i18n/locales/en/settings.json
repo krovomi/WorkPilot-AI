@@ -3193,5 +3193,42 @@
 		"useRemote": "Use {{repo}}",
 		"detected": "No repository saved: this project uses the one of its git remote, {{repo}}.",
 		"saveDetected": "Save it in the settings"
+	},
+	"forgeAccounts": {
+		"navLabel": "Forge accounts",
+		"title": "Forge accounts",
+		"description": "Save your GitHub, GitLab, Azure DevOps and Bitbucket accounts once (work, personal, a client…). Each project then picks the one it works with in its own settings. Tokens stay encrypted on this computer and are never shown again.",
+		"empty": "No forge account saved yet.",
+		"add": "Add an account",
+		"forge": "Forge",
+		"label": "Name",
+		"labelPlaceholder": "Work, Personal, Client X…",
+		"gitlabHost": "GitLab instance",
+		"azureHost": "Azure DevOps organization",
+		"bitbucketUsername": "Username or email (optional)",
+		"bitbucketUsernameHint": "With an API token or an app password, the username or Atlassian email it signs in with. Leave empty for a workspace or repository access token.",
+		"token": "Token",
+		"tokenPlaceholder": "Personal access token",
+		"tokenKeep": "Leave empty to keep the saved token",
+		"save": "Save",
+		"cancel": "Cancel",
+		"tokenSet": "Token saved",
+		"noToken": "No token",
+		"test": "Test",
+		"testOk": "Connected as {{username}}",
+		"testFailed": "Connection failed: {{error}}",
+		"edit": "Edit {{label}}",
+		"delete": "Delete {{label}}",
+		"deleteTitle": "Delete the account {{label}}?",
+		"deleteDescription": "Projects that use it will have no token for this forge until you pick another account or enter a token of their own.",
+		"picker": {
+			"label": "Account",
+			"ownToken": "This project's own token",
+			"withUsername": "{{label}} ({{username}})",
+			"missing": "Deleted account",
+			"hint": "A saved account brings its token and its address. Manage accounts in Settings, Forge accounts.",
+			"noneHint": "To use the same account in several projects, save it once in Settings, Forge accounts.",
+			"missingHint": "The account this project used was deleted: pick another one or enter a token for this project."
+		}
 	}
 }

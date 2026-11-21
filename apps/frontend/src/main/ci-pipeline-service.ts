@@ -52,6 +52,7 @@ import {
 } from "./ipc-handlers/task/plan-file-utils";
 import { parseEnvFile } from "./ipc-handlers/utils";
 import { learningLoopService } from "./learning-loop-service";
+import { withForgeAccounts } from "./forge/forge-credentials";
 import { readProjectEnvFile } from "./project-env-file";
 import { projectStore } from "./project-store";
 import { taskStateManager } from "./task-state-manager";
@@ -117,7 +118,8 @@ export function readMergedProjectEnv(project: Project): MergedEnv {
 			path.join(project.path, project.autoBuildPath || ".workpilot", ".env"),
 		),
 	);
-	return merged;
+	// A saved forge account the project names lends its token (forge-credentials).
+	return withForgeAccounts(merged);
 }
 
 function isAutoFixEnabled(env: MergedEnv): boolean {

@@ -163,7 +163,9 @@ describe("GitHubIntegration", () => {
 		const update = setSettings.mock.calls[0][0] as (prev: ProjectSettings) => ProjectSettings;
 		expect(update({ mainBranch: "x" } as ProjectSettings).mainBranch).toBe("main");
 
-		await userEvent.click(screen.getByRole("combobox"));
+		// The branch picker, not the account one (a native select).
+		const branchPicker = screen.getAllByRole("combobox").find((element) => element.tagName === "BUTTON");
+		await userEvent.click(branchPicker as HTMLElement);
 		await userEvent.click(screen.getByRole("option", { name: /origin\/develop/ }));
 		expect(updateEnvConfig).toHaveBeenLastCalledWith({ defaultBranch: "origin/develop" });
 	});
@@ -191,5 +193,15 @@ describe("GitHubIntegration", () => {
 		// Without a project folder, no branch to choose.
 		renderGitHub({}, { projectPath: undefined });
 		expect(screen.queryByText("Default branch")).toBeNull();
+	});
+
+	it("uses a saved account instead of the token fields, keeping the repository", async () => {
+		const { updateEnvConfig } = renderGitHub({ githubAccountId: "acct-1", githubRepo: "acme/api" });
+		expect(screen.queryByLabelText("Personal Access Token")).toBeNull();
+		expect(screen.getByDisplayValue("acme/api")).toBeInTheDocument();
+		// The list has no such account (any more): it is named as deleted.
+		expect(await screen.findByRole("option", { name: "Deleted account" })).toBeInTheDocument();
+		await userEvent.selectOptions(screen.getByLabelText("Account"), "");
+		expect(updateEnvConfig).toHaveBeenCalledWith({ githubAccountId: "" });
 	});
 });

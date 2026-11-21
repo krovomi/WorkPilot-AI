@@ -23,7 +23,7 @@ import type {
 } from "../../shared/types";
 import { parseAcceptanceCriteriaText } from "../../shared/utils/acceptance-criteria";
 import type { AgentManager } from "../agent";
-import { readProjectEnv } from "../project-env-file";
+import { readProjectForgeEnv } from "../forge/forge-credentials";
 import { projectStore } from "../project-store";
 import { readIfExists, updateExistingFile } from "../utils/existing-file";
 import { type AzureDevOpsOperation, callAzureDevOpsPython } from "./azure-devops-connector";
@@ -59,7 +59,7 @@ const decodeName = (name: string | undefined): string | undefined => {
 function readConfig(project: Project): AzureConfig {
 	if (!project.autoBuildPath) return {};
 	try {
-		const vars = readProjectEnv(project);
+		const vars = readProjectForgeEnv(project);
 		return {
 			pat: vars.AZURE_DEVOPS_PAT || undefined,
 			orgUrl: vars.AZURE_DEVOPS_ORG_URL || undefined,
