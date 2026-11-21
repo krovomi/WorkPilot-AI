@@ -113,7 +113,7 @@ export function narrativeText(answer: string | null): string | null {
 	if (!answer) return null;
 	let flat = "";
 	for (const char of answer) {
-		flat += isControl(char.codePointAt(0) ?? 0) ? " " : char;
+		flat += isControl(char.charCodeAt(0)) ? " " : char;
 	}
 	let line = flat.replace(/\s+/g, " ").trim();
 	while (line && QUOTES.has(line[0])) line = line.slice(1);

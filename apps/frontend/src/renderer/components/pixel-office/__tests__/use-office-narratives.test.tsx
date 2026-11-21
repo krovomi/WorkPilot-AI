@@ -140,6 +140,20 @@ describe("useOfficeNarratives", () => {
 		expect(result.current.slice(1).map((s) => s.text)).toEqual([undefined, undefined]);
 	});
 
+	it("gives each answer to its own scene only", async () => {
+		narrate
+			.mockResolvedValueOnce({ success: true, text: "First." })
+			.mockResolvedValueOnce(undefined);
+		const two = [task("1", "in_progress", "coding"), task("2", "in_progress", "coding")];
+		const { result, rerender } = renderHook((props: Props) => useOfficeNarratives(props), {
+			initialProps: { ...base, ai: true, tasks: two },
+		});
+		rerender({ ...base, ai: true, tasks: two.map((t) => ({ ...t, status: "error" as const })) });
+		await waitFor(() => expect(result.current[0].text).toBe("First."));
+		await act(() => Promise.resolve());
+		expect(result.current[1].text).toBeUndefined();
+	});
+
 	it("keeps the template when the bridge is missing", () => {
 		api.electronAPI = {};
 		const { result, rerender } = renderHook((props: Props) => useOfficeNarratives(props), {

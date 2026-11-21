@@ -180,7 +180,7 @@
 			"handed-to-qa": "{{from}} hands in their copy for {{spec}} to {{to}}.",
 			"qa-sent-back": "{{from}} hands {{spec}} back to {{to}}, with a few notes in the margin.",
 			"qa-approved": "{{from}} signs off {{spec}}: it is waiting for {{to}}.",
-			"shipped": "{{spec}} ships. The whole office applauds.",
+			"shipped": "Delivered: {{spec}}. The whole office applauds.",
 			"stumbled": "{{from}} trips over an error on {{spec}} and stops."
 		}
 	},

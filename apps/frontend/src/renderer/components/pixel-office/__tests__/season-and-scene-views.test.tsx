@@ -32,10 +32,16 @@ describe("sceneText", () => {
 		);
 	});
 
+	it("tells a delivery without naming anyone", () => {
+		expect(
+			sceneText(i18n.t, { kind: "shipped", taskId: "t", title: "Dark mode", spec: "7" }),
+		).toBe("Delivered: spec #7. The whole office applauds.");
+	});
+
 	it("names the task when there is no spec number, in French too", async () => {
 		await i18n.changeLanguage("fr");
 		expect(sceneText(i18n.t, { ...HANDED, kind: "shipped", spec: "" })).toBe(
-			"« Dark mode » est livrée. Tout le bureau applaudit.",
+			"Livraison : « Dark mode ». Tout le bureau applaudit.",
 		);
 		expect(sceneText(i18n.t, { ...HANDED, kind: "qa-approved", from: "reviewer", to: "you", fromFamily: undefined })).toBe(
 			"Reviewer QA valide la spec n°042 : à vous de jouer.",
