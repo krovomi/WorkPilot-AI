@@ -320,7 +320,13 @@ export interface AppSettings {
 	globalAnthropicApiKey?: string;
 	globalGoogleApiKey?: string;
 	globalGroqApiKey?: string;
+	/** OpenRouter key (shared/constants/gateway-providers.ts). */
 	globalOpenRouterApiKey?: string;
+	/** Hugging Face token with "Make calls to Inference Providers". */
+	globalHuggingFaceApiKey?: string;
+	/** Default model of each gateway (an id of its catalogue, e.g. `org/model`). */
+	globalOpenRouterModel?: string;
+	globalHuggingFaceModel?: string;
 	globalMistralApiKey?: string;
 	globalDeepSeekApiKey?: string;
 	globalMetaLlamaApiKey?: string;

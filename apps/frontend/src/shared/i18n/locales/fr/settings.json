@@ -238,7 +238,16 @@
 					"unverified": "● Tool-calling à vérifier",
 					"unverifiedDetail": "— non confirmé d'après le nom ; ouvrez la carte du modèle. Les tailles « ~Go » sont estimées (quant 4-bit)."
 				},
-				"estimatedSize": " · ~{{size}} Go"
+				"estimatedSize": " · ~{{size}} Go",
+				"cloudBadge": "Cloud",
+				"cloudBadgeTitle": "Servi par le routeur Hugging Face, avec appel d’outils",
+				"cloudPrice": "{{price}} par M de jetons",
+				"tryInCloud": "Essayer dans le cloud",
+				"tryInCloudTooltip": "Faire de {{id}} le modèle cloud de Hugging Face, sans rien télécharger",
+				"cloudDefault": "Modèle cloud",
+				"cloudChosen": "{{id}} est maintenant le modèle cloud de Hugging Face. Choisissez le moteur Hugging Face sur une tâche pour l’essayer, sans rien télécharger.",
+				"cloudNeedsToken": "Ajoutez d’abord un jeton Hugging Face dans la page du provider Hugging Face.",
+				"cloudSaveFailed": "Le modèle cloud n’a pas pu être enregistré."
 			},
 			"providers": {
 				"anthropic": "Modèles Anthropic Claude",
@@ -248,6 +257,8 @@
 				"deepseek": "Modèles DeepSeek (DeepSeek-Coder, etc.)",
 				"google": "Accès API Google et Google DeepMind",
 				"grok": "Modèles Grok xAI",
+				"openrouter": "Des centaines de modèles de nombreux éditeurs (Kimi, GLM, DeepSeek, Claude, GPT…) avec une seule clé OpenRouter",
+				"huggingface": "Les modèles ouverts du Hub Hugging Face via Inference Providers, facturés sur votre compte Hugging Face",
 				"loadError": "Échec du chargement de la liste des fournisseurs",
 				"meta": "Modèles officiels Meta AI",
 				"mistral": "Modèles Mistral AI (Mistral, Codéal, etc.)",
@@ -259,7 +270,22 @@
 				"pi": "Agent de code minimaliste, piloté via le CLI pi",
 				"gemini-cli": "Gemini CLI, l'agent open source de Google, piloté via le protocole ACP"
 			},
-			"title": "Comptes"
+			"title": "Comptes",
+			"gatewayCatalog": {
+				"title": "Modèles de {{name}}",
+				"description": "La liste en direct des modèles que {{name}} sert avec appel d’outils, avec leur prix. Cliquez sur l’un d’eux pour en faire le modèle par défaut.",
+				"searchPlaceholder": "Filtrer les modèles…",
+				"empty": "Aucun modèle ne correspond.",
+				"more": "Encore {{count}} : affinez le filtre.",
+				"price": "{{price}} par M de jetons",
+				"context": "contexte de {{size}}",
+				"providers_one": "{{count}} fournisseur",
+				"providers_other": "{{count}} fournisseurs",
+				"default": "Par défaut",
+				"setDefault": "Faire de {{id}} le modèle par défaut",
+				"offline": "Liste hors ligne : {{name}} n’a pas pu être joint.",
+				"loading": "Chargement des modèles…"
+			}
 		},
 		"agent": {
 			"description": "Modèle par défaut et framework",
@@ -678,7 +704,9 @@
 		"phaseConfiguration": "Configuration des Phases",
 		"phaseConfigurationDescription": "Configurez les modèles et les niveaux de réflexion pour chaque phase du pipeline de développement",
 		"presets": {
-			"auto": { "name": "Auto (Optimisé)" },
+			"auto": {
+				"name": "Auto (Optimisé)"
+			},
 			"complex": {
 				"name": "Tâches complexes",
 				"description": "Pour les implémentations délicates en plusieurs étapes, qui demandent une analyse approfondie"
@@ -3106,5 +3134,13 @@
 			"invalid_policy": "Politique invalide",
 			"tool_loop": "Coupe-circuit"
 		}
+	},
+	"forgeBinding": {
+		"mismatchTitle": "Ce projet pointe sur {{saved}}, qui n'est aucun de ses remotes",
+		"mismatchDescription": "Ce dépôt vient peut-être d'un autre projet. Utiliser le dépôt du remote de ce projet :",
+		"mismatchNoRemote": "Aucun remote de ce projet n'est sur cette forge : ce dépôt appartient sans doute à un autre projet. Vérifiez-le, ou désactivez cette intégration pour ce projet.",
+		"useRemote": "Utiliser {{repo}}",
+		"detected": "Aucun dépôt enregistré : ce projet utilise celui de son remote git, {{repo}}.",
+		"saveDetected": "L'enregistrer dans les réglages"
 	}
 }

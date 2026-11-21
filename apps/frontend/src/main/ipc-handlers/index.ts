@@ -83,6 +83,7 @@ import { registerDocDriftHandlers } from "./doc-drift-handlers";
 import { registerDocumentationHandlers } from "./documentation-handlers";
 import { registerCodeInsightsHandlers } from "./code-insights-handlers";
 import { registerEnvHandlers } from "./env-handlers";
+import { registerForgeBindingHandlers } from "./forge-binding-handlers";
 import { registerEnvSnapshotHandlers } from "./env-snapshot-handlers";
 import { registerOfflineModeHandlers } from "./offline-mode-handlers";
 import { registerFileHandlers } from "./file-handlers";
@@ -375,6 +376,9 @@ export function setupIpcHandlers(
 
 	// Environment configuration handlers
 	registerEnvHandlers(getMainWindow);
+
+	// A project's forge settings checked against its git remotes
+	registerForgeBindingHandlers();
 
 	// Linear integration handlers
 	registerLinearHandlers(agentManager, getMainWindow);

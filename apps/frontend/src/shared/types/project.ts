@@ -561,7 +561,7 @@ export interface GitStatus {
 }
 
 export interface RepoProviderDetectionResult {
-	provider: "github" | "azure_devops" | "unknown";
+	provider: "github" | "gitlab" | "azure_devops" | "unknown";
 	remoteName?: string;
 	remoteUrl?: string;
 }

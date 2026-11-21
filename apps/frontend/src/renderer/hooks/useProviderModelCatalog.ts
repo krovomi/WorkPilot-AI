@@ -42,6 +42,13 @@ export interface CatalogModel {
 	/** For local providers only: parameter count in billions (e.g. 8, 70). Used
 	 * to warn that a small model is weak for planning. null/undefined = unknown. */
 	param_b?: number | null;
+	/** For gateways (OpenRouter, Hugging Face): USD per million tokens, as the
+	 * gateway reports it. null/undefined = unknown. */
+	inputPrice?: number | null;
+	outputPrice?: number | null;
+	contextWindow?: number | null;
+	/** For Hugging Face: how many inference providers serve it with tools. */
+	providerCount?: number;
 }
 
 export interface ProviderModelCatalog {
