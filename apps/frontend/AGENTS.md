@@ -25,10 +25,9 @@ modules de handlers IPC. Ce fichier donne les points d'entrée.
 | `src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) ; colonnes dans `kanban/KanbanColumn.tsx` |
 | `src/renderer/stores/task-store.ts` | ~1 850 | — |
 
-Chercher le symbole (`grep -n`), lire le voisinage, éditer. Rien ne bloque une lecture complète :
-c'est une discipline, pas un garde-fou. Leur taille, elle, est plafonnée : un fichier de plus de
-2 000 lignes ne peut pas grossir (`tests/baselines/file-size.json`), donc une feature y ajoute un
-module voisin plutôt que des lignes. Les handlers de worktree sont répartis par groupe :
+Chercher le symbole (`grep -n`), lire le voisinage, éditer : une discipline, pas un garde-fou.
+Un fichier de plus de 2 000 lignes ne grossit plus (`tests/baselines/file-size.json`) : une
+feature y ajoute un module voisin. Les handlers de worktree sont répartis par groupe :
 `task/worktree-handlers.ts` (état, liste, abandon, IDE, terminal, impact, synchronisation)
 enregistre `worktree-diff-handlers.ts`, `worktree-merge-handlers.ts`, `worktree-file-handlers.ts`,
 `worktree-create-pr-handlers.ts` et `worktree-visual-proof-handlers.ts` ; fonctions partagées
