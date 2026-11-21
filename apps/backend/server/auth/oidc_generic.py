@@ -60,18 +60,26 @@ MAX_DISCOVERY_BYTES = 512_000
 MAX_SUBJECT = 320
 
 _lock = threading.Lock()
-_discovery: dict[str, Any] | None = None
-_discovered_at = 0.0
-_jwk_client: pyjwt.PyJWKClient | None = None
+
+
+class _Discovered:
+    """The provider's discovery document, when it was read, and its key client."""
+
+    def __init__(self) -> None:
+        self.document: dict[str, Any] | None = None
+        self.at = 0.0
+        self.keys: pyjwt.PyJWKClient | None = None
+
+
+_cache = _Discovered()
 
 
 def reset_cache() -> None:
     """Forget the discovery document and the key client (tests, config change)."""
-    global _discovery, _discovered_at, _jwk_client
     with _lock:
-        _discovery = None
-        _discovered_at = 0.0
-        _jwk_client = None
+        _cache.document = None
+        _cache.at = 0.0
+        _cache.keys = None
 
 
 def _fetch_discovery(issuer: str) -> dict[str, Any]:
@@ -118,27 +126,27 @@ def _checked(document: dict[str, Any], issuer: str) -> dict[str, Any]:
 
 def discover() -> dict[str, Any]:
     """The configured provider's endpoints and algorithms (cached for an hour)."""
-    global _discovery, _discovered_at, _jwk_client
     settings = get_settings()
     if not settings.oidc_enabled:
         raise OidcError("Single sign-on is not configured on this server")
     with _lock:
-        fresh = time.monotonic() - _discovered_at < DISCOVERY_TTL_SECONDS
-        if _discovery is not None and fresh:
-            return _discovery
+        fresh = time.monotonic() - _cache.at < DISCOVERY_TTL_SECONDS
+        if _cache.document is not None and fresh:
+            return _cache.document
     discovered = _checked(_fetch_discovery(settings.oidc_issuer), settings.oidc_issuer)
     with _lock:
-        if _discovery is None or _discovery["jwks_uri"] != discovered["jwks_uri"]:
-            _jwk_client = pyjwt.PyJWKClient(discovered["jwks_uri"], cache_keys=True)
-        _discovery, _discovered_at = discovered, time.monotonic()
+        known = _cache.document
+        if known is None or known["jwks_uri"] != discovered["jwks_uri"]:
+            _cache.keys = pyjwt.PyJWKClient(discovered["jwks_uri"], cache_keys=True)
+        _cache.document, _cache.at = discovered, time.monotonic()
         return discovered
 
 
 def _keys() -> pyjwt.PyJWKClient:
     discover()
     with _lock:
-        assert _jwk_client is not None  # set by discover()
-        return _jwk_client
+        assert _cache.keys is not None  # set by discover()
+        return _cache.keys
 
 
 def validate_id_token(id_token: str) -> dict[str, Any]:
