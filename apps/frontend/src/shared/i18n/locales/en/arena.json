@@ -55,6 +55,13 @@
 		"battleCount_one": "{{count}} battle",
 		"battleCount_other": "{{count}} battles",
 		"clearAll": "Clear All",
+		"clearConfirm": {
+			"title": "Clear the battle history?",
+			"description_one": "{{count}} battle and its votes will be deleted. This cannot be undone.",
+			"description_other": "{{count}} battles and their votes will be deleted. This cannot be undone.",
+			"cancel": "Cancel",
+			"confirm": "Clear All"
+		},
 		"awaitingVote": "Awaiting vote"
 	},
 	"analytics": {

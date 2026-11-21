@@ -13,6 +13,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { app, safeStorage } from "electron";
+import { asyncEncryptionUsable } from "./secret-storage";
 
 export type ConnectionMode = "local" | "server";
 
@@ -68,12 +69,9 @@ function stateFilePath(): string {
 // Writes are chained so an older state never lands after a newer one.
 let persistChain: Promise<void> = Promise.resolve();
 
-async function encryptionAvailable(): Promise<boolean> {
-	try {
-		return await safeStorage.isAsyncEncryptionAvailable();
-	} catch {
-		return false;
-	}
+/** Never waits on a keyring that did not answer at startup (secret-storage.ts). */
+function encryptionAvailable(): Promise<boolean> {
+	return asyncEncryptionUsable();
 }
 
 async function writeState(state: {
