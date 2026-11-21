@@ -415,6 +415,22 @@
 			"member": "Member",
 			"owner": "Owner"
 		},
+		"bulk": {
+			"label": "Selected cards",
+			"saveFailed_one": "{{count}} card could not be changed",
+			"saveFailed_other": "{{count}} cards could not be changed"
+		},
+		"undoLabels": {
+			"type": "type change",
+			"priority": "priority change",
+			"move_one": "move of {{count}} card",
+			"move_other": "move of {{count}} cards",
+			"delete_one": "deletion of {{count}} card",
+			"delete_other": "deletion of {{count}} cards"
+		},
+		"undone": "Undone: {{label}}",
+		"undoStale": "Could not fully undo ({{label}}): a card has changed since",
+		"undoNothing": "Nothing to undo",
 		"cardMenu": {
 			"label": "Card actions",
 			"open": "Open",

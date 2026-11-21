@@ -291,6 +291,7 @@ describe("memo comparators", () => {
 			{ onSelectAll: vi.fn() },
 			{ onDeselectAll: vi.fn() },
 			{ onToggleSelect: vi.fn() },
+			{ onCardSelectGesture: vi.fn() },
 			{ isCollapsed: true },
 			{ columnWidth: 300 },
 			{ isResizing: true },

@@ -20,8 +20,6 @@ import {
 	AlertTriangle,
 	Ban,
 	CheckCheck,
-	ChevronLeft,
-	ChevronRight,
 	ChevronsRight,
 	Coins,
 	GitPullRequest,
@@ -29,7 +27,6 @@ import {
 	RefreshCw,
 	Timer,
 	Trash2,
-	X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -55,6 +52,11 @@ import { useViewState } from "../contexts/ViewStateContext";
 import { useKanbanAccessibility } from "../hooks/useKanbanAccessibility";
 import { useToast } from "../hooks/use-toast";
 import { useVisibleKanbanColumns } from "../hooks/useVisibleKanbanColumns";
+import { useBoardBulkEdits } from "../hooks/useBoardBulkEdits";
+import { useBoardSelection } from "../hooks/useBoardSelection";
+import { useBoardShortcuts } from "../hooks/useBoardShortcuts";
+import { isLightCard, recordMoves } from "../lib/card-edits";
+import { usePendingDeleteStore } from "../stores/pending-delete-store";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
 import {
 	canMoveTaskTo,
@@ -115,6 +117,9 @@ import { BulkPRDialog } from "./BulkPRDialog";
 import { formatCost } from "./formula-lab/formula-utils";
 import { JiraSidePanel } from "./jira-import/JiraSidePanel";
 import { KanbanToolbar } from "./kanban/KanbanToolbar";
+import { BoardSelectionContext } from "./kanban/board-selection-context";
+import { BulkActionBar } from "./kanban/BulkActionBar";
+import { deleteCardsLater } from "./kanban/deleteCardsLater";
 import { PRFilesModal } from "./PRFilesModal";
 import { QueueSettingsModal } from "./QueueSettingsModal";
 import { TaskCard } from "./TaskCard";
@@ -331,10 +336,6 @@ export function KanbanBoard({
 	// Track tasks manually moved to queue to prevent auto-promotion back
 	const manuallyQueuedTaskIdsRef = useRef<Set<string>>(new Set());
 
-	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(
-		new Set(),
-	);
-
 	// True when the currently dragged task is part of a multi-selection
 	const [isDraggingBulkSelected, setIsDraggingBulkSelected] = useState(false);
 
@@ -421,6 +422,8 @@ export function KanbanBoard({
 	}, [columnPreferences]);
 
 	// Filter tasks based on archive status
+	// Cards deleted but still in their undo delay (kanban/deleteCardsLater.tsx).
+	const pendingDeletes = usePendingDeleteStore((s) => s.ids);
 	const filteredTasks = useMemo(() => {
 		// Archive gate first, then (optionally) the abandoned gate, then the
 		// user-selected search/source/category/priority filters from the filter bar.
@@ -431,8 +434,10 @@ export function KanbanBoard({
 		if (hideAbandoned) {
 			base = base.filter((t) => t.metadata?.abandoned !== true);
 		}
-		return base.filter((t) => taskMatchesFilters(t, kanbanFilters));
-	}, [tasks, showArchived, hideAbandoned, kanbanFilters]);
+		return base.filter(
+			(t) => !pendingDeletes.has(t.id) && taskMatchesFilters(t, kanbanFilters),
+		);
+	}, [tasks, showArchived, hideAbandoned, kanbanFilters, pendingDeletes]);
 
 	// Count of abandoned tasks currently on the board (drives the filter toggle).
 	const abandonedCount = useMemo(
@@ -625,40 +630,20 @@ export function KanbanBoard({
 		return grouped;
 	}, [filteredTasks, taskOrder, kanbanSort]);
 
-	// Prune stale IDs when tasks are deleted or filtered out
-	useEffect(() => {
-		const allTaskIds = new Set(filteredTasks.map((t) => t.id));
-		setSelectedTaskIds((prev) => {
-			const filtered = new Set([...prev].filter((id) => allTaskIds.has(id)));
-			return filtered.size === prev.size ? prev : filtered;
-		});
-	}, [filteredTasks]);
-
-	// Selection callbacks for bulk actions (all columns)
-	const toggleTaskSelection = useCallback((taskId: string) => {
-		setSelectedTaskIds((prev) => {
-			const next = new Set(prev);
-			if (next.has(taskId)) {
-				next.delete(taskId);
-			} else {
-				next.add(taskId);
-			}
-			return next;
-		});
-	}, []);
-
-	// Select every card of one column (the column header's checkbox).
+	const {
+		selectedTaskIds,
+		setSelectedTaskIds,
+		toggleTaskSelection,
+		selectGesture,
+		selectTasks,
+		deselectAllTasks,
+	} = useBoardSelection(filteredTasks);
+	// Select every card of one column (header checkbox, menu, Ctrl+A).
 	const selectAllTasks = useCallback(
-		(columnStatus: (typeof TASK_STATUS_COLUMNS)[number]) => {
-			const columnIds = tasksByStatus[columnStatus].map((t: Task) => t.id);
-			setSelectedTaskIds((prev) => new Set<string>([...prev, ...columnIds]));
-		},
-		[tasksByStatus],
+		(columnStatus: string) =>
+			selectTasks(tasksByStatus[columnStatus as (typeof TASK_STATUS_COLUMNS)[number]].map((t) => t.id)),
+		[tasksByStatus, selectTasks],
 	);
-
-	const deselectAllTasks = useCallback(() => {
-		setSelectedTaskIds(new Set());
-	}, []);
 
 	// Get selected task objects for bulk actions
 	const selectedTasks = useMemo(() => {
@@ -748,35 +733,31 @@ export function KanbanBoard({
 				setSelectedTaskIds(remainingIds);
 			}
 		}
-	}, [selectedTaskIds, deselectAllTasks, handleUndoBulkDelete, toast, t]);
+	}, [selectedTaskIds, deselectAllTasks, handleUndoBulkDelete, toast, t, setSelectedTaskIds]);
 
-	// Handle bulk move of all selected tasks to a target status
-	const handleBulkMove = useCallback(
-		async (targetStatus: TaskStatus) => {
-			if (selectedTaskIds.size === 0) return;
-			const taskIds = Array.from(selectedTaskIds);
-			let failedCount = 0;
-			for (const taskId of taskIds) {
-				const result = await persistTaskStatus(taskId, targetStatus);
-				if (!result.success) failedCount++;
-			}
-			if (failedCount === 0) {
-				toast({
-					title: t("kanban.bulkMoveSuccess", { count: taskIds.length }),
-				});
-				deselectAllTasks();
-			} else {
-				toast({
-					title: t("kanban.bulkMoveError", {
-						failed: failedCount,
-						total: taskIds.length,
-					}),
-					variant: "destructive",
-				});
-			}
-		},
-		[selectedTaskIds, deselectAllTasks, toast, t],
+	const bulkEdits = useBoardBulkEdits({
+		projectId,
+		selectedTasks,
+		deselectAllTasks,
+		openDeleteConfirm: handleOpenDeleteConfirm,
+	});
+	const boardSelection = useMemo(
+		() => ({
+			selectedTaskIds,
+			onSetType: bulkEdits.setType,
+			onSetPriority: bulkEdits.setPriority,
+			onDelete: bulkEdits.deleteSelection,
+			onClear: deselectAllTasks,
+		}),
+		[selectedTaskIds, bulkEdits, deselectAllTasks],
 	);
+	useBoardShortcuts({
+		onSelectColumn: selectAllTasks,
+		hasSelection: selectedTaskIds.size > 0,
+		onClearSelection: deselectAllTasks,
+		onDeleteSelection: bulkEdits.deleteSelection,
+		onUndo: bulkEdits.undo,
+	});
 
 	// Open BulkPRDialog after user confirms "mark as done" for human_review tasks
 	const handleBulkMarkDoneConfirm = useCallback(() => {
@@ -817,9 +798,11 @@ export function KanbanBoard({
 		}
 	}, [tasksByStatus.done, projectId]);
 
-	const handleDeleteTask = useCallback(async (taskId: string) => {
+	const handleDeleteTask = useCallback((taskId: string) => {
 		// Get the task information for the confirmation dialog
 		const task = useTaskStore.getState().tasks.find((t) => t.id === taskId);
+		// A card nothing has worked on goes after a few seconds, with an undo.
+		if (task && isLightCard(task)) return deleteCardsLater([task], t);
 		const taskTitle = task?.title || "Untitled";
 
 		// Open confirmation dialog instead of deleting directly
@@ -828,7 +811,7 @@ export function KanbanBoard({
 			taskId,
 			taskTitle,
 		});
-	}, []);
+	}, [t]);
 
 	// Open the duplicate dialog pre-filled with the source task so the user can
 	// edit the fields before the copy is actually created.
@@ -928,6 +911,7 @@ export function KanbanBoard({
 		toast,
 		t,
 		handleUndoDelete,
+		setSelectedTaskIds,
 	]);
 
 	/**
@@ -1237,6 +1221,9 @@ export function KanbanBoard({
 				providedTask ||
 				useTaskStore.getState().tasks.find((t) => t.id === taskId);
 			const result = await persistTaskStatus(taskId, newStatus);
+			if (result.success && task) {
+				recordMoves([{ id: taskId, from: task.status, to: newStatus }], t("tasks:kanban.undoLabels.move", { count: 1 }));
+			}
 
 			if (!result.success) {
 				if (result.worktreeExists) {
@@ -2133,7 +2120,7 @@ export function KanbanBoard({
 				}
 
 				// Valid transition: move all selected tasks
-				await handleBulkMove(newStatus);
+				await bulkEdits.moveSelection(newStatus);
 				return;
 			}
 
@@ -2240,7 +2227,7 @@ export function KanbanBoard({
 			processQueue,
 			selectedTaskIds,
 			selectedColumnStatus,
-			handleBulkMove,
+			bulkEdits,
 			toast,
 			t,
 			setColumnOrder,
@@ -2251,7 +2238,7 @@ export function KanbanBoard({
 	);
 
 	return (
-		<div className="flex h-full flex-col">
+		<div className="flex h-full flex-col" data-board-selecting={selectedTaskIds.size > 0 ? "" : undefined}>
 			{/* Screen-reader live region for drag-and-drop announcements */}
 			<div
 				aria-live="polite"
@@ -2519,6 +2506,7 @@ export function KanbanBoard({
 				onDragOver={handleDragOver}
 				onDragEnd={handleDragEnd}
 			>
+				<BoardSelectionContext.Provider value={boardSelection}>
 				<SortableContext
 					items={columnOrder.map((s) => `col-${s}`)}
 					strategy={horizontalListSortingStrategy}
@@ -2589,6 +2577,7 @@ export function KanbanBoard({
 								onSelectAll={() => selectAllTasks(status)}
 								onDeselectAll={deselectAllTasks}
 								onToggleSelect={toggleTaskSelection}
+								onCardSelectGesture={selectGesture}
 								onDeleteTask={handleDeleteTask}
 								onDuplicateTask={handleDuplicateTask}
 								onViewPRFiles={handleViewPRFiles}
@@ -2605,6 +2594,7 @@ export function KanbanBoard({
 						))}
 					</div>
 				</SortableContext>
+				</BoardSelectionContext.Provider>
 
 				{/* Drag overlay - enhanced visual feedback */}
 				<DragOverlay>
@@ -2627,157 +2617,17 @@ export function KanbanBoard({
 			</DndContext>
 
 			{selectedTaskIds.size > 0 && (
-				<div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-					<div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-border bg-card shadow-lg backdrop-blur-sm">
-						<span className="text-sm font-medium text-foreground">
-							{t("kanban.selectedCountOther", { count: selectedTaskIds.size })}
-						</span>
-						<div className="w-px h-5 bg-border" />
-
-						{/* Context-sensitive move actions based on selected column */}
-						{selectedColumnStatus === null ? (
-							<span className="text-xs text-muted-foreground flex items-center gap-1.5">
-								<Ban className="h-3.5 w-3.5" />
-								{t("kanban.mixedColumnWarning")}
-							</span>
-						) : selectedColumnStatus === "backlog" ? (
-							<>
-								<Button
-									variant="outline"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("queue")}
-								>
-									<ChevronRight className="h-4 w-4" />
-									{t("columns.queue")}
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("in_progress")}
-								>
-									<ChevronsRight className="h-4 w-4" />
-									{t("columns.in_progress")}
-								</Button>
-							</>
-						) : selectedColumnStatus === "queue" ? (
-							<>
-								<Button
-									variant="outline"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("backlog")}
-								>
-									<ChevronLeft className="h-4 w-4" />
-									{t("columns.backlog")}
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("in_progress")}
-								>
-									<ChevronsRight className="h-4 w-4" />
-									{t("columns.in_progress")}
-								</Button>
-							</>
-						) : selectedColumnStatus === "in_progress" ? (
-							<>
-								<Button
-									variant="outline"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("queue")}
-								>
-									<ChevronLeft className="h-4 w-4" />
-									{t("columns.queue")}
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("ai_review")}
-								>
-									<ChevronsRight className="h-4 w-4" />
-									{t("columns.ai_review")}
-								</Button>
-							</>
-						) : selectedColumnStatus === "ai_review" ? (
-							<>
-								<Button
-									variant="outline"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("in_progress")}
-								>
-									<ChevronLeft className="h-4 w-4" />
-									{t("columns.in_progress")}
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("human_review")}
-								>
-									<ChevronsRight className="h-4 w-4" />
-									{t("columns.human_review")}
-								</Button>
-							</>
-						) : selectedColumnStatus === "human_review" ? (
-							<>
-								<Button
-									variant="outline"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("ai_review")}
-								>
-									<ChevronLeft className="h-4 w-4" />
-									{t("columns.ai_review")}
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									className="gap-2"
-									onClick={() => setBulkMarkDoneConfirmOpen(true)}
-								>
-									<CheckCheck className="h-4 w-4" />
-									{t("kanban.markAsDone")}
-								</Button>
-							</>
-						) : selectedColumnStatus === "done" ? (
-							<Button
-								variant="default"
-								size="sm"
-								className="gap-2"
-								onClick={handleOpenBulkPRDialog}
-							>
-								<GitPullRequest className="h-4 w-4" />
-								{t("kanban.createPRs")}
-							</Button>
-						) : null}
-
-						<div className="w-px h-5 bg-border" />
-						<Button
-							variant="ghost"
-							size="sm"
-							className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-							onClick={handleOpenDeleteConfirm}
-						>
-							<Trash2 className="h-4 w-4" />
-							{t("kanban.deleteSelected")}
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="gap-2 text-muted-foreground hover:text-foreground"
-							onClick={deselectAllTasks}
-						>
-							<X className="h-4 w-4" />
-							{t("kanban.clearSelection")}
-						</Button>
-					</div>
-				</div>
+				<BulkActionBar
+					count={selectedTaskIds.size}
+					column={selectedColumnStatus}
+					onMove={bulkEdits.moveSelection}
+					onMarkDone={() => setBulkMarkDoneConfirmOpen(true)}
+					onCreatePRs={handleOpenBulkPRDialog}
+					onSetType={bulkEdits.setType}
+					onSetPriority={bulkEdits.setPriority}
+					onDelete={bulkEdits.deleteSelection}
+					onClear={deselectAllTasks}
+				/>
 			)}
 
 			{/* Bulk "mark as done" confirmation dialog (human_review → done + PR creation) */}
