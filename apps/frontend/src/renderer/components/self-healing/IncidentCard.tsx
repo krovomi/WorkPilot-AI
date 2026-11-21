@@ -86,6 +86,9 @@ export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry, child
 							</Chips>
 						</div>
 					)}
+					{incident.fix_card && (
+						<p className="wp-meta mt-1">{t("selfHealing:fixCard", { card: incident.fix_card })}</p>
+					)}
 					{prLink && (
 						<a
 							href={prLink}
@@ -100,7 +103,7 @@ export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry, child
 
 				{isActionable && (
 					<div className="flex flex-col gap-1">
-						{incident.status === "pending" && onTriggerFix && (
+						{(incident.status === "pending" || incident.status === "escalated") && onTriggerFix && (
 							<CharterButton size="sm" icon={Wrench} onClick={() => onTriggerFix(incident.id)}>
 								{t("selfHealing:fix")}
 							</CharterButton>
