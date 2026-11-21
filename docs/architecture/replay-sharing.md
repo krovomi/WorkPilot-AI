@@ -1,10 +1,10 @@
 ---
-feature: "Rejeu d'agent : partage, import, signets, vidéo et résumé"
+feature: "Rejeu d'agent : partage, lien d'équipe, signets, vidéo"
 summary: >-
-  Une session enregistrée s'exporte en `.wpreplay` (JSON gzip), en page HTML sans script ou en
-  vidéo WebM de cette page jouée hors réseau, toujours masquée (secrets, dossiers du projet et
-  du home) ; un rejeu importé est reconstruit champ par champ, borné, sous un nouvel id ; les
-  signets et le résumé des étapes écrit par un modèle vivent dans la session.
+  Une session s'exporte masquée en `.wpreplay`, en page HTML sans script ou en vidéo WebM ou
+  MP4 (seule ou côte à côte avec une autre) ; en mode serveur, un membre la confie au projet par
+  un lien révocable à durée de vie, dont le serveur ne garde que l'empreinte du jeton ; l'import
+  reconstruit tout, borné ; signets, réponses et résumé vivent dans la session.
 ---
 
 # Partager un rejeu d'agent
@@ -15,25 +15,33 @@ summary: >-
 Le rejeu (`apps/backend/replay/`) enregistre chaque session d'agent dans
 `~/.workpilot/replays/<id>.json` : étapes, appels d'outils, diffs, raisonnement, tokens. Il ne
 quittait pas la machine : montrer à un collègue comment l'agent a résolu un problème demandait
-un partage d'écran. Une session se partage maintenant de trois façons, se marque, et se
-résume quand son modèle n'a pas laissé de raisonnement.
+un partage d'écran. Une session se partage maintenant par fichier, par page, par vidéo ou
+par un lien d'équipe, se marque et se discute, et se résume quand son modèle n'a pas laissé de
+raisonnement.
 
 ```
 apps/backend/replay/
   bundle.py      le format .wpreplay : export masqué, import reconstruit et borné
   viewer.py      la page HTML autonome, rendue depuis un bundle déjà masqué
-  bookmarks.py   signets d'une session enregistrée
+  bookmarks.py   signets d'une session enregistrée et leurs réponses
+  compare_page.py  deux sessions côte à côte, la page que joue la vidéo A/B
   video.py       la page jouée étape par étape dans Chromium, enregistrée en WebM
+  mp4.py         le WebM encodé de nouveau en MP4 par le ffmpeg du système
   summary.py     le résumé des étapes par un modèle, pour une session sans raisonnement
   api.py         POST /replay/sessions/{id}/export, POST /replay/import,
-                 POST et DELETE /replay/sessions/{id}/bookmarks,
-                 POST /replay/sessions/{id}/video, POST /replay/sessions/{id}/summary
+                 POST et DELETE /replay/sessions/{id}/bookmarks[/{bid}/replies],
+                 POST /replay/sessions/{id}/video, POST /replay/compare/video,
+                 POST /replay/sessions/{id}/summary
+apps/backend/shared_features/replay_shares.py   les liens d'équipe (mode serveur)
+apps/backend/server/db/alembic/versions/0017_replay_shares.py
 apps/backend/foundation/platform/browser.py   chrome_executable, partagé avec verify
-apps/frontend/src/main/ipc-handlers/replay-share-handlers.ts   boîtes natives, fichiers
-apps/frontend/src/main/ipc-handlers/replay-video-handlers.ts   vidéo et résumé
-apps/frontend/src/renderer/stores/replay-share-store.ts
-apps/frontend/src/renderer/components/agent-replay/ReplaySharing.tsx
-apps/frontend/src/renderer/components/agent-replay/ReplayStepsSummary.tsx
+apps/frontend/src/main/ipc-handlers/replay-share-handlers.ts   boîtes natives, fichiers, signets
+apps/frontend/src/main/ipc-handlers/replay-video-handlers.ts   vidéos et résumé
+apps/frontend/src/main/replay-team-share.ts                    lien d'équipe, côté app
+apps/frontend/src/main/ipc-handlers/replay-team-share-handlers.ts
+apps/frontend/src/renderer/stores/replay-share-store.ts, replay-team-share-store.ts
+apps/frontend/src/renderer/components/agent-replay/ReplaySharing.tsx, ReplayTeamShare.tsx,
+  ReplayBookmarkReplies.tsx, ReplayComparisonVideo.tsx, ReplayStepsSummary.tsx
 ```
 
 ## Le bundle `.wpreplay`
@@ -125,9 +133,30 @@ dans le cycle d'imports), ou celui de Playwright, sous l'enregistrement vidéo d
 Pas de Playwright, pas de navigateur, ou pas d'encodeur vidéo de Playwright (`ffmpeg`, installé
 à part : `playwright install ffmpeg`) est une **réponse**, pas une erreur : la route répond
 `available: false` et le nom de ce qui manque (`no_playwright`, `no_browser`, `no_encoder`),
-et l'app l'affiche avec la commande qui l'installe. Le WebM est le format natif de Playwright ;
-un MP4 demanderait un second encodage, et une vidéo côte à côte (A/B) un rendu de la
-comparaison, que la page n'a pas.
+et l'app l'affiche avec la commande qui l'installe. Le WebM est le format natif de Playwright.
+
+### Deux sessions côte à côte
+
+La vue de comparaison du rejeu propose la vidéo des deux sessions qu'elle compare
+(`POST /replay/compare/video`, deux ids). `compare_page.py` rend une page à deux colonnes,
+chacune écrite depuis le bundle masqué de sa session avec les mêmes options, ses textes
+échappés, ses identifiants préfixés (`a-step-`, `b-step-`), sans script, avec sa propre CSP
+(l'empreinte de sa feuille de style, `_csp` de `viewer.py`). `video.py` y trouve les colonnes
+(`main.pair > section.side`) et ouvre à chaque pas l'étape suivante de chacune ; une colonne
+qui n'a plus d'étape garde la dernière ouverte. Les bornes, le navigateur et l'enregistrement
+sont ceux d'une session seule : la durée se compte sur la plus longue des deux.
+
+### Le MP4
+
+Le MP4 est le WebM encodé de nouveau (`mp4.py`), parce qu'un lecteur ou un outil de
+présentation ne lit pas toujours le WebM. Il passe par le `ffmpeg` du système
+(`find_executable`, jamais un chemin venu de l'app) : liste d'arguments, `-nostdin`, entrées et
+sorties sur `DEVNULL`, environnement construit (`PATH` et les dossiers temporaires, aucune
+variable d'identifiant), dossier temporaire à lui, supprimé ensuite. H.264 (`libx264`) d'abord,
+MPEG-4 quand la build de ffmpeg n'a pas H.264 ; échéance de 120 s, sortie lue dans la borne de
+40 Mo. Pas de ffmpeg, ou un ffmpeg qui ne démarre pas, est une réponse (`no_mp4_encoder`) ; le
+main vérifie la boîte `ftyp` avant d'ouvrir la boîte d'enregistrement, et force le nom en
+`.mp4`. Le format arrive du renderer en liste fermée (`webm`, `mp4`).
 
 ## Le résumé par un modèle
 
@@ -163,23 +192,66 @@ session enregistrée en prend un ; une session encore en cours d'enregistrement 
 le recorder quand elle se termine, ce qui perdrait le signet (409). Au plus 200 par session,
 note de 4 000 caractères.
 
+Un signet se discute : chaque lecteur d'une session enregistrée répond à sa note
+(`BookmarkReply` : note, auteur, date ; au plus 50 réponses par signet, même borne de note) ;
+une réponse se retire sur la machine qui garde la session, la seule à l'écrire. Les réponses vivent dans le fichier de la session, comme
+le signet : elles partent masquées avec l'export, reviennent bornées à l'import (les 50
+premières entrées sont lues, ce qui n'est pas une réponse parmi elles est écarté) et
+s'affichent sous le signet dans la page, comme du texte. Une discussion entre deux machines
+passe donc par un nouvel export ou par un lien d'équipe.
+
+## Le lien d'équipe (mode serveur)
+
+Sans hébergement, un rejeu ne se partageait qu'en envoyant un fichier. Le mode serveur en a
+un : un membre d'un projet du serveur confie la session au projet et reçoit un lien
+(`shared_features/replay_shares.py`, feature `replay_shares`, domaine `lab`, table
+`replay_shares`).
+
+- **Ce qui est gardé** : le bundle que l'app de l'auteur a construit, déjà masqué sur sa
+  machine, avec les options de la boîte de partage. Le serveur le relit une fois par le même
+  décodeur borné qu'un import (10 Mo au plus), pour ne garder qu'un bundle que l'app saura
+  ouvrir, et en tire son titre et son nombre d'étapes. Rien n'y est exécuté.
+- **Le lien** : `workpilot-replay://<hôte>/<projet>/<partage>#<jeton>`, un jeton aléatoire de
+  32 octets dont le serveur ne garde que le SHA-256 (comparé en temps constant) : une copie de
+  la base ne reconstruit aucun lien. Le jeton voyage dans le corps de la requête qui ouvre le
+  partage, jamais dans une URL qu'un proxy journaliserait. L'app ne montre le lien qu'une fois,
+  à sa création.
+- **Durée et révocation** : de 1 à 30 jours (7 par défaut ; l'app offre 1, 7 et 30) ; l'auteur ou le propriétaire du
+  projet le révoque depuis la boîte de partage. Un lien révoqué ou expiré répond 410 et son
+  bundle quitte la base ; au plus 200 liens ouverts par projet, et les liens finis depuis
+  30 jours sont oubliés.
+- **Qui l'atteint** : chaque route prend un `project_id` résolu par `resolve_project_scope`
+  (un autre tenant reçoit 404). Lister et ouvrir demandent `lab.read` (tout rôle du projet) et
+  le jeton ; créer, `lab.write` et le rôle `member` ; révoquer, être l'auteur ou le
+  propriétaire. Il n'y a pas de lecteur public : une route sans permission est interdite (S5),
+  et la page HTML hors ligne sert déjà celui qui n'a pas de compte.
+- **L'ouverture** : collé dans « Ouvrir un lien d'équipe » à côté d'Import, le lien est
+  analysé par le main (schéma, hôte du serveur connecté, projet connu) et le bundle reçu passe
+  par `/replay/import` comme un fichier : reconstruit, borné, sous un nouvel id.
+- **La mesure** : le serveur compte les ouvertures de chaque lien, et l'app l'affiche à côté du
+  lien ; l'équipe voit si ses partages sont lus.
+
 ## IPC
 
-Six canaux (`replay:exportSession`, `replay:importSession`, `replay:addBookmark`,
-`replay:removeBookmark`, `replay:exportVideo`, `replay:summarizeSession`), un module de preload
-typé, des handlers qui revalident : id de session `[A-Za-z0-9_-]`, format et langue en liste
-fermée, options booléennes, étape entière bornée, textes bornés, nom de provider de forme
-fermée. Le renderer ne donne jamais de chemin ; le nom de fichier proposé vient du
+Treize canaux (`replay:exportSession`, `replay:importSession`, `replay:addBookmark`,
+`replay:removeBookmark`, `replay:addBookmarkReply`, `replay:removeBookmarkReply`,
+`replay:exportVideo`, `replay:exportComparisonVideo`, `replay:summarizeSession`,
+`replay:shareToTeam`, `replay:listTeamShares`, `replay:revokeTeamShare`,
+`replay:openTeamShare`), un module de preload typé, des handlers qui revalident : id de session,
+de signet, de réponse, de projet et de partage `[A-Za-z0-9_-]`, format, langue et durée en
+liste fermée, options booléennes, étape entière bornée, textes bornés, nom de provider de forme
+fermée, lien analysé dans le main. Le renderer ne donne jamais de chemin ; le nom de fichier proposé vient du
 backend et passe par `path.basename`. Le main n'écrit que ce qui a été demandé (un gzip pour un
 `.wpreplay`, une page pour l'HTML, borné comme un bundle) et lit un bundle par une seule poignée
 de fichier : le fichier vérifié est celui qui est lu, jamais au-delà de la borne.
 
 ## Pas encore fait
 
-- **URL de partage signée** (TTL, révocable dans les réglages) : il faut un hébergement. La
-  bonne place est le mode serveur, où les rejeux sont aujourd'hui une feature locale
-  (`LOCAL_ONLY_FEATURES`).
-- **Vidéo MP4 et vidéo côte à côte** (deux sessions comparées) : le WebM d'une session est
-  fait ; le MP4 demanderait un second encodage, le côte à côte une page de comparaison.
-- **Discussion d'un signet** à plusieurs, et les métriques d'usage (exports par semaine, taux de
-  signets).
+- **Lecteur public d'un lien, sans compte** : chaque route du serveur porte une permission
+  (S5). Celui qui n'a pas de compte reçoit la page HTML ou la vidéo.
+- **Révocation depuis les Réglages** : un lien se révoque dans la boîte de partage, où la
+  liste des liens du projet est affichée ; une page des Réglages qui liste tous les liens de
+  tous les projets reste à faire.
+- **Métriques globales d'usage** (exports par semaine, part des rejeux annotés) : l'app ne
+  compte que les ouvertures de chaque lien d'équipe. Il n'y a pas de télémétrie où compter le
+  reste sans en créer une, ce qui est une décision à part.
