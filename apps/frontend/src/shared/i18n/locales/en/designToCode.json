@@ -250,7 +250,9 @@
 			"budget": "Time budget spent: {{score}} % match",
 			"stalled": "No more progress: {{score}} % match",
 			"failed": "Stopped on an error: {{score}} % match",
-			"skipped": "The render loop did not run"
+			"skipped": "The render loop did not run",
+			"budget_tokens": "Token budget spent: {{score}} % match",
+			"budget_cost": "Cost budget spent: {{score}} % match"
 		},
 		"reason": {
 			"no_model": "No model answered the generation: there is nothing real to correct.",
@@ -295,13 +297,64 @@
 		"live": "Iteration {{iteration}}/{{max}}: {{stage}}",
 		"stage": {
 			"render": "rendering",
-			"correct": "correcting"
+			"correct": "correcting",
+			"responsive": "responsive pass",
+			"states": "hover and focus pass"
 		},
 		"axis": {
 			"x": "horizontal",
 			"y": "vertical",
 			"width": "width",
 			"height": "height"
+		},
+		"spend": {
+			"tokens": "{{tokens}} tokens of {{max}}",
+			"tokensEstimated": "about {{tokens}} tokens of {{max}} (estimated: the provider reported none)",
+			"cost": "${{cost}} of ${{max}} (price catalogue)",
+			"flatRate": "no per-token cost (plan or local model)",
+			"unknownCost": "cost unknown: the price catalogue has no price for this model",
+			"costUnchecked": "the cost budget could not be checked"
+		},
+		"responsive": {
+			"title": "Responsive pass",
+			"mobile": "Mobile",
+			"tablet": "Tablet",
+			"desktop": "Desktop",
+			"size": "{{width}} × {{height}}",
+			"compared": "compared with the design: {{score}} %",
+			"notCompared": "no design at this width: checked on its own",
+			"clean": "No overflow, cut text or overlap.",
+			"overflow": "The page is {{px}} px wider than the screen",
+			"outside": "{{label}} goes past the right edge",
+			"clipped": "{{label}}: text cut by its box",
+			"overlap": "{{a}} overlaps {{b}}"
+		},
+		"states": {
+			"title": "Hover and focus (first {{limit}} interactive elements)",
+			"noElements": "No interactive element in view.",
+			"summary": "No visible hover: {{hover}} · no visible focus: {{focus}} · not reached with Tab: {{unreached}}",
+			"rest": "At rest",
+			"hover": "Hover",
+			"focus": "Focus",
+			"visible": "changes on screen",
+			"none_hover": "no hover style",
+			"none_focus": "no visible focus (WCAG 2.4.7)",
+			"unreached": "not reached"
 		}
+	},
+	"loopOptions": {
+		"button": "Loop",
+		"summary": "{{iterations}} × {{threshold}} %",
+		"maxIterations": "Iterations",
+		"threshold": "Threshold",
+		"maxTokens": "Token budget",
+		"maxCostUsd": "Cost budget",
+		"iterationsValue_one": "{{count}} correction",
+		"iterationsValue_other": "{{count}} corrections",
+		"tokensValue": "{{value}}k tokens",
+		"costValue": "${{value}}",
+		"budgetHint": "The cost budget applies when the price catalogue knows the model; the backend keeps every value within its bounds.",
+		"responsive": "Responsive pass (mobile, tablet, desktop)",
+		"states": "Hover and focus captures"
 	}
 }

@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from design_to_code.budget import FLAT_RATE, PRICED, Pricing, Usage
 from design_to_code.diff import (
     JPEG_TOLERANCE,
     Box,
@@ -30,10 +31,16 @@ from design_to_code.diff import (
     fraction_box,
     load_image,
 )
-from design_to_code.loop import CorrectionError, LoopConfig, run_loop, serialize
+from design_to_code.loop import CorrectionError, LoopConfig, Reply, run_loop, serialize
+from design_to_code.passes import responsive_pass, states_pass
 from design_to_code.preview import PREVIEW_PATH, extract_html, html_page, mirror_prompt
 from design_to_code.render import Renderer, RenderError, font_families
-from design_to_code.vision import Credentials, VisionRoute, decide_route
+from design_to_code.vision import (
+    Credentials,
+    VisionRoute,
+    catalogue_provider,
+    decide_route,
+)
 from PIL import UnidentifiedImageError
 from services.design_to_code_stacks import get_stack
 
@@ -160,6 +167,10 @@ def local_vision_model() -> str:
 def route_models(service: Any) -> dict[str, str]:
     """The model each route would ask, so the catalogue can be consulted."""
     from core.oneshot import _resolve_model
+    from services.design_to_code_service import (
+        GOOGLE_VISION_MODEL,
+        OPENAI_VISION_MODEL,
+    )
 
     subscription = _resolve_model("claude", None, None)
     return {
@@ -167,14 +178,41 @@ def route_models(service: Any) -> dict[str, str]:
         "claude_subscription": service.vision_model
         if subscription == "default"
         else subscription,
-        "openai": "",
-        "google": os.getenv("DESIGN_TO_CODE_VISION_MODEL_GOOGLE", ""),
+        "openai": OPENAI_VISION_MODEL,
+        "google": os.getenv("DESIGN_TO_CODE_VISION_MODEL_GOOGLE", GOOGLE_VISION_MODEL),
         "ollama": local_vision_model(),
     }
 
 
+def pricing_for(route: VisionRoute) -> Pricing:
+    """How the route's tokens are paid, from the price catalogue only.
+
+    The subscription and a local model have no per-token price (``flat_rate``);
+    a model the catalogue does not price is ``unknown``, never guessed.
+    """
+    from cost_intelligence.catalog import FLAT_RATE_PROVIDERS, PricingCatalog
+
+    provider = catalogue_provider(route.route)
+    if route.route == "claude_subscription" or provider in FLAT_RATE_PROVIDERS:
+        return Pricing(FLAT_RATE, lambda usage: 0.0)
+    row = PricingCatalog().get_pricing(provider, route.model) if route.model else None
+    if row is None:
+        return Pricing()
+
+    def price(usage: Usage) -> float:
+        return row.cost_for_tokens(
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cache_write_tokens=usage.cache_write_tokens,
+            cache_read_tokens=usage.cache_read_tokens,
+        )
+
+    return Pricing(PRICED, price)
+
+
 def make_corrector(service: Any, route: VisionRoute) -> Callable[[str, bytes], Any]:
-    """The loop's ``correct``: the composite picture and the prompt to one vision call."""
+    """The loop's ``correct``: the composite picture and the prompt to one vision
+    call, answered with the tokens the provider reported (``service.last_usage``)."""
 
     async def ask_local(prompt: str, png: bytes) -> str:
         from docintel.engines.ollama_vision import ask
@@ -189,9 +227,14 @@ def make_corrector(service: Any, route: VisionRoute) -> Callable[[str, bytes], A
             raise CorrectionError(f"local vision model: {reason}")
         return text
 
-    async def correct(prompt: str, png: bytes) -> str:
+    async def correct(prompt: str, png: bytes) -> Reply:
+        service.last_usage = None
         if route.route == "ollama":
-            return await ask_local(prompt, png)
+            return Reply(await ask_local(prompt, png))
+        text = await ask_cloud(prompt, png)
+        return Reply(text, service.last_usage)
+
+    async def ask_cloud(prompt: str, png: bytes) -> str:
         data_url = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
         try:
             if route.route == "claude_api":
@@ -323,6 +366,17 @@ async def run_render_loop(
                 mirror=mirror,
                 config=config,
                 on_progress=on_progress,
+                pricing=pricing_for(route),
+            )
+            passes = await run_passes(
+                renderer,
+                outcome,
+                entry,
+                target=target,
+                regions=regions,
+                masks=masks,
+                config=config,
+                on_progress=on_progress,
             )
     except RenderError as exc:
         return skipped(exc.code, threshold=threshold, route=route)
@@ -342,5 +396,55 @@ async def run_render_loop(
             "missing_fonts": renderer.missing_fonts,
             "viewport": {"width": width, "height": height, "scale": scale},
             "tolerance": config.tolerance,
+            **passes,
         },
     )
+
+
+async def run_passes(
+    renderer: Renderer,
+    outcome: Any,
+    entry: str,
+    *,
+    target: Any,
+    regions: list[Region],
+    masks: list[Box],
+    config: LoopConfig,
+    on_progress: Progress | None,
+) -> dict:
+    """The responsive and states passes asked for, on the version kept.
+
+    A pass that cannot open the page reports why; the loop's result stays.
+    """
+    found: dict[str, dict] = {}
+    if not outcome.iterations:
+        return found
+    asked = [name for name in ("responsive", "states") if getattr(config, name)]
+    for name in asked:
+        if on_progress is not None:
+            on_progress(
+                {
+                    "stage": name,
+                    "iteration": outcome.best_index,
+                    "max_iterations": config.max_iterations,
+                    "score": None,
+                    "best": outcome.iterations[outcome.best_index].score,
+                }
+            )
+        try:
+            if name == "responsive":
+                found[name] = await responsive_pass(
+                    renderer,
+                    outcome.files,
+                    entry,
+                    target=target,
+                    regions=regions,
+                    masks=masks,
+                    tolerance=config.tolerance,
+                    threshold=config.threshold,
+                )
+            else:
+                found[name] = await states_pass(renderer, outcome.files, entry)
+        except RenderError as exc:
+            found[name] = {"status": "failed", "detail": exc.code}
+    return found

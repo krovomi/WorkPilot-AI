@@ -8,6 +8,7 @@ import importlib
 import io
 import json
 import re
+import types
 from pathlib import Path
 
 import httpx
@@ -436,3 +437,132 @@ def test_the_provider_and_the_offline_policy_are_read_from_their_sources(
         '{"airgapStrict": true}', encoding="utf-8"
     )
     assert glue.airgap_strict(project) is True
+
+
+def test_the_passes_asked_for_run_on_the_version_kept(world, monkeypatch) -> None:
+    seen: list = []
+
+    async def responsive(renderer, files, page, **kwargs):
+        seen.append(("responsive", files[page], kwargs["threshold"]))
+        return {"status": "done", "breakpoints": []}
+
+    async def states(renderer, files, page):
+        seen.append(("states", files[page]))
+        raise RenderError("load_failed")
+
+    monkeypatch.setattr(glue, "responsive_pass", responsive)
+    monkeypatch.setattr(glue, "states_pass", states)
+    events: list = []
+    report = asyncio.run(
+        glue.run_render_loop(
+            world["service"],
+            _result(),
+            image_data=_data_url(_draw(RED)),
+            framework="html",
+            config=LoopConfig(responsive=True, states=True),
+            on_progress=events.append,
+        )
+    )
+    kept = f'<header style="background:{RED}"></header>'
+    assert seen == [("responsive", kept, 0.95), ("states", kept)]
+    assert report["responsive"] == {"status": "done", "breakpoints": []}
+    assert report["states"] == {"status": "failed", "detail": "load_failed"}
+    stages = [e["stage"] for e in events]
+    assert stages[-2:] == ["responsive", "states"]
+    assert events[-1]["iteration"] == report["best_iteration"]
+    # The provider reported no tokens here: the spend is an estimate.
+    assert report["spend"]["estimated"] and report["spend"]["tokens"] > 0
+
+
+def test_no_pass_runs_when_not_asked_or_when_nothing_was_rendered(world) -> None:
+    report = _loop(world, _result())
+    assert "responsive" not in report and "states" not in report
+
+    outcome = types.SimpleNamespace(iterations=[])
+
+    async def scenario():
+        return await glue.run_passes(
+            None,
+            outcome,
+            "index.html",
+            target=None,
+            regions=[],
+            masks=[],
+            config=LoopConfig(responsive=True, states=True),
+            on_progress=None,
+        )
+
+    assert asyncio.run(scenario()) == {}
+
+
+def test_the_passes_run_without_a_progress_callback(world, monkeypatch) -> None:
+    async def states(renderer, files, page):
+        return {"status": "done", "elements": []}
+
+    monkeypatch.setattr(glue, "states_pass", states)
+    report = asyncio.run(
+        glue.run_render_loop(
+            world["service"],
+            _result(),
+            image_data=_data_url(_draw(RED)),
+            framework="html",
+            config=LoopConfig(states=True),
+        )
+    )
+    assert report["states"] == {"status": "done", "elements": []}
+
+
+@pytest.mark.parametrize(
+    ("route", "model", "status"),
+    [
+        ("claude_api", "claude-opus-5", "priced"),
+        ("openai", "gpt-4o", "priced"),
+        ("claude_subscription", "claude-opus-5", "flat_rate"),
+        ("ollama", "llava", "flat_rate"),
+        ("google", "gemini-1.5-flash", "unknown"),
+        ("claude_api", "", "unknown"),
+    ],
+)
+def test_the_cost_comes_from_the_catalogue_or_is_unknown(route, model, status) -> None:
+    from design_to_code.budget import Usage
+
+    pricing = glue.pricing_for(VisionRoute("x", route=route, model=model))
+    assert pricing.status == status
+    if status == "unknown":
+        assert pricing.price is None
+    elif status == "flat_rate":
+        assert pricing.price(Usage(1_000_000, 1_000_000)) == 0.0
+    else:
+        assert pricing.price(Usage(1_000_000, 0, 0, 0)) > 0
+
+
+def test_the_correction_carries_the_tokens_its_provider_reported(
+    monkeypatch, tmp_path
+) -> None:
+    from design_to_code.budget import Usage
+
+    service = DesignToCodeService(str(tmp_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-0001")
+
+    async def openai(self, key, image, prompt):
+        self.last_usage = Usage(5, 6)
+        return "answer"
+
+    monkeypatch.setattr(DesignToCodeService, "_call_openai_vision", openai)
+    reply = asyncio.run(_correct(service, "openai")("p", b"png"))
+    assert (reply.text, reply.usage) == ("answer", Usage(5, 6))
+
+    monkeypatch.setattr(
+        "docintel.engines.ollama_vision.ask", lambda image, prompt, env: ("local", "")
+    )
+    service.last_usage = Usage(1, 1)
+    reply = asyncio.run(_correct(service, "ollama")("p", b"png"))
+    assert (reply.text, reply.usage) == ("local", None)
+
+
+def test_the_openai_and_gemini_models_are_the_ones_called(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.delenv("DESIGN_TO_CODE_VISION_MODEL_GOOGLE", raising=False)
+    models = glue.route_models(DesignToCodeService(str(tmp_path)))
+    assert (models["openai"], models["google"]) == ("gpt-4o", "gemini-1.5-flash")
