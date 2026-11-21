@@ -25,55 +25,28 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..models import FollowupReviewContext
-
-# Make AgentDefinition optional — not required when running with Copilot provider
-try:
     from claude_agent_sdk import AgentDefinition
-except ImportError:
-    AgentDefinition = None  # type: ignore[assignment,misc]
+    from runners.github.models import FollowupReviewContext
 
-try:
-    from ...core.client import create_agent_client
-    from ...phase_config import get_thinking_budget, resolve_model_id
-    from ..context_gatherer import _validate_git_ref
-    from ..gh_client import GHClient
-    from ..models import (
-        BRANCH_BEHIND_BLOCKER_MSG,
-        BRANCH_BEHIND_REASONING,
-        GitHubRunnerConfig,
-        MergeVerdict,
-        PRReviewFinding,
-        PRReviewResult,
-        ReviewSeverity,
-    )
-    from .agent_utils import create_working_dir_injector
-    from .category_utils import map_category
-    from .io_utils import safe_print
-    from .pr_worktree_manager import PRWorktreeManager
-    from .pydantic_models import ParallelFollowupResponse
-    from .sdk_utils import process_agent_stream
-except (ImportError, ValueError, SystemError):
-    from context_gatherer import _validate_git_ref
-    from core.client import create_agent_client
-    from gh_client import GHClient
-    from models import (
-        BRANCH_BEHIND_BLOCKER_MSG,
-        BRANCH_BEHIND_REASONING,
-        GitHubRunnerConfig,
-        MergeVerdict,
-        PRReviewFinding,
-        PRReviewResult,
-        ReviewSeverity,
-    )
-    from phase_config import get_thinking_budget, resolve_model_id
-    from services.agent_utils import create_working_dir_injector
-    from services.category_utils import map_category
-    from services.io_utils import safe_print
-    from services.pr_worktree_manager import PRWorktreeManager
-    from services.pydantic_models import ParallelFollowupResponse
-    from services.sdk_utils import process_agent_stream
-
+from core.client import create_agent_client
+from phase_config import get_thinking_budget, resolve_model_id
+from runners.github.context_gatherer import _validate_git_ref
+from runners.github.gh_client import GHClient
+from runners.github.models import (
+    BRANCH_BEHIND_BLOCKER_MSG,
+    BRANCH_BEHIND_REASONING,
+    GitHubRunnerConfig,
+    MergeVerdict,
+    PRReviewFinding,
+    PRReviewResult,
+    ReviewSeverity,
+)
+from runners.github.services.agent_utils import create_working_dir_injector
+from runners.github.services.category_utils import map_category
+from runners.github.services.io_utils import safe_print
+from runners.github.services.pr_worktree_manager import PRWorktreeManager
+from runners.github.services.pydantic_models import ParallelFollowupResponse
+from runners.github.services.sdk_utils import process_agent_stream
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +101,9 @@ class ParallelFollowupReviewer:
         self.config = config
         self.progress_callback = progress_callback
         self.worktree_manager = PRWorktreeManager(project_dir, PR_WORKTREE_DIR)
+        self.prompts_dir = (
+            Path(__file__).parent.parent.parent.parent / "prompts" / "github"
+        )
 
     def _report_progress(self, phase: str, progress: int, message: str, **kwargs):
         """Report progress if callback is set."""
@@ -135,12 +111,10 @@ class ParallelFollowupReviewer:
             import sys
 
             if "orchestrator" in sys.modules:
+                # The runner imports the orchestrator by its bare name.
                 ProgressCallback = sys.modules["orchestrator"].ProgressCallback
             else:
-                try:
-                    from ..orchestrator import ProgressCallback
-                except ImportError:
-                    from orchestrator import ProgressCallback
+                from runners.github.orchestrator import ProgressCallback
 
             self.progress_callback(
                 ProgressCallback(
@@ -150,9 +124,7 @@ class ParallelFollowupReviewer:
 
     def _load_prompt(self, filename: str) -> str:
         """Load a prompt file from the prompts/github directory."""
-        prompt_file = (
-            Path(__file__).parent.parent.parent.parent / "prompts" / "github" / filename
-        )
+        prompt_file = self.prompts_dir / filename
         if prompt_file.exists():
             return prompt_file.read_text(encoding="utf-8")
         logger.warning(f"Prompt file not found: {prompt_file}")
@@ -803,7 +775,7 @@ The SDK will run invoked agents in parallel automatically.
             for rv in response.resolution_verifications:
                 if rv.status == "resolved":
                     resolved_ids.append(rv.finding_id)
-                elif rv.status in ("unresolved", "partially_resolved", "cant_verify"):
+                else:  # unresolved, partially_resolved, cant_verify
                     # Check if finding was validated and dismissed as false positive
                     if rv.finding_id in dismissed_ids:
                         # Finding-validator determined this was a false positive - skip it
@@ -1248,12 +1220,10 @@ Agents invoked: {agents_str}
             else:
                 return "**🟠 Needs revision** - See details below."
 
-        elif verdict == MergeVerdict.MERGE_WITH_CHANGES:
+        else:  # MERGE_WITH_CHANGES
             if pending_ci > 0:
                 return (
                     "**🟡 Can merge once CI passes** - Minor suggestions, no blockers."
                 )
             else:
                 return "**🟡 Can merge** - Minor suggestions noted, no blockers."
-
-        return "**📝 Review complete** - See details below."

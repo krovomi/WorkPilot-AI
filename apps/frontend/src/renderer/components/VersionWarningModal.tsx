@@ -37,7 +37,8 @@ export function VersionWarningModal({
 	};
 
 	return (
-		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+		// Without a trigger, Radix only asks to close (Escape, click outside).
+		<Dialog open={isOpen} onOpenChange={onClose}>
 			<DialogContent className="sm:max-w-md" hideCloseButton>
 				<DialogHeader>
 					<div className="flex items-center gap-3">
