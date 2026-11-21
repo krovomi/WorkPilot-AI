@@ -62,6 +62,14 @@ dans `src/shared/constants/gateway-providers.ts`.
   toucher au modèle local : on essaie un modèle sur une tâche avant d'en télécharger des gigaoctets
   (`HubDiscoveryWithCloud.tsx`). Le choix n'est qu'un identifiant de modèle ; la clé reste dans le
   main.
+- **Doublons d'issues par le sens.** Le triage des issues GitHub montre au modèle les issues ouvertes
+  les plus proches par le sens (similarité cosinus des embeddings titre et corps, au-dessus de 0,70,
+  cinq au plus), au lieu de celles qui partagent des mots du titre. Le jeton Hugging Face suffit : le
+  routeur sert les embeddings sur sa route `feature-extraction` (`thenlper/gte-large` par défaut),
+  pas sur son `/v1` compatible OpenAI, qui n'a pas `/embeddings`. OpenAI, Voyage et un modèle local
+  restent possibles (`ISSUE_EMBEDDINGS_PROVIDER`). Les vecteurs sont mis en cache par issue, service
+  et modèle ; un service en panne ou refusé laisse les mots partagés. En hors-ligne strict, seul un
+  modèle local nommé sert. Le modèle décide toujours : ceci ne choisit que ce qu'il compare.
 - **Hors-ligne strict.** Ce sont des providers cloud : `offline_policy` les refuse comme les autres.
 
 ## Où les toucher
@@ -73,4 +81,5 @@ dans `src/shared/constants/gateway-providers.ts`.
 | Effort, attribution | `core/llm_optimization.py` (`gateway_effort_params`, `compatible_cache_routing`) |
 | Test de clé (API locale) | `provider_api.py` (`_VALIDATION_SPECS`) |
 | Catalogue sur la page du provider, « Essayer dans le cloud » | `src/renderer/components/settings/GatewayModelCatalog.tsx`, `HubDiscoveryWithCloud.tsx`, `gateway-model-catalog.ts` |
+| Doublons d'issues par embeddings (triage) | `runners/github/services/duplicate_candidates.py`, `runners/github/duplicates.py` (`_huggingface_embedding`) |
 | Réglages, environnement du backend, test de clé (Electron) | `src/shared/constants/gateway-providers.ts`, `src/main/services/provider-settings-keys.ts` |
