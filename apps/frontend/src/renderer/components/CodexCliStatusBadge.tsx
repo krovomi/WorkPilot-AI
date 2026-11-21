@@ -7,7 +7,7 @@ import {
 	RefreshCw,
 	X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCliStatus } from "@/contexts/CliStatusContext";
 import { refreshProviderModelCatalog } from "@/hooks/useProviderModelCatalog";
@@ -20,7 +20,6 @@ import { formatAppTime } from "@/lib/date-format";
 
 interface CodexCliStatusBadgeProps {
 	readonly className?: string;
-	readonly onNavigateToTerminals?: () => void;
 	// Mode replié de la sidebar : affiche uniquement l'icône pour éviter le débordement
 	readonly isCollapsed?: boolean;
 	/** Where the « Outils CLI » panel places this badge, once its check answers. */
@@ -31,10 +30,8 @@ interface CodexIconProps {
 	readonly className?: string;
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
-type StatusType = "loading" | "installed" | "outdated" | "not-found" | "error";
-
-const _CHECK_INTERVAL_MS = 60 * 1000; // Re-check every 60s
+/** After an update, the second check that picks up a `codex.cmd` written late. */
+const RECHECK_AFTER_UPDATE_MS = 2000;
 
 /**
  * OpenAI Codex icon (simplified)
@@ -66,7 +63,6 @@ function CodexIcon({ className }: CodexIconProps) {
  */
 export function CodexCliStatusBadge({
 	className,
-	onNavigateToTerminals: _onNavigateToTerminals,
 	isCollapsed = false,
 	onPresenceChange,
 }: CodexCliStatusBadgeProps) {
@@ -77,6 +73,10 @@ export function CodexCliStatusBadge({
 	const [isOpen, setIsOpen] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
 	const [updateError, setUpdateError] = useState<string | null>(null);
+	const recheckTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	useEffect(() => () => clearTimeout(recheckTimer.current), []);
 
 	// Use data from context
 	const status = codex.status;
@@ -98,14 +98,12 @@ export function CodexCliStatusBadge({
 		setIsUpdating(true);
 		setUpdateError(null);
 		try {
-			if (!globalThis.electronAPI?.updateCodexCli) {
-				setUpdateError("Update not available");
-				return;
-			}
-
 			const result = await globalThis.electronAPI.updateCodexCli();
 			if (!result.success) {
-				setUpdateError(result.error || "Update failed");
+				setUpdateError(
+					result.error ||
+						t("navigation:codex.updateFailed", "Updating Codex CLI failed."),
+				);
 				return;
 			}
 
@@ -114,10 +112,18 @@ export function CodexCliStatusBadge({
 			// Belt-and-suspenders: on Windows, the freshly-written `codex.cmd` can take
 			// a moment to be visible to `execFile`. Refresh a second time after a short
 			// delay so the sidebar picks up the new version reliably.
-			setTimeout(() => refreshCodex(), 2000);
+			clearTimeout(recheckTimer.current);
+			recheckTimer.current = setTimeout(
+				() => refreshCodex(),
+				RECHECK_AFTER_UPDATE_MS,
+			);
 		} catch (err) {
 			console.error("Failed to update Codex CLI:", err);
-			setUpdateError(err instanceof Error ? err.message : "Update failed");
+			setUpdateError(
+				err instanceof Error
+					? err.message
+					: t("navigation:codex.updateFailed", "Updating Codex CLI failed."),
+			);
 		} finally {
 			setIsUpdating(false);
 		}
@@ -172,8 +178,6 @@ export function CodexCliStatusBadge({
 				return t("navigation:codex.notFound", "Codex CLI not found");
 			case "error":
 				return t("navigation:codex.error", "Codex CLI error");
-			default:
-				return "Codex CLI";
 		}
 	};
 
@@ -368,11 +372,11 @@ export function CodexCliStatusBadge({
 						variant="link"
 						size="sm"
 						className="w-full text-xs text-muted-foreground gap-1"
-						onClick={() =>
-							globalThis.electronAPI?.openExternal?.(
+						onClick={() => {
+							void globalThis.electronAPI.openExternal(
 								"https://github.com/openai/codex",
-							)
-						}
+							);
+						}}
 					>
 						{t("navigation:codex.viewDocs", "View Codex CLI documentation")}
 						<ExternalLink className="h-3 w-3" />

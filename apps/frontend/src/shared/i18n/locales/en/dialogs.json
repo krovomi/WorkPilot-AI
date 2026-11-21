@@ -222,18 +222,10 @@
 		"selectComplexity": "Select complexity",
 		"impact": "Impact",
 		"selectImpact": "Select impact",
-		"lowComplexity": "Low",
-		"mediumComplexity": "Medium",
-		"highComplexity": "High",
-		"lowImpact": "Low Impact",
-		"mediumImpact": "Medium Impact",
-		"highImpact": "High Impact",
-		"titleRequired": "Title is required",
-		"descriptionRequired": "Description is required",
-		"phaseRequired": "Please select a phase",
 		"cancel": "Cancel",
 		"adding": "Adding...",
 		"addFeature": "Add Feature",
+		"defaultRationale": "Added to the roadmap by hand.",
 		"failedToAdd": "Failed to add feature. Please try again."
 	},
 	"addProject": {
@@ -391,6 +383,7 @@
 		"originPage": "This page overrides the global choice.",
 		"originSettings": "This page follows the global choice.",
 		"reset": "Reset",
+		"saveFailed": "This page's choice could not be saved.",
 		"effort": {
 			"none": "None",
 			"low": "Low",
@@ -466,7 +459,6 @@
 		"orgUrlPlaceholder": "https://dev.azure.com/myorganisation",
 		"pat": "PAT token",
 		"patPlaceholder": "Personal Access Token",
-		"required": "All fields are required.",
 		"invalidUrl": "Invalid Azure DevOps URL.",
 		"save": "Confirm"
 	}

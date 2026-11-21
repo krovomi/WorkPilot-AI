@@ -42,6 +42,8 @@ interface RichTextEditorProps {
 	disabled?: boolean;
 	id?: string;
 	ariaRequired?: boolean;
+	/** The id of the visible label: a `<label for>` does not name a div. */
+	ariaLabelledBy?: string;
 	ariaDescribedBy?: string;
 	className?: string;
 	/** Highlight the editor as a drop target. */
@@ -115,6 +117,7 @@ export function RichTextEditor({
 	disabled = false,
 	id,
 	ariaRequired,
+	ariaLabelledBy,
 	ariaDescribedBy,
 	className,
 	isDragOver,
@@ -149,17 +152,16 @@ export function RichTextEditor({
 
 	// Sync external value -> DOM (only when it actually changed externally).
 	useEffect(() => {
-		const el = editorRef.current;
-		if (!el) return;
+		// The editable element is mounted whenever an effect or a handler runs.
+		const el = editorRef.current as HTMLDivElement;
 		if (value === lastValueRef.current) return;
-		el.innerHTML = prepareRichTextForDisplay(value || "");
+		el.innerHTML = prepareRichTextForDisplay(value);
 		lastValueRef.current = value;
 		setIsEmpty(computeEmpty(el));
 	}, [value, computeEmpty]);
 
 	const emitChange = useCallback(() => {
-		const el = editorRef.current;
-		if (!el) return;
+		const el = editorRef.current as HTMLDivElement;
 		const empty = computeEmpty(el);
 		setIsEmpty(empty);
 		const html = empty ? "" : el.innerHTML;
@@ -168,9 +170,9 @@ export function RichTextEditor({
 	}, [onChange, computeEmpty]);
 
 	const updateActive = useCallback(() => {
-		const el = editorRef.current;
-		const sel = window.getSelection();
-		if (!el || !sel || !el.contains(sel.anchorNode)) return;
+		const el = editorRef.current as HTMLDivElement;
+		const sel = window.getSelection() as Selection;
+		if (!el.contains(sel.anchorNode)) return;
 		try {
 			setActive({
 				bold: document.queryCommandState("bold"),
@@ -191,18 +193,17 @@ export function RichTextEditor({
 
 	const exec = useCallback(
 		(command: string, val?: string) => {
-			if (disabled) return;
-			editorRef.current?.focus();
+			// The toolbar buttons are disabled with the editor: no click reaches here then.
+			(editorRef.current as HTMLDivElement).focus();
 			document.execCommand(command, false, val);
 			emitChange();
 			updateActive();
 		},
-		[disabled, emitChange, updateActive],
+		[emitChange, updateActive],
 	);
 
 	const getSelectionAnchorHref = useCallback((): string => {
-		const sel = window.getSelection();
-		let node = (sel?.anchorNode ?? null) as Node | null;
+		let node = (window.getSelection() as Selection).anchorNode;
 		while (node && node !== editorRef.current) {
 			if (node instanceof HTMLAnchorElement) {
 				return node.getAttribute("href") ?? "";
@@ -213,27 +214,27 @@ export function RichTextEditor({
 	}, []);
 
 	const openLinkPopover = useCallback(() => {
-		if (disabled) return;
-		const sel = window.getSelection();
+		const sel = window.getSelection() as Selection;
 		savedRangeRef.current =
-			sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+			sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
 		setLinkUrl(getSelectionAnchorHref());
 		setLinkOpen(true);
-	}, [disabled, getSelectionAnchorHref]);
+	}, [getSelectionAnchorHref]);
 
 	const applyLink = useCallback(() => {
-		const el = editorRef.current;
-		if (!el) return;
 		const url = linkUrl.trim();
-		el.focus();
-		const sel = window.getSelection();
-		if (sel && savedRangeRef.current) {
+		// Read before focusing the editor: the focus leaving the link box
+		// dismisses it, which forgets the saved selection.
+		const range = savedRangeRef.current;
+		(editorRef.current as HTMLDivElement).focus();
+		const sel = window.getSelection() as Selection;
+		if (range) {
 			sel.removeAllRanges();
-			sel.addRange(savedRangeRef.current);
+			sel.addRange(range);
 		}
 		if (!url) {
 			document.execCommand("unlink");
-		} else if (savedRangeRef.current && !savedRangeRef.current.collapsed) {
+		} else if (range && !range.collapsed) {
 			document.execCommand("createLink", false, url);
 		} else {
 			// Nothing selected: insert the URL itself as a link.
@@ -310,12 +311,12 @@ export function RichTextEditor({
 
 				<Popover
 					open={linkOpen}
-					onOpenChange={(open) => {
-						setLinkOpen(open);
-						if (!open) {
-							setLinkUrl("");
-							savedRangeRef.current = null;
-						}
+					// Only the box closes itself (Escape, a click or the focus
+					// outside); the link button opens it.
+					onOpenChange={() => {
+						setLinkOpen(false);
+						setLinkUrl("");
+						savedRangeRef.current = null;
 					}}
 				>
 					<PopoverAnchor asChild>
@@ -388,6 +389,7 @@ export function RichTextEditor({
 					tabIndex={disabled ? -1 : 0}
 					aria-multiline="true"
 					aria-required={ariaRequired}
+					aria-labelledby={ariaLabelledBy}
 					aria-describedby={ariaDescribedBy}
 					contentEditable={!disabled}
 					suppressContentEditableWarning

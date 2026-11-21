@@ -44,6 +44,22 @@ function errorMessage(e: unknown): string {
 	return e instanceof Error ? e.message : String(e);
 }
 
+// ---------- the open project ----------
+
+/**
+ * The project the panels' results belong to, and a counter bumped each time
+ * it changes. An answer that comes back after the project changed is dropped:
+ * it would show the previous project's findings under the new one's name.
+ */
+let boundProject: string | null = null;
+let projectEpoch = 0;
+
+/** True while the project that was open when the call started is still open. */
+function stillOpen(): () => boolean {
+	const epoch = projectEpoch;
+	return () => epoch === projectEpoch;
+}
+
 // ---------- #3.8 Longevity ----------
 
 interface LongevityState extends BaseSlice {
@@ -61,13 +77,15 @@ export const useLongevityStore = create<LongevityState>((set) => ({
 			set({ phase: "error", error: "projectPath is required" });
 			return;
 		}
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.scoreLongevity(projectPath);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", report: res.report ?? null });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	reset: () => set({ phase: "idle", error: null, report: null }),
@@ -82,20 +100,24 @@ interface AgentHealthState extends BaseSlice {
 	refresh: (projectPath: string) => Promise<void>;
 }
 
-export const useAgentHealthStore = create<AgentHealthState>((set) => ({
+export const useAgentHealthStore = create<AgentHealthState>((set, get) => ({
 	phase: "idle",
 	error: null,
 	projectPath: null,
 	health: null,
 	refresh: async (projectPath) => {
-		set({ phase: "running", error: null, projectPath });
+		const live = stillOpen();
+		// Another project's scores are not this one's, even while its own load.
+		const sameProject = get().projectPath === projectPath;
+		set({ phase: "running", error: null, projectPath, ...(sameProject ? {} : { health: null }) });
 		try {
 			const res = await globalThis.electronAPI.scoreProjectAgentHealth(projectPath);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			const { scores, pending, tasks_read, min_runs } = res;
 			set({ phase: "ok", health: { scores, pending, tasks_read, min_runs } });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e), health: null });
+			if (live()) set({ phase: "error", error: errorMessage(e), health: null });
 		}
 	},
 }));
@@ -185,13 +207,16 @@ export const useDomainAgentsStore = create<DomainAgentsState>((set) => ({
 		}
 	},
 	build: async (domain, role, projectPath) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.buildDomainBundle(domain, role, projectPath);
+			// Built for the previous project: its libraries are not this one's.
+			if (!live()) return set({ phase: "idle" });
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", bundle: res.bundle });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			set(live() ? { phase: "error", error: errorMessage(e) } : { phase: "idle" });
 		}
 	},
 	loadProjectDomain: async (projectPath) => {
@@ -275,6 +300,7 @@ export const useLicenseStore = create<LicenseState>((set) => ({
 			set({ phase: "error", error: "projectPath is required" });
 			return;
 		}
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.scanLicenses(
@@ -283,10 +309,11 @@ export const useLicenseStore = create<LicenseState>((set) => ({
 				undefined,
 				online,
 			);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", report: res.report, online: res.online ?? online });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 }));
@@ -312,33 +339,39 @@ export const useArchDriftStore = create<ArchDriftState>((set) => ({
 	configSource: null,
 	baselineCount: null,
 	scan: async (projectPath) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.scanArchitecture(projectPath);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", scanReport: res.report, configSource: res.config_source });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	saveBaseline: async (projectPath) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.saveArchBaseline(projectPath);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", baselineCount: res.violation_count, configSource: res.config_source });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	compare: async (projectPath) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.compareArchDrift(projectPath);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", driftReport: res.drift, configSource: res.config_source });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 }));
@@ -527,6 +560,7 @@ export const useCogContextStore = create<CogContextState>((set) => ({
 	error: null,
 	context: null,
 	optimize: async (projectPath, prompt, candidateFiles, tokenBudget) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.optimizeContext(
@@ -535,10 +569,11 @@ export const useCogContextStore = create<CogContextState>((set) => ({
 				tokenBudget,
 				{ projectDir: projectPath },
 			);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", context: res.context });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 }));
@@ -561,19 +596,22 @@ export const useAuditTrailStore = create<AuditTrailState>((set) => ({
 	replayEvents: [],
 	integrity: null,
 	loadEvents: async (storageDir, trailName) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.auditEvents({
 				storageDir,
 				trailName,
 			});
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", events: res.events });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	replay: async (correlationId, storageDir, trailName) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.auditReplay(
@@ -581,23 +619,50 @@ export const useAuditTrailStore = create<AuditTrailState>((set) => ({
 				storageDir,
 				trailName,
 			);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", replayEvents: res.bundle.events });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	verify: async (storageDir, trailName) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.auditVerify(storageDir, trailName);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", integrity: res.integrity });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 }));
+
+/**
+ * Called by the hub when the open project changes: the findings of the
+ * previous project are cleared, and answers still in flight for it dropped.
+ */
+export function bindPhase35Project(projectPath: string): void {
+	if (projectPath === boundProject) return;
+	boundProject = projectPath;
+	projectEpoch += 1;
+	const idle = { phase: "idle" as Phase, error: null };
+	useLongevityStore.setState({ ...idle, report: null });
+	useAgentHealthStore.setState({ ...idle, projectPath: null, health: null });
+	useDomainAgentsStore.setState({ bundle: null });
+	useLicenseStore.setState({ ...idle, report: null, online: null });
+	useArchDriftStore.setState({
+		...idle,
+		scanReport: null,
+		driftReport: null,
+		configSource: null,
+		baselineCount: null,
+	});
+	useCogContextStore.setState({ ...idle, context: null });
+	useAuditTrailStore.setState({ ...idle, events: [], replayEvents: [], integrity: null });
+}
 
 // ---------- #3.5 Pair Realtime ----------
 

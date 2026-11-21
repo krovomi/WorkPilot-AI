@@ -90,4 +90,15 @@ describe("TaskCreationExtras", () => {
 		expect(field.value).toBe("");
 		expect(screen.getByTestId("criteria")).toHaveTextContent("");
 	});
+
+	it("keeps the text when the mode already shown is picked again", () => {
+		render(<Harness />);
+		fireEvent.click(screen.getByRole("button", { name: /acceptance criteria/i }));
+		fireEvent.click(screen.getByRole("button", { name: "Text" }));
+		const field = screen.getByRole("textbox") as HTMLTextAreaElement;
+		fireEvent.change(field, { target: { value: "Only\n" } });
+		fireEvent.click(screen.getByRole("button", { name: "Text" }));
+		expect(screen.getByRole("textbox")).toHaveValue("Only\n");
+		expect(screen.getByRole("button", { name: "Text" })).toHaveAttribute("aria-pressed", "true");
+	});
 });
