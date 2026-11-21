@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useHermesStore } from "../stores/hermes-store";
 import { CheckRow, SoulInstallNote } from "./task-detail/HermesLearningCard";
 import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
+import { type CliUpdateReporter, useReportCliUpdate } from "./cli-update-all";
 import { CliUpdateChip, CliUpdateSection, useCliUpdate } from "./CliUpdateSection";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -31,6 +32,8 @@ interface HermesStatusBadgeProps {
 	readonly isCollapsed?: boolean;
 	/** Where the « Outils CLI » panel places this badge, once the doctor answers. */
 	readonly onPresenceChange?: (presence: CliPresence) => void;
+	/** Hands this badge's update to the panel's « Tout mettre à jour ». */
+	readonly onUpdateChange?: CliUpdateReporter;
 }
 
 /**
@@ -49,6 +52,7 @@ interface HermesStatusBadgeProps {
 export function HermesStatusBadge({
 	isCollapsed = false,
 	onPresenceChange,
+	onUpdateChange,
 }: HermesStatusBadgeProps) {
 	const { t } = useTranslation(["hermes", "common", "navigation"]);
 	const [isOpen, setIsOpen] = useState(false);
@@ -85,6 +89,7 @@ export function HermesStatusBadge({
 	const reloadAfterUpdate = useCallback(() => void load(true), [load]);
 	const updates = useCliUpdate("hermes", NAME, installed === true, reloadAfterUpdate);
 	const outdated = installed === true && Boolean(updates.info?.isOutdated);
+	useReportCliUpdate(onUpdateChange, outdated && !unavailable, updates.isUpdating, updates.update);
 	const version = updates.info?.version;
 	useReportCliPresence(
 		onPresenceChange,

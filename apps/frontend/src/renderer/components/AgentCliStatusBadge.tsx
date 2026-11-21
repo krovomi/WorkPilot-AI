@@ -26,6 +26,7 @@ import {
 	type CliPresence,
 	useReportCliPresence,
 } from "./cli-tool-order";
+import { type CliUpdateReporter, useReportCliUpdate } from "./cli-update-all";
 import { CliUpdateChip, CliUpdateSection, useCliUpdate } from "./CliUpdateSection";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -133,6 +134,8 @@ interface AgentCliStatusBadgeProps {
 	readonly isCollapsed?: boolean;
 	/** Where the « Outils CLI » panel places this badge, once its check answers. */
 	readonly onPresenceChange?: (presence: CliPresence) => void;
+	/** Hands this badge's update to the panel's « Tout mettre à jour ». */
+	readonly onUpdateChange?: CliUpdateReporter;
 }
 
 function toBadgeStatus(result: AgentCliStatus | null): BadgeStatus {
@@ -152,6 +155,7 @@ export function AgentCliStatusBadge({
 	className,
 	isCollapsed = false,
 	onPresenceChange,
+	onUpdateChange,
 }: AgentCliStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation"]);
 	const [result, setResult] = useState<AgentCliStatus | null>(null);
@@ -209,6 +213,7 @@ export function AgentCliStatusBadge({
 	const status = toBadgeStatus(result);
 	const updates = useCliUpdate(tool, name, status === "installed", refresh);
 	const outdated = status === "installed" && Boolean(updates.info?.isOutdated);
+	useReportCliUpdate(onUpdateChange, outdated, updates.isUpdating, updates.update);
 	const version = result?.version;
 
 	const statusColor = {
