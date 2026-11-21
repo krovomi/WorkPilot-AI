@@ -41,12 +41,15 @@ import type { McpMarketplaceServer } from "../../../shared/types/mcp-marketplace
 import { InstalledWatchStore } from "../installed-watch";
 import { readMcpPolicy } from "../policy-file";
 import { RegistryFactsStore } from "../registry-facts";
+import { SourceScanStore } from "../source-scan";
 import {
 	installedWatchStore,
 	installGuardDeps,
 	marketplaceDataDir,
 	projectMcpServers,
+	scoreDeps,
 	securityStore,
+	sourceScanStore,
 	startMcpInstalledWatch,
 	stopMcpInstalledWatch,
 	watchDeps,
@@ -84,6 +87,30 @@ describe("stores", () => {
 		expect(securityStore()).toBe(securityStore());
 		expect(installedWatchStore()).toBeInstanceOf(InstalledWatchStore);
 		expect(installedWatchStore()).toBe(installedWatchStore());
+		expect(sourceScanStore()).toBeInstanceOf(SourceScanStore);
+		expect(sourceScanStore()).toBe(sourceScanStore());
+	});
+});
+
+describe("scoreDeps", () => {
+	it("scores with the main's stores and the accepted findings of the project's policy", () => {
+		const d = scoreDeps();
+		expect(d.store).toBe(securityStore());
+		expect(d.scan).toBe(sourceScanStore());
+		expect(d.offline("/air")).toBe(true);
+		const project = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-runtime-policy-"));
+		try {
+			expect(d.accepted?.(project)).toEqual([]);
+			fs.mkdirSync(path.join(project, ".workpilot"));
+			const finding = { server: "github", rule: "dynamicCode", reason: "reviewed" };
+			fs.writeFileSync(
+				path.join(project, ".workpilot", "mcp-policy.json"),
+				JSON.stringify({ acceptedFindings: [finding] }),
+			);
+			expect(d.accepted?.(project)).toEqual([finding]);
+		} finally {
+			fs.rmSync(project, { recursive: true, force: true });
+		}
 	});
 });
 
@@ -102,6 +129,7 @@ describe("watchDeps", () => {
 		expect(d.offline("/air")).toBe(true);
 		expect(d.catalog()).toBe(loadMcpCatalog());
 		expect(d.facts).toBe(securityStore());
+		expect(d.scan).toBe(sourceScanStore());
 		expect(d.watch).toBe(installedWatchStore());
 		d.warn?.("x");
 		expect(state.warn).toHaveBeenCalledWith("x");
