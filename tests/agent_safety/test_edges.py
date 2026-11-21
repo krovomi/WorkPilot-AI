@@ -97,6 +97,20 @@ def test_the_scratch_index_copes_with_a_main_checkout_and_no_index(tmp_path: Pat
     assert not index.parent.exists()
 
 
+def test_the_scratch_index_keeps_the_time_of_the_index(tmp_path: Path):
+    # Git re-reads a file whose entry is as recent as the index itself; a copy
+    # stamped later would make a same-second edit look unchanged.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    (repo / "a.txt").write_text("a\n", encoding="utf-8")
+    git(repo, "add", "a.txt")
+    real = repo / ".git" / "index"
+    os.utime(real, ns=(1_700_000_000_000_000_000, 1_700_000_000_000_000_000))
+    with _ScratchIndex(repo) as index:
+        assert index.stat().st_mtime_ns == real.stat().st_mtime_ns
+
+
 # -- events -------------------------------------------------------------------------
 
 

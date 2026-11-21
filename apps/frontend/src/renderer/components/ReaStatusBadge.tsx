@@ -75,9 +75,7 @@ export function ReaStatusBadge({ isCollapsed = false, onPresenceChange }: ReaSta
 		void refresh();
 	}, [refresh]);
 
-	const install = useCallback(async () => {
-		const run = globalThis.electronAPI?.installRea;
-		if (!run) return;
+	const install = useCallback(async (run: () => Promise<ReaInstallResult>) => {
 		setIsInstalling(true);
 		setInstallError(null);
 		let answer: ReaInstallResult;
@@ -113,9 +111,11 @@ export function ReaStatusBadge({ isCollapsed = false, onPresenceChange }: ReaSta
 
 	const state: BadgeState = status ? status.state : "loading";
 	const ready = state === "ready";
-	const canInstall =
-		Boolean(globalThis.electronAPI?.installRea) &&
-		(state === "absent" || state === "other_version");
+	// Only offered where the preload has it (the browser preview has a partial API)
+	const installer =
+		state === "absent" || state === "other_version"
+			? globalThis.electronAPI?.installRea
+			: undefined;
 	const missing = state !== "loading" && state !== "ready" && state !== "other_version";
 	useReportCliPresence(onPresenceChange, state === "loading" ? null : missing ? "missing" : "installed");
 
@@ -172,6 +172,8 @@ export function ReaStatusBadge({ isCollapsed = false, onPresenceChange }: ReaSta
 						<Button
 							variant="ghost"
 							size={isCollapsed ? "icon" : "sm"}
+							// Collapsed, the icon alone would leave the button unnamed
+							aria-label={isCollapsed ? NAME : undefined}
 							className={cn(
 								isCollapsed ? "justify-center" : "w-full justify-start gap-2 text-xs",
 								missing ? "text-muted-foreground" : "",
@@ -193,7 +195,7 @@ export function ReaStatusBadge({ isCollapsed = false, onPresenceChange }: ReaSta
 										{NAME}
 										{ready ? ` (${version})` : ""}
 									</span>
-									{canInstall && (
+									{installer && (
 										<span className="ml-auto text-3xs bg-primary/15 text-primary px-1.5 py-0.5 rounded flex items-center gap-1">
 											{isInstalling && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
 											{isInstalling
@@ -241,7 +243,13 @@ export function ReaStatusBadge({ isCollapsed = false, onPresenceChange }: ReaSta
 						</p>
 					)}
 
-					{canInstall && (
+					{status?.error && (
+						<p role="alert" className="text-xs text-destructive break-words">
+							{t("navigation:rea.checkFailed", { error: status.error })}
+						</p>
+					)}
+
+					{installer && (
 						<>
 							<p className="text-xs font-mono bg-muted px-1 rounded break-all">
 								<code>{`npm install -g --ignore-scripts ${REA_SPEC}`}</code>
@@ -250,7 +258,7 @@ export function ReaStatusBadge({ isCollapsed = false, onPresenceChange }: ReaSta
 								size="sm"
 								className="w-full gap-1"
 								onClick={() => {
-									void install();
+									void install(installer);
 								}}
 								disabled={isInstalling}
 							>
