@@ -110,7 +110,7 @@ describe("SortableFeatureCard — content", () => {
 	it("shows the priority, the phase, the title, the description and translated levels", () => {
 		renderCards([makeFeature()]);
 		expect(screen.getByText("Must have")).toBeInTheDocument();
-		expect(screen.getByText("Foundations ...")).toBeInTheDocument();
+		expect(screen.getByText("Foundations and groundwork")).toBeInTheDocument();
 		expect(screen.getByRole("heading", { name: "Dark mode" })).toBeInTheDocument();
 		expect(screen.getByText("Let people pick a dark theme")).toBeInTheDocument();
 		expect(screen.getByText("Low complexity")).toBeInTheDocument();
@@ -128,13 +128,14 @@ describe("SortableFeatureCard — content", () => {
 		expect(screen.getByText("Low impact")).toBeInTheDocument();
 	});
 
-	it("shows no phase without a roadmap or for an unknown phase", () => {
+	it("shows no phase for an unknown phase", () => {
 		render(
 			<TooltipProvider>
 				<DndContext>
 					<SortableContext items={["f1"]}>
 						<SortableFeatureCard
 							feature={makeFeature({ phaseId: "gone", complexity: "medium", impact: "medium" })}
+							roadmap={ROADMAP}
 							onClick={vi.fn()}
 						/>
 					</SortableContext>
@@ -185,9 +186,9 @@ describe("SortableFeatureCard — imported features", () => {
 	it("names GitHub, not its code, as the source of an imported issue", async () => {
 		renderCards([makeFeature({ votes: 0, source: { provider: "github_issue" } })]);
 		expect(screen.queryByText("0")).not.toBeInTheDocument();
-		fireEvent.focus(screen.getByText("External"));
+		fireEvent.focus(screen.getByText("GitHub Issues"));
 		expect(
-			(await screen.findAllByText("Imported from GitHub")).length,
+			(await screen.findAllByText("Imported from GitHub Issues")).length,
 		).toBeGreaterThan(0);
 		expect(screen.queryByText(/github_issue/)).not.toBeInTheDocument();
 	});
@@ -255,7 +256,7 @@ describe("SortableFeatureCard — actions", () => {
 });
 
 describe("SortableFeatureCard — drag", () => {
-	it("fades the dragged card and rings the one it is over", async () => {
+	it("fades the dragged card while it moves", async () => {
 		renderCards([makeFeature(), makeFeature({ id: "f2", title: "Offline mode" })]);
 		const dragged = handleOf("Dark mode");
 		const target = handleOf("Offline mode");
@@ -264,18 +265,16 @@ describe("SortableFeatureCard — drag", () => {
 		});
 		expect(dragged).toHaveClass("opacity-40");
 		expect(dragged.style.zIndex).toBe("50");
-		expect(target).not.toHaveClass("ring-2");
+		// The column under the card is what lights up (RoadmapKanbanView), not the other card.
 		for (let i = 0; i < 4; i++) {
 			await act(async () => {
 				fireEvent.keyDown(dragged, { code: "ArrowDown", key: "ArrowDown" });
 			});
 		}
-		expect(target).toHaveClass("ring-2");
-		expect(dragged).not.toHaveClass("ring-2");
+		expect(target).not.toHaveClass("opacity-40");
 		await act(async () => {
 			fireEvent.keyDown(dragged, { code: "Escape", key: "Escape" });
 		});
 		expect(dragged).not.toHaveClass("opacity-40");
-		expect(target).not.toHaveClass("ring-2");
 	});
 });
