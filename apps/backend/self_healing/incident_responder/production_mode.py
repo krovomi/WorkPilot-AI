@@ -39,6 +39,7 @@ from .models import (
     IncidentSource,
     ProductionIncidentData,
 )
+from .prompt_fill import fill_template
 
 logger = logging.getLogger(__name__)
 
@@ -186,10 +187,7 @@ class ProductionMode:
             "{{SUSPECT_COMMITS}}": self._render_suspects(data, source),
         }
 
-        for key, value in replacements.items():
-            template = template.replace(key, value)
-
-        return template
+        return fill_template(template, replacements)
 
     @staticmethod
     def _render_group(data: dict[str, Any]) -> str:

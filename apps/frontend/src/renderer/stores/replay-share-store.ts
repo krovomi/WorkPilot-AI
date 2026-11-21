@@ -1,5 +1,6 @@
 /**
- * Sharing a recorded agent session (#347): export, import, bookmarks.
+ * Sharing a recorded agent session (#347): export, import, bookmarks, a
+ * video of the replay and a model's summary of its steps.
  *
  * Main does the work (`main/ipc-handlers/replay-share-handlers.ts`); this
  * store only keeps what is running and the last outcome, as an i18n key. A
@@ -13,6 +14,7 @@ import type {
 	ReplayBookmark,
 	ReplayBookmarkRequest,
 	ReplayExportOptions,
+	ReplayVideoOptions,
 } from "../../shared/types/replay-share";
 import { useAgentReplayStore } from "./agent-replay-store";
 
@@ -24,10 +26,24 @@ const KNOWN_ERRORS = new Set([
 	"unsupported_version",
 	"not_a_file",
 	"bad_export",
+	"bad_target",
+	"video_busy",
+	"video_timeout",
+	"video_too_large",
+	"video_failed",
+	"recording",
+	"has_thinking",
+	"no_steps",
+	"summary_failed",
+	"summary_empty",
 ]);
 
+const appLanguage = (): "en" | "fr" =>
+	i18n.language?.startsWith("fr") ? "fr" : "en";
+
 export interface ReplayShareNotice {
-	tone: "ok" | "error";
+	/** `info`: nothing went wrong, the machine lacks what the action needs. */
+	tone: "ok" | "error" | "info";
 	key: string;
 	values?: Record<string, string>;
 }
@@ -36,6 +52,8 @@ interface ReplayShareState {
 	exporting: boolean;
 	importing: boolean;
 	savingBookmark: boolean;
+	recordingVideo: boolean;
+	summarizing: boolean;
 	notice: ReplayShareNotice | null;
 	exportSession: (
 		sessionId: string,
@@ -44,6 +62,12 @@ interface ReplayShareState {
 	importSession: () => Promise<void>;
 	addBookmark: (sessionId: string, request: ReplayBookmarkRequest) => Promise<boolean>;
 	removeBookmark: (sessionId: string, bookmarkId: string) => Promise<void>;
+	exportVideo: (
+		sessionId: string,
+		options: Omit<ReplayVideoOptions, "language">,
+	) => Promise<void>;
+	/** Asks `provider`'s fast model; the summary lands on the open session. */
+	summarize: (sessionId: string, provider: string) => Promise<void>;
 	clearNotice: () => void;
 }
 
@@ -87,14 +111,15 @@ export const useReplayShareStore = create<ReplayShareState>((set) => ({
 	exporting: false,
 	importing: false,
 	savingBookmark: false,
+	recordingVideo: false,
+	summarizing: false,
 	notice: null,
 
 	exportSession: async (sessionId, options) => {
 		set({ exporting: true, notice: null });
-		const language = i18n.language?.startsWith("fr") ? "fr" : "en";
 		const result = await window.electronAPI.exportReplaySession(sessionId, {
 			...options,
-			language,
+			language: appLanguage(),
 		});
 		if (!result.success) set({ exporting: false, notice: failure(result) });
 		else if (result.canceled) set({ exporting: false });
@@ -150,6 +175,55 @@ export const useReplayShareStore = create<ReplayShareState>((set) => ({
 			return;
 		}
 		withBookmarks(sessionId, (marks) => marks.filter((b) => b.id !== bookmarkId));
+	},
+
+	exportVideo: async (sessionId, options) => {
+		set({ recordingVideo: true, notice: null });
+		const result = await window.electronAPI.exportReplayVideo(sessionId, {
+			...options,
+			language: appLanguage(),
+		});
+		if (!result.success) set({ recordingVideo: false, notice: failure(result) });
+		else if (result.canceled) set({ recordingVideo: false });
+		else if ("refused" in result)
+			set({
+				recordingVideo: false,
+				notice: { tone: "info", key: `replay:share.video.refused.${result.refused}` },
+			});
+		else
+			set({
+				recordingVideo: false,
+				notice: {
+					tone: "ok",
+					key:
+						result.stepsPlayed < result.stepsTotal
+							? "replay:share.video.savedPart"
+							: "replay:share.video.saved",
+					values: {
+						path: result.filePath,
+						played: String(result.stepsPlayed),
+						total: String(result.stepsTotal),
+					},
+				},
+			});
+	},
+
+	summarize: async (sessionId, provider) => {
+		set({ summarizing: true, notice: null });
+		const result = await window.electronAPI.summarizeReplaySession(sessionId, {
+			provider: provider.trim().toLowerCase(),
+			language: appLanguage(),
+		});
+		if (!result.success) {
+			set({ summarizing: false, notice: failure(result) });
+			return;
+		}
+		useAgentReplayStore.setState((state) => {
+			const session = state.activeSession;
+			if (!session || session.session_id !== sessionId) return {};
+			return { activeSession: { ...session, summary: result.summary } };
+		});
+		set({ summarizing: false });
 	},
 
 	clearNotice: () => set({ notice: null }),

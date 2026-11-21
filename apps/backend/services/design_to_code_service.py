@@ -35,6 +35,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from design_to_code.budget import read_usage
 from offline_policy import is_local_provider, local_endpoint
 from services.design_to_code_providers import (
     cloud_refusal,
@@ -57,6 +58,9 @@ logger = logging.getLogger(__name__)
 
 # Constants
 CONTENT_TYPE_JSON = "application/json"
+#: The models of the OpenAI and Gemini vision calls (Gemini's can be set).
+OPENAI_VISION_MODEL = "gpt-4o"
+GOOGLE_VISION_MODEL = "gemini-1.5-flash"
 DEFAULT_FONT_FAMILY = "Inter, sans-serif"
 
 
@@ -554,6 +558,8 @@ class DesignToCodeService:
         self.progress_callbacks: list[Callable[..., None]] = []
         # Set when a canned example answered instead of a model.
         self._simulated = False
+        # The tokens the last vision call's provider reported (render loop budget).
+        self.last_usage: Any = None
 
         # Configuration (direct API calls only; the one-shot trunk and the
         # Claude subscription route use the user's own model choice).
@@ -942,6 +948,7 @@ Return ONLY the JSON, no additional text."""
             )
             response.raise_for_status()
             data = response.json()
+            self.last_usage = read_usage(data)
             return data["content"][0]["text"]
 
     async def _call_claude_subscription_vision(
@@ -993,6 +1000,8 @@ Return ONLY the JSON, no additional text."""
         async with client:
             await client.query(_message())
             async for msg in client.receive_response():
+                if hasattr(msg, "total_cost_usd"):  # the closing ResultMessage
+                    self.last_usage = read_usage(getattr(msg, "usage", None))
                 for block in getattr(msg, "content", None) or []:
                     text = getattr(block, "text", None)
                     if isinstance(text, str):
@@ -1017,13 +1026,14 @@ Return ONLY the JSON, no additional text."""
                     "Content-Type": CONTENT_TYPE_JSON,
                 },
                 json={
-                    "model": "gpt-4o",
+                    "model": OPENAI_VISION_MODEL,
                     "max_tokens": 4096,
                     "messages": _openai_vision_messages(prompt, image_data),
                 },
             )
             response.raise_for_status()
             data = response.json()
+            self.last_usage = read_usage(data)
             return data["choices"][0]["message"]["content"]
 
     async def _call_gemini_vision(
@@ -1043,7 +1053,7 @@ Return ONLY the JSON, no additional text."""
             media_type = "image/png"
             b64_data = image_data
 
-        model = os.getenv("DESIGN_TO_CODE_VISION_MODEL_GOOGLE", "gemini-1.5-flash")
+        model = os.getenv("DESIGN_TO_CODE_VISION_MODEL_GOOGLE", GOOGLE_VISION_MODEL)
         async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
@@ -1067,6 +1077,7 @@ Return ONLY the JSON, no additional text."""
             )
             response.raise_for_status()
             data = response.json()
+            self.last_usage = read_usage(data)
             return data["candidates"][0]["content"]["parts"][0]["text"]
 
     def _mock_vision_analysis(self) -> str:

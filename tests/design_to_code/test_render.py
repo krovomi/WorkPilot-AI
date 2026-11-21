@@ -283,3 +283,42 @@ def test_root_is_read_from_the_effective_user(monkeypatch) -> None:
     assert render_module._is_root() is True
     monkeypatch.delattr(render_module.os, "geteuid", raising=False)
     assert render_module._is_root() is False
+
+
+def test_a_pass_opens_its_page_at_its_own_width_behind_the_same_guards() -> None:
+    world: dict = {}
+
+    async def scenario():
+        async with Renderer(400, 300, launcher=_launcher(world)) as renderer:
+            async with renderer.open_page(
+                {"index.html": "x"}, "index.html", (390, 844, 1)
+            ) as tab:
+                assert isinstance(tab, FakePage)
+
+    asyncio.run(scenario())
+    assert world["context"] == {
+        "viewport": {"width": 390, "height": 844},
+        "device_scale_factor": 1,
+        "java_script_enabled": False,
+        "offline": True,
+    }
+    assert [outcome for _, outcome in world["routes"]] == [
+        "continue",
+        "continue",
+        "abort",
+        "abort",
+    ]
+
+
+def test_a_probe_the_browser_refuses_is_a_render_error() -> None:
+    world: dict = {}
+
+    async def scenario():
+        async with Renderer(400, 300, launcher=_launcher(world)) as renderer:
+            async with renderer.open_page({"index.html": "x"}, "index.html"):
+                raise PlaywrightError("Target closed\nstack")
+
+    with pytest.raises(RenderError) as error:
+        asyncio.run(scenario())
+    assert error.value.code == "load_failed" and "Target closed" in str(error.value)
+    assert world["context_closed"]

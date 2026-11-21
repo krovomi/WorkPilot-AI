@@ -1,0 +1,124 @@
+/**
+ * The MCP install policy: a closed schema where anything unexpected is the
+ * strictest policy, said invalid; and the refusal it makes of a server.
+ */
+import { describe, expect, it } from "vitest";
+import type { McpMarketplaceServer } from "../../types/mcp-marketplace";
+import { loadMcpCatalog } from "../install";
+import {
+	invalidPolicy,
+	parseMcpPolicy,
+	policyNeedsScore,
+	policyRefusal,
+	STRICTEST_POLICY,
+} from "../install-policy";
+
+const github = loadMcpCatalog().find((s) => s.id === "github") as McpMarketplaceServer;
+
+describe("parseMcpPolicy", () => {
+	it("reads a full policy, ids once each", () => {
+		expect(
+			parseMcpPolicy(
+				JSON.stringify({
+					version: 1,
+					allowedServers: ["github", "sentry", "github"],
+					minScore: 60,
+					blockCustomServers: true,
+				}),
+			),
+		).toEqual({
+			state: "active",
+			policy: { allowedServers: ["github", "sentry"], minScore: 60, blockCustomServers: true },
+		});
+	});
+
+	it("reads an empty policy as allowing everything but saying it exists", () => {
+		expect(parseMcpPolicy("{}")).toEqual({
+			state: "active",
+			policy: { blockCustomServers: false },
+		});
+	});
+
+	it("is invalid, and the strictest, for anything unexpected", () => {
+		const cases: [string, string, string?][] = [
+			["not json", "notJson"],
+			["[]", "schema"],
+			['"x"', "schema"],
+			['{"allowServers": []}', "schema", "allowServers"],
+			['{"version": 2}', "schema", "version"],
+			['{"allowedServers": "github"}', "schema", "allowedServers"],
+			['{"allowedServers": ["../x"]}', "schema", "allowedServers"],
+			['{"allowedServers": [3]}', "schema", "allowedServers"],
+			[JSON.stringify({ allowedServers: Array(501).fill("a") }), "schema", "allowedServers"],
+			['{"minScore": 101}', "schema", "minScore"],
+			['{"minScore": -1}', "schema", "minScore"],
+			['{"minScore": 50.5}', "schema", "minScore"],
+			['{"minScore": "60"}', "schema", "minScore"],
+			['{"blockCustomServers": "yes"}', "schema", "blockCustomServers"],
+		];
+		for (const [text, reason, field] of cases) {
+			const state = parseMcpPolicy(text);
+			expect(state).toEqual({
+				state: "invalid",
+				reason,
+				...(field ? { field } : {}),
+				policy: STRICTEST_POLICY,
+			});
+		}
+	});
+
+	it("does not echo a field name that is not a plain name", () => {
+		const state = parseMcpPolicy(JSON.stringify({ "<img src=x>": 1 }));
+		expect(state).toEqual({ state: "invalid", reason: "schema", policy: STRICTEST_POLICY });
+	});
+});
+
+describe("policyRefusal", () => {
+	const subject = { serverId: "github", name: "GitHub", entry: github };
+
+	it("lets anything through without a policy", () => {
+		expect(policyRefusal({ state: "none" }, { ...subject, entry: null })).toBeNull();
+	});
+
+	it("refuses everything under an invalid policy", () => {
+		expect(policyRefusal(invalidPolicy("notJson"), subject)).toEqual({
+			reason: "policyInvalid",
+			serverId: "github",
+			name: "GitHub",
+		});
+	});
+
+	it("refuses a custom server only when the policy says so", () => {
+		const custom = { serverId: "mine", name: "Mine", entry: null };
+		expect(policyRefusal({ state: "active", policy: { blockCustomServers: false } }, custom)).toBeNull();
+		expect(policyRefusal({ state: "active", policy: { blockCustomServers: true } }, custom)).toEqual({
+			reason: "customBlocked",
+			serverId: "mine",
+			name: "Mine",
+		});
+	});
+
+	it("refuses a catalog server the list leaves out", () => {
+		const only = (ids: string[]) =>
+			({ state: "active", policy: { allowedServers: ids, blockCustomServers: false } }) as const;
+		expect(policyRefusal(only(["github"]), subject)).toBeNull();
+		expect(policyRefusal(only(["sentry"]), subject)?.reason).toBe("notAllowed");
+		expect(policyRefusal(only([]), subject)?.reason).toBe("notAllowed");
+	});
+
+	it("refuses a score under the minimum, once the score is known", () => {
+		const min = { state: "active", policy: { minScore: 70, blockCustomServers: false } } as const;
+		expect(policyNeedsScore(min)).toBe(true);
+		expect(policyNeedsScore({ state: "active", policy: { blockCustomServers: true } })).toBe(false);
+		expect(policyNeedsScore(invalidPolicy("schema"))).toBe(false);
+		expect(policyRefusal(min, subject)).toBeNull();
+		expect(policyRefusal(min, { ...subject, score: 70 })).toBeNull();
+		expect(policyRefusal(min, { ...subject, score: 69 })).toEqual({
+			reason: "scoreTooLow",
+			serverId: "github",
+			name: "GitHub",
+			score: 69,
+			minScore: 70,
+		});
+	});
+});

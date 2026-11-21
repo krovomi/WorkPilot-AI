@@ -6,7 +6,9 @@ filter, and the values of secret-named environment variables) and replaces
 the project folder and the home folder by ``<project>`` and ``~``, in every
 text of the session. On request it also drops the reasoning (thinking steps
 and the ``reasoning`` of each step), the token counts and costs, and the
-content of the files (their diff lines stay).
+content of the files (their diff lines stay). A summary a model wrote of the
+steps (``replay.summary``) is a text of the session like any other: it is
+masked on its way out and rebuilt, bounded, on its way in.
 
 Import reads a bundle someone else made, so every field is rebuilt from what
 it should be: a text stays a text and is cut to a bound, a number stays a
@@ -26,6 +28,7 @@ import math
 import time
 import uuid
 import zlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -40,6 +43,7 @@ from .models import (
     ReplaySession,
     ReplayStep,
     ReplayStepType,
+    SessionSummary,
 )
 
 FORMAT = "wpreplay"
@@ -55,6 +59,7 @@ MAX_TEXT = 200_000
 MAX_CONTENT = 2_000_000
 MAX_SHORT = 500
 MAX_DEPTH = 6
+MAX_SUMMARY = 4_000
 IMPORTED_TAG = "imported"
 
 _THINKING = ReplayStepType.AGENT_THINKING
@@ -116,7 +121,18 @@ class _Masker:
         return value
 
 
-def _has_thinking(session: ReplaySession) -> bool:
+def text_masker(
+    session: ReplaySession, home: str | None = None
+) -> Callable[[str], str]:
+    """What masks a text of ``session`` on export, for a text made from it."""
+    masker = _Masker(
+        session.project_path, home if home is not None else str(Path.home())
+    )
+    return masker.text
+
+
+def has_thinking(session: ReplaySession) -> bool:
+    """Whether the model left a trace: a thinking step, or a step's reasoning."""
     return any(
         step.step_type == _THINKING or step.reasoning.strip() for step in session.steps
     )
@@ -162,7 +178,7 @@ def build_bundle(
         session.project_path, home if home is not None else str(Path.home())
     )
     masked = masker.value(data)
-    if not _has_thinking(session):
+    if not has_thinking(session):
         thinking = "none"
     elif options.strip_reasoning:
         thinking = "removed"
@@ -350,6 +366,21 @@ def _breakpoint(data: dict[str, Any]) -> Breakpoint | None:
     )
 
 
+def _summary(data: Any) -> SessionSummary | None:
+    if not isinstance(data, dict):
+        return None
+    text = _text(data.get("text"), MAX_SUMMARY)
+    if not text.strip():
+        return None
+    return SessionSummary(
+        text=text,
+        provider=_text(data.get("provider"), MAX_SHORT),
+        model=_text(data.get("model"), MAX_SHORT),
+        language="fr" if data.get("language") == "fr" else "en",
+        created_at=_number(data.get("created_at")),
+    )
+
+
 def session_from_bundle(bundle: dict[str, Any]) -> ReplaySession:
     """A new local session rebuilt from the bundle's session, field by field."""
     data: dict[str, Any] = bundle["session"]
@@ -372,6 +403,7 @@ def session_from_bundle(bundle: dict[str, Any]) -> ReplaySession:
         steps=[_step(s, i) for i, s in enumerate(steps)],
         breakpoints=[b for b in breakpoints if b is not None],
         bookmarks=[_bookmark(b) for b in _dicts(data.get("bookmarks"), MAX_ITEMS)],
+        summary=_summary(data.get("summary")),
         total_tokens=_count(data.get("total_tokens")),
         total_cost_usd=_number(data.get("total_cost_usd")),
         total_tool_calls=_count(data.get("total_tool_calls")),

@@ -64,7 +64,7 @@ const cases = [
 		prefix: "gl",
 		state: () => useGitLabStore.getState(),
 		error: () => useGitLabStore.getState().error,
-		errorStatus: { phase: "error", progress: 0, message: "boom" },
+		errorStatus: { phase: "error", progress: 0, message: "boom", error: "boom" },
 	},
 ] as const;
 
