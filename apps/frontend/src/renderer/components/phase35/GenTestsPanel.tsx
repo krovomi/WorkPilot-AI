@@ -88,7 +88,8 @@ export function describeGenError(raw: string, t: TFunction): { message: string; 
 		return { message: t(`genTests.errors.run.${match[1]}`), detail: match[2].trim() };
 	}
 	if (raw === "busy") return { message: t("genTests.errors.run.busy"), detail: "" };
-	return { message: translateBackendError(raw, t) ?? raw, detail: "" };
+	// Never null here: the panel only describes an error it has.
+	return { message: translateBackendError(raw, t) as string, detail: "" };
 }
 
 const durationText = (seconds: number | null): string =>
@@ -312,7 +313,8 @@ export function GenTestsPanel({ projectPath }: GenTestsPanelProps) {
 						<p className="text-xs text-muted-foreground">
 							{lastSource.kind === "run"
 								? t("genTests.lastRun", { command: lastSource.value })
-								: t("genTests.lastReport", { format: t(`genTests.formats.${lastSource.value}`) })}
+								: t("genTests.lastReport", { format: t(`genTests.formats.${lastSource.value}`, { defaultValue: lastSource.value }),
+									})}
 						</p>
 					)}
 
