@@ -29,6 +29,7 @@ import {
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
+import { ReplayTeamShareSection } from "./ReplayTeamShare";
 
 const MAX_NOTE = 4000;
 
@@ -116,6 +117,7 @@ export const ReplayShareButton: React.FC<{ sessionId: string }> = ({ sessionId }
 							{t("replay:share.exportBundle")}
 						</Button>
 					</div>
+					<ReplayTeamShareSection sessionId={sessionId} options={options} />
 				</DialogContent>
 			</Dialog>
 		</>

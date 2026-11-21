@@ -227,7 +227,17 @@
 			"has_thinking": "This session has its own reasoning, so it needs no summary.",
 			"no_steps": "This session has no steps to summarize.",
 			"summary_failed": "The model could not be reached for a summary. Check the provider's sign-in, then try again.",
-			"summary_empty": "The model gave an empty summary. Try again."
+			"summary_empty": "The model gave an empty summary. Try again.",
+			"not_a_link": "This is not a WorkPilot replay link.",
+			"not_signed_in": "Sign in to your WorkPilot server to open a team link.",
+			"other_server": "This link is for another WorkPilot server than the one you are signed in to.",
+			"not_a_server_project": "This project is not one of your WorkPilot server's projects.",
+			"too_large_to_share": "This session is too large to leave with the server. Export it as a file instead, or leave out file contents.",
+			"bad_share": "The server answered something unexpected, so nothing was opened.",
+			"share_not_found": "This link does not open anything: it may be mistyped, or for another project.",
+			"share_expired": "This link has expired. Ask for a new one.",
+			"share_revoked": "This link was revoked. Ask for a new one.",
+			"too_many_shares": "This project already has as many open links as it may keep. Revoke one first."
 		},
 		"video": {
 			"export": "Export a video (WebM)",
@@ -240,6 +250,43 @@
 				"no_browser": "A video needs Chromium or Chrome, and none was found on this machine. Install one (for instance with “playwright install chromium”), then try again.",
 				"no_encoder": "A video needs Playwright's video encoder, which is not installed. Run “playwright install ffmpeg”, then try again."
 			}
+		},
+		"team": {
+			"title": "Team link",
+			"hint": "Leaves this masked session with a project of your WorkPilot server. Only the project's members can open the link, until it expires or is revoked.",
+			"project": "Project",
+			"ttl": "Lasts",
+			"ttlOptions": {
+				"1": "1 day",
+				"7": "7 days",
+				"30": "30 days"
+			},
+			"create": "Create the link",
+			"creating": "Creating the link…",
+			"link": "Link to send",
+			"linkOnce": "The server shows this link only once: copy it now.",
+			"copy": "Copy",
+			"copied": "Copied",
+			"listTitle": "Links of this project",
+			"empty": "No link yet.",
+			"loading": "Loading the links…",
+			"byLine": "By {{by}}, {{steps}} steps",
+			"expires": "Ends {{date}}",
+			"opened": "Opened {{count}} times",
+			"revoke": "Revoke",
+			"state": {
+				"active": "Open",
+				"expired": "Expired",
+				"revoked": "Revoked"
+			}
+		},
+		"open": {
+			"button": "Open a team link",
+			"title": "Open a team link",
+			"description": "Paste a link a teammate sent. The session comes from the WorkPilot server you are signed in to and is added to your replays.",
+			"label": "Link",
+			"submit": "Open",
+			"opening": "Opening…"
 		}
 	},
 	"bookmarks": {

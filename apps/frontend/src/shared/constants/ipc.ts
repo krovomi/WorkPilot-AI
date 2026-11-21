@@ -921,6 +921,11 @@ export const IPC_CHANNELS = {
 	REPLAY_REMOVE_BOOKMARK: "replay:removeBookmark",
 	REPLAY_EXPORT_VIDEO: "replay:exportVideo",
 	REPLAY_SUMMARIZE_SESSION: "replay:summarizeSession",
+	// A replay left with a server project's team, behind a link (#347)
+	REPLAY_SHARE_TO_TEAM: "replay:shareToTeam",
+	REPLAY_LIST_TEAM_SHARES: "replay:listTeamShares",
+	REPLAY_REVOKE_TEAM_SHARE: "replay:revokeTeamShare",
+	REPLAY_OPEN_TEAM_SHARE: "replay:openTeamShare",
 	// Session History — the same records, as history cards
 	SESSION_HISTORY_LIST: "sessionHistory:list",
 

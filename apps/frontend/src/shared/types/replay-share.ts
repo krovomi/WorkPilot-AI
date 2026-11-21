@@ -82,3 +82,38 @@ export type ReplayImportResult =
 			session: { session_id: string; agent_name: string };
 	  }
 	| { success: false; error: string; unreachable?: true };
+
+/** How long a team link lasts, in days (the server allows 1 to 30). */
+export const REPLAY_SHARE_TTL_DAYS = [1, 7, 30] as const;
+
+/** A session left with a server project's team, as its list shows it (#347). */
+export interface ReplayTeamShare {
+	id: string;
+	title: string;
+	steps: number;
+	createdBy: string;
+	createdAt: string;
+	expiresAt: string;
+	state: "active" | "expired" | "revoked";
+	openCount: number;
+	lastOpenedAt?: string;
+	canRevoke: boolean;
+}
+
+export interface ReplayTeamShareRequest {
+	/** A server project the app listed, where the person is a member. */
+	projectId: string;
+	ttlDays: number;
+	stripReasoning: boolean;
+	stripTokens: boolean;
+	includeFileContents: boolean;
+}
+
+/** The link holds its token: the server never shows it again. */
+export type ReplayTeamShareResult =
+	| { success: true; link: string; share: ReplayTeamShare }
+	| { success: false; error: string; unreachable?: true };
+
+export type ReplayTeamShareListResult =
+	| { success: true; shares: ReplayTeamShare[] }
+	| { success: false; error: string; unreachable?: true };

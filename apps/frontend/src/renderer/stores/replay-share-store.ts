@@ -36,6 +36,17 @@ const KNOWN_ERRORS = new Set([
 	"no_steps",
 	"summary_failed",
 	"summary_empty",
+	// Team links (#347): main's and the server's refusals.
+	"not_a_link",
+	"not_signed_in",
+	"other_server",
+	"not_a_server_project",
+	"too_large_to_share",
+	"bad_share",
+	"share_not_found",
+	"share_expired",
+	"share_revoked",
+	"too_many_shares",
 ]);
 
 const appLanguage = (): "en" | "fr" =>

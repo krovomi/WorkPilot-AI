@@ -75,6 +75,7 @@ import {
 	ReplayShareNotice,
 } from "./ReplaySharing";
 import { ReplayStepsSummary } from "./ReplayStepsSummary";
+import { ReplayOpenLinkButton } from "./ReplayTeamShare";
 import { TimeTravelPanel } from "./TimeTravelPanel";
 import { formatAppDateTime } from "@/lib/date-format";
 
@@ -746,7 +747,8 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 						/>
 					)}
 					<ReplayShareNotice />
-					<div className="flex justify-end">
+					<div className="flex justify-end gap-2">
+						<ReplayOpenLinkButton />
 						<ReplayImportButton />
 					</div>
 					<SessionListView
