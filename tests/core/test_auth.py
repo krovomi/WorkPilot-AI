@@ -155,7 +155,7 @@ class SecretService:
         self.items: list[tuple[dict, Item]] = []
         self.available = True
         self.locked = False
-        self.unlock_dismissed = False
+        self.unlock_calls = 0
         self.connections: list[Connection] = []
 
     def add(self, label: str, secret: bytes | Exception, app="claude-code") -> None:
@@ -183,8 +183,9 @@ class SecretService:
         return self.locked
 
     def unlock(self) -> bool:
-        self.locked = self.unlock_dismissed
-        return self.unlock_dismissed
+        self.unlock_calls += 1
+        self.locked = False
+        return False
 
     def search_items(self, attributes: dict):
         if self.locked:
@@ -417,18 +418,13 @@ class TestLinux:
 
         assert auth.get_auth_token() == TOKEN
 
-    def test_a_locked_keyring_is_unlocked(self, secret_service):
+    def test_a_locked_keyring_is_never_unlocked(self, secret_service):
+        # The unlock prompt waits with no time limit: the API would hang on it
         secret_service.locked = True
-        secret_service.add("Claude Code-credentials", credentials().encode())
-
-        assert auth.get_auth_token() == TOKEN
-
-    def test_a_dismissed_unlock_prompt_gives_none(self, secret_service):
-        secret_service.locked = True
-        secret_service.unlock_dismissed = True
         secret_service.add("Claude Code-credentials", credentials().encode())
 
         assert auth.get_auth_token() is None
+        assert secret_service.unlock_calls == 0
 
     def test_an_entry_that_cannot_be_read_gives_none(self, secret_service):
         secret_service.add("Claude Code-credentials", LockedException("locked item"))
