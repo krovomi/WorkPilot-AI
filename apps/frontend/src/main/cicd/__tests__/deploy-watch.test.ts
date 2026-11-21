@@ -59,6 +59,36 @@ describe("watchConfigured", () => {
 		expect(watchConfigured({ CICD_MONITOR_HEALTH_URL: "https://a/h" })).toBe(true);
 		expect(watchConfigured({ CICD_MONITOR_PROMETHEUS_URL: "http://localhost:9090" })).toBe(true);
 	});
+
+	it("knows each metric source by the key it cannot work without", () => {
+		expect(watchConfigured({ CICD_MONITOR_SOURCE: "datadog", CICD_MONITOR_DATADOG_API_KEY: "dd-0000" })).toBe(
+			true,
+		);
+		expect(watchConfigured({ CICD_MONITOR_SOURCE: "Datadog", CICD_MONITOR_PROMETHEUS_URL: "http://x" })).toBe(
+			false,
+		);
+		expect(watchConfigured({ CICD_MONITOR_SOURCE: "newrelic", CICD_MONITOR_NEWRELIC_API_KEY: "NRAK-0000" })).toBe(
+			true,
+		);
+		expect(
+			watchConfigured({ CICD_MONITOR_SOURCE: "cloudwatch", CICD_MONITOR_AWS_SECRET_ACCESS_KEY: "aws-0000" }),
+		).toBe(true);
+		expect(watchConfigured({ CICD_MONITOR_SOURCE: "prometheus", CICD_MONITOR_PROMETHEUS_URL: "http://x" })).toBe(
+			true,
+		);
+	});
+});
+
+describe("alert outcomes", () => {
+	it("keeps known channels and statuses only", () => {
+		const watch = parseDeployWatch(
+			{ ...STATE, alerts: { slack: "sent", pagerduty: "rm -rf", email: "offline", sms: "sent" } },
+			false,
+		);
+		expect(watch?.alerts).toEqual({ slack: "sent", email: "offline" });
+		expect(parseDeployWatch({ ...STATE, alerts: { slack: 1 } }, false)?.alerts).toBeUndefined();
+		expect(parseDeployWatch({ ...STATE, alerts: "sent" }, false)?.alerts).toBeUndefined();
+	});
 });
 
 describe("parseDeployWatch", () => {

@@ -2,7 +2,8 @@
  * The watch after a deployment, on a run of the CI/CD page (#366): the
  * verdict, the last sample, and the rollback (proposed, started, refused by a
  * migration, or by hand with a link to the last good run); after a bad
- * verdict, the incident report and the revert PR of the deployed commit.
+ * verdict, the incident report, the revert PR of the deployed commit and
+ * what became of the alerts (Slack, PagerDuty, e-mail).
  */
 
 import { AlertTriangle, ExternalLink, GitPullRequest, Undo2 } from "lucide-react";
@@ -10,6 +11,7 @@ import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
+	DeployAlertChannel,
 	DeployIncident,
 	DeployRevertPr,
 	DeployWatch,
@@ -67,6 +69,18 @@ function RevertPrLine({ revert }: { readonly revert: DeployRevertPr }): React.Re
 	return (
 		<div className={failed ? "text-destructive" : "wp-meta"} data-testid="deploy-revert-pr">
 			{t(`cicdTriggers:watch.revertPr.${revert.status}`)}
+		</div>
+	);
+}
+
+function AlertsLine({ alerts }: { readonly alerts: NonNullable<DeployWatch["alerts"]> }): React.ReactElement {
+	const { t } = useTranslation(["cicdTriggers"]);
+	const entries = (Object.entries(alerts) as [DeployAlertChannel, string][]).map(([channel, status]) =>
+		t(`cicdTriggers:watch.alerts.${status}`, { channel: t(`cicdTriggers:watch.alerts.channels.${channel}`) }),
+	);
+	return (
+		<div className="wp-meta" data-testid="deploy-alerts">
+			{t("cicdTriggers:watch.alerts.line", { list: entries.join(" · ") })}
 		</div>
 	);
 }
@@ -190,6 +204,7 @@ export function DeployWatchPanel({ watch, busy, onRollback }: DeployWatchPanelPr
 			)}
 			{watch.incident && <IncidentReport incident={watch.incident} />}
 			{watch.revertPr && <RevertPrLine revert={watch.revertPr} />}
+			{watch.alerts && <AlertsLine alerts={watch.alerts} />}
 			{watch.rollback === "started" && !revertOpened(watch.revertPr) && (
 				<div className="wp-meta">{t("cicdTriggers:watch.revertHint")}</div>
 			)}
