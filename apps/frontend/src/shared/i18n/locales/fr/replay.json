@@ -217,7 +217,29 @@
 			"unsupported_version": "Ce rejeu vient d'une version plus récente de WorkPilot.",
 			"not_a_file": "Choisissez un fichier, pas un dossier.",
 			"bad_export": "Le backend a produit un fichier inattendu : rien n'a été écrit.",
-			"generic": "Le rejeu n'a pas pu être partagé : {{error}}"
+			"generic": "Le rejeu n'a pas pu être partagé : {{error}}",
+			"bad_target": "Ce fichier ne peut pas être écrit à cet endroit : choisissez un autre nom ou un autre dossier.",
+			"video_busy": "Une vidéo est déjà en cours d'enregistrement. Attendez qu'elle se termine.",
+			"video_timeout": "L'enregistrement de la vidéo a pris trop de temps et a été arrêté.",
+			"video_too_large": "La vidéo est trop grosse pour être enregistrée.",
+			"video_failed": "Le navigateur n'a pas pu enregistrer la vidéo.",
+			"recording": "Cette session est encore en cours d'enregistrement.",
+			"has_thinking": "Cette session a son propre raisonnement : elle n'a pas besoin de résumé.",
+			"no_steps": "Cette session n'a aucune étape à résumer.",
+			"summary_failed": "Le modèle n'a pas pu être joint pour le résumé. Vérifiez la connexion au provider, puis réessayez.",
+			"summary_empty": "Le modèle a rendu un résumé vide. Réessayez."
+		},
+		"video": {
+			"export": "Exporter une vidéo (WebM)",
+			"recording": "Enregistrement de la vidéo…",
+			"hint": "La vidéo est la même page masquée, jouée étape par étape dans un navigateur sans fenêtre sur cette machine. Elle dure deux minutes au plus.",
+			"saved": "Vidéo enregistrée dans {{path}}",
+			"savedPart": "Vidéo enregistrée dans {{path}} : elle joue {{played}} étapes sur {{total}}, la page les montre toutes.",
+			"refused": {
+				"no_playwright": "Une vidéo demande Playwright, que le backend de cette machine n'a pas. Installez-le avec les dépendances du backend, puis réessayez.",
+				"no_browser": "Une vidéo demande Chromium ou Chrome, et aucun n'a été trouvé sur cette machine. Installez-en un (par exemple avec « playwright install chromium »), puis réessayez.",
+				"no_encoder": "Une vidéo demande l'encodeur vidéo de Playwright, qui n'est pas installé. Lancez « playwright install ffmpeg », puis réessayez."
+			}
 		}
 	},
 	"bookmarks": {
@@ -229,5 +251,15 @@
 		"remove": "Retirer le signet",
 		"empty": "Aucun signet pour l'instant.",
 		"recording": "Les signets s'ajoutent une fois l'enregistrement de la session terminé."
+	},
+	"summary": {
+		"title": "Résumé des étapes",
+		"none": "Le modèle de cette session n'a laissé aucun raisonnement. Un modèle peut résumer les étapes en quelques lignes.",
+		"ask": "Résumer avec {{provider}}",
+		"again": "Résumer à nouveau avec {{provider}}",
+		"working": "Résumé en cours…",
+		"writtenBy": "Écrit par un modèle ({{model}}) à partir des étapes enregistrées, masquées comme pour un export.",
+		"recording": "Un résumé se demande une fois l'enregistrement de la session terminé.",
+		"noProvider": "Choisissez un provider par défaut dans les Réglages pour résumer les étapes."
 	}
 }

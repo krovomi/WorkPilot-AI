@@ -9,7 +9,9 @@ import {
 	type DesignToCodeProgress,
 	type DesignToCodeResult,
 	type DesignWriteOutcome,
+	type RenderLoopOptions,
 } from "../../shared/types/design-to-code";
+import { RENDER_LOOP_BOUNDS } from "../../shared/constants/design-render-loop";
 import { type DesignStep, stepOfPhase } from "../lib/design-import-steps";
 import { useProjectStore } from "./project-store";
 
@@ -111,6 +113,8 @@ interface DesignToCodeState {
 	customInstructions: string;
 	/** Render, compare and correct the code after its generation. */
 	renderLoop: boolean;
+	/** Its limits and passes, as offered by the page (the runner bounds them). */
+	loopOptions: RenderLoopOptions;
 	/** The iteration shown in the iterations panel (null: the best one). */
 	selectedIteration: number | null;
 
@@ -139,6 +143,7 @@ interface DesignToCodeActions {
 	setUseDesignTokens: (use: boolean) => void;
 	setCustomInstructions: (instructions: string) => void;
 	setRenderLoop: (on: boolean) => void;
+	setLoopOptions: (options: Partial<RenderLoopOptions>) => void;
 	selectIteration: (index: number | null) => void;
 
 	setImageData: (
@@ -183,6 +188,14 @@ const initialState: DesignToCodeState = {
 	useDesignTokens: true,
 	customInstructions: "",
 	renderLoop: true,
+	loopOptions: {
+		maxIterations: RENDER_LOOP_BOUNDS.maxIterations.default,
+		threshold: RENDER_LOOP_BOUNDS.threshold.default,
+		maxTokens: RENDER_LOOP_BOUNDS.maxTokens.default,
+		maxCostUsd: RENDER_LOOP_BOUNDS.maxCostUsd.default,
+		responsive: false,
+		states: false,
+	},
 	selectedIteration: null,
 	imageData: null,
 	imagePreview: null,
@@ -228,6 +241,7 @@ export const useDesignToCodeStore = create<
 	setCustomInstructions: (instructions) =>
 		set({ customInstructions: instructions }),
 	setRenderLoop: (on) => set({ renderLoop: on }),
+	setLoopOptions: (options) => set((s) => ({ loopOptions: { ...s.loopOptions, ...options } })),
 	selectIteration: (index) => set({ selectedIteration: index }),
 
 	setImageData: (data, preview, name) =>
@@ -375,6 +389,7 @@ export async function runDesignToCodePipeline(): Promise<void> {
 			useDesignTokens: state.useDesignTokens,
 			customInstructions: state.customInstructions,
 			renderLoop: state.renderLoop,
+			renderLoopOptions: state.renderLoop ? state.loopOptions : undefined,
 		});
 
 		useDesignToCodeStore.getState().setPipelineResult(result);

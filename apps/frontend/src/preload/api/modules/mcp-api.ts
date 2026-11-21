@@ -11,7 +11,9 @@ import type {
 	HuggingFaceModelInfo,
 	HuggingFaceModelSearchParams,
 } from "../../../shared/types/mcp-marketplace";
+import type { McpPolicyState } from "../../../shared/types/mcp-policy";
 import type {
+	McpInstalledWatchView,
 	McpSecurityRequest,
 	McpSecurityScore,
 } from "../../../shared/types/mcp-security";
@@ -43,6 +45,16 @@ export interface McpAPI {
 	getMcpServerSecurity: (
 		request: McpSecurityRequest,
 	) => Promise<IPCResult<McpSecurityScore>>;
+	/** The project's MCP install policy (`.workpilot/mcp-policy.json`), read by the main */
+	getMcpInstallPolicy: (request: {
+		projectId: string;
+	}) => Promise<IPCResult<McpPolicyState>>;
+	/** What the daily check found on the project's installed servers */
+	getMcpInstalledWatch: (request: {
+		projectId: string;
+	}) => Promise<IPCResult<McpInstalledWatchView>>;
+	/** Acknowledges every alert of a catalog server; false when it had none */
+	acknowledgeMcpAlerts: (request: { serverId: string }) => Promise<IPCResult<boolean>>;
 }
 
 export function createMcpAPI(): McpAPI {
@@ -58,5 +70,14 @@ export function createMcpAPI(): McpAPI {
 
 		getMcpServerSecurity: (request: McpSecurityRequest) =>
 			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_GET_SECURITY, request),
+
+		getMcpInstallPolicy: (request: { projectId: string }) =>
+			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_GET_POLICY, request),
+
+		getMcpInstalledWatch: (request: { projectId: string }) =>
+			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_GET_INSTALLED_WATCH, request),
+
+		acknowledgeMcpAlerts: (request: { serverId: string }) =>
+			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_ACKNOWLEDGE_ALERTS, request),
 	};
 }

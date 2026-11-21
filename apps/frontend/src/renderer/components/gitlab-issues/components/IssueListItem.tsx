@@ -1,18 +1,14 @@
 import { MessageCircle, Sparkles, Tag, User } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import type { GitLabIssue } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import type { IssueListItemProps } from "../types";
-import { useTranslation } from "react-i18next";
 
-// GitLab issue state colors and labels
-const GITLAB_ISSUE_STATE_COLORS: Record<string, string> = {
+// GitLab issue state colors; the label is `gitlab:states.<state>`
+const GITLAB_ISSUE_STATE_COLORS: Record<GitLabIssue["state"], string> = {
 	opened: "bg-success/10 text-success border-success/20",
 	closed: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-};
-
-const GITLAB_ISSUE_STATE_LABELS: Record<string, string> = {
-	opened: "Open",
-	closed: "Closed",
 };
 
 export function IssueListItem(props: Readonly<IssueListItemProps>) {
@@ -41,9 +37,9 @@ export function IssueListItem(props: Readonly<IssueListItemProps>) {
 					<div className="flex items-center gap-2 mb-1">
 						<Badge
 							variant="outline"
-							className={`text-xs ${GITLAB_ISSUE_STATE_COLORS[issue.state] || ""}`}
+							className={`text-xs ${GITLAB_ISSUE_STATE_COLORS[issue.state]}`}
 						>
-							{GITLAB_ISSUE_STATE_LABELS[issue.state] || issue.state}
+							{t(`gitlab:states.${issue.state}`)}
 						</Badge>
 						<span className="text-xs text-muted-foreground">#{issue.iid}</span>
 					</div>

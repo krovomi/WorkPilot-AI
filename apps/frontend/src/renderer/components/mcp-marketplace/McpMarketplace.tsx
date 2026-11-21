@@ -26,7 +26,9 @@ import type {
 import {
 	loadBuilderProjects,
 	loadInstalledServers,
+	loadInstalledWatch,
 	loadMarketplaceCatalog,
+	loadMcpPolicy,
 	useMcpMarketplaceStore,
 } from "../../stores/mcp-marketplace-store";
 import { useProjectStore } from "../../stores/project-store";
@@ -44,6 +46,7 @@ import { Input } from "../ui/input";
 import { McpBuilder } from "./McpBuilder";
 import { McpErrorNotice } from "./McpErrorNotice";
 import { McpInstalledList } from "./McpInstalledList";
+import { McpPolicyBanner } from "./McpPolicyNotice";
 import { McpServerCard } from "./McpServerCard";
 
 const TABS: { id: McpMarketplaceTab; labelKey: string; icon: typeof Store }[] =
@@ -116,14 +119,18 @@ export function McpMarketplace() {
 		loadBuilderProjects();
 	}, []);
 
-	// Installed servers are the selected project's
+	// Installed servers, their alerts and the install policy are the selected project's
 	useEffect(() => {
 		loadInstalledServers(projectId);
+		loadMcpPolicy(projectId);
+		loadInstalledWatch(projectId);
 	}, [projectId]);
 
 	const handleRefresh = useCallback(() => {
 		loadMarketplaceCatalog();
 		loadInstalledServers(projectId);
+		loadMcpPolicy(projectId);
+		loadInstalledWatch(projectId);
 		loadBuilderProjects();
 	}, [projectId]);
 
@@ -159,6 +166,7 @@ export function McpMarketplace() {
 					onChange={setActiveTab}
 				/>
 				<McpErrorNotice className="mt-3" />
+				<McpPolicyBanner projectId={projectId} className="mt-3" />
 			</div>
 
 			{/* Catalog tab content */}

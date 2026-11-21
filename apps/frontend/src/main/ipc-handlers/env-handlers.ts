@@ -32,6 +32,8 @@ import {
 	writeProjectEnvFile,
 } from "../project-env-file";
 import { ensureProjectEnvIgnored } from "../project-initializer";
+import { installGuardDeps } from "../mcp-security/runtime";
+import { mcpInstallRefusal, refusalMessage } from "../mcp-security/install-guard";
 import { withGhCliToken } from "./github/oauth-token";
 import { withGlabCliToken } from "./gitlab/oauth-token";
 import { projectStore } from "../project-store";
@@ -1187,21 +1189,27 @@ ${otherLines.join("\n")}
 				// Generate new content
 				// A secret sent back as the mask ENV_GET showed keeps its stored value;
 				// the mask of a gh or glab sign-in stands for the token it holds now.
+				const storedServers = parseCustomMcpServers(
+					existingContent ? parseEnvFile(existingContent).CUSTOM_MCP_SERVERS : undefined,
+				);
+				const unmasked = unmaskProjectEnvUpdate(config, storedServers);
+				// The project's MCP install policy (#369): a server added or changed
+				// is checked here, whatever the renderer showed.
+				const refusal = await mcpInstallRefusal(
+					project.path,
+					storedServers,
+					unmasked.customMcpServers,
+					installGuardDeps(),
+				);
+				if (refusal) {
+					return {
+						success: false,
+						error: refusalMessage(refusal),
+						data: { mcpPolicyRefusal: refusal },
+					};
+				}
 				const newContent = generateEnvContent(
-					await withGlabCliToken(
-						config,
-						await withGhCliToken(
-							config,
-							unmaskProjectEnvUpdate(
-								config,
-								parseCustomMcpServers(
-									existingContent
-										? parseEnvFile(existingContent).CUSTOM_MCP_SERVERS
-										: undefined,
-								),
-							),
-						),
-					),
+					await withGlabCliToken(config, await withGhCliToken(config, unmasked)),
 					existingContent,
 				);
 
