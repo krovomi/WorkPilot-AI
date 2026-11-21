@@ -12,6 +12,10 @@ Nothing happens when the swarm is off, in a swarm worker, when no two
 subtasks can run together, outside a git checkout, or when the task's
 worktree holds work that is not committed (the subtasks start from the
 branch, and would not see it).
+
+When the swarm stops because the task was paused or its policy said stop
+(``halt``), the build stops at that pause (``BuildPaused``): the coder must
+not start a session of its own right after it.
 """
 
 from __future__ import annotations
@@ -21,10 +25,11 @@ import os
 from pathlib import Path
 
 from core.progress import is_build_complete, swarm_focus
+from foundation.build_signals import BuildPaused
 
 from . import subtask_worktree
 from .dependency_analyzer import DependencyAnalyzer
-from .types import SwarmConfig
+from .types import SwarmConfig, SwarmPhase
 
 #: The app's swarm setting: how many subtasks may run at once (off below 2).
 SWARM_ENV = "WORKPILOT_SWARM_MAX_PARALLEL"
@@ -110,4 +115,6 @@ async def run_swarm_phase(
     )
     if source_spec_dir:
         sync_spec_to_source(spec_dir, source_spec_dir)
+    if status.phase == SwarmPhase.PAUSED:
+        raise BuildPaused("coding")
     return is_build_complete(spec_dir)

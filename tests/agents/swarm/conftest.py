@@ -33,6 +33,11 @@ seen = {
     "wave": os.environ.get("SWARM_WAVE_INDEX"),
 }
 (attempts / (subtask + ".env.json")).write_text(json.dumps(seen), encoding="utf-8")
+if step in ("pause", "pause_ok"):
+    # What a worker's breaker or policy watch writes before it stops.
+    pause = Path(".workpilot") / "specs" / spec / "pause_state.json"
+    pause.write_text(json.dumps({"enabled": True, "reason": "tool_loop"}), encoding="utf-8")
+    sys.exit(1 if step == "pause" else 0)
 if step == "ok":
     print("working on " + subtask, flush=True)
     print('__EXEC_PHASE__:{"phase": "coding"}', flush=True)

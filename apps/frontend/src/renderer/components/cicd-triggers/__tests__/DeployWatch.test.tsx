@@ -7,7 +7,8 @@ import type { DeployWatch } from "../../../../shared/types/deploy-watch";
 import { useCICDTriggersStore } from "../../../stores/cicd-triggers-store";
 import { useProjectStore } from "../../../stores/project-store";
 import { CICDTriggersDashboard } from "../CICDTriggersDashboard";
-import { DeployMonitorSettings } from "../DeployMonitorSettings";
+import { DeployAlertSettings } from "../DeployAlertSettings";
+import { DeployMonitorSettings, metricSource } from "../DeployMonitorSettings";
 import { canRollBack, DeployWatchPanel, isWatchRunning, revertOpened } from "../DeployWatchPanel";
 
 vi.mock("react-i18next", () => ({
@@ -247,6 +248,80 @@ describe("DeployMonitorSettings", () => {
 		fireEvent.change(field, { target: { value: "20" } });
 		fireEvent.blur(field);
 		expect(onSave).toHaveBeenCalledWith({ monitor_window_minutes: "20" });
+		expect(screen.getByLabelText("cicdTriggers:monitor.monitor_prometheus_token")).toBeTruthy();
+	});
+
+	it("shows the fields of the chosen source and saves a new source", () => {
+		const onSave = vi.fn();
+		const { rerender } = render(
+			<DeployMonitorSettings config={{ monitor_source: "datadog" } as never} onSave={onSave} />,
+		);
+		expect(screen.queryByLabelText("cicdTriggers:monitor.monitor_prometheus_url")).toBeNull();
+		const site = screen.getByLabelText("cicdTriggers:monitor.monitor_datadog_site") as HTMLSelectElement;
+		expect(site.value).toBe("datadoghq.com");
+		fireEvent.change(site, { target: { value: "datadoghq.eu" } });
+		expect(onSave).toHaveBeenCalledWith({ monitor_datadog_site: "datadoghq.eu" });
+		expect(screen.getByText("cicdTriggers:monitor.queryHint.datadog")).toBeTruthy();
+		rerender(
+			<DeployMonitorSettings
+				config={{ monitor_source: "newrelic", monitor_newrelic_region: "eu" } as never}
+				onSave={onSave}
+			/>,
+		);
+		const region = screen.getByLabelText("cicdTriggers:monitor.monitor_newrelic_region") as HTMLSelectElement;
+		expect(region.value).toBe("eu");
+		expect(screen.getByLabelText("cicdTriggers:monitor.monitor_newrelic_api_key")).toBeTruthy();
+		rerender(<DeployMonitorSettings config={{ monitor_source: "cloudwatch" } as never} onSave={onSave} />);
+		expect(screen.getByLabelText("cicdTriggers:monitor.monitor_aws_secret_access_key")).toBeTruthy();
+		fireEvent.change(screen.getByLabelText("cicdTriggers:monitor.monitor_source"), {
+			target: { value: "prometheus" },
+		});
+		expect(onSave).toHaveBeenCalledWith({ monitor_source: "prometheus" });
+	});
+
+	it("reads an unknown source as Prometheus", () => {
+		expect(metricSource(null)).toBe("prometheus");
+		expect(metricSource({ monitor_source: "splunk" } as never)).toBe("prometheus");
+		expect(metricSource({ monitor_source: "cloudwatch" } as never)).toBe("cloudwatch");
+	});
+});
+
+describe("DeployAlertSettings", () => {
+	it("saves each channel's settings", () => {
+		const onSave = vi.fn();
+		const { rerender } = render(
+			<DeployAlertSettings config={{ alert_slack_webhook_url: "***" } as never} onSave={onSave} />,
+		);
+		const slack = screen.getByLabelText("cicdTriggers:alerts.alert_slack_webhook_url") as HTMLInputElement;
+		expect(slack.value).toBe("***");
+		fireEvent.change(slack, { target: { value: "https://hooks.slack.com/services/x" } });
+		fireEvent.blur(slack);
+		expect(onSave).toHaveBeenCalledWith({ alert_slack_webhook_url: "https://hooks.slack.com/services/x" });
+		const region = screen.getByLabelText("cicdTriggers:alerts.alert_pagerduty_region") as HTMLSelectElement;
+		expect(region.value).toBe("us");
+		fireEvent.change(region, { target: { value: "eu" } });
+		expect(onSave).toHaveBeenCalledWith({ alert_pagerduty_region: "eu" });
+		const host = screen.getByLabelText("cicdTriggers:alerts.alert_smtp_host");
+		fireEvent.change(host, { target: { value: "smtp.example.com" } });
+		fireEvent.blur(host);
+		expect(onSave).toHaveBeenCalledWith({ alert_smtp_host: "smtp.example.com" });
+		rerender(<DeployAlertSettings config={null} onSave={onSave} />);
+		expect((screen.getByLabelText("cicdTriggers:alerts.alert_email_to") as HTMLInputElement).value).toBe("");
+	});
+});
+
+describe("alert outcomes", () => {
+	it("lists each channel and what became of it", () => {
+		render(<DeployWatchPanel watch={watch({ alerts: { slack: "sent", pagerduty: "failed" } })} busy={false} onRollback={vi.fn()} />);
+		const line = screen.getByTestId("deploy-alerts").textContent ?? "";
+		expect(line).toContain("cicdTriggers:watch.alerts.line");
+		expect(line).toContain("cicdTriggers:watch.alerts.sent");
+		expect(line).toContain("cicdTriggers:watch.alerts.channels.pagerduty");
+	});
+
+	it("shows nothing without alerts", () => {
+		render(<DeployWatchPanel watch={watch()} busy={false} onRollback={vi.fn()} />);
+		expect(screen.queryByTestId("deploy-alerts")).toBeNull();
 	});
 });
 
@@ -328,6 +403,16 @@ describe("CICDTriggersDashboard with a watch", () => {
 		});
 		expect(invoke).toHaveBeenCalledWith("cicdTriggers:setConfig", "/projects/shop", {
 			monitor_health_url: "https://app/h",
+		});
+
+		const recipients = screen.getByLabelText("cicdTriggers:alerts.alert_email_to");
+		fireEvent.change(recipients, { target: { value: "oncall@example.com" } });
+		await act(async () => {
+			fireEvent.blur(recipients);
+			await vi.advanceTimersByTimeAsync(10);
+		});
+		expect(invoke).toHaveBeenCalledWith("cicdTriggers:setConfig", "/projects/shop", {
+			alert_email_to: "oncall@example.com",
 		});
 	});
 });
