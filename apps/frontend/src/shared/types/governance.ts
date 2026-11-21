@@ -40,6 +40,12 @@ export interface PolicyAuditEvent {
 	reason: string | null;
 	provider: string | null;
 	model: string | null;
+	/**
+	 * Who let an `approved` call through. On a server: the account, its id and
+	 * its roles; on this computer alone: the local user, "not verified".
+	 * Absent from a report older than the field.
+	 */
+	approvedBy?: string | null;
 }
 
 export interface GovernanceSchedule {
@@ -53,7 +59,12 @@ export interface GovernanceSchedule {
 export interface GovernanceSections {
 	source: string;
 	schedule: GovernanceSchedule | null;
-	files: { forbidden: string[]; requiresReview: string[] };
+	files: {
+		forbidden: string[];
+		requiresReview: string[];
+		/** `files.reviewers`: the server roles one of which approves a reviewed call. */
+		reviewers?: string[];
+	};
 	budget: { maxTokensPerHour: number | null; maxTokensPerTask: number | null } | null;
 	/** `loop_detection`: identical tool calls before the circuit breaker trips. */
 	loopDetection?: { maxSameToolCall: number } | null;
@@ -76,6 +87,36 @@ export interface GovernanceReport {
 	/** The last decisions, newest first. */
 	events: PolicyAuditEvent[];
 	metrics: GovernanceMetrics;
+}
+
+/** A call an agent of a server project waits on, until a person answers it. */
+export interface GovernanceRequest {
+	id: string;
+	at: string;
+	rules: string[];
+	tool: string | null;
+	targetKind: "file" | "command" | null;
+	target: string | null;
+	task: string | null;
+	message: string | null;
+}
+
+/** A server project's governance (`shared_features/governance.py`). */
+export interface ServerGovernanceReport extends GovernanceReport {
+	/** The calls waiting for an approval, newest first. */
+	pending: GovernanceRequest[];
+	/** Agents running on the server: started by this person, and in all. */
+	agents: { mine: number; project: number };
+	/** What the server lets this person do; it checks again on each request. */
+	may: { approve: boolean; stop: boolean; stopProject: boolean; export: boolean };
+}
+
+/** Whose agents the kill switch of a server project stops. */
+export type ServerStopScope = "mine" | "project";
+
+export interface ServerStopResult {
+	stoppedRuns: number;
+	stoppedJobs: number;
 }
 
 export type AuditExportFormat = "csv" | "json";

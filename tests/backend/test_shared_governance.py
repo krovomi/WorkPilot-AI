@@ -698,3 +698,53 @@ def test_an_approval_given_on_the_desktop_says_it_is_not_verified(tmp_path):
     # Only an approval carries an approver in the trail.
     event = policy_audit.record(tmp_path, decision="deny", approver="Ada")
     assert event is not None and event["approvedBy"] is None
+
+
+@pytest.mark.asyncio
+async def test_an_org_administrator_outside_the_project_may_stop_it_all(server):
+    """No membership row, but the right to manage members: the owner's say."""
+    from shared_features.governance import StopRequest, governance, stop
+
+    admin = _principal("u-eve", org="org-a", permissions=_ALL | {"project.member.write"})
+    scope = await _scope(admin, "p-a")
+    assert scope.project_role is None
+    report = await governance(scope=scope, principal=admin)
+    assert report["may"]["stopProject"] is True
+    got = await _with_db(
+        stop, req=StopRequest(scope="project"), scope=scope, principal=admin
+    )
+    assert got["stoppedRuns"] == 0
+
+
+def test_a_root_home_is_not_rewritten(monkeypatch):
+    from shared_features import governance
+
+    monkeypatch.setattr(governance.Path, "home", classmethod(lambda cls: Path("/")))
+    assert governance._relative("/etc/x", Path("/srv/p")) == "/etc/x"
+
+
+@pytest.mark.asyncio
+async def test_a_job_that_cannot_be_recorded_leaves_no_starter(monkeypatch):
+    from server.services import project_jobs
+
+    jobs = project_jobs.ProjectJobs()
+
+    async def nothing(project_id):
+        return None
+
+    def broken():
+        raise RuntimeError("database down")
+
+    monkeypatch.setattr(jobs, "settle_orphans", nothing)
+    monkeypatch.setattr(project_jobs, "get_session_factory", broken)
+    with pytest.raises(RuntimeError):
+        await jobs.start(
+            project_id="p-a",
+            org_id=None,
+            server_path="/srv/p",
+            feature="roadmap",
+            runner="roadmap_runner.py",
+            args=[],
+            user_id="u-ada",
+        )
+    assert jobs._running == {} and jobs._starters == {}

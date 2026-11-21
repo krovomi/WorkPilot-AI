@@ -45,12 +45,21 @@ export function StopAllAgentsButton() {
 				return;
 			}
 			const paused = data.pausedTasks.length + data.failedTasks.length;
+			const server = data.serverAgents ?? 0;
+			const unreachable = data.serverFailed ?? 0;
+			const serverLines = [
+				server > 0 ? t("navigation:stopAll.serverDone", { count: server }) : null,
+				unreachable > 0 ? t("navigation:stopAll.serverFailed", { count: unreachable }) : null,
+			].filter(Boolean);
 			toast(
-				paused + data.stoppedProcesses === 0
-					? { title: t("navigation:stopAll.nothing") }
+				paused + data.stoppedProcesses + server === 0
+					? {
+							title: t("navigation:stopAll.nothing"),
+							...(serverLines.length ? { description: serverLines.join(" ") } : {}),
+						}
 					: {
 							title: t("navigation:stopAll.done", { count: paused }),
-							description: t("navigation:stopAll.resumeHint"),
+							description: [t("navigation:stopAll.resumeHint"), ...serverLines].join(" "),
 						},
 			);
 			const projectId = useProjectStore.getState().selectedProjectId;
