@@ -1,6 +1,13 @@
 /** Shared formatting + colour helpers for the Formula Lab. */
 
+import { providerRegistry } from "../../../shared/services/providerRegistry";
 import type { Formula } from "../../stores/formula-matrix-store";
+
+/** A provider's name as the Settings show it, else the id itself. */
+export function providerName(provider: string): string {
+	const id = provider === "claude" ? "anthropic" : provider;
+	return providerRegistry.getProvider(id)?.label ?? provider;
+}
 
 /**
  * USD → EUR conversion rate. The pricing catalog is denominated in USD (that is
