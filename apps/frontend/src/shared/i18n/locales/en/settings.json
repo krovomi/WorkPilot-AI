@@ -3067,7 +3067,7 @@
 		"hint": "What workpilot.policy.yaml says to every agent on every provider. Read only: change the file in the repository and have it reviewed like code.",
 		"refresh": "Refresh",
 		"loadFailed": "The governance policy could not be read: {{error}}",
-		"invalid": "workpilot.policy.yaml is refused: no agent writes a file or runs a command until it is fixed.",
+		"invalid": "workpilot.policy.yaml is refused: until it is fixed, every task pauses before its next session and no agent writes a file or runs a command.",
 		"none": "workpilot.policy.yaml sets no hours, files or token budget.",
 		"scheduleTitle": "Allowed hours",
 		"noSchedule": "Any time",
@@ -3079,8 +3079,16 @@
 		"requiresReview": "Review required",
 		"noFiles": "No file rule",
 		"budgetTitle": "Token budget",
-		"noBudget": "No hourly limit",
+		"noBudget": "No token limit",
 		"budgetLine": "{{spent}} of {{limit}} tokens in the last hour",
+		"taskBudgetLine": "At most {{limit}} tokens per task",
+		"loopTitle": "Circuit breaker",
+		"loopLine": "Pauses an agent after {{count}} identical tool calls",
+		"noLoop": "The app's own limit",
+		"metricsBlocked_one": "{{count}} agent action stopped in the last 24 h",
+		"metricsBlocked_other": "{{count}} agent actions stopped in the last 24 h",
+		"metricsTrips_one": "{{count}} circuit-breaker trip in the last 7 days",
+		"metricsTrips_other": "{{count}} circuit-breaker trips in the last 7 days",
 		"decisionsTitle": "Last decisions",
 		"noDecisions": "The policy has not taken any decision yet.",
 		"exportCsv": "Export CSV",
@@ -3095,7 +3103,8 @@
 			"warn": "Warned",
 			"outside_hours": "Outside hours",
 			"budget_exceeded": "Budget reached",
-			"invalid_policy": "Invalid policy"
+			"invalid_policy": "Invalid policy",
+			"tool_loop": "Circuit breaker"
 		}
 	}
 }
