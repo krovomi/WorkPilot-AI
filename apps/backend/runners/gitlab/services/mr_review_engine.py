@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from core.io_utils import safe_print
+from runners.forge_review_prompt import change_context
 
 from ...github.services.deep_context_provider import DeepContext
 from ..models import (
@@ -25,8 +26,6 @@ from ..models import (
     ReviewCategory,
     ReviewSeverity,
 )
-
-from runners.forge_review_prompt import change_context
 
 
 @dataclass
@@ -44,33 +43,6 @@ class ProgressCallback:
 _UNPARSED_SUMMARY = (
     "Review completed but failed to parse structured output. Please re-run the review."
 )
-
-
-def sanitize_user_content(content: str, max_length: int = 100000) -> str:
-    """
-    Sanitize user-provided content to prevent prompt injection.
-
-    - Strips null bytes and control characters (except newlines/tabs)
-    - Truncates excessive length
-    """
-    if not content:
-        return ""
-
-    # Remove null bytes and control characters (except newline, tab, carriage return)
-    sanitized = "".join(
-        char
-        for char in content
-        if char == "\n"
-        or char == "\t"
-        or char == "\r"
-        or (ord(char) >= 32 and ord(char) != 127)
-    )
-
-    # Truncate if too long
-    if len(sanitized) > max_length:
-        sanitized = sanitized[:max_length] + "\n\n... (content truncated for length)"
-
-    return sanitized
 
 
 class MRReviewEngine:

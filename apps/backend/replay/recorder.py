@@ -275,19 +275,17 @@ class ReplayRecorder:
         if before_content and after_content:
             diff.diff_lines = _compute_simple_diff(before_content, after_content)
 
-        step = self._add_step(
+        # The diff is on the step before its breakpoints are checked: a
+        # file-change breakpoint matches on the path it holds.
+        return self._add_step(
             session_id,
             step_type,
             {
                 "label": f"File {operation}: {_short_path(file_path)}",
                 "description": f"{operation.title()} {file_path}",
+                "file_diffs": [diff],
             },
         )
-
-        if step:
-            step.file_diffs.append(diff)
-
-        return step
 
     def record_command(
         self,
@@ -512,44 +510,6 @@ class ReplayRecorder:
         return False
 
     # -------------------------------------------------------------------
-    # A/B Comparison
-    # -------------------------------------------------------------------
-
-    def compare_sessions(
-        self, session_a_id: str, session_b_id: str
-    ) -> ABComparison | None:
-        """Compare two replay sessions side by side."""
-        a = self.load_session(session_a_id)
-        b = self.load_session(session_b_id)
-        if not a or not b:
-            return None
-
-        files_a = set(a.files_touched)
-        files_b = set(b.files_touched)
-
-        tools_a = set(a.tool_usage_stats().keys())
-        tools_b = set(b.tool_usage_stats().keys())
-
-        comparison = ABComparison(
-            session_a_id=session_a_id,
-            session_b_id=session_b_id,
-            token_diff=b.total_tokens - a.total_tokens,
-            cost_diff=b.total_cost_usd - a.total_cost_usd,
-            duration_diff=b.duration_seconds - a.duration_seconds,
-            step_count_diff=b.step_count - a.step_count,
-            tool_calls_diff=b.total_tool_calls - a.total_tool_calls,
-            file_changes_diff=b.total_file_changes - a.total_file_changes,
-            common_files=sorted(files_a & files_b),
-            unique_files_a=sorted(files_a - files_b),
-            unique_files_b=sorted(files_b - files_a),
-            common_tools=sorted(tools_a & tools_b),
-            unique_tools_a=sorted(tools_a - tools_b),
-            unique_tools_b=sorted(tools_b - tools_a),
-        )
-
-        return comparison
-
-    # -------------------------------------------------------------------
     # Internal helpers
     # -------------------------------------------------------------------
 
@@ -597,6 +557,7 @@ class ReplayRecorder:
             cumulative_cost_usd=session.total_cost_usd,
             options_considered=data.get("options_considered", []),
             chosen_option=data.get("chosen_option"),
+            file_diffs=data.get("file_diffs", []),
         )
 
         # Link to previous step
@@ -664,9 +625,34 @@ class ReplayRecorder:
                 return step.step_index == target_idx
             except ValueError:
                 return False
-        elif bp.breakpoint_type == BreakpointType.PATTERN_MATCH:
-            return bp.condition.lower() in step.description.lower()
-        return False
+        # PATTERN_MATCH, the last of the closed set of types.
+        return bp.condition.lower() in step.description.lower()
+
+
+def compare(a: ReplaySession, b: ReplaySession) -> ABComparison:
+    """B measured against A: what it spent more or less, what each one touched alone."""
+    files_a = set(a.files_touched)
+    files_b = set(b.files_touched)
+
+    tools_a = set(a.tool_usage_stats().keys())
+    tools_b = set(b.tool_usage_stats().keys())
+
+    return ABComparison(
+        session_a_id=a.session_id,
+        session_b_id=b.session_id,
+        token_diff=b.total_tokens - a.total_tokens,
+        cost_diff=b.total_cost_usd - a.total_cost_usd,
+        duration_diff=b.duration_seconds - a.duration_seconds,
+        step_count_diff=b.step_count - a.step_count,
+        tool_calls_diff=b.total_tool_calls - a.total_tool_calls,
+        file_changes_diff=b.total_file_changes - a.total_file_changes,
+        common_files=sorted(files_a & files_b),
+        unique_files_a=sorted(files_a - files_b),
+        unique_files_b=sorted(files_b - files_a),
+        common_tools=sorted(tools_a & tools_b),
+        unique_tools_a=sorted(tools_a - tools_b),
+        unique_tools_b=sorted(tools_b - tools_a),
+    )
 
 
 def _short_path(path: str) -> str:
