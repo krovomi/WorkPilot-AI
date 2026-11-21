@@ -66,6 +66,7 @@ describe("parsing the server's answers", () => {
 
 	it("falls back on anything it does not recognise", () => {
 		expect(parseApproval({ criticality: "urgent" })).toBeNull();
+		expect(parseApproval({ criticality: "high" })?.approvals).toEqual([]);
 		expect(parseApproval(null)).toBeNull();
 		expect(parseApproval([])).toBeNull();
 		expect(

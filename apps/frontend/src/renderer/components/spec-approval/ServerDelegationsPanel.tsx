@@ -2,7 +2,11 @@ import type React from "react";
 import { useCallback, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, UserPlus, X } from "lucide-react";
-import type { ServerDelegation, ServerPerson } from "@shared/types/server-approval";
+import type {
+	ServerDelegation,
+	ServerDelegationInput,
+	ServerPerson,
+} from "@shared/types/server-approval";
 import { formatAppDate } from "../../lib/date-format";
 import { CharterButton, Chip, Notice, Panel } from "../charter";
 import { Input } from "../ui/input";
@@ -55,17 +59,16 @@ export function ServerDelegationsPanel({
 
 	const endsAt = dayBoundary(ends, true);
 	const startsAt = starts ? dayBoundary(starts, false) : undefined;
-	const canLend = Boolean(to && endsAt && (!starts || startsAt)) && !busy;
+	// The delegation the form describes, once it describes one.
+	const request: ServerDelegationInput | null =
+		to && endsAt && (!starts || startsAt)
+			? { toUserId: to, endsAt, ...(startsAt ? { startsAt } : {}) }
+			: null;
 
-	async function lend() {
-		if (!endsAt) return;
+	async function lend(input: ServerDelegationInput) {
 		setBusy(true);
 		try {
-			const result = await globalThis.electronAPI.createServerDelegation(projectId, {
-				toUserId: to,
-				endsAt,
-				...(startsAt ? { startsAt } : {}),
-			});
+			const result = await globalThis.electronAPI.createServerDelegation(projectId, input);
 			if (!result.success) {
 				setError(result.error ?? t("specApproval:delegations.saveFailed"));
 				return;
@@ -157,7 +160,12 @@ export function ServerDelegationsPanel({
 					<span>{t("specApproval:delegations.until")}</span>
 					<Input id={`${ids}-until`} type="date" value={ends} onChange={(e) => setEnds(e.target.value)} />
 				</label>
-				<CharterButton icon={UserPlus} busy={busy} disabled={!canLend} onClick={() => void lend()}>
+				<CharterButton
+					icon={UserPlus}
+					busy={busy}
+					disabled={!request || busy}
+					onClick={request ? () => void lend(request) : undefined}
+				>
 					{t("specApproval:delegations.lend")}
 				</CharterButton>
 			</div>
