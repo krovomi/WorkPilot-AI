@@ -6,6 +6,8 @@ pin the second source: the public registry, filtered by the same allow-lists,
 adding to the static catalogue and never replacing a live answer.
 """
 
+import json
+
 import httpx
 import pytest
 
@@ -354,3 +356,45 @@ def test_the_cache_is_written_through_a_unique_temporary_file(monkeypatch, tmp_p
         "registry.json",
         "registry.tmp",
     ]
+
+
+def _cache(monkeypatch, tmp_path, providers):
+    path = tmp_path / "registry.json"
+    path.write_text(
+        json.dumps({"fetched_at": 1.0, "providers": providers}), encoding="utf-8"
+    )
+    monkeypatch.setattr(registry, "CACHE_PATH", path)
+    monkeypatch.delenv("MODEL_REGISTRY_ENABLED", raising=False)
+
+
+def test_window_and_tool_use_are_read_from_the_cache_only(monkeypatch, tmp_path):
+    _cache(
+        monkeypatch,
+        tmp_path,
+        {
+            "broken": "not a list",
+            "openai": [
+                {"id": "nameless"},
+                "not a record",
+                {"id": "GPT-7", "tool_call": True, "limit": {"context": 400_000}},
+                {"id": "gpt-7-nano", "tool_call": False, "limit": {"context": True}},
+                {"id": "gpt-7-mini", "tool_call": "yes", "limit": "big"},
+            ],
+        },
+    )
+    assert registry.cached_context_window(" gpt-7 ") == 400_000
+    assert registry.cached_tool_call("gpt-7") is True
+    assert registry.cached_tool_call("gpt-7-nano") is False
+    assert registry.cached_context_window("gpt-7-nano") is None
+    assert registry.cached_tool_call("gpt-7-mini") is None
+    assert registry.cached_context_window("gpt-7-mini") is None
+    assert registry.cached_tool_call("unknown") is None
+    assert registry.cached_context_window(None) is None
+    monkeypatch.setenv("MODEL_REGISTRY_ENABLED", "false")
+    assert registry.cached_tool_call("gpt-7") is None
+
+
+def test_no_cache_says_nothing(monkeypatch, tmp_path):
+    monkeypatch.setattr(registry, "CACHE_PATH", tmp_path / "absent.json")
+    assert registry.cached_tool_call("gpt-7") is None
+    assert registry.cached_context_window("gpt-7") is None

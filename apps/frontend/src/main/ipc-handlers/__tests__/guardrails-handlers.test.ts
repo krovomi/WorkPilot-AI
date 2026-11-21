@@ -44,6 +44,12 @@ describe("guardrailsRunnerArgs", () => {
 		);
 		expect(guardrailsRunnerArgs("answer", { projectPath: project, requestId: "0123456789ab" }).at(-1)).toBe("--refuse");
 		expect(guardrailsRunnerArgs("check-diff", { projectPath: project }).slice(-2)).toEqual(["--ref", "HEAD"]);
+		expect(guardrailsRunnerArgs("governance", { projectPath: project })).toEqual([
+			"governance",
+			"--project-path",
+			project,
+		]);
+		expect(guardrailsRunnerArgs("audit", { projectPath: project }).slice(-2)).toEqual(["--limit", "10000"]);
 	});
 
 	it.each([

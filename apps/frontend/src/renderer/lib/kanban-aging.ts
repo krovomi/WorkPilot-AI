@@ -7,6 +7,7 @@
  * can render as a colored accent, so stale work surfaces itself.
  */
 
+import type { TFunction } from "i18next";
 import type { Task, TaskStatus } from "../../shared/types";
 
 export type AgingLevel = "none" | "aging" | "stuck";
@@ -52,14 +53,17 @@ export function getTaskAgingLevel(
 }
 
 /**
- * Compact, locale-independent idle-duration label ("3j", "5h", "12min").
- * French short units to match the rest of the kanban surface; kept here rather
- * than in i18n because it's a numeric format, not prose.
+ * Compact idle-duration label ("3d", "5h", "12min" in English), with the
+ * short units of the app's language.
  */
-export function formatAgingDuration(hours: number): string {
-	if (hours >= 24) return `${Math.floor(hours / 24)}j`;
-	if (hours >= 1) return `${Math.floor(hours)}h`;
-	return `${Math.max(1, Math.floor(hours * 60))}min`;
+export function formatAgingDuration(hours: number, t: TFunction): string {
+	if (hours >= 24)
+		return t("tasks:kanban.aging.days", { count: Math.floor(hours / 24) });
+	if (hours >= 1)
+		return t("tasks:kanban.aging.hours", { count: Math.floor(hours) });
+	return t("tasks:kanban.aging.minutes", {
+		count: Math.max(1, Math.floor(hours * 60)),
+	});
 }
 
 /** Count tasks at each non-"none" aging level (board-wide flow signal). */

@@ -610,14 +610,12 @@ def _claude_transcript_exists(session_id: str, config_dir: str | None) -> bool:
         return False
 
 
-# Permission mode hardening for read-only phases. "plan" lets Claude explore and
-# reason but refuses every write/exec tool call — a strong defense-in-depth
-# complement to the tools allowlist. Only for agent types that have no business
-# modifying files; a prompt that has to write its output (the spec researcher,
-# the spec self-critique) must never be mapped onto one of these, or its phase
-# reports success over a placeholder file. Module-level so tests read the set
-# the client applies instead of a copy of it.
-# See: code.claude.com/docs/en/agent-sdk/permissions
+# Permission mode hardening for read-only phases: "plan" lets Claude explore and
+# reason but refuses every write/exec tool call, on top of the tools allowlist.
+# Only for types with no business modifying files; a prompt that writes its
+# output (spec researcher, spec self-critique) must never be one of these, or its
+# phase reports success over a placeholder file. Module-level so tests read the
+# set the client applies. See: code.claude.com/docs/en/agent-sdk/permissions
 READ_ONLY_AGENT_TYPES = frozenset(
     {
         "analyzer",
@@ -625,6 +623,8 @@ READ_ONLY_AGENT_TYPES = frozenset(
         "spec_validation",
         "pr_reviewer",
         "pr_orchestrator_parallel",
+        "pr_followup_parallel",
+        "issue_triage",
         "insights",
     }
 )

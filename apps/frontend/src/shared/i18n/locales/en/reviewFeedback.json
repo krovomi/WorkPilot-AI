@@ -1,0 +1,43 @@
+{
+	"title": "Feedback on this project's reviews",
+	"subtitle": "What people accepted and rejected across every PR review, and what the reviewer learned from it.",
+	"show": "Show",
+	"hide": "Hide",
+	"refresh": "Refresh",
+	"loading": "Loading the feedback…",
+	"empty": "No feedback yet. Accept or reject findings to teach the reviewer this project's conventions.",
+	"overall": "{{rate}}% of {{total}} rated findings accepted",
+	"byCategory": "Acceptance rate by category",
+	"columns": {
+		"category": "Category",
+		"accepted": "Accepted",
+		"rejected": "Rejected",
+		"notApplicable": "Not applicable",
+		"rate": "Acceptance"
+	},
+	"rate": "{{rate}}%",
+	"rulesTitle": "Learned from rejections",
+	"rulesHint": "A kind of finding rejected {{threshold}} times more than accepted is downgraded to low; twice that, it is hidden. Security and critical findings are never touched.",
+	"noRules": "No kind of finding has been rejected often enough to change the reviews.",
+	"status": {
+		"dropped": "Hidden",
+		"downgraded": "Downgraded to low"
+	},
+	"counts": "Rejected {{rejected}}, accepted {{accepted}}",
+	"mostly": "Mostly: {{reason}}",
+	"reset": "Reset",
+	"resetLabel": "Forget the feedback on “{{label}}”",
+	"resetHint": "Reset forgets the verdicts given so far on that kind of finding: the reviewer raises it again until it is rejected again.",
+	"conventions": {
+		"write": "Generate review-conventions.md",
+		"hint": "Writes the rules deduced from this feedback to .workpilot/review-conventions.md, without any model. The same feedback always gives the same file.",
+		"written_one": "Written to {{path}} ({{count}} rule).",
+		"written_other": "Written to {{path}} ({{count}} rules)."
+	},
+	"errors": {
+		"invalid": "This request could not be read.",
+		"not_found": "This project or this kind of finding was not found.",
+		"server_project": "Feedback on findings is not available for server projects yet.",
+		"write_failed": "The file could not be written."
+	}
+}

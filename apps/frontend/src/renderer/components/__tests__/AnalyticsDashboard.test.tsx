@@ -139,6 +139,19 @@ describe("AnalyticsDashboard", () => {
 		});
 	});
 
+	it("compares the project in the How you compare tab", async () => {
+		const getBuildComparison = vi.fn().mockResolvedValue({ success: false, error: "Unknown project" });
+		(globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI.getBuildComparison =
+			getBuildComparison;
+		render(<AnalyticsDashboard projectPath="/test/project" />);
+		await waitFor(() => {
+			expect(screen.getByText("Performance")).toBeInTheDocument();
+		});
+		fireEvent.click(screen.getByText("How you compare"));
+		expect(await screen.findByText("Unknown project")).toBeInTheDocument();
+		expect(getBuildComparison).toHaveBeenCalledWith("/test/project");
+	});
+
 	it("switches to Performance tab", async () => {
 		render(<AnalyticsDashboard projectPath="/test/project" />);
 

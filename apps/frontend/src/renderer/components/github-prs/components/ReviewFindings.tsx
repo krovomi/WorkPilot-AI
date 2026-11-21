@@ -29,6 +29,7 @@ import type { PRReviewFinding } from "../hooks/useGitHubPRs";
 import { FindingItem } from "./FindingItem";
 import { FindingsSummary } from "./FindingsSummary";
 import { LearnedSuppressionsNote } from "./LearnedSuppressionsNote";
+import { ReviewFeedbackStats } from "./ReviewFeedbackStats";
 import { SeverityGroupHeader } from "./SeverityGroupHeader";
 
 interface ReviewFindingsProps {
@@ -156,6 +157,8 @@ export function ReviewFindings({
 			/>
 
 			<LearnedSuppressionsNote suppressions={learnedSuppressions} />
+
+			{projectId && <ReviewFeedbackStats projectId={projectId} />}
 
 			{findingFeedback.error && (
 				<p className="text-xs text-destructive" role="alert">

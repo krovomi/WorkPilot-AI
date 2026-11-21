@@ -10,7 +10,10 @@ the command line (``python apps/backend/runners/guardrails_runner.py <command>``
 * ``check-diff`` a dry run of the rules over the changes since ``--ref``,
   file by file, without blocking anything (``workpilot policy validate``);
 * ``activity``   the log of triggered rules and the requests awaiting approval;
-* ``answer``     approve or refuse one pending request.
+* ``answer``     approve or refuse one pending request;
+* ``governance`` the hours, files and token budget of ``workpilot.policy.yaml``,
+  the tokens spent in the last hour, and the last decisions of the audit trail;
+* ``audit``      the audit trail itself, newest first, for an export.
 
 Output: one line ``GUARDRAILS_RESULT:<json>``, or ``GUARDRAILS_ERROR:<json string>``.
 """
@@ -101,10 +104,35 @@ def check_diff(project: Path, ref: str) -> dict[str, Any]:
     }
 
 
+def governance_report(project: Path) -> dict[str, Any]:
+    """What the read-only governance panel shows: the policy, its state, its decisions."""
+    from agents.policy_watch import tokens_last_hour
+    from security.guardrail_policy import load_policy
+    from security.policy_audit import read_events
+
+    policy = load_policy(project)
+    return {
+        "governance": policy.governance.to_dict() if policy.governance else None,
+        "errors": policy.errors,
+        "sources": [s.__dict__ for s in policy.sources if s.layer == "repository"],
+        "tokensLastHour": tokens_last_hour(project),
+        "events": read_events(project, 50),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="WorkPilot guardrails")
     parser.add_argument(
-        "command", choices=["validate", "test", "check-diff", "activity", "answer"]
+        "command",
+        choices=[
+            "validate",
+            "test",
+            "check-diff",
+            "activity",
+            "answer",
+            "governance",
+            "audit",
+        ],
     )
     parser.add_argument("--project-path", required=True)
     parser.add_argument("--tool", default="Write")
@@ -113,6 +141,9 @@ def main() -> None:
         "--ref", default="HEAD", help="compare against this ref (check-diff)"
     )
     parser.add_argument("--request", help="request id (answer)")
+    parser.add_argument(
+        "--limit", type=int, default=10_000, help="decisions to read (audit)"
+    )
     decision = parser.add_mutually_exclusive_group()
     decision.add_argument("--approve", action="store_true")
     decision.add_argument("--refuse", action="store_true")
@@ -146,6 +177,12 @@ def main() -> None:
             result = check_diff(project, args.ref)
         elif args.command == "activity":
             result = ledger.activity(project)
+        elif args.command == "governance":
+            result = governance_report(project)
+        elif args.command == "audit":
+            from security.policy_audit import read_events
+
+            result = {"events": read_events(project, max(1, args.limit))}
         else:
             if not args.request or not (args.approve or args.refuse):
                 raise RuntimeError("answer needs --request and --approve or --refuse")

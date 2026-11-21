@@ -8,7 +8,7 @@ import { useCICDTriggersStore } from "../../../stores/cicd-triggers-store";
 import { useProjectStore } from "../../../stores/project-store";
 import { CICDTriggersDashboard } from "../CICDTriggersDashboard";
 import { DeployMonitorSettings } from "../DeployMonitorSettings";
-import { canRollBack, DeployWatchPanel, isWatchRunning } from "../DeployWatchPanel";
+import { canRollBack, DeployWatchPanel, isWatchRunning, revertOpened } from "../DeployWatchPanel";
 
 vi.mock("react-i18next", () => ({
 	useTranslation: () => ({
@@ -141,6 +141,78 @@ describe("DeployWatchPanel", () => {
 		expect(screen.getByText("cicdTriggers:watch.rollback.failed").className).toContain("text-destructive");
 		expect(screen.getByText(/watch\.plan\.manual/)).toBeTruthy();
 		expect(screen.queryByRole("link")).toBeNull();
+	});
+});
+
+describe("incident report and revert PR", () => {
+	const incident = {
+		criticalSamples: 2,
+		warningSamples: 1,
+		healthChecks: 3,
+		healthFailed: 2,
+		metrics: [
+			{ name: "errors", baseline: 0.01, worst: 0.05, worstChangePct: 400, level: "critical" as const },
+			{ name: "p95", baseline: null, worst: null, worstChangePct: null, level: "unknown" as const },
+		],
+		explanation: "Errors went up fivefold.",
+	};
+
+	it("knows an opened revert PR by its link", () => {
+		expect(revertOpened(undefined)).toBe(false);
+		expect(revertOpened({ status: "opened", url: "", sha: "" })).toBe(false);
+		expect(revertOpened({ status: "exists", url: "https://x/pr/1", sha: "" })).toBe(true);
+		expect(revertOpened({ status: "failed", url: "https://x/pr/1", sha: "" })).toBe(false);
+	});
+
+	it("shows the report, the model's words and the revert PR link", () => {
+		render(
+			<DeployWatchPanel
+				watch={watch({
+					rollback: "started",
+					incident,
+					revertPr: { status: "opened", url: "https://github.com/acme/shop/pull/7", sha: "b".repeat(40) },
+				})}
+				busy={false}
+				onRollback={vi.fn()}
+			/>,
+		);
+		const report = screen.getByTestId("deploy-incident");
+		expect(report.textContent).toContain("watch.incident.title");
+		expect(report.textContent).toContain('"critical":2');
+		expect(report.textContent).toContain('"failed":2');
+		expect(report.textContent).toContain('"worst":"0.05"');
+		expect(report.textContent).toContain('"change":"—"');
+		expect(screen.getByText("Errors went up fivefold.")).toBeTruthy();
+		const link = screen.getByTestId("deploy-revert-pr");
+		expect(link.getAttribute("href")).toBe("https://github.com/acme/shop/pull/7");
+		expect(link.textContent).toContain("b".repeat(12));
+		// The PR is the revert: no hint to do it by hand.
+		expect(screen.queryByText("cicdTriggers:watch.revertHint")).toBeNull();
+	});
+
+	it("says why there is no revert PR", () => {
+		const { rerender } = render(
+			<DeployWatchPanel
+				watch={watch({
+					incident: { ...incident, healthChecks: 0, metrics: [], explanation: "" },
+					revertPr: { status: "conflict", url: "", sha: "" },
+				})}
+				busy={false}
+				onRollback={vi.fn()}
+			/>,
+		);
+		expect(screen.getByTestId("deploy-revert-pr").className).toContain("text-destructive");
+		expect(screen.getByTestId("deploy-incident").textContent).not.toContain("watch.incident.health");
+		expect(screen.queryByText(/watch\.incident\.explanation/)).toBeNull();
+		rerender(
+			<DeployWatchPanel
+				watch={watch({ revertPr: { status: "offline", url: "", sha: "" } })}
+				busy={false}
+				onRollback={vi.fn()}
+			/>,
+		);
+		expect(screen.getByTestId("deploy-revert-pr").className).toContain("wp-meta");
+		expect(screen.getByText("cicdTriggers:watch.revertPr.offline")).toBeTruthy();
 	});
 });
 

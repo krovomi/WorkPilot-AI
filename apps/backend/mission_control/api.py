@@ -10,11 +10,18 @@ Provides REST endpoints for:
 """
 
 import logging
+from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, HTTPException
+from foundation.api_safety import SpecAddressError, resolve_spec_dir, validated_dir
 from pydantic import BaseModel, Field
 
+from .composition import CompositionError, suggest_composition
 from .orchestrator import get_mission_control
+from .refine import parse_hints
+from .signals import read_signals, read_spec_text
+from .templates import TEMPLATES
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +77,24 @@ class AgentStateUpdateRequest(BaseModel):
 
 class StartSessionRequest(BaseModel):
     name: str = "Mission Control"
+
+
+class CompositionRequest(BaseModel):
+    """What a crew is suggested from; the main process resolves the project."""
+
+    prompt: str = Field(default="", max_length=20_000)
+    project_dir: str | None = Field(default=None, max_length=4_096)
+    spec_id: str | None = Field(default=None, max_length=200)
+    template: str | None = Field(default=None, max_length=40)
+    providers: list[Annotated[str, Field(max_length=64)]] = Field(
+        min_length=1, max_length=8
+    )
+    budget_usd: float | None = Field(default=None, gt=0, le=1_000_000)
+    budget_tokens: int | None = Field(default=None, gt=0, le=10_000_000_000)
+    # Ask for the light model's request (``refine.py``); its answer comes back
+    # in ``model_hints`` on a second call.
+    refine: bool = False
+    model_hints: str | None = Field(default=None, max_length=8_000)
 
 
 # ---------------------------------------------------------------------------
@@ -307,3 +332,58 @@ async def get_events(limit: int = 50):
     mc = get_mission_control()
     events = mc.get_event_log(limit)
     return {"success": True, "events": events}
+
+
+# ---------------------------------------------------------------------------
+# Composition (docs/architecture/mission-control-composition.md)
+# ---------------------------------------------------------------------------
+
+
+def _composition_dirs(req: CompositionRequest) -> tuple[Path | None, Path | None]:
+    """The project and spec directories, resolved then checked; or a code."""
+    if req.spec_id and not req.project_dir:
+        raise CompositionError("invalid_spec")
+    if not req.project_dir:
+        return None, None
+    try:
+        project = validated_dir(req.project_dir, "project_dir")
+    except ValueError:
+        raise CompositionError("invalid_project") from None
+    if not req.spec_id:
+        return project, None
+    try:
+        spec = resolve_spec_dir(None, str(project), req.spec_id)
+    except SpecAddressError:
+        raise CompositionError("invalid_spec") from None
+    return project, spec
+
+
+@router.post("/composition")
+async def suggest(req: CompositionRequest):
+    """Suggest a crew for a description or a spec, within a budget.
+
+    A refusal the person can act on (an unknown template, no usable provider,
+    a spec that is not there) answers ``success: false`` with a code.
+    """
+    try:
+        if req.template and req.template not in TEMPLATES:
+            raise CompositionError("unknown_template")
+        project, spec = _composition_dirs(req)
+        signals = read_signals(req.prompt, project, spec)
+        hints = parse_hints(req.model_hints) if req.model_hints else None
+        text = "\n\n".join(
+            t for t in (req.prompt.strip(), read_spec_text(spec) if spec else "") if t
+        )
+        composition = suggest_composition(
+            signals,
+            req.providers,
+            template_key=req.template,
+            budget_usd=req.budget_usd,
+            budget_tokens=req.budget_tokens,
+            hints=hints,
+            hints_unusable=bool(req.model_hints) and hints is None,
+            refine_text=text if req.refine and not req.model_hints else None,
+        )
+    except CompositionError as exc:
+        return {"success": False, "error": exc.code}
+    return {"success": True, "composition": composition}

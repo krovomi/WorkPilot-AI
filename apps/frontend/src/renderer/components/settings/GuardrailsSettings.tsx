@@ -24,6 +24,7 @@ import {
 import "../charter/charter.css";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
+import { GovernancePolicyPanel } from "./GovernancePolicyPanel";
 import { GuardrailsActivity } from "./GuardrailsActivity";
 import { SettingsSection } from "./SettingsSection";
 
@@ -176,6 +177,7 @@ function GuardrailsEditor({ projectPath }: { readonly projectPath: string }): Re
 				)}
 			</Section>
 			<Tester projectPath={projectPath} />
+			<GovernancePolicyPanel projectPath={projectPath} />
 			<GuardrailsActivity projectPath={projectPath} />
 		</>
 	);

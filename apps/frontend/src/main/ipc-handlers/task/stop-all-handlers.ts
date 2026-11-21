@@ -6,6 +6,7 @@ import { appLog } from "../../app-logger";
 import { KILL_SWITCH_PAUSE_REASON } from "./pause-state-utils";
 import { pauseTaskNow } from "./pause-task";
 import { findTaskAndProject } from "./shared";
+import { registerStopAfterStepHandlers } from "./stop-after-step-handlers";
 
 /**
  * "Stop all agents": the kill switch (issue #353).
@@ -52,7 +53,9 @@ export function stopAllAgents(agentManager: AgentManager): StopAllResult {
 	return result;
 }
 
+/** Both ways to stop the agents: at once (the kill switch), or after their step (the spoken stop). */
 export function registerStopAllHandlers(agentManager: AgentManager): void {
+	registerStopAfterStepHandlers(agentManager);
 	ipcMain.handle(
 		IPC_CHANNELS.AGENTS_STOP_ALL,
 		async (): Promise<IPCResult<StopAllResult>> => ({

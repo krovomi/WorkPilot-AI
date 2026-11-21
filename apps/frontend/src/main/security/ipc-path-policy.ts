@@ -61,6 +61,7 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"costs:setBudget": [0],
 	"crossLangTranslation:clearHistory": [0],
 	"crossLangTranslation:getHistory": [0],
+	"dashboard:compare": [0],
 	"dashboard:getSnapshot": [0],
 	"dictation:start": [2],
 	"fileExplorer:list": [0],
