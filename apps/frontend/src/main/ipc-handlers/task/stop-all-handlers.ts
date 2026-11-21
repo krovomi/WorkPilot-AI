@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from "../../../shared/constants";
 import type { IPCResult, StopAllResult } from "../../../shared/types";
 import type { AgentManager } from "../../agent";
 import { appLog } from "../../app-logger";
+import { stopServerAgents } from "../../server-governance";
 import { KILL_SWITCH_PAUSE_REASON } from "./pause-state-utils";
 import { pauseTaskNow } from "./pause-task";
 import { findTaskAndProject } from "./shared";
@@ -20,6 +21,11 @@ import { registerStopAfterStepHandlers } from "./stop-after-step-handlers";
  * Every other agent process (ideation, roadmap, insights…) has no spec to
  * resume from and is stopped outright. A task whose pause cannot be written
  * is stopped all the same: stopping is the point of the switch.
+ *
+ * Signed in to a server, the switch also stops, in each server project the
+ * person works on, the runs and jobs they started there
+ * (`server-governance.ts`, `POST /api/features/governance/stop`): never a
+ * colleague's. Those end cancelled, like Stop on a card of the server.
  *
  * Takes no argument from the renderer: what runs is read here.
  */
@@ -53,6 +59,18 @@ export function stopAllAgents(agentManager: AgentManager): StopAllResult {
 	return result;
 }
 
+/** The kill switch on this computer, then on the server projects. */
+export async function stopAllAgentsEverywhere(agentManager: AgentManager): Promise<StopAllResult> {
+	const local = stopAllAgents(agentManager);
+	const server = await stopServerAgents();
+	if (server.stopped + server.failed > 0) {
+		appLog.info(
+			`[AGENTS_STOP_ALL] ${server.stopped} server agent(s) stopped, ${server.failed} server project(s) unreachable.`,
+		);
+	}
+	return { ...local, serverAgents: server.stopped, serverFailed: server.failed };
+}
+
 /** Both ways to stop the agents: at once (the kill switch), or after their step (the spoken stop). */
 export function registerStopAllHandlers(agentManager: AgentManager): void {
 	registerStopAfterStepHandlers(agentManager);
@@ -60,7 +78,7 @@ export function registerStopAllHandlers(agentManager: AgentManager): void {
 		IPC_CHANNELS.AGENTS_STOP_ALL,
 		async (): Promise<IPCResult<StopAllResult>> => ({
 			success: true,
-			data: stopAllAgents(agentManager),
+			data: await stopAllAgentsEverywhere(agentManager),
 		}),
 	);
 }

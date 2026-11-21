@@ -330,6 +330,8 @@ class RunManager:
         self._tracked: set[str] = set()
         # run_id -> project_id of the runs above: what a project delete stops.
         self._projects: dict[str, str] = {}
+        # run_id -> who started it: what "stop my agents" stops.
+        self._starters: dict[str, str] = {}
 
     def _get_semaphore(self) -> asyncio.Semaphore:
         if self._semaphore is None:
@@ -399,6 +401,7 @@ class RunManager:
             raise
         self._tracked.add(run_id)
         self._projects[run_id] = project_id
+        self._starters[run_id] = user_id
 
         asyncio.get_running_loop().create_task(
             self._execute(
@@ -446,13 +449,30 @@ class RunManager:
         longer exists, then record its end on a row that is gone. Returns how
         many runs were stopped; gives up waiting after ``timeout`` seconds.
         """
-        runs = [run for run, owner in self._projects.items() if owner == project_id]
-        for run_id in runs:
-            await self.cancel_run(run_id)
+        runs = await self.stop_runs(project_id)
         await wait_until_ended(
             lambda: any(run in self._tracked for run in runs), timeout
         )
         return len(runs)
+
+    def active_runs(self, project_id: str, started_by: str | None = None) -> list[str]:
+        """The runs of a project this process holds, only ``started_by``'s when given."""
+        return [
+            run
+            for run, owner in self._projects.items()
+            if owner == project_id
+            and (started_by is None or self._starters.get(run) == started_by)
+        ]
+
+    async def stop_runs(
+        self, project_id: str, started_by: str | None = None
+    ) -> list[str]:
+        """Stop the project's runs (only those ``started_by`` started, when
+        given) without waiting for them to end; the ids stopped."""
+        runs = self.active_runs(project_id, started_by)
+        for run_id in runs:
+            await self.cancel_run(run_id)
+        return runs
 
     async def settle_orphans(self) -> int:
         """Mark failed the runs left queued or running by a server that stopped.
@@ -605,6 +625,7 @@ class RunManager:
             self._cancelled.discard(run_id)
             self._tracked.discard(run_id)
             self._projects.pop(run_id, None)
+            self._starters.pop(run_id, None)
 
     async def _set_run_status(
         self, run_id: str, status: str, error: str | None = None

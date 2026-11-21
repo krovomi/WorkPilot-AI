@@ -564,7 +564,12 @@ async def guardrails_hook(
     policy = load_policy(root)
     project = main_project(root)
 
-    def _audit(decision: str, reason: str, rules: list[str] | None = None) -> None:
+    def _audit(
+        decision: str,
+        reason: str,
+        rules: list[str] | None = None,
+        approver: str | None = None,
+    ) -> None:
         audit.record(
             project,
             decision=decision,
@@ -573,6 +578,7 @@ async def guardrails_hook(
             rules=rules,
             reason=reason,
             task=audit.task_of(root),
+            approver=approver,
         )
 
     if policy.errors:
@@ -607,11 +613,11 @@ async def guardrails_hook(
         return {}
 
     if decision.action == GuardrailAction.REQUIRE_APPROVAL:
-        if ledger.consume_approval(project, decision, target):
+        if approval := ledger.consume_approval(project, decision, target):
             ledger.record(
                 project, decision, tool_name, target, root, outcome="approved"
             )
-            _audit("approved", decision.message, rule_ids)
+            _audit("approved", decision.message, rule_ids, audit.approver_of(approval))
             return {}
         ledger.record(project, decision, tool_name, target, root, outcome="pending")
         _audit("review", decision.message, rule_ids)

@@ -191,3 +191,57 @@ export interface UiPreferences {
 	theme: ThemeMode | null;
 	colorTheme: ColorThemeId | null;
 }
+
+/** A decision of the policy audit trail (`security/policy_audit.py`). */
+export type PolicyDecision =
+	| "deny"
+	| "review"
+	| "approved"
+	| "warn"
+	| "outside_hours"
+	| "budget_exceeded"
+	| "invalid_policy"
+	| "tool_loop";
+
+export interface PolicyEvent {
+	id?: string;
+	at?: string;
+	task?: string | null;
+	tool?: string | null;
+	target?: string | null;
+	decision: PolicyDecision;
+	rules?: string[];
+	/** Who approved the call: a name, the server's id and roles, for an `approved` decision. */
+	approvedBy?: string | null;
+}
+
+/** A call an agent waits on until someone approves or refuses it. */
+export interface GovernanceRequest {
+	id: string;
+	at?: string;
+	rules?: string[];
+	tool?: string | null;
+	target?: { kind?: string | null; summary?: string | null };
+	task?: string | null;
+}
+
+/**
+ * `GET /api/features/governance` (`shared_features/governance.py`): what the
+ * project's `workpilot.policy.yaml` says, read by the server from its clone,
+ * the calls its agents wait on, its agents, and what this person may do.
+ */
+export interface GovernanceReport {
+	governance: {
+		schedule: { timezone: string; allowedHours: string[]; days: string[]; openNow: boolean } | null;
+		files: { forbidden: string[]; requiresReview: string[]; reviewers?: string[] };
+		budget: { maxTokensPerHour?: number | null; maxTokensPerTask?: number | null } | null;
+		loopDetection?: { maxSameToolCall: number } | null;
+	} | null;
+	errors?: string[];
+	tokensLastHour?: number;
+	events?: PolicyEvent[];
+	metrics?: { blocked24h?: number; breakerTrips7d?: number };
+	pending?: GovernanceRequest[];
+	agents: { mine: number; project: number };
+	may: { approve: boolean; stop: boolean; stopProject: boolean; export: boolean };
+}

@@ -26,6 +26,7 @@ import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { GovernancePolicyPanel } from "./GovernancePolicyPanel";
 import { GuardrailsActivity } from "./GuardrailsActivity";
+import { ServerGovernancePanel } from "./ServerGovernancePanel";
 import { SettingsSection } from "./SettingsSection";
 
 const ACTIONS: GuardrailAction[] = ["allow", "warn", "deny", "require_approval"];
@@ -45,7 +46,10 @@ export function GuardrailsView(): React.ReactElement {
 	const { t } = useTranslation(["settings", "navigation", "common"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const { doc, dirty, loading, loadFailed, addRule, save } = useGuardrailsStore();
-	const projectPath = activeProject?.path;
+	// A server project's agents run on the server: its rules are its
+	// workpilot.policy.yaml, read there, and nothing here edits the mirror.
+	const serverProjectId = activeProject?.remote ? activeProject.id : null;
+	const projectPath = serverProjectId ? undefined : activeProject?.path;
 
 	return (
 		<ModuleStage scroll="page" data-testid="guardrails-view">
@@ -77,7 +81,9 @@ export function GuardrailsView(): React.ReactElement {
 				}
 			/>
 			<Page className="max-w-none space-y-4">
-				{projectPath ? (
+				{serverProjectId ? (
+					<ServerGovernancePanel projectId={serverProjectId} />
+				) : projectPath ? (
 					<GuardrailsEditor projectPath={projectPath} />
 				) : (
 					<EmptyStage icon={ShieldHalf} tone="red" title={t("settings:guardrails.title")}>
@@ -94,7 +100,18 @@ export function GuardrailsSettings(): React.ReactElement {
 	const { t } = useTranslation(["settings", "common"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const { dirty, loading, loadFailed, addRule, save } = useGuardrailsStore();
-	const projectPath = activeProject?.path;
+	const serverProjectId = activeProject?.remote ? activeProject.id : null;
+	const projectPath = serverProjectId ? undefined : activeProject?.path;
+
+	if (serverProjectId) {
+		return (
+			<SettingsSection title={t("settings:guardrails.title")} description={t("settings:governance.serverHint")}>
+				<div className="wp-scope">
+					<ServerGovernancePanel projectId={serverProjectId} />
+				</div>
+			</SettingsSection>
+		);
+	}
 
 	return (
 		<SettingsSection
