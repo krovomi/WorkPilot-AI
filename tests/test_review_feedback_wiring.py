@@ -278,7 +278,7 @@ class TestDatasetEdges:
         def _denied(_path):
             raise PermissionError("denied")
 
-        monkeypatch.setattr(rf, "_read_tail", _denied)
+        monkeypatch.setattr(rf, "read_tail", _denied)
         with caplog.at_level(logging.WARNING):
             assert rf.load_feedback(tmp_path) == []
         assert "PermissionError" in caplog.text
