@@ -124,3 +124,32 @@ def test_the_replay_shares_table_comes_and_goes_with_its_revision(alembic_config
         engine.dispose()
     command.downgrade(config, "0016_spec_approvals")
     assert "replay_shares" not in _tables(db)
+
+
+def test_the_escalations_table_comes_and_goes_with_its_revision(alembic_config):
+    config, db = alembic_config
+    command.upgrade(config, "head")
+    assert "approval_escalations" in _tables(db)
+    command.downgrade(config, "0017_replay_shares")
+    assert "approval_escalations" not in _tables(db)
+    # A table already there (``create_all`` of a newer build) is kept.
+    command.upgrade(config, "0018_approval_escalations")
+    command.downgrade(config, "0017_replay_shares")
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text("CREATE TABLE approval_escalations (run_id VARCHAR(36))")
+            )
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    assert "approval_escalations" in _tables(db)
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(sa.text("DROP TABLE approval_escalations"))
+    finally:
+        engine.dispose()
+    command.downgrade(config, "0017_replay_shares")
+    assert "approval_escalations" not in _tables(db)

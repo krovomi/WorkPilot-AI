@@ -551,6 +551,29 @@ class ApprovalDelegation(Base):
     )
 
 
+class ApprovalEscalation(Base):
+    """A card whose plan waited too long, and when the second group heard of it.
+
+    One row per spec run whose plan waited: a later spec run starts a new
+    wait, which may escalate again (``services/approval_escalation.py``).
+    """
+
+    __tablename__ = "approval_escalations"
+
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), primary_key=True
+    )
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    spec_name: Mapped[str] = mapped_column(String(300))
+    criticality: Mapped[str] = mapped_column(String(10))
+    notified: Mapped[int] = mapped_column(Integer, default=0)
+    escalated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class AgentRun(Base):
     __tablename__ = "agent_runs"
 

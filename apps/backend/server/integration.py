@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from importlib import import_module
 
 from fastapi import FastAPI, Request
@@ -287,6 +289,28 @@ async def _ensure_db_ready() -> None:
             logger.exception("Could not settle runs interrupted by a restart")
 
 
+def _run_periodic_jobs(app: FastAPI) -> None:
+    """Run the server's periodic jobs for the app's lifetime, inside its lifespan.
+
+    One today: escalating a plan that waited too long for its approvals
+    (``services/approval_escalation.py``), started only when it is on.
+    """
+    inner = app.router.lifespan_context
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI) -> AsyncIterator[object]:
+        from server.services import approval_escalation
+
+        async with inner(application) as state:
+            approval_escalation.start(ready=_ensure_db_ready)
+            try:
+                yield state
+            finally:
+                await approval_escalation.stop()
+
+    app.router.lifespan_context = lifespan
+
+
 def mount_server_mode(app: FastAPI) -> bool:
     """Activate auth middleware + multi-user routers. Returns True if active."""
     settings = get_settings()
@@ -386,5 +410,6 @@ def mount_server_mode(app: FastAPI) -> bool:
             continue
         app.include_router(module.router)
 
+    _run_periodic_jobs(app)
     logger.info("WorkPilot server mode ACTIVE (multi-user, auth required)")
     return True

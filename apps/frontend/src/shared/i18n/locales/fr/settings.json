@@ -1466,7 +1466,8 @@
 		"events": {
 			"plan_review": "Un plan attend son approbation",
 			"review_ready": "Un travail est prêt pour ma revue",
-			"failed": "Un run s'est arrêté sur une erreur"
+			"failed": "Un run s'est arrêté sur une erreur",
+			"approval_escalated": "Un plan a trop attendu ses approbateurs"
 		},
 		"language": "Langue des messages",
 		"enabled": "{{channel}} activé",
