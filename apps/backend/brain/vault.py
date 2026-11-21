@@ -21,7 +21,16 @@ from .graph import BrainGraph, rebuild
 from .home import KINDS, MARKER, brain_dir, graph_path, is_brain, kind_dir
 from .images import DEFAULT_MAX_IMAGES, iter_images
 from .memories import refresh_bridges, remember, write_digest
-from .notes import Note, inside, iter_notes, now_iso, read_note, slugify, write_note
+from .notes import (
+    Note,
+    inside,
+    iter_notes,
+    listed,
+    now_iso,
+    read_note,
+    slugify,
+    write_note,
+)
 from .sync import (
     SyncResult,
     ensure_repo,
@@ -313,18 +322,18 @@ class Brain:
         meta["title"] = title
         meta.setdefault("created", now_iso())
         meta["updated"] = now_iso()
-        merged_tags = list(dict.fromkeys([*(meta.get("tags") or []), *(tags or [])]))
+        merged_tags = list(dict.fromkeys([*listed(meta.get("tags")), *(tags or [])]))
         if merged_tags:
             meta["tags"] = merged_tags
         if task:
             # The Kanban task this note was learned on (`runtime.task_ref`):
             # what the task panel's brain card lists.
-            tasks = list(meta.get("tasks") or [])
+            tasks = listed(meta.get("tasks"))
             if task not in tasks:
                 tasks.append(task)
             meta["tasks"] = tasks
         if agent:
-            agents = list(meta.get("agents") or [])
+            agents = listed(meta.get("agents"))
             if agent not in agents:
                 agents.append(agent)
             meta["agents"] = agents

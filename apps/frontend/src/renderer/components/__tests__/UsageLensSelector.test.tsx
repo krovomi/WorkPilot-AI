@@ -112,9 +112,10 @@ describe("UsageLensSelector", () => {
 	it("keeps a remembered provider that is no longer configured", async () => {
 		localStorage.setItem("usageProvider", "mistral");
 		renderLens();
-		expect(trigger().textContent).toBe("mistral");
+		// Named by its label, as everywhere the header names a provider.
+		expect(trigger().textContent).toBe("Mistral AI");
 		const list = await openList();
-		expect(within(list).getByRole("option", { name: "mistral" })).toBeTruthy();
+		expect(within(list).getByRole("option", { name: "Mistral AI" })).toBeTruthy();
 	});
 
 	it("explains itself on focus, but never over the open list", async () => {

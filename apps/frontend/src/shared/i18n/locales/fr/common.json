@@ -1008,7 +1008,10 @@
 			"optional": "Facultatif",
 			"agents": "Agents qui l'utilisent",
 			"agentsHint": "Modifiable plus tard dans Outils des agents.",
-			"noAgent": "Choisissez au moins un agent."
+			"noAgent": "Choisissez au moins un agent.",
+			"showValue": "Afficher la valeur",
+			"hideValue": "Masquer la valeur",
+			"openHelp": "Où obtenir {{name}}"
 		},
 		"installedTab": {
 			"empty": "Aucun serveur MCP dans ce projet",
@@ -1049,12 +1052,41 @@
 			"httpConfiguration": "Configuration HTTP",
 			"transformTemplate": "Modèle de transformation",
 			"transformPlaceholder": "Modèle de transformation des données d'entrée...",
-			"paramDescriptionPlaceholder": "Description"
+			"paramDescriptionPlaceholder": "Description",
+			"addTool": "Ajouter un outil",
+			"removeParam": "Supprimer le paramètre",
+			"paramName": "Nom du paramètre",
+			"paramType": "Type du paramètre",
+			"paramDescription": "Description du paramètre",
+			"colorCode": "Code couleur",
+			"httpMethod": "Méthode HTTP",
+			"httpPath": "Chemin",
+			"chain": "Enchaînement",
+			"paramTypes": {
+				"string": "Texte",
+				"number": "Nombre",
+				"boolean": "Oui / non",
+				"array": "Liste",
+				"object": "Objet"
+			}
 		},
 		"officialOnly": "Officiels",
 		"official": "Officiel",
 		"community": "Communauté",
 		"noProject": "Sélectionnez un projet : les serveurs s'installent par projet.",
+		"errors": {
+			"loadCatalog": "Le catalogue n'a pas pu être chargé.",
+			"loadBuilder": "Vos serveurs du constructeur n'ont pas pu être chargés.",
+			"unknownServer": "{{name}} n'est pas dans le catalogue.",
+			"missingValues": "À remplir : {{name}}.",
+			"alreadyInstalled": "{{name}} est déjà installé dans ce projet.",
+			"readSettings": "Les réglages du projet n'ont pas pu être lus : rien n'a été modifié.",
+			"saveSettings": "Les réglages du projet n'ont pas pu être enregistrés.",
+			"install": "Le serveur n'a pas pu être installé.",
+			"uninstall": "Le serveur n'a pas pu être retiré.",
+			"saveBuilder": "Le serveur n'a pas pu être enregistré.",
+			"deleteBuilder": "Le serveur n'a pas pu être supprimé."
+		},
 		"requires": {
 			"uv": "Nécessite uv (uvx) sur cette machine.",
 			"az": "Nécessite Azure CLI, connecté avec az login."
@@ -1076,6 +1108,7 @@
 			"title": "Sécurité",
 			"checking": "Lecture du registre et des vulnérabilités connues…",
 			"recheck": "Vérifier à nouveau",
+			"readFailed": "Le registre n'a pas pu être lu.",
 			"checkedAt": "Registre lu le {{date}}",
 			"unchecked": {
 				"remote": "Tourne sur les serveurs de son éditeur : rien ne tourne sur cette machine, et il n'y a pas de paquet à vérifier.",
@@ -1175,7 +1208,8 @@
 			"installing": "Installation...",
 			"uninstall": "Désinstaller",
 			"enable": "Activer",
-			"disable": "Désactiver"
+			"disable": "Désactiver",
+			"uninstallNamed": "Désinstaller {{name}}"
 		},
 		"sdk": {
 			"title": "SDK de Plugins",
@@ -1246,14 +1280,26 @@
 			"openFolderFailed": "Impossible d’ouvrir le dossier du plugin",
 			"done": "Terminé",
 			"namePlaceholder": "Mon super plugin",
-			"untitled": "Sans titre"
+			"createFailed": "Impossible de créer le plugin",
+			"copyFailed": "Impossible de copier la configuration",
+			"fieldIdInvalid": "Lettres minuscules, chiffres et tirets simples (mon-plugin)",
+			"fieldTemplateContentPlaceholder": "# Modèle de spec\n\n## Exigences\n...",
+			"configFile": "Écrit dans plugin.config.json, dans le dossier du plugin"
 		},
 		"byAuthor": "par {{author}}",
 		"noProject": "Sélectionnez un projet : les plugins s'installent dans les skills d'un projet.",
 		"installedIn": "Dans {{paths}}",
 		"howToUse": "Lancez-le avec /{{id}} dans la barre de commandes du Kanban, ou laissez l'agent s'en servir.",
 		"showSkill": "Voir le skill",
-		"hideSkill": "Masquer le skill"
+		"hideSkill": "Masquer le skill",
+		"sortBy": "Trier les plugins",
+		"loading": "Chargement des plugins",
+		"errors": {
+			"loadCatalog": "Impossible de charger le catalogue",
+			"loadInstalled": "Impossible de lire les plugins installés dans ce projet",
+			"install": "Échec de l’installation",
+			"uninstall": "Échec de la désinstallation"
+		}
 	},
 	"chatHistory": {
 		"title": "Historique des conversations",
