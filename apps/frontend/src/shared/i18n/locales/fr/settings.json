@@ -285,6 +285,34 @@
 				"setDefault": "Faire de {{id}} le modèle par défaut",
 				"offline": "Liste hors ligne : {{name}} n’a pas pu être joint.",
 				"loading": "Chargement des modèles…"
+			},
+			"gatewayRouting": {
+				"title": "Routage",
+				"description": {
+					"openrouter": "Comment OpenRouter choisit le fournisseur qui répond, et ce que ce fournisseur peut faire de vos prompts.",
+					"huggingface": "Comment le routeur Hugging Face choisit le fournisseur d’inférence qui répond."
+				},
+				"sort": "Ordre des fournisseurs",
+				"sortDefault": "Choix d’OpenRouter (répartition de charge)",
+				"sorts": {
+					"price": "Le moins cher d’abord",
+					"throughput": "Le débit le plus rapide d’abord",
+					"latency": "La latence la plus basse d’abord"
+				},
+				"denyDataCollection": "Seulement les fournisseurs qui ne conservent pas les prompts et n’entraînent pas dessus",
+				"zeroRetention": "Seulement les fournisseurs sans conservation des données",
+				"fallbacks": "Modèles de secours",
+				"fallbacksHint": "Essayés dans l’ordre quand le modèle par défaut est indisponible, limité ou refuse la requête. {{count}} au plus.",
+				"fallbackAria": "Modèle de secours {{index}}",
+				"fallbackPlaceholder": "éditeur/modèle",
+				"invalidModel": "Pas un identifiant de modèle : {{id}}",
+				"policy": "Politique du routeur",
+				"policyDefault": "Par défaut de Hugging Face",
+				"policies": {
+					"fastest": "Le fournisseur le plus rapide",
+					"cheapest": "Le fournisseur le moins cher"
+				},
+				"saveFailed": "Le routage n’a pas pu être enregistré."
 			}
 		},
 		"agent": {

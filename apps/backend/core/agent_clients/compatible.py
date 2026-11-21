@@ -31,6 +31,7 @@ class CompatibleProviderAgentClient(OpenAIAgentClient):
         effort_params: dict[str, Any] | None = None,
         prompt_cache_key: str | None = None,
         cache_headers: dict[str, str] | None = None,
+        routing_params: dict[str, Any] | None = None,
     ):
         endpoint = base_url.rstrip("/")
         if not endpoint.endswith("/chat/completions"):
@@ -57,3 +58,5 @@ class CompatibleProviderAgentClient(OpenAIAgentClient):
         # Cache routing the provider documents (`compatible_cache_routing`):
         # Mistral's opt-in key, xAI's sticky-server header.
         self._cache_headers = dict(cache_headers or {})
+        # A gateway's routing options (`gateway_routing.gateway_routing_params`).
+        self._routing_params = dict(routing_params or {})

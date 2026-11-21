@@ -309,6 +309,34 @@
 				"setDefault": "Make {{id}} the default model",
 				"offline": "Offline list: {{name}} could not be reached.",
 				"loading": "Loading the models…"
+			},
+			"gatewayRouting": {
+				"title": "Routing",
+				"description": {
+					"openrouter": "How OpenRouter picks the provider that answers, and what that provider may do with your prompts.",
+					"huggingface": "How the Hugging Face router picks the inference provider that answers."
+				},
+				"sort": "Provider order",
+				"sortDefault": "OpenRouter's choice (load balancing)",
+				"sorts": {
+					"price": "Cheapest first",
+					"throughput": "Fastest output first",
+					"latency": "Lowest latency first"
+				},
+				"denyDataCollection": "Only providers that do not store or train on prompts",
+				"zeroRetention": "Only zero-data-retention providers",
+				"fallbacks": "Fallback models",
+				"fallbacksHint": "Tried in order when the default model is down, rate-limited or refuses the request. Up to {{count}}.",
+				"fallbackAria": "Fallback model {{index}}",
+				"fallbackPlaceholder": "vendor/model",
+				"invalidModel": "Not a model id: {{id}}",
+				"policy": "Router policy",
+				"policyDefault": "Hugging Face default",
+				"policies": {
+					"fastest": "Fastest provider",
+					"cheapest": "Cheapest provider"
+				},
+				"saveFailed": "The routing could not be saved."
 			}
 		},
 		"updates": {
