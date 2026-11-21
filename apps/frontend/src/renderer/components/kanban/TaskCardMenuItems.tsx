@@ -10,6 +10,7 @@ import {
 	Play,
 	Shapes,
 	Trash2,
+	X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { CardType } from "../../../shared/constants/card-types";
@@ -18,6 +19,7 @@ import type { TaskStatusColumn } from "../../../shared/constants/task";
 import type { TaskPriority, TaskStatus } from "../../../shared/types";
 import {
 	DropdownMenuItem,
+	DropdownMenuLabel,
 	DropdownMenuSeparator,
 	DropdownMenuSub,
 	DropdownMenuSubContent,
@@ -184,6 +186,66 @@ export function TaskCardMenuItems({
 					</DropdownMenuItem>
 				</>
 			)}
+		</>
+	);
+}
+
+interface SelectionMenuItemsProps {
+	count: number;
+	onSetType: (type: CardType) => void;
+	onSetPriority: (priority: TaskPriority) => void;
+	onDelete: () => void;
+	onClear: () => void;
+}
+
+/**
+ * The right-click menu of a card that is part of a selection of several:
+ * it acts on every selected card.
+ */
+export function SelectionMenuItems({
+	count,
+	onSetType,
+	onSetPriority,
+	onDelete,
+	onClear,
+}: SelectionMenuItemsProps) {
+	const { t } = useTranslation(["tasks"]);
+	return (
+		<>
+			<DropdownMenuLabel>
+				{t("tasks:kanban.selectedCountOther", { count })}
+			</DropdownMenuLabel>
+			<DropdownMenuSeparator />
+			<DropdownMenuSub>
+				<DropdownMenuSubTrigger>
+					<Shapes className="mr-2 h-4 w-4" />
+					{t("tasks:kanban.cardMenu.type")}
+				</DropdownMenuSubTrigger>
+				<DropdownMenuSubContent className="max-h-80 w-56 overflow-y-auto">
+					<CardTypeMenuItems onSelect={onSetType} />
+				</DropdownMenuSubContent>
+			</DropdownMenuSub>
+			<DropdownMenuSub>
+				<DropdownMenuSubTrigger>
+					<Flag className="mr-2 h-4 w-4" />
+					{t("tasks:kanban.cardMenu.priority")}
+				</DropdownMenuSubTrigger>
+				<DropdownMenuSubContent className="w-44">
+					<PriorityMenuItems onSelect={onSetPriority} />
+				</DropdownMenuSubContent>
+			</DropdownMenuSub>
+			<DropdownMenuItem onSelect={onClear}>
+				<X className="mr-2 h-4 w-4" />
+				{t("tasks:kanban.clearSelection")}
+			</DropdownMenuItem>
+			<DropdownMenuSeparator />
+			<DropdownMenuItem
+				onSelect={onDelete}
+				className="text-destructive focus:text-destructive"
+			>
+				<Trash2 className="mr-2 h-4 w-4" />
+				{t("tasks:kanban.deleteSelected")}
+			</DropdownMenuItem>
 		</>
 	);
 }

@@ -1515,9 +1515,13 @@ export const TaskCard = memo(function TaskCard({
 					</Button>
 				)}
 				<div className={cn(isSelectable ? "flex gap-2" : "w-full")}>
-					{/* Checkbox for selectable mode - stops event propagation */}
+					{/* Checkbox for selectable mode - stops event propagation. Shown
+					    on hover, on focus, or while the board has a selection. */}
 					{isSelectable && (
-						<div className="shrink-0 pt-0.5">
+						<div
+							className="kanban-card-check shrink-0 pt-0.5"
+							data-checked={isSelected ? "" : undefined}
+						>
 							<Checkbox
 								checked={isSelected}
 								onCheckedChange={onToggleSelect}
