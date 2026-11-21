@@ -26,11 +26,11 @@ from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from server.authz.principal import get_principal
 from server.authz.scope import ProjectScope, resolve_project_scope
-from server.authz.self_approval import may_approve_own
 from server.db.engine import get_db
 from server.db.models import Project
 from server.services.events import emit_board_event
 from server.services.run_manager import set_approval_carry
+from shared_board.approvals import give_approval
 from shared_board.attachments import (
     MAX_IMAGES,
     ImageUpload,
@@ -141,20 +141,6 @@ async def card_changes(
     return await asyncio.to_thread(_changes, scope.path, base, card_id)
 
 
-def _approve_next_build(directory: Path, approved_by: str) -> None:
-    """Sending the work back is this person's approval of the build it starts.
-
-    The approval the build checks (``review_state.json``) covers ``spec.md``
-    and the plan; the last build moved the plan on and the request just added
-    its subtask, so the build started next stopped at "review required" until
-    someone approved the spec again. The route's permission is the one the
-    approval takes (``review.approve``).
-    """
-    from review.state import ReviewState
-
-    ReviewState.load(directory).approve(directory, approved_by=approved_by)
-
-
 def _reopen_plan(plan_path: Path, subtask: dict[str, Any]) -> None:
     """As the app does on a request for changes: a traced subtask, failed
     subtasks retried, completed ones kept, QA to run again."""
@@ -201,9 +187,10 @@ async def request_changes(
     """Send the card's work back with what to change.
 
     Writes the request where the build reads it (``QA_FIX_REQUEST.md`` in the
-    workspace), reopens the plan and approves it as this person's, as Start
-    does; the app then starts a ``build`` run. The
-    feedback is a person's text, written to a file, never to argv.
+    workspace), reopens the plan and adds this person's approval of it, as
+    Start does; the app then starts a ``build`` run. The route's permission
+    is the one the approval takes (``review.approve``). The feedback is a
+    person's text, written to a file, never to argv.
     """
     from server.services.run_manager import get_run_manager
 
@@ -251,17 +238,12 @@ async def request_changes(
         plan = spec_dir / "implementation_plan.json"
         if plan.is_file():
             _reopen_plan(plan, dict(subtask))
-    # On one's own card, as the deployment allows: otherwise the build it
-    # starts waits for someone else's approval.
-    approved = await may_approve_own(
-        db,
-        project_id=scope.project_id,
-        org_id=scope.org_id,
-        user_id=principal.id,
-        author_id=row.created_by if row is not None else None,
-    )
-    if approved:
-        _approve_next_build(directory, principal.email or principal.id)
+    # Sending the work back is this person's approval of the build it starts,
+    # one of those the card's criticality needs (``shared_board/approvals``),
+    # and on one's own card as the deployment allows: otherwise the build
+    # waits for the others' approvals.
+    given = await give_approval(db, scope, principal, directory, row, request)
+    approved = given is not None and given[0].complete
     emit_board_event(
         scope.project_id, "spec_updated", {"spec": card_id, "by": principal.id}
     )

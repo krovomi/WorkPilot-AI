@@ -101,6 +101,10 @@ def _scope(project_id, org_id, clone, role):
     return ProjectScope(project_id, org_id, clone, role)
 
 
+#: What the route's permission (``review.approve``) lets through.
+APPROVER = frozenset({"review.approve"})
+
+
 def _request(**principal):
     from server.authz.principal import Principal
     from starlette.requests import Request
@@ -238,11 +242,12 @@ async def test_a_request_for_changes_is_written_where_the_build_reads_it(
         result = await request_changes(
             card_id,
             ChangeRequest(feedback=feedback),
-            _request(),
+            _request(permissions=APPROVER),
             _scope(pid, oid, clone, "member"),
             db,
         )
-    # The author asks for the changes: the build they start is approved.
+    # The author, alone on the project, asks for the changes: the build they
+    # start is approved.
     assert result == {"requested": True, "approved": True}
 
     spec = workspace / ".workpilot/specs" / card_id
@@ -283,14 +288,14 @@ async def test_the_build_a_request_for_changes_starts_is_approved_by_its_author(
         await request_changes(
             card_id,
             ChangeRequest(feedback="Keep the session for 30 days."),
-            _request(id="u-2", email="b@x"),
+            _request(permissions=APPROVER),
             _scope(pid, oid, clone, "member"),
             db,
         )
 
     state = ReviewState.load(spec)
     assert state.is_approval_valid(spec)
-    assert state.approved_by == "b@x"
+    assert state.approved_by == "U"
 
 
 @pytest.mark.asyncio
