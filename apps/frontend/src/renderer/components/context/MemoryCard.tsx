@@ -256,6 +256,7 @@ export function MemoryCard({ memory, actions }: MemoryCardProps) {
 						projectId={actions.projectId}
 						memoryId={memory.path}
 						pinned={memory.pinned === true}
+						appliesTo={memory.applies_to}
 						onChanged={actions.onChanged}
 					/>
 				)}

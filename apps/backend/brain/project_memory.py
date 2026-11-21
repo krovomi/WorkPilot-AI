@@ -1065,6 +1065,7 @@ def _episode(hit: dict[str, Any]) -> dict[str, Any]:
         "session_number": meta.get("session_number"),
         "path": hit["path"],
         "pinned": meta.get("pinned") is True,
+        "applies_to": str(meta.get("applies_to") or ""),
     }
 
 

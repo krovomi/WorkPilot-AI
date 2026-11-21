@@ -158,11 +158,11 @@ async def test_a_viewer_reads_but_cannot_change_a_card(tmp_path):
     from fastapi import HTTPException
     from shared_board.api import (
         CardCreate,
-        approve_card,
         create_card,
         delete_card,
         get_card,
     )
+    from shared_board.approvals import approve_card
 
     pid, oid, clone = await _project(tmp_path)
     async with await _db() as db:
@@ -202,10 +202,10 @@ async def test_a_started_card_cannot_be_edited_and_approval_follows_the_spec(tmp
     from shared_board.api import (
         CardCreate,
         CardUpdate,
-        approve_card,
         create_card,
         update_card,
     )
+    from shared_board.approvals import approve_card
 
     pid, oid, clone = await _project(tmp_path)
     scope = _scope(pid, oid, clone, "member")
@@ -213,15 +213,21 @@ async def test_a_started_card_cannot_be_edited_and_approval_follows_the_spec(tmp
         card = await create_card(CardCreate(title="T"), _request(), scope, db)
     directory = clone / ".workpilot/specs" / card["id"]
 
+    approver = {"permissions": frozenset({"review.approve"})}
     async with await _db() as db:
         with pytest.raises(HTTPException) as exc:
-            await approve_card(card["id"], _request(), scope, db)
+            await approve_card(card["id"], _request(**approver), scope, db)
         assert exc.value.status_code == 409  # nothing to approve yet
 
         (directory / "spec.md").write_text("# Spec\n", encoding="utf-8")
+        # Without the approval right, refused.
+        with pytest.raises(HTTPException) as exc:
+            await approve_card(card["id"], _request(), scope, db)
+        assert exc.value.status_code == 403
         # Its author, alone on the project, approves it.
-        result = await approve_card(card["id"], _request(email="lead@x"), scope, db)
-    assert result == {"approved": True, "approvedBy": "lead@x"}
+        result = await approve_card(card["id"], _request(**approver), scope, db)
+    assert result["approved"] is True and result["approvedBy"] == "U"
+    assert result["approval"]["count"] == 1 and result["approval"]["needed"] == 1
     assert ReviewState.load(directory).is_approval_valid(directory)
 
     with pytest.raises(HTTPException) as exc:
@@ -387,7 +393,7 @@ async def test_a_card_without_a_review_needs_the_approval_right(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_a_run_skips_the_review_only_for_who_may_approve(monkeypatch):
+async def test_a_run_skips_the_review_only_for_who_may_approve(monkeypatch, tmp_path):
     from server.auth.deps import CurrentUser
     from server.routers import specs
     from server.schemas import StartRunRequest
@@ -403,6 +409,7 @@ async def test_a_run_skips_the_review_only_for_who_may_approve(monkeypatch):
     class Spec:
         claimed_by = "u-1"
         created_by = None
+        spec_name = "001-x"
 
     class Project:
         server_path = "/srv/p"
@@ -421,20 +428,22 @@ async def test_a_run_skips_the_review_only_for_who_may_approve(monkeypatch):
 
     from fastapi import HTTPException
 
+    await _project(tmp_path)
     user = CurrentUser(id="u-1", email="a@x", display_name="A", role="member")
     for permissions in (
         frozenset({"agent.execute"}),
         frozenset({"agent.execute", "review.approve"}),
     ):
-        with pytest.raises(HTTPException):
-            await specs.start_run(
-                "p",
-                "s",
-                StartRunRequest(phase="spec"),
-                _request(permissions=permissions),
-                user,
-                None,
-            )
+        async with await _db() as db:
+            with pytest.raises(HTTPException):
+                await specs.start_run(
+                    "p",
+                    "s",
+                    StartRunRequest(phase="spec"),
+                    _request(permissions=permissions),
+                    user,
+                    db,
+                )
     assert seen == [False, True]
 
 
