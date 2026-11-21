@@ -66,7 +66,7 @@ function AchievementRow({
 			className={`flex items-start gap-2 ${at ? "" : "opacity-50"}`}
 		>
 			<Icon
-				className={`mt-0.5 h-4 w-4 shrink-0 ${at ? "text-amber-400" : "text-muted-foreground"}`}
+				className={`mt-0.5 h-4 w-4 shrink-0 ${at ? "text-warning" : "text-muted-foreground"}`}
 				aria-hidden
 			/>
 			<span className="flex min-w-0 flex-col">

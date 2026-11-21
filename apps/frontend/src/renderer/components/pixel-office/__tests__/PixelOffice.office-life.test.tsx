@@ -11,6 +11,7 @@ import { usePixelOfficeStore } from "../../../stores/pixel-office-store";
 import { useTaskStore } from "../../../stores/task-store";
 import { TooltipProvider } from "../../ui/tooltip";
 import { PixelOffice } from "../PixelOffice";
+import { installFakeCanvas } from "./fake-canvas";
 import { KIOSK_REFRESH_MS } from "../use-kiosk-mode";
 
 function task(overrides: Partial<Task>): Task {
@@ -172,5 +173,24 @@ describe("PixelOffice", () => {
 		fireEvent.click(screen.getByRole("button", { name: "TV mode" }));
 		const button = (await screen.findByRole("button", { name: "Animations" })) as HTMLButtonElement;
 		expect(button.disabled).toBe(true);
+	});
+
+	it("a waiting agent drawn while calm holds still", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const contextOf = installFakeCanvas();
+		usePixelOfficeStore.setState({
+			settings: { ...usePixelOfficeStore.getState().settings, calmMode: true },
+		});
+		const { container } = office();
+		await screen.findByText("Waiting to start");
+		const mini = Array.from(container.querySelectorAll("canvas")).find(
+			(canvas) => canvas.width === 16 && canvas.height === 24,
+		) as HTMLCanvasElement;
+		const drawn = () => contextOf(mini).calls.filter((call) => call.name === "drawImage").length;
+		expect(drawn()).toBe(1);
+		await act(async () => {
+			vi.advanceTimersByTime(3000);
+		});
+		expect(drawn()).toBe(1);
 	});
 });
