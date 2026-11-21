@@ -115,14 +115,16 @@ class ReviewState:
 
         Returns False if:
         - Not approved
+        - The approval records no spec content
         - spec.md or implementation_plan.json changed since approval
         """
         if not self.approved:
             return False
 
         if not self.spec_hash:
-            # Legacy approval without hash - treat as valid
-            return True
+            # An approval that names no spec content covers nothing: the
+            # review step always records what it approved.
+            return False
 
         current_hash = _compute_spec_hash(spec_dir)
         return self.spec_hash == current_hash
@@ -219,6 +221,36 @@ class ReviewState:
 
         if auto_save:
             self.save(spec_dir)
+
+
+def read_review_record(spec_dir: Path) -> bytes | None:
+    """The review file as it is now (None when there is none).
+
+    Taken before a step that runs agents in the spec folder, it tells
+    `keep_reviewed_approval_only` whether the file changed while they ran.
+    """
+    try:
+        return (Path(spec_dir) / REVIEW_STATE_FILE).read_bytes()
+    except OSError:
+        return None
+
+
+def keep_reviewed_approval_only(spec_dir: Path, before: bytes | None) -> bool:
+    """Withdraw an approval that the review step did not record.
+
+    A spec is approved by its review: the checkpoint, the card, the server
+    route. The spec phases only write the spec and its plan, so when the
+    review file changed while they ran, the approval in it was not given by
+    that review. It is withdrawn (feedback and history kept) and the review
+    asks again. Returns True when an approval was withdrawn.
+    """
+    if read_review_record(spec_dir) == before:
+        return False
+    state = ReviewState.load(spec_dir)
+    if not state.approved:
+        return False
+    state.invalidate(spec_dir)
+    return True
 
 
 def get_review_status_summary(spec_dir: Path) -> dict:
