@@ -187,8 +187,10 @@ def get_relative_spec_path(spec_dir: Path, project_dir: Path) -> str:
     """
     try:
         # Try to make path relative to project_dir
+        # Forward slashes on every OS: the prompt joins it with "/spec.md",
+        # and a Windows "\\" in the middle gave the agent a mixed path.
         relative = spec_dir.relative_to(project_dir)
-        return f"./{relative}"
+        return f"./{relative.as_posix()}"
     except ValueError:
         # Not under project_dir: where the worktree's copy of the spec lives
         # (workspace setup copies it there).

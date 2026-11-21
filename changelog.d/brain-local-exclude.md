@@ -7,3 +7,5 @@ section: 🐛 Corrections
   exclus par le fichier d'exclusion local du dépôt, et une synchronisation ne les envoie plus.
 - **Garde-fou des worktrees sur Windows** : un worktree à la racine d'un disque désigne la
   racine du disque (`D:\`) comme dossier interdit, et non le dossier courant de ce disque.
+- **Prompts sur Windows** : le chemin de la spec donné à l'agent s'écrit avec des `/`
+  (`./.workpilot/specs/001-x/spec.md`), au lieu de mêler `\` et `/`.
