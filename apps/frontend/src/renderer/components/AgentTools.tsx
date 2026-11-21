@@ -57,7 +57,9 @@ import {
 } from "../hooks";
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
+import type { McpPolicyRefusal, McpPolicyRefusalData } from "../../shared/types/mcp-policy";
 import { CustomMcpDialog } from "./CustomMcpDialog";
+import { McpPolicyRefusalNotice } from "./mcp-marketplace/McpPolicyNotice";
 import { McpServerSettingsDialog } from "./McpServerSettingsDialog";
 import { TokenSavingsSettings } from "./settings/TokenSavingsSettings";
 import { UiUxSettings } from "./settings/UiUxSettings";
@@ -921,6 +923,8 @@ export function AgentTools() {
 		Record<string, McpHealthCheckResult>
 	>({});
 	const [testingServers, setTestingServers] = useState<Set<string>>(new Set());
+	// Why the project's MCP policy refused the last save, until the next one.
+	const [policyRefusal, setPolicyRefusal] = useState<McpPolicyRefusal | null>(null);
 
 	// Update MCP server toggle
 	// Which server's settings are open. A custom server routes to the editor it
@@ -963,6 +967,9 @@ export function AgentTools() {
 					patch,
 				);
 				saved = result.success;
+				setPolicyRefusal(
+					saved ? null : ((result.data as McpPolicyRefusalData | undefined)?.mcpPolicyRefusal ?? null),
+				);
 			} catch (error) {
 				console.error("Failed to save the project's agent tools:", error);
 			}
@@ -1485,6 +1492,10 @@ export function AgentTools() {
 											{t("settings:mcp.addCustomServer")}
 										</button>
 									</div>
+
+									{policyRefusal && (
+										<McpPolicyRefusalNotice refusal={policyRefusal} className="mb-3" />
+									)}
 
 									{customServers.length > 0 ? (
 										<div className="space-y-2">

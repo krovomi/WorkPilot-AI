@@ -1,10 +1,11 @@
 /**
  * Accept / Reject / Not applicable on one review finding (#361), with an
  * optional reason from a closed list. Repeated rejections of a kind of
- * finding teach the reviewer to stop raising it on this project.
+ * finding teach the reviewer to stop raising it on this project. On a server
+ * project, a member's rejection is held until a maintainer approves it.
  */
 
-import { Ban, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Ban, Hourglass, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -23,6 +24,8 @@ interface FindingFeedbackProps {
 	findingId: string;
 	verdict?: ReviewFeedbackVerdict;
 	pending?: boolean;
+	/** The rejection waits for a maintainer before the reviewer learns from it. */
+	held?: boolean;
 	onSubmit: (input: ReviewFeedbackInput) => Promise<boolean> | boolean;
 }
 
@@ -56,6 +59,7 @@ export function FindingFeedback({
 	findingId,
 	verdict,
 	pending = false,
+	held = false,
 	onSubmit,
 }: FindingFeedbackProps) {
 	const { t } = useTranslation("common");
@@ -112,6 +116,13 @@ export function FindingFeedback({
 					);
 				})}
 			</fieldset>
+
+			{held && !draft && (
+				<p className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
+					<Hourglass className="h-3 w-3" />
+					{t("prReview.feedback.held")}
+				</p>
+			)}
 
 			{draft && (
 				<div className="flex items-end gap-2 flex-wrap">

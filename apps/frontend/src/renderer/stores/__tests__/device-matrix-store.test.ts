@@ -2,6 +2,7 @@
  * The device matrix store (#383): devices are captured one after the other in
  * catalogue order under the chosen throttling, a stop keeps what was
  * rendered, a failure is named, and the export names the rendered devices.
+ * A task under review gets its default devices captured once, unasked.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_MATRIX_DEVICE_IDS } from "../../../shared/constants/device-presets";
@@ -25,6 +26,10 @@ const capture = (deviceId: string): { success: true; data: DeviceCapture } => ({
 		network: "none",
 		cpu: "1x",
 		loadMs: 0,
+		orientation: "portrait",
+		width: 393,
+		height: 852,
+		previewSession: false,
 	},
 });
 
@@ -39,6 +44,10 @@ describe("useDeviceMatrixStore", () => {
 			stopRequested: false,
 			network: "none",
 			cpu: "1x",
+			orientation: "portrait",
+			previewSession: false,
+			showMarkers: true,
+			autoCaptured: [],
 			exporting: false,
 			exportStatus: null,
 		});
@@ -67,8 +76,10 @@ describe("useDeviceMatrixStore", () => {
 			.mockRejectedValueOnce(new Error("bridge gone"));
 		useDeviceMatrixStore.getState().setNetwork("fast-3g");
 		useDeviceMatrixStore.getState().setCpu("4x");
+		useDeviceMatrixStore.getState().setOrientation("landscape");
+		useDeviceMatrixStore.getState().setPreviewSession(true);
 		await useDeviceMatrixStore.getState().captureSelected("/cart");
-		const throttled = { network: "fast-3g", cpu: "4x" };
+		const throttled = { network: "fast-3g", cpu: "4x", orientation: "landscape", previewSession: true };
 		expect(captureEmulatorDevice.mock.calls.map(([request]) => request)).toEqual([
 			{ deviceId: "iphone-15", path: "/cart", ...throttled },
 			{ deviceId: "pixel-8", path: "/cart", ...throttled },
@@ -126,8 +137,12 @@ describe("useDeviceMatrixStore", () => {
 			expect(useDeviceMatrixStore.getState()).toMatchObject({ exporting: true, exportStatus: null });
 			return { success: true, data: { saved: true, fileName: "grid.png" } };
 		});
-		await useDeviceMatrixStore.getState().exportGrid();
-		expect(exportEmulatorDeviceGrid).toHaveBeenCalledWith({ deviceIds: ["iphone-15", "desktop-1080p"] });
+		await useDeviceMatrixStore.getState().exportGrid("png");
+		expect(exportEmulatorDeviceGrid).toHaveBeenCalledWith({
+			deviceIds: ["iphone-15", "desktop-1080p"],
+			format: "png",
+			markers: true,
+		});
 		expect(useDeviceMatrixStore.getState()).toMatchObject({
 			exporting: false,
 			exportStatus: { status: "saved", fileName: "grid.png" },
@@ -137,13 +152,13 @@ describe("useDeviceMatrixStore", () => {
 	it("says nothing after a cancelled export, and names a failed one", async () => {
 		useDeviceMatrixStore.setState({ entries: { "iphone-15": { status: "done", capture: capture("iphone-15").data } } });
 		exportEmulatorDeviceGrid.mockResolvedValueOnce({ success: true, data: { saved: false } });
-		await useDeviceMatrixStore.getState().exportGrid();
+		await useDeviceMatrixStore.getState().exportGrid("png");
 		expect(useDeviceMatrixStore.getState().exportStatus).toBeNull();
 		exportEmulatorDeviceGrid.mockResolvedValueOnce({ success: false, error: "write-failed" });
-		await useDeviceMatrixStore.getState().exportGrid();
+		await useDeviceMatrixStore.getState().exportGrid("png");
 		expect(useDeviceMatrixStore.getState().exportStatus).toEqual({ status: "failed", error: "write-failed" });
 		exportEmulatorDeviceGrid.mockRejectedValueOnce(new Error("bridge gone"));
-		await useDeviceMatrixStore.getState().exportGrid();
+		await useDeviceMatrixStore.getState().exportGrid("png");
 		expect(useDeviceMatrixStore.getState().exportStatus).toEqual({ status: "failed", error: "export-failed" });
 		// A new capture or a clear forgets the last export.
 		useDeviceMatrixStore.getState().clear();
@@ -152,12 +167,44 @@ describe("useDeviceMatrixStore", () => {
 
 	it("exports nothing without a rendered device, while capturing or while exporting", async () => {
 		useDeviceMatrixStore.setState({ entries: { "iphone-15": { status: "failed", error: "busy" } } });
-		await useDeviceMatrixStore.getState().exportGrid();
+		await useDeviceMatrixStore.getState().exportGrid("png");
 		const done = { "iphone-15": { status: "done" as const, capture: capture("iphone-15").data } };
 		useDeviceMatrixStore.setState({ entries: done, running: true });
-		await useDeviceMatrixStore.getState().exportGrid();
+		await useDeviceMatrixStore.getState().exportGrid("png");
 		useDeviceMatrixStore.setState({ running: false, exporting: true });
-		await useDeviceMatrixStore.getState().exportGrid();
+		await useDeviceMatrixStore.getState().exportGrid("png");
 		expect(exportEmulatorDeviceGrid).not.toHaveBeenCalled();
+	});
+
+	it("exports a PDF without markers when the markers are off", async () => {
+		useDeviceMatrixStore.setState({ entries: { "iphone-15": { status: "done", capture: capture("iphone-15").data } } });
+		useDeviceMatrixStore.getState().setShowMarkers(false);
+		exportEmulatorDeviceGrid.mockResolvedValueOnce({ success: true, data: { saved: true, fileName: "grid.pdf" } });
+		await useDeviceMatrixStore.getState().exportGrid("pdf");
+		expect(exportEmulatorDeviceGrid).toHaveBeenCalledWith({ deviceIds: ["iphone-15"], format: "pdf", markers: false });
+	});
+
+	it("captures the given devices instead of the selection, in catalogue order", async () => {
+		captureEmulatorDevice.mockImplementation(async ({ deviceId }) => capture(deviceId));
+		await useDeviceMatrixStore.getState().captureSelected("/", ["desktop-1080p", "made-up", "pixel-8"]);
+		expect(captureEmulatorDevice.mock.calls.map(([request]) => request.deviceId)).toEqual(["pixel-8", "desktop-1080p"]);
+		expect(useDeviceMatrixStore.getState().selected).toEqual([...DEFAULT_MATRIX_DEVICE_IDS]);
+	});
+
+	it("captures the default devices once per key, unasked", async () => {
+		useDeviceMatrixStore.getState().setSelection(["tv-1080p"]);
+		captureEmulatorDevice.mockImplementation(async ({ deviceId }) => capture(deviceId));
+		expect(useDeviceMatrixStore.getState().autoCapture("task-1", "/cart")).toBe(true);
+		await vi.waitFor(() => expect(useDeviceMatrixStore.getState().running).toBe(false));
+		expect(captureEmulatorDevice.mock.calls.map(([request]) => [request.deviceId, request.path])).toEqual(
+			DEFAULT_MATRIX_DEVICE_IDS.map((id) => [id, "/cart"]),
+		);
+		expect(useDeviceMatrixStore.getState().autoCaptured).toEqual(["task-1"]);
+		expect(useDeviceMatrixStore.getState().autoCapture("task-1", "/cart")).toBe(false);
+		useDeviceMatrixStore.setState({ running: true });
+		expect(useDeviceMatrixStore.getState().autoCapture("task-2", "/")).toBe(false);
+		useDeviceMatrixStore.setState({ running: false, exporting: true });
+		expect(useDeviceMatrixStore.getState().autoCapture("task-2", "/")).toBe(false);
+		expect(captureEmulatorDevice).toHaveBeenCalledTimes(DEFAULT_MATRIX_DEVICE_IDS.length);
 	});
 });

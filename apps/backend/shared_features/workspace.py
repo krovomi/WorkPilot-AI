@@ -16,7 +16,8 @@ on the project. An error a run or a job ended with passes through
 
 ``/compare`` sets the project against the organization's other projects:
 only those the person may read themselves (``load_project_scope``), only as
-medians of groups of ``MIN_GROUP`` projects or more, and never by name.
+medians of groups of ``MIN_GROUP`` projects or more (a top tenth from
+``MIN_TOP``), and never by name.
 """
 
 from __future__ import annotations
@@ -44,6 +45,9 @@ MAX_ERROR = 2_000
 #: one project the person could single out.
 MAX_PEERS = 100
 MIN_GROUP = 5
+#: The fewest projects a group's top tenth is given for: from twenty up, the
+#: best tenth holds two projects or more, so it is never the best one's figure.
+MIN_TOP = 20
 
 #: The board's statuses (``implementation_plan.json``) in the words of the
 #: desktop's dashboard; the others are shown as they are.
@@ -239,4 +243,5 @@ async def compare(
         [peer.path for peer in peers],
         datetime.now(UTC),
         min_group=MIN_GROUP,
+        min_top=MIN_TOP,
     )

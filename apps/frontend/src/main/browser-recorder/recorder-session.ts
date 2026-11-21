@@ -5,7 +5,9 @@
  * person drives and prints each step it records. The main keeps those steps
  * (read through `parseRecordedStep`, at most `MAX_RECORDED_STEPS`), so an
  * export later sends the runner only steps it made itself: the renderer only
- * picks which ones to keep, by id. The runner gets the static environment
+ * picks which ones to keep, by id. A check the recorder proposes after an
+ * action (a step with `after`) is kept apart, at most `MAX_SUGGESTIONS`, and
+ * is exported only when the renderer names it. The runner gets the static environment
  * (no provider, no key, no Claude profile, S1): it calls no model, and the
  * page it opens is someone else's code.
  */
@@ -15,6 +17,7 @@ import { BrowserWindow } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import {
 	MAX_RECORDED_STEPS,
+	MAX_SUGGESTIONS,
 	parseRecordedStep,
 	type RecordedStep,
 	type RecorderEvent,
@@ -63,6 +66,7 @@ const defaultDeps: RecorderDeps = { spawnRunner: spawnRecorderRunner, broadcast:
 interface Session {
 	projectPath: string;
 	steps: RecordedStep[];
+	suggestions: RecordedStep[];
 	child: ChildProcess | null;
 }
 
@@ -79,14 +83,14 @@ export function readRecordUrl(raw: unknown): string | null {
 	}
 }
 
-/** Adds or replaces (same id) a step of the session; false past the cap. */
-function upsert(steps: RecordedStep[], step: RecordedStep): boolean {
+/** Adds or replaces (same id) a step of the session; false past `cap`. */
+function upsert(steps: RecordedStep[], step: RecordedStep, cap: number): boolean {
 	const index = steps.findIndex((s) => s.id === step.id);
 	if (index >= 0) {
 		steps[index] = step;
 		return true;
 	}
-	if (steps.length >= MAX_RECORDED_STEPS) return false;
+	if (steps.length >= cap) return false;
 	steps.push(step);
 	return true;
 }
@@ -124,7 +128,7 @@ export async function startRecording(
 	if (!url) return { success: false, error: "Only an http:// or https:// address can be recorded." };
 	if (session?.child) return { success: false, error: "A recording is already running." };
 
-	const current: Session = { projectPath, steps: [], child: null };
+	const current: Session = { projectPath, steps: [], suggestions: [], child: null };
 	session = current;
 	let child: ChildProcess;
 	try {
@@ -137,7 +141,10 @@ export async function startRecording(
 	readLines(child, (line) => {
 		if (line.startsWith(STEP_PREFIX)) {
 			const step = parseRecordedStep(parseJson(line.slice(STEP_PREFIX.length)));
-			if (step && upsert(current.steps, step)) deps.broadcast({ type: "step", step });
+			const kept = step?.after
+				? upsert(current.suggestions, step, MAX_SUGGESTIONS)
+				: step && upsert(current.steps, step, MAX_RECORDED_STEPS);
+			if (step && kept) deps.broadcast({ type: "step", step });
 		} else if (line.startsWith(DONE_PREFIX)) {
 			const done = (parseJson(line.slice(DONE_PREFIX.length)) ?? {}) as Record<string, unknown>;
 			ended = true;
@@ -171,10 +178,10 @@ export function stopRecording(): { success: boolean } {
 	return { success: true };
 }
 
-/** The steps of `projectPath`'s last recording whose ids are in `ids`, in that order. */
+/** The steps (and kept checks) of `projectPath`'s last recording whose ids are in `ids`, in that order. */
 export function recordedSteps(projectPath: string, ids: readonly string[]): RecordedStep[] {
 	if (!session || session.projectPath !== projectPath) return [];
-	const byId = new Map(session.steps.map((step) => [step.id, step]));
+	const byId = new Map([...session.steps, ...session.suggestions].map((step) => [step.id, step]));
 	return ids.map((id) => byId.get(id)).filter((step): step is RecordedStep => step !== undefined);
 }
 

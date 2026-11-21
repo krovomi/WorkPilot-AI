@@ -18,6 +18,11 @@
  * trop petite : `scrollWidth > clientWidth` ou `scrollHeight > clientHeight`
  * sans défilement possible), et les éléments qui se chevauchent (deux
  * contenus du flux normal dont les boîtes se recouvrent nettement).
+ *
+ * Sur mobile seulement, la navigation cassée : un bloc de navigation dont
+ * aucun lien n'est visible sans qu'aucun bouton de menu ne permette de
+ * l'ouvrir, ou un bouton de menu qui commande (`aria-controls`) un élément
+ * absent de la page.
  */
 import type { DevicePreset, ResponsiveIssue, ResponsiveIssueKind, ResponsiveIssueSample, ResponsiveReport } from "../../shared/types/device-matrix";
 
@@ -29,6 +34,10 @@ export const MAX_ELEMENTS = 4000;
 export const MAX_OVERLAP_CANDIDATES = 500;
 /** Part de la plus petite des deux boîtes recouverte pour parler de chevauchement. */
 export const MIN_OVERLAP_RATIO = 0.25;
+/** Blocs de navigation lus, liens lus par bloc, boutons de menu examinés. */
+export const MAX_NAVIGATIONS = 20;
+export const MAX_NAV_LINKS = 200;
+export const MAX_MENU_TOGGLES = 500;
 const MAX_SELECTOR = 120;
 const MAX_COORDINATE = 100_000;
 
@@ -39,6 +48,7 @@ export const ISSUE_KINDS: readonly ResponsiveIssueKind[] = [
 	"small-text",
 	"overlapping-elements",
 	"truncated-text",
+	"broken-navigation",
 ];
 
 /**
@@ -56,11 +66,17 @@ export const ISSUE_KINDS: readonly ResponsiveIssueKind[] = [
  * voulus), dont aucun ne contient l'autre, et qui se recouvrent sur plus de
  * 2 px dans chaque sens et sur au moins `minOverlap` de la plus petite boîte.
  * L'exemple est leur intersection, nommée `a / b`.
+ *
+ * Un bouton de menu est un élément visible qui annonce ce qu'il ouvre :
+ * `aria-expanded` ou `aria-controls`, un `summary`, ou l'étiquette d'une case
+ * à cocher (le menu « hamburger » en CSS seul). Un lien est visible quand sa
+ * boîte a une taille et touche la largeur de la fenêtre (un menu poussé hors
+ * de l'écran par `transform` ne l'est pas).
  */
 export const RESPONSIVE_PROBE = `(function (o) {
 	var root = document.documentElement;
 	var vw = window.innerWidth || root.clientWidth;
-	var kinds = ["horizontal-overflow", "overflowing-media", "small-touch-target", "small-text", "overlapping-elements", "truncated-text"];
+	var kinds = ["horizontal-overflow", "overflowing-media", "small-touch-target", "small-text", "overlapping-elements", "truncated-text", "broken-navigation"];
 	var counts = {};
 	var samples = {};
 	kinds.forEach(function (k) { counts[k] = 0; samples[k] = []; });
@@ -136,6 +152,33 @@ export const RESPONSIVE_PROBE = `(function (o) {
 			push("overlapping-elements", describe(p.el) + " / " + describe(q.el), left, top, w, h);
 		}
 	}
+	var shown = function (el) {
+		var s = getComputedStyle(el);
+		var box = el.getBoundingClientRect();
+		return s.display !== "none" && s.visibility !== "hidden" && box.width > 0 && box.height > 0 && box.right > 0 && box.left < vw;
+	};
+	if (o.nav) {
+		var toggles = Array.prototype.slice.call(
+			document.querySelectorAll("[aria-expanded], [aria-controls], summary, label[for]"), 0, o.maxToggles
+		).filter(function (t) {
+			if (t.tagName === "LABEL") {
+				var box = document.getElementById(t.getAttribute("for") || "");
+				if (!box || box.getAttribute("type") !== "checkbox") return false;
+			}
+			return shown(t);
+		});
+		var navs = Array.prototype.slice.call(document.querySelectorAll("nav, [role=navigation]"), 0, o.maxNavs);
+		navs.forEach(function (nav) {
+			var links = Array.prototype.slice.call(nav.querySelectorAll("a[href]"), 0, o.maxLinks);
+			if (links.length === 0 || links.some(shown) || toggles.length > 0) return;
+			add("broken-navigation", nav, nav.getBoundingClientRect());
+		});
+		toggles.forEach(function (t) {
+			var ids = (t.getAttribute("aria-controls") || "").split(/\\s+/).filter(Boolean);
+			if (ids.length === 0 || ids.some(function (id) { return document.getElementById(id); })) return;
+			add("broken-navigation", t, t.getBoundingClientRect());
+		});
+	}
 	return {
 		viewportWidth: vw,
 		scrollWidth: root.scrollWidth,
@@ -145,17 +188,21 @@ export const RESPONSIVE_PROBE = `(function (o) {
 	};
 })`;
 
-/** L'appel du script pour un appareil : le texte n'est vérifié que sur mobile, les cibles que sur un écran tactile. */
+/** L'appel du script pour un appareil : le texte et la navigation ne sont vérifiés que sur mobile, les cibles que sur un écran tactile. */
 export function buildProbe(device: Pick<DevicePreset, "mobile" | "touch">): string {
 	const options = {
 		touch: device.touch,
 		text: device.mobile,
+		nav: device.mobile,
 		minTouch: MIN_TOUCH_TARGET_PX,
 		minText: MIN_TEXT_PX,
 		maxSamples: MAX_SAMPLES,
 		maxElements: MAX_ELEMENTS,
 		maxCandidates: MAX_OVERLAP_CANDIDATES,
 		minOverlap: MIN_OVERLAP_RATIO,
+		maxNavs: MAX_NAVIGATIONS,
+		maxLinks: MAX_NAV_LINKS,
+		maxToggles: MAX_MENU_TOGGLES,
 	};
 	return `${RESPONSIVE_PROBE}(${JSON.stringify(options)})`;
 }

@@ -24,6 +24,8 @@ interface FindingItemProps {
 	feedback?: {
 		verdict?: ReviewFeedbackVerdict;
 		pending: boolean;
+		/** A server project's rejection waiting for a maintainer. */
+		held?: boolean;
 		onSubmit: (input: ReviewFeedbackInput) => Promise<boolean>;
 	};
 }
@@ -125,6 +127,7 @@ export function FindingItem({
 					findingId={finding.id}
 					verdict={feedback.verdict}
 					pending={feedback.pending}
+					held={feedback.held}
 					onSubmit={feedback.onSubmit}
 				/>
 			)}

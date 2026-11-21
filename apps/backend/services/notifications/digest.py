@@ -238,10 +238,8 @@ def _send(
             if config.channel == NotificationChannel.WEBHOOK
             else build_text_payload(config.channel, text)
         )
-        try:
-            ok, code, error = post_json(config.webhook_url, payload)
-        except (OSError, ValueError) as exc:
-            ok, code, error = False, None, type(exc).__name__
+        # `post_json` never raises: a failure comes back as its answer.
+        ok, code, error = post_json(config.webhook_url, payload)
         results.append(ChannelResult(config.channel, ok, code, error))
     return results
 
