@@ -129,9 +129,9 @@ def test_the_model_can_split_a_batch(tmp_path, model):
     assert client.options["max_thinking_tokens"] == 99
     prompt = client.prompts[0]
     assert "Batch ID: b-1" in prompt and "Detected Themes: login" in prompt
-    assert "- Labels: bug, auth" in prompt
+    assert "Labels: bug, auth" in prompt
     assert "x" * 500 + "..." in prompt and "x" * 501 not in prompt
-    assert "- Labels: none" in prompt
+    assert "Labels: none" in prompt
     assert "- Similarity to primary: 82%" in prompt
     # Nothing is left in the project.
     assert list(tmp_path.iterdir()) == []

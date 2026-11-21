@@ -99,7 +99,7 @@ class TestAReview:
         assert "Add login rate limit" in prompt
         assert "+    check_rate(ip)" in prompt
         assert "4 additions, 1 deletions across 2 files" in prompt
-        assert "- `app/rate.py`" in prompt
+        assert "\n- app/rate.py\n" in prompt
 
     def test_progress_is_reported_from_gathering_to_complete(
         self, gitlab, model, llm, review
@@ -212,7 +212,7 @@ class TestAReview:
 
         asyncio.run(review().review_mr(7))
 
-        assert "- `new.py`" in stand_in.prompts[0]
+        assert "\n- new.py\n" in stand_in.prompts[0]
 
     def test_high_findings_are_remembered_for_the_next_review(
         self, gitlab, model, llm, review
