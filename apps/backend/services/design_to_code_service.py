@@ -322,11 +322,11 @@ class DesignTokenExtractor:
                 self._parse_json_tokens(content)
             elif suffix in (".css", ".scss"):
                 self._parse_css_tokens(content)
-            elif suffix in (".js", ".ts"):
+            else:  # .js / .ts theme configs, the only other supported files
                 self._parse_js_tokens(content)
 
             logger.debug(f"Parsed tokens from {filepath}")
-        except Exception as e:
+        except (OSError, UnicodeDecodeError, RecursionError) as e:
             logger.warning(f"Could not parse token file {filepath}: {e}")
 
     def _parse_json_tokens(self, content: str) -> None:
@@ -588,8 +588,8 @@ class DesignToCodeService:
         for cb in self.phase_callbacks:
             try:
                 cb(phase, status)
-            except Exception:
-                pass
+            except (OSError, TypeError, ValueError):
+                logger.debug("design-to-code phase callback raised", exc_info=True)
         for cb in self.progress_callbacks:
             try:
                 cb(phase, status, detail or {})
@@ -715,7 +715,7 @@ class DesignToCodeService:
             if figma_file_key:
                 self._set_phase(PipelinePhase.FIGMA_SYNC, "Syncing with Figma...")
                 sync_status = await self._sync_figma(
-                    figma_file_key, figma_node_id, generated_files
+                    figma_file_key, figma_node_id, generated_files, fw
                 )
                 result.figma_sync_status = sync_status
 
@@ -1208,10 +1208,13 @@ Return ONLY the JSON, no additional text."""
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse design analysis JSON: {e}")
             return DesignSpec(raw_analysis=raw_json)
+        if not isinstance(data, dict):
+            logger.error("Design analysis is not a JSON object")
+            return DesignSpec(raw_analysis=raw_json)
 
         # Parse components
         components = []
-        for comp_data in data.get("components", []):
+        for comp_data in _objects(data.get("components")):
             comp = ComponentSpec(
                 name=comp_data.get("name", "Unknown"),
                 type=comp_data.get("type", "div"),
@@ -1223,7 +1226,7 @@ Return ONLY the JSON, no additional text."""
                 bounds=_parse_bounds(comp_data.get("bounds")),
             )
             # Parse nested children
-            for child_data in comp_data.get("children", []):
+            for child_data in _objects(comp_data.get("children")):
                 child = ComponentSpec(
                     name=child_data.get("name", "Unknown"),
                     type=child_data.get("type", "div"),
@@ -1237,7 +1240,9 @@ Return ONLY the JSON, no additional text."""
             components.append(comp)
 
         # Parse layout
-        layout_data = data.get("layout", {})
+        layout_data = data.get("layout")
+        if not isinstance(layout_data, dict):
+            layout_data = {}
         layout = LayoutSpec(
             type=layout_data.get("type", "flex"),
             direction=layout_data.get("direction", "column"),
@@ -1643,6 +1648,8 @@ export default DesignComponent;
             files_data = json.loads(cleaned)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse generated files JSON: {e}")
+            files_data = None
+        if not isinstance(files_data, list):
             return [
                 GeneratedFile(
                     path="generated_output.txt",
@@ -1653,7 +1660,7 @@ export default DesignComponent;
             ]
 
         files = []
-        for fd in files_data:
+        for fd in _objects(files_data):
             files.append(
                 GeneratedFile(
                     path=fd.get("path", "unknown"),
@@ -1673,6 +1680,7 @@ export default DesignComponent;
         file_key: str,
         node_id: str | None,
         generated_files: list[GeneratedFile],
+        framework: FrameworkType = FrameworkType.REACT,
     ) -> dict[str, Any]:
         """Sync generated code metadata back to Figma (bidirectional).
 
@@ -1690,13 +1698,18 @@ export default DesignComponent;
 
             connector = FigmaConnector(access_token=figma_token)
 
-            # Post a comment on the Figma node with the generated code info
-            component_names = []
+            # Post a comment on the Figma node with the generated code info:
+            # the components as the stack names them (Dart, Swift, XAML…).
+            stack = get_stack(framework.value)
+            component_names: list[str] = []
             for gf in generated_files:
-                if gf.language in ("tsx", "jsx", "vue", "svelte"):
-                    name = Path(gf.path).stem
-                    if name not in ("index", "styles", "types"):
-                        component_names.append(name)
+                name = (
+                    component_name(gf.path)
+                    if is_component_file(stack, gf.path, gf.language)
+                    else None
+                )
+                if name and name not in component_names:
+                    component_names.append(name)
 
             comment = (
                 f"🤖 Code generated by WorkPilot Design-to-Code Pipeline\n\n"
@@ -1723,6 +1736,13 @@ export default DesignComponent;
 # =============================================================================
 # CONVENIENCE FUNCTION
 # =============================================================================
+
+
+def _objects(raw: Any) -> list[dict[str, Any]]:
+    """The JSON objects of a list a model answered; anything else is dropped."""
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
 
 
 def _parse_bounds(raw: Any) -> dict[str, float] | None:

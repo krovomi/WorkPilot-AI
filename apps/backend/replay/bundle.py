@@ -37,6 +37,7 @@ from foundation.log_redaction import text_redactor
 
 from .models import (
     Bookmark,
+    BookmarkReply,
     Breakpoint,
     BreakpointType,
     FileDiff,
@@ -60,6 +61,7 @@ MAX_CONTENT = 2_000_000
 MAX_SHORT = 500
 MAX_DEPTH = 6
 MAX_SUMMARY = 4_000
+MAX_REPLIES = 50
 IMPORTED_TAG = "imported"
 
 _THINKING = ReplayStepType.AGENT_THINKING
@@ -341,6 +343,15 @@ def _step(data: dict[str, Any], position: int) -> ReplayStep:
     )
 
 
+def _reply(data: dict[str, Any]) -> BookmarkReply:
+    return BookmarkReply(
+        id=_text(data.get("id"), 64) or uuid.uuid4().hex[:8],
+        note=_text(data.get("note"), 4000),
+        author=_text(data.get("author"), 100),
+        created_at=_number(data.get("created_at")),
+    )
+
+
 def _bookmark(data: dict[str, Any]) -> Bookmark:
     return Bookmark(
         id=_text(data.get("id"), 64) or uuid.uuid4().hex[:8],
@@ -348,6 +359,7 @@ def _bookmark(data: dict[str, Any]) -> Bookmark:
         note=_text(data.get("note"), 4000),
         author=_text(data.get("author"), 100),
         created_at=_number(data.get("created_at")),
+        replies=[_reply(r) for r in _dicts(data.get("replies"), MAX_REPLIES)],
     )
 
 

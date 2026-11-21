@@ -12,9 +12,12 @@ import i18n from "i18next";
 import { create } from "zustand";
 import type {
 	ReplayBookmark,
+	ReplayBookmarkReply,
+	ReplayBookmarkReplyRequest,
 	ReplayBookmarkRequest,
 	ReplayExportOptions,
 	ReplayVideoOptions,
+	ReplayVideoResult,
 } from "../../shared/types/replay-share";
 import { useAgentReplayStore } from "./agent-replay-store";
 
@@ -36,6 +39,19 @@ const KNOWN_ERRORS = new Set([
 	"no_steps",
 	"summary_failed",
 	"summary_empty",
+	"empty_reply",
+	"too_many_replies",
+	// Team links (#347): main's and the server's refusals.
+	"not_a_link",
+	"not_signed_in",
+	"other_server",
+	"not_a_server_project",
+	"too_large_to_share",
+	"bad_share",
+	"share_not_found",
+	"share_expired",
+	"share_revoked",
+	"too_many_shares",
 ]);
 
 const appLanguage = (): "en" | "fr" =>
@@ -62,8 +78,21 @@ interface ReplayShareState {
 	importSession: () => Promise<void>;
 	addBookmark: (sessionId: string, request: ReplayBookmarkRequest) => Promise<boolean>;
 	removeBookmark: (sessionId: string, bookmarkId: string) => Promise<void>;
+	/** Answers a bookmark; the reply lands under it on the open session. */
+	addReply: (
+		sessionId: string,
+		bookmarkId: string,
+		request: ReplayBookmarkReplyRequest,
+	) => Promise<boolean>;
+	removeReply: (sessionId: string, bookmarkId: string, replyId: string) => Promise<void>;
 	exportVideo: (
 		sessionId: string,
+		options: Omit<ReplayVideoOptions, "language">,
+	) => Promise<void>;
+	/** Two sessions side by side, as one video. */
+	exportComparisonVideo: (
+		sessionAId: string,
+		sessionBId: string,
 		options: Omit<ReplayVideoOptions, "language">,
 	) => Promise<void>;
 	/** Asks `provider`'s fast model; the summary lands on the open session. */
@@ -102,6 +131,39 @@ function withBookmarks(
 		if (!session || session.session_id !== sessionId) return {};
 		return { activeSession: { ...session, bookmarks: change(session.bookmarks ?? []) } };
 	});
+}
+
+function withReplies(
+	sessionId: string,
+	bookmarkId: string,
+	change: (replies: ReplayBookmarkReply[]) => ReplayBookmarkReply[],
+): void {
+	withBookmarks(sessionId, (marks) =>
+		marks.map((mark) =>
+			mark.id === bookmarkId ? { ...mark, replies: change(mark.replies ?? []) } : mark,
+		),
+	);
+}
+
+/** What a recording came to, for the notice; null when the person canceled. */
+function videoNotice(result: ReplayVideoResult): ReplayShareNotice | null {
+	if (!result.success) return failure(result);
+	if (result.canceled) return null;
+	if ("refused" in result) {
+		return { tone: "info", key: `replay:share.video.refused.${result.refused}` };
+	}
+	return {
+		tone: "ok",
+		key:
+			result.stepsPlayed < result.stepsTotal
+				? "replay:share.video.savedPart"
+				: "replay:share.video.saved",
+		values: {
+			path: result.filePath,
+			played: String(result.stepsPlayed),
+			total: String(result.stepsTotal),
+		},
+	};
 }
 
 const byStep = (a: ReplayBookmark, b: ReplayBookmark) =>
@@ -177,35 +239,52 @@ export const useReplayShareStore = create<ReplayShareState>((set) => ({
 		withBookmarks(sessionId, (marks) => marks.filter((b) => b.id !== bookmarkId));
 	},
 
+	addReply: async (sessionId, bookmarkId, request) => {
+		set({ savingBookmark: true, notice: null });
+		const result = await window.electronAPI.addReplayBookmarkReply(
+			sessionId,
+			bookmarkId,
+			request,
+		);
+		if (!result.success) {
+			set({ savingBookmark: false, notice: failure(result) });
+			return false;
+		}
+		withReplies(sessionId, bookmarkId, (replies) => [...replies, result.reply]);
+		set({ savingBookmark: false });
+		return true;
+	},
+
+	removeReply: async (sessionId, bookmarkId, replyId) => {
+		const result = await window.electronAPI.removeReplayBookmarkReply(
+			sessionId,
+			bookmarkId,
+			replyId,
+		);
+		if (!result.success) {
+			set({ notice: failure(result) });
+			return;
+		}
+		withReplies(sessionId, bookmarkId, (replies) => replies.filter((r) => r.id !== replyId));
+	},
+
 	exportVideo: async (sessionId, options) => {
 		set({ recordingVideo: true, notice: null });
 		const result = await window.electronAPI.exportReplayVideo(sessionId, {
 			...options,
 			language: appLanguage(),
 		});
-		if (!result.success) set({ recordingVideo: false, notice: failure(result) });
-		else if (result.canceled) set({ recordingVideo: false });
-		else if ("refused" in result)
-			set({
-				recordingVideo: false,
-				notice: { tone: "info", key: `replay:share.video.refused.${result.refused}` },
-			});
-		else
-			set({
-				recordingVideo: false,
-				notice: {
-					tone: "ok",
-					key:
-						result.stepsPlayed < result.stepsTotal
-							? "replay:share.video.savedPart"
-							: "replay:share.video.saved",
-					values: {
-						path: result.filePath,
-						played: String(result.stepsPlayed),
-						total: String(result.stepsTotal),
-					},
-				},
-			});
+		set({ recordingVideo: false, notice: videoNotice(result) });
+	},
+
+	exportComparisonVideo: async (sessionAId, sessionBId, options) => {
+		set({ recordingVideo: true, notice: null });
+		const result = await window.electronAPI.exportReplayComparisonVideo(
+			sessionAId,
+			sessionBId,
+			{ ...options, language: appLanguage() },
+		);
+		set({ recordingVideo: false, notice: videoNotice(result) });
 	},
 
 	summarize: async (sessionId, provider) => {

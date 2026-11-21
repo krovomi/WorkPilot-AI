@@ -22,6 +22,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -914,4 +915,43 @@ class TeamChatMessage(Base):
     reply_to: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
+    )
+
+
+class ReplayShare(Base):
+    """A recorded agent session shared with a server project's team (#347).
+
+    ``bundle`` is the ``.wpreplay`` the sharer's app built, already masked
+    there (``replay/bundle.py``) and read back once here before it is kept.
+    The link that opens it holds a token the server only keeps as its
+    SHA-256 (``token_hash``): the row alone cannot rebuild the link. A share
+    ends at ``expires_at`` or when it is revoked, which also drops its bundle.
+    """
+
+    __tablename__ = "replay_shares"
+    __table_args__ = (Index("ix_replay_shares_project", "project_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    created_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by_name: Mapped[str] = mapped_column(String(200), default="")
+    title: Mapped[str] = mapped_column(String(200), default="")
+    steps: Mapped[int] = mapped_column(Integer, default=0)
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    bundle: Mapped[bytes] = mapped_column(LargeBinary)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    open_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_opened_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )

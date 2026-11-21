@@ -414,6 +414,29 @@
 			"viewer": "Viewer",
 			"member": "Member",
 			"owner": "Owner"
+		},
+		"quickAdd": {
+			"addCard": "Add a card",
+			"addQueued": "Add and queue",
+			"addTooltip": "Add a card (N)",
+			"ariaLabel": "Describe the new card",
+			"placeholder": "Describe the task… Paste a list to create one card per line.",
+			"type": "Type",
+			"noType": "No type (detected automatically)",
+			"priority": "Priority",
+			"noPriority": "No priority",
+			"splitLines_one": "One card per line ({{count}})",
+			"splitLines_other": "One card per line ({{count}})",
+			"create": "Create",
+			"queue": "Queue",
+			"createMany_one": "Create {{count}} card",
+			"createMany_other": "Create {{count}} cards",
+			"moreOptions": "More options…",
+			"close": "Close (Esc)",
+			"hint": "Enter to create · Shift+Enter for a new line · Esc to close",
+			"created_one": "Card created in {{column}}",
+			"created_other": "{{count}} cards created in {{column}}",
+			"createFailed": "The card could not be created. Your text is kept: try again."
 		}
 	},
 	"queue": {
@@ -735,6 +758,13 @@
 			"field": "{{label}}: {{value}}",
 			"progress": "{{status}} · {{percent}}%",
 			"blockedBy": "Waiting for: {{titles}}"
+		},
+		"families": {
+			"build": "Build",
+			"fix": "Fix",
+			"quality": "Harden",
+			"know": "Understand",
+			"ops": "Operate"
 		}
 	},
 	"images": {

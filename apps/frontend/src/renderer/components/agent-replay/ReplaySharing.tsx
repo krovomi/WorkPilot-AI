@@ -6,7 +6,7 @@
  * (`apps/backend/replay/bundle.py`); the dialog only offers what may be taken
  * out on top. The video is that same masked page, played step by step by the
  * backend (`apps/backend/replay/video.py`). A bookmark note is Markdown and
- * is shown as text.
+ * is shown as text, and so are the replies under it.
  */
 
 import { Bookmark, Download, Film, Share2, Trash2, Upload } from "lucide-react";
@@ -16,7 +16,10 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import type { ReplaySessionFull, ReplayStep } from "../../stores/agent-replay-store";
 import { useReplayShareStore } from "../../stores/replay-share-store";
-import type { ReplayExportFormat } from "../../../shared/types/replay-share";
+import type {
+	ReplayExportFormat,
+	ReplayVideoFormat,
+} from "../../../shared/types/replay-share";
 import { Notice } from "../charter";
 import { Button } from "../ui/button";
 import {
@@ -29,6 +32,8 @@ import {
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
+import { ReplayBookmarkReplies } from "./ReplayBookmarkReplies";
+import { ReplayTeamShareSection } from "./ReplayTeamShare";
 
 const MAX_NOTE = 4000;
 
@@ -61,10 +66,11 @@ export const ReplayShareButton: React.FC<{ sessionId: string }> = ({ sessionId }
 		setOpen(false);
 	};
 
-	const record = async () => {
+	const record = async (format: ReplayVideoFormat) => {
 		await exportVideo(sessionId, {
 			stripReasoning: options.stripReasoning,
 			stripTokens: options.stripTokens,
+			format,
 		});
 		setOpen(false);
 	};
@@ -104,9 +110,12 @@ export const ReplayShareButton: React.FC<{ sessionId: string }> = ({ sessionId }
 					</div>
 					<p className="text-xs text-muted-foreground">{t("replay:share.video.hint")}</p>
 					<div className="flex flex-wrap justify-end gap-2 pt-2">
-						<Button variant="outline" disabled={busy} onClick={record}>
+						<Button variant="outline" disabled={busy} onClick={() => record("webm")}>
 							<Film className="h-4 w-4 mr-1" />
 							{t(recordingVideo ? "replay:share.video.recording" : "replay:share.video.export")}
+						</Button>
+						<Button variant="outline" disabled={busy} onClick={() => record("mp4")}>
+							{t("replay:share.video.exportMp4")}
 						</Button>
 						<Button variant="outline" disabled={busy} onClick={() => run("html")}>
 							{t("replay:share.exportPage")}
@@ -116,6 +125,7 @@ export const ReplayShareButton: React.FC<{ sessionId: string }> = ({ sessionId }
 							{t("replay:share.exportBundle")}
 						</Button>
 					</div>
+					<ReplayTeamShareSection sessionId={sessionId} options={options} />
 				</DialogContent>
 			</Dialog>
 		</>
@@ -244,6 +254,11 @@ export const ReplayBookmarks: React.FC<{
 								<p className="text-xs text-muted-foreground">{bookmark.author}</p>
 							)}
 							<p className="whitespace-pre-wrap break-words">{bookmark.note}</p>
+							<ReplayBookmarkReplies
+								sessionId={session.session_id}
+								bookmark={bookmark}
+								readOnly={recording}
+							/>
 						</li>
 					))}
 				</ul>
