@@ -28,6 +28,28 @@ describe("providerFromRemoteUrl", () => {
 		);
 	});
 
+	it("names Bitbucket Cloud from bitbucket.org or one of its subdomains", () => {
+		expect(providerFromRemoteUrl("git@bitbucket.org:ws/repo.git")).toBe("bitbucket");
+		expect(providerFromRemoteUrl("https://dev@bitbucket.org/ws/repo.git")).toBe(
+			"bitbucket",
+		);
+		expect(providerFromRemoteUrl("ssh://git@altssh.bitbucket.org:443/ws/repo.git")).toBe(
+			"bitbucket",
+		);
+	});
+
+	it("is not fooled by a spoofed Bitbucket host", () => {
+		for (const url of [
+			"https://bitbucket.org.evil.example/ws/repo",
+			"https://evil.example/bitbucket.org/ws/repo",
+			"https://notbitbucket.org/ws/repo",
+			"https://evil.example/?bitbucket.org/ws/repo",
+			"git@evilbitbucket.org:ws/repo.git",
+		]) {
+			expect(providerFromRemoteUrl(url)).toBe("unknown");
+		}
+	});
+
 	it("is not fooled by a forge name outside the host", () => {
 		expect(providerFromRemoteUrl("https://evil.example/github.com/o/r")).toBe(
 			"unknown",

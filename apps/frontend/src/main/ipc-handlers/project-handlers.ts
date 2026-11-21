@@ -322,7 +322,7 @@ function createProviderResult(
 	remoteUrl?: string,
 ): RepoProviderDetectionResult {
 	return {
-		provider: provider as "github" | "azure_devops" | "unknown",
+		provider: provider as RemoteProvider,
 		remoteName,
 		remoteUrl,
 	};
