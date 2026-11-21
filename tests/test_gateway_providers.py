@@ -347,3 +347,53 @@ def test_every_provider_list_knows_the_gateways():
         assert PROVIDER_IDS[name] == name
         assert load_providers()[name].adapter == "CompatibleProviderAgentClient"
         assert registry[name]["models"], name
+
+
+def test_the_provider_page_model_wins_over_the_registry_default(monkeypatch):
+    monkeypatch.setenv("HUGGINGFACE_API_KEY", "hf_test_0000")
+    monkeypatch.setenv("HUGGINGFACE_MODEL", "  zai-org/GLM-5.3-Flash ")
+    config = gateway_providers.gateway_env_config("huggingface", None)
+    assert config is not None
+    assert config["model"] == "zai-org/GLM-5.3-Flash"
+    monkeypatch.setenv("HUGGINGFACE_MODEL", "   ")
+    assert gateway_providers.env_model("huggingface") is None
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
+    assert gateway_providers.env_model("openrouter") is None
+
+
+def test_phase_config_starts_a_gateway_on_the_page_model(tmp_path):
+    """A build spawned with `<GATEWAY>_MODEL` runs every phase on that model.
+
+    Read in a fresh interpreter: `phase_config` reads it at import.
+    """
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    backend = Path(__file__).resolve().parents[1] / "apps" / "backend"
+    code = (
+        "import json, phase_config as p; print(json.dumps("
+        "[sorted(set(p.PROVIDER_DEFAULT_MODELS[n].values()))"
+        " for n in ('openrouter', 'huggingface')]))"
+    )
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(backend),
+        "OPENROUTER_MODEL": "deepseek/deepseek-v4",
+        "HUGGINGFACE_MODEL": " zai-org/GLM-5.3-Flash ",
+    }
+    out = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+        timeout=120,
+    ).stdout
+    assert json.loads(out.strip().splitlines()[-1]) == [
+        ["deepseek/deepseek-v4"],
+        ["zai-org/GLM-5.3-Flash"],
+    ]

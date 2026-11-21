@@ -141,13 +141,15 @@ DEEPSEEK_MODEL = _DEEPSEEK_ENTRY.model_id if _DEEPSEEK_ENTRY else "deepseek-flas
 _GROK_ENTRY = get_default("grok")
 GROK_MODEL = _GROK_ENTRY.model_id if _GROK_ENTRY else "grok-4.3"
 
+# A gateway's default model: the one its provider page names (the frontend
+# injects it as OPENROUTER_MODEL / HUGGINGFACE_MODEL), else the registry's.
 _OPENROUTER_ENTRY = get_default("openrouter")
-OPENROUTER_MODEL = (
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "").strip() or (
     _OPENROUTER_ENTRY.model_id if _OPENROUTER_ENTRY else "moonshotai/kimi-k3.1-pro"
 )
 
 _HUGGINGFACE_ENTRY = get_default("huggingface")
-HUGGINGFACE_MODEL = (
+HUGGINGFACE_MODEL = os.getenv("HUGGINGFACE_MODEL", "").strip() or (
     _HUGGINGFACE_ENTRY.model_id if _HUGGINGFACE_ENTRY else "moonshotai/Kimi-K3.1-Pro"
 )
 

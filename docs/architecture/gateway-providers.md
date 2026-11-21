@@ -49,6 +49,19 @@ dans `src/shared/constants/gateway-providers.ts`.
   la page d'activité de l'utilisateur ; rien de la tâche n'y figure.
 - **Valeurs par défaut.** `models_registry.py` donne un modèle par défaut à chaque passerelle et un
   repli hors ligne ; `cost_intelligence/catalog.py` les chiffre (relevé du 21 novembre 2026).
+- **Un modèle par défaut par passerelle, choisi dans l'app.** La page du provider affiche le
+  catalogue en direct (`GatewayModelCatalog.tsx` : prix, contexte, nombre de fournisseurs chez
+  Hugging Face) ; un clic en fait le modèle par défaut (`globalOpenRouterModel`,
+  `globalHuggingFaceModel`). Une tâche démarre toutes ses phases dessus, comme sur le modèle
+  d'Ollama (`shared/utils/provider-default-model.ts`), sauf réglage par phase du provider ; le main
+  le transmet au backend en `OPENROUTER_MODEL` / `HUGGINGFACE_MODEL` (`providerModelEnv`), lu par
+  `phase_config` et `gateway_env_config`.
+- **« Essayer dans le cloud ».** La recherche de modèles du Hub, sur la page du modèle local, marque
+  les dépôts que le routeur Hugging Face sert avec appel d'outils (comparés sans casse au catalogue
+  `huggingface`) et en affiche le prix. Le bouton en fait le modèle du provider Hugging Face, sans
+  toucher au modèle local : on essaie un modèle sur une tâche avant d'en télécharger des gigaoctets
+  (`HubDiscoveryWithCloud.tsx`). Le choix n'est qu'un identifiant de modèle ; la clé reste dans le
+  main.
 - **Hors-ligne strict.** Ce sont des providers cloud : `offline_policy` les refuse comme les autres.
 
 ## Où les toucher
@@ -59,4 +72,5 @@ dans `src/shared/constants/gateway-providers.ts`.
 | Client d'agent et appels courts | `core/client.py` (`_COMPATIBLE_PROVIDER_URLS`), `core/oneshot.py` |
 | Effort, attribution | `core/llm_optimization.py` (`gateway_effort_params`, `compatible_cache_routing`) |
 | Test de clé (API locale) | `provider_api.py` (`_VALIDATION_SPECS`) |
+| Catalogue sur la page du provider, « Essayer dans le cloud » | `src/renderer/components/settings/GatewayModelCatalog.tsx`, `HubDiscoveryWithCloud.tsx`, `gateway-model-catalog.ts` |
 | Réglages, environnement du backend, test de clé (Electron) | `src/shared/constants/gateway-providers.ts`, `src/main/services/provider-settings-keys.ts` |

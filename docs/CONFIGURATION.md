@@ -717,6 +717,7 @@ setting them by hand matters mainly for the CLI and headless runs.
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base. |
 | `HUGGINGFACE_API_KEY` | — | Hugging Face token of the `huggingface` provider, a fine-grained token with "Make calls to Inference Providers"; `HF_TOKEN` is read when it is unset. Secret. |
 | `HUGGINGFACE_BASE_URL` | `https://router.huggingface.co/v1` | Hugging Face Inference Providers router. |
+| `OPENROUTER_MODEL`, `HUGGINGFACE_MODEL` | registry default | Default model of the gateway, chosen on its provider page or with « Try in the cloud » in the Hub model search; the app sets it for the backend. |
 
 For these base URLs, agent sessions prefer the variable to the URL saved in
 the provider configuration; the model list does the opposite. OpenRouter and

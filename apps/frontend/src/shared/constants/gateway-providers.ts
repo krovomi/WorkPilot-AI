@@ -16,8 +16,12 @@ export interface GatewayProvider {
 	readonly label: string;
 	/** The Settings field that stores the key (masked to the renderer). */
 	readonly settingsKey: "globalOpenRouterApiKey" | "globalHuggingFaceApiKey";
+	/** The Settings field that stores the default model (a model id). */
+	readonly modelSettingsKey: "globalOpenRouterModel" | "globalHuggingFaceModel";
 	/** The environment variable the backend reads the key from. */
 	readonly envVar: string;
+	/** The environment variable that carries the default model to the backend. */
+	readonly modelEnvVar: string;
 	/** The environment variable that overrides the endpoint. */
 	readonly baseUrlEnvVar: string;
 	/** The OpenAI-compatible endpoint, up to `/v1`. */
@@ -40,7 +44,9 @@ export const GATEWAY_PROVIDERS: readonly GatewayProvider[] = [
 		id: "openrouter",
 		label: "OpenRouter",
 		settingsKey: "globalOpenRouterApiKey",
+		modelSettingsKey: "globalOpenRouterModel",
 		envVar: "OPENROUTER_API_KEY",
+		modelEnvVar: "OPENROUTER_MODEL",
 		baseUrlEnvVar: "OPENROUTER_BASE_URL",
 		baseUrl: "https://openrouter.ai/api/v1",
 		keyCheckUrl: "https://openrouter.ai/api/v1/key",
@@ -52,7 +58,9 @@ export const GATEWAY_PROVIDERS: readonly GatewayProvider[] = [
 		id: "huggingface",
 		label: "Hugging Face",
 		settingsKey: "globalHuggingFaceApiKey",
+		modelSettingsKey: "globalHuggingFaceModel",
 		envVar: "HUGGINGFACE_API_KEY",
+		modelEnvVar: "HUGGINGFACE_MODEL",
 		baseUrlEnvVar: "HUGGINGFACE_BASE_URL",
 		baseUrl: "https://router.huggingface.co/v1",
 		keyCheckUrl: "https://huggingface.co/api/whoami-v2",
