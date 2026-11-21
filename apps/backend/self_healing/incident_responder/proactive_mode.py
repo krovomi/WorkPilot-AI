@@ -113,7 +113,8 @@ class ProactiveMode:
                 description=(
                     f"File '{report.file_path}' has a high fragility risk score of {report.risk_score}/100. "
                     f"Cyclomatic complexity: {report.cyclomatic_complexity}, "
-                    f"Git churn: {report.git_churn_count} commits in 30 days, "
+                    f"Git churn: {report.git_churn_count} commits in "
+                    f"{self.analyzer.churn_days} days, "
                     f"Test coverage: {report.test_coverage_percent}%."
                 ),
                 status=HealingStatus.PENDING,

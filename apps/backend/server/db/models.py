@@ -456,6 +456,100 @@ class SpecIndex(Base):
     )
 
 
+class SpecCriticality(Base):
+    """How critical a person said a card is, which sets how many approve it.
+
+    A card with no row takes its criticality from the spec's own assessment
+    (``server/authz/approval_policy.py``), never below ``medium``.
+    """
+
+    __tablename__ = "spec_criticality"
+
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    spec_name: Mapped[str] = mapped_column(String(300), primary_key=True)
+    criticality: Mapped[str] = mapped_column(String(10))
+    set_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class SpecApproval(Base):
+    """One person's approval of a card's spec and plan, as they then stood.
+
+    ``content_hash`` is the SHA-256 of ``spec.md`` and the plan when it was
+    given: an edit afterwards voids it. ``slot_id`` is whose approval it is:
+    the person's own, or the approver they stand in for (``acting_for``,
+    through a delegation). The row stays when its person leaves: it is the
+    record of who approved what.
+    """
+
+    __tablename__ = "spec_approvals"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "spec_name",
+            "content_hash",
+            "slot_id",
+            name="uq_spec_approval",
+        ),
+        Index("ix_spec_approvals_card", "project_id", "spec_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    spec_name: Mapped[str] = mapped_column(String(300))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    slot_id: Mapped[str] = mapped_column(String(36))
+    acting_for: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    criticality: Mapped[str] = mapped_column(String(10))
+    # The role slugs that approval was given with (the stand-in's: the
+    # approver they act for), for the roles a criticality asks for.
+    roles: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class ApprovalDelegation(Base):
+    """An approver's right to approve on a project, lent for a while.
+
+    From ``starts_at`` to ``ends_at``, ``to_user_id`` approves the cards of
+    ``project_id`` in the name of ``from_user_id``, as long as that person
+    may still approve there. A delegate never lends it on.
+    """
+
+    __tablename__ = "approval_delegations"
+    __table_args__ = (Index("ix_delegations_to_user", "to_user_id", "ends_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    from_user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    to_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class AgentRun(Base):
     __tablename__ = "agent_runs"
 

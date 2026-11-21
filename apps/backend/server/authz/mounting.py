@@ -64,6 +64,11 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/board/cards/{card_id}/approve"): "review.approve",
     # Sending a card's work back is the other answer to the same review.
     ("POST", "/api/board/cards/{card_id}/request-changes"): "review.approve",
+    # How critical a card is sets how many approve it; lending one's
+    # approval, or ending that, is the approver's.
+    ("PUT", "/api/board/cards/{card_id}/criticality"): "review.approve",
+    ("POST", "/api/board/delegations"): "review.approve",
+    ("DELETE", "/api/board/delegations/{delegation_id}"): "review.approve",
     # A message to a running card's agent changes what the agent does.
     ("POST", "/api/board/cards/{card_id}/steering"): "agent.execute",
     # A shared feature's job runs its agent on the project's clone; stopping
@@ -101,6 +106,24 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
 }
 
 
+#: The routes an approval lent by a delegation reaches (``server/authz/
+#: delegation.py``): the two answers to a card's review, on the project the
+#: delegation names. Lending it on or setting a criticality stays the
+#: approver's.
+DELEGATED_ROUTES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("POST", "/api/board/cards/{card_id}/approve"),
+        ("POST", "/api/board/cards/{card_id}/request-changes"),
+    }
+)
+
+
+def _delegated(request: Request, principal: Principal, route_path: str) -> bool:
+    if (request.method.upper(), route_path) not in DELEGATED_ROUTES:
+        return False
+    return principal.acting_for(request.query_params.get("project_id")) is not None
+
+
 def permission_for(method: str, route_path: str, domain: str) -> str:
     """The permission a request to this route requires."""
     override = ROUTE_OVERRIDES.get((method.upper(), route_path))
@@ -130,7 +153,7 @@ def _feature_guard(feature: str):
         route = request.scope.get("route")
         route_path = getattr(route, "path", request.url.path)
         needed = permission_for(request.method, route_path, domain)
-        if not principal.has(needed):
+        if not principal.has(needed) and not _delegated(request, principal, route_path):
             raise HTTPException(status_code=403, detail=f"Missing permission: {needed}")
         return principal
 

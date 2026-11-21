@@ -383,6 +383,17 @@ describe("server card actions", () => {
 			error: "Missing permission: review.approve",
 		});
 		expect(calls).toEqual(["approve"]);
+
+		// A card that needs more approvals waits for them: no build yet.
+		approval = {
+			ok: true,
+			data: { approved: false, approval: { count: 1, needed: 2 } },
+		};
+		calls.length = 0;
+		const waiting = await actions.startServerCard(card);
+		expect(waiting.success).toBe(false);
+		expect(waiting.error).toContain("1 of 2");
+		expect(calls).toEqual(["approve"]);
 	});
 
 	it("stops the card's active run and leaves finished ones alone", async () => {
