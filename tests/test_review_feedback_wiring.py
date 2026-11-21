@@ -134,6 +134,7 @@ class TestReviewApplies:
         orch.bot_detector = SimpleNamespace(
             should_skip_pr_review=lambda **_k: (False, ""),
             mark_review_started=lambda _n: None,
+            mark_review_finished=lambda _n, success=True: None,
             get_last_commit_sha=lambda _c: "abc123",
             mark_reviewed=lambda _n, _sha: None,
         )
@@ -476,6 +477,7 @@ class TestFollowupApplies:
         reviewed: list[str] = []
         orch.bot_detector = SimpleNamespace(
             mark_review_started=lambda _n: None,
+            mark_review_finished=lambda _n, success=True: None,
             mark_reviewed=lambda _n, sha: reviewed.append(sha),
         )
 

@@ -41,7 +41,7 @@ beforeEach(async () => {
 	vi.mocked(captureDictation).mockReset().mockImplementation(async (onChunk, _onLevel, onEnded) => {
 		chunk = onChunk;
 		ended = onEnded;
-		return stop;
+		return Object.assign(stop, { flush: vi.fn() });
 	});
 });
 afterEach(() => {

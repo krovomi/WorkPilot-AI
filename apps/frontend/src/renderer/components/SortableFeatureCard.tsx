@@ -52,12 +52,16 @@ export function SortableFeatureCard({
 	// Get phase name for the feature
 	const phaseName = roadmap.phases.find((p) => p.id === feature.phaseId)?.name;
 
-	// A feature imported from another tool (Canny, GitHub Issues) says from where.
+	// A feature imported from another tool (Canny, GitHub Issues) says from where:
+	// the tool's name, or "External" on the badge and the roadmap file's own
+	// word in the tooltip for a tool the app does not know.
 	const provider = feature.source?.provider;
-	const providerName =
+	const sourceName =
 		provider && provider !== "internal"
-			? t(`roadmap:providers.${provider}`, { defaultValue: t("roadmap:featureCard.external") })
+			? t(`roadmap:providers.${provider}`, { defaultValue: provider })
 			: null;
+	const providerName =
+		sourceName === provider ? t("roadmap:featureCard.external") : sourceName;
 	const linkedSpecId = feature.linkedSpecId;
 
 	return (
@@ -213,7 +217,7 @@ export function SortableFeatureCard({
 								</Badge>
 							</TooltipTrigger>
 							<TooltipContent>
-								{t("roadmap:featureCard.importedFrom", { provider: providerName })}
+								{t("roadmap:featureCard.importedFrom", { provider: sourceName })}
 							</TooltipContent>
 						</Tooltip>
 					)}

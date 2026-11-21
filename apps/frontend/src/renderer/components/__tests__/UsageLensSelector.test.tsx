@@ -144,13 +144,13 @@ describe("UsageLensSelector", () => {
 	});
 
 	it("names an unknown provider in the app's language", async () => {
-		lens.usageProvider = "unknown";
+		localStorage.setItem("usageProvider", "unknown");
 		await i18n.changeLanguage("fr");
 		try {
 			renderLens();
-			const trigger = screen.getByRole("combobox");
-			expect(trigger.textContent).toContain("Inconnu");
-			expect(trigger.textContent).not.toContain("Unknown");
+			const combobox = screen.getByRole("combobox");
+			expect(combobox.textContent).toContain("Inconnu");
+			expect(combobox.textContent).not.toContain("Unknown");
 		} finally {
 			await i18n.changeLanguage("en");
 		}
