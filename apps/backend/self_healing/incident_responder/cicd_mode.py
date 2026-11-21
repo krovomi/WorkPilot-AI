@@ -17,8 +17,10 @@ Flow:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import subprocess
+import tempfile
 from pathlib import Path
 
 from foundation.ci_logs import (
@@ -30,6 +32,7 @@ from foundation.ci_logs import (
 )
 from rtk import capture_for_model
 from security.untrusted import clean_untrusted, quote_untrusted
+from suite_runner.runs import detect_test_commands, run_once
 
 from ..cicd import flow
 from .models import (
@@ -220,92 +223,74 @@ class CICDMode:
         return doc.text, ""
 
     async def run_tests(
-        self, working_dir: Path | None = None
+        self, working_dir: Path | None = None, timeout_s: float = 300
     ) -> tuple[bool, str, list[str]]:
         """Run the project test suite and return results.
+
+        The command is the stack's own, detected by `suite_runner` (.NET,
+        pytest, Vitest, Jest, Maven, Gradle, Go, Rust, PHP, RSpec, Dart,
+        Swift...), run without a shell and without the backend's credentials.
 
         Returns:
             Tuple of (all_passed, output, failing_test_names)
         """
-        cwd = str(working_dir or self.project_dir)
-        test_cmd = self._detect_test_command()
-
-        if not test_cmd:
+        project = Path(working_dir or self.project_dir)
+        commands = detect_test_commands(project)
+        if not commands:
             return (
                 False,
                 "No test command detected for this project",
                 ["NO_TEST_COMMAND"],
             )
 
-        try:
-            result = subprocess.run(
-                test_cmd,
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-                timeout=300,
-                shell=False,
+        with tempfile.TemporaryDirectory(prefix="self-healing-tests-") as out:
+            outcome = await asyncio.to_thread(
+                run_once, commands[0], project, Path(out), timeout_s=timeout_s
             )
-            output = (result.stdout or "") + "\n" + (result.stderr or "")
-            passed = result.returncode == 0
-            failing = self._parse_failing_tests(output) if not passed else []
-            return passed, output, failing
-        except subprocess.TimeoutExpired:
-            return False, "Test execution timed out after 300s", ["TIMEOUT"]
-        except (FileNotFoundError, OSError) as e:
-            return False, f"Failed to run tests: {e}", ["EXECUTION_ERROR"]
+            output = (
+                outcome.log.read_text(encoding="utf-8", errors="replace")
+                if outcome.log and outcome.log.is_file()
+                else ""
+            )
+        if outcome.timed_out:
+            return False, f"Test execution timed out after {timeout_s:g}s", ["TIMEOUT"]
+        if outcome.error:
+            return False, f"Failed to run tests: {outcome.error}", ["EXECUTION_ERROR"]
+        passed = outcome.exit_code == 0
+        return passed, output, [] if passed else self._parse_failing_tests(output)
 
-    def _detect_test_command(self) -> list[str]:
-        """Detect the appropriate test command for the project.
+    def _git(self, *args: str, timeout: float = 30) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(self.project_dir),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
 
-        Returns the command as an argv list (for shell=False execution).
-        Returns an empty list when no test command can be inferred.
+    def _resolve_commit(self, ref: str) -> str:
+        """The commit id ``ref`` names in the project, or "" when it names none.
+
+        A value that reads as an option never reaches git.
         """
-        project = self.project_dir
-
-        # Python
-        if (project / "pytest.ini").exists() or (project / "pyproject.toml").exists():
-            if (project / ".venv").exists():
-                return [".venv/bin/pytest", "-v", "--tb=short"]
-            return ["pytest", "-v", "--tb=short"]
-
-        # Node.js
-        if (project / "package.json").exists():
-            import json
-
-            try:
-                pkg = json.loads((project / "package.json").read_text(encoding="utf-8"))
-                scripts = pkg.get("scripts", {})
-                if "test" in scripts:
-                    if (project / "pnpm-lock.yaml").exists():
-                        return ["pnpm", "test"]
-                    elif (project / "yarn.lock").exists():
-                        return ["yarn", "test"]
-                    return ["npm", "test"]
-            except (json.JSONDecodeError, OSError):
-                pass
-
-        # Go
-        if (project / "go.mod").exists():
-            return ["go", "test", "./..."]
-
-        # Rust
-        if (project / "Cargo.toml").exists():
-            return ["cargo", "test"]
-
-        return []
+        if not ref or ref.startswith("-"):
+            return ""
+        result = self._git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+        return result.stdout.strip() if result.returncode == 0 else ""
 
     def _get_commit_diff(self, commit_sha: str) -> str:
         """Get the diff for a specific commit."""
         try:
-            result = subprocess.run(
-                ["git", "diff", f"{commit_sha}~1..{commit_sha}", "--stat"],
-                cwd=str(self.project_dir),
-                capture_output=True,
-                text=True,
-                timeout=30,
+            sha = self._resolve_commit(commit_sha)
+            if not sha:
+                return f"Failed to get diff for {commit_sha}: no such commit"
+            parent = self._resolve_commit(f"{sha}~1")
+            # The first commit of a history has no parent to diff against:
+            # `git show` reads it against the empty tree.
+            what = (
+                ["diff", f"{parent}..{sha}"] if parent else ["show", "--format=", sha]
             )
-            stat = result.stdout
+            stat = self._git(*what, "--stat").stdout
 
             # The full diff is read by the analyzer agent and by nothing else,
             # so it goes through rtk: the `diff --git` / `index` / `---` / `+++`
@@ -313,9 +298,7 @@ class CICDMode:
             # hunks do not. The `--stat` above deliberately does not — it is
             # short already, and it is the half a person reads in the report.
             capture = capture_for_model(
-                ["git", "diff", f"{commit_sha}~1..{commit_sha}"],
-                cwd=self.project_dir,
-                timeout=30,
+                ["git", *what], cwd=self.project_dir, timeout=30
             )
             # Limit diff size to avoid context overflow
             diff = capture.text
@@ -329,17 +312,11 @@ class CICDMode:
 
     def _get_commit_message(self, commit_sha: str) -> str:
         """Get the commit message for a specific commit."""
-        if not commit_sha:
-            return ""
         try:
-            result = subprocess.run(
-                ["git", "log", "-1", "--format=%B", commit_sha],
-                cwd=str(self.project_dir),
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            return result.stdout.strip()
+            sha = self._resolve_commit(commit_sha)
+            if not sha:
+                return ""
+            return self._git("log", "-1", "--format=%B", sha, timeout=10).stdout.strip()
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
             return ""
 

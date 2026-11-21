@@ -123,7 +123,7 @@ Implemented in [apps/backend/core/auth.py](../apps/backend/core/auth.py)
 | 3 | `config_dir` argument | Explicitly passed by the caller. |
 | 4 | `CLAUDE_CONFIG_DIR` env var | Profile-specific config directory. |
 | 5 | `.credentials.json` in (3) or (4) | File-based storage. |
-| 6 | System credential store | macOS Keychain; on Windows the credential files Claude Code writes (`%USERPROFILE%\.claude\.credentials.json`…); on Linux the Secret Service (via `secretstorage`), then `~/.claude/.credentials.json`. A profile (3 or 4) reads only its own entry, never the default one. |
+| 6 | System credential store | macOS Keychain; on Windows the credential files Claude Code writes (`%USERPROFILE%\.claude\.credentials.json`…); on Linux the Secret Service (via `secretstorage`; a locked keyring is skipped, never unlocked, since its prompt would hang the API), then `~/.claude/.credentials.json`. A profile (3 or 4) reads only its own entry, never the default one. |
 
 A token in Claude Code's encrypted form (`enc:…`) is not decrypted: the build stops
 and says to run `claude setup-token` or to set a plaintext `CLAUDE_CODE_OAUTH_TOKEN`.
@@ -348,7 +348,9 @@ the same way, next to Entra. The server reads the provider's discovery document
 | `WORKPILOT_OIDC_CLIENT_ID` | — | The client ID of a **public** client (native or desktop app, PKCE, no secret), checked as the token audience. Register the redirect URI `http://localhost` (any port, path `/callback`). |
 | `WORKPILOT_OIDC_NAME` | `SSO` | The provider's name on the button, "Sign in with {name}" (40 printable characters at most). |
 | `WORKPILOT_OIDC_SCOPES` | `openid profile email` | The scopes asked for; `openid` is always added. The provider must return a verified `email` (`email_verified`) for a person it has not signed in before. |
-| `WORKPILOT_SELF_APPROVAL` | `when-alone` | Whether the author of a card approves its own spec: `allow`, `deny`, or `when-alone` (only when nobody else on the project may approve). Any other value is logged and replaced by the default. |
+| `WORKPILOT_SELF_APPROVAL` | `when-alone` | Whether the author of a card approves its own spec: `allow`, `deny`, or `when-alone` (only while the others who may approve on the project could not give the approvals the card needs). Any other value is logged and replaced by the default. |
+| `WORKPILOT_APPROVAL_QUORUM` | `low=1,medium=1,high=1` | How many people approve a card, by its criticality, e.g. `low=1,medium=2,high=3` (1 to 10; a level left out needs 1). A card is `medium` unless an approver sets it, or its spec's assessment says it is complex (`high`). |
+| `WORKPILOT_APPROVAL_ROLES` | — | The roles one of a card's approvers must hold, by criticality, as role slugs joined by `+`, e.g. `high=tech-lead+security` (5 per level at most). |
 
 The provider sign-in is on only when both `WORKPILOT_OIDC_ISSUER` and
 `WORKPILOT_OIDC_CLIENT_ID` are set; neither is a secret.

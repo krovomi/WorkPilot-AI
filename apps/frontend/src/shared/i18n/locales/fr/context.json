@@ -170,7 +170,8 @@
 				"value": "Deux valeurs pour le même réglage",
 				"recommendation": "Recommandations opposées",
 				"negation": "L'une dit de le faire, l'autre non",
-				"textual": "Modifiée sur deux machines"
+				"textual": "Modifiée sur deux machines",
+				"reopened": "Une décision antérieure a été annulée"
 			},
 			"verdict": {
 				"contradiction": "Elles se contredisent",
@@ -181,7 +182,9 @@
 				"a": "préfère la note déjà ici",
 				"b": "préfère la note reçue",
 				"none": "pas de préférence"
-			}
+			},
+			"escalated": "Tranché le {{date}} {{actor}}, et de nouveau contredit : un mainteneur tranche.",
+			"waitingMaintainer": "En attente d'un mainteneur : {{names}}."
 		},
 		"trash": {
 			"title": "Oubliées récemment",
@@ -205,7 +208,11 @@
 			"confirmForget": "L'oublier",
 			"forgetHint": "Une mémoire oubliée reste restaurable depuis l'onglet Cycle de vie pendant la durée de rétention.",
 			"history": "Historique",
-			"hideHistory": "Masquer l'historique"
+			"hideHistory": "Masquer l'historique",
+			"scope": "Portée",
+			"scopePlaceholder": "Où elle s'applique (ex. apps/billing/) ; vide : partout",
+			"saveScope": "Enregistrer",
+			"scopeBadge": "S'applique à {{scope}}"
 		},
 		"action": {
 			"create": "Créée",
@@ -219,7 +226,8 @@
 			"merge": "Fusionnée",
 			"archive": "Archivée",
 			"resolve": "Conflit tranché",
-			"conflict": "Conflit détecté"
+			"conflict": "Conflit détecté",
+			"designate": "Mainteneurs désignés"
 		},
 		"actor": {
 			"user": "par toi",
@@ -227,7 +235,8 @@
 			"agentType": "par l'agent {{type}}",
 			"sync": "par la synchronisation",
 			"learning-loop": "par le learning loop",
-			"lifecycle": "par la règle de rétention"
+			"lifecycle": "par la règle de rétention",
+			"person": "par {{name}}"
 		},
 		"reason": {
 			"recorded": "enregistrée",
@@ -248,7 +257,12 @@
 			"textual-conflict": "modifiée sur deux machines",
 			"person-chose": "une personne a choisi",
 			"person-wrote": "une personne a écrit la note canonique",
-			"not-a-conflict": "une personne a dit que ce n'était pas un conflit"
+			"not-a-conflict": "une personne a dit que ce n'était pas un conflit",
+			"undone": "une décision automatique a été annulée",
+			"unmerged": "séparée de la note dans laquelle elle avait été fusionnée",
+			"escalated": "contredite à nouveau peu après une décision",
+			"maintainers-changed": "les mainteneurs ont changé",
+			"scoped": "l'endroit où elle s'applique a changé"
 		},
 		"errors": {
 			"failed": "l'action a échoué",
@@ -265,7 +279,37 @@
 			"no-runtime": "aucun modèle disponible",
 			"provider-refused": "le fournisseur a refusé (mode hors-ligne ?)",
 			"no-answer": "le modèle n'a rien donné d'exploitable",
-			"server-mode": "indisponible en mode serveur"
+			"server-mode": "indisponible en mode serveur",
+			"not-revertible": "cette décision ne peut plus être annulée",
+			"maintainer-only": "seul un mainteneur tranche ce conflit"
+		},
+		"undo": {
+			"last": "Annuler la dernière décision automatique (dans l'heure)",
+			"undo": "Annuler",
+			"unmerge": "Séparer",
+			"done": "Décision annulée.",
+			"queued": "Décision annulée : les deux mémoires vous attendent dans « À trancher »."
+		},
+		"metrics": {
+			"title": "Comportement du cycle de vie",
+			"restores": "{{count}} mémoires restaurées cette semaine",
+			"automaticForgets": "{{count}} retirées automatiquement cette semaine",
+			"pinRate": "{{rate}} % épinglées ({{pinned}} sur {{live}})",
+			"conflicts": "{{count}} conflits en 30 jours : {{auto}} réglés par les règles, {{resolved}} par une personne",
+			"resolution": "{{hours}} h en moyenne avant qu'une personne tranche",
+			"views": "{{count}} historiques ouverts sur cet ordinateur",
+			"tooAggressive": "Beaucoup de mémoires ont été restaurées cette semaine : les retraits automatiques sont peut-être trop agressifs."
+		},
+		"maintainers": {
+			"list": "Mainteneurs : {{names}}",
+			"none": "Aucun mainteneur : n'importe qui tranche un conflit qui oscille.",
+			"edit": "Modifier",
+			"placeholder": "Noms ou e-mails, séparés par des virgules",
+			"save": "Enregistrer",
+			"cancel": "Annuler"
+		},
+		"decisions": {
+			"title": "Décisions"
 		}
 	}
 }

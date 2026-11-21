@@ -44,6 +44,14 @@ export interface MissionControlAgent {
 	/** The model's answer to the current task, as it streams in. */
 	output: string;
 	error_message: string;
+	/** `auto` for an agent of a composed crew (#344). */
+	origin?: "manual" | "auto";
+	/** The tokens its composition expected; 0 for a manual agent. */
+	estimated_tokens?: number;
+	/** How many times live rebalancing moved it on its current task. */
+	rebalances?: number;
+	/** Its answer repeats itself: the run is stopped and rebalanced. */
+	loop_detected?: boolean;
 }
 
 export interface MissionControlDecisionNode {
@@ -88,6 +96,39 @@ export interface MissionControlSession {
 	total_tokens: number;
 	total_cost_usd: number;
 	elapsed_seconds: number;
+	/** The crew's providers and budget, and the rebalancing switch (#344). */
+	plan?: MissionControlPlan;
+	over_budget?: boolean;
+	rebalance_count?: number;
+}
+
+export interface MissionControlPlan {
+	/** Where a rebalanced agent may go, in the person's order. */
+	providers: string[];
+	budget_usd: number | null;
+	budget_tokens: number | null;
+	auto_rebalance: boolean;
+}
+
+/** A crew's providers and budget (replaced together), or the switch alone. */
+export interface MissionControlPlanRequest {
+	providers?: string[];
+	budgetUsd?: number;
+	budgetTokens?: number;
+	autoRebalance?: boolean;
+}
+
+/** The issue's measures over the sessions this person ran (`metrics.py`). */
+export interface MissionControlMetrics {
+	sessions: number;
+	auto_share: number | null;
+	avg_tokens_auto: number | null;
+	avg_tokens_manual: number | null;
+	delta_tokens: number | null;
+	estimate_ratio: number | null;
+	rebalances_per_session: number | null;
+	budget_sessions: number;
+	overrun_rate: number | null;
 }
 
 /** What the backend logs (`mission_control/orchestrator.py`, `_log_event`). */
@@ -100,13 +141,31 @@ export type MissionControlEventType =
 	| "agent_stopped"
 	| "agent_config_updated"
 	| "agent_completed"
-	| "agent_failed";
+	| "agent_failed"
+	| "agent_rebalanced"
+	| "agent_rebalance_skipped"
+	| "agent_loop_detected";
+
+/** Why a run was rebalanced, what was done, and why nothing was. */
+export type MissionControlRebalanceReason = "loop" | "rate_limited" | "provider_failed" | "failed";
+export type MissionControlRebalanceAction = "retry_profile" | "reroute" | "escalate";
+export type MissionControlRebalanceSkip = "limit" | "over_budget" | "no_alternative" | "disabled";
 
 export interface MissionControlEvent {
 	type: MissionControlEventType;
 	timestamp: number;
 	/** Every event names its agent; a start carries its task, a failure its error. */
-	data: { agent_id: string; task?: string; error?: string } & Record<string, unknown>;
+	data: {
+		agent_id: string;
+		task?: string;
+		error?: string;
+		reason?: MissionControlRebalanceReason;
+		action?: MissionControlRebalanceAction;
+		skipped?: MissionControlRebalanceSkip;
+		/** A rebalancing's models, as the card names them. */
+		from?: string;
+		to?: string;
+	} & Record<string, unknown>;
 }
 
 export interface MissionControlState {
@@ -122,6 +181,9 @@ export interface MissionControlNewAgent {
 	provider: string;
 	model: string;
 	modelLabel: string;
+	/** An agent of a composed crew, with the tokens its composition expected. */
+	origin?: "manual" | "auto";
+	estimatedTokens?: number;
 }
 
 export interface MissionControlStartRequest {
@@ -215,6 +277,8 @@ export interface MissionControlComposition {
 		has_spec: boolean;
 	};
 	hinted: boolean;
+	/** Roles whose token estimate past sessions calibrated. */
+	calibrated?: string[];
 	warnings: MissionControlCompositionWarning[];
 	budget: { usd: number | null; tokens: number | null };
 	full: MissionControlCrew;

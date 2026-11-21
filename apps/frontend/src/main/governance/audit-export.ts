@@ -10,6 +10,7 @@
 
 import {
 	type AuditExportFormat,
+	type GovernanceMetrics,
 	POLICY_DECISIONS,
 	type PolicyAuditEvent,
 	type PolicyDecision,
@@ -73,6 +74,16 @@ export function auditEvents(answer: unknown): PolicyAuditEvent[] {
 		});
 	}
 	return events;
+}
+
+function count(value: unknown): number {
+	return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.min(Math.trunc(value), 1_000_000) : 0;
+}
+
+/** The trail's counts of a runner answer, each a bounded whole number (0 when unreadable). */
+export function auditMetrics(answer: unknown): GovernanceMetrics {
+	const raw = (answer as { metrics?: Record<string, unknown> } | null)?.metrics;
+	return { blocked24h: count(raw?.blocked24h), breakerTrips7d: count(raw?.breakerTrips7d) };
 }
 
 function cell(value: string | null): string {

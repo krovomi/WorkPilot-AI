@@ -136,6 +136,9 @@ describe("TaskDictation — recording", () => {
 		await record();
 		expect(api.dictationStart).toHaveBeenCalledWith(expect.any(String), false, "/work/app");
 		expect(screen.getByRole("meter", { name: "Microphone level" })).toBeInTheDocument();
+		// The Stop button is drawn before React runs the effect that starts the
+		// clock; let it run, or a slow machine advances time before the clock exists.
+		await act(() => Promise.resolve());
 		act(() => {
 			vi.advanceTimersByTime(61_000);
 		});

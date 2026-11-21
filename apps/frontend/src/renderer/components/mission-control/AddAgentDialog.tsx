@@ -11,7 +11,10 @@ import { AlertTriangle, Brain, Cpu, Rocket, User, Wand2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { providerRegistry } from "../../../shared/services/providerRegistry";
-import type { MissionControlPlannedAgent } from "../../../shared/types/mission-control";
+import type {
+	MissionControlPlannedAgent,
+	MissionControlPlanRequest,
+} from "../../../shared/types/mission-control";
 import { isCustomModelSentinel } from "../../../shared/utils/local-models";
 import { type CatalogModel, useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { useMissionControlStore } from "../../stores/mission-control-store";
@@ -66,10 +69,14 @@ export function AddAgentDialog({ open, onOpenChange, onAdd, error }: AddAgentDia
 	const { models } = useProviderModelCatalog(provider);
 	const [mode, setMode] = useState<Mode>("manual");
 	const createAgent = useMissionControlStore((s) => s.createAgent);
+	const setPlan = useMissionControlStore((s) => s.setPlan);
 
-	// One agent per role of the crew, in its order; the dialog closes once all
-	// exist, and stays open on the first refusal.
-	const applyCrew = async (agents: MissionControlPlannedAgent[]) => {
+	// The session learns the crew's providers and budget (where a stuck agent
+	// may be rebalanced), then gets one agent per role, in its order; the
+	// dialog closes once all exist, and stays open on the first refusal.
+	const applyCrew = async (agents: MissionControlPlannedAgent[], plan: MissionControlPlanRequest) => {
+		// Without the plan, rebalancing falls back on the agents' own providers.
+		await setPlan(plan);
 		for (const agent of agents) {
 			const roleName = t(`missionControl:roles.${agent.role}`);
 			const created = await createAgent(
@@ -78,6 +85,7 @@ export function AddAgentDialog({ open, onOpenChange, onAdd, error }: AddAgentDia
 				agent.provider,
 				agent.model,
 				agent.model_label,
+				{ origin: "auto", estimatedTokens: agent.input_tokens + agent.output_tokens },
 			);
 			if (!created) return;
 		}

@@ -324,8 +324,11 @@ def _get_token_from_linux_secret_service(config_dir: str | None = None) -> str |
 
     try:
         collection = secretstorage.get_default_collection(connection)
-        # Unlocking may prompt the user; a dismissed prompt means no token
-        if collection.is_locked() and collection.unlock():
+        # Never unlock: the prompt waits for an answer with no time limit, and
+        # this runs inside the API (``/health``, a build) where nobody may see
+        # it (blank under WSLg, absent over SSH). A locked keyring gives no
+        # token from here; the credentials file is read next.
+        if collection.is_locked():
             return None
         for item in collection.search_items({"application": "claude-code"}):
             # Exact label: a profile never reads another profile's entry

@@ -86,6 +86,8 @@ async def test_the_route_hands_them_to_the_run(monkeypatch):
 
     class Spec:
         claimed_by = "u-1"
+        created_by = "u-1"
+        spec_name = "001-login"
 
     class Project:
         server_path = "/srv/p"

@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { registerDictationHandlers } from "./dictation-handlers";
+import { registerDictationHandlers, runnerAnswer } from "./dictation-handlers";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
 const mocks = vi.hoisted(() => ({
@@ -130,5 +130,43 @@ describe("dictation IPC ownership and lifecycle", () => {
 		beforeQuit();
 		expect(await pending).toEqual({ error: "cancelled" });
 		expect(child.kill).toHaveBeenCalledOnce();
+	});
+	it("passes the language the runner heard, and a line that is not an answer fails the chunk", async () => {
+		const ready = handlers.get(IPC_CHANNELS.DICTATION_START)?.(event(), "s", false);
+		child.stdout.write('{"ready":true}\n');
+		await ready;
+		const heard = handlers.get(IPC_CHANNELS.DICTATION_TRANSCRIBE)?.(
+			event(),
+			"s",
+			new ArrayBuffer(44),
+			"auto",
+		);
+		child.stdout.write('{"text":"Ouvre le Kanban","language":"fr","extra":1}\n');
+		expect(await heard).toEqual({ text: "Ouvre le Kanban", language: "fr" });
+		const broken = handlers.get(IPC_CHANNELS.DICTATION_TRANSCRIBE)?.(
+			event(),
+			"s",
+			new ArrayBuffer(44),
+			"auto",
+		);
+		child.stdout.write('["not", "an", "answer"]\n');
+		expect(await broken).toEqual({ error: "transcription" });
+		expect(child.kill).toHaveBeenCalledOnce();
+	});
+});
+
+describe("runnerAnswer", () => {
+	it("keeps only the known fields, and a language from the closed list", () => {
+		expect(runnerAnswer({ ready: true, text: "hi", error: "x".repeat(80), language: "en" })).toEqual({
+			ready: true,
+			text: "hi",
+			error: "x".repeat(40),
+			language: "en",
+		});
+		expect(runnerAnswer({ text: "hi", language: "fr-FR" })).toEqual({ text: "hi" });
+		expect(runnerAnswer({ text: 3, ready: "yes", language: "<b>" })).toEqual({});
+		expect(runnerAnswer(null)).toBeNull();
+		expect(runnerAnswer("text")).toBeNull();
+		expect(runnerAnswer([])).toBeNull();
 	});
 });

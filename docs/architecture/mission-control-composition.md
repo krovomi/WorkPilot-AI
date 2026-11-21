@@ -2,11 +2,12 @@
 feature: Mission Control, composition automatique
 summary: >-
   Une équipe d'agents proposée d'après une description, une spec ou un modèle de session, sur les
-  providers choisis et mélangés ; modèles filtrés par capacités, coûts du catalogue Cost
-  Intelligence, équipe moins chère sous un budget, budget trop bas refusé.
+  providers mélangés, filtrés par capacités et chiffrés par Cost Intelligence, moins chère sous un
+  budget ; un agent bloqué rééquilibré (profil Claude, provider, modèle plus puissant) ; un
+  historique local mesure l'adoption et calibre les estimations.
 ---
 
-# Mission Control : composer l'équipe (#344, lot 1)
+# Mission Control : composer l'équipe et la rééquilibrer (#344)
 
 Ajouter des agents à Mission Control se faisait un par un, rôle, provider et modèle choisis à la
 main (`AddAgentDialog.tsx`). Un débutant devait deviner « combien d'agents, lesquels, sur quel
@@ -96,20 +97,77 @@ donne `hints_unusable`.
 - La route est locale : `mission_control` est dans `LOCAL_ONLY_FEATURES` et ne se monte pas sur un
   serveur.
 
+## Rééquilibrage en direct (lot 2)
+
+| Morceau | Où | Rôle |
+|---|---|---|
+| Décision | `mission_control/rebalance.py` | la cause d'un échec, puis le remède ; aucune entrée réseau, aucun modèle |
+| Plan de session | `mission_control/session_plan.py`, `POST /session/plan`, IPC `missionControl:setPlan` | les providers de l'équipe dans l'ordre choisi, son budget, l'interrupteur |
+| Application | `MissionControlOrchestrator.rebalance_agent`, `POST /agents/{id}/rebalance` | change le provider et le modèle de l'agent, le journalise, compte |
+| Relance | `main/mission-control/mission-control-runs.ts` | demande la décision avant d'enregistrer l'échec, relance la même tâche (`rebalanced: true`) |
+| UI | `SessionHealth.tsx`, `AgentPanel.tsx`, `AgentEventLog.tsx` | budget dépensé, nombre de rééquilibrages, case à cocher, pastilles de la carte, ligne du journal |
+
+Un run qui finit mal a l'une de trois causes, chacune son remède :
+
+- **le provider a échoué** (`rate_limited` : limite de débit ou quota ; `provider_failed` :
+  identifiant refusé, réseau, provider ou modèle introuvable) : la même tâche va au provider
+  suivant du plan qui fait tourner un agent et a un modèle capable du même niveau (un modèle local
+  ou choisi par une CLI vaut `standard` ailleurs). Pour une limite Claude, le main passe
+  `rateLimitSource` à `runOneShotLLM` ; quand le système de profils Claude a un autre profil
+  (`suggestedProfile`), l'agent reste sur Claude et repart sur ce profil (`retry_profile`) ;
+- **l'agent a échoué** (toute autre erreur) : son modèle monte d'un niveau sur le même provider,
+  `fast` → `standard` → `flagship` ; au sommet, ou si le niveau du dessus ne sait pas tenir le rôle,
+  il va à un autre provider ;
+- **la réponse tourne en boucle** : le backend, à chaque morceau reçu, cherche un passage de 30 à
+  600 caractères répété cinq fois de suite à la fin de la réponse (une fenêtre égale à elle-même
+  décalée d'une période, quel que soit l'endroit où le dernier morceau coupe ; un passage de moins
+  de cinq caractères distincts, comme une règle de tirets, est de la mise en forme). Il le dit dans
+  sa réponse à la mise à jour ; le main arrête le run et demande la décision, qui monte le modèle.
+
+La cause se lit dans la liste fermée de `foundation.error_details.classify` ; le texte de l'erreur
+n'est qu'une donnée classée, jamais une instruction, et ne choisit ni provider ni modèle : ceux-ci
+viennent du registre (`model_pick.pick`), des capacités (`rebalance.capable`) et du plan.
+
+Les garde-fous : deux rééquilibrages au plus par tâche (`MAX_REBALANCES`, remis à zéro quand la
+personne lance une nouvelle tâche) ; aucun quand la session a atteint son budget (`over_budget`) ;
+aucun quand la case est décochée. Une décision prise ou refusée laisse un événement
+(`agent_rebalanced`, `agent_rebalance_skipped`, `agent_loop_detected`) que le journal traduit, un
+nœud « Rebalanced » dans l'arbre de décision, et une pastille sur la carte. Sans plan (une équipe
+montée à la main), les providers de repli sont ceux des agents de la session, dans l'ordre où ils
+ont été ajoutés.
+
+## Budget, métriques et calibrage (lot 2)
+
+- **Budget de la session** : appliquer une équipe envoie son plan avant de créer les agents ; la
+  session compare ce que les agents ont dépensé au budget (`over_budget`) et l'affiche, avec un
+  avertissement une fois atteint.
+- **Historique** (`mission_control/metrics.py`) : une session qui a dépensé au moins un token laisse
+  une ligne à sa fin dans `<WORKPILOT_DATA_DIR ou ~/.workpilot>/mission-control/metrics.json`
+  (`foundation.json_ledger`, 500 lignes au plus ; un fichier qui est un lien symbolique n'est ni lu
+  ni écrit) : origine de l'équipe (`auto`, `manual`, `mixed`), tokens attendus et dépensés, budget
+  et dépassement, rééquilibrages, et par rôle d'un agent composé ses tokens attendus et dépensés.
+  Aucune tâche, réponse ni erreur n'y entre. `GET /metrics` en tire les quatre mesures de l'issue
+  (part des sessions composées automatiquement, tokens moyens d'une session automatique et
+  manuelle et leur écart, rééquilibrages par session, part des budgets dépassés) et le rapport
+  dépensé / attendu ; l'écran d'accueil de Mission Control les affiche (`MissionControlMetrics.tsx`).
+- **Calibrage** : dès qu'un rôle a trois relevés, son estimation de tokens est multipliée par la
+  médiane de dépensé / attendu (bornée entre 0,25 et 4) ; la composition le dit (`calibrated`) et le
+  panneau nomme les rôles calibrés.
+
 ## Pas encore fait
 
-- **Rééquilibrage en direct** (lot 2) : lancer un agent secondaire ou monter le modèle d'un agent
-  bloqué (erreurs répétées, boucle détectée dans son arbre de décision), avec notification. Les
-  agents de Mission Control tournent aujourd'hui un seul tour sans outils
-  (`main/mission-control/mission-control-runs.ts`) : il faut d'abord des runs longs à surveiller.
-- **Profil de secours** quand un provider est limité (rate limit) : reprendre la composition sans
-  lui.
-- **Métriques** de l'issue : part des sessions composées automatiquement, écart de tokens entre
-  équipes automatiques et manuelles, dépassements de budget.
-- **Historique calibré** : les tokens par rôle sont des constantes ; les relevés des runs passés
-  (`cost_intelligence.cost_predictor`) pourraient les remplacer.
-- **Test en CI contre un Ollama local** des modèles de session : la composition n'appelle aucun
-  modèle et marche hors ligne, mais le second avis n'est testé qu'avec un double.
+- **Lancer un agent secondaire** à côté d'un agent bloqué. Un run de Mission Control est un seul
+  appel sans outils (`main/mission-control/mission-control-runs.ts`) : un second agent répondrait
+  au même prompt une seconde fois, sans travail à se partager. Changer le modèle de l'agent bloqué
+  est le remède qui convient à ce run ; un agent d'appoint aura un sens avec des runs longs, qui
+  appellent des outils.
+- **Boucle lue dans l'arbre de décision** (réflexions ou appels d'outils répétés) : ces runs ne
+  remontent ni réflexion ni appel d'outil, la boucle se lit donc dans la réponse. Même raison.
+- **Test en CI contre un Ollama local** des modèles de session : il faut un serveur Ollama et un
+  modèle téléchargé sur les runners, ce que la CI n'héberge pas. La composition et le rééquilibrage
+  n'appellent aucun modèle et marchent hors ligne ; le second avis n'est testé qu'avec un double.
 - Capacité d'appel d'outils d'un modèle Ollama : seul le cache de models.dev est lu ; la
   détection en direct d'`ollama_model_detector` n'est pas appelée, pour ne pas joindre le serveur
-  local pendant une composition.
+  local pendant une composition ou un rééquilibrage.
+- Les métriques sont celles de la personne, sur sa machine : aucune n'est envoyée ni agrégée entre
+  utilisateurs, faute d'un service qui les recevrait.
