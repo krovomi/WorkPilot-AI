@@ -1,8 +1,8 @@
 {
 	"title": "Issues GitLab",
 	"states": {
-		"opened": "Ouvert",
-		"closed": "Fermé"
+		"opened": "Ouverte",
+		"closed": "Fermée"
 	},
 	"complexity": {
 		"simple": "Simple",
@@ -19,6 +19,7 @@
 		"all": "Toutes"
 	},
 	"empty": {
+		"noIssues": "Aucune issue trouvée",
 		"noMatch": "Aucune issue ne correspond à votre recherche",
 		"selectIssue": "Sélectionnez une issue pour voir les détails"
 	},
@@ -56,7 +57,20 @@
 		"cancel": "Annuler",
 		"done": "Terminé",
 		"close": "Fermer",
-		"investigateAria": "Analyser l'issue"
+		"investigateAria": "Analyser l'issue",
+		"failed": "La tâche n'a pas pu être créée",
+		"phases": {
+			"fetching": "Lecture de l'issue...",
+			"analyzing": "Analyse de l'issue...",
+			"creating_task": "Création de la tâche...",
+			"complete": "Tâche créée"
+		}
+	},
+	"errors": {
+		"loadIssues": "Impossible de charger les issues GitLab",
+		"checkConnection": "Impossible de vérifier la connexion à GitLab",
+		"createCard": "Impossible de créer la carte",
+		"unknown": "Erreur inconnue"
 	},
 	"settings": {
 		"enableIssues": "Activer les issues GitLab",

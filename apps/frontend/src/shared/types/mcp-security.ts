@@ -87,3 +87,49 @@ export interface McpSecurityRequest {
 	/** Read the registry again even when the last read is recent. */
 	refresh?: boolean;
 }
+
+/**
+ * What got worse for an installed catalog server since the last reading
+ * (lot 2): a new advisory for the version it runs, a maintainer who
+ * appeared, the package deprecated or yanked, the score fallen below 50.
+ */
+export type McpWatchAlertKind =
+	| "newVulnerability"
+	| "maintainerAdded"
+	| "deprecated"
+	| "lowScore";
+
+export interface McpWatchAlert {
+	/** Stable for one finding: the same advisory is never raised twice. */
+	id: string;
+	kind: McpWatchAlertKind;
+	values?: Record<string, string | number>;
+	/** ISO time it was found. */
+	detectedAt: string;
+	/** ISO time the person acknowledged it. */
+	acknowledgedAt?: string;
+}
+
+/**
+ * - `watched`: read at least once by the daily check;
+ * - `pending`: a catalog server the check has not read yet;
+ * - `remote`: runs on its vendor's servers, no package to watch;
+ * - `offline`: the project is in strict offline mode, nothing is read;
+ * - `unverifiable`: not a catalog server, never read on the network.
+ */
+export type McpWatchStatus = "watched" | "pending" | "remote" | "offline" | "unverifiable";
+
+export interface McpInstalledServerWatch {
+	serverId: string;
+	status: McpWatchStatus;
+	/** The alerts not acknowledged yet. */
+	alerts: McpWatchAlert[];
+	/** ISO time of the reading the alerts compare with. */
+	checkedAt?: string;
+}
+
+export interface McpInstalledWatchView {
+	/** ISO time of the last daily check. */
+	lastRun?: string;
+	servers: McpInstalledServerWatch[];
+}

@@ -40,6 +40,11 @@ _CATALOGUE = {
 }
 
 
+def catalogue_provider(route: str | None) -> str:
+    """The price and model catalogues' provider name for a route ("" for none)."""
+    return _CATALOGUE.get(route or "", "")
+
+
 @dataclass(frozen=True)
 class Credentials:
     """What the runner's environment holds, as booleans (never the values)."""

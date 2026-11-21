@@ -29,7 +29,15 @@ export interface ExecutionWaveOptions {
 	unplannedPolicy?: UnplannedPolicy;
 	/** Files outside its plan before a spec is reported as drifting (default 3). */
 	driftThreshold?: number;
+	/**
+	 * Add fragile zones to the score: files the project's history changes
+	 * together, one in each spec (default true).
+	 */
+	fragileZones?: boolean;
 }
+
+/** What a test merge of two worktrees' commits said (`git merge-tree`). */
+export type WaveMergeVerdict = "clean" | "conflict";
 
 /** What the renderer sends: a project by id, tasks by id, never a path. */
 export interface ExecutionWavePlanRequest {
@@ -60,6 +68,37 @@ export interface WavePairRisk {
 	unknown: boolean;
 	/** True when the pair may not share a wave. */
 	blocking: boolean;
+	/**
+	 * Set when the pair was test-merged: two specs of one wave, both with a
+	 * worktree, sharing files under the tolerance. `conflict` splits them.
+	 */
+	mergeCheck?: WaveMergeVerdict;
+	/** Files the test merge left in conflict, at most 20 (display paths). */
+	conflictFiles?: string[];
+	/**
+	 * Fragile zones counted in the score: `a/x ↔ b/y`, a file of each spec
+	 * that the history changes together; at most 20.
+	 */
+	fragileLinks?: string[];
+}
+
+/** Whether the history was read for fragile zones, and how far back. */
+export interface WaveFragileZones {
+	enabled: boolean;
+	/** Commits read; null when off or when git could not read the history. */
+	commits: number | null;
+}
+
+/** The preventive merge checks behind a plan; nothing is written to a worktree. */
+export interface WaveMergeChecks {
+	/** Pairs test-merged. */
+	checked: number;
+	/** Pairs the test merge put in different waves. */
+	conflicts: number;
+	/** Pairs that qualified but were left unchecked (pair or time limit reached). */
+	unchecked: number;
+	/** Pairs git could not test-merge (no common history, git too old). */
+	failed: number;
 }
 
 export interface ExecutionWave {
@@ -112,5 +151,39 @@ export interface ExecutionWavePlan {
 	totalRisk: number;
 	/** Summed score left inside the waves. */
 	residualRisk: number;
+	mergeChecks: WaveMergeChecks;
+	fragileZones: WaveFragileZones;
 	computedAt: string;
+}
+
+/**
+ * An "Execute in optimal order" run, as the renderer saves it after every
+ * step and the main process keeps in `<project>/.workpilot/` so that it
+ * survives a restart. The waves already run are those before `current`.
+ */
+export interface WaveRunState {
+	projectId: string;
+	/** Task ids per wave, in merge order. */
+	waves: string[][];
+	/** 0-based index of the wave being run. */
+	current: number;
+	advanceWhen: WaveAdvanceWhen;
+	/** The project's max parallel tasks, from the plan the run started from. */
+	maxParallel: number;
+	/** Tasks the run has already tried to start. */
+	started: string[];
+}
+
+/** A run read back from the project: when it was saved, by the main process. */
+export interface SavedWaveRun extends WaveRunState {
+	savedAt: string;
+}
+
+/**
+ * What a project holds: a run to resume or none; `ignored` when a saved file
+ * was there but unreadable or incoherent (it is then left as it is).
+ */
+export interface SavedWaveRunResult {
+	run: SavedWaveRun | null;
+	ignored: boolean;
 }

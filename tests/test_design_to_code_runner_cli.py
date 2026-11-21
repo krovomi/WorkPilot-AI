@@ -400,6 +400,12 @@ def test_the_render_loop_refines_the_files_and_reports_each_iteration(
         "0.9",
         "--loop-budget-seconds",
         "120",
+        "--loop-max-tokens",
+        "50000",
+        "--loop-max-cost",
+        "0.5",
+        "--loop-responsive",
+        "--loop-states",
     )
     out = capsys.readouterr().out
     result = _line(out, RESULT)
@@ -410,6 +416,8 @@ def test_the_render_loop_refines_the_files_and_reports_each_iteration(
     assert result["generated_files"][0]["content"] == "corrected\n"
     assert (seen["config"].max_iterations, seen["config"].threshold) == (3, 0.9)
     assert seen["config"].budget_seconds == 120 and seen["framework"] == "react"
+    assert (seen["config"].max_tokens, seen["config"].max_cost_usd) == (50_000, 0.5)
+    assert seen["config"].responsive and seen["config"].states
     loop_lines = [
         json.loads(line[len(PHASE) :])
         for line in out.splitlines()
@@ -452,6 +460,11 @@ def test_without_the_flag_no_loop_runs(
         ("--loop-max-iterations", "11"),
         ("--loop-threshold", "1.5"),
         ("--loop-budget-seconds", "5"),
+        ("--loop-max-tokens", "100"),
+        ("--loop-max-tokens", "9000000"),
+        ("--loop-max-cost", "0"),
+        ("--loop-max-cost", "nan"),
+        ("--loop-max-cost", "1000"),
     ],
 )
 def test_loop_bounds_are_refused_outside_their_range(

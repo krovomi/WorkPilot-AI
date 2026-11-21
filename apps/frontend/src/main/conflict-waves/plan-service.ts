@@ -1,8 +1,10 @@
 /**
  * Builds an execution wave plan for a project: validates what the renderer
  * sent, resolves the project and its tasks here, reads the worktrees, runs the
- * pure planner. The renderer names a project and tasks by id, never a path;
- * the max parallelism is the project's own setting, not a renderer value.
+ * pure planner, then test-merges the pairs it put together under the
+ * tolerance (`merge-check.ts`). The renderer names a project and tasks by id,
+ * never a path; the max parallelism is the project's own setting, not a
+ * renderer value.
  */
 
 import type {
@@ -12,19 +14,21 @@ import type {
 } from "../../shared/types/conflict-waves";
 import type { Project } from "../../shared/types/project";
 import type { Task, TaskPriority, TaskStatus } from "../../shared/types/task";
+import type { CoChanges } from "./fragile-zones";
+import { type MergeCheckDeps, planWithMergeChecks } from "./merge-check";
 import { type PlannerTask, planExecutionWaves } from "./planner";
 
 /** A project id is a UUID the main process minted. */
-const PROJECT_ID = /^[A-Za-z0-9-]{1,64}$/;
+export const PROJECT_ID = /^[A-Za-z0-9-]{1,64}$/;
 /**
  * A task id is its spec folder name, which may keep accents: letters, digits,
  * marks, `.`, `_`, `-`, nothing that separates a path. It is only ever looked
  * up in the project's own task list.
  */
-const TASK_ID = /^[\p{L}\p{N}][\p{L}\p{N}\p{M}._-]{0,199}$/u;
+export const TASK_ID = /^[\p{L}\p{N}][\p{L}\p{N}\p{M}._-]{0,199}$/u;
 export const MAX_PLAN_TASKS = 200;
 const DEFAULT_MAX_PARALLEL = 3;
-const MAX_PARALLEL_CEILING = 32;
+export const MAX_PARALLEL_CEILING = 32;
 const MAX_TOLERANCE = 100;
 const MAX_DRIFT_THRESHOLD = 1000;
 const DEFAULT_DRIFT_THRESHOLD = 3;
@@ -47,6 +51,7 @@ export interface ValidatedWaveRequest {
 	tolerance: number;
 	unplannedPolicy: UnplannedPolicy;
 	driftThreshold: number;
+	fragileZones: boolean;
 }
 
 export type Validation<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -100,14 +105,23 @@ export function validateWavePlanRequest(raw: unknown): Validation<ValidatedWaveR
 	if (policy !== "isolate" && policy !== "independent") {
 		return { ok: false, error: "Invalid unplanned policy" };
 	}
+	const fragileZones = opts.fragileZones ?? true;
+	if (typeof fragileZones !== "boolean") return { ok: false, error: "Invalid fragile zones option" };
 
 	return {
 		ok: true,
-		value: { projectId, taskIds: ids, tolerance, unplannedPolicy: policy, driftThreshold },
+		value: {
+			projectId,
+			taskIds: ids,
+			tolerance,
+			unplannedPolicy: policy,
+			driftThreshold,
+			fragileZones,
+		},
 	};
 }
 
-export interface WavePlanDeps {
+export interface WavePlanDeps extends MergeCheckDeps {
 	getProject: (projectId: string) => Project | undefined;
 	getTasks: (projectId: string) => Task[];
 	readWorktreeFiles: (
@@ -115,6 +129,8 @@ export interface WavePlanDeps {
 		specId: string,
 		mainBranch?: string,
 	) => Promise<string[] | null>;
+	/** Files the project's history changes together, or null when git cannot say. */
+	readCoChanges: (projectPath: string) => Promise<CoChanges | null>;
 	now?: () => Date;
 }
 
@@ -178,17 +194,31 @@ export async function buildExecutionWavePlan(
 		),
 	});
 
-	const [plannerCandidates, plannerRunning] = await Promise.all([
+	const [plannerCandidates, plannerRunning, coChanges] = await Promise.all([
 		Promise.all(candidates.map(toPlanner)),
 		Promise.all(running.map(toPlanner)),
+		request.fragileZones ? deps.readCoChanges(project.path) : Promise.resolve(null),
 	]);
 	const maxParallel = maxParallelOf(project);
-	const result = planExecutionWaves(plannerCandidates, plannerRunning, {
-		maxParallel,
-		tolerance: request.tolerance,
-		unplannedPolicy: request.unplannedPolicy,
-		driftThreshold: request.driftThreshold,
+	// Task id -> spec id, for the candidates that have a worktree to test-merge.
+	const withWorktree = new Map<string, string>();
+	plannerCandidates.forEach((t, i) => {
+		if (t.actualFiles !== null) withWorktree.set(t.id, candidates[i].specId);
 	});
+	const { result, mergeChecks } = await planWithMergeChecks(
+		(checks) =>
+			planExecutionWaves(plannerCandidates, plannerRunning, {
+				maxParallel,
+				tolerance: request.tolerance,
+				unplannedPolicy: request.unplannedPolicy,
+				driftThreshold: request.driftThreshold,
+				mergeChecks: checks,
+				coChanges: coChanges?.index,
+			}),
+		project.path,
+		withWorktree,
+		deps,
+	);
 
 	return {
 		ok: true,
@@ -198,6 +228,8 @@ export async function buildExecutionWavePlan(
 			tolerance: request.tolerance,
 			unplannedPolicy: request.unplannedPolicy,
 			...result,
+			mergeChecks,
+			fragileZones: { enabled: request.fragileZones, commits: coChanges?.commits ?? null },
 			computedAt: (deps.now?.() ?? new Date()).toISOString(),
 		},
 	};

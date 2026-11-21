@@ -78,7 +78,11 @@
 			"unplannedIndependent": "Les supposer indépendantes",
 			"advance": "Vague suivante",
 			"advanceMerged": "une fois la vague fusionnée",
-			"advanceReview": "une fois la vague en revue"
+			"advanceReview": "une fois la vague en revue",
+			"fragile": "Zones fragiles",
+			"fragileHint": "Les fichiers que les derniers commits modifient ensemble, un dans chaque spec, s'ajoutent au score de la paire.",
+			"fragileOn": "D'après l'historique",
+			"fragileOff": "Désactivées"
 		},
 		"empty": {
 			"noProject": "Sélectionnez un projet pour planifier ses vagues.",
@@ -112,7 +116,10 @@
 			"kicker": "Scores",
 			"shared": "{{count}} fichiers communs",
 			"unknown": "empreinte inconnue",
-			"together": "peuvent partager une vague"
+			"together": "peuvent partager une vague",
+			"mergeClean": "merge de test propre",
+			"mergeConflict": "merge de test en conflit",
+			"fragile": "{{count}} liens fragiles"
 		},
 		"run": {
 			"running": "Vague {{current}} sur {{total}} en cours.",
@@ -130,6 +137,23 @@
 			"runningConflict": "{{task}} partage des fichiers avec {{running}}, déjà en cours.",
 			"unplanned": "{{count}} specs n'ont pas encore de plan : leur empreinte est inconnue.",
 			"error": "Impossible de calculer les vagues : {{error}}"
+		},
+		"mergeCheck": {
+			"split": "{{a}} et {{b}} sont sous la tolérance, mais un merge de test de leurs worktrees est en conflit sur {{files}} : elles passent dans des vagues différentes.",
+			"summary": "Merges de test des paires d'une même vague : {{checked}} vérifiées, {{conflicts}} séparées. Seul le travail commité est fusionné ; aucun worktree ni aucune branche n'est modifié.",
+			"unchecked": "{{count}} paires d'une même vague n'ont pas été testées (limite atteinte).",
+			"failed": "Git n'a pas pu faire le merge de test de {{count}} paires (pas d'historique commun, ou git antérieur à 2.38)."
+		},
+		"resume": {
+			"title": "Une exécution a été interrompue à la vague {{current}} sur {{total}} (enregistrée le {{savedAt}}). Les tâches déjà lancées ont continué.",
+			"resume": "Reprendre l'exécution",
+			"abandon": "L'abandonner",
+			"ignored": "Une exécution enregistrée dans ce projet est illisible ou ne correspond plus à ses tâches : elle a été ignorée.",
+			"waves": "Vagues de l'exécution reprise"
+		},
+		"fragile": {
+			"summary": "Zones fragiles : les fichiers modifiés ensemble dans les {{commits}} derniers commits s'ajoutent aux scores.",
+			"unavailable": "Zones fragiles : git n'a pas pu lire l'historique du projet ; les scores ne comptent que les fichiers partagés."
 		}
 	}
 }
