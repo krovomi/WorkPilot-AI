@@ -338,7 +338,6 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 			terminalRef,
 			xtermRef,
 			fit,
-			write: _write, // Output now handled by useGlobalTerminalListeners
 			writeln,
 			focus,
 			dispose,
@@ -507,7 +506,9 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 			isRecreatingRef,
 			onExit: (exitCode) => {
 				isCreatedRef.current = false;
-				writeln(`\r\n\x1b[90mProcess exited with code ${exitCode}\x1b[0m`);
+				writeln(
+					`\r\n\x1b[90m${t("terminal:processExited", { code: exitCode })}\x1b[0m`,
+				);
 			},
 		});
 

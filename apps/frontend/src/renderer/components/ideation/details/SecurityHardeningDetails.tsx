@@ -7,13 +7,18 @@ import {
 	Wrench,
 } from "lucide-react";
 import {
-	SECURITY_CATEGORY_LABELS,
 	SECURITY_SEVERITY_COLORS,
 } from "../../../../shared/constants";
 import type { SecurityHardeningIdea } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
 import { Card } from "../../ui/card";
 import { useTranslation } from "react-i18next";
+import { useIdeaLabels } from "../hooks/useIdeaLabels";
+
+/** A reference opens only when it is a web address; "CWE-79" stays text. */
+function isWebUrl(value: string): boolean {
+	return /^https?:\/\/\S+$/i.test(value);
+}
 
 interface SecurityHardeningDetailsProps {
 	idea: SecurityHardeningIdea;
@@ -23,6 +28,7 @@ export function SecurityHardeningDetails({
 	idea,
 }: SecurityHardeningDetailsProps) {
 	const { t } = useTranslation();
+	const labels = useIdeaLabels();
 	return (
 		<>
 			{/* Metrics */}
@@ -31,13 +37,13 @@ export function SecurityHardeningDetails({
 					<div
 						className={`text-lg font-semibold ${SECURITY_SEVERITY_COLORS[idea.severity]}`}
 					>
-						{idea.severity}
+						{labels.level(idea.severity)}
 					</div>
 					<div className="text-xs text-muted-foreground">{t("ideation:details.severity")}</div>
 				</Card>
 				<Card className="p-3 text-center">
 					<div className="text-lg font-semibold">
-						{idea.affectedFiles?.length ?? 0}
+						{idea.affectedFiles.length}
 					</div>
 					<div className="text-xs text-muted-foreground">{t("ideation:details.files")}</div>
 				</Card>
@@ -50,7 +56,7 @@ export function SecurityHardeningDetails({
 					{t("ideation:performanceDetails.category")}
 				</h3>
 				<Badge variant="outline">
-					{SECURITY_CATEGORY_LABELS[idea.category]}
+					{labels.category(idea.type, idea.category)}
 				</Badge>
 			</div>
 
@@ -86,7 +92,7 @@ export function SecurityHardeningDetails({
 			</div>
 
 			{/* Affected Files */}
-			{idea.affectedFiles && idea.affectedFiles.length > 0 && (
+			{idea.affectedFiles.length > 0 && (
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<FileCode className="h-4 w-4" />
@@ -114,9 +120,13 @@ export function SecurityHardeningDetails({
 						{idea.references.map((ref, i) => (
 							// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
 							<li key={i} className="text-sm text-primary hover:underline">
-								<a href={ref} target="_blank" rel="noopener noreferrer">
-									{ref}
-								</a>
+								{isWebUrl(ref) ? (
+									<a href={ref} target="_blank" rel="noopener noreferrer">
+										{ref}
+									</a>
+								) : (
+									<span className="text-muted-foreground">{ref}</span>
+								)}
 							</li>
 						))}
 					</ul>

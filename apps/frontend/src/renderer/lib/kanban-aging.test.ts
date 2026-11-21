@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import i18n from "../../shared/i18n";
 import type { Task, TaskStatus } from "../../shared/types";
 import {
 	countAgingTasks,
@@ -65,14 +66,19 @@ describe("getTaskAgingLevel", () => {
 });
 
 describe("formatAgingDuration", () => {
-	it("formats days, hours and minutes", () => {
-		expect(formatAgingDuration(50)).toBe("2j");
-		expect(formatAgingDuration(5)).toBe("5h");
-		expect(formatAgingDuration(0.5)).toBe("30min");
+	it("formats days, hours and minutes in the app's language", async () => {
+		await i18n.changeLanguage("en");
+		expect(formatAgingDuration(50, i18n.t)).toBe("2d");
+		expect(formatAgingDuration(5, i18n.t)).toBe("5h");
+		expect(formatAgingDuration(0.5, i18n.t)).toBe("30min");
+		await i18n.changeLanguage("fr");
+		expect(formatAgingDuration(50, i18n.t)).toBe("2j");
+		await i18n.changeLanguage("en");
 	});
 
-	it("never shows 0min", () => {
-		expect(formatAgingDuration(0)).toBe("1min");
+	it("never shows 0min", async () => {
+		await i18n.changeLanguage("en");
+		expect(formatAgingDuration(0, i18n.t)).toBe("1min");
 	});
 });
 

@@ -29,7 +29,7 @@ export interface PausedTask {
 export function pauseTaskNow(
 	agentManager: AgentManager,
 	taskId: string,
-	options: { subtaskId?: string; reason?: string } = {},
+	options: { subtaskId?: string; reason?: string; halt?: boolean } = {},
 ): IPCResult<PausedTask> {
 	const { task, project } = findTaskAndProject(taskId);
 	if (!task || !project) {
@@ -62,6 +62,23 @@ export function pauseTaskNow(
 	// Re-scan so the scanner surfaces the pause on task.metadata; the
 	// UI uses that to switch the controls into the paused state.
 	projectStore.invalidateTasksCache(project.id);
+
+	// `halt: false` (the spoken stop): the backend ends its session after the
+	// tool call in flight (`agents/tool_breaker.py` reads this file after each
+	// result) and its loop stops at the pause, so the process exits by itself.
+	if (options.halt === false) {
+		return {
+			success: true,
+			data: {
+				taskId,
+				paused: true,
+				pausedAt,
+				pausedPhase: phase,
+				specDirs: written,
+				wasRunning: agentManager.isRunning(taskId),
+			},
+		};
+	}
 
 	// Immediate pause: stop the running subprocess NOW rather than waiting for
 	// the backend to reach its next cooperative checkpoint (which, mid-session,

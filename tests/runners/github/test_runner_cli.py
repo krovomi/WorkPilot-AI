@@ -17,8 +17,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from gh_fake import write_fake_gh  # noqa: E402
+from tests.gh_fake import write_fake_gh
 
 BACKEND = Path(__file__).resolve().parents[3] / "apps" / "backend"
 RUNNER = BACKEND / "runners" / "github" / "runner.py"
@@ -175,7 +174,7 @@ def test_check_labels_lists_an_issue_a_maintainer_labelled(project, gh):
     gh.answer(
         {
             **ANSWERS,
-            "api /repos/own/repo/issues/5/events": {
+            "api --method GET /repos/own/repo/issues/5/events": {
                 "stdout": json.dumps(
                     [
                         {
@@ -186,10 +185,10 @@ def test_check_labels_lists_an_issue_a_maintainer_labelled(project, gh):
                     ]
                 )
             },
-            "api /repos/own/repo/collaborators/ann/permission": {
+            "api --method GET /repos/own/repo/collaborators/ann/permission": {
                 "stdout": json.dumps({"permission": "admin"})
             },
-            "api /repos/own/repo": {
+            "api --method GET /repos/own/repo": {
                 "stdout": json.dumps({"owner": {"login": "own", "type": "User"}})
             },
         }

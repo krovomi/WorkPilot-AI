@@ -221,6 +221,15 @@ class TestWhatStopsAPass:
             await harness.run()
         assert harness.review_calls == []
 
+    async def test_the_policy_pauses_before_a_pass(self, harness, monkeypatch):
+        # Outside the hours or past the token budget of workpilot.policy.yaml.
+        monkeypatch.setattr(
+            loop, "policy_pause_before_session", lambda *_a: "policy_hours"
+        )
+        with pytest.raises(BuildPaused):
+            await harness.run()
+        assert harness.review_calls == []
+
     async def test_the_visual_qa_counts_are_shown(self, harness, monkeypatch, capsys):
         monkeypatch.setattr(
             loop, "run_visual_qa", lambda *_a: {"high": 1, "medium": 0, "low": 2}

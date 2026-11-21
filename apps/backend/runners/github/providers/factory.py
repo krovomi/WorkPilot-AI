@@ -17,6 +17,14 @@ from .protocol import GitProvider, ProviderType
 # Provider registry for dynamic registration
 _PROVIDER_REGISTRY: dict[ProviderType, Callable[..., GitProvider]] = {}
 
+# The forges the protocol names that have no built-in provider yet.
+_PLANNED = {
+    ProviderType.GITLAB: "GitLab",
+    ProviderType.BITBUCKET: "Bitbucket",
+    ProviderType.GITEA: "Gitea",
+    ProviderType.AZURE_DEVOPS: "Azure DevOps",
+}
+
 
 def register_provider(
     provider_type: ProviderType,
@@ -61,15 +69,14 @@ def get_provider(
         provider = get_provider("github", "owner/repo")
         pr = await provider.fetch_pr(123)
     """
-    # Convert string to enum if needed
-    if isinstance(provider_type, str):
-        try:
-            provider_type = ProviderType(provider_type.lower())
-        except ValueError:
-            raise ValueError(
-                f"Unknown provider type: {provider_type}. "
-                f"Supported: {[p.value for p in ProviderType]}"
-            )
+    # A ProviderType is a str too: one conversion covers both.
+    try:
+        provider_type = ProviderType(provider_type.lower())
+    except ValueError:
+        raise ValueError(
+            f"Unknown provider type: {provider_type}. "
+            f"Supported: {[p.value for p in ProviderType]}"
+        )
 
     # Check registry first
     if provider_type in _PROVIDER_REGISTRY:
@@ -80,31 +87,10 @@ def get_provider(
         return GitHubProvider(_repo=repo, **kwargs)
 
     # Future providers (not yet implemented)
-    if provider_type == ProviderType.GITLAB:
-        raise NotImplementedError(
-            "GitLab provider not yet implemented. "
-            "See providers/gitlab_provider.py.stub for interface."
-        )
-
-    if provider_type == ProviderType.BITBUCKET:
-        raise NotImplementedError(
-            "Bitbucket provider not yet implemented. "
-            "See providers/bitbucket_provider.py.stub for interface."
-        )
-
-    if provider_type == ProviderType.GITEA:
-        raise NotImplementedError(
-            "Gitea provider not yet implemented. "
-            "See providers/gitea_provider.py.stub for interface."
-        )
-
-    if provider_type == ProviderType.AZURE_DEVOPS:
-        raise NotImplementedError(
-            "Azure DevOps provider not yet implemented. "
-            "See providers/azure_devops_provider.py.stub for interface."
-        )
-
-    raise ValueError(f"Unsupported provider type: {provider_type}")
+    raise NotImplementedError(
+        f"{_PLANNED[provider_type]} provider not yet implemented. "
+        f"See providers/{provider_type.value}_provider.py.stub for interface."
+    )
 
 
 def list_available_providers() -> list[ProviderType]:
@@ -134,11 +120,10 @@ def is_provider_available(provider_type: ProviderType | str) -> bool:
     Returns:
         True if the provider is available
     """
-    if isinstance(provider_type, str):
-        try:
-            provider_type = ProviderType(provider_type.lower())
-        except ValueError:
-            return False
+    try:
+        provider_type = ProviderType(provider_type.lower())
+    except ValueError:
+        return False
 
     # GitHub is always available
     if provider_type == ProviderType.GITHUB:
@@ -146,7 +131,3 @@ def is_provider_available(provider_type: ProviderType | str) -> bool:
 
     # Check registry
     return provider_type in _PROVIDER_REGISTRY
-
-
-# Register default providers
-# (Future implementations can be registered here or by external packages)

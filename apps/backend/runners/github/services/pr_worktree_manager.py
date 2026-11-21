@@ -53,10 +53,11 @@ def _get_max_age_days() -> int:
 
 
 # Safe pattern for git refs (SHA, branch names)
-# Allows: alphanumeric, dots, underscores, hyphens, forward slashes
+# Allows: alphanumeric, dots, underscores, hyphens, forward slashes; the first
+# character is alphanumeric, so a ref is never read by git as an option
 import re
 
-SAFE_REF_PATTERN = re.compile(r"^[a-zA-Z0-9._/\-]+$")
+SAFE_REF_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/\-]*$")
 
 
 class WorktreeInfo(NamedTuple):
@@ -164,21 +165,13 @@ class PRWorktreeManager:
             if result.returncode != 0:
                 # Check for fatal errors in stderr (git outputs info to stderr too)
                 stderr = result.stderr.strip()
-                # Clean up partial worktree on failure
-                if worktree_path.exists():
-                    shutil.rmtree(worktree_path, ignore_errors=True)
+                # Clean up a partial worktree on failure (none: a no-op)
+                shutil.rmtree(worktree_path, ignore_errors=True)
                 raise RuntimeError(f"Failed to create worktree: {stderr}")
 
-            # Verify the worktree was actually created
-            if not worktree_path.exists():
-                raise RuntimeError(
-                    f"Worktree creation reported success but path does not exist: {worktree_path}"
-                )
-
         except subprocess.TimeoutExpired:
-            # Clean up partial worktree on timeout
-            if worktree_path.exists():
-                shutil.rmtree(worktree_path, ignore_errors=True)
+            # Clean up a partial worktree on timeout (none: a no-op)
+            shutil.rmtree(worktree_path, ignore_errors=True)
             raise RuntimeError(f"Timeout creating worktree for {head_sha}")
 
         logger.info(f"[WorktreeManager] Created worktree at {worktree_path}")
@@ -257,12 +250,10 @@ class PRWorktreeManager:
             # Extract PR number from directory name (format: pr-XXX-sha)
             pr_number = None
             if item.name.startswith("pr-"):
-                parts = item.name.split("-")
-                if len(parts) >= 2:
-                    try:
-                        pr_number = int(parts[1])
-                    except ValueError:
-                        pass  # Non-numeric PR number in dir name - leave as None
+                try:
+                    pr_number = int(item.name.split("-")[1])
+                except ValueError:
+                    pass  # Non-numeric PR number in dir name - leave as None
 
             worktrees.append(
                 WorktreeInfo(path=item, age_days=age_days, pr_number=pr_number)
@@ -296,9 +287,7 @@ class PRWorktreeManager:
         registered = set()
         for line in result.stdout.split("\n"):
             if line.startswith("worktree "):
-                parts = line.split(" ", 1)
-                if len(parts) > 1 and parts[1]:
-                    registered.add(Path(parts[1]))
+                registered.add(Path(line.removeprefix("worktree ")))
 
         return registered
 

@@ -90,10 +90,23 @@ export interface MissionControlSession {
 	elapsed_seconds: number;
 }
 
+/** What the backend logs (`mission_control/orchestrator.py`, `_log_event`). */
+export type MissionControlEventType =
+	| "agent_created"
+	| "agent_removed"
+	| "agent_started"
+	| "agent_paused"
+	| "agent_resumed"
+	| "agent_stopped"
+	| "agent_config_updated"
+	| "agent_completed"
+	| "agent_failed";
+
 export interface MissionControlEvent {
-	type: string;
+	type: MissionControlEventType;
 	timestamp: number;
-	data: Record<string, unknown>;
+	/** Every event names its agent; a start carries its task, a failure its error. */
+	data: { agent_id: string; task?: string; error?: string } & Record<string, unknown>;
 }
 
 export interface MissionControlState {
@@ -117,4 +130,98 @@ export interface MissionControlStartRequest {
 	task: string;
 	/** The project a CLI provider runs in; the model call is text only. */
 	projectId?: string;
+}
+
+/** The ready-made crews; `auto` lets the work decide (#344). */
+export const MISSION_CONTROL_TEMPLATES = [
+	"bug_fix",
+	"new_feature",
+	"refactor_module",
+	"incident_response",
+] as const;
+export type MissionControlTemplate = (typeof MISSION_CONTROL_TEMPLATES)[number];
+
+export interface MissionControlCompositionRequest {
+	/** A description of the work, the person's own words. */
+	prompt?: string;
+	/** The project whose stack is read; a spec is read only within it. */
+	projectId?: string;
+	specId?: string;
+	template?: MissionControlTemplate;
+	/** In order of preference; a role goes to the first that serves it. */
+	providers: string[];
+	budgetUsd?: number;
+	budgetTokens?: number;
+	/** Ask a fast model of the first provider for a second opinion. */
+	refine?: boolean;
+}
+
+export interface MissionControlPlannedAgent {
+	key: string;
+	role: string;
+	critical: boolean;
+	optional: boolean;
+	provider: string;
+	/** Empty: the provider's own default (a CLI agent). */
+	model: string;
+	model_label: string;
+	tier: "flagship" | "standard" | "fast" | "local" | "provider_default";
+	input_tokens: number;
+	output_tokens: number;
+	/** null: the catalog has no price for this model. */
+	cost_usd: number | null;
+	flat_rate: boolean;
+	tool_use: boolean | null;
+	context_window: number;
+}
+
+export interface MissionControlCrew {
+	agents: MissionControlPlannedAgent[];
+	cost_usd: number;
+	tokens: number;
+	unpriced: number;
+	/** Expected quality relative to the full crew, 0 to 1. */
+	quality: number;
+}
+
+export interface MissionControlCompositionWarning {
+	code: string;
+	params: Record<string, string>;
+}
+
+export type MissionControlCompositionChange =
+	| { key: string; role: string; kind: "dropped" }
+	| {
+			key: string;
+			role: string;
+			kind: "model";
+			from: MissionControlPlannedAgent;
+			to: MissionControlPlannedAgent;
+	  };
+
+export interface MissionControlComposition {
+	status: "ok" | "degraded" | "refused";
+	template: string;
+	template_source: "chosen" | "model" | "fallback" | "kind";
+	complexity: "small" | "medium" | "large";
+	signals: {
+		words: number;
+		spec_tokens: number;
+		touched_files: number;
+		domains: string[];
+		has_test_suite: boolean;
+		languages: string[];
+		kind: string;
+		has_spec: boolean;
+	};
+	hinted: boolean;
+	warnings: MissionControlCompositionWarning[];
+	budget: { usd: number | null; tokens: number | null };
+	full: MissionControlCrew;
+	/** The crew to create; null when the budget is refused. */
+	proposed: MissionControlCrew | null;
+	/** The smallest crew, when even it does not fit the budget. */
+	minimum: MissionControlCrew | null;
+	steps: string[];
+	changes: MissionControlCompositionChange[];
 }

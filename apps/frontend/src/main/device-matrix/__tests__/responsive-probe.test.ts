@@ -7,12 +7,15 @@
  * the page answers is reshaped and bounded before it leaves the main.
  *
  * jsdom has no layout, so each element carries its box in `data-box`
- * (`left,top,width,height`) and the probe's `getBoundingClientRect` reads it.
+ * (`left,top,width,height`) and the probe's `getBoundingClientRect` reads it;
+ * its content size, in `data-scroll` (`scrollWidth,clientWidth,scrollHeight,clientHeight`).
  */
 import { describe, expect, it } from "vitest";
 import {
 	MAX_ELEMENTS,
+	MAX_OVERLAP_CANDIDATES,
 	MAX_SAMPLES,
+	MIN_OVERLAP_RATIO,
 	MIN_TEXT_PX,
 	MIN_TOUCH_TARGET_PX,
 	RESPONSIVE_PROBE,
@@ -36,6 +39,15 @@ function probe(body: string, device = { mobile: true, touch: true }, viewport = 
 		const [left, top, width, height] = (this.getAttribute("data-box") ?? "0,0,100,20").split(",").map(Number);
 		return { left, top, width, height, right: left + width, bottom: top + height, x: left, y: top } as DOMRect;
 	};
+	const metrics = ["scrollWidth", "clientWidth", "scrollHeight", "clientHeight"];
+	metrics.forEach((name, index) => {
+		Object.defineProperty(window.HTMLElement.prototype, name, {
+			configurable: true,
+			get(this: HTMLElement) {
+				return Number((this.getAttribute("data-scroll") ?? "0,0,0,0").split(",")[index]);
+			},
+		});
+	});
 	const before = window.document.body.innerHTML;
 	// The page's own script engine runs the probe, as Electron's isolated world does.
 	const output = (window as unknown as { eval: (code: string) => unknown }).eval(buildProbe(device)) as ProbeOutput;
@@ -57,6 +69,8 @@ describe("RESPONSIVE_PROBE", () => {
 			minText: MIN_TEXT_PX,
 			maxSamples: MAX_SAMPLES,
 			maxElements: MAX_ELEMENTS,
+			maxCandidates: MAX_OVERLAP_CANDIDATES,
+			minOverlap: MIN_OVERLAP_RATIO,
 		});
 	});
 
@@ -118,6 +132,70 @@ describe("RESPONSIVE_PROBE", () => {
 		expect(kind(probe(body, { mobile: false, touch: false }), "small-text")?.count).toBe(0);
 	});
 
+	it("names two contents that overlap, by their intersection", () => {
+		const output = probe(
+			'<p id="title" data-box="0,0,200,40">Title</p>' +
+				'<button class="cta" data-box="150,10,100,40">Go</button>' +
+				'<p data-box="0,100,200,40">apart</p>',
+			{ mobile: false, touch: false },
+		);
+		const overlap = kind(output, "overlapping-elements");
+		expect(overlap?.count).toBe(1);
+		expect(overlap?.samples[0]).toMatchObject({ selector: "p#title / button.cta", width: 50 });
+	});
+
+	it("does not count nesting, a touch, a sliver, an invisible or an empty element", () => {
+		const output = probe(
+			// A parent and its own child: contained, not overlapping.
+			'<div style="overflow-x: visible" data-box="0,0,300,100">text<span data-box="10,10,50,20">in</span></div>' +
+				// Lines that touch: 2 px.
+				'<p data-box="0,200,200,20">one</p><p data-box="0,218,200,20">two</p>' +
+				// Under MIN_OVERLAP_RATIO of the smaller box.
+				'<p data-box="0,300,100,100">left</p><p data-box="80,300,100,100">right</p>' +
+				// Transparent, or with nothing to show.
+				'<p style="opacity: 0" data-box="0,500,100,40">ghost</p><p data-box="0,500,100,40">shown</p>' +
+				'<div data-box="0,600,100,40"></div><div data-box="0,600,100,40"></div>',
+			{ mobile: false, touch: false },
+		);
+		expect(kind(output, "overlapping-elements")?.count).toBe(0);
+	});
+
+	it("leaves fixed, sticky and absolute layers, and what is inside them, alone", () => {
+		const output = probe(
+			'<p data-box="0,0,200,40">content</p>' +
+				'<header style="position: fixed; overflow-x: visible" data-box="0,0,400,50"><a href="/" data-box="0,0,80,50">home</a></header>' +
+				'<span style="position: absolute" data-box="10,10,20,20">3</span>' +
+				'<nav style="position: sticky" data-box="0,0,400,30">menu</nav>',
+			{ mobile: false, touch: false },
+		);
+		expect(kind(output, "overlapping-elements")?.count).toBe(0);
+	});
+
+	it("compares no more than MAX_OVERLAP_CANDIDATES elements", () => {
+		const stack = '<b data-box="0,0,50,50">x</b>'.repeat(MAX_OVERLAP_CANDIDATES + 5);
+		const overlap = kind(probe(stack, { mobile: false, touch: false }), "overlapping-elements");
+		expect(overlap?.count).toBe((MAX_OVERLAP_CANDIDATES * (MAX_OVERLAP_CANDIDATES - 1)) / 2);
+		expect(overlap?.samples).toHaveLength(MAX_SAMPLES);
+	});
+
+	it("flags text cut off by an ellipsis or a clip, or spilling out of a fixed box, on every device", () => {
+		const output = probe(
+			'<p class="name" style="overflow-x: hidden; text-overflow: ellipsis" data-box="0,0,100,20" data-scroll="300,100,20,20">A very long name</p>' +
+				'<p data-box="0,40,100,40" data-scroll="100,100,90,40">Many lines in a fixed height</p>' +
+				// A box that scrolls: nothing is lost.
+				'<p style="overflow-x: auto; overflow-y: auto" data-box="0,100,100,40" data-scroll="300,100,90,40">scrolls</p>' +
+				// Fits, has no text, is inline, or has no box of its own.
+				'<p data-box="0,160,100,20" data-scroll="100,100,20,20">fits</p>' +
+				'<div data-box="0,200,100,20" data-scroll="300,100,20,20"></div>' +
+				'<span style="display: inline" data-box="0,240,100,20" data-scroll="300,100,20,20">inline</span>' +
+				'<p data-box="0,280,100,20" data-scroll="300,0,20,0">empty box</p>',
+			{ mobile: false, touch: false },
+		);
+		const truncated = kind(output, "truncated-text");
+		expect(truncated?.count).toBe(2);
+		expect(truncated?.samples.map((sample) => sample.selector)).toEqual(["p.name", "p"]);
+	});
+
 	it("keeps at most MAX_SAMPLES examples but the full count", () => {
 		const many = Array.from({ length: MAX_SAMPLES + 5 }, (_, i) => `<span data-box="${i},0,900,10"></span>`).join("");
 		const overflow = kind(probe(many), "horizontal-overflow");
@@ -171,6 +249,20 @@ describe("sanitizeReport", () => {
 		expect(overflow?.count).toBe(overflow?.samples.length);
 		expect(overflow?.samples.length).toBeLessThanOrEqual(MAX_SAMPLES);
 		expect(report?.issues[1]).toEqual({ kind: "overflowing-media", count: 2, samples: [] });
+	});
+
+	it("keeps overlaps and cut-off text, in the order of the kinds", () => {
+		const report = sanitizeReport({
+			issues: [
+				{ kind: "truncated-text", count: 1, samples: [{ selector: "p.name" }] },
+				{ kind: "overlapping-elements", count: 2, samples: [{ selector: "h1 / button.cta", width: 40 }] },
+			],
+		});
+		expect(report?.issues.map((issue) => [issue.kind, issue.count])).toEqual([
+			["overlapping-elements", 2],
+			["truncated-text", 1],
+		]);
+		expect(report?.issues[0].samples[0].selector).toBe("h1 / button.cta");
 	});
 
 	it("bounds a long selector and reads a report without issues", () => {

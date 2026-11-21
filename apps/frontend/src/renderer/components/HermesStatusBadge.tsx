@@ -52,6 +52,7 @@ export function HermesStatusBadge({
 }: HermesStatusBadgeProps) {
 	const { t } = useTranslation(["hermes", "common", "navigation"]);
 	const [isOpen, setIsOpen] = useState(false);
+	const [docsError, setDocsError] = useState<string | null>(null);
 	const status = useHermesStore((s) => s.status);
 	const loading = useHermesStore((s) => s.loading);
 	const running = useHermesStore((s) => s.running);
@@ -63,6 +64,17 @@ export function HermesStatusBadge({
 	useEffect(() => {
 		void load();
 	}, [load]);
+
+	const openDocs = useCallback(async () => {
+		setDocsError(null);
+		try {
+			await globalThis.electronAPI?.openExternal?.(DOCS_URL);
+		} catch (err) {
+			// The main process says what it tried; a silent click says nothing.
+			const reason = err instanceof Error ? err.message : String(err);
+			setDocsError(t("hermes:sidebar.docsFailed", { error: reason }));
+		}
+	}, [t]);
 
 	// A degraded hermes is installed; an unreachable doctor reads as missing,
 	// as the badge itself shows it.
@@ -92,6 +104,8 @@ export function HermesStatusBadge({
 				? status.readiness.state
 				: "error";
 	const readiness = status?.readiness;
+	// A persona of the person's own (`diverged`) counts as installed: only a
+	// missing one is offered, never overwritten from here.
 	const soul = status?.soul;
 	const soulMissing = Boolean(soul?.offered && !soul.installed);
 	const pending = status?.pending.length ?? 0;
@@ -130,6 +144,8 @@ export function HermesStatusBadge({
 						<Button
 							variant="ghost"
 							size={isCollapsed ? "icon" : "sm"}
+							// Collapsed, the icon alone would leave the button unnamed
+							aria-label={isCollapsed ? NAME : undefined}
 							className={cn(
 								isCollapsed ? "justify-center" : "w-full justify-start gap-2 text-xs",
 								missing ? "text-muted-foreground" : "",
@@ -206,12 +222,10 @@ export function HermesStatusBadge({
 							variant="outline"
 							className="w-full gap-1"
 							disabled={running}
-							onClick={() => void installSoul(soul?.state === "diverged")}
+							onClick={() => void installSoul(false)}
 						>
 							<Sparkles className="h-3 w-3" aria-hidden />
-							{soul?.state === "diverged"
-								? t("hermes:soul.replace")
-								: t("hermes:soul.install")}
+							{t("hermes:soul.install")}
 						</Button>
 					)}
 
@@ -244,11 +258,19 @@ export function HermesStatusBadge({
 						variant="link"
 						size="sm"
 						className="w-full text-xs text-muted-foreground gap-1"
-						onClick={() => globalThis.electronAPI?.openExternal?.(DOCS_URL)}
+						onClick={() => {
+							void openDocs();
+						}}
 					>
 						{t("hermes:sidebar.docs", { name: NAME })}
 						<ExternalLink className="h-3 w-3" />
 					</Button>
+
+					{docsError && (
+						<p role="alert" className="text-xs text-destructive break-words">
+							{docsError}
+						</p>
+					)}
 				</div>
 			</PopoverContent>
 		</Popover>

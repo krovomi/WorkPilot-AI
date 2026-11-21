@@ -30,6 +30,13 @@
 		"completed": "Session complete",
 		"error": "Error"
 	},
+	"statusMessages": {
+		"starting": "Starting the pair programming session…",
+		"planning": "Analyzing the project and planning the AI's share of the work…",
+		"stopped": "Session stopped.",
+		"completed": "Session completed.",
+		"failed": "An error occurred."
+	},
 	"aiWork": {
 		"waiting": "Waiting to start...",
 		"planning": "Analyzing project and planning implementation...",
@@ -71,6 +78,7 @@
 	},
 	"errors": {
 		"startFailed": "Failed to start pair programming session",
+		"stopFailed": "Failed to stop the pair programming session",
 		"noProject": "Please select a project first"
 	},
 	"session": {

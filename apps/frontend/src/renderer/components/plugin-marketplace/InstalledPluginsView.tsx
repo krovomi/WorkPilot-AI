@@ -1,6 +1,7 @@
 import type { CatalogPluginType } from "@shared/types/plugin-marketplace";
 import { PackageOpen, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import {
 	uninstallPlugin,
@@ -18,7 +19,13 @@ const TYPE_COLORS: Record<CatalogPluginType, string> = {
 export function InstalledPluginsView() {
 	const { t } = useTranslation(["common"]);
 	const { installed, isInstalledLoading, projectId } =
-		usePluginMarketplaceStore();
+		usePluginMarketplaceStore(
+			useShallow((state) => ({
+				installed: state.installed,
+				isInstalledLoading: state.isInstalledLoading,
+				projectId: state.projectId,
+			})),
+		);
 
 	const typeLabel: Record<CatalogPluginType, string> = {
 		agent: t("common:pluginMarketplace.types.agent"),
@@ -29,7 +36,11 @@ export function InstalledPluginsView() {
 	if (isInstalledLoading) {
 		return (
 			<div className="flex items-center justify-center h-full">
-				<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+				<div
+					role="status"
+					aria-label={t("common:pluginMarketplace.loading")}
+					className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"
+				/>
 			</div>
 		);
 	}
@@ -93,6 +104,9 @@ export function InstalledPluginsView() {
 							className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
 							onClick={() => uninstallPlugin(projectId, plugin.pluginId)}
 							title={t("common:pluginMarketplace.actions.uninstall")}
+							aria-label={t("common:pluginMarketplace.actions.uninstallNamed", {
+								name: plugin.name,
+							})}
 						>
 							<Trash2 className="h-3.5 w-3.5" />
 						</Button>

@@ -6,11 +6,13 @@
 		"addFeature": "Add Feature",
 		"addNewFeature": "Add a new feature to the roadmap",
 		"regenerateRoadmap": "Regenerate Roadmap",
-		"target": "Target",
+		"targetAudience": "Target: {{audience}}",
 		"morePersonas": "+{{count}} more personas",
 		"secondaryPersonas": "Secondary Personas:",
-		"features": "features",
-		"phases": "phases"
+		"featureCount_one": "{{count}} feature",
+		"featureCount_other": "{{count}} features",
+		"phaseCount_one": "{{count}} phase",
+		"phaseCount_other": "{{count}} phases"
 	},
 	"emptyState": {
 		"title": "No Roadmap Yet",
@@ -84,6 +86,7 @@
 		}
 	},
 	"competitorAnalysis": {
+		"recently": "recently",
 		"title": "Competitor Analysis",
 		"noAnalysis": "No competitor analysis available",
 		"lastUpdated": "Last updated: {{date}}",
@@ -193,12 +196,20 @@
 		"competitorInsight": "This feature addresses competitor pain points",
 		"task": "Task",
 		"build": "Build",
-		"impact": "{{impact}} impact",
 		"competitorInsightTitle": "Competitor Insight",
-		"external": "External"
+		"external": "External",
+		"complexityLevel": {
+			"low": "Low complexity",
+			"medium": "Medium complexity",
+			"high": "High complexity"
+		},
+		"impactLevel": {
+			"low": "Low impact",
+			"medium": "Medium impact",
+			"high": "High impact"
+		}
 	},
 	"featureDetail": {
-		"severity": "{{severity}} severity",
 		"deleteDescription": "This will permanently remove \"{{title}}\" from your roadmap.",
 		"rationale": "Rationale",
 		"complexity": "Complexity",
@@ -233,5 +244,30 @@
 		"planned": "Planned",
 		"in_progress": "In progress",
 		"done": "Done"
+	},
+	"levels": {
+		"complexity": { "low": "Low", "medium": "Medium", "high": "High" },
+		"impact": { "low": "Low", "medium": "Medium", "high": "High" },
+		"complexityBadge": { "low": "Low complexity", "medium": "Medium complexity", "high": "High complexity" },
+		"impactBadge": { "low": "Low impact", "medium": "Medium impact", "high": "High impact" },
+		"severity": { "low": "Low severity", "medium": "Medium severity", "high": "High severity" }
+	},
+	"phaseStatus": {
+		"planned": "Planned",
+		"in_progress": "In progress",
+		"completed": "Completed"
+	},
+	"roadmapStatus": {
+		"draft": "Draft",
+		"active": "Active",
+		"archived": "Archived"
+	},
+	"errors": {
+		"convertFailed": "The feature could not be turned into a task: {{error}}",
+		"unknown": "unknown error"
+	},
+	"providers": {
+		"canny": "Canny",
+		"github_issue": "GitHub Issues"
 	}
 }

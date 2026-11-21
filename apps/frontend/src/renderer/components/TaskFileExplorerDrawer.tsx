@@ -41,7 +41,8 @@ export function TaskFileExplorerDrawer({
 	projectPath,
 }: TaskFileExplorerDrawerProps) {
 	const { t } = useTranslation();
-	const { clearCache, loadDirectory } = useFileExplorerStore();
+	const clearCache = useFileExplorerStore((s) => s.clearCache);
+	const loadDirectory = useFileExplorerStore((s) => s.loadDirectory);
 
 	const handleRefresh = () => {
 		clearCache();

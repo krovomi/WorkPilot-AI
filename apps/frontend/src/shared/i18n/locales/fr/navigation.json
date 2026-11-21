@@ -194,7 +194,6 @@
 		"notInstalledShort": "Non installé",
 		"checkingShort": "Vérification...",
 		"version": "Version",
-		"notInstalledDescription": "{{name}} n'est pas dans votre PATH. Installez-le, connectez-vous une fois dans un terminal, puis actualisez.",
 		"signInHint": "WorkPilot utilise la connexion propre à la CLI et ne lit jamais ses identifiants.",
 		"viewDocs": "Voir la documentation de {{name}}",
 		"install": {
@@ -262,6 +261,7 @@
 		"latest": "Dernière",
 		"lastChecked": "Dernière vérification",
 		"notInstalledDescription": "Codex CLI n'est pas installé. Cliquez sur « Installer » pour l'installer en arrière-plan :",
+		"updateFailed": "La mise à jour de Codex CLI a échoué.",
 		"installing": "Installation en cours, merci de patienter...",
 		"viewDocs": "Voir la documentation Codex CLI"
 	},
@@ -490,7 +490,8 @@
 			"busy": "REA est déjà en cours d'installation."
 		},
 		"noCredentials": "REA tourne sans vos identifiants, depuis un dossier à lui, et ne fait que lire des fichiers.",
-		"docsFailed": "Le lien ne s'est pas ouvert : {{error}}"
+		"docsFailed": "Le lien ne s'est pas ouvert : {{error}}",
+		"checkFailed": "La vérification n'a pas abouti : {{error}}"
 	},
 	"cliStatus": {
 		"installFailed": "Échec de l'installation",

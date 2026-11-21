@@ -102,6 +102,14 @@ def test_an_absent_hermes_files_nothing(project, monkeypatch, tmp_path):
     assert not (project / "skills" / "_proposed").exists()
 
 
+def test_a_build_without_the_hermes_package_skips_the_turn(project, monkeypatch):
+    # The package is optional: a build that ships without it imports nothing.
+    monkeypatch.setitem(sys.modules, "hermes.loop", None)
+
+    assert asyncio.run(observe_with_hermes(project)) is None
+    assert not (project / "skills" / "_proposed").exists()
+
+
 def test_an_issue_triage_turns_the_cycle(home, project):
     """Through the orchestrator, end to end on its own flow, with GitHub faked."""
     from runners.github.orchestrator import GitHubOrchestrator

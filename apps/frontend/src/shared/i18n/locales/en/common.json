@@ -240,7 +240,9 @@
 			"checkTerminal": "Check the Agent Terminals section in the sidebar to complete OAuth login.",
 			"authStartFailed": "Failed to start authentication",
 			"addProfileFailed": "Failed to add profile",
-			"tryAgain": "Please try again."
+			"tryAgain": "Please try again.",
+			"autoSwitchFailed": "Failed to save the auto-switch setting",
+			"switchFailed": "Failed to switch account"
 		},
 		"sdk": {
 			"title": "AI Rate Limit",
@@ -532,7 +534,10 @@
 		"cancel": "Cancel this download",
 		"retry": "Retry",
 		"cancelledLabel": "Cancelled",
-		"hint": "Downloads keep running in the background, even if you close this task."
+		"hint": "Downloads keep running in the background, even if you close this task.",
+		"hoursRemaining": "{{count}}h remaining",
+		"minutesRemaining": "{{count}}m remaining",
+		"secondsRemaining": "{{count}}s remaining"
 	},
 	"ideation": {
 		"converting": "Converting...",
@@ -917,7 +922,14 @@
 		"stopping": "Stopping...",
 		"progress": "Progress",
 		"lastActivityPrefix": "last activity",
-		"lastProgressUpdateTooltip": "Last progress update received"
+		"lastProgressUpdateTooltip": "Last progress update received",
+		"timeAgo": {
+			"justNow": "just now",
+			"seconds": "{{count}}s ago",
+			"minutes": "{{count}}m ago",
+			"hours": "{{count}}h ago",
+			"days": "{{count}}d ago"
+		}
 	},
 	"time": {
 		"justNow": "just now",
@@ -1005,7 +1017,10 @@
 			"optional": "Optional",
 			"agents": "Agents that use it",
 			"agentsHint": "You can change this later in Agent Tools.",
-			"noAgent": "Pick at least one agent."
+			"noAgent": "Pick at least one agent.",
+			"showValue": "Show the value",
+			"hideValue": "Hide the value",
+			"openHelp": "Where to get {{name}}"
 		},
 		"installedTab": {
 			"empty": "No MCP server in this project",
@@ -1046,12 +1061,41 @@
 			"httpConfiguration": "HTTP Configuration",
 			"transformTemplate": "Transform Template",
 			"transformPlaceholder": "Template for transforming input data...",
-			"paramDescriptionPlaceholder": "Description"
+			"paramDescriptionPlaceholder": "Description",
+			"addTool": "Add a tool",
+			"removeParam": "Remove the parameter",
+			"paramName": "Parameter name",
+			"paramType": "Parameter type",
+			"paramDescription": "Parameter description",
+			"colorCode": "Color code",
+			"httpMethod": "HTTP method",
+			"httpPath": "Path",
+			"chain": "Chain",
+			"paramTypes": {
+				"string": "Text",
+				"number": "Number",
+				"boolean": "Yes / no",
+				"array": "List",
+				"object": "Object"
+			}
 		},
 		"officialOnly": "Official",
 		"official": "Official",
 		"community": "Community",
 		"noProject": "Select a project: servers are installed per project.",
+		"errors": {
+			"loadCatalog": "The catalog could not be loaded.",
+			"loadBuilder": "Your builder servers could not be loaded.",
+			"unknownServer": "{{name}} is not in the catalog.",
+			"missingValues": "Fill in: {{name}}.",
+			"alreadyInstalled": "{{name}} is already installed in this project.",
+			"readSettings": "The project settings could not be read: nothing was changed.",
+			"saveSettings": "The project settings could not be saved.",
+			"install": "The server could not be installed.",
+			"uninstall": "The server could not be removed.",
+			"saveBuilder": "The server could not be saved.",
+			"deleteBuilder": "The server could not be deleted."
+		},
 		"requires": {
 			"uv": "Needs uv (uvx) on this machine.",
 			"az": "Needs the Azure CLI, signed in with az login."
@@ -1073,6 +1117,7 @@
 			"title": "Security",
 			"checking": "Reading the registry and known vulnerabilities…",
 			"recheck": "Check again",
+			"readFailed": "The registry could not be read.",
 			"checkedAt": "Registry read {{date}}",
 			"unchecked": {
 				"remote": "Runs on its vendor's servers: nothing of it runs on this machine, and there is no package to check.",
@@ -1172,7 +1217,8 @@
 			"installing": "Installing...",
 			"uninstall": "Uninstall",
 			"enable": "Enable",
-			"disable": "Disable"
+			"disable": "Disable",
+			"uninstallNamed": "Uninstall {{name}}"
 		},
 		"sdk": {
 			"title": "Plugin SDK",
@@ -1243,19 +1289,34 @@
 			"openFolderFailed": "Could not open the plugin folder",
 			"done": "Done",
 			"namePlaceholder": "My Awesome Plugin",
-			"untitled": "Untitled"
+			"createFailed": "Could not create the plugin",
+			"copyFailed": "Could not copy the configuration",
+			"fieldIdInvalid": "Use lowercase letters, digits and single hyphens (my-plugin)",
+			"fieldTemplateContentPlaceholder": "# Spec template\n\n## Requirements\n...",
+			"configFile": "Written to plugin.config.json in the plugin folder"
 		},
 		"byAuthor": "by {{author}}",
 		"noProject": "Select a project: plugins are installed into a project's skills.",
 		"installedIn": "In {{paths}}",
 		"howToUse": "Run it with /{{id}} in the Kanban command bar, or let the agent pick it up.",
 		"showSkill": "Show the skill",
-		"hideSkill": "Hide the skill"
+		"hideSkill": "Hide the skill",
+		"sortBy": "Sort plugins",
+		"loading": "Loading plugins",
+		"errors": {
+			"loadCatalog": "Failed to load catalog",
+			"loadInstalled": "Could not read the plugins installed in this project",
+			"install": "Installation failed",
+			"uninstall": "Uninstall failed"
+		}
 	},
 	"chatHistory": {
 		"title": "Chat History",
 		"byTeammate": "By {{name}}, read only",
 		"noConversations": "No conversations yet",
+		"titleInputLabel": "Conversation title",
+		"renameFailed": "The conversation could not be renamed.",
+		"deleteFailed": "The conversation could not be deleted.",
 		"today": "Today",
 		"yesterday": "Yesterday",
 		"daysAgo": "{{count}} days ago",
@@ -1392,6 +1453,7 @@
 		"description": "Sign in to a shared server, or continue in local mode.",
 		"serverUrl": "Server URL",
 		"entraButton": "Sign in with Microsoft",
+		"ssoButton": "Sign in with {{name}}",
 		"email": "Email",
 		"password": "Password",
 		"localAccountButton": "Sign in",
@@ -1424,13 +1486,36 @@
 		"parent": "⬆ Parent",
 		"noFolders": "No folder found.",
 		"checkPath": "Check the path or your access rights.",
-		"dragReferences": "Drag files to add as references"
+		"dragReferences": "Drag files to add as references",
+		"loadFailed": "Could not open this folder."
 	},
 	"shortcutsOverlay": {
 		"title": "Keyboard Shortcuts",
 		"pressBefore": "Press",
 		"escapeKey": "Escape",
-		"pressAfter": "to close · Single-key shortcuts work when not typing in an input"
+		"pressAfter": "to close · Menu shortcuts (two letters, typed one after the other) work when a project is open and you are not typing in a field",
+		"groups": {
+			"navigation": "Navigation",
+			"general": "General",
+			"terminal": "Terminals",
+			"menu": "Menu"
+		},
+		"items": {
+			"goKanban": "Go to Kanban",
+			"goTerminals": "Go to Terminals",
+			"goInsights": "Go to Insights",
+			"goRoadmap": "Go to Roadmap",
+			"openSettings": "Open Settings",
+			"commandPalette": "Command palette",
+			"shortcuts": "Keyboard shortcuts",
+			"newTask": "New task",
+			"addProject": "Add a project (outside Terminals)",
+			"voiceAssistant": "Voice assistant",
+			"stopAgents": "Stop all agents",
+			"closeDialog": "Close a dialog or overlay",
+			"newTerminal": "New terminal (in Terminals)",
+			"closeTerminal": "Close the terminal (in Terminals)"
+		}
 	},
 	"learningMode": {
 		"level": "Level: {{level}}",

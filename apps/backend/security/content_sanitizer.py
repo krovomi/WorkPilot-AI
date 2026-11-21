@@ -4,6 +4,7 @@ GitHub Content Sanitization
 
 Protects against prompt injection attacks by:
 - Stripping HTML comments that may contain hidden instructions
+- Stripping characters a reader does not see (control, zero-width, tag)
 - Enforcing content length limits
 - Escaping special delimiters
 
@@ -63,6 +64,14 @@ class ContentSanitizer:
     HTML_COMMENT_PATTERN = re.compile(r"<!--[\s\S]*?-->", re.MULTILINE)
     SCRIPT_TAG_PATTERN = re.compile(r"<script\b[\s\S]*?</script\b[^>]*>", re.IGNORECASE)
     STYLE_TAG_PATTERN = re.compile(r"<style\b[\s\S]*?</style\b[^>]*>", re.IGNORECASE)
+
+    # Characters a reader does not see: control characters other than tab and
+    # line breaks (C0, DEL, C1, a carriage return outside CRLF), zero-width
+    # characters and the Unicode tag block (U+E0000 to U+E007F)
+    INVISIBLE_PATTERN = re.compile(
+        "[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]|\r(?!\n)"
+        "|[\u200b-\u200d\u2060\ufeff]|[\U000e0000-\U000e007f]"
+    )
 
     # Patterns that look like prompt injection attempts
     INJECTION_PATTERNS = [
@@ -172,6 +181,13 @@ class ContentSanitizer:
                 logger.info(
                     f"Removed {len(html_comments)} HTML comments from {content_type}"
                 )
+
+        # Step 1b: Remove characters a reader does not see
+        invisible = self.INVISIBLE_PATTERN.findall(content)
+        if invisible:
+            content = self.INVISIBLE_PATTERN.sub("", content)
+            removed_items.append(f"{len(invisible)} invisible characters")
+            was_modified = True
 
         # Step 2: Remove script/style tags
         script_tags = self.SCRIPT_TAG_PATTERN.findall(content)

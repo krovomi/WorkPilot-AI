@@ -53,9 +53,6 @@ export const GUIDE_ANCHORS = {
 	},
 } as const;
 
-/** Build the attribute object to spread onto a target element. */
-export const guideAttr = (anchor: string) => ({ "data-guide": anchor });
-
 /** CSS selector for a given anchor. */
 export const guideSelector = (anchor: string) =>
 	`[data-guide="${anchor}"]`;

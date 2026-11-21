@@ -52,8 +52,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "dependency_guard": {"foundation"},
     # The watch after a deployment (docs/architecture/deploy-watch.md): git and
     # atomic writes through foundation, the strict offline policy. A leaf the
-    # deploy watch runner calls.
-    "deploy_watch": {"foundation", "offline_policy"},
+    # deploy watch runner calls. Its incident report asks the project's model
+    # through the agent_runtime port, with the metrics fenced by
+    # security.untrusted; the revert PR's forge is handed in by the runner.
+    "deploy_watch": {"agent_runtime", "foundation", "offline_policy", "security"},
     # The API contract watcher (docs/architecture/api-contract-watcher.md):
     # git through foundation; the consumer registry is read in the main
     # checkout (security.guardrail_policy.main_project). Its QA gate is in qa,
@@ -221,8 +223,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "task_logger",
     },
     # Out of the agents' cycle since A1's third step. The archify map builds its
-    # own prompts; its workflow phase lives in workflows/architecture_map_phase.py.
-    "architecture_visualizer": {"foundation"},
+    # own prompts, the task's text quoted as data (security.untrusted, rule S2);
+    # its workflow phase lives in workflows/architecture_map_phase.py.
+    "architecture_visualizer": {"foundation", "security"},
     # Attachments and diagnostics: the CI parsers and the traceability record
     # are read from foundation, not from self_healing or spec.
     "docintel": {
@@ -272,6 +275,23 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # the prompt section and its staged skills, nothing that runs an agent
     # (docs/architecture/windev.md). A leaf: the stack detection imports it.
     "windev": set(),
+    # Mission Control's composition (docs/architecture/mission-control-composition.md):
+    # the model registry, the price catalog, the context windows, the provider
+    # matrix, the stack and the card's kind, the untrusted-content fence and the
+    # API's path checks. It runs no agent (the main process calls the model),
+    # so nothing that reaches core or agents.
+    "mission_control": {
+        "context_mgmt",
+        "cost_intelligence",
+        "foundation",
+        "models_registry",
+        "phase_config",
+        "project",
+        "public_model_registry",
+        "security",
+        "skills_registry",
+        "tasks",
+    },
     # Smart Estimation's calibration loop (docs/architecture/smart-estimation.md):
     # its ledger through foundation's JSON lock, the merge diff through
     # foundation's git. A leaf the estimation runner and the merge event read.

@@ -32,23 +32,39 @@ import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { envWithoutCredentials } from "../utils/child-env";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { getAppLanguage } from "../app-language";
+import { notificationService } from "../notification-service";
 import {
 	DEPLOY_WATCH_RUNNER,
 	LiveDeployWatches,
 	RUN_ID,
+	deployAlertText,
 	readDeployWatch,
 	watchConfigured,
 } from "../cicd/deploy-watch";
+import {
+	CICD_PROVIDERS,
+	isProviderRunId,
+	runsLimit,
+	type TriggerParams,
+	triggerParams,
+} from "../cicd/trigger-inputs";
+
+export { CICD_PROVIDERS };
 
 
-function getRunnerPath(runner = "cicd_triggers_runner.py"): string {
+function getBackendPath(): string {
 	// Bundled resources once packaged, `apps/backend` in dev (app path is
 	// `apps/frontend`). Walking up from `import.meta.dirname` (`out/main`)
 	// left the repository and the runner was never found.
-	const backendPath = app.isPackaged
+	return app.isPackaged
 		? path.resolve(process.resourcesPath, "backend")
 		: path.resolve(app.getAppPath(), "..", "backend");
-	return path.join(backendPath, "runners", runner);
+}
+
+function getRunnerPath(runner = "cicd_triggers_runner.py"): string {
+	return path.join(getBackendPath(), "runners", runner);
 }
 
 /**
@@ -66,6 +82,8 @@ export function findKnownProject(projectDir: unknown): Project | null {
 }
 
 const UNKNOWN_PROJECT = { success: false, error: "Project not found" } as const;
+const INVALID_TRIGGER = { success: false, error: "Invalid trigger request" } as const;
+const INVALID_RUN_ID = { success: false, error: "Invalid run id" } as const;
 
 /** Renderer field → `.workpilot/.env` key. Nothing outside this list is written. */
 export const CICD_CONFIG_KEYS: Readonly<Record<string, string>> = {
@@ -171,6 +189,7 @@ async function runRunner(
 	project: Project,
 	args: string[],
 	runner?: string,
+	runnerEnv?: Record<string, string>,
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
 	const pythonPath = getConfiguredPythonPath();
 	const [cmd, pythonBaseArgs] = parsePythonCommand(pythonPath);
@@ -179,7 +198,7 @@ async function runRunner(
 	return new Promise((resolve) => {
 		// Only the CI/CD settings, decrypted: the project's files are never
 		// spread whole into the child's environment.
-		const env = envWithoutCredentials(process.env, readCicdConfig(project));
+		const env = runnerEnv ?? envWithoutCredentials(process.env, readCicdConfig(project));
 
 		const proc = spawn(cmd, cmdArgs, { env, cwd: project.path });
 		const stdout: string[] = [];
@@ -230,14 +249,6 @@ function saveRun(projectDir: string, run: object): void {
 	);
 }
 
-interface TriggerParams {
-	provider: string;
-	pr_url?: string;
-	branch?: string;
-	workflow?: string;
-	ref?: string;
-}
-
 /** Where a run came from, and the task an automatic one was started for. */
 interface RunOrigin {
 	source?: "manual" | "auto";
@@ -259,13 +270,22 @@ function startDeployWatch(project: Project, runId: string): void {
 		return;
 	}
 	if (!watchConfigured(config)) return;
-	liveWatches.start(project.path, runId, () =>
-		runRunner(
+	liveWatches.start(project.path, runId, async () => {
+		// The environment of a Python runner (the user's provider and its key,
+		// for the incident report) plus the CI/CD settings: no more than any
+		// view runner gets (docs/rules/security.md, S4).
+		const env = await pythonRunnerEnv(getBackendPath(), { extra: config });
+		await runRunner(
 			project,
 			["--action", "watch", "--project", project.path, "--run-id", runId],
 			DEPLOY_WATCH_RUNNER,
-		),
-	);
+			env,
+		);
+		// A warning or critical verdict reaches the person on the app's
+		// notification channels (desktop, ntfy, Telegram).
+		const alert = deployAlertText(getAppLanguage(), project.name, readDeployWatch(project.path, runId, true));
+		if (alert) notificationService.announce(project.id, alert);
+	});
 }
 
 /**
@@ -316,8 +336,6 @@ async function triggerPipeline(
 	if (result.success) startDeployWatch(project, run.id);
 	return { id: run.id, triggeredAt: run.triggered_at, result };
 }
-
-export const CICD_PROVIDERS = ["github", "gitlab", "azure", "jenkins"] as const;
 
 /**
  * Whether the CI/CD settings of `project` ask for a pipeline on `event` (an
@@ -461,12 +479,12 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_LIST_RUNS,
-		(_event, projectDir: unknown, limit: number = 50) => {
+		(_event, projectDir: unknown, limit?: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
 			try {
 				const runs = loadRuns(project.path)
-					.slice(0, limit)
+					.slice(0, runsLimit(limit))
 					.map((run) => withWatch(project.path, run));
 				return { success: true, data: runs };
 			} catch (err) {
@@ -477,9 +495,11 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_TRIGGER,
-		async (_event, projectDir: unknown, params: TriggerParams) => {
+		async (_event, projectDir: unknown, raw: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
+			const params = triggerParams(raw);
+			if (!params) return INVALID_TRIGGER;
 			const { result } = await triggerPipeline(project, params);
 			return result;
 		},
@@ -487,9 +507,10 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_GET_RUN_STATUS,
-		async (_event, projectDir: unknown, runId: string) => {
+		async (_event, projectDir: unknown, runId: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
+			if (!isProviderRunId(runId)) return INVALID_RUN_ID;
 			return runRunner(project, [
 				"--action",
 				"status",
@@ -504,9 +525,10 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_CANCEL_RUN,
-		async (_event, projectDir: unknown, runId: string) => {
+		async (_event, projectDir: unknown, runId: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
+			if (!isProviderRunId(runId)) return INVALID_RUN_ID;
 			return runRunner(project, [
 				"--action",
 				"cancel",
@@ -524,9 +546,7 @@ export function registerCICDTriggersHandlers(): void {
 		async (_event, projectDir: unknown, runId: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
-			if (typeof runId !== "string" || !RUN_ID.test(runId)) {
-				return { success: false, error: "Invalid run id" };
-			}
+			if (typeof runId !== "string" || !RUN_ID.test(runId)) return INVALID_RUN_ID;
 			if (liveWatches.isLive(project.path, runId)) {
 				return { success: false, error: "watch-running" };
 			}

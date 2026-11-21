@@ -3,7 +3,6 @@ import {
 	ROADMAP_COMPLEXITY_COLORS,
 	ROADMAP_IMPACT_COLORS,
 	ROADMAP_PRIORITY_COLORS,
-	ROADMAP_PRIORITY_LABELS,
 } from "../../../shared/constants";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -20,6 +19,7 @@ export function FeatureCard({
 	hasCompetitorInsight = false,
 }: FeatureCardProps) {
 	const { t } = useTranslation();
+	const linkedSpecId = feature.linkedSpecId;
 	return (
 		<Card
 			className="p-4 hover:bg-muted/50 cursor-pointer transition-colors"
@@ -32,21 +32,19 @@ export function FeatureCard({
 							variant="outline"
 							className={ROADMAP_PRIORITY_COLORS[feature.priority]}
 						>
-							{t(`roadmap:priorityLabels.${feature.priority}`, {
-								defaultValue: ROADMAP_PRIORITY_LABELS[feature.priority],
-							})}
+							{t(`roadmap:priorityLabels.${feature.priority}`)}
 						</Badge>
 						<Badge
 							variant="outline"
 							className={`text-xs ${ROADMAP_COMPLEXITY_COLORS[feature.complexity]}`}
 						>
-							{feature.complexity}
+							{t(`roadmap:levels.complexityBadge.${feature.complexity}`)}
 						</Badge>
 						<Badge
 							variant="outline"
 							className={`text-xs ${ROADMAP_IMPACT_COLORS[feature.impact]}`}
 						>
-							{t("roadmap:featureCard.impact", { impact: feature.impact })}
+							{t(`roadmap:levels.impactBadge.${feature.impact}`)}
 						</Badge>
 						{hasCompetitorInsight && (
 							<Tooltip>
@@ -70,14 +68,13 @@ export function FeatureCard({
 						{feature.description}
 					</p>
 				</div>
-				{feature.linkedSpecId ? (
+				{linkedSpecId ? (
 					<Button
 						variant="outline"
 						size="sm"
 						onClick={(e) => {
 							e.stopPropagation();
-							// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-							onGoToTask(feature.linkedSpecId!);
+							onGoToTask(linkedSpecId);
 						}}
 					>
 						<ExternalLink className="h-3 w-3 mr-1" />

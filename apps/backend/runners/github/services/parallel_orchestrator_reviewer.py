@@ -26,57 +26,29 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-try:
-    from ...core.client import create_agent_client, create_client
-    from ...phase_config import get_thinking_budget, resolve_model_id
-    from ..context_gatherer import PRContext, _validate_git_ref
-    from ..gh_client import GHClient
-    from ..models import (
-        BRANCH_BEHIND_BLOCKER_MSG,
-        BRANCH_BEHIND_REASONING,
-        GitHubRunnerConfig,
-        MergeVerdict,
-        PRReviewFinding,
-        PRReviewResult,
-        ReviewSeverity,
-    )
-    from .agent_utils import create_working_dir_injector
-    from .category_utils import map_category
-    from .io_utils import safe_print
-    from .pr_worktree_manager import PRWorktreeManager
-    from .pydantic_models import (
-        AgentAgreement,
-        FindingValidationResponse,
-        ParallelOrchestratorResponse,
-        SpecialistResponse,
-    )
-    from .sdk_utils import process_agent_stream, process_sdk_stream
-except (ImportError, ValueError, SystemError):
-    from context_gatherer import PRContext, _validate_git_ref
-    from core.client import create_agent_client, create_client
-    from gh_client import GHClient
-    from models import (
-        BRANCH_BEHIND_BLOCKER_MSG,
-        BRANCH_BEHIND_REASONING,
-        GitHubRunnerConfig,
-        MergeVerdict,
-        PRReviewFinding,
-        PRReviewResult,
-        ReviewSeverity,
-    )
-    from phase_config import get_thinking_budget, resolve_model_id
-    from services.agent_utils import create_working_dir_injector
-    from services.category_utils import map_category
-    from services.io_utils import safe_print
-    from services.pr_worktree_manager import PRWorktreeManager
-    from services.pydantic_models import (
-        AgentAgreement,
-        FindingValidationResponse,
-        ParallelOrchestratorResponse,
-        SpecialistResponse,
-    )
-    from services.sdk_utils import process_agent_stream, process_sdk_stream
-
+from core.client import create_agent_client, create_client
+from phase_config import get_thinking_budget, resolve_model_id
+from runners.github.context_gatherer import PRContext, _validate_git_ref
+from runners.github.gh_client import GHClient
+from runners.github.models import (
+    BRANCH_BEHIND_BLOCKER_MSG,
+    BRANCH_BEHIND_REASONING,
+    GitHubRunnerConfig,
+    MergeVerdict,
+    PRReviewFinding,
+    PRReviewResult,
+    ReviewSeverity,
+)
+from runners.github.services.agent_utils import create_working_dir_injector
+from runners.github.services.category_utils import map_category
+from runners.github.services.io_utils import safe_print
+from runners.github.services.pr_worktree_manager import PRWorktreeManager
+from runners.github.services.pydantic_models import (
+    AgentAgreement,
+    FindingValidationResponse,
+    SpecialistResponse,
+)
+from runners.github.services.sdk_utils import process_agent_stream, process_sdk_stream
 
 # =============================================================================
 # Specialist Configuration for Parallel SDK Sessions
@@ -130,6 +102,9 @@ DEBUG_MODE = os.environ.get("DEBUG", "").lower() in ("true", "1", "yes")
 
 # Directory for PR review worktrees (inside github/pr for consistency)
 PR_WORKTREE_DIR = ".workpilot/github/pr/worktrees"
+
+# The review counts the files of the PR's worktree, for the log, up to this many
+WORKTREE_FILE_COUNT_LIMIT = 10000
 
 
 def _is_finding_in_scope(
@@ -193,6 +168,9 @@ class ParallelOrchestratorReviewer:
         self.config = config
         self.progress_callback = progress_callback
         self.worktree_manager = PRWorktreeManager(project_dir, PR_WORKTREE_DIR)
+        self.prompts_dir = (
+            Path(__file__).parent.parent.parent.parent / "prompts" / "github"
+        )
 
     def _report_progress(self, phase: str, progress: int, message: str, **kwargs):
         """Report progress if callback is set."""
@@ -200,12 +178,10 @@ class ParallelOrchestratorReviewer:
             import sys
 
             if "orchestrator" in sys.modules:
+                # The runner imports the orchestrator by its bare name.
                 ProgressCallback = sys.modules["orchestrator"].ProgressCallback
             else:
-                try:
-                    from ..orchestrator import ProgressCallback
-                except ImportError:
-                    from orchestrator import ProgressCallback
+                from runners.github.orchestrator import ProgressCallback
 
             self.progress_callback(
                 ProgressCallback(
@@ -215,9 +191,7 @@ class ParallelOrchestratorReviewer:
 
     def _load_prompt(self, filename: str) -> str:
         """Load a prompt file from the prompts/github directory."""
-        prompt_file = (
-            Path(__file__).parent.parent.parent.parent / "prompts" / "github" / filename
-        )
+        prompt_file = self.prompts_dir / filename
         if prompt_file.exists():
             return prompt_file.read_text(encoding="utf-8")
         logger.warning(f"Prompt file not found: {prompt_file}")
@@ -479,11 +453,8 @@ Report findings with specific file paths, line numbers, and code evidence.
                     ).hexdigest()[:12]
 
                     category = map_category(f.category)
-
-                    try:
-                        severity = ReviewSeverity(f.severity.lower())
-                    except ValueError:
-                        severity = ReviewSeverity.MEDIUM
+                    # The schema only lets the four severities through.
+                    severity = ReviewSeverity(f.severity)
 
                     finding = PRReviewFinding(
                         id=finding_id,
@@ -578,95 +549,6 @@ Report findings with specific file paths, line numbers, and code evidence.
 
         return (all_findings, agents_invoked)
 
-    def _log_agents_invoked(self, agents: list[str]) -> None:
-        """Log invoked agents with clear formatting.
-
-        Args:
-            agents: List of agent names that were invoked
-        """
-        if agents:
-            safe_print(
-                f"[ParallelOrchestrator] Specialist agents invoked: {', '.join(agents)}",
-                flush=True,
-            )
-            for agent in agents:
-                safe_print(f"[Agent:{agent}] Analysis complete")
-
-    def _log_findings_summary(self, findings: list[PRReviewFinding]) -> None:
-        """Log findings summary for verification.
-
-        Args:
-            findings: List of findings to summarize
-        """
-        if findings:
-            safe_print(
-                f"[ParallelOrchestrator] Parsed {len(findings)} findings from structured output",
-                flush=True,
-            )
-            safe_print("[ParallelOrchestrator] Findings summary:")
-            for i, f in enumerate(findings, 1):
-                safe_print(
-                    f"  [{f.severity.value.upper()}] {i}. {f.title} ({f.file}:{f.line})",
-                    flush=True,
-                )
-
-    def _create_finding_from_structured(self, finding_data: Any) -> PRReviewFinding:
-        """Create a PRReviewFinding from structured output data.
-
-        Args:
-            finding_data: Finding data from structured output
-
-        Returns:
-            PRReviewFinding instance
-        """
-        finding_id = hashlib.md5(
-            f"{finding_data.file}:{finding_data.line}:{finding_data.title}".encode(),
-            usedforsecurity=False,
-        ).hexdigest()[:12]
-
-        category = map_category(finding_data.category)
-
-        try:
-            severity = ReviewSeverity(finding_data.severity.lower())
-        except ValueError:
-            severity = ReviewSeverity.MEDIUM
-
-        # Extract evidence: prefer verification.code_examined, fallback to evidence field
-        evidence = finding_data.evidence
-        if hasattr(finding_data, "verification") and finding_data.verification:
-            # Structured verification has more detailed evidence
-            verification = finding_data.verification
-            if hasattr(verification, "code_examined") and verification.code_examined:
-                evidence = verification.code_examined
-
-        # Extract end_line if present
-        end_line = getattr(finding_data, "end_line", None)
-
-        # Extract source_agents if present
-        source_agents = getattr(finding_data, "source_agents", []) or []
-
-        # Extract cross_validated if present
-        cross_validated = getattr(finding_data, "cross_validated", False)
-
-        # Extract is_impact_finding if present (for findings about callers/affected files)
-        is_impact_finding = getattr(finding_data, "is_impact_finding", False)
-
-        return PRReviewFinding(
-            id=finding_id,
-            file=finding_data.file,
-            line=finding_data.line,
-            end_line=end_line,
-            title=finding_data.title,
-            description=finding_data.description,
-            category=category,
-            severity=severity,
-            suggested_fix=finding_data.suggested_fix or "",
-            evidence=evidence,
-            source_agents=source_agents,
-            cross_validated=cross_validated,
-            is_impact_finding=is_impact_finding,
-        )
-
     async def _get_ci_status(self, pr_number: int) -> dict:
         """Fetch CI status for the PR.
 
@@ -752,12 +634,8 @@ Report findings with specific file paths, line numbers, and code evidence.
                 logger.warning(
                     "[ParallelOrchestrator] No head_sha available, using current checkout"
                 )
-                # Fallback to original behavior if no SHA available
-                project_root = (
-                    self.project_dir.parent.parent
-                    if self.project_dir.name == "backend"
-                    else self.project_dir
-                )
+                # No SHA: the project checkout itself
+                project_root = self.project_dir
             else:
                 if DEBUG_MODE:
                     safe_print(
@@ -769,20 +647,17 @@ Report findings with specific file paths, line numbers, and code evidence.
                         head_sha, context.pr_number
                     )
                     project_root = worktree_path
-                    # Count files in worktree to give user visibility (with limit to avoid slowdown)
-                    MAX_FILE_COUNT = 10000
-                    try:
-                        file_count = 0
-                        for f in worktree_path.rglob("*"):
-                            if f.is_file() and ".git" not in f.parts:
-                                file_count += 1
-                                if file_count >= MAX_FILE_COUNT:
-                                    break
-                    except (OSError, PermissionError):
-                        file_count = 0
+                    # Count files in worktree to give user visibility (with
+                    # limit to avoid slowdown). `rglob` skips what it cannot read.
+                    file_count = 0
+                    for f in worktree_path.rglob("*"):
+                        if f.is_file() and ".git" not in f.parts:
+                            file_count += 1
+                            if file_count >= WORKTREE_FILE_COUNT_LIMIT:
+                                break
                     file_count_str = (
                         f"{file_count:,}+"
-                        if file_count >= MAX_FILE_COUNT
+                        if file_count >= WORKTREE_FILE_COUNT_LIMIT
                         else f"{file_count:,}"
                     )
                     # Always log worktree creation with file count (not gated by DEBUG_MODE)
@@ -804,12 +679,8 @@ Report findings with specific file paths, line numbers, and code evidence.
                         f"[ParallelOrchestrator] Worktree creation failed, "
                         f"using current checkout: {e}"
                     )
-                    # Fallback to original behavior if worktree creation fails
-                    project_root = (
-                        self.project_dir.parent.parent
-                        if self.project_dir.name == "backend"
-                        else self.project_dir
-                    )
+                    # No worktree: the project checkout itself
+                    project_root = self.project_dir
 
             # Removed: Related files rescanning
             # LLM agents now discover relevant files themselves via Read, Grep, Glob tools
@@ -976,13 +847,10 @@ Report findings with specific file paths, line numbers, and code evidence.
                 agents_invoked=agents_invoked,
             )
 
-            # Map verdict to overall_status
-            if verdict == MergeVerdict.BLOCKED:
+            # Map verdict to overall_status (`_generate_verdict` never says
+            # MERGE_WITH_CHANGES)
+            if verdict in (MergeVerdict.BLOCKED, MergeVerdict.NEEDS_REVISION):
                 overall_status = "request_changes"
-            elif verdict == MergeVerdict.NEEDS_REVISION:
-                overall_status = "request_changes"
-            elif verdict == MergeVerdict.MERGE_WITH_CHANGES:
-                overall_status = "comment"
             else:
                 overall_status = "approve"
 
@@ -1048,45 +916,6 @@ Report findings with specific file paths, line numbers, and code evidence.
             # Always cleanup worktree, even on error
             if worktree_path:
                 self._cleanup_pr_worktree(worktree_path)
-
-    def _parse_structured_output(
-        self, structured_output: dict[str, Any]
-    ) -> tuple[list[PRReviewFinding] | None, list[str]]:
-        """Parse findings and agents from SDK structured output.
-
-        Returns:
-            Tuple of (findings list or None if parsing failed, agents list)
-        """
-        findings = []
-        agents_from_output: list[str] = []
-
-        try:
-            result = ParallelOrchestratorResponse.model_validate(structured_output)
-            agents_from_output = result.agents_invoked or []
-
-            logger.info(
-                f"[ParallelOrchestrator] Structured output: verdict={result.verdict}, "
-                f"{len(result.findings)} findings, agents={agents_from_output}"
-            )
-
-            # Log agents invoked with clear formatting
-            self._log_agents_invoked(agents_from_output)
-
-            # Convert structured findings to PRReviewFinding objects
-            for f in result.findings:
-                finding = self._create_finding_from_structured(f)
-                findings.append(finding)
-
-            # Log findings summary for verification
-            self._log_findings_summary(findings)
-
-        except Exception as e:
-            logger.error(
-                f"[ParallelOrchestrator] Structured output parsing failed: {e}"
-            )
-            return None, agents_from_output
-
-        return findings, agents_from_output
 
     def _extract_json_from_text(self, output: str) -> dict[str, Any] | None:
         """Extract JSON object from text output.
@@ -1542,12 +1371,6 @@ For EACH finding above:
             # Fail-safe: return original findings
             return findings
 
-        if not structured_output:
-            logger.warning(
-                "[PRReview] No structured validation output, keeping original findings"
-            )
-            return findings
-
         # Parse validation results
         try:
             response = FindingValidationResponse.model_validate(structured_output)
@@ -1586,7 +1409,7 @@ For EACH finding above:
                     f"{validation.explanation[:100]}"
                 )
 
-            elif validation.validation_status == "needs_human_review":
+            else:  # needs_human_review
                 # Keep but flag
                 finding.validation_status = "needs_human_review"
                 finding.validation_evidence = validation.code_evidence
