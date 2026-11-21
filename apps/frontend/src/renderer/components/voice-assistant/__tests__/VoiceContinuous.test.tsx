@@ -8,7 +8,10 @@ import { MAX_SENTENCE_MS } from "../use-continuous-capture";
 import { VoiceContinuous } from "../VoiceContinuous";
 
 vi.mock("../../task-form/dictation-audio", () => ({ captureDictation: vi.fn() }));
-vi.mock("../../../stores/task-store", () => ({ createTask: vi.fn() }));
+vi.mock("../../../stores/task-store", async () => {
+	const { create } = await import("zustand");
+	return { createTask: vi.fn(), useTaskStore: create(() => ({ tasks: [] as unknown[] })) };
+});
 vi.mock("react-i18next", () => ({
 	useTranslation: () => ({
 		t: (key: string, values?: Record<string, unknown>) => {

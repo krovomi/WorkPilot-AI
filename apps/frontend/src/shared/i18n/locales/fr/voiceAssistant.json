@@ -68,7 +68,7 @@
 		"recording": "Appuyez sur les touches…",
 		"reset": "Rétablir la valeur par défaut",
 		"conflict": {
-			"invalid": "Utilisez Ctrl, Alt ou ⌘ avec une lettre, un chiffre, une touche de fonction ou Espace.",
+			"invalid": "Utilisez Ctrl, Alt ou ⌘ avec une lettre, un chiffre, une touche de fonction ou Espace, ou une touche de F13 à F24 seule (une pédale).",
 			"altgr": "Ctrl+Alt correspond à AltGr sur beaucoup de claviers (il tape @, € ou [). Choisissez une autre combinaison.",
 			"used": "{{shortcut}} est déjà utilisé par WorkPilot ou par le système."
 		},
@@ -83,7 +83,20 @@
 			"low": "Faible (pièce bruyante)",
 			"medium": "Moyenne",
 			"high": "Élevée (pièce calme, voix douce)"
-		}
+		},
+		"feedback": "Retour vocal",
+		"feedbackLevels": {
+			"off": "Muet",
+			"short": "Court : les réponses",
+			"verbose": "Bavard : les réponses et les tâches en cours"
+		},
+		"feedbackTry": "Écouter",
+		"feedbackSample": "Assistant vocal prêt.",
+		"feedbackHelp": "Dit avec les voix du système, sur cet ordinateur. En écoute continue, le micro ignore ce que dit l'assistant.",
+		"feedbackUnavailable": "Aucune voix locale n'est installée sur ce système : rien ne peut être dit à voix haute.",
+		"wake": "Mot d'éveil",
+		"wakeHelp": "Quand l'écoute continue est éteinte, le micro attend cette phrase, puis ouvre l'assistant. Un voyant qui pulse et un bouton pour couper le micro restent à l'écran. La parole est transcrite sur cet ordinateur.",
+		"wakePhrase": "Phrase"
 	},
 	"stop": {
 		"confirm": "Arrêter les agents en cours après leur étape actuelle ?",
@@ -105,7 +118,8 @@
 			"thinking": "Je réfléchis…",
 			"muted": "Micro coupé",
 			"paused": "En pause pendant que le panneau est ouvert",
-			"off": "Micro éteint"
+			"off": "Micro éteint",
+			"dictating": "En pause pendant la dictée du formulaire"
 		},
 		"mute": "Couper le micro",
 		"unmute": "Rallumer le micro",
@@ -115,5 +129,39 @@
 		"createQuestion": "Créer la tâche « {{title}} » ?",
 		"sayYes": "Dites « oui » ou « non », ou utilisez les boutons.",
 		"cancelled": "Annulé."
+	},
+	"heard": "Entendu en {{language}}.",
+	"speech": {
+		"opening": "J'ouvre {{view}}."
+	},
+	"narration": {
+		"phase": {
+			"planning": "{{title}} : planification.",
+			"coding": "{{title}} : écriture du code.",
+			"qa_review": "{{title}} : vérification du travail.",
+			"qa_fixing": "{{title}} : correction de ce que la vérification a trouvé.",
+			"rate_limit_paused": "{{title}} : en pause, limite du fournisseur atteinte."
+		},
+		"planReview": "{{title}} : le plan attend votre validation.",
+		"review": "{{title}} : fini, prêt pour votre revue.",
+		"failed": "{{title}} : échec.",
+		"stopped": "{{title}} : arrêtée.",
+		"done": "{{title}} : terminée.",
+		"subtaskDone": "Fait : {{detail}}.",
+		"working": "Maintenant : {{detail}}."
+	},
+	"pair": {
+		"follow": "Mode binôme : suivre une tâche en cours",
+		"none": "Aucune tâche suivie",
+		"hint": "Dites ce que l'agent doit faire : il reçoit vos mots à sa prochaine session.",
+		"sendQuestion": "Envoyer à « {{title}} » : « {{text}} » ?",
+		"send": "Envoyer à l'agent",
+		"sent": "Envoyé à « {{title}} » : son agent le lit à sa prochaine session.",
+		"sendFailed": "Le message n'a pas pu être envoyé à « {{title}} »."
+	},
+	"wake": {
+		"title": "Assistant vocal, en attente de son mot d'éveil",
+		"waiting": "Dites « {{phrase}} »",
+		"muted": "Mot d'éveil coupé"
 	}
 }
