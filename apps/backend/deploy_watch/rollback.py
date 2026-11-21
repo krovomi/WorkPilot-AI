@@ -11,7 +11,10 @@ its own commit, WorkPilot can do the rollback:
 
 GitLab creates a pipeline only on a branch or a tag, and Jenkins only knows
 its job's parameters: for them the plan names the last good pipeline or
-build and its link, and the rollback stays manual. The branch still holds
+build and its link, and the rollback stays manual. Jenkins says which commit
+each build checked out when its Git plugin records it (`lastBuiltRevision`):
+the plan then carries both commits, for the migration check and the revert
+PR. The branch still holds
 the bad commit either way: the report says to revert it.
 
 Every request goes to the provider's own API host, with the token of the
@@ -305,6 +308,15 @@ def _gitlab_plan(env: dict, triggered: datetime, fetch: Fetch) -> RollbackPlan:
     )
 
 
+def _jenkins_sha(actions: object) -> str:
+    """The commit the Git plugin says a build checked out, or ""."""
+    for action in actions if isinstance(actions, list) else []:
+        revision = action.get("lastBuiltRevision") if isinstance(action, dict) else None
+        if isinstance(revision, dict) and _sha(revision.get("SHA1")):
+            return revision["SHA1"]
+    return ""
+
+
 def _jenkins_plan(env: dict, triggered: datetime, fetch: Fetch) -> RollbackPlan:
     base = str(env.get("CICD_JENKINS_URL") or "").rstrip("/")
     job = str(env.get("CICD_JENKINS_JOB") or "")
@@ -320,7 +332,10 @@ def _jenkins_plan(env: dict, triggered: datetime, fetch: Fetch) -> RollbackPlan:
             else f"Bearer {token}"
         )
     url = f"{base}/job/{quote(job)}/api/json?" + urlencode(
-        {"tree": "builds[number,result,timestamp,url]{0,50}"}
+        {
+            "tree": "builds[number,result,timestamp,url,"
+            "actions[lastBuiltRevision[SHA1]]]{0,50}"
+        }
     )
     status, doc = _json(fetch, url, headers)
     items = doc.get("builds") if status == 200 and isinstance(doc, dict) else None
@@ -335,16 +350,22 @@ def _jenkins_plan(env: dict, triggered: datetime, fetch: Fetch) -> RollbackPlan:
                     "at": datetime.fromtimestamp(stamp / 1000, UTC),
                     "good": item.get("result") == "SUCCESS",
                     "id": str(item["number"]),
+                    "sha": _jenkins_sha(item.get("actions")),
                     "url": item.get("url")
                     if valid_url(str(item.get("url") or ""))
                     else "",
                 }
             )
-    good, _current = _split(runs, triggered)
+    good, current = _split(runs, triggered)
     if not good:
         return RollbackPlan("jenkins", "no_previous_success")
     return RollbackPlan(
-        "jenkins", "manual", target_run=good["id"], target_url=good["url"]
+        "jenkins",
+        "manual",
+        target_run=good["id"],
+        target_sha=good["sha"],
+        target_url=good["url"],
+        current_sha=current["sha"] if current else "",
     )
 
 
