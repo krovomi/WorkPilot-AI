@@ -3170,5 +3170,13 @@
 		"useRemote": "Use {{repo}}",
 		"detected": "No repository saved: this project uses the one of its git remote, {{repo}}.",
 		"saveDetected": "Save it in the settings"
+	},
+	"serverReplayLinks": {
+		"navLabel": "Replay links",
+		"title": "My replay team links",
+		"description": "Every team link to a replay you made, on every project of this server you are still a member of. Revoke a link here to end it at once: whoever has it can no longer open it.",
+		"refresh": "Refresh",
+		"empty": "You have not made any team link yet.",
+		"project": "Project: {{project}}"
 	}
 }

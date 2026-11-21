@@ -1,6 +1,7 @@
 /**
  * A recorded agent session left with a server project's team (#347): the
- * link that opens it, the project's list of links, revoking one.
+ * link that opens it, the project's list of links, the person's own links
+ * on every project (Settings), revoking one.
  *
  * The local backend builds the `.wpreplay`, masked as for a file
  * (`apps/backend/replay/bundle.py`); main sends it to the server the app is
@@ -19,6 +20,8 @@
 
 import type {
 	ReplayImportResult,
+	ReplayMyTeamShare,
+	ReplayMyTeamShareListResult,
 	ReplayTeamShare,
 	ReplayTeamShareListResult,
 	ReplayTeamShareResult,
@@ -27,6 +30,7 @@ import { REPLAY_SHARE_TTL_DAYS } from "../shared/types/replay-share";
 import { backendFetch } from "./ipc-handlers/_backend-fetch";
 import { isReplayId } from "./ipc-handlers/replay-handlers";
 import { exportedFile } from "./ipc-handlers/replay-share-handlers";
+import { recordReplayExport } from "./replay-usage";
 import { authedFetch, getServerUrl, isServerMode } from "./server-connection";
 import { getServerProject } from "./server-projects";
 
@@ -203,6 +207,7 @@ export async function shareToTeam(
 			? buildShareLink(serverUrl, project.id, share.id, data.token)
 			: null;
 	if (!share || !link) return fail("bad_share");
+	await recordReplayExport("team_link");
 	return { success: true, link, share };
 }
 
@@ -222,6 +227,31 @@ export async function listTeamShares(
 			.slice(0, MAX_SHARES)
 			.map(toTeamShare)
 			.filter((share): share is ReplayTeamShare => share !== null),
+	};
+}
+
+/** One of the person's own links, with the project it was left with, or null. */
+export function toMyTeamShare(raw: unknown): ReplayMyTeamShare | null {
+	const share = toTeamShare(raw);
+	if (!share || !isRecord(raw)) return null;
+	const projectId = raw.project_id;
+	if (typeof projectId !== "string" || !PROJECT_ID.test(projectId)) return null;
+	return { ...share, projectId, projectName: label(raw.project_name, MAX_TITLE) ?? projectId };
+}
+
+/** The person's own links, on every project of the server they still reach. */
+export async function listMyTeamShares(): Promise<ReplayMyTeamShareListResult> {
+	if (!getServerUrl() || !isServerMode()) return fail("not_signed_in");
+	const answer = await authedFetch<unknown>("/api/features/replay-shares/mine", "GET");
+	if (!answer.ok) return fail(answer.error);
+	const rows = isRecord(answer.data) ? answer.data.shares : null;
+	if (!Array.isArray(rows)) return fail("bad_share");
+	return {
+		success: true,
+		shares: rows
+			.slice(0, MAX_SHARES)
+			.map(toMyTeamShare)
+			.filter((share): share is ReplayMyTeamShare => share !== null),
 	};
 }
 

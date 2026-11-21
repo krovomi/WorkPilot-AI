@@ -3170,5 +3170,13 @@
 		"useRemote": "Utiliser {{repo}}",
 		"detected": "Aucun dépôt enregistré : ce projet utilise celui de son remote git, {{repo}}.",
 		"saveDetected": "L'enregistrer dans les réglages"
+	},
+	"serverReplayLinks": {
+		"navLabel": "Liens de rejeu",
+		"title": "Mes liens d'équipe vers un rejeu",
+		"description": "Chaque lien d'équipe vers un rejeu que vous avez créé, sur chaque projet de ce serveur dont vous êtes encore membre. Révoquer un lien ici y met fin aussitôt : qui l'a reçu ne peut plus l'ouvrir.",
+		"refresh": "Actualiser",
+		"empty": "Vous n'avez encore créé aucun lien d'équipe.",
+		"project": "Projet : {{project}}"
 	}
 }

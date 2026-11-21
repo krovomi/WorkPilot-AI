@@ -1,6 +1,7 @@
 /**
  * A replay left with a server project's team, behind a link that expires
- * (#347): share, list, revoke, open. Each argument is checked by
+ * (#347): share, list, revoke, open, and the person's own links on every
+ * project of the server (Settings). Each argument is checked by
  * `../replay-team-share.ts` before anything is asked of the local backend or
  * the server.
  */
@@ -8,6 +9,7 @@
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import {
+	listMyTeamShares,
 	listTeamShares,
 	openTeamShare,
 	revokeTeamShare,
@@ -29,4 +31,5 @@ export function registerReplayTeamShareHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.REPLAY_OPEN_TEAM_SHARE, (_e, link: unknown) =>
 		openTeamShare(link),
 	);
+	ipcMain.handle(IPC_CHANNELS.REPLAY_LIST_MY_TEAM_SHARES, () => listMyTeamShares());
 }
