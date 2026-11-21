@@ -28,6 +28,15 @@ MAX_FILE_CONTENT_CHARS = 50_000  # 50KB per file
 MAX_COMMENT_CHARS = 5_000  # 5KB per comment
 
 
+def _char_class(*ranges: tuple[int, int]) -> str:
+    """A regex character class for the given code point ranges, both ends kept."""
+    return (
+        "["
+        + "".join(f"{re.escape(chr(a))}-{re.escape(chr(b))}" for a, b in ranges)
+        + "]"
+    )
+
+
 @dataclass
 class SanitizeResult:
     """Result of sanitization operation."""
@@ -69,8 +78,14 @@ class ContentSanitizer:
     # line breaks (C0, DEL, C1, a carriage return outside CRLF), zero-width
     # characters and the Unicode tag block (U+E0000 to U+E007F)
     INVISIBLE_PATTERN = re.compile(
-        "[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]|\r(?!\n)"
-        "|[\u200b-\u200d\u2060\ufeff]|[\U000e0000-\U000e007f]"
+        "|".join(
+            (
+                _char_class((0x00, 0x08), (0x0B, 0x0C), (0x0E, 0x1F), (0x7F, 0x9F)),
+                "\r(?!\n)",
+                _char_class((0x200B, 0x200D), (0x2060, 0x2060), (0xFEFF, 0xFEFF)),
+                _char_class((0xE0000, 0xE007F)),
+            )
+        )
     )
 
     # Patterns that look like prompt injection attempts

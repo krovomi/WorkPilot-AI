@@ -415,7 +415,7 @@ class TestWhereTheSpecialistsRead:
 
         assert {c.options["project_dir"] for c in model.clients} == {project}
 
-    def test_from_the_backend_folder_the_repository_root_is_read(
+    def test_a_project_folder_named_backend_is_read_as_it_is(
         self, tmp_path, model, forge
     ):
         backend = tmp_path / "apps" / "backend"
@@ -435,7 +435,7 @@ class TestWhereTheSpecialistsRead:
         review(reviewer, pr(""))
         review(reviewer, pr("0123456789abcdef0123456789abcdef01234567"))
 
-        assert {c.options["project_dir"] for c in model.clients} == {tmp_path}
+        assert {c.options["project_dir"] for c in model.clients} == {backend}
 
     def test_a_large_worktree_is_announced_with_a_lower_bound(
         self, reviewer, model, forge, head, monkeypatch, capsys

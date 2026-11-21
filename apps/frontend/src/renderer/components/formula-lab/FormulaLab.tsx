@@ -12,8 +12,9 @@ import {
 	Search,
 	Sparkles,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import {
 	type Formula,
 	formulaKey,
@@ -55,9 +56,30 @@ const MAX_ROWS = 500;
 /** Sortable table columns; `null` falls back to the preference ranking. */
 type SortKey = "formula" | "effort" | "tokens" | "cost" | "success" | null;
 
+/** Ascending order of each sortable column. */
+const COMPARE: Record<NonNullable<SortKey>, (a: Formula, b: Formula) => number> = {
+	formula: (a, b) =>
+		`${a.provider} ${a.model}`.localeCompare(`${b.provider} ${b.model}`),
+	effort: (a, b) =>
+		EFFORT_ORDER.indexOf(a.effort as (typeof EFFORT_ORDER)[number]) -
+		EFFORT_ORDER.indexOf(b.effort as (typeof EFFORT_ORDER)[number]),
+	tokens: (a, b) => totalTokens(a) - totalTokens(b),
+	cost: (a, b) => a.expected_cost_usd - b.expected_cost_usd,
+	success: (a, b) => a.success_probability - b.success_probability,
+};
+
+/** The four headline picks, in display order. */
+const PICKS = [
+	{ id: "bestValue", icon: "🏆", accent: "#16a34a" },
+	{ id: "safest", icon: "🛡️", accent: "#0ea5e9" },
+	{ id: "cheapest", icon: "💸", accent: "#f59e0b" },
+	{ id: "fastest", icon: "⚡", accent: "#8b5cf6" },
+] as const;
+
 export function FormulaLab() {
 	const { t } = useTranslation(["formulaLab", "common"]);
 	const { toast } = useToast();
+	const perTokenId = useId();
 	const {
 		isOpen,
 		ticketTitle,
@@ -66,6 +88,7 @@ export function FormulaLab() {
 		error,
 		weight,
 		selectedKey,
+		appliedKey,
 		applying,
 		refining,
 		refineError,
@@ -75,7 +98,27 @@ export function FormulaLab() {
 		fetchMatrix,
 		applyFormula,
 		refineTopFormulas,
-	} = useFormulaMatrixStore();
+	} = useFormulaMatrixStore(
+		useShallow((s) => ({
+			isOpen: s.isOpen,
+			ticketTitle: s.ticketTitle,
+			matrix: s.matrix,
+			loading: s.loading,
+			error: s.error,
+			weight: s.weight,
+			selectedKey: s.selectedKey,
+			appliedKey: s.appliedKey,
+			applying: s.applying,
+			refining: s.refining,
+			refineError: s.refineError,
+			setWeight: s.setWeight,
+			setSelectedKey: s.setSelectedKey,
+			closeLab: s.closeLab,
+			fetchMatrix: s.fetchMatrix,
+			applyFormula: s.applyFormula,
+			refineTopFormulas: s.refineTopFormulas,
+		})),
+	);
 
 	const [providerFilter, setProviderFilter] = useState<string>("all");
 	const [effortFilter, setEffortFilter] = useState<Set<string>>(
@@ -123,26 +166,8 @@ export function FormulaLab() {
 	const ranked = useMemo(() => {
 		if (!sortKey) return rankFormulas(filtered, weight);
 		const dir = sortDir === "asc" ? 1 : -1;
-		const num = (f: Formula): number => {
-			switch (sortKey) {
-				case "effort":
-					return EFFORT_ORDER.indexOf(f.effort as (typeof EFFORT_ORDER)[number]);
-				case "tokens":
-					return totalTokens(f);
-				case "cost":
-					return f.expected_cost_usd;
-				case "success":
-					return f.success_probability;
-				default:
-					return 0;
-			}
-		};
-		return [...filtered].sort((a, b) => {
-			if (sortKey === "formula") {
-				return dir * `${a.provider} ${a.model}`.localeCompare(`${b.provider} ${b.model}`);
-			}
-			return dir * (num(a) - num(b));
-		});
+		const compare = COMPARE[sortKey];
+		return [...filtered].sort((a, b) => dir * compare(a, b));
 	}, [filtered, weight, sortKey, sortDir]);
 	const picks = useMemo(() => pickSmart(filtered), [filtered]);
 	const pareto = useMemo(() => paretoFront(filtered), [filtered]);
@@ -173,17 +198,27 @@ export function FormulaLab() {
 					? ChevronUp
 					: ChevronDown
 				: ChevronsUpDown;
+		const ariaSort =
+			sortKey !== key
+				? undefined
+				: sortDir === "asc"
+					? "ascending"
+					: "descending";
 		return (
 			<th
-				className={`cursor-pointer select-none p-2 font-medium hover:text-foreground ${alignCls}`}
-				onClick={() => toggleSort(key)}
+				className={`select-none p-2 font-medium ${alignCls}`}
+				aria-sort={ariaSort}
 			>
-				<span className={`inline-flex items-center gap-1 ${justifyCls}`}>
+				<button
+					type="button"
+					onClick={() => toggleSort(key)}
+					className={`inline-flex cursor-pointer items-center gap-1 hover:text-foreground ${justifyCls}`}
+				>
 					{t(labelKey)}
 					<Icon
 						className={`h-3 w-3 ${sortKey === key ? "text-primary" : "opacity-40"}`}
 					/>
-				</span>
+				</button>
 			</th>
 		);
 	};
@@ -209,7 +244,7 @@ export function FormulaLab() {
 			description: ok
 				? t("formulaLab:toast.appliedDesc", {
 						model: shortModel(formula.model),
-						effort: effortLabel(formula.effort),
+						effort: effortLabel(formula.effort, t),
 					})
 				: t("formulaLab:toast.failedDesc"),
 			variant: ok ? "default" : "destructive",
@@ -324,56 +359,24 @@ export function FormulaLab() {
 
 							{/* Smart picks */}
 							<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-								{picks.bestValue && (
-									<FormulaCard
-										formula={picks.bestValue}
-										pickLabel={`🏆 ${t("formulaLab:picks.bestValue")}`}
-										accent="#16a34a"
-										selected={selectedKey === formulaKey(picks.bestValue)}
-										applied={selectedKey === formulaKey(picks.bestValue)}
-										applying={applying}
-										onSelect={() =>
-											picks.bestValue &&
-											setSelectedKey(formulaKey(picks.bestValue))
-										}
-										onApply={() =>
-											picks.bestValue && handleApply(picks.bestValue)
-										}
-									/>
-								)}
-								{picks.safest && (
-									<FormulaCard
-										formula={picks.safest}
-										pickLabel={`🛡️ ${t("formulaLab:picks.safest")}`}
-										accent="#0ea5e9"
-										selected={selectedKey === formulaKey(picks.safest)}
-										applying={applying}
-										onSelect={() => picks.safest && setSelectedKey(formulaKey(picks.safest))}
-										onApply={() => picks.safest && handleApply(picks.safest)}
-									/>
-								)}
-								{picks.cheapest && (
-									<FormulaCard
-										formula={picks.cheapest}
-										pickLabel={`💸 ${t("formulaLab:picks.cheapest")}`}
-										accent="#f59e0b"
-										selected={selectedKey === formulaKey(picks.cheapest)}
-										applying={applying}
-										onSelect={() => picks.cheapest && setSelectedKey(formulaKey(picks.cheapest))}
-										onApply={() => picks.cheapest && handleApply(picks.cheapest)}
-									/>
-								)}
-								{picks.fastest && (
-									<FormulaCard
-										formula={picks.fastest}
-										pickLabel={`⚡ ${t("formulaLab:picks.fastest")}`}
-										accent="#8b5cf6"
-										selected={selectedKey === formulaKey(picks.fastest)}
-										applying={applying}
-										onSelect={() => picks.fastest && setSelectedKey(formulaKey(picks.fastest))}
-										onApply={() => picks.fastest && handleApply(picks.fastest)}
-									/>
-								)}
+								{PICKS.map(({ id, icon, accent }) => {
+									const pick = picks[id];
+									if (!pick) return null;
+									const key = formulaKey(pick);
+									return (
+										<FormulaCard
+											key={id}
+											formula={pick}
+											pickLabel={`${icon} ${t(`formulaLab:picks.${id}`)}`}
+											accent={accent}
+											selected={selectedKey === key}
+											applied={appliedKey === key}
+											applying={applying}
+											onSelect={() => setSelectedKey(key)}
+											onApply={() => handleApply(pick)}
+										/>
+									);
+								})}
 							</div>
 
 							{/* Efficiency frontier chart */}
@@ -393,12 +396,14 @@ export function FormulaLab() {
 										value={search}
 										onChange={(e) => setSearch(e.target.value)}
 										placeholder={t("formulaLab:filters.searchPlaceholder")}
+										aria-label={t("formulaLab:filters.searchPlaceholder")}
 										className="h-8 w-44 pl-7 pr-2 text-xs"
 									/>
 								</div>
 								<NativeSelect
 									value={providerFilter}
 									onChange={(e) => setProviderFilter(e.target.value)}
+									aria-label={t("formulaLab:filters.provider")}
 									className="h-8 px-2 text-xs"
 								>
 									<option value="all">{t("formulaLab:filters.allProviders")}</option>
@@ -414,24 +419,27 @@ export function FormulaLab() {
 											key={effort}
 											type="button"
 											onClick={() => toggleEffort(effort)}
+											aria-pressed={effortFilter.has(effort)}
 											className={`rounded-md border px-2 py-1 transition-colors ${
 												effortFilter.has(effort)
 													? "border-primary bg-primary/10 text-primary"
 													: "border-border text-muted-foreground"
 											}`}
 										>
-											{effortLabel(effort)}
+											{effortLabel(effort, t)}
 										</button>
 									))}
 								</div>
-								{/* biome-ignore lint/a11y/noLabelWithoutControl: Switch is a custom component */}
-								<label className="ml-auto flex items-center gap-1.5">
+								<div className="ml-auto flex items-center gap-1.5">
 									<Switch
+										id={perTokenId}
 										checked={perTokenOnly}
 										onCheckedChange={setPerTokenOnly}
 									/>
-									{t("formulaLab:filters.perTokenOnly")}
-								</label>
+									<label htmlFor={perTokenId}>
+										{t("formulaLab:filters.perTokenOnly")}
+									</label>
+								</div>
 								<span className="text-muted-foreground">
 									{t("formulaLab:filters.count", { count: filtered.length })}
 								</span>
@@ -454,6 +462,7 @@ export function FormulaLab() {
 										{ranked.slice(0, MAX_ROWS).map((f) => {
 											const key = formulaKey(f);
 											const isSel = key === selectedKey;
+											const name = `${shortModel(f.model)} · ${effortLabel(f.effort, t)}`;
 											return (
 												<tr
 													key={key}
@@ -470,9 +479,17 @@ export function FormulaLab() {
 																	backgroundColor: providerColor(f.provider),
 																}}
 															/>
-															<span className="font-medium">
+															<button
+																type="button"
+																onClick={() => setSelectedKey(key)}
+																aria-pressed={isSel}
+																aria-label={t("formulaLab:selectFormula", {
+																	formula: `${f.provider} ${name}`,
+																})}
+																className="font-medium hover:underline"
+															>
 																{shortModel(f.model)}
-															</span>
+															</button>
 															<span className="text-muted-foreground">
 																{f.provider}
 															</span>
@@ -500,7 +517,7 @@ export function FormulaLab() {
 													</td>
 													<td className="p-2">
 														<Badge variant="outline" className="text-3xs">
-															{effortLabel(f.effort)}
+															{effortLabel(f.effort, t)}
 														</Badge>
 													</td>
 													<td className="p-2 text-right tabular-nums text-muted-foreground">
@@ -510,7 +527,9 @@ export function FormulaLab() {
 														<span className="inline-flex items-center justify-end gap-1">
 															{f.cost_basis === "measured" && (
 																<span
+																	role="img"
 																	title={t("formulaLab:costBasis.measuredTooltip")}
+																	aria-label={t("formulaLab:costBasis.measuredTooltip")}
 																	className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-success"
 																/>
 															)}
@@ -525,7 +544,11 @@ export function FormulaLab() {
 																stroke={3}
 															/>
 															{f.ai_refined && (
-																<span title={f.refine_reason}>
+																<span
+																	role="img"
+																	title={f.refine_reason || t("formulaLab:refine.aiBadge")}
+																	aria-label={t("formulaLab:refine.aiBadge")}
+																>
 																	<Sparkles className="h-3 w-3 text-primary" />
 																</span>
 															)}
@@ -537,6 +560,9 @@ export function FormulaLab() {
 															variant={isSel ? "default" : "ghost"}
 															className="h-7 text-2xs"
 															disabled={applying}
+															aria-label={t("formulaLab:applyFormula", {
+																formula: `${f.provider} ${name}`,
+															})}
 															onClick={(e) => {
 																e.stopPropagation();
 																handleApply(f);
@@ -573,7 +599,7 @@ export function FormulaLab() {
 							<div>
 								<div className="font-semibold">
 									{shortModel(selectedFormula.model)} ·{" "}
-									{effortLabel(selectedFormula.effort)}
+									{effortLabel(selectedFormula.effort, t)}
 								</div>
 								<div className="text-xs text-muted-foreground">
 									{selectedFormula.provider} · {formatCostBand(selectedFormula)}

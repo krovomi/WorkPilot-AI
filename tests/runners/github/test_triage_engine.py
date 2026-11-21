@@ -126,12 +126,12 @@ def test_the_model_s_answer_becomes_the_triage(engine, model):
     assert (result.issue_number, result.repo) == (4, "own/repo")
 
     client = made[0]
-    assert client.options["agent_type"] == "qa_reviewer"
+    assert client.options["agent_type"] == "issue_triage"
     assert client.options["model"].startswith("claude-")  # "sonnet" resolved
     prompt = client.prompts[0]
     assert prompt.startswith(engine.prompt_manager.get_triage_prompt())
     assert "## Issue #4" in prompt
-    assert "**Labels:** bug, web" in prompt
+    assert "\nLabels: bug, web\n" in prompt
     assert "- #2: Login fails on Firefox" in prompt
     assert "#3" not in prompt
 
@@ -143,8 +143,9 @@ def test_a_model_that_fails_leaves_an_unsure_feature(engine, model, capsys):
     assert "Triage error for #4: provider down" in capsys.readouterr().out
 
 
-def test_the_context_shows_at_most_five_look_alikes():
+def test_the_context_shows_at_most_five_look_alikes(tmp_path):
     engine = TriageEngine.__new__(TriageEngine)
+    engine.github_dir = tmp_path
     issue = {
         "number": 1,
         "title": "Crash",
@@ -153,7 +154,7 @@ def test_the_context_shows_at_most_five_look_alikes():
     }
     alikes = [{"number": n, "title": f"Crash {n}"} for n in range(2, 9)]
     context = engine.build_triage_context(issue, [issue, *alikes])
-    assert "**Labels:** \n" in context
+    assert "\nLabels:\n</user_content>" in context
     assert "No description" in context
     listed = [line for line in context.splitlines() if line.startswith("- #")]
     assert listed == [f"- #{n}: Crash {n}" for n in range(2, 7)]
