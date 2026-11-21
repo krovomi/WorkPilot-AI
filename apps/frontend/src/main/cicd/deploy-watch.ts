@@ -15,6 +15,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
+	DeployAlertChannel,
+	DeployAlertStatus,
 	DeployIncident,
 	DeployMetricCheck,
 	DeployRevertPr,
@@ -55,13 +57,7 @@ const REVERTS: readonly DeployRevertStatus[] = [
 	"unavailable",
 ];
 
-/** The CI/CD settings name something to watch after a deployment. */
-export function watchConfigured(config: Record<string, string>): boolean {
-	return Boolean(
-		(config.CICD_MONITOR_HEALTH_URL ?? "").trim() ||
-			(config.CICD_MONITOR_PROMETHEUS_URL ?? "").trim(),
-	);
-}
+export { watchConfigured } from "./watch-settings";
 
 function text(value: unknown, limit = MAX_TEXT): string {
 	return typeof value === "string" ? value.slice(0, limit) : "";
@@ -147,6 +143,16 @@ function incident(raw: unknown): DeployIncident | undefined {
 	};
 }
 
+const ALERT_CHANNELS: readonly DeployAlertChannel[] = ["slack", "pagerduty", "email"];
+const ALERT_STATUSES: readonly DeployAlertStatus[] = ["sent", "failed", "invalid", "offline"];
+
+function alerts(raw: unknown): DeployWatch["alerts"] {
+	const r = record(raw);
+	const known = ALERT_CHANNELS.filter((c) => ALERT_STATUSES.includes(r[c] as DeployAlertStatus));
+	if (known.length === 0) return undefined;
+	return Object.fromEntries(known.map((c) => [c, r[c] as DeployAlertStatus]));
+}
+
 /** The state the runner wrote, typed and bounded. */
 export function parseDeployWatch(raw: unknown, live: boolean): DeployWatch | undefined {
 	const s = record(raw);
@@ -181,6 +187,7 @@ export function parseDeployWatch(raw: unknown, live: boolean): DeployWatch | und
 		rollbackByPerson: s.rollback_by === "person",
 		...(revertPr(s.revert_pr) ? { revertPr: revertPr(s.revert_pr) } : {}),
 		...(incident(s.incident) ? { incident: incident(s.incident) } : {}),
+		...(alerts(s.alerts) ? { alerts: alerts(s.alerts) } : {}),
 	};
 }
 

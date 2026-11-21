@@ -80,6 +80,12 @@ export interface DeployIncident {
 	explanation: string;
 }
 
+/** Where the alert of a bad verdict went (`CICD_ALERT_*` settings). */
+export type DeployAlertChannel = "slack" | "pagerduty" | "email";
+
+/** sent; failed to send; settings refused; not sent under strict offline mode. */
+export type DeployAlertStatus = "sent" | "failed" | "invalid" | "offline";
+
 export interface DeployWatch {
 	runId: string;
 	phase: DeployWatchPhase;
@@ -101,4 +107,6 @@ export interface DeployWatch {
 	rollbackByPerson: boolean;
 	revertPr?: DeployRevertPr;
 	incident?: DeployIncident;
+	/** The configured alert channels and what became of each. */
+	alerts?: Partial<Record<DeployAlertChannel, DeployAlertStatus>>;
 }

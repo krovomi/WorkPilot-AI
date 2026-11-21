@@ -54,7 +54,7 @@
 	},
 	"monitor": {
 		"heading": "Surveillance après déploiement",
-		"description": "Après un pipeline lancé depuis WorkPilot, le health check et les métriques Prometheus sont comparés à leur niveau d'avant, pendant une fenêtre d'observation.",
+		"description": "Après un pipeline lancé depuis WorkPilot, le health check et les métriques de la source choisie sont comparés à ce qu'ils étaient avant, pendant une fenêtre d'observation.",
 		"monitor_health_url": "URL du health check",
 		"monitor_prometheus_url": "URL de Prometheus",
 		"monitor_prometheus_token": "Jeton Prometheus (facultatif)",
@@ -62,7 +62,30 @@
 		"monitor_deploy_wait_minutes": "Attente du déploiement (minutes)",
 		"auto_rollback": "Rollback automatique sur un verdict critique",
 		"autoRollbackHint": "Désactivé : le rollback est proposé ici. Activé : GitHub Actions et Azure Pipelines reviennent à la dernière exécution réussie, sauf si le changement contient une migration de base de données.",
-		"fileHint": "Métriques et seuils : .workpilot/deploy-monitors.yaml (requête PromQL, type error_rate, latency, throughput ou custom, warning et critical en pourcentage). revert_pr: true ouvre une PR qui revert le commit déployé après un verdict critique ; explain_incident: false retire le modèle du rapport d'incident."
+		"fileHint": "Métriques et seuils : .workpilot/deploy-monitors.yaml (requête dans le langage de la source, type error_rate, latency, throughput ou custom, warning et critical en pourcentage). revert_pr: true ouvre une PR qui reverte le commit déployé après un verdict critique ; explain_incident: false tient le modèle hors du rapport d'incident.",
+		"monitor_source": "Source des métriques",
+		"sources": {
+			"prometheus": "Prometheus",
+			"datadog": "Datadog",
+			"newrelic": "New Relic",
+			"cloudwatch": "Amazon CloudWatch"
+		},
+		"monitor_datadog_site": "Site Datadog",
+		"monitor_datadog_api_key": "Clé d'API Datadog",
+		"monitor_datadog_app_key": "Clé d'application Datadog",
+		"monitor_newrelic_region": "Région New Relic",
+		"monitor_newrelic_account_id": "Identifiant du compte New Relic",
+		"monitor_newrelic_api_key": "Clé d'API utilisateur New Relic",
+		"monitor_aws_region": "Région AWS",
+		"monitor_aws_access_key_id": "Identifiant de la clé d'accès AWS",
+		"monitor_aws_secret_access_key": "Clé d'accès secrète AWS",
+		"monitor_aws_session_token": "Jeton de session AWS (facultatif)",
+		"queryHint": {
+			"prometheus": "La requête de chaque métrique est en PromQL ; un vecteur est additionné.",
+			"datadog": "La requête de chaque métrique est une requête de métrique Datadog ; le point le plus récent de chaque série sur les cinq dernières minutes est additionné.",
+			"newrelic": "La requête de chaque métrique est en NRQL, avec sa clause SINCE ; les nombres du résultat sont additionnés.",
+			"cloudwatch": "La requête de chaque métrique est une requête Metrics Insights ou une expression mathématique ; la valeur la plus récente de chaque résultat sur les cinq dernières minutes est additionnée."
+		}
 	},
 	"watch": {
 		"notConfigured": "Non surveillé : aucun health check ni aucune métrique configurés.",
@@ -126,6 +149,32 @@
 			"health": "health check en échec {{failed}} fois sur {{checks}}",
 			"metric": "{{name}} : {{baseline}} avant, {{worst}} au pire ({{change}} %, {{level}})",
 			"explanation": "Le modèle du projet :"
+		},
+		"alerts": {
+			"line": "Alertes : {{list}}",
+			"sent": "{{channel}} : envoyée",
+			"failed": "{{channel}} : non remise",
+			"invalid": "{{channel}} : réglages refusés",
+			"offline": "{{channel}} : ignorée (hors-ligne strict)",
+			"channels": {
+				"slack": "Slack",
+				"pagerduty": "PagerDuty",
+				"email": "e-mail"
+			}
 		}
+	},
+	"alerts": {
+		"heading": "Alertes après un mauvais déploiement",
+		"description": "Un verdict dégradé part sur Slack et par e-mail ; un verdict critique prévient aussi la personne d'astreinte par PagerDuty. Seuls les faits de la surveillance sont envoyés, jamais le texte du modèle.",
+		"alert_slack_webhook_url": "URL du webhook entrant Slack",
+		"alert_pagerduty_routing_key": "Clé d'intégration (routing key) PagerDuty",
+		"alert_pagerduty_region": "Région PagerDuty",
+		"alert_email_to": "Destinataires de l'e-mail (séparés par des virgules)",
+		"alert_email_from": "Expéditeur de l'e-mail",
+		"alert_smtp_host": "Serveur SMTP",
+		"alert_smtp_port": "Port SMTP (465 : TLS, sinon STARTTLS)",
+		"alert_smtp_user": "Utilisateur SMTP (facultatif)",
+		"alert_smtp_password": "Mot de passe SMTP (facultatif)",
+		"offlineHint": "Hors-ligne strict : seuls un webhook ou un serveur SMTP sur cette machine ou à une adresse privée sont utilisés ; PagerDuty n'est pas appelé."
 	}
 }
