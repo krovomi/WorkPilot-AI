@@ -1094,7 +1094,9 @@
 			"install": "The server could not be installed.",
 			"uninstall": "The server could not be removed.",
 			"saveBuilder": "The server could not be saved.",
-			"deleteBuilder": "The server could not be deleted."
+			"deleteBuilder": "The server could not be deleted.",
+			"policyRefused": "The project's MCP policy refused {{name}}.",
+			"acknowledge": "The alerts could not be acknowledged."
 		},
 		"requires": {
 			"uv": "Needs uv (uvx) on this machine.",
@@ -1162,6 +1164,50 @@
 				"noSource": "Source code unavailable: it cannot be audited.",
 				"unpinned": "Not pinned: each start runs the newest release, whatever it contains.",
 				"executesCommands": "It can run commands ({{tools}}): give it only to the agents that need it."
+			}
+		},
+		"policy": {
+			"active": "This project has an MCP policy (.workpilot/mcp-policy.json): only what it allows can be installed.",
+			"allowed": "Allowed catalog servers: {{ids}}.",
+			"allowedNone": "No catalog server is allowed.",
+			"minScore": "Lowest security score: {{min}}.",
+			"customBlocked": "Servers outside the catalog are refused.",
+			"invalidTitle": "The project's MCP policy (.workpilot/mcp-policy.json) is invalid: no server can be installed until it is fixed.",
+			"invalid": {
+				"unreadable": "The file could not be read.",
+				"notJson": "The file is not valid JSON.",
+				"schema": "A field is unknown or has a wrong value.",
+				"schemaField": "Unknown or wrong field: {{field}}.",
+				"outsideProject": "The file, or its folder, links outside the project.",
+				"notAFile": "It is not a regular file.",
+				"tooLarge": "The file is larger than 64 KB."
+			},
+			"refusals": {
+				"policyInvalid": "{{name}} cannot be installed: the project's MCP policy is invalid.",
+				"notAllowed": "The project's MCP policy does not allow {{name}}.",
+				"scoreTooLow": "{{name}} has a security score of {{score}}; the project's MCP policy needs {{minScore}} or more.",
+				"customBlocked": "The project's MCP policy refuses servers outside the catalog ({{name}})."
+			}
+		},
+		"watch": {
+			"title": "Security alerts",
+			"alertCount_one": "{{count}} alert",
+			"alertCount_other": "{{count}} alerts",
+			"unverifiable": "Not verifiable",
+			"unverifiableHint": "Not a catalog server: it is never checked on the network.",
+			"status": {
+				"watched": "Checked daily; last reading {{date}}.",
+				"pending": "Will be read by the next daily check.",
+				"remote": "Runs on its vendor's servers: no package to check.",
+				"offline": "Strict offline mode: this project's servers are not checked."
+			},
+			"acknowledge": "Acknowledge",
+			"detectedAt": "Found {{date}}",
+			"alerts": {
+				"newVulnerability": "New advisory for version {{version}}: {{id}}, {{summary}}",
+				"maintainerAdded": "New maintainer: {{names}}. A new maintainer can publish anything under this name; check its latest release.",
+				"deprecated": "The publisher deprecated or withdrew this package.",
+				"lowScore": "The security score fell to {{score}} (it was {{previous}})."
 			}
 		}
 	},
