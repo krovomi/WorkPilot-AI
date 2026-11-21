@@ -8,16 +8,17 @@
  * words in the app's language.
  */
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
+import type { AnomalySignal } from "../../../preload/api/modules/phase35-features-api";
 import { useCicdAnomalyStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { PanelShell } from "./_panel-shell";
 
-const SEV_COLOR: Record<string, string> = {
+const SEV_COLOR: Record<AnomalySignal["severity"], string> = {
 	critical: "bg-destructive/20 text-destructive border-destructive/40",
 	high: "bg-orange-500/20 text-orange-700 border-orange-500/40",
 	medium: "bg-warning/20 text-warning border-warning/40",
@@ -43,12 +44,8 @@ export function CicdAnomalyPanel() {
 	const isRunning = phase === "running";
 	const filled = logs.filter((l) => l.trim().length > 0);
 
-	const logError = useMemo(() => {
-		if (filled.length === 0) return t("cicdAnomaly.validation.logRequired");
-		if (logs.some((l) => l.length > LOG_MAX_LEN))
-			return t("cicdAnomaly.validation.logTooLarge", { max: LOG_MAX_LEN });
-		return null;
-	}, [filled.length, logs, t]);
+	// Each box is cut at LOG_MAX_LEN as it is typed, so an empty form is the one mistake left.
+	const logError = filled.length === 0 ? t("cicdAnomaly.validation.logRequired") : null;
 
 	const fixText = (fixId: string | undefined, fallback: string) =>
 		fixId ? t(`cicdAnomaly.fixes.${fixId}` as never, { defaultValue: fallback }) : fallback;
@@ -176,7 +173,7 @@ export function CicdAnomalyPanel() {
 									className="rounded border p-2"
 								>
 									<div className="flex flex-wrap items-center gap-2">
-										<Badge className={SEV_COLOR[s.severity] ?? "bg-muted"}>
+										<Badge className={SEV_COLOR[s.severity]}>
 											{t(`common.severity.${s.severity}` as never, { defaultValue: s.severity })}
 										</Badge>
 										<span className="text-xs font-medium">{kindText(s.kind)}</span>

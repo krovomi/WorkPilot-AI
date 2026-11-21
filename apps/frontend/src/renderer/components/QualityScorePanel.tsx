@@ -29,8 +29,6 @@ import {
 
 interface QualityScorePanelProps {
 	readonly score: QualityScore;
-	readonly isLoading?: boolean;
-	readonly onRefresh?: () => void;
 }
 
 // Icon mapping for severity
@@ -60,11 +58,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 	complexity: "📊",
 };
 
-export function QualityScorePanel({
-	score,
-	isLoading: _isLoading,
-	onRefresh: _onRefresh,
-}: QualityScorePanelProps) {
+export function QualityScorePanel({ score }: QualityScorePanelProps) {
 	const { t } = useTranslation("qualityScore");
 	const [isExpanded, setIsExpanded] = useState(true);
 	const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
@@ -135,11 +129,7 @@ export function QualityScorePanel({
 								) : (
 									<ChevronRight className="h-4 w-4" />
 								)}
-								{t(
-									"issuesDetected_" +
-										(score.total_issues === 1 ? "one" : "other"),
-									{ count: score.total_issues },
-								)}
+								{t("issuesDetected", { count: score.total_issues })}
 							</CollapsibleTrigger>
 							<CollapsibleContent className="mt-3 space-y-2">
 								{/* Severity Breakdown */}
@@ -195,6 +185,7 @@ export function QualityScorePanel({
 														variant="ghost"
 														size="sm"
 														className="w-full justify-between h-auto p-0 hover:bg-transparent"
+														aria-expanded={isOpen}
 														onClick={() => toggleCategory(category)}
 													>
 														<div className="flex items-center gap-2">

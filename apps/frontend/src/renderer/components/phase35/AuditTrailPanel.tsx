@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { formatAppDateTime } from "../../lib/date-format";
 import { useAuditTrailStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
@@ -31,20 +32,26 @@ function defaultStorageDir(projectPath: string): string {
 }
 
 export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
-	const { t } = useTranslation("phase35");
-	const {
-		phase,
-		error,
-		events,
-		replayEvents,
-		integrity,
-		loadEvents,
-		replay,
-		verify,
-	} = useAuditTrailStore();
+	const { t, i18n } = useTranslation("phase35");
+	const { phase, error, events, replayEvents, integrity, loadEvents, replay, verify } =
+		useAuditTrailStore(
+			useShallow((s) => ({
+				phase: s.phase,
+				error: s.error,
+				events: s.events,
+				replayEvents: s.replayEvents,
+				integrity: s.integrity,
+				loadEvents: s.loadEvents,
+				replay: s.replay,
+				verify: s.verify,
+			})),
+		);
 	const [storageDir, setStorageDir] = useState(() => defaultStorageDir(projectPath));
 	const [trailName, setTrailName] = useState("default");
 	const [correlationId, setCorrelationId] = useState("");
+	// The list last asked for. A replay used to hide the full list for good:
+	// "Events" fetched it again and the replay stayed on screen.
+	const [asked, setAsked] = useState<"events" | "replay" | null>(null);
 
 	const isRunning = phase === "running";
 
@@ -66,6 +73,8 @@ export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 
 	const canBrowse = !storageDirError && !trailNameError;
 	const canReplay = canBrowse && !correlationIdError;
+	const showing = asked ?? (replayEvents.length > 0 ? "replay" : "events");
+	const listed = showing === "replay" ? replayEvents : events;
 
 	return (
 		<PanelShell
@@ -77,7 +86,10 @@ export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 					<Button
 						size="sm"
 						variant="outline"
-						onClick={() => loadEvents(storageDir.trim(), trailName.trim())}
+						onClick={() => {
+							setAsked("events");
+							void loadEvents(storageDir.trim(), trailName.trim());
+						}}
 						disabled={isRunning || !canBrowse}
 					>
 						{t("audit.events")}
@@ -158,9 +170,10 @@ export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 					</div>
 					<Button
 						size="sm"
-						onClick={() =>
-							replay(correlationId.trim(), storageDir.trim(), trailName.trim())
-						}
+						onClick={() => {
+							setAsked("replay");
+							void replay(correlationId.trim(), storageDir.trim(), trailName.trim());
+						}}
 						disabled={isRunning || !canReplay}
 					>
 						{t("audit.replay")}
@@ -181,22 +194,32 @@ export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 						<span className="ml-2 text-xs text-muted-foreground">
 							{integrity.events_checked} {t("audit.eventsChecked")}
 						</span>
-						{integrity.breakage_reason && (
+						{integrity.first_broken_sequence !== null && (
 							<div className="mt-1 text-xs text-destructive">
-								{integrity.breakage_reason}
+								{t("audit.brokenAt", { sequence: integrity.first_broken_sequence })}
 							</div>
+						)}
+						{integrity.breakage_reason && (
+							<code className="mt-1 block text-3xs text-muted-foreground">
+								{integrity.breakage_reason}
+							</code>
 						)}
 					</div>
 				)}
 
-				{(replayEvents.length > 0 || events.length > 0) && (
+				{asked && listed.length === 0 && phase === "ok" && (
+					<p className="text-xs text-muted-foreground">
+						{showing === "replay" ? t("audit.noReplayEvents") : t("audit.noEvents")}
+					</p>
+				)}
+				{listed.length > 0 && (
 					<div>
 						<div className="font-medium mb-1">
-							{replayEvents.length > 0 ? t("audit.replayLabel") : t("audit.events")} (
-							{(replayEvents.length || events.length).toLocaleString()})
+							{showing === "replay" ? t("audit.replayLabel") : t("audit.events")} (
+							{listed.length.toLocaleString(i18n.language)})
 						</div>
 						<ol className="space-y-1 text-xs max-h-96 overflow-auto">
-							{(replayEvents.length > 0 ? replayEvents : events).map((e) => (
+							{listed.map((e) => (
 								<li
 									key={e.event_hash}
 									className="rounded border p-2 font-mono"

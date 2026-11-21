@@ -18,7 +18,7 @@ import {
 	Sparkles,
 	Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	DEFAULT_AGENT_PROFILES,
@@ -76,12 +76,20 @@ interface AgentProfileSelectorProps {
 	readonly provider?: string;
 }
 
-const iconMap: Record<string, React.ElementType> = {
+const iconMap = {
 	Brain,
 	Scale,
 	Zap,
 	Sparkles,
 };
+
+/** Each preset names one of these icons. */
+const presetIcon = (icon: string | undefined): React.ElementType =>
+	iconMap[icon as keyof typeof iconMap];
+
+/** A preset by id; an unknown id is the auto profile, the first preset. */
+const presetById = (id: string) =>
+	DEFAULT_AGENT_PROFILES.find((p) => p.id === id) ?? DEFAULT_AGENT_PROFILES[0];
 
 // Phase label translation keys
 const PHASE_LABEL_KEYS: Record<
@@ -122,10 +130,11 @@ export function AgentProfileSelector({
 }: AgentProfileSelectorProps) {
 	const { t } = useTranslation("settings");
 	const [showPhaseDetails, setShowPhaseDetails] = useState(false);
+	const fieldId = useId();
 
-	// Resolve the active provider: explicit prop > context > "" (defaults to anthropic-like)
+	// Resolve the active provider: explicit prop > context ("" means anthropic)
 	const { selectedProvider } = useProviderContext();
-	const activeProvider = provider ?? selectedProvider ?? "";
+	const activeProvider = provider ?? selectedProvider;
 
 	// Live model catalog for the active provider. The hook unions the live
 	// API response with the local static catalog (legacy short aliases +
@@ -137,7 +146,6 @@ export function AgentProfileSelector({
 		liveCatalog.models;
 
 	const isCustom = profileId === "custom";
-	const _isAuto = profileId === "auto";
 
 	// Use provided phase configs or defaults
 	const currentPhaseModels = phaseModels || DEFAULT_PHASE_MODELS;
@@ -218,18 +226,11 @@ export function AgentProfileSelector({
 			// Keep current model/thinking level, just mark as custom
 			onProfileChange("custom", model || "sonnet", thinkingLevel || "medium");
 		} else {
-			// Select preset profile - all profiles now have phase configs
-			const profile = DEFAULT_AGENT_PROFILES.find((p) => p.id === selectedId);
-			if (profile) {
-				onProfileChange(profile.id, profile.model, profile.thinkingLevel);
-				// Initialize phase configs with profile defaults if callbacks provided
-				if (onPhaseModelsChange && profile.phaseModels) {
-					onPhaseModelsChange(profile.phaseModels);
-				}
-				if (onPhaseThinkingChange && profile.phaseThinking) {
-					onPhaseThinkingChange(profile.phaseThinking);
-				}
-			}
+			// The dropdown offers only the presets, and every preset has phase configs.
+			const profile = presetById(selectedId);
+			onProfileChange(profile.id, profile.model, profile.thinkingLevel);
+			onPhaseModelsChange?.(profile.phaseModels as PhaseModelConfig);
+			onPhaseThinkingChange?.(profile.phaseThinking as PhaseThinkingConfig);
 		}
 	};
 
@@ -237,24 +238,20 @@ export function AgentProfileSelector({
 		phase: keyof PhaseModelConfig,
 		value: string,
 	) => {
-		if (onPhaseModelsChange) {
-			onPhaseModelsChange({
-				...currentPhaseModels,
-				[phase]: value,
-			});
-		}
+		onPhaseModelsChange?.({
+			...currentPhaseModels,
+			[phase]: value,
+		});
 	};
 
 	const handlePhaseThinkingChange = (
 		phase: keyof PhaseThinkingConfig,
 		value: ThinkingLevel,
 	) => {
-		if (onPhaseThinkingChange) {
-			onPhaseThinkingChange({
-				...currentPhaseThinking,
-				[phase]: value,
-			});
-		}
+		onPhaseThinkingChange?.({
+			...currentPhaseThinking,
+			[phase]: value,
+		});
 	};
 
 	// Label of a preset's representative model as offered by the active provider.
@@ -279,29 +276,20 @@ export function AgentProfileSelector({
 				description: t("agentProfile.customDescription"),
 			};
 		}
-		const profile = DEFAULT_AGENT_PROFILES.find((p) => p.id === profileId);
-		if (profile) {
-			return {
-				icon: iconMap[profile.icon || "Scale"] || Scale,
-				label: profile.name,
-				// The "auto" profile description names its model ("Uses Opus…");
-				// make it reflect the provider-resolved model so it can't claim
-				// Opus while the phases run on, e.g., GPT-5.5 Pro.
-				description:
-					profile.id === "auto"
-						? t("agentProfile.autoDescriptionModel", {
-								model: profileModelLabel(profile.model),
-							})
-						: profile.description,
-			};
-		}
-		// Default to auto profile (the actual default)
+		// An unknown id shows the auto profile, the actual default.
+		const profile = presetById(profileId);
 		return {
-			icon: Sparkles,
-			label: t("agentProfile.autoLabel"),
-			description: t("agentProfile.autoDescriptionModel", {
-				model: profileModelLabel("opus"),
-			}),
+			icon: presetIcon(profile.icon),
+			label: t(`agentProfile.presets.${profile.id}.name`),
+			// The "auto" profile description names its model ("Uses Opus…");
+			// make it reflect the provider-resolved model so it can't claim
+			// Opus while the phases run on, e.g., GPT-5.5 Pro.
+			description:
+				profile.id === "auto"
+					? t("agentProfile.autoDescriptionModel", {
+							model: profileModelLabel(profile.model),
+						})
+					: t(`agentProfile.presets.${profile.id}.description`),
 		};
 	};
 
@@ -332,16 +320,19 @@ export function AgentProfileSelector({
 					</SelectTrigger>
 					<SelectContent>
 						{DEFAULT_AGENT_PROFILES.map((profile) => {
-							const ProfileIcon = iconMap[profile.icon || "Scale"] || Scale;
+							const ProfileIcon = presetIcon(profile.icon);
 							const modelLabel = profileModelLabel(profile.model);
 							return (
 								<SelectItem key={profile.id} value={profile.id}>
 									<div className="flex items-center gap-2">
 										<ProfileIcon className="h-4 w-4 shrink-0" />
 										<div>
-											<span className="font-medium">{profile.name}</span>
+											<span className="font-medium">
+												{t(`agentProfile.presets.${profile.id}.name`)}
+											</span>
 											<span className="ml-2 text-xs text-muted-foreground">
-												({modelLabel} + {profile.thinkingLevel})
+												({modelLabel} +{" "}
+												{t(`general.thinkingLevels.${profile.thinkingLevel}`)})
 											</span>
 										</div>
 									</div>
@@ -414,7 +405,7 @@ export function AgentProfileSelector({
 									const modelLabel =
 										providerModels
 											.find((m) => m.value === currentPhaseModels[phase])
-											?.label?.replace("Claude ", "") ||
+											?.label.replace("Claude ", "") ??
 										currentPhaseModels[phase];
 									return (
 										<div
@@ -440,16 +431,22 @@ export function AgentProfileSelector({
 							).map((phase) => (
 								<div key={phase} className="space-y-2">
 									<div className="flex items-center justify-between">
-										<Label className="text-xs font-medium text-foreground">
+										<span
+											id={`${fieldId}-${phase}-label`}
+											className="text-xs font-medium text-foreground"
+										>
 											{t(PHASE_LABEL_KEYS[phase].label)}
-										</Label>
+										</span>
 										<span className="text-3xs text-muted-foreground">
 											{t(PHASE_LABEL_KEYS[phase].description)}
 										</span>
 									</div>
 									<div className="grid grid-cols-2 gap-2">
 										<div className="space-y-1">
-											<Label className="text-3xs text-muted-foreground">
+											<Label
+												htmlFor={`${fieldId}-${phase}-model`}
+												className="text-3xs text-muted-foreground"
+											>
 												{t("agentProfile.model")}
 											</Label>
 											<Select
@@ -459,7 +456,11 @@ export function AgentProfileSelector({
 												}
 												disabled={disabled}
 											>
-												<SelectTrigger className="h-8 text-xs">
+												<SelectTrigger
+													id={`${fieldId}-${phase}-model`}
+													aria-describedby={`${fieldId}-${phase}-label`}
+													className="h-8 text-xs"
+												>
 													<SelectValue />
 												</SelectTrigger>
 												<SelectContent searchable>
@@ -472,7 +473,10 @@ export function AgentProfileSelector({
 											</Select>
 										</div>
 										<div className="space-y-1">
-											<Label className="text-3xs text-muted-foreground">
+											<Label
+												htmlFor={`${fieldId}-${phase}-thinking`}
+												className="text-3xs text-muted-foreground"
+											>
 												{t("agentProfile.thinking")}
 											</Label>
 											<Select
@@ -485,13 +489,17 @@ export function AgentProfileSelector({
 												}
 												disabled={disabled}
 											>
-												<SelectTrigger className="h-8 text-xs">
+												<SelectTrigger
+													id={`${fieldId}-${phase}-thinking`}
+													aria-describedby={`${fieldId}-${phase}-label`}
+													className="h-8 text-xs"
+												>
 													<SelectValue />
 												</SelectTrigger>
 												<SelectContent>
 													{THINKING_LEVELS.map((level) => (
 														<SelectItem key={level.value} value={level.value}>
-															{level.label}
+															{t(`general.thinkingLevels.${level.value}`)}
 														</SelectItem>
 													))}
 												</SelectContent>
@@ -558,9 +566,12 @@ export function AgentProfileSelector({
 								{THINKING_LEVELS.map((level) => (
 									<SelectItem key={level.value} value={level.value}>
 										<div className="flex items-center gap-2">
-											<span>{level.label}</span>
+											<span>{t(`general.thinkingLevels.${level.value}`)}</span>
 											<span className="text-xs text-muted-foreground">
-												- {level.description}
+												-{" "}
+												{t(
+													`agentProfile.thinkingLevelDescriptions.${level.value}`,
+												)}
 											</span>
 										</div>
 									</SelectItem>
