@@ -90,6 +90,7 @@ import { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 import { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 import { registerGithubHandlers } from "./github-handlers";
 import { registerGitlabHandlers } from "./gitlab";
+import { registerGovernanceHandlers } from "./governance-handlers";
 import { registerGuardrailsHandlers } from "./guardrails-handlers";
 import { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 import { registerIdeationHandlers } from "./ideation-handlers";
@@ -224,6 +225,7 @@ export { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 export { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 export { registerGithubHandlers } from "./github-handlers";
 export { registerGitlabHandlers } from "./gitlab";
+export { registerGovernanceHandlers } from "./governance-handlers";
 export { registerGuardrailsHandlers } from "./guardrails-handlers";
 export { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 export { registerIdeationHandlers } from "./ideation-handlers";
@@ -636,6 +638,8 @@ export function setupIpcHandlers(
 
 	// Guardrails handlers (user-defined agent guardrails)
 	registerGuardrailsHandlers();
+	// Governance panel: hours, files and token budget of workpilot.policy.yaml, audit export
+	registerGovernanceHandlers();
 
 	// Cost Predictor handlers (ex-ante spec cost prediction)
 	registerCostPredictorHandlers();

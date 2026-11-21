@@ -3060,5 +3060,42 @@
 			"saveError": "Les réglages du basculement n'ont pas pu être enregistrés.",
 			"orderError": "L'ordre de la chaîne n'a pas pu être enregistré."
 		}
+	},
+	"governance": {
+		"kicker": "Gouvernance",
+		"title": "Heures, fichiers et budget de jetons",
+		"hint": "Ce que workpilot.policy.yaml impose à chaque agent, sur tous les providers. En lecture seule : modifiez le fichier dans le dépôt et faites-le relire comme du code.",
+		"refresh": "Actualiser",
+		"loadFailed": "La politique de gouvernance n'a pas pu être lue : {{error}}",
+		"invalid": "workpilot.policy.yaml est refusé : aucun agent n'écrit de fichier ni ne lance de commande tant qu'il n'est pas corrigé.",
+		"none": "workpilot.policy.yaml ne fixe ni heures, ni fichiers, ni budget de jetons.",
+		"scheduleTitle": "Heures permises",
+		"noSchedule": "À toute heure",
+		"openNow": "Ouvert maintenant",
+		"closedNow": "Fermé maintenant",
+		"scheduleLine": "{{hours}} ({{timezone}}), {{days}}",
+		"filesTitle": "Fichiers",
+		"forbidden": "Interdits",
+		"requiresReview": "Revue requise",
+		"noFiles": "Aucune règle de fichier",
+		"budgetTitle": "Budget de jetons",
+		"noBudget": "Pas de limite horaire",
+		"budgetLine": "{{spent}} jetons sur {{limit}} dans la dernière heure",
+		"decisionsTitle": "Dernières décisions",
+		"noDecisions": "La politique n'a encore pris aucune décision.",
+		"exportCsv": "Exporter en CSV",
+		"exportJson": "Exporter en JSON",
+		"exported_one": "{{count}} décision exportée dans {{path}}",
+		"exported_other": "{{count}} décisions exportées dans {{path}}",
+		"exportFailed": "L'export a échoué : {{error}}",
+		"decisions": {
+			"deny": "Refusé",
+			"review": "Revue",
+			"approved": "Approuvé",
+			"warn": "Averti",
+			"outside_hours": "Hors horaires",
+			"budget_exceeded": "Budget atteint",
+			"invalid_policy": "Politique invalide"
+		}
 	}
 }

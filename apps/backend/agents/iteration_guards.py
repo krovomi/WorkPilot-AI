@@ -7,8 +7,10 @@
 - The cost budget (``cost_budget``, docs/architecture/cost-budgets.md): a task
   or project past its limit, or spending without completing subtasks, pauses
   before the next session.
+- The hours and token budget of ``workpilot.policy.yaml``
+  (``agents.policy_watch``): outside them, the next session does not start.
 
-Both raise ``BuildPaused``, which unwinds to ``handle_build_command`` like the
+All three raise ``BuildPaused``, which unwinds to ``handle_build_command`` like the
 Pause button does.
 """
 
@@ -82,6 +84,14 @@ def _check_budget(spec_dir: Path, phase: str, status_manager: StatusManager) -> 
         raise BuildPaused(phase)
 
 
+def _check_policy(spec_dir: Path, phase: str, status_manager: StatusManager) -> None:
+    from .policy_watch import policy_pause_before_session
+
+    if policy_pause_before_session(spec_dir, phase) is not None:
+        status_manager.update(state=BuildState.PAUSED)
+        raise BuildPaused(phase)
+
+
 def guard_iteration(
     spec_dir: Path,
     project_dir: Path,
@@ -92,6 +102,7 @@ def guard_iteration(
     phase = "planning" if is_planning else "coding"
     _check_loop(spec_dir, project_dir, iteration, phase, status_manager)
     _check_budget(spec_dir, phase, status_manager)
+    _check_policy(spec_dir, phase, status_manager)
 
 
 __all__ = ["guard_iteration"]

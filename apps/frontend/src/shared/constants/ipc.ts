@@ -1231,6 +1231,8 @@ export const IPC_CHANNELS = {
 	GUARDRAILS_ACTIVITY: "guardrails:activity",
 	GUARDRAILS_ANSWER: "guardrails:answer",
 	GUARDRAILS_CHECK_DIFF: "guardrails:checkDiff",
+	GOVERNANCE_REPORT: "governance:report",
+	GOVERNANCE_EXPORT_AUDIT: "governance:exportAudit",
 	I18N_AGENT_CANCEL: "i18nAgent:cancel",
 	I18N_AGENT_ERROR: "i18n-agent-error",
 	I18N_AGENT_EVENT: "i18n-agent-event",

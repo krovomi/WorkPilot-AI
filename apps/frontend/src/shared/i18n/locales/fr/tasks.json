@@ -2676,5 +2676,12 @@
 		},
 		"anomalyLine_one": "{{label}}",
 		"anomalyLine_other": "{{label}} (×{{count}})"
+	},
+	"policyPause": {
+		"hoursChip": "Hors des heures permises",
+		"hoursBody": "workpilot.policy.yaml permet aux agents de travailler {{hours}} ({{timezone}}). La tâche s'est mise en pause une fois son action en cours terminée.",
+		"budgetChip": "Budget de jetons atteint",
+		"budgetBody": "Les agents du projet ont dépensé {{spent}} jetons dans la dernière heure, autant ou plus que les {{limit}} permis par workpilot.policy.yaml.",
+		"hint": "Reprenez-la quand la politique le permet de nouveau ; la décision figure dans le journal d'audit de Réglages > Garde-fous."
 	}
 }

@@ -31,6 +31,7 @@ from typing import Any
 
 import yaml
 
+from .governance_policy import SECTIONS, Governance, parse_governance
 from .guardrails import ACTION_PRIORITY, GuardrailRule
 
 GLOBAL_ENV_VAR = "WORKPILOT_GUARDRAILS_GLOBAL"
@@ -56,6 +57,8 @@ class Policy:
     sources: list[PolicySource] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    #: The schedule, files and budget of ``workpilot.policy.yaml``, if it has any.
+    governance: Governance | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -71,6 +74,7 @@ class Policy:
             "sources": [s.__dict__ for s in self.sources],
             "errors": self.errors,
             "warnings": self.warnings,
+            "governance": self.governance.to_dict() if self.governance else None,
         }
 
 
@@ -120,6 +124,27 @@ def _parse(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     return data, None
 
 
+_KNOWN_TOP_KEYS = frozenset({"version", "rules"})
+
+
+def _top_level_errors(data: dict[str, Any], layer: str, name: str) -> list[str]:
+    """Keys a layer may not hold: a typo in a key never turns a limit off in silence."""
+    errors = []
+    allowed = _KNOWN_TOP_KEYS | (set(SECTIONS) if layer == "repository" else set())
+    for key in sorted(set(data) - allowed, key=str):
+        if key in SECTIONS:
+            errors.append(
+                f"{name}: '{key}' is only read from workpilot.policy.yaml, "
+                "the versioned policy of the repository"
+            )
+        else:
+            errors.append(f"{name}: unknown key '{key}'")
+    version = data.get("version", 1)
+    if isinstance(version, bool) or version != 1:
+        errors.append(f"{name}: 'version' must be 1")
+    return errors
+
+
 _CACHE: dict[tuple[str, ...], tuple[tuple[float, ...], Policy]] = {}
 
 
@@ -153,7 +178,21 @@ def load_policy(root: Path) -> Policy:
             policy.errors.append(error)
             continue
         assert data is not None
-        rules = [r for r in data.get("rules") or []]
+        top_errors = _top_level_errors(data, layer, path.name)
+        if top_errors:
+            policy.errors.extend(top_errors)
+            continue
+        rules: list[Any] = [r for r in data.get("rules") or []]
+        file_rules: list[GuardrailRule] = []
+        if layer == "repository" and any(k in data for k in SECTIONS):
+            governance, gov_errors = parse_governance(
+                data, path.name, source=f"{layer}:{path.name}"
+            )
+            if gov_errors:
+                policy.errors.extend(gov_errors)
+                continue
+            policy.governance = governance
+            file_rules = governance.file_rules()
         seen_here: set[str] = set()
         count = 0
         for raw in rules:
@@ -180,6 +219,11 @@ def load_policy(root: Path) -> Policy:
             by_id[rule.id] = rule
             policy.rules.append(rule)
             count += 1
+        for rule in file_rules:
+            if rule.id not in seen_here:
+                seen_here.add(rule.id)
+                policy.rules.append(rule)
+                count += 1
         policy.sources.append(PolicySource(layer=layer, path=str(path), rules=count))
     if not policy.errors:
         for rule in policy.rules:
