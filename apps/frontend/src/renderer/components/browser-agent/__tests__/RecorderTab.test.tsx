@@ -94,6 +94,35 @@ describe("RecorderTab", () => {
 		expect(useBrowserRecorderStore.getState().steps.map((s) => s.id)).toEqual(["s1", "s2", "s3", "s4", "s5"]);
 	});
 
+	it("notes where a step's element lives and what its replay waits for", () => {
+		useBrowserRecorderStore.setState({
+			steps: [
+				{
+					id: "s1",
+					kind: "click",
+					selectors: [{ strategy: "text", value: "Payer" }],
+					frames: ["#pay"],
+					shadow: ["x-card"],
+					waitVisible: true,
+					waitRequest: { method: "POST", path: "/api/pay" },
+					waitUrl: "http://a.test/merci",
+				},
+				{ id: "s2", kind: "click", selectors: [{ strategy: "text", value: "Fin" }] },
+			],
+		});
+		render(<RecorderTab projectPath="/projects/app" />);
+		expect(screen.getAllByTestId("step-notes")).toHaveLength(1);
+		for (const note of [
+			"dans un cadre",
+			"dans un shadow root",
+			"attend son affichage",
+			"attend POST /api/pay",
+			"attend http://a.test/merci",
+		]) {
+			expect(screen.getByText(note)).toBeInTheDocument();
+		}
+	});
+
 	it("exports in the chosen format and shows what each export gave back", async () => {
 		useBrowserRecorderStore.setState({ steps: STEPS });
 		render(<RecorderTab projectPath="/projects/app" />);

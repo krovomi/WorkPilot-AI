@@ -34,6 +34,8 @@ function plan(waves: string[][], extra: Partial<ExecutionWavePlan> = {}): Execut
 		runningConflicts: [],
 		totalRisk: 3,
 		residualRisk: 0,
+		mergeChecks: { checked: 0, conflicts: 0, unchecked: 0, failed: 0 },
+		fragileZones: { enabled: false, commits: null },
 		computedAt: "2026-11-14T08:00:00.000Z",
 		...extra,
 	};
@@ -81,7 +83,7 @@ describe("WavesView", () => {
 		await screen.findByTestId("wave-1");
 		expect(api.planExecutionWaves).toHaveBeenCalledWith({
 			projectId: PROJECT,
-			options: { tolerance: 0, unplannedPolicy: "isolate" },
+			options: { tolerance: 0, unplannedPolicy: "isolate", fragileZones: true },
 		});
 		expect(screen.getByRole("table", { name: "Plan" })).toBeInTheDocument();
 		expect(screen.getAllByText("Wave 2").length).toBeGreaterThan(0);
@@ -128,7 +130,7 @@ describe("WavesView", () => {
 		expect(api.planExecutionWaves).toHaveBeenLastCalledWith({
 			projectId: PROJECT,
 			taskIds: ["c"],
-			options: { tolerance: 0, unplannedPolicy: "isolate" },
+			options: { tolerance: 0, unplannedPolicy: "isolate", fragileZones: true },
 		});
 
 		await act(async () => {
@@ -169,7 +171,7 @@ describe("WavesView", () => {
 		expect(await screen.findByText("No spec is waiting in the backlog or queue.")).toBeInTheDocument();
 		expect(api.planExecutionWaves).toHaveBeenCalledWith({
 			projectId: PROJECT,
-			options: { tolerance: 1, unplannedPolicy: "independent" },
+			options: { tolerance: 1, unplannedPolicy: "independent", fragileZones: true },
 		});
 		expect(useExecutionWavesStore.getState().options.advanceWhen).toBe("review");
 		expect(screen.getByRole("button", { name: "Execute in optimal order" })).toBeDisabled();
@@ -261,5 +263,148 @@ describe("WavesView", () => {
 		await screen.findByTestId("wave-1");
 		const states = [...document.querySelectorAll("td[data-state]")].map((cell) => cell.getAttribute("data-state"));
 		expect(states).toEqual(["pending", "pending", "pending"]);
+	});
+});
+
+describe("WavesView, preventive merge check", () => {
+	it("says which pair a test merge split and on which files, and what was not checked", async () => {
+		api.planExecutionWaves.mockReset().mockResolvedValue({
+			success: true,
+			data: plan([["a", "c"], ["b"]], {
+				tolerance: 2,
+				pairs: [
+					{ a: "a", b: "b", score: 1, level: "low", sharedFiles: ["src/cart.go"], unknown: false, blocking: true, mergeCheck: "conflict", conflictFiles: ["src/cart.go", "go.sum"] },
+					{ a: "a", b: "c", score: 1, level: "low", sharedFiles: ["README.md"], unknown: false, blocking: false, mergeCheck: "clean", conflictFiles: [] },
+					{ a: "b", b: "c", score: 1, level: "low", sharedFiles: ["x"], unknown: false, blocking: true, mergeCheck: "conflict" },
+				],
+				mergeChecks: { checked: 3, conflicts: 2, unchecked: 4, failed: 1 },
+			}),
+		});
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		const notice = await screen.findByText(/Spec a and Spec b are under the tolerance/);
+		expect(notice).toHaveTextContent("conflicts on src/cart.go, go.sum");
+		expect(screen.getByText(/Spec b and Spec c are under the tolerance/)).toBeInTheDocument();
+		expect(screen.getByText(/3 checked, 2 split/)).toBeInTheDocument();
+		expect(screen.getByText(/4 pairs sharing a wave were not test-merged/)).toBeInTheDocument();
+		expect(screen.getByText(/Git could not test-merge 1 pairs/)).toBeInTheDocument();
+		expect(screen.getAllByText("test merge conflicts")).toHaveLength(2);
+		expect(screen.getByText("test merge clean")).toBeInTheDocument();
+	});
+
+	it("says nothing of test merges when none was run", async () => {
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		await screen.findByTestId("wave-1");
+		expect(screen.queryByText(/Test merges/)).toBeNull();
+	});
+});
+
+describe("WavesView, a run saved before a restart", () => {
+	const SAVED = {
+		projectId: PROJECT,
+		waves: [["a"], ["b", "c"]],
+		current: 1,
+		advanceWhen: "merged" as const,
+		maxParallel: 2,
+		started: ["a"],
+		savedAt: "2026-11-16T07:00:00.000Z",
+	};
+
+	beforeEach(() => {
+		api.loadExecutionWaveRun = vi.fn(async () => ({ success: true, data: { run: SAVED, ignored: false } }));
+		api.saveExecutionWaveRun = vi.fn(async () => ({ success: true }));
+		api.clearExecutionWaveRun = vi.fn(async () => ({ success: true }));
+		useTaskStore.setState({ tasks: [task("a", "done"), task("b"), task("c")] });
+	});
+
+	it("offers to resume it, then shows the run's waves until a plan is computed", async () => {
+		await useExecutionWavesStore.getState().loadSavedRun(PROJECT);
+		render(<WavesView />);
+		expect(screen.getByTestId("saved-wave-run")).toHaveTextContent("interrupted at wave 2 of 2");
+		fireEvent.click(screen.getByRole("button", { name: "Resume the run" }));
+		expect(await screen.findByText("Running wave 2 of 2.")).toBeInTheDocument();
+		expect(screen.queryByTestId("saved-wave-run")).toBeNull();
+		expect(screen.getByText("Waves of the resumed run")).toBeInTheDocument();
+		expect(screen.getByText("Spec b, Spec c")).toBeInTheDocument();
+		const states = [...document.querySelectorAll("li[data-state]")].map((li) => li.getAttribute("data-state"));
+		expect(states).toEqual(["finished", "current"]);
+		await waitFor(() => expect(api.updateTaskStatus).toHaveBeenCalledWith("b", "in_progress", undefined));
+	});
+
+	it("lists a pending wave of the resumed run as such", async () => {
+		api.loadExecutionWaveRun = vi.fn(async () => ({
+			success: true,
+			data: { run: { ...SAVED, waves: [["a"], ["b"], ["c"]], current: 1 }, ignored: false },
+		}));
+		await useExecutionWavesStore.getState().loadSavedRun(PROJECT);
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Resume the run" }));
+		await screen.findByText("Running wave 2 of 3.");
+		const states = [...document.querySelectorAll("li[data-state]")].map((li) => li.getAttribute("data-state"));
+		expect(states).toEqual(["finished", "current", "pending"]);
+	});
+
+	it("abandons it on request", async () => {
+		await useExecutionWavesStore.getState().loadSavedRun(PROJECT);
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Abandon it" }));
+		await waitFor(() => expect(api.clearExecutionWaveRun).toHaveBeenCalledWith(PROJECT));
+		expect(screen.queryByTestId("saved-wave-run")).toBeNull();
+		expect(api.updateTaskStatus).not.toHaveBeenCalled();
+	});
+
+	it("says so when a saved run was ignored", async () => {
+		api.loadExecutionWaveRun = vi.fn(async () => ({ success: true, data: { run: null, ignored: true } }));
+		await useExecutionWavesStore.getState().loadSavedRun(PROJECT);
+		render(<WavesView />);
+		expect(screen.getByText(/could not be read or no longer matches its tasks/)).toBeInTheDocument();
+	});
+
+	it("shows a run saved for another project nowhere", async () => {
+		useExecutionWavesStore.setState({ savedRun: { ...SAVED, projectId: "p2" } });
+		render(<WavesView />);
+		expect(screen.queryByTestId("saved-wave-run")).toBeNull();
+	});
+});
+
+describe("WavesView, fragile zones", () => {
+	it("shows the fragile links of a pair and how far back the history was read", async () => {
+		api.planExecutionWaves.mockReset().mockResolvedValue({
+			success: true,
+			data: plan([["a"], ["b"]], {
+				pairs: [
+					{ a: "a", b: "b", score: 1, level: "low", sharedFiles: [], unknown: false, blocking: true, fragileLinks: ["db/schema.sql ↔ db/0001.cs"] },
+				],
+				fragileZones: { enabled: true, commits: 300 },
+			}),
+		});
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		expect(await screen.findByText("1 fragile links")).toBeInTheDocument();
+		expect(screen.getByText(/changed together in the last 300 commits/)).toBeInTheDocument();
+	});
+
+	it("says when the history could not be read", async () => {
+		api.planExecutionWaves.mockReset().mockResolvedValue({
+			success: true,
+			data: plan([["a"]], { fragileZones: { enabled: true, commits: null } }),
+		});
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		expect(await screen.findByText(/could not read the project's history/)).toBeInTheDocument();
+	});
+
+	it("turns them off and on for the next plan", async () => {
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Off" }));
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		await screen.findByTestId("wave-1");
+		expect(api.planExecutionWaves).toHaveBeenLastCalledWith({
+			projectId: PROJECT,
+			options: { tolerance: 0, unplannedPolicy: "isolate", fragileZones: false },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "From the history" }));
+		expect(useExecutionWavesStore.getState().options.fragileZones).toBe(true);
 	});
 });

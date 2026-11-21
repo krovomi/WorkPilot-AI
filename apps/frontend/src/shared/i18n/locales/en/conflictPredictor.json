@@ -78,7 +78,11 @@
 			"unplannedIndependent": "Assume independent",
 			"advance": "Next wave starts",
 			"advanceMerged": "once the wave is merged",
-			"advanceReview": "once the wave is in review"
+			"advanceReview": "once the wave is in review",
+			"fragile": "Fragile zones",
+			"fragileHint": "Files the last commits changed together, one in each spec, add to the pair's score.",
+			"fragileOn": "From the history",
+			"fragileOff": "Off"
 		},
 		"empty": {
 			"noProject": "Select a project to plan its waves.",
@@ -112,7 +116,10 @@
 			"kicker": "Scores",
 			"shared": "{{count}} shared files",
 			"unknown": "unknown footprint",
-			"together": "may share a wave"
+			"together": "may share a wave",
+			"mergeClean": "test merge clean",
+			"mergeConflict": "test merge conflicts",
+			"fragile": "{{count}} fragile links"
 		},
 		"run": {
 			"running": "Running wave {{current}} of {{total}}.",
@@ -130,6 +137,23 @@
 			"runningConflict": "{{task}} shares files with {{running}}, already running.",
 			"unplanned": "{{count}} specs have no plan yet: their footprint is unknown.",
 			"error": "Could not compute the waves: {{error}}"
+		},
+		"mergeCheck": {
+			"split": "{{a}} and {{b}} are under the tolerance, but a test merge of their worktrees conflicts on {{files}}: they run in different waves.",
+			"summary": "Test merges of the pairs sharing a wave: {{checked}} checked, {{conflicts}} split. Only committed work is merged; no worktree or branch is changed.",
+			"unchecked": "{{count}} pairs sharing a wave were not test-merged (limit reached).",
+			"failed": "Git could not test-merge {{count}} pairs (no common history, or git older than 2.38)."
+		},
+		"resume": {
+			"title": "A run was interrupted at wave {{current}} of {{total}} (saved {{savedAt}}). Tasks already started kept going.",
+			"resume": "Resume the run",
+			"abandon": "Abandon it",
+			"ignored": "A run saved in this project could not be read or no longer matches its tasks: it was ignored.",
+			"waves": "Waves of the resumed run"
+		},
+		"fragile": {
+			"summary": "Fragile zones: files changed together in the last {{commits}} commits add to the scores.",
+			"unavailable": "Fragile zones: git could not read the project's history; scores use shared files only."
 		}
 	}
 }

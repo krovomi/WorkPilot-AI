@@ -217,8 +217,8 @@ class GitHubPermissionChecker:
         events: list[dict] = []
         for page in range(1, MAX_EVENT_PAGES + 1):
             batch = await self.gh_client.api_get(
-                f"/repos/{self.repo}/issues/{issue_number}/events"
-                f"?per_page={EVENTS_PER_PAGE}&page={page}"
+                f"/repos/{self.repo}/issues/{issue_number}/events",
+                params={"per_page": str(EVENTS_PER_PAGE), "page": str(page)},
             )
             batch = batch or []
             events.extend(batch)

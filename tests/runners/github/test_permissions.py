@@ -124,7 +124,8 @@ async def test_check_label_adder_success(permission_checker, mock_gh_client):
     assert username == "alice"
     assert role == "COLLABORATOR"
     mock_gh_client.api_get.assert_any_call(
-        "/repos/owner/test-repo/issues/123/events?per_page=100&page=1"
+        "/repos/owner/test-repo/issues/123/events",
+        params={"per_page": "100", "page": "1"},
     )
 
 
@@ -171,7 +172,8 @@ async def test_check_label_adder_reads_every_page_of_events(
 
     assert (username, role) == ("alice", "COLLABORATOR")
     mock_gh_client.api_get.assert_any_call(
-        f"/repos/owner/test-repo/issues/123/events?per_page={full}&page=2"
+        "/repos/owner/test-repo/issues/123/events",
+        params={"per_page": str(full), "page": "2"},
     )
 
 

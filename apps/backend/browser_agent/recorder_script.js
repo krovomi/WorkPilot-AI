@@ -1,9 +1,13 @@
 // The in-page half of the Browser Agent recorder (browser_agent/recorder.py).
 //
 // Runs in every frame of a page the person drives; it only describes what
-// they do, through the `__workpilotRecord` binding, and the recorder keeps the
-// main frame's reports. A value typed into a password field, or into a field
-// named like a secret, is never sent: the report says `secret: true` instead.
+// they do, through the `__workpilotRecord` binding. Python adds the frame's
+// place in the page (it asks the parent frame to describe the <iframe>, with
+// `__workpilotDescribe`). An element inside open shadow roots is described in
+// its own root, with the hosts above it (`shadow`); an element the page
+// inserted after the previous action says so (`appeared`), for the replay to
+// wait for it. A value typed into a password field, or into a field named
+// like a secret, is never sent: the report says `secret: true` instead.
 // Everything sent is plain data that Python bounds and checks again.
 (() => {
 	if (window.__workpilotRecorder) return;
@@ -27,12 +31,41 @@
 	const line = (value) =>
 		typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, MAX) : "";
 
-	const count = (selector) => {
+	// The document, or the shadow root the element is in: selectors are unique there.
+	const rootOf = (el) => {
+		const root = el.getRootNode ? el.getRootNode() : document;
+		return root && typeof root.querySelectorAll === "function" ? root : document;
+	};
+
+	const count = (root, selector) => {
 		try {
-			return document.querySelectorAll(selector).length;
+			return root.querySelectorAll(selector).length;
 		} catch (_error) {
 			return 0;
 		}
+	};
+
+	// The host of the open shadow root `node` is in, or null.
+	const hostOf = (node) => {
+		const root = node.getRootNode ? node.getRootNode() : null;
+		return root && root !== document && root.host ? root.host : null;
+	};
+
+	// Elements the page inserted, by the number of actions sent before.
+	let actions = 0;
+	const inserted = new WeakMap();
+	new MutationObserver((records) => {
+		if (!actions) return;
+		for (const record of records) {
+			for (const node of record.addedNodes) if (node.nodeType === 1) inserted.set(node, actions);
+		}
+	}).observe(document, { childList: true, subtree: true });
+
+	const appeared = (el) => {
+		for (let node = el; node; node = node.parentElement || hostOf(node)) {
+			if (actions && inserted.get(node) === actions) return true;
+		}
+		return false;
 	};
 
 	const implicitRole = (el) => {
@@ -60,7 +93,9 @@
 	const labelOf = (el) => {
 		const ids = (el.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean);
 		if (ids.length) {
-			return line(ids.map((id) => textOf(document.getElementById(id) || document.body)).join(" "));
+			const root = rootOf(el);
+			const byId = (id) => (root.getElementById ? root.getElementById(id) : document.getElementById(id));
+			return line(ids.map((id) => textOf(byId(id) || document.body)).join(" "));
 		}
 		const labels = el.labels;
 		if (labels && labels.length) return textOf(labels[0]);
@@ -93,11 +128,12 @@
 
 	const cssPath = (el) => {
 		const parts = [];
+		const root = rootOf(el);
 		let node = el;
 		for (let depth = 0; node && node.nodeType === 1 && depth < 5; depth += 1) {
 			parts.unshift(segment(node));
 			const selector = parts.join(" > ");
-			if (count(selector) === 1) return selector;
+			if (count(root, selector) === 1) return selector;
 			node = node.parentElement;
 		}
 		return "";
@@ -112,7 +148,8 @@
 		);
 	};
 
-	const describe = (el) => {
+	const describeElement = (el) => {
+		const root = rootOf(el);
 		const tag = el.tagName.toLowerCase();
 		const testId = el.getAttribute("data-testid") || "";
 		const id = el.id || "";
@@ -127,23 +164,45 @@
 			placeholder: line(el.getAttribute("placeholder") || ""),
 			text: ["input", "textarea", "select"].includes(tag) ? "" : textOf(el),
 			testId: line(testId),
-			testIdUnique: Boolean(testId) && count(`[data-testid="${CSS.escape(testId)}"]`) === 1,
+			testIdUnique: Boolean(testId) && count(root, `[data-testid="${CSS.escape(testId)}"]`) === 1,
 			testAttr: attr
 				? {
 						name: attr,
 						value: line(attrValue),
-						unique: count(`[${attr}="${CSS.escape(attrValue)}"]`) === 1,
+						unique: count(root, `[${attr}="${CSS.escape(attrValue)}"]`) === 1,
 					}
 				: null,
 			id: line(id),
-			idUnique: Boolean(id) && count(`#${CSS.escape(id)}`) === 1,
+			idUnique: Boolean(id) && count(root, `#${CSS.escape(id)}`) === 1,
 			nameAttr: line(nameAttr),
-			nameUnique: Boolean(nameAttr) && count(`${tag}[name="${CSS.escape(nameAttr)}"]`) === 1,
+			nameUnique: Boolean(nameAttr) && count(root, `${tag}[name="${CSS.escape(nameAttr)}"]`) === 1,
 			type: line(el.getAttribute("type") || ""),
 			autocomplete: line(el.getAttribute("autocomplete") || ""),
 			path: cssPath(el),
 			secret: isSecret(el),
 		};
+	};
+
+	// The element, the shadow hosts above it (outermost first), and whether it is new.
+	const describe = (el) => {
+		const hosts = [];
+		for (let host = hostOf(el); host && hosts.length < 5; host = hostOf(host)) {
+			hosts.unshift(describeElement(host));
+		}
+		return { ...describeElement(el), shadow: hosts, appeared: appeared(el) };
+	};
+	// For Python: the <iframe> element of a child frame, described in this frame.
+	window.__workpilotDescribe = (el) => (el && el.nodeType === 1 ? describe(el) : null);
+
+	// The element the event happened on, inside open shadow roots too.
+	const origin = (event) => {
+		const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+		return path.length ? path[0] : event.target;
+	};
+
+	const act = (report) => {
+		send(report);
+		actions += 1;
 	};
 
 	const ACTIONABLE =
@@ -164,7 +223,7 @@
 	document.addEventListener(
 		"click",
 		(event) => {
-			const el = actionable(event.target);
+			const el = actionable(origin(event));
 			if (!el) return;
 			if (event.altKey) {
 				// Alt+click: assert the element's visible text instead of clicking it.
@@ -177,7 +236,7 @@
 			// The click on a label reaches its field next; a field's focus is its fill.
 			if ((tag === "label" && el.control) || tag === "select" || tag === "option") return;
 			if (isTextField(el)) return;
-			send({ kind: "click", target: describe(el) });
+			act({ kind: "click", target: describe(el) });
 		},
 		true,
 	);
@@ -185,31 +244,38 @@
 	document.addEventListener(
 		"input",
 		(event) => {
-			const el = event.target;
+			const el = origin(event);
 			if (!el || el.nodeType !== 1 || !isTextField(el)) return;
 			const target = describe(el);
-			send({ kind: "fill", target, value: target.secret ? "" : String(el.value || "") });
+			act({ kind: "fill", target, value: target.secret ? "" : String(el.value || "") });
 		},
 		true,
 	);
 
-	document.addEventListener(
-		"change",
-		(event) => {
-			const el = event.target;
-			if (!el || el.nodeType !== 1 || el.tagName.toLowerCase() !== "select") return;
-			send({ kind: "select", target: describe(el), value: String(el.value || "") });
-		},
-		true,
-	);
+	const onChange = (event) => {
+		const el = origin(event);
+		if (!el || el.nodeType !== 1 || el.tagName.toLowerCase() !== "select") return;
+		act({ kind: "select", target: describe(el), value: String(el.value || "") });
+	};
+	document.addEventListener("change", onChange, true);
+	// `change` does not leave a shadow root: listen in each open one the page attaches.
+	const attachShadow = Element.prototype.attachShadow;
+	if (typeof attachShadow === "function") {
+		Element.prototype.attachShadow = function (init) {
+			const root = attachShadow.call(this, init);
+			if (init && init.mode === "open") root.addEventListener("change", onChange, true);
+			return root;
+		};
+	}
 
 	document.addEventListener(
 		"keydown",
 		(event) => {
 			if (event.key !== "Enter" && event.key !== "Escape") return;
-			const el = event.target && event.target.nodeType === 1 ? event.target : document.body;
+			const target = origin(event);
+			const el = target && target.nodeType === 1 ? target : document.body;
 			if (event.key === "Enter" && el.tagName.toLowerCase() === "textarea") return;
-			send({ kind: "press", target: describe(el), key: event.key });
+			act({ kind: "press", target: describe(el), key: event.key });
 		},
 		true,
 	);
