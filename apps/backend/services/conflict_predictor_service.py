@@ -17,6 +17,7 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 from core.model_info import get_current_model_info
+from foundation.base_branch import detect_base_branch
 
 
 @dataclass
@@ -66,6 +67,7 @@ class ConflictPredictorService:
 
     def __init__(self):
         self.model_info = get_current_model_info()
+        self.base_branch = "main"
 
     def analyze_project_conflicts(self, project_path: str) -> ConflictAnalysisResult:
         """
@@ -79,6 +81,10 @@ class ConflictPredictorService:
         """
         if not project_path or not os.path.exists(project_path):
             raise ValueError(f"Invalid project path: {project_path}")
+
+        # Each branch is compared with the branch it starts from, which is
+        # not always `main` (`DEFAULT_BRANCH`, then main, master, develop).
+        self.base_branch = detect_base_branch(Path(project_path), Path(project_path))
 
         # Get all worktrees and their modifications
         worktrees = self._get_active_worktrees(project_path)
@@ -145,9 +151,12 @@ class ConflictPredictorService:
                     # Two marker columns: `*` the current branch, `+` one
                     # checked out in another worktree.
                     branch = line[2:].strip().replace("remotes/origin/", "")
+                    # `origin/HEAD -> origin/main` names a branch, it is not one.
                     if (
                         branch
-                        and branch not in ["main", "master", "develop"]
+                        and " -> " not in branch
+                        and branch
+                        not in ["main", "master", "develop", self.base_branch]
                         and branch not in worktrees
                     ):
                         worktrees.append(branch)
@@ -189,9 +198,15 @@ class ConflictPredictorService:
             # Get the branch name (worktree name is often the branch name)
             branch_name = worktree_name
 
-            # Get diff against main branch
+            # Three dots: what the branch changed since it left its base, not
+            # what the base changed since (which every branch would share).
             result = subprocess.run(
-                ["git", "diff", "--name-status", "main.." + branch_name],
+                [
+                    "git",
+                    "diff",
+                    "--name-status",
+                    f"{self.base_branch}...{branch_name}",
+                ],
                 cwd=project_path,
                 capture_output=True,
                 text=True,
@@ -252,7 +267,14 @@ class ConflictPredictorService:
         """Get number of lines added/removed for a file"""
         try:
             result = subprocess.run(
-                ["git", "diff", "--numstat", "main.." + branch, "--", file_path],
+                [
+                    "git",
+                    "diff",
+                    "--numstat",
+                    f"{self.base_branch}...{branch}",
+                    "--",
+                    file_path,
+                ],
                 cwd=project_path,
                 capture_output=True,
                 text=True,
@@ -299,9 +321,9 @@ class ConflictPredictorService:
                     for j in range(i + 1, len(mods)):
                         mod1, mod2 = mods[i], mods[j]
 
-                        conflict = self._analyze_file_conflict(mod1, mod2, file_path)
-                        if conflict:
-                            conflicts.append(conflict)
+                        conflicts.append(
+                            self._analyze_file_conflict(mod1, mod2, file_path)
+                        )
 
         # Check for dependency conflicts
         dependency_conflicts = self._detect_dependency_conflicts(modifications)
@@ -311,7 +333,7 @@ class ConflictPredictorService:
 
     def _analyze_file_conflict(
         self, mod1: FileModification, mod2: FileModification, file_path: str
-    ) -> ConflictRisk | None:
+    ) -> ConflictRisk:
         """Analyze conflict between two modifications to the same file"""
 
         # Same file modifications are always a risk
@@ -577,8 +599,14 @@ class ConflictPredictorService:
             if (mod.lines_added + mod.lines_removed) > 50
         ]
 
-        for area in extensive_changes[:3]:  # Top 3 extensive changes
-            if area not in high_risk_areas:
+        # The first 3 files changed extensively that no conflict names yet,
+        # each once even when several branches changed it.
+        named = set(conflict_areas)
+        for area in extensive_changes:
+            if len(named) - len(conflict_areas) == 3:
+                break
+            if area not in named:
+                named.add(area)
                 high_risk_areas.append(f"{area} (extensive changes)")
 
         return high_risk_areas
