@@ -471,12 +471,17 @@ class GitHubOrchestrator:
                 flush=True,
             )
 
-            # What this project rejected often enough is downgraded or dropped
-            # here, after the review, so it holds on every provider (#361).
+            # The review reads its findings again: a remark made twice at one
+            # place is one finding, at its most severe (#361).
+            from runners.github.services import self_critique
             from runners.github.services.learned_suppression import (
                 apply_learned_suppressions,
             )
 
+            findings, merged_findings = self_critique.merge_redundant(findings)
+
+            # What this project rejected often enough is downgraded or dropped
+            # here, after the review, so it holds on every provider (#361).
             findings, learned_suppressions = apply_learned_suppressions(
                 self.project_dir, findings
             )
@@ -544,7 +549,7 @@ class GitHubOrchestrator:
                 ai_triages=ai_triages,
                 risk_assessment=risk_assessment,
                 ci_status=ci_status,
-            )
+            ) + self_critique.summary_note(merged_findings)
 
             # Get HEAD SHA for follow-up review tracking
             head_sha = self.bot_detector.get_last_commit_sha(pr_context.commits)
@@ -929,6 +934,26 @@ class GitHubOrchestrator:
                     is_followup_review=True,
                     unresolved_findings=[f.id for f in previous_review.findings],
                     blockers=blockers,
+                    learned_suppressions=list(previous_review.learned_suppressions),
+                )
+                # Feedback given since the review counts, as in a follow-up
+                # with new commits (#361).
+                from runners.github.services.learned_suppression import (
+                    apply_to_followup,
+                )
+
+                apply_to_followup(
+                    self.project_dir,
+                    result,
+                    lambda remaining: self._generate_verdict(
+                        remaining,
+                        [],
+                        [],
+                        ci_status,
+                        has_merge_conflicts=followup_context.has_merge_conflicts,
+                        merge_state_status=followup_context.merge_state_status,
+                    ),
+                    ci_status,
                 )
                 await result.save(self.github_dir)
                 return result
@@ -1008,12 +1033,15 @@ class GitHubOrchestrator:
                 result = await reviewer.review_followup(followup_context)
                 result.jev = jev_observation
 
-            # What this project rejected often enough, as in the initial
-            # review; the verdict is then recomputed with the initial review's
-            # rule on the findings that remain (#361).
+            # The self-check and what this project rejected often enough, as
+            # in the initial review; the verdict is then recomputed with the
+            # initial review's rule on the findings that remain (#361).
+            from runners.github.services import self_critique
             from runners.github.services.learned_suppression import (
                 apply_to_followup,
             )
+
+            self_critique.apply_to_followup(result)
 
             followup_ci = followup_context.ci_status or {}
             apply_to_followup(

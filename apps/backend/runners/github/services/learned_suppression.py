@@ -132,7 +132,8 @@ def apply_to_followup(
 
     dropped_ids = {item["id"] for item in dropped}
     result.findings = kept
-    result.learned_suppressions = dropped
+    # A follow-up with no new commit keeps what the review already hid.
+    result.learned_suppressions = [*result.learned_suppressions, *dropped]
     result.unresolved_findings = [
         fid for fid in result.unresolved_findings if fid not in dropped_ids
     ]

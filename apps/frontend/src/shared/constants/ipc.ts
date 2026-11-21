@@ -495,6 +495,8 @@ export const IPC_CHANNELS = {
 	GITHUB_PR_REVIEW_FEEDBACK_STATS: "github:pr:reviewFeedback:stats",
 	GITHUB_PR_REVIEW_FEEDBACK_RESET: "github:pr:reviewFeedback:reset",
 	GITHUB_PR_REVIEW_CONVENTIONS_WRITE: "github:pr:reviewConventions:write",
+	// A maintainer's decision on a held rejection (server projects)
+	GITHUB_PR_REVIEW_FEEDBACK_HELD_DECIDE: "github:pr:reviewFeedback:heldDecide",
 
 	// GitHub PR Review events (main -> renderer)
 	GITHUB_PR_REVIEW_PROGRESS: "github:pr:reviewProgress",

@@ -278,7 +278,7 @@ class TestDatasetEdges:
         def _denied(_path):
             raise PermissionError("denied")
 
-        monkeypatch.setattr(rf, "_read_tail", _denied)
+        monkeypatch.setattr(rf, "read_tail", _denied)
         with caplog.at_level(logging.WARNING):
             assert rf.load_feedback(tmp_path) == []
         assert "PermissionError" in caplog.text
@@ -547,3 +547,86 @@ class TestFollowupPromptCarriesTheBlock:
 
         assert rf.PROMPT_HEADING in prompt
         assert "Missing docstring" in prompt
+
+
+class TestFollowupWithoutNewCommit:
+    """A follow-up with nothing new re-applies the feedback given since the review."""
+
+    def _run(self, tmp_path, config, monkeypatch, previous, ci=None):
+        orch = _bare_orchestrator(tmp_path, config)
+        orch._jev_worker = None
+        orch._report_progress = lambda *a, **k: None
+        asyncio.run(previous.save(orch.github_dir))
+
+        async def _checks(_number):
+            return dict(ci or {})
+
+        orch.gh_client = SimpleNamespace(get_pr_checks_comprehensive=_checks)
+        orch.bot_detector = SimpleNamespace(
+            mark_review_started=lambda _n: None,
+            mark_review_finished=lambda _n, success=True: None,
+        )
+
+        class _Gatherer:
+            def __init__(self, *_a, **_k):
+                pass
+
+            async def gather(self):
+                return FollowupReviewContext(
+                    pr_number=5,
+                    previous_review=previous,
+                    previous_commit_sha="abc123",
+                    current_commit_sha="abc123",
+                )
+
+        context_gatherer = importlib.import_module("runners.github.context_gatherer")
+        monkeypatch.setattr(context_gatherer, "FollowupContextGatherer", _Gatherer)
+        return orch, asyncio.run(orch.followup_review_pr(5))
+
+    def _previous(self, findings, verdict=MergeVerdict.NEEDS_REVISION):
+        previous = _followup(findings, verdict=verdict)
+        previous.is_followup_review = False
+        previous.reviewed_commit_sha = "abc123"
+        previous.learned_suppressions = [{"id": "older", "title": "t"}]
+        return previous
+
+    def test_a_finding_rejected_since_is_hidden_and_the_verdict_relaxed(
+        self, tmp_path, config, monkeypatch
+    ):
+        _rejections(tmp_path, 6)
+        previous = self._previous([_finding("noise", "Missing docstring on `bar`")])
+
+        orch, result = self._run(tmp_path, config, monkeypatch, previous)
+
+        assert result.success and result.is_followup_review
+        assert result.findings == []
+        assert result.unresolved_findings == []
+        assert [s["id"] for s in result.learned_suppressions] == ["older", "noise"]
+        assert result.verdict == MergeVerdict.READY_TO_MERGE
+        assert "No new commits since last review" in result.summary
+        assert "1 finding(s) hidden" in result.summary
+        saved = PRReviewResult.load(orch.github_dir, 5)
+        assert saved is not None and saved.findings == []
+
+    def test_failing_ci_still_blocks(self, tmp_path, config, monkeypatch):
+        _rejections(tmp_path, 6)
+        previous = self._previous([_finding("noise", "Missing docstring on `bar`")])
+        ci = {"failing": 1, "failed_checks": ["lint"]}
+
+        _orch, result = self._run(tmp_path, config, monkeypatch, previous, ci)
+
+        assert result.findings == []
+        assert result.verdict == MergeVerdict.BLOCKED
+        assert "CI Failed: lint" in result.blockers
+
+    def test_without_feedback_the_previous_review_stands(
+        self, tmp_path, config, monkeypatch
+    ):
+        previous = self._previous([_finding("kept", "Possible None dereference")])
+
+        _orch, result = self._run(tmp_path, config, monkeypatch, previous)
+
+        assert [f.id for f in result.findings] == ["kept"]
+        assert result.verdict == MergeVerdict.NEEDS_REVISION
+        assert result.learned_suppressions == [{"id": "older", "title": "t"}]
+        assert result.summary.endswith("Previous findings still apply.")

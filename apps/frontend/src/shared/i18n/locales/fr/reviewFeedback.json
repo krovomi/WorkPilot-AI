@@ -28,6 +28,17 @@
 	"reset": "Réinitialiser",
 	"resetLabel": "Oublier les retours sur « {{label}} »",
 	"resetHint": "Réinitialiser oublie les verdicts donnés jusqu'ici sur ce type de résultat : le relecteur le signale de nouveau jusqu'à ce qu'il soit de nouveau rejeté.",
+	"maintainerOnly": "Sur un projet serveur, seul un propriétaire du projet peut réinitialiser une règle.",
+	"held": {
+		"title_one": "{{count}} rejet en attente d'un mainteneur",
+		"title_other": "{{count}} rejets en attente d'un mainteneur",
+		"hint": "Sur un projet serveur, le rejet d'un membre compte une fois approuvé par un propriétaire du projet : un nouveau venu n'apprend pas seul au relecteur.",
+		"pr": "PR n° {{number}}",
+		"approve": "Approuver",
+		"discard": "Écarter",
+		"approveLabel": "Approuver le rejet de « {{label}} »",
+		"discardLabel": "Écarter le rejet de « {{label}} »"
+	},
 	"conventions": {
 		"write": "Générer review-conventions.md",
 		"hint": "Écrit les règles déduites de ces retours dans .workpilot/review-conventions.md, sans aucun modèle. Les mêmes retours donnent toujours le même fichier.",
@@ -37,7 +48,7 @@
 	"errors": {
 		"invalid": "Cette demande n'a pas pu être lue.",
 		"not_found": "Ce projet ou ce type de résultat est introuvable.",
-		"server_project": "Les retours sur les résultats ne sont pas encore disponibles pour les projets serveur.",
-		"write_failed": "Le fichier n'a pas pu être écrit."
+		"server_project": "Le fichier de conventions ne s'écrit que pour un projet local : le clone d'un projet serveur n'est la copie de travail de personne.",
+		"write_failed": "La modification n'a pas pu être enregistrée."
 	}
 }
