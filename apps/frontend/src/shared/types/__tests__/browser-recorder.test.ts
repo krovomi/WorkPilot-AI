@@ -46,6 +46,46 @@ describe("parseRecordedStep", () => {
 		expect(step).toEqual({ id: "s1", kind: "click", selectors: [{ strategy: "role", role: "button", value: "Save" }] });
 	});
 
+	it("keeps a selector's place, a loader wait and the action a check follows", () => {
+		const step = parseRecordedStep({
+			id: "s4",
+			kind: "assert_text",
+			selectors: [
+				{ ...button, nth: 2 },
+				{ strategy: "text", value: "Save", nth: 0 },
+				{ strategy: "text", value: "A", nth: 20 },
+				{ strategy: "text", value: "B", nth: 1.5 },
+				{ strategy: "text", value: "C", nth: "1" },
+				{ strategy: "text", value: "D", nth: -1 },
+			],
+			text: "Saved",
+			waitHidden: ".spinner",
+			after: "s3",
+		});
+		expect(step).toEqual({
+			id: "s4",
+			kind: "assert_text",
+			selectors: [
+				{ strategy: "role", role: "button", value: "Save", nth: 2 },
+				{ strategy: "text", value: "Save", nth: 0 },
+			],
+			text: "Saved",
+			waitHidden: ".spinner",
+			after: "s3",
+		});
+		const odd = parseRecordedStep({
+			id: "s5",
+			kind: "click",
+			selectors: [button],
+			waitHidden: "body > div:nth-of-type(2)",
+			after: "s3",
+		});
+		expect(odd).toEqual({ id: "s5", kind: "click", selectors: [{ strategy: "role", role: "button", value: "Save" }] });
+		expect(parseRecordedStep({ id: "s6", kind: "assert_text", selectors: [button], text: "x", after: "../s3" })?.after).toBeUndefined();
+		expect(parseRecordedStep({ id: "s7", kind: "click", selectors: [button], waitHidden: `.${"a".repeat(400)}` })?.waitHidden).toBeUndefined();
+		expect(parseRecordedStep({ id: "s8", kind: "click", selectors: [button], waitHidden: 3 })?.waitHidden).toBeUndefined();
+	});
+
 	it("refuses what is not a step", () => {
 		expect(parseRecordedStep(null)).toBeNull();
 		expect(parseRecordedStep({ id: "../x", kind: "click", selectors: [button] })).toBeNull();

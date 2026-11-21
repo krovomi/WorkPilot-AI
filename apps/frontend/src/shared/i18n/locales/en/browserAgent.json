@@ -104,7 +104,16 @@
 		"waits": {
 			"visible": "waits for it to show",
 			"request": "waits for {{method}} {{path}}",
-			"url": "waits for {{url}}"
+			"url": "waits for {{url}}",
+			"hidden": "waits for the loading indicator to go"
+		},
+		"suggestions": {
+			"title": "Suggested checks",
+			"hint": "What showed up right after an action. Keep a check to add it after that action; it is not in the test until you do.",
+			"check": "Check that “{{text}}” shows",
+			"after": "after: {{action}}",
+			"keep": "Keep",
+			"dismiss": "Set this check aside"
 		},
 		"exportTitle": "Export",
 		"nameLabel": "Test name",
