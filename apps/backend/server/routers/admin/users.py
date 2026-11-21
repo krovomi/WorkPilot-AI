@@ -7,6 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import CurrentUser
 from server.auth.jwt_tokens import revoke_all_sessions
+from server.authz.delegation import end_delegations_of
 from server.authz.deps import require_org, require_permission, require_platform_admin
 from server.authz.principal import Principal
 from server.db.engine import get_db
@@ -62,13 +63,18 @@ async def deactivate_user(
     user = await _account_of(db, org_id, user_id, actor)
     user.is_active = False
     revoked = await revoke_all_sessions(db, user_id, commit=False)
+    ended = await end_delegations_of(db, user_id=user_id)
 
     await record(
         db,
         action="user.deactivated",
         actor_id=actor.id,
         org_id=org_id,
-        payload={"user_id": user_id, "sessions_revoked": revoked},
+        payload={
+            "user_id": user_id,
+            "sessions_revoked": revoked,
+            "delegations_ended": ended,
+        },
         request=request,
     )
     await db.commit()
