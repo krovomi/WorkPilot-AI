@@ -703,6 +703,40 @@
 		},
 		"help": "Decided without AI from the category, the imported item or the words of the title. Change it if it is wrong: later versions will pick the workflow from it."
 	},
+	"cardType": {
+		"label": "Card type",
+		"values": {
+			"feature": "Feature",
+			"ux": "UI / UX",
+			"bug": "Bug",
+			"hotfix": "Hotfix",
+			"security": "Security",
+			"perf": "Performance",
+			"refactor": "Refactoring",
+			"test": "Tests",
+			"investigation": "Investigation",
+			"spike": "Spike / POC",
+			"docs": "Docs",
+			"run": "Operations (RUN)",
+			"upgrade": "Upgrade",
+			"infra": "Infra / chore"
+		},
+		"proposedTitle": "{{type}} (proposed, confirm it in the task detail)",
+		"also": "Also: {{type}}",
+		"basis": {
+			"user": "chosen by you",
+			"category": "from the category",
+			"import": "from the imported item",
+			"keywords": "from the title",
+			"severity": "from the security severity",
+			"origin": "from the card's origin"
+		},
+		"preview": {
+			"field": "{{label}}: {{value}}",
+			"progress": "{{status}} · {{percent}}%",
+			"blockedBy": "Waiting for: {{titles}}"
+		}
+	},
 	"images": {
 		"removeImageAriaLabel": "Remove image {{filename}}",
 		"pasteHint": "Tip: Paste screenshots directly with {{shortcut}} to add reference images."
