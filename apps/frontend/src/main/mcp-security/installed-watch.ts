@@ -7,7 +7,9 @@
  * score (`registry-facts.ts`) — and compares them with the last reading it
  * kept. What got worse becomes an alert: a new advisory for the version it
  * runs, a maintainer who appeared, the package deprecated or yanked, the
- * score fallen below 50. An alert is raised once (its id is stable) and stays
+ * score fallen below 50, and, from the static scan of each new version
+ * (lot 3), a risky rule the previous version did not trip or code that can
+ * no longer be read. An alert is raised once (its id is stable) and stays
  * until the person acknowledges it.
  *
  * Only catalog servers are read, as the catalog defines them
@@ -26,6 +28,7 @@ import type {
 	McpMarketplaceFailure,
 	McpMarketplaceServer,
 } from "../../shared/types/mcp-marketplace";
+import type { McpCodeRule, McpCodeScan } from "../../shared/types/mcp-code-scan";
 import type {
 	McpInstalledServerWatch,
 	McpInstalledWatchView,
@@ -38,6 +41,7 @@ import {
 	packageOf,
 	type RegistryFactsStore,
 } from "./registry-facts";
+import { codeScanFor, type SourceScanStore } from "./source-scan";
 
 const MAX_ALERTS = 50;
 
@@ -50,6 +54,28 @@ export interface WatchBaseline {
 	deprecated: boolean;
 	score: number;
 	checkedAt: string;
+	/** The rules the last scanned version tripped; absent until one is scanned. */
+	codeRules?: McpCodeRule[];
+	/** The code of the last version read could not be read. */
+	codeUnavailable?: boolean;
+}
+
+/** The rules a new version may not trip in silence. */
+const RISKY_RULES: readonly McpCodeRule[] = ["shellExec", "dynamicCode", "hardcodedSecret"];
+
+type CodeReading = McpCodeScan | "unknown" | undefined;
+
+function codeBaseline(code: CodeReading, previous?: WatchBaseline): Partial<WatchBaseline> {
+	if (!code || code === "unknown") {
+		return {
+			...(previous?.codeRules ? { codeRules: previous.codeRules } : {}),
+			...(previous?.codeUnavailable ? { codeUnavailable: true } : {}),
+		};
+	}
+	if (code.status === "unavailable") {
+		return { ...(previous?.codeRules ? { codeRules: previous.codeRules } : {}), codeUnavailable: true };
+	}
+	return { codeRules: [...new Set(code.findings.map((f) => f.rule))].sort() };
 }
 
 interface WatchedServer {
@@ -106,6 +132,7 @@ export function baselineOf(
 	facts: McpRegistryFacts,
 	score: number,
 	previous?: WatchBaseline,
+	code?: CodeReading,
 ): WatchBaseline {
 	const vulnerabilities = facts.vulnerabilitiesUnknown
 		? previous?.vulnerabilities
@@ -117,6 +144,7 @@ export function baselineOf(
 		deprecated: Boolean(facts.deprecated),
 		score,
 		checkedAt: facts.checkedAt,
+		...codeBaseline(code, previous),
 	};
 }
 
@@ -126,6 +154,7 @@ export function worsened(
 	facts: McpRegistryFacts,
 	score: number,
 	detectedAt: string,
+	code?: CodeReading,
 ): McpWatchAlert[] {
 	const alerts: McpWatchAlert[] = [];
 	const add = (id: string, kind: McpWatchAlert["kind"], values: McpWatchAlert["values"]) =>
@@ -156,6 +185,26 @@ export function worsened(
 	if (securityLevel(previous.score) !== "low" && securityLevel(score) === "low") {
 		add(`low:${facts.checkedAt}`, "lowScore", { score, previous: previous.score });
 	}
+	if (code && code !== "unknown") {
+		const version = code.version;
+		if (code.status === "unavailable") {
+			if (!previous.codeUnavailable) {
+				add(`code-unavailable:${version}`, "sourceUnavailable", { version });
+			}
+		} else if (previous.codeRules) {
+			const known = new Set(previous.codeRules);
+			for (const rule of RISKY_RULES) {
+				const found = code.findings.find((f) => f.rule === rule);
+				if (found && !known.has(rule)) {
+					add(`code:${rule}:${version}`, "newCodeFinding", {
+						rule,
+						version,
+						file: `${found.file}:${found.line}`,
+					});
+				}
+			}
+		}
+	}
 	return alerts;
 }
 
@@ -171,6 +220,8 @@ export interface WatchDeps {
 	offline: (projectPath: string) => boolean;
 	catalog: () => McpMarketplaceServer[];
 	facts: RegistryFactsStore;
+	/** The static scan of each new version (lot 3); absent: not read. */
+	scan?: SourceScanStore;
 	watch: InstalledWatchStore;
 	now?: () => number;
 	warn?: (message: string) => void;
@@ -212,18 +263,21 @@ export async function runInstalledWatch(deps: WatchDeps): Promise<number | null>
 			);
 			continue;
 		}
-		const score = scoreServer(entry, { facts, now: start }).score;
+		const code = deps.scan
+			? await codeScanFor(deps.scan, ref, facts.version, true)
+			: undefined;
+		const score = scoreServer(entry, { facts, now: start, ...(code ? { code } : {}) }).score;
 		const data = deps.watch.read();
 		const server = data.servers[entry.id] ?? { alerts: [] };
 		const known = new Set(server.alerts.map((a) => a.id));
 		const fresh = server.baseline
-			? worsened(server.baseline, facts, score, new Date(start).toISOString()).filter(
+			? worsened(server.baseline, facts, score, new Date(start).toISOString(), code).filter(
 					(a) => !known.has(a.id),
 				)
 			: [];
 		raised += fresh.length;
 		data.servers[entry.id] = {
-			baseline: baselineOf(facts, score, server.baseline),
+			baseline: baselineOf(facts, score, server.baseline, code),
 			alerts: [...server.alerts, ...fresh].slice(-MAX_ALERTS),
 		};
 		deps.watch.write(data);

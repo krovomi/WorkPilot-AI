@@ -15,9 +15,11 @@ import { readProjectEnv } from "../project-env-file";
 import { projectStore } from "../project-store";
 import type { InstallGuardDeps } from "./install-guard";
 import { InstalledWatchStore, runInstalledWatch, type WatchDeps } from "./installed-watch";
+import { acceptedFindings } from "../../shared/mcp-catalog/install-policy";
 import { readMcpPolicy } from "./policy-file";
 import { RegistryFactsStore } from "./registry-facts";
-import { scoreCatalogEntry } from "./server-security";
+import { type ScoreDeps, scoreCatalogEntry } from "./server-security";
+import { SourceScanStore } from "./source-scan";
 
 /** `userData/mcp-marketplace`, created when missing. */
 export function marketplaceDataDir(): string {
@@ -28,11 +30,28 @@ export function marketplaceDataDir(): string {
 
 let factsStore: RegistryFactsStore | null = null;
 let watchStore: InstalledWatchStore | null = null;
+let scanStore: SourceScanStore | null = null;
 
 /** The registry facts of the catalog's packages, cached in the app's data. */
 export function securityStore(): RegistryFactsStore {
 	factsStore ??= new RegistryFactsStore(path.join(marketplaceDataDir(), "security-facts.json"));
 	return factsStore;
+}
+
+/** The static scans of the catalog's packages, one per version (lot 3). */
+export function sourceScanStore(): SourceScanStore {
+	scanStore ??= new SourceScanStore(path.join(marketplaceDataDir(), "code-scans.json"));
+	return scanStore;
+}
+
+/** What a score needs: facts, scans, offline mode, the policy's accepted findings. */
+export function scoreDeps(): ScoreDeps {
+	return {
+		store: securityStore(),
+		offline: offlineStrict,
+		scan: sourceScanStore(),
+		accepted: (projectPath) => acceptedFindings(readMcpPolicy(projectPath)),
+	};
 }
 
 /** The last reading and the alerts of each installed catalog server. */
@@ -54,6 +73,7 @@ export function watchDeps(): WatchDeps {
 		offline: offlineStrict,
 		catalog: loadMcpCatalog,
 		facts: securityStore(),
+		scan: sourceScanStore(),
 		watch: installedWatchStore(),
 		warn: (message) => appLog.warn(message),
 	};
@@ -64,10 +84,7 @@ export function installGuardDeps(): InstallGuardDeps {
 		readPolicy: readMcpPolicy,
 		catalog: loadMcpCatalog,
 		score: async (entry, projectPath) =>
-			(await scoreCatalogEntry(entry, projectPath, {
-				store: securityStore(),
-				offline: offlineStrict,
-			})).score,
+			(await scoreCatalogEntry(entry, projectPath, scoreDeps())).score,
 	};
 }
 
