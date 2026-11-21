@@ -17,7 +17,8 @@
 		"nothing_to_stop": "Nothing was running on this card any more. Pull to refresh.",
 		"entra_disabled": "This server doesn't offer Microsoft sign-in.",
 		"entra_failed": "Microsoft sign-in didn't complete.",
-		"entra_misconfigured": "The server's Microsoft sign-in settings are invalid."
+		"entra_misconfigured": "The server's Microsoft sign-in settings are invalid.",
+		"approval_waiting": "Your approval is recorded: {{given}} of {{needed}}. The build starts once the card has every approval it needs."
 	},
 	"signIn": {
 		"title": "WorkPilot AI",
@@ -565,5 +566,36 @@
 		"operator": "Operator",
 		"analyst": "Analyst",
 		"viewer": "Viewer"
+	},
+	"approval": {
+		"count": "{{given}} of {{needed}} approvals",
+		"criticality": "Criticality",
+		"levels": {
+			"low": "Low",
+			"medium": "Medium",
+			"high": "High"
+		},
+		"sources": {
+			"set": "Set by a person",
+			"assessed": "Assessed from the plan",
+			"default": "The server's default"
+		},
+		"missingRoles": "Still missing: {{roles}}",
+		"by": "{{by}}, {{at}}",
+		"byFor": "{{by}} for {{for}}, {{at}}"
+	},
+	"delegations": {
+		"title": "Lent approvals",
+		"hint": "Lend your approval to a colleague while you are away. They approve in your name until the end date.",
+		"current": "Current and planned",
+		"item": "{{from}} → {{to}}, {{start}} to {{end}}",
+		"active": "Active",
+		"planned": "Planned",
+		"end": "End",
+		"empty": "No approval is lent on this project.",
+		"lendTitle": "Lend my approval",
+		"noColleague": "No colleague can approve on this project.",
+		"days": "For how many days (1 to 90)",
+		"lend": "Lend"
 	}
 }

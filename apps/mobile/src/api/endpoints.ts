@@ -6,12 +6,17 @@
 import type { ServerClient } from "./client";
 import type {
 	AgentRun,
+	ApproveResult,
 	AuthConfig,
 	BoardCard,
+	CardApproval,
 	CardChanges,
 	CardDetails,
 	CardKind,
+	Criticality,
+	Delegation,
 	MyPermissions,
+	ProjectMember,
 	RunPhase,
 	ServerProject,
 	SteeringMessage,
@@ -87,7 +92,24 @@ export function api(client: ServerClient) {
 			(await client.request<{ engines: EngineOption[] }>("GET", `/api/board/engines?project_id=${enc(projectId)}`))
 				.engines,
 		deleteCard: (projectId: string, cardId: string) => client.request("DELETE", cardsPath(projectId, cardId)),
-		approve: (projectId: string, cardId: string) => client.request("POST", cardsPath(projectId, cardId, "approve")),
+		approve: (projectId: string, cardId: string) =>
+			client.request<ApproveResult>("POST", cardsPath(projectId, cardId, "approve")),
+		/** A card's criticality, its approvals and what is missing (`shared_board/approvals.py`). */
+		approvals: (projectId: string, cardId: string) =>
+			client.request<CardApproval>("GET", cardsPath(projectId, cardId, "approvals")),
+		setCriticality: (projectId: string, cardId: string, criticality: Criticality) =>
+			client.request<CardApproval>("PUT", cardsPath(projectId, cardId, "criticality"), { criticality }),
+		/** The approvals lent on the project, running or to come. */
+		delegations: (projectId: string) =>
+			client.request<Delegation[]>("GET", `/api/board/delegations?project_id=${enc(projectId)}`),
+		lendApproval: (projectId: string, toUserId: string, endsAt: string) =>
+			client.request<Delegation>("POST", `/api/board/delegations?project_id=${enc(projectId)}`, {
+				to_user_id: toUserId,
+				ends_at: endsAt,
+			}),
+		endDelegation: (projectId: string, delegationId: string) =>
+			client.request("DELETE", `/api/board/delegations/${enc(delegationId)}?project_id=${enc(projectId)}`),
+		members: (projectId: string) => client.request<ProjectMember[]>("GET", `/projects/${enc(projectId)}/members`),
 		changes: (projectId: string, cardId: string) =>
 			client.request<CardChanges>("GET", cardsPath(projectId, cardId, "changes")),
 		logs: async (projectId: string, cardId: string) =>

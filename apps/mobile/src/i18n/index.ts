@@ -8,6 +8,7 @@ import { getLocales } from "expo-localization";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { ApiError } from "../api/client";
+import { ApprovalWaiting } from "../board/actions";
 import en from "./en.json";
 import fr from "./fr.json";
 
@@ -41,6 +42,9 @@ export function describeError(err: unknown): string {
 		if (err.status === 403) return i18n.t("errors.forbidden");
 		if (err.status === 429) return i18n.t("errors.too_many");
 		return i18n.t("errors.generic", { message: err.message });
+	}
+	if (err instanceof ApprovalWaiting) {
+		return i18n.t("errors.approval_waiting", { given: err.count, needed: err.needed });
 	}
 	if (err instanceof Error && i18n.exists(`errors.${err.message}`)) return i18n.t(`errors.${err.message}`);
 	return i18n.t("errors.generic", { message: err instanceof Error ? err.message : String(err) });

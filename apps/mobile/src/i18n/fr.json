@@ -17,7 +17,8 @@
 		"nothing_to_stop": "Plus rien ne tournait sur cette carte. Tire pour actualiser.",
 		"entra_disabled": "Ce serveur ne propose pas la connexion Microsoft.",
 		"entra_failed": "La connexion Microsoft n'a pas abouti.",
-		"entra_misconfigured": "Les réglages de connexion Microsoft du serveur sont invalides."
+		"entra_misconfigured": "Les réglages de connexion Microsoft du serveur sont invalides.",
+		"approval_waiting": "Votre approbation est enregistrée : {{given}} sur {{needed}}. Le build démarre quand la carte a toutes les approbations qu'il lui faut."
 	},
 	"signIn": {
 		"title": "WorkPilot AI",
@@ -565,5 +566,36 @@
 		"operator": "Opérateur",
 		"analyst": "Analyste",
 		"viewer": "Lecteur"
+	},
+	"approval": {
+		"count": "{{given}} approbations sur {{needed}}",
+		"criticality": "Criticité",
+		"levels": {
+			"low": "Faible",
+			"medium": "Moyenne",
+			"high": "Haute"
+		},
+		"sources": {
+			"set": "Choisie par une personne",
+			"assessed": "Évaluée d'après le plan",
+			"default": "Valeur par défaut du serveur"
+		},
+		"missingRoles": "Il manque encore : {{roles}}",
+		"by": "{{by}}, {{at}}",
+		"byFor": "{{by}} pour {{for}}, {{at}}"
+	},
+	"delegations": {
+		"title": "Approbations prêtées",
+		"hint": "Prêtez votre approbation à un collègue pendant votre absence. Il approuve en votre nom jusqu'à la date de fin.",
+		"current": "En cours et prévues",
+		"item": "{{from}} → {{to}}, du {{start}} au {{end}}",
+		"active": "En cours",
+		"planned": "Prévue",
+		"end": "Terminer",
+		"empty": "Aucune approbation n'est prêtée sur ce projet.",
+		"lendTitle": "Prêter mon approbation",
+		"noColleague": "Aucun collègue ne peut approuver sur ce projet.",
+		"days": "Pour combien de jours (1 à 90)",
+		"lend": "Prêter"
 	}
 }
