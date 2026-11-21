@@ -1,8 +1,8 @@
 import { AlertCircle, CheckCircle2, FileCode, Users } from "lucide-react";
-import { UIUX_CATEGORY_LABELS } from "../../../../shared/constants";
 import type { UIUXImprovementIdea } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
 import { useTranslation } from "react-i18next";
+import { useIdeaLabels } from "../hooks/useIdeaLabels";
 
 interface UIUXDetailsProps {
 	idea: UIUXImprovementIdea;
@@ -10,12 +10,13 @@ interface UIUXDetailsProps {
 
 export function UIUXDetails({ idea }: UIUXDetailsProps) {
 	const { t } = useTranslation();
+	const labels = useIdeaLabels();
 	return (
 		<>
 			{/* Category */}
 			<div>
 				<Badge variant="outline" className="text-sm">
-					{UIUX_CATEGORY_LABELS[idea.category]}
+					{labels.category(idea.type, idea.category)}
 				</Badge>
 			</div>
 
@@ -47,7 +48,7 @@ export function UIUXDetails({ idea }: UIUXDetailsProps) {
 			</div>
 
 			{/* Affected Components */}
-			{idea.affectedComponents && idea.affectedComponents.length > 0 && (
+			{idea.affectedComponents.length > 0 && (
 				<div>
 					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 						<FileCode className="h-4 w-4" />
