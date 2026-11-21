@@ -28,6 +28,17 @@
 	"reset": "Reset",
 	"resetLabel": "Forget the feedback on “{{label}}”",
 	"resetHint": "Reset forgets the verdicts given so far on that kind of finding: the reviewer raises it again until it is rejected again.",
+	"maintainerOnly": "Only a project owner can reset a rule on a server project.",
+	"held": {
+		"title_one": "{{count}} rejection waiting for a maintainer",
+		"title_other": "{{count}} rejections waiting for a maintainer",
+		"hint": "On a server project, a member's rejection counts once a project owner approves it, so a newcomer does not teach the reviewer alone.",
+		"pr": "PR #{{number}}",
+		"approve": "Approve",
+		"discard": "Discard",
+		"approveLabel": "Approve the rejection of “{{label}}”",
+		"discardLabel": "Discard the rejection of “{{label}}”"
+	},
 	"conventions": {
 		"write": "Generate review-conventions.md",
 		"hint": "Writes the rules deduced from this feedback to .workpilot/review-conventions.md, without any model. The same feedback always gives the same file.",
@@ -37,7 +48,7 @@
 	"errors": {
 		"invalid": "This request could not be read.",
 		"not_found": "This project or this kind of finding was not found.",
-		"server_project": "Feedback on findings is not available for server projects yet.",
-		"write_failed": "The file could not be written."
+		"server_project": "The conventions file is written only for a local project: a server project's clone is nobody's working copy.",
+		"write_failed": "The change could not be saved."
 	}
 }

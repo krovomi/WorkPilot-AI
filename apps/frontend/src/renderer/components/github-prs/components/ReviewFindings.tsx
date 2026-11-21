@@ -241,6 +241,7 @@ export function ReviewFindings({
 													? {
 															verdict: findingFeedback.feedback[finding.id],
 															pending: findingFeedback.pendingId === finding.id,
+															held: findingFeedback.held.includes(finding.id),
 															onSubmit: findingFeedback.submit,
 														}
 													: undefined

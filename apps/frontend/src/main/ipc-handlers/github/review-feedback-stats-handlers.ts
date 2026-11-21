@@ -5,8 +5,10 @@
  * The renderer names a project by id and, for a reset, a signature; nothing
  * else. Each is checked here before a folder is opened: the signature must
  * have the shape of one and be a kind of remark the dataset holds
- * (`recordReset`). A server project's reviews live on the server, which does
- * not take feedback yet: every call answers `server_project`.
+ * (`recordReset`). A server project's feedback lives on the server
+ * (`review-feedback-server.ts`), which also holds a member's rejections until
+ * a maintainer decides; its conventions file is not written here (the server's
+ * clone is nobody's working copy): that call answers `server_project`.
  */
 
 import { ipcMain } from "electron";
@@ -17,9 +19,14 @@ import type {
 } from "../../../shared/types/review-feedback";
 import { serverProjectOf } from "../server-review-jobs";
 import { writeConventions } from "./review-conventions";
-import { SIGNATURE } from "./review-feedback-dataset";
+import { FINDING_ID, SIGNATURE } from "./review-feedback-dataset";
+import {
+	decideServerHeld,
+	resetServerRule,
+	serverFeedbackStats,
+} from "./review-feedback-server";
 import { computeStats, configuredThreshold } from "./review-feedback-stats";
-import { readRecords, recordReset } from "./review-feedback-store";
+import { isPrNumber, readRecords, recordReset } from "./review-feedback-store";
 import { withProjectOrNull } from "./utils/project-middleware";
 
 type Refusal = { success: false; error: "invalid" | "server_project" };
@@ -32,6 +39,8 @@ function refusal(projectId: unknown): Refusal | null {
 	return null;
 }
 
+const INVALID = { success: false, error: "invalid" } as const;
+
 function statsOf(projectPath: string): ReviewFeedbackStatsResult {
 	return {
 		success: true,
@@ -43,6 +52,8 @@ export function registerReviewFeedbackStatsHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_STATS,
 		async (_event, projectId: unknown): Promise<ReviewFeedbackStatsResult> => {
+			const remote = serverProjectOf(projectId);
+			if (remote) return serverFeedbackStats(remote);
 			const refused = refusal(projectId);
 			if (refused) return refused;
 			const result = await withProjectOrNull(projectId as string, async (project) =>
@@ -59,11 +70,13 @@ export function registerReviewFeedbackStatsHandlers(): void {
 			projectId: unknown,
 			signature: unknown,
 		): Promise<ReviewFeedbackStatsResult> => {
+			if (typeof signature !== "string" || !SIGNATURE.test(signature)) {
+				return INVALID;
+			}
+			const remote = serverProjectOf(projectId);
+			if (remote) return resetServerRule(remote, signature);
 			const refused = refusal(projectId);
 			if (refused) return refused;
-			if (typeof signature !== "string" || !SIGNATURE.test(signature)) {
-				return { success: false, error: "invalid" };
-			}
 			const result = await withProjectOrNull(
 				projectId as string,
 				async (project): Promise<ReviewFeedbackStatsResult> => {
@@ -73,6 +86,31 @@ export function registerReviewFeedbackStatsHandlers(): void {
 				},
 			);
 			return result ?? { success: false, error: "not_found" };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_HELD_DECIDE,
+		async (
+			_event,
+			projectId: unknown,
+			prNumber: unknown,
+			findingId: unknown,
+			approve: unknown,
+		): Promise<ReviewFeedbackStatsResult> => {
+			if (
+				typeof projectId !== "string" ||
+				!isPrNumber(prNumber) ||
+				typeof findingId !== "string" ||
+				!FINDING_ID.test(findingId) ||
+				typeof approve !== "boolean"
+			) {
+				return INVALID;
+			}
+			// Only a server holds rejections: a local project's count at once.
+			const remote = serverProjectOf(projectId);
+			if (!remote) return { success: false, error: "not_found" };
+			return decideServerHeld(remote, prNumber, findingId, approve);
 		},
 	);
 

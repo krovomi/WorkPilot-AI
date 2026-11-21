@@ -104,7 +104,16 @@
 		"waits": {
 			"visible": "attend son affichage",
 			"request": "attend {{method}} {{path}}",
-			"url": "attend {{url}}"
+			"url": "attend {{url}}",
+			"hidden": "attend que l'indicateur de chargement disparaisse"
+		},
+		"suggestions": {
+			"title": "Vérifications proposées",
+			"hint": "Ce qui est apparu juste après une action. Gardez une vérification pour l'ajouter après cette action ; elle n'est pas dans le test tant que vous ne l'avez pas gardée.",
+			"check": "Vérifier que « {{text}} » s'affiche",
+			"after": "après : {{action}}",
+			"keep": "Garder",
+			"dismiss": "Écarter cette vérification"
 		},
 		"exportTitle": "Exporter",
 		"nameLabel": "Nom du test",

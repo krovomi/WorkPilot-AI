@@ -29,7 +29,38 @@ beforeEach(() => {
 
 const store = () => useBrowserRecorderStore.getState();
 
+const check = (id: string, after: string, text = "Saved"): RecordedStep => ({
+	id,
+	kind: "assert_text",
+	selectors: [{ strategy: "text", value: text }],
+	text,
+	after,
+});
+
 describe("browser recorder store", () => {
+	it("keeps a proposed check apart until the person keeps it after its action", () => {
+		for (const id of ["s1", "s2"]) store().handleEvent({ type: "step", step: click(id) });
+		store().handleEvent({ type: "step", step: check("s3", "s1") });
+		store().handleEvent({ type: "step", step: check("s4", "s1", "Done") });
+		store().handleEvent({ type: "step", step: check("s5", "s9") });
+		store().handleEvent({ type: "step", step: check("s6", "s2") });
+		expect(store().steps.map((s) => s.id)).toEqual(["s1", "s2"]);
+		expect(store().suggestions.map((s) => s.id)).toEqual(["s3", "s4", "s5", "s6"]);
+
+		store().acceptSuggestion("s3");
+		store().acceptSuggestion("s4");
+		store().acceptSuggestion("s5");
+		store().acceptSuggestion("s404");
+		expect(store().steps.map((s) => s.id)).toEqual(["s1", "s3", "s4", "s2", "s5"]);
+		// Kept, it is a step: the recorder repeating it changes nothing.
+		store().handleEvent({ type: "step", step: check("s3", "s1", "Again") });
+		expect(store().suggestions.map((s) => s.id)).toEqual(["s6"]);
+
+		store().dismissSuggestion("s6");
+		store().handleEvent({ type: "step", step: check("s6", "s2") });
+		expect(store().suggestions).toEqual([]);
+	});
+
 	it("follows the session's events", () => {
 		store().handleEvent({ type: "started", url: "http://a.test/" });
 		expect(store().status).toBe("recording");
