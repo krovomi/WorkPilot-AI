@@ -488,6 +488,10 @@ export const IPC_CHANNELS = {
 	// Accept / reject / not applicable on a review finding (#361)
 	GITHUB_PR_REVIEW_FEEDBACK_SET: "github:pr:reviewFeedback:set",
 	GITHUB_PR_REVIEW_FEEDBACK_GET: "github:pr:reviewFeedback:get",
+	// The project's acceptance rate, a learned rule reset, the conventions file
+	GITHUB_PR_REVIEW_FEEDBACK_STATS: "github:pr:reviewFeedback:stats",
+	GITHUB_PR_REVIEW_FEEDBACK_RESET: "github:pr:reviewFeedback:reset",
+	GITHUB_PR_REVIEW_CONVENTIONS_WRITE: "github:pr:reviewConventions:write",
 
 	// GitHub PR Review events (main -> renderer)
 	GITHUB_PR_REVIEW_PROGRESS: "github:pr:reviewProgress",

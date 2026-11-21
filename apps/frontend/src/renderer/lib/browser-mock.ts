@@ -314,6 +314,18 @@ const browserMockAPI: Partial<ElectronAPI> = {
 			success: true as const,
 			feedback: {},
 		}),
+		getReviewFeedbackStats: async () => ({
+			success: true as const,
+			stats: { threshold: 3, categories: [], rules: [] },
+		}),
+		resetReviewFeedbackRule: async () => ({
+			success: false as const,
+			error: "not_found" as const,
+		}),
+		writeReviewConventions: async () => ({
+			success: false as const,
+			error: "write_failed" as const,
+		}),
 		getPRReview: async () => null,
 		getPRReviewsBatch: async () => ({}),
 		deletePRReview: async () => true,
