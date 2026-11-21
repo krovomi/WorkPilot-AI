@@ -55,24 +55,34 @@ afterEach(() => {
 });
 
 describe("loadProjects", () => {
-	it("restores the tabs, the projects and the last selected project", async () => {
+	it("restores the tabs and the projects, the active tab being the selected project", async () => {
 		api.getTabState.mockResolvedValue({
 			success: true,
 			data: { openProjectIds: ["a", "b"], activeProjectId: "b", tabOrder: ["b", "a"] },
 		});
 		api.getProjects.mockResolvedValue({ success: true, data: [project("a"), project("b")] });
+		// An older selection saved on this machine: the views showed project a
+		// (its pull requests) under project b's tab.
 		localStorage.setItem("lastSelectedProjectId", "a");
 		await loadProjects();
 		expect(store()).toMatchObject({
 			openProjectIds: ["a", "b"],
 			activeProjectId: "b",
 			tabOrder: ["b", "a"],
-			selectedProjectId: "a",
+			selectedProjectId: "b",
 			isLoading: false,
 			error: null,
 		});
 		expect(store().projects).toHaveLength(2);
 		expect(api.checkProjectPaths).toHaveBeenCalled();
+	});
+
+	it("restores the last selected project when no tab is active", async () => {
+		api.getTabState.mockResolvedValue({ success: true, data: { openProjectIds: [] } });
+		api.getProjects.mockResolvedValue({ success: true, data: [project("a"), project("b")] });
+		localStorage.setItem("lastSelectedProjectId", "a");
+		await loadProjects();
+		expect(store()).toMatchObject({ selectedProjectId: "a", activeProjectId: null });
 	});
 
 	it("falls back to the active tab when nothing was selected on this machine", async () => {

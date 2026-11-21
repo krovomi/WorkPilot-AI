@@ -75,6 +75,11 @@ class LoopConfig:
     #: Passes the runner makes on the version kept, once the loop has stopped.
     responsive: bool = False
     states: bool = False
+    #: One correction from the passes' findings, kept only when it helps.
+    fix_passes: bool = False
+    #: Zones the person drew on the design, as fractions ``(x, y, w, h)``:
+    #: left out of the score, like the dynamic components.
+    masks: tuple[tuple[float, float, float, float], ...] = ()
 
 
 @dataclass
@@ -104,6 +109,8 @@ class LoopOutcome:
     detail: str = ""
     budget_kind: str = ""
     spend: dict = field(default_factory=dict)
+    #: The running total, for a correction made after the loop (the passes').
+    ledger: Spend | None = None
 
 
 def _data_url(png: bytes) -> str:
@@ -204,6 +211,7 @@ async def run_loop(
             detail=detail,
             budget_kind=budget_kind,
             spend=spend.as_dict(cfg.max_tokens, cfg.max_cost_usd),
+            ledger=spend,
         )
 
     notify("render", 0)

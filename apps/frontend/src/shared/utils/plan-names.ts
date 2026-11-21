@@ -35,7 +35,10 @@ export function claudePlanName(
 	subscriptionType: string | null | undefined,
 	rateLimitTier?: string | null,
 ): string | undefined {
-	const type = clean(subscriptionType)?.toLowerCase();
+	// Anthropic's organization types spell it "claude_max", Claude Code "max".
+	const type = clean(subscriptionType)
+		?.toLowerCase()
+		.replace(/^claude[_-]/, "");
 	if (!type) return undefined;
 	if (type === "max") {
 		// "default_claude_max_20x" → 20x; Max comes in 5x and 20x.

@@ -75,6 +75,71 @@ describe("useGitHubPRs across projects", () => {
 		expect(result.current.prs.map((p) => p.number)).toEqual([12]);
 	});
 
+	it("never shows the previous project's repository once the project changed", async () => {
+		// The first project's answer comes late, after the switch.
+		let answerWorkpilot: (value: unknown) => void = () => undefined;
+		checkGitHubConnection.mockImplementation((projectId: string) =>
+			projectId === "workpilot"
+				? new Promise((resolve) => {
+						answerWorkpilot = resolve;
+					})
+				: Promise.resolve({
+						success: true,
+						data: { connected: true, repoFullName: "acme/dotnet" },
+					}),
+		);
+		listPRs.mockImplementation(async (projectId: string) => ({
+			prs: projectId === "dotnet" ? [pr(3, "Bump the SDK")] : [pr(1185, "Browser agent")],
+			hasNextPage: false,
+			endCursor: null,
+		}));
+
+		const { result, rerender } = renderHook(
+			({ projectId }: { projectId: string }) =>
+				useGitHubPRs(projectId, { isActive: true }),
+			{ initialProps: { projectId: "workpilot" } },
+		);
+		await waitFor(() => expect(checkGitHubConnection).toHaveBeenCalledWith("workpilot"));
+
+		rerender({ projectId: "dotnet" });
+		await waitFor(() => expect(result.current.repoFullName).toBe("acme/dotnet"));
+
+		await act(async () => {
+			answerWorkpilot({
+				success: true,
+				data: { connected: true, repoFullName: "krovomi/WorkPilot-AI" },
+			});
+		});
+
+		expect(result.current.repoFullName).toBe("acme/dotnet");
+		expect(result.current.prs.map((p) => p.number)).toEqual([3]);
+		expect(listPRs).not.toHaveBeenCalledWith("workpilot");
+	});
+
+	it("forgets the previous project's repository as soon as the project changes", async () => {
+		checkGitHubConnection.mockImplementation((projectId: string) =>
+			projectId === "workpilot"
+				? Promise.resolve({
+						success: true,
+						data: { connected: true, repoFullName: "krovomi/WorkPilot-AI" },
+					})
+				: new Promise(() => undefined),
+		);
+		listPRs.mockResolvedValue({ prs: [pr(1185, "Browser agent")], hasNextPage: false, endCursor: null });
+
+		const { result, rerender } = renderHook(
+			({ projectId }: { projectId: string }) =>
+				useGitHubPRs(projectId, { isActive: true }),
+			{ initialProps: { projectId: "workpilot" } },
+		);
+		await waitFor(() => expect(result.current.repoFullName).toBe("krovomi/WorkPilot-AI"));
+
+		rerender({ projectId: "dotnet" });
+
+		expect(result.current.repoFullName).toBeNull();
+		expect(result.current.prs).toEqual([]);
+	});
+
 	it("loads nothing before a project is selected", async () => {
 		const { rerender } = renderHook(
 			({ projectId }: { projectId: string }) => useGitHubPRs(projectId, { isActive: true }),

@@ -134,4 +134,97 @@ describe("GitHub issue stores", () => {
 		sync().clearSyncStatus();
 		expect(sync().syncStatus).toBeNull();
 	});
+
+	// A slow answer for the project left behind must not land on the project
+	// switched to: its repository, its issues.
+	describe("an answer that comes after the project changed", () => {
+		const deferred = () => {
+			let resolve: (value: unknown) => void = () => undefined;
+			const promise = new Promise((r) => {
+				resolve = r;
+			});
+			return { promise, resolve };
+		};
+
+		it("does not replace the connection status of the project switched to", async () => {
+			const late = deferred();
+			api.checkGitHubConnection.mockImplementation((projectId: string) =>
+				projectId === "workpilot"
+					? late.promise
+					: Promise.resolve({
+							success: true,
+							data: { connected: true, repoFullName: "acme/dotnet" },
+						}),
+			);
+			const first = checkGitHubConnection("workpilot");
+			await checkGitHubConnection("dotnet");
+			late.resolve({
+				success: true,
+				data: { connected: true, repoFullName: "krovomi/WorkPilot-AI" },
+			});
+			expect(await first).toBeNull();
+			expect(useSyncStatusStore.getState().getRepoFullName()).toBe("acme/dotnet");
+		});
+
+		it("forgets another project's status while the new one is checked", async () => {
+			api.checkGitHubConnection.mockResolvedValue({
+				success: true,
+				data: { connected: true, repoFullName: "krovomi/WorkPilot-AI" },
+			});
+			await checkGitHubConnection("workpilot");
+			api.checkGitHubConnection.mockReturnValue(new Promise(() => undefined));
+			void checkGitHubConnection("dotnet");
+			expect(useSyncStatusStore.getState().syncStatus).toBeNull();
+		});
+
+		it("does not replace the issues of the project switched to", async () => {
+			const late = deferred();
+			api.getGitHubIssues.mockImplementation((projectId: string) =>
+				projectId === "workpilot"
+					? late.promise
+					: Promise.resolve({
+							success: true,
+							data: { issues: [{ ...ISSUE, title: "Dotnet" }], hasMore: false },
+						}),
+			);
+			const first = loadGitHubIssues("workpilot", "open");
+			await loadGitHubIssues("dotnet", "open");
+			late.resolve({ success: true, data: { issues: [ISSUE], hasMore: true } });
+			await first;
+			expect(useIssuesStore.getState().issues.map((i) => i.title)).toEqual(["Dotnet"]);
+			expect(useIssuesStore.getState().isLoading).toBe(false);
+		});
+
+		it("does not show the error of a request left behind", async () => {
+			let fail: (reason: Error) => void = () => undefined;
+			api.getGitHubIssues.mockReturnValueOnce(
+				new Promise((_, reject) => {
+					fail = reject;
+				}),
+			);
+			const stale = loadGitHubIssues("workpilot", "open");
+			api.getGitHubIssues.mockResolvedValue({
+				success: true,
+				data: { issues: [ISSUE], hasMore: false },
+			});
+			await loadGitHubIssues("dotnet", "open");
+			fail(new Error("late"));
+			await stale;
+			expect(useIssuesStore.getState().error).toBeNull();
+		});
+
+		it("drops a next page asked before the list was read again", async () => {
+			const late = deferred();
+			api.getGitHubIssues.mockReturnValueOnce(late.promise);
+			const more = loadMoreGitHubIssues("workpilot", "open");
+			api.getGitHubIssues.mockResolvedValue({
+				success: true,
+				data: { issues: [{ ...ISSUE, title: "Dotnet" }], hasMore: false },
+			});
+			await loadGitHubIssues("dotnet", "open");
+			late.resolve({ success: true, data: { issues: [{ ...ISSUE, id: 2, number: 2 }], hasMore: true } });
+			await more;
+			expect(useIssuesStore.getState().issues.map((i) => i.title)).toEqual(["Dotnet"]);
+		});
+	});
 });

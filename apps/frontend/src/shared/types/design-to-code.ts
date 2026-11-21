@@ -94,6 +94,10 @@ export interface RenderLoopOptions {
 	responsive: boolean;
 	/** Capture hover and focus of the first interactive elements. */
 	states: boolean;
+	/** Send what the passes found back to the model once, kept if it helps. */
+	fixPasses: boolean;
+	/** Zones drawn on the design, left out of the score (`RENDER_LOOP_MAX_MASKS`). */
+	masks: DesignBounds[];
 }
 
 /** Where a component sits on the design, as fractions of the image. */
@@ -192,7 +196,7 @@ export interface DesignToCodeProgress {
 
 /** A step of the render loop, as the runner reports it live. */
 export interface DesignLoopProgress {
-	stage: "render" | "correct" | "responsive" | "states";
+	stage: "render" | "correct" | "responsive" | "states" | "fix_passes";
 	iteration: number;
 	max_iterations: number;
 	score: number | null;
@@ -321,6 +325,30 @@ export interface DesignRenderLoop {
 	spend?: DesignLoopSpend;
 	responsive?: DesignResponsivePass;
 	states?: DesignStatesPass;
+	/** How many zones drawn on the design were left out of the score. */
+	drawn_masks?: number;
+	/** The correction made from the passes' findings, when it was asked for. */
+	pass_fix?: DesignPassFix;
+}
+
+/** One correction from the passes' findings (`design_to_code.pass_fix`). */
+export interface DesignPassFix {
+	status: "nothing_to_fix" | "budget" | "failed" | "no_edits" | "regressed" | "no_gain" | "kept";
+	/** Findings before and after the correction. */
+	before: number;
+	after?: number;
+	budget_kind?: "tokens" | "cost";
+	detail?: string;
+	applied_edits?: number;
+	refused_edits?: { path: string; reason: string }[];
+	notes?: string[];
+	tokens?: number;
+	cost_usd?: number | null;
+	/** Score at the design's size, before and after the correction. */
+	score_before?: number;
+	score?: number;
+	/** The findings it made disappear, as the runner wrote them (English). */
+	resolved?: string[];
 }
 
 export interface DesignStackDetection {

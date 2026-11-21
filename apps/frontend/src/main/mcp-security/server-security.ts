@@ -5,6 +5,11 @@
  * installs into: both are checked here (S6). A project in strict offline mode
  * (`.workpilot/offline-mode.json`) gets the score from the catalog and the
  * last facts read, with no network call (S7).
+ *
+ * With a scan store, the score also counts the static scan of the code the
+ * server runs (lot 3): read for a new version, kept for a known one, only
+ * the kept one in strict offline mode. The findings the project's MCP
+ * policy accepts cost nothing.
  */
 
 import { loadMcpCatalog } from "../../shared/mcp-catalog/install";
@@ -14,10 +19,13 @@ import type {
 	McpMarketplaceServer,
 } from "../../shared/types/mcp-marketplace";
 import type {
+	McpRegistryFacts,
 	McpSecurityRequest,
 	McpSecurityScore,
 } from "../../shared/types/mcp-security";
+import type { McpAcceptedFinding } from "../../shared/types/mcp-code-scan";
 import { packageOf, type RegistryFactsStore } from "./registry-facts";
+import { codeScanFor, type SourceScanStore } from "./source-scan";
 
 export interface ServerSecurityDeps {
 	store: RegistryFactsStore;
@@ -25,6 +33,10 @@ export interface ServerSecurityDeps {
 	projectPath: (projectId: string) => string | undefined;
 	offline: (projectPath: string) => boolean;
 	catalog?: () => McpMarketplaceServer[];
+	/** The static scan of the code (lot 3); absent: not part of the score. */
+	scan?: SourceScanStore;
+	/** The findings the policy of the project at this path accepts. */
+	accepted?: (projectPath: string) => McpAcceptedFinding[];
 }
 
 /** A request refused for a reason the renderer words (`code`). */
@@ -46,7 +58,7 @@ function parseRequest(raw: unknown): McpSecurityRequest {
 	return { serverId, projectId: projectId ?? null, refresh: refresh === true };
 }
 
-export type ScoreDeps = Pick<ServerSecurityDeps, "store" | "offline">;
+export type ScoreDeps = Pick<ServerSecurityDeps, "store" | "offline" | "scan" | "accepted">;
 
 /**
  * The score of catalog entry `entry` for a project at `projectPath` (none: no
@@ -61,19 +73,28 @@ export async function scoreCatalogEntry(
 ): Promise<McpSecurityScore> {
 	const ref = packageOf(entry);
 	if (!ref) return scoreServer(entry);
+	const accepted = projectPath && deps.accepted ? deps.accepted(projectPath) : [];
+	const code = async (facts: McpRegistryFacts | undefined, online: boolean) =>
+		deps.scan ? { code: await codeScanFor(deps.scan, ref, facts?.version, online) } : {};
 	if (projectPath && deps.offline(projectPath)) {
+		const facts = deps.store.cached(entry.id);
 		return scoreServer(entry, {
-			facts: deps.store.cached(entry.id),
+			facts,
 			unchecked: "offline",
+			...(await code(facts, false)),
+			accepted,
 		});
 	}
 	try {
 		const facts = await deps.store.facts(entry.id, ref, refresh);
-		return scoreServer(entry, { facts });
+		return scoreServer(entry, { facts, ...(await code(facts, true)), accepted });
 	} catch {
+		const facts = deps.store.cached(entry.id);
 		return scoreServer(entry, {
-			facts: deps.store.cached(entry.id),
+			facts,
 			unchecked: "unreachable",
+			...(await code(facts, false)),
+			accepted,
 		});
 	}
 }

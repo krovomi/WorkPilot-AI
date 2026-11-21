@@ -299,7 +299,8 @@
 			"render": "rendering",
 			"correct": "correcting",
 			"responsive": "responsive pass",
-			"states": "hover and focus pass"
+			"states": "hover and focus pass",
+			"fix_passes": "correcting from the passes"
 		},
 		"axis": {
 			"x": "horizontal",
@@ -340,6 +341,19 @@
 			"none_hover": "no hover style",
 			"none_focus": "no visible focus (WCAG 2.4.7)",
 			"unreached": "not reached"
+		},
+		"drawnMasks_one": "{{count}} zone drawn on the design left out of the score",
+		"drawnMasks_other": "{{count}} zones drawn on the design left out of the score",
+		"passFix": {
+			"title": "Correction from the passes",
+			"nothing_to_fix": "The passes found nothing to correct.",
+			"budget_tokens": "Not made: the token budget is spent.",
+			"budget_cost": "Not made: the cost budget is spent.",
+			"failed": "The correction could not be made.",
+			"no_edits": "The model proposed no edit that applies.",
+			"regressed": "Discarded: the page drifted from the design ({{score}} % instead of {{scoreBefore}} %).",
+			"no_gain": "Discarded: {{after}} problems remain out of {{before}}.",
+			"kept": "Kept: {{after}} problems left out of {{before}}; {{score}} % at the design's size."
 		}
 	},
 	"loopOptions": {
@@ -355,6 +369,16 @@
 		"costValue": "${{value}}",
 		"budgetHint": "The cost budget applies when the price catalogue knows the model; the backend keeps every value within its bounds.",
 		"responsive": "Responsive pass (mobile, tablet, desktop)",
-		"states": "Hover and focus captures"
+		"states": "Hover and focus captures",
+		"fixPasses": "Correct from the passes (once, kept if it helps)"
+	},
+	"masks": {
+		"draw": "Hide a zone",
+		"drawing": "Drag on the design",
+		"hint": "Zones you draw are left out of the render loop's score: dates, photos, live data.",
+		"count_one": "{{count}} zone hidden (at most {{max}})",
+		"count_other": "{{count}} zones hidden (at most {{max}})",
+		"clear": "Clear the zones",
+		"remove": "Remove zone {{index}}"
 	}
 }

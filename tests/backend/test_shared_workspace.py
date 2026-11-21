@@ -457,9 +457,9 @@ async def test_the_comparison_reads_only_the_peers_the_person_may_read(
     assert answer["recent"]["cost"] == pytest.approx(9.6)
     assert answer["recent"]["minutes"] == pytest.approx(4 * 60 + 5)
     assert answer["previous"]["specs"] == 0
-    assert answer["min_group"] == 5
+    assert answer["min_group"] == 5 and answer["min_top"] == 20
     # Four readable peers: their number, never their median.
-    assert answer["groups"]["all"] == {"projects": 4, "medians": None}
+    assert answer["groups"]["all"] == {"projects": 4, "medians": None, "top": None}
     served = json.dumps(answer)
     for name in ("Secret peer", "Shop", str(tmp_path)):
         assert name not in served
@@ -478,6 +478,23 @@ async def test_the_comparison_gives_a_median_from_five_readable_peers(server, tm
     assert groups["all"]["medians"]["minutes"] == pytest.approx(20.0)
     assert groups["all"]["medians"]["agents"] == pytest.approx(1.0)
     assert groups["all"]["medians"]["qa_iterations"] is None
+    # Five projects are too few for a top tenth.
+    assert groups["all"]["top"] is None
+
+
+@pytest.mark.asyncio
+async def test_the_comparison_gives_a_top_tenth_from_twenty_readable_peers(
+    server, tmp_path
+):
+    await _peers(server, tmp_path, 20, member_of=20)
+    scope = await _scope(server, "u-ada", "org_a", "a")
+    answer = await _compare(server, scope)
+    top = answer["groups"]["all"]["top"]
+    assert answer["groups"]["all"]["projects"] == 20
+    assert top["cost"] == pytest.approx(2.0)
+    assert top["qa_iterations"] is None
+    served = json.dumps(answer)
+    assert "Secret peer" not in served and str(tmp_path) not in served
 
 
 def test_a_ledger_out_of_the_clone_or_too_large_is_not_read(tmp_path):

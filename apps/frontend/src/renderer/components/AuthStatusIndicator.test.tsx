@@ -14,6 +14,7 @@ import type { ClaudeProfile } from "../../shared/types/agent";
 import type { APIProfile } from "../../shared/types/profile";
 import { useClaudeProfileStore } from "../stores/claude-profile-store";
 import { useSettingsStore } from "../stores/settings-store";
+import { useUsagePlanStore } from "../stores/usage-plan-store";
 import { AuthStatusIndicator } from "./AuthStatusIndicator";
 import { ProviderContext } from "./ProviderContext";
 
@@ -104,6 +105,7 @@ beforeEach(async () => {
 	vi.clearAllMocks();
 	useSettingsStore.setState({ profiles: PROFILES, activeProfileId: null });
 	useClaudeProfileStore.setState({ profiles: [], activeProfileId: "default" });
+	useUsagePlanStore.setState({ plans: {} });
 	api.getGithubCliStatus.mockResolvedValue({
 		success: true,
 		data: { available: true, isAuth: true, username: "octocat" },
@@ -125,16 +127,21 @@ describe("AuthStatusIndicator badge", () => {
 		expect(badge.className).toContain("text-orange-500");
 		await openDetails();
 		expect(screen.getAllByText("OAuth")[0]).toBeInTheDocument();
-		expect(screen.getAllByText("Claude Code Max")[0]).toBeInTheDocument();
+		expect(screen.getAllByText("Claude Max")[0]).toBeInTheDocument();
+		// A Claude Code login is not a missing profile.
+		expect(screen.queryByText(/No profile configured/)).not.toBeInTheDocument();
 	});
 
 	it.each([
-		["pro", "Claude Code Pro"],
-		["enterprise", "Claude Code"],
-		[undefined, "Claude Code"],
-	])("names the subscription %s", async (subscriptionType, label) => {
+		["pro", undefined, "Claude Pro"],
+		["max", "default_claude_max_20x", "Claude Max 20x"],
+		["enterprise", undefined, "Claude Enterprise"],
+		[undefined, undefined, "Claude Code"],
+	])("names the stored subscription %s", async (subscriptionType, rateLimitTier, label) => {
 		useClaudeProfileStore.setState({
-			profiles: [{ id: "default", name: "Default", subscriptionType } as ClaudeProfile],
+			profiles: [
+				{ id: "default", name: "Default", subscriptionType, rateLimitTier } as ClaudeProfile,
+			],
 			activeProfileId: "default",
 		});
 		// Anthropic observed without an API profile for it: the subscription.
@@ -142,6 +149,62 @@ describe("AuthStatusIndicator badge", () => {
 		renderBadge("anthropic");
 		await openDetails();
 		expect(screen.getAllByText(label)[0]).toBeInTheDocument();
+	});
+
+	it("prefers the plan the usage reports to the one stored at login", async () => {
+		// Signed in on Pro, upgraded to Max since: the stored copy is stale.
+		useClaudeProfileStore.setState({
+			profiles: [
+				{
+					id: "default",
+					name: "Default",
+					subscriptionType: "pro",
+					rateLimitTier: "default_claude_ai",
+				} as ClaudeProfile,
+			],
+			activeProfileId: "default",
+		});
+		useSettingsStore.setState({ profiles: [] });
+		useUsagePlanStore
+			.getState()
+			.setPlan("claude", { billing: "subscription", name: "Claude Max 20x" });
+		renderBadge("anthropic");
+		await openDetails();
+		expect(screen.getAllByText("Claude Max 20x")[0]).toBeInTheDocument();
+		expect(screen.queryByText("Claude Pro")).not.toBeInTheDocument();
+		expect(screen.queryByText(/No profile configured/)).not.toBeInTheDocument();
+	});
+
+	it("shows the subscription of another provider the usage reports", async () => {
+		useUsagePlanStore
+			.getState()
+			.setPlan("openai", { billing: "subscription", name: "ChatGPT Plus" });
+		renderBadge("openai");
+		expect(
+			screen.getByRole("button", { name: "Authentication: OpenAI" }),
+		).toHaveAttribute("data-auth-type", "provider");
+		await openDetails();
+		expect(screen.getAllByText("OAuth")[0]).toBeInTheDocument();
+		expect(screen.getAllByText("ChatGPT Plus")[0]).toBeInTheDocument();
+		expect(screen.queryByText(/No profile configured/)).not.toBeInTheDocument();
+	});
+
+	it("says subscription when the provider does not name its plan", async () => {
+		useUsagePlanStore.getState().setPlan("gemini-cli", { billing: "subscription" });
+		renderBadge("gemini-cli");
+		await openDetails();
+		expect(screen.getAllByText("Subscription")[0]).toBeInTheDocument();
+		expect(screen.queryByText(/No profile configured/)).not.toBeInTheDocument();
+	});
+
+	it("calls a global API key billed per use an API key, not a subscription", async () => {
+		useSettingsStore.setState({ profiles: [] });
+		useUsagePlanStore.getState().setPlan("anthropic", { billing: "api" });
+		renderBadge("anthropic");
+		await openDetails();
+		expect(screen.getAllByText("API Key")[0]).toBeInTheDocument();
+		expect(screen.queryByText("Subscription")).not.toBeInTheDocument();
+		expect(screen.queryByText(/No profile configured/)).not.toBeInTheDocument();
 	});
 
 	it("shows the active API profile, its id and its endpoint", async () => {

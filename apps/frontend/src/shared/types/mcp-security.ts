@@ -7,13 +7,16 @@
  * facts are fetched by the main process (`main/mcp-security/`).
  */
 
+import type { McpCodeReport } from "./mcp-code-scan";
+
 export type McpSecurityDimensionKey =
 	| "publisher"
 	| "permissions"
 	| "execution"
 	| "freshness"
 	| "supplyChain"
-	| "maintainers";
+	| "maintainers"
+	| "code";
 
 /** `ok`: nothing to say; `warn`: worth a look; `risk`: a reason not to install; `unknown`: not checked. */
 export type McpSecurityStatus = "ok" | "warn" | "risk" | "unknown";
@@ -35,7 +38,11 @@ export type McpSecurityAlertKind =
 	| "deprecated"
 	| "noSource"
 	| "unpinned"
-	| "executesCommands";
+	| "executesCommands"
+	| "sourceUnavailable"
+	| "undeclaredCommands"
+	| "dynamicCode"
+	| "hardcodedSecret";
 
 export interface McpSecurityAlert {
 	kind: McpSecurityAlertKind;
@@ -56,6 +63,8 @@ export interface McpSecurityScore {
 	checkedAt?: string;
 	/** Why the registry was not read: offline project, unreachable. */
 	unchecked?: "offline" | "unreachable" | "remote";
+	/** The static scan of the code it runs (lot 3), when the main read it. */
+	code?: McpCodeReport;
 }
 
 export interface McpKnownVulnerability {
@@ -91,13 +100,16 @@ export interface McpSecurityRequest {
 /**
  * What got worse for an installed catalog server since the last reading
  * (lot 2): a new advisory for the version it runs, a maintainer who
- * appeared, the package deprecated or yanked, the score fallen below 50.
+ * appeared, the package deprecated or yanked, the score fallen below 50, a
+ * rule of the code scan that the previous version did not trip (lot 3).
  */
 export type McpWatchAlertKind =
 	| "newVulnerability"
 	| "maintainerAdded"
 	| "deprecated"
-	| "lowScore";
+	| "lowScore"
+	| "newCodeFinding"
+	| "sourceUnavailable";
 
 export interface McpWatchAlert {
 	/** Stable for one finding: the same advisory is never raised twice. */

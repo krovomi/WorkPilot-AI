@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import type {
 	DesignBreakpointCheck,
 	DesignLoopSpend,
+	DesignPassFix,
 	DesignResponsivePass,
 	DesignStatesPass,
 } from "../../../../shared/types/design-to-code";
@@ -115,6 +116,28 @@ function StateCell({ state, kind }: { state: { changed: boolean; image: string }
 				{t(state.changed ? "loop.states.visible" : `loop.states.none_${kind}`)}
 			</span>
 		</span>
+	);
+}
+
+/** The correction made from the passes' findings, and whether it was kept (#379). */
+export function PassFixLine({ fix }: { fix: DesignPassFix }) {
+	const { t } = useTranslation("designToCode");
+	const key = fix.status === "budget" ? `budget_${fix.budget_kind ?? "tokens"}` : fix.status;
+	return (
+		<div data-testid="design-loop-pass-fix" data-status={fix.status}>
+			<div className="di-group-label mt-3">{t("loop.passFix.title")}</div>
+			<div className={fix.status === "kept" ? "di-muted text-xs" : "di-faint text-xs"}>
+				{t(`loop.passFix.${key}`, {
+					before: fix.before,
+					after: fix.after ?? fix.before,
+					score: percent(fix.score),
+					scoreBefore: percent(fix.score_before),
+				})}
+			</div>
+			{fix.status === "failed" && fix.detail && (
+				<div className="di-muted di-mono text-2xs">{fix.detail}</div>
+			)}
+		</div>
 	);
 }
 

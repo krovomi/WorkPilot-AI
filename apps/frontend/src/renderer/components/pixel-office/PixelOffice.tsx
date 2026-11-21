@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { FAMILY_SHIRTS } from "../../lib/pixel-office-providers";
 import {
 	onOfficeSignal,
 	type PixelAgent,
@@ -34,6 +35,10 @@ import { AchievementsPanel } from "./AchievementsPanel";
 import { AchievementToast } from "./AchievementToast";
 import { AddAgentButton, AgentBubble } from "./AgentBubble";
 import { KioskOverlay } from "./KioskOverlay";
+import { NarrativeFeed } from "./NarrativeFeed";
+import { OfficeScenesMenu } from "./OfficeScenesMenu";
+import { ProviderLegend } from "./ProviderLegend";
+import { SeasonPanel } from "./SeasonPanel";
 import { closeChimes, playChime } from "./office-sounds";
 import { shippedToday } from "./office-stats";
 import { PixelOfficeCanvas } from "./PixelOfficeCanvas";
@@ -41,6 +46,8 @@ import { getCharacterSprite } from "./pixel-sprites";
 import { useKioskMode } from "./use-kiosk-mode";
 import { useOfficeAchievements } from "./use-office-achievements";
 import { useOfficeCalm } from "./use-office-motion";
+import { useOfficeNarratives } from "./use-office-narratives";
+import { useOfficeSeason } from "./use-office-season";
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
@@ -53,9 +60,12 @@ const MINI_FRAME_MS = 700;
 function MiniPixelChar({
 	characterIndex,
 	calm,
+	shirt,
 }: {
 	readonly characterIndex: number;
 	readonly calm: boolean;
+	/** The provider family's colour, when the task names a provider. */
+	readonly shirt?: string;
 }) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -70,7 +80,7 @@ function MiniPixelChar({
 		const draw = () => {
 			ctx.imageSmoothingEnabled = false;
 			ctx.clearRect(0, 0, width, height);
-			const sprite = getCharacterSprite(characterIndex, "down", frame);
+			const sprite = getCharacterSprite(characterIndex, "down", frame, shirt);
 			ctx.drawImage(sprite, 0, 0, width, height);
 		};
 
@@ -85,7 +95,7 @@ function MiniPixelChar({
 		}, MINI_FRAME_MS);
 
 		return () => clearInterval(timer);
-	}, [characterIndex, calm]);
+	}, [characterIndex, calm, shirt]);
 
 	return (
 		<canvas
@@ -197,7 +207,11 @@ function WaitingQueue({ agents, onAgentClick, calm }: WaitingQueueProps) {
 									animationDelay: `${place * 0.4}s`,
 								}}
 							>
-								<MiniPixelChar characterIndex={agent.characterIndex} calm={calm} />
+								<MiniPixelChar
+									characterIndex={agent.characterIndex}
+									calm={calm}
+									shirt={agent.providerFamily && FAMILY_SHIRTS[agent.providerFamily]}
+								/>
 							</div>
 							{/* Violet glow dot */}
 							<div
@@ -254,7 +268,7 @@ export function PixelOffice({
 	onNavigateToTerminals,
 	onNavigateToKanban,
 }: PixelOfficeProps) {
-	const { t } = useTranslation(["pixelOffice", "common", "navigation"]);
+	const { t, i18n } = useTranslation(["pixelOffice", "common", "navigation"]);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 	const [bubblePos, setBubblePos] = useState<{ x: number; y: number } | null>(
@@ -337,6 +351,19 @@ export function PixelOffice({
 		refreshAchievements();
 	}, [projectId, refreshAchievements]);
 	const kiosk = useKioskMode(containerRef, kioskRefresh);
+	const season = useOfficeSeason(
+		achievements.projectTasks,
+		achievements.incidents,
+		achievements.now,
+	);
+	const scenes = useOfficeNarratives({
+		projectId,
+		tasks: achievements.projectTasks,
+		ready: !tasksLoading,
+		enabled: settings.narratives,
+		ai: settings.narrativesAi,
+		language: i18n.language,
+	});
 	const calm = useOfficeCalm(settings.calmMode);
 	const toggleCalm = useCallback(
 		() =>
@@ -605,6 +632,7 @@ export function PixelOffice({
 							<Chip tone="pink">{t("pixelOffice:badges.pending", { count: pendingAgents.length })}</Chip>
 						)}
 					</Chips>
+					<ProviderLegend agents={seatedAgents} />
 				</div>
 
 				<div className="flex items-center gap-1">
@@ -614,6 +642,16 @@ export function PixelOffice({
 					/>
 					<div className="w-px h-5 bg-border mx-1" />
 					<AchievementsPanel unlocked={achievements.unlocked} />
+					<SeasonPanel
+						season={season.season}
+						progress={season.progress}
+						decor={season.decor}
+					/>
+					<OfficeScenesMenu
+						enabled={settings.narratives}
+						ai={settings.narrativesAi}
+						onChange={updateSettings}
+					/>
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<Button
@@ -730,6 +768,7 @@ export function PixelOffice({
 					onDismiss={achievements.dismissToast}
 					calm={calm}
 				/>
+				<NarrativeFeed scenes={scenes} calm={calm} />
 				{agents.length === 0 ? (
 					<div className="flex flex-col items-center justify-center h-full text-center gap-4 px-8">
 						<Building2 className="h-16 w-16 text-white/25" aria-hidden />
@@ -752,6 +791,7 @@ export function PixelOffice({
 								height={dimensions.height}
 								emptyDeskLabel={t("pixelOffice:canvas.emptyDesk")}
 								calm={calm}
+								decor={season.decorIds}
 								onAgentClick={handleAgentClick}
 							/>
 						)}

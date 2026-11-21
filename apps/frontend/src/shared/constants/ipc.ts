@@ -824,6 +824,9 @@ export const IPC_CHANNELS = {
 		"performanceProfiler:implementationComplete",
 
 	// Pipeline Generator (Feature 23) — AI-powered CI/CD pipeline generation
+	// Pixel Office: a mini-scene written by the page's model
+	PIXEL_OFFICE_NARRATE: "pixelOffice:narrate",
+
 	PIPELINE_GENERATOR_GENERATE: "pipelineGenerator:generate",
 	PIPELINE_GENERATOR_CANCEL: "pipelineGenerator:cancel",
 	// Pipeline Generator events (main -> renderer)
@@ -1193,6 +1196,9 @@ export const IPC_CHANNELS = {
 	// "How you compare": a project's specs against its past and the person's
 	// other projects, read from their folders (main/build-compare.ts)
 	DASHBOARD_COMPARE: "dashboard:compare",
+	// Its team report, worded by the renderer, printed to a PDF the person
+	// saves (main/build-compare-report.ts)
+	DASHBOARD_COMPARE_EXPORT: "dashboard:compareExport",
 	DASHBOARD_GET_SNAPSHOT: "dashboard:getSnapshot",
 	DESIGN_TO_CODE_DETECT_STACK: "designToCode:detectStack",
 	DESIGN_TO_CODE_PROGRESS: "designToCode:progress",

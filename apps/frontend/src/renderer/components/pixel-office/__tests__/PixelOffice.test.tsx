@@ -478,3 +478,54 @@ describe("PixelOffice toolbar and keyboard", () => {
 		expect(sounds.playChime).toHaveBeenCalledOnce();
 	});
 });
+
+describe("PixelOffice providers, seasons and scenes", () => {
+	const openai = { metadata: { provider: "openai" } } as Partial<Task>;
+
+	it("dresses a queued task in its provider's colour and names the providers at work", () => {
+		room({
+			terminals: [terminal({ isClaudeMode: true })],
+			tasks: [task({ status: "backlog", ...openai })],
+		});
+		const view = mount();
+		const mini = view.container.querySelector("canvas") as HTMLCanvasElement;
+		const sprite = contextOf(mini).calls.find((c) => c.name === "drawImage")
+			?.args[0] as HTMLCanvasElement;
+		const shirts = contextOf(sprite).calls.map((c) => c.fillStyle);
+		expect(shirts).toContain("#10A37F");
+		const legend = screen.getByRole("list", { name: "Providers at work" });
+		expect(legend.textContent).toBe("Anthropic");
+	});
+
+	it("shows the season's goals and hands the earned decor to the canvas", () => {
+		const shipped = Array.from({ length: 5 }, (_, i) =>
+			task({
+				id: `r${i}`,
+				status: "done",
+				updatedAt: new Date(),
+				metadata: { kind: "refactoring" },
+			} as Partial<Task>),
+		);
+		room({ terminals: [terminal({})], tasks: shipped });
+		mount();
+		expect(screen.getByRole("button", { name: /^Show the goals of Season Q[1-4] \d{4}$/ })).toBeTruthy();
+		expect((canvasProbe.props as unknown as { decor: string[] }).decor).toEqual(["whiteboard"]);
+	});
+
+	it("tells a scene when a task changes hands, and lets the person turn scenes off", () => {
+		room({ tasks: [task({})] });
+		mount();
+		act(() =>
+			useTaskStore.setState({
+				tasks: [task({ executionProgress: { phase: "qa_review" } as Task["executionProgress"] })],
+			}),
+		);
+		expect(screen.getByTestId("office-scene").textContent).toBe(
+			"Coder hands in their copy for spec #001 to QA Reviewer.",
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Scene settings" }));
+		fireEvent.click(screen.getByRole("switch", { name: "Show scenes when a task changes hands" }));
+		expect(usePixelOfficeStore.getState().settings.narratives).toBe(false);
+		expect(screen.queryByTestId("office-scene")).toBeNull();
+	});
+});

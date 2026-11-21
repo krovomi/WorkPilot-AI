@@ -49,25 +49,32 @@ const SHIPPED: ReadonlySet<Task["status"]> = new Set<Task["status"]>([
 export interface IncidentFact {
 	status: string;
 	fixPrUrl?: string;
+	/** When it was resolved, in ms; absent when the runner gave no valid date. */
+	resolvedAt?: number;
 }
 
 /**
  * Read the incidents the Self-Healing runner returned. They come from a
  * subprocess, so each entry is checked: an entry without a string status is
- * dropped, and an empty fix URL counts as none.
+ * dropped, an empty fix URL counts as none, and a resolution date that does
+ * not parse counts as no date.
  */
 export function incidentFactsOf(data: unknown): IncidentFact[] {
 	if (!Array.isArray(data)) return [];
 	const facts: IncidentFact[] = [];
 	for (const entry of data) {
 		if (!entry || typeof entry !== "object") continue;
-		const { status, fix_pr_url: url } = entry as Record<string, unknown>;
+		const {
+			status,
+			fix_pr_url: url,
+			resolved_at: resolved,
+		} = entry as Record<string, unknown>;
 		if (typeof status !== "string") continue;
-		facts.push(
-			typeof url === "string" && url.length > 0
-				? { status, fixPrUrl: url }
-				: { status },
-		);
+		const fact: IncidentFact = { status };
+		if (typeof url === "string" && url.length > 0) fact.fixPrUrl = url;
+		const at = typeof resolved === "string" ? Date.parse(resolved) : Number.NaN;
+		if (Number.isFinite(at)) fact.resolvedAt = at;
+		facts.push(fact);
 	}
 	return facts;
 }

@@ -1057,8 +1057,9 @@ Return ONLY the JSON, no additional text."""
         async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                headers={"Content-Type": CONTENT_TYPE_JSON},
-                params={"key": api_key},
+                # The key goes in its header: a URL ends up in error messages
+                # and proxy logs.
+                headers={"Content-Type": CONTENT_TYPE_JSON, "x-goog-api-key": api_key},
                 json={
                     "contents": [
                         {
