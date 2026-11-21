@@ -317,7 +317,7 @@ def mount_server_mode(app: FastAPI) -> bool:
     if not settings.server_mode:
         return False
 
-    from server.auth.jwt_tokens import TokenError, decode_access_token
+    from server.auth.jwt_tokens import TokenError, decode_access_token, login_of
 
     # SECURITY: the auth middleware is registered BEFORE any router is mounted.
     # Starlette applies middleware to the whole app regardless of registration
@@ -364,6 +364,8 @@ def mount_server_mode(app: FastAPI) -> bool:
         request.state.user_id = claims["sub"]
         request.state.user_email = claims.get("email", "")
         request.state.user_role = claims.get("role", "member")
+        # The sign-in this token comes from, for the audit log.
+        request.state.login = login_of(claims)
 
         # Resolve the tenant and the effective permissions once per request.
         # Doing it here rather than in a dependency means every route — the ~150

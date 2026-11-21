@@ -256,6 +256,10 @@ class AuthSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # The sign-in this session comes from, kept across refreshes: what the
+    # audit log names an action's session by (``jwt_tokens.LOGIN_METHODS``).
+    login_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    login_method: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class AccessToken(Base):
@@ -879,6 +883,10 @@ class AuditLog(Base):
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    # The sign-in the actor acted under, and how they signed in (None for an
+    # entry written without a signed-in session).
+    login_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    login_method: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

@@ -166,6 +166,8 @@ async def list_sessions(
             ip=session.ip,
             created_at=session.created_at,
             expires_at=session.expires_at,
+            login_id=session.login_id,
+            login_method=session.login_method,
         )
         for session, user in (await db.execute(query)).all()
     ]
