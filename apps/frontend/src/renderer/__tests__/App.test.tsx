@@ -808,6 +808,21 @@ describe("the page on screen", () => {
 		expect(stubProps("GitHubPRs").isActive).toBe(false);
 	});
 
+	it("the Bitbucket pages show the project on screen, and none without one", async () => {
+		await renderApp();
+		await go("bitbucket-pull-requests", true);
+		await screen.findByTestId("stub-BitbucketViews");
+		expect(stubProps("BitbucketViews")).toMatchObject({ view: "bitbucket-pull-requests", projectId: "p1" });
+		await act(async () => {
+			useProjectStore.setState({ activeProjectId: null, selectedProjectId: "p1" });
+		});
+		expect(stubProps("BitbucketViews").projectId).toBe("p1");
+		await act(async () => {
+			useProjectStore.setState({ activeProjectId: null, selectedProjectId: null });
+		});
+		expect(screen.queryByTestId("stub-BitbucketViews")).toBeNull();
+	});
+
 	it("the issue pages link to their task on the Kanban", async () => {
 		await renderApp({ tasks: [makeTask("a")] });
 		await go("github-issues", true);

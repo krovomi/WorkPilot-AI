@@ -424,6 +424,97 @@ class TestRouting:
         assert result["pr_url"] == result_pr["pr_url"]
         assert calls == [(("x", "main", "T", False, None), {"remote": "origin"})]
 
+    def test_a_split_part_keeps_its_marks_but_gets_no_label(
+        self, worktree_manager, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import core.pr_group as pr_group
+        import core.worktree_pr as worktree_module
+
+        class Marks:
+            group = "g"
+            section = "## Group"
+
+            def title(self, title: str) -> str:
+                return f"[g] {title}"
+
+        calls: list[tuple] = []
+        labels: list[tuple] = []
+        monkeypatch.setattr(pr_group, "decoration_for", lambda _d: Marks())
+        monkeypatch.setattr(pr_group, "apply_group_label", lambda *a: labels.append(a))
+        monkeypatch.setattr(
+            bitbucket_pr,
+            "create_bitbucket_pull_request",
+            lambda _m, *a, **k: (
+                calls.append((a, k)) or {"success": True, "pr_url": "u"}
+            ),
+        )
+        with (
+            patch.object(
+                worktree_manager,
+                "push_branch",
+                return_value={"success": True, "remote": "origin", "branch": "b"},
+            ),
+            patch.object(
+                worktree_module, "detect_git_provider", return_value="bitbucket"
+            ),
+        ):
+            result = worktree_manager.push_and_create_pr(
+                spec_name="x", target_branch="main", title="T"
+            )
+        assert result["success"] is True
+        assert calls == [
+            (
+                ("x", "main", "[g] T", False, None),
+                {"remote": "origin", "body_suffix": "## Group"},
+            )
+        ]
+        assert labels == []
+
+    def test_a_split_part_on_github_still_gets_its_label(
+        self, worktree_manager, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import core.pr_group as pr_group
+        import core.worktree_pr as worktree_module
+
+        class Marks:
+            group = "g"
+            section = "## Group"
+
+            def title(self, title: str) -> str:
+                return title
+
+        labels: list[tuple] = []
+        monkeypatch.setattr(pr_group, "decoration_for", lambda _d: Marks())
+        monkeypatch.setattr(pr_group, "apply_group_label", lambda *a: labels.append(a))
+        with (
+            patch.object(
+                worktree_manager,
+                "push_branch",
+                return_value={"success": True, "remote": "origin", "branch": "b"},
+            ),
+            patch.object(
+                worktree_manager,
+                "create_pull_request",
+                return_value={"success": True, "pr_url": "gh-url"},
+            ),
+            patch.object(worktree_module, "detect_git_provider", return_value="github"),
+        ):
+            worktree_manager.push_and_create_pr(spec_name="x", target_branch="main")
+        assert [(a[0], a[3], a[4]) for a in labels] == [("github", "gh-url", "g")]
+
+    def test_find_existing_pr_url_still_defaults_to_github(
+        self, worktree_manager
+    ) -> None:
+        import core.worktree_pr as worktree_module
+
+        with (
+            patch.object(worktree_module, "detect_git_provider", return_value="github"),
+            patch.object(
+                worktree_manager, "_get_existing_pr_url", return_value="gh-url"
+            ),
+        ):
+            assert worktree_manager.find_existing_pr_url("x") == "gh-url"
+
     def test_find_existing_pr_url_routes_bitbucket(
         self, worktree_manager, monkeypatch: pytest.MonkeyPatch
     ) -> None:
