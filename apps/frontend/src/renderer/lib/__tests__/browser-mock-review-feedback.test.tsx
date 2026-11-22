@@ -22,7 +22,7 @@ describe("browser mock: review feedback", () => {
 		});
 		await expect(github.getReviewFeedbackStats("p")).resolves.toEqual({
 			success: true,
-			stats: { threshold: 3, categories: [], rules: [] },
+			stats: { threshold: 3, categories: [], rules: [], months: [] },
 		});
 		await expect(
 			github.resetReviewFeedbackRule("p", "0123456789abcdef"),

@@ -5,15 +5,18 @@
  * listed by name; on a server they are the organization's projects the
  * person may read, as medians only, from groups of `min_group` projects.
  *
- * Every figure is per spec and lower is better: minutes, USD, QA iterations,
- * agents. Nothing is sent anywhere (`main/build-compare.ts`). Groups are the
- * same stack and size, the same stack, the same team size, and all; each
- * gives its top tenth once it is large enough (`min_top`). The project's own
+ * Every figure is per spec: minutes, USD, QA iterations, agents (lower is
+ * better), mutation score and first-run CI pass rate (higher is better).
+ * Nothing is sent anywhere (`main/build-compare.ts`). Groups are the same
+ * stack and size, the same stack, the same team size, and all; each gives
+ * its top tenth once it is large enough (`min_top`) and its trend, which
+ * the project's own trend is read against (`compare-pace`). A project that
+ * changed segment is compared with both while it moves. The project's own
  * last weeks draw a sparkline, its kinds of work have a table of their own
  * (`CompareKinds`), and "Generate team report" prints all of it to a PDF.
  */
 
-import { AlertTriangle, FileDown, RefreshCw, Scale, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, FileDown, Gauge, RefreshCw, Scale, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -29,6 +32,7 @@ import { CharterButton, Chip, Chips, EmptyStage, Notice, Panel, ScanLine } from 
 import { CompareKinds } from "./CompareKinds";
 import { CompareSparkline } from "./CompareSparkline";
 import { formatMetric, formatTrend, METRIC_KEYS, trendTone } from "./compare-format";
+import { moveSentences, paceLines, paceSentence } from "./compare-pace";
 import { compareReport } from "./compare-report";
 
 interface HowYouCompareProps {
@@ -108,9 +112,14 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 					{t("compare.top", { value: formatMetric(metric, group.top[metric]) })}
 				</span>
 			)}
+			{group.trend && group.trend[metric] !== null && (
+				<span className="wp-meta block">{t("compare.groupTrend", { value: formatTrend(group.trend[metric]) })}</span>
+			)}
 		</>
 	);
 	const others = comparison.projects.filter((line) => !line.current);
+	const moves = moveSentences(comparison, t);
+	const pace = paceLines(comparison);
 
 	return (
 		<div className="space-y-4" data-testid="how-you-compare">
@@ -129,8 +138,22 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 					<div className="flex flex-wrap items-center gap-2">
 						<Chips>
 							<Chip tone="blue">{stackLabel(comparison.segment.stack)}</Chip>
-							<Chip tone="violet">{sizeLabel(comparison.segment.size)}</Chip>
-							<Chip tone="green">{teamLabel(comparison.segment.team)}</Chip>
+							<Chip tone="violet">
+								{comparison.segment.size_from
+									? t("compare.movedChip", {
+											from: sizeLabel(comparison.segment.size_from),
+											to: sizeLabel(comparison.segment.size),
+										})
+									: sizeLabel(comparison.segment.size)}
+							</Chip>
+							<Chip tone="green">
+								{comparison.segment.team_from
+									? t("compare.movedChip", {
+											from: teamLabel(comparison.segment.team_from),
+											to: teamLabel(comparison.segment.team),
+										})
+									: teamLabel(comparison.segment.team)}
+							</Chip>
 						</Chips>
 						<CharterButton
 							size="sm"
@@ -151,6 +174,11 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 				{report && "failed" in report && (
 					<Notice tone="red" icon={AlertTriangle}>
 						{report.failed}
+					</Notice>
+				)}
+				{moves.length > 0 && (
+					<Notice tone="amber" icon={ArrowRightLeft}>
+						{moves.join(" ")}
 					</Notice>
 				)}
 				<p className="wp-meta">
@@ -200,7 +228,7 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 										{formatMetric(metric, comparison.previous[metric])}
 									</td>
 									<td className="py-1.5 pr-3">
-										<Chip tone={trendTone(comparison.trend[metric])} dot={false}>
+										<Chip tone={trendTone(metric, comparison.trend[metric])} dot={false}>
 											{formatTrend(comparison.trend[metric])}
 										</Chip>
 									</td>
@@ -221,7 +249,22 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 					<p className="wp-meta">{t("compare.topNote", { count: comparison.min_top })}</p>
 				)}
 				<p className="wp-meta">{t("compare.lowerIsBetter")}</p>
+				<p className="wp-meta">{t("compare.qualitySources")}</p>
 			</Panel>
+
+			{pace.length > 0 && (
+				<Panel className="space-y-2" data-testid="compare-pace">
+					<h3 className="wp-title flex items-center gap-2 text-sm">
+						<Gauge className="h-4 w-4" aria-hidden="true" />
+						{t("compare.pace.title")}
+					</h3>
+					<ul className="space-y-1 text-xs">
+						{pace.map((line) => (
+							<li key={line.metric}>{paceSentence(line, t)}</li>
+						))}
+					</ul>
+				</Panel>
+			)}
 
 			<CompareKinds kinds={comparison.kinds} minGroup={comparison.min_group} />
 
@@ -266,8 +309,6 @@ export function HowYouCompare({ projectPath, serverProjectId }: HowYouComparePro
 					)}
 				</Panel>
 			)}
-
-			<p className="wp-meta">{t("compare.ciPending")}</p>
 		</div>
 	);
 }

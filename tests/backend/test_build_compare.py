@@ -252,6 +252,8 @@ def test_a_window_holds_the_medians_of_the_specs_started_in_it():
         "cost": 2.0,
         "qa_iterations": 1.0,
         "agents": 3.0,
+        "mutation_score": None,
+        "ci_first_pass": None,
     }
     empty = build_compare.window(
         facts, NOW - timedelta(days=5), NOW - timedelta(days=4)
@@ -262,6 +264,8 @@ def test_a_window_holds_the_medians_of_the_specs_started_in_it():
         "cost": None,
         "qa_iterations": None,
         "agents": None,
+        "mutation_score": None,
+        "ci_first_pass": None,
     }
 
 
@@ -328,6 +332,8 @@ def test_a_group_s_median_is_given_from_min_group_projects():
         "stack": "csharp",
         "size": "medium",
         "team": "unknown",
+        "size_from": None,
+        "team_from": None,
     }
     assert answer["recent"]["minutes"] == 10.0
     assert answer["previous"]["minutes"] == 20.0
@@ -337,6 +343,7 @@ def test_a_group_s_median_is_given_from_min_group_projects():
         "projects": 2,
         "medians": None,
         "top": None,
+        "trend": None,
     }
     assert answer["min_top"] is None
     assert answer["groups"]["stack"]["top"] is None
@@ -566,5 +573,11 @@ def test_the_runner_runs_as_the_desktop_starts_it(tmp_path):
     )
     answer = json.loads(line.removeprefix("BUILD_COMPARE_RESULT:"))
     assert answer["recent"]["cost"] == pytest.approx(0.4)
-    assert answer["segment"] == {"stack": "other", "size": "unknown", "team": "unknown"}
+    assert answer["segment"] == {
+        "stack": "other",
+        "size": "unknown",
+        "team": "unknown",
+        "size_from": None,
+        "team_from": None,
+    }
     assert str(project) not in json.dumps(answer["groups"])

@@ -5,7 +5,9 @@
  * one capture runs at a time. An orientation is a name, the preview's session
  * a yes or no. The export names devices, a format and whether to box faulty
  * elements: the images and the boxes are the main's own, the file goes where
- * the save dialog says.
+ * the save dialog says. A custom device is named like a catalogue one; a
+ * persona by its id, its cookies decrypted by the main and never returned. The
+ * breakpoint scan takes the same fields as a capture and shares its lock.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,6 +21,26 @@ const exporting = vi.hoisted(() => ({
 	language: "en",
 }));
 
+const library = vi.hoisted(() => ({ custom: [] as { id: string; [key: string]: unknown }[] }));
+const persona = vi.hoisted(() => ({ cookies: vi.fn() }));
+const scan = vi.hoisted(() => ({ fn: vi.fn() }));
+
+vi.mock("../../device-matrix/custom-devices", async () => {
+	const { findDevicePreset } = await import("../../../shared/constants/device-presets");
+	return {
+		listCustomDevices: async () => library.custom,
+		findDevice: async (id: unknown) => findDevicePreset(id) ?? library.custom.find((device) => device.id === id),
+	};
+});
+vi.mock("../../device-matrix/personas", () => {
+	class PersonaFailure extends Error {
+		constructor(readonly code: string) {
+			super(code);
+		}
+	}
+	return { PersonaFailure, personaCookies: (...args: unknown[]) => persona.cookies(...args) };
+});
+vi.mock("../../device-matrix/breakpoint-scan", () => ({ scanBreakpoints: (...args: unknown[]) => scan.fn(...args) }));
 vi.mock("electron", () => ({
 	ipcMain: { handle: (channel: string, handler: (event: unknown, raw: unknown) => Promise<unknown>) => handlers.set(channel, handler) },
 }));
@@ -37,13 +59,32 @@ vi.mock("../../app-language", () => ({ getAppLanguage: () => exporting.language 
 vi.mock("node:fs/promises", () => ({ writeFile: (...args: unknown[]) => exporting.write(...args) }));
 
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import { DEVICE_PRESETS } from "../../../shared/constants/device-presets";
 import { DeviceCaptureFailure } from "../../device-matrix/device-capture";
+import { PersonaFailure } from "../../device-matrix/personas";
 import {
 	readCaptureRequest,
 	readExportRequest,
+	readScanRequest,
 	registerDeviceMatrixHandlers,
 	resolveCaptureUrl,
+	sessionOptions,
 } from "../device-matrix-handlers";
+
+const CATALOGUE = new Set(DEVICE_PRESETS.map((device) => device.id));
+const PERSONA = "persona-11111111-2222-4333-8444-555555555555";
+const CUSTOM = "custom-11111111-2222-4333-8444-555555555555";
+const foldable = {
+	id: CUSTOM,
+	name: "Flip 6",
+	category: "phone",
+	width: 360,
+	height: 748,
+	deviceScaleFactor: 3,
+	mobile: true,
+	touch: true,
+	userAgent: "Mozilla/5.0 (Linux; Android 14) Mobile",
+};
 
 registerDeviceMatrixHandlers();
 const call = (channel: string, raw: unknown) => {
@@ -56,7 +97,7 @@ const invoke = (raw: unknown) =>
 	call(
 		IPC_CHANNELS.APP_EMULATOR_CAPTURE_DEVICE,
 		raw && typeof raw === "object"
-			? { network: "none", cpu: "1x", orientation: "portrait", previewSession: false, ...raw }
+			? { network: "none", cpu: "1x", orientation: "portrait", previewSession: false, persona: null, ...raw }
 			: raw,
 	);
 /** An export request: the given fields over a plain PNG one. */
@@ -64,6 +105,25 @@ const exportGrid = (raw: Record<string, unknown>) =>
 	call(IPC_CHANNELS.APP_EMULATOR_EXPORT_DEVICE_GRID, { format: "png", markers: false, ...raw });
 
 const shot = { url: "http://localhost:5173/cart", image: "data:image/png;base64,AA==", report: null, loadMs: 420 };
+
+describe("registerDeviceMatrixHandlers", () => {
+	it("registers the custom device and persona channels with the capture ones", () => {
+		for (const channel of [
+			IPC_CHANNELS.APP_EMULATOR_LIST_CUSTOM_DEVICES,
+			IPC_CHANNELS.APP_EMULATOR_SAVE_CUSTOM_DEVICE,
+			IPC_CHANNELS.APP_EMULATOR_DELETE_CUSTOM_DEVICE,
+			IPC_CHANNELS.APP_EMULATOR_LIST_PERSONAS,
+			IPC_CHANNELS.APP_EMULATOR_SAVE_PERSONA,
+			IPC_CHANNELS.APP_EMULATOR_DELETE_PERSONA,
+			IPC_CHANNELS.APP_EMULATOR_SCAN_BREAKPOINTS,
+			IPC_CHANNELS.APP_EMULATOR_EMULATE_LIVE_VIEW,
+			IPC_CHANNELS.APP_EMULATOR_READ_LIVE_SCROLL,
+			IPC_CHANNELS.APP_EMULATOR_SET_LIVE_SCROLL,
+		]) {
+			expect(handlers.has(channel)).toBe(true);
+		}
+	});
+});
 
 describe("resolveCaptureUrl", () => {
 	it("resolves an absolute path on the server's origin", () => {
@@ -90,7 +150,7 @@ describe("resolveCaptureUrl", () => {
 });
 
 describe("readCaptureRequest", () => {
-	const plain = { network: "none", cpu: "1x", orientation: "portrait", previewSession: false };
+	const plain = { network: "none", cpu: "1x", orientation: "portrait", previewSession: false, persona: null };
 	it("keeps only a device id, a path, two profile ids, an orientation and a yes or no", () => {
 		expect(
 			readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, url: "https://evil.example", latency: 0 }),
@@ -104,17 +164,87 @@ describe("readCaptureRequest", () => {
 		expect(readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, orientation: 90 })).toBeNull();
 		expect(readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, previewSession: "yes" })).toBeNull();
 	});
+
+	it("takes a persona id or null, never beside the preview's session", () => {
+		expect(readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, persona: PERSONA })).toMatchObject({
+			persona: PERSONA,
+		});
+		expect(readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, persona: undefined })).toBeNull();
+		expect(readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, persona: { id: PERSONA } })).toBeNull();
+		expect(
+			readCaptureRequest({ deviceId: "pixel-8", path: "/", ...plain, previewSession: true, persona: PERSONA }),
+		).toBeNull();
+	});
+});
+
+describe("readScanRequest", () => {
+	it("keeps a device id, a path and a session choice", () => {
+		expect(
+			readScanRequest({ deviceId: "desktop-1080p", path: "/", previewSession: false, persona: null, widths: [1] }),
+		).toEqual({ deviceId: "desktop-1080p", path: "/", previewSession: false, persona: null });
+		expect(readScanRequest(null)).toBeNull();
+		expect(readScanRequest({ deviceId: 1, path: "/", previewSession: false, persona: null })).toBeNull();
+		expect(readScanRequest({ deviceId: "desktop-1080p", path: "/" })).toBeNull();
+	});
+});
+
+describe("sessionOptions", () => {
+	beforeEach(() => {
+		persona.cookies = vi.fn(async () => [{ name: "sid" }]);
+	});
+
+	it("lends the preview's session, or nothing, without reading a persona", async () => {
+		expect(await sessionOptions({ previewSession: true, persona: null }, "http://localhost:5173/")).toEqual({
+			previewSession: true,
+		});
+		expect(persona.cookies).not.toHaveBeenCalled();
+	});
+
+	it("replays a persona's cookies, decrypted by the main", async () => {
+		expect(await sessionOptions({ previewSession: false, persona: PERSONA }, "http://localhost:5173/")).toEqual({
+			previewSession: false,
+			persona: [{ name: "sid" }],
+		});
+		expect(persona.cookies).toHaveBeenCalledWith(PERSONA, "http://localhost:5173/");
+	});
+
+	it.each(["unknown-persona", "persona-locked", "persona-elsewhere"])("names a persona that is %s", async (code) => {
+		persona.cookies = vi.fn(async () => {
+			throw new PersonaFailure(code as "unknown-persona");
+		});
+		await expect(sessionOptions({ previewSession: false, persona: PERSONA }, "http://localhost:5173/")).rejects.toMatchObject({
+			code,
+		});
+	});
+
+	it("hides any other failure behind session-failed, and refuses an id the main never gave", async () => {
+		persona.cookies = vi.fn(async () => {
+			throw new PersonaFailure("write-failed");
+		});
+		await expect(sessionOptions({ previewSession: false, persona: PERSONA }, "http://x/")).rejects.toMatchObject({
+			code: "session-failed",
+		});
+		persona.cookies = vi.fn(async () => {
+			throw new Error("keyring: /home/someone");
+		});
+		await expect(sessionOptions({ previewSession: false, persona: PERSONA }, "http://x/")).rejects.toMatchObject({
+			code: "session-failed",
+		});
+		await expect(sessionOptions({ previewSession: false, persona: "../personas" }, "http://x/")).rejects.toMatchObject({
+			code: "unknown-persona",
+		});
+	});
 });
 
 describe("readExportRequest", () => {
 	const plain = { format: "png", markers: false };
 	it("keeps catalogue ids, once each, in the order received, a known format and a yes or no", () => {
-		expect(readExportRequest({ deviceIds: ["pixel-8", "iphone-15", "pixel-8"], ...plain })).toEqual({
+		expect(readExportRequest({ deviceIds: ["pixel-8", "iphone-15", "pixel-8"], ...plain }, CATALOGUE)).toEqual({
 			deviceIds: ["pixel-8", "iphone-15"],
 			format: "png",
 			markers: false,
 		});
-		expect(readExportRequest({ deviceIds: ["pixel-8"], format: "pdf", markers: true })).toMatchObject({
+		expect(readExportRequest({ deviceIds: ["pixel-8"], format: "pdf", markers: true }, CATALOGUE)).toMatchObject({
 			format: "pdf",
 			markers: true,
 		});
@@ -127,12 +257,12 @@ describe("readExportRequest", () => {
 		["an empty list", { deviceIds: [], ...plain }],
 		["an unknown id", { deviceIds: ["pixel-8", "../../etc"], ...plain }],
 		["a non-string id", { deviceIds: [8], ...plain }],
-		["more ids than the catalogue", { deviceIds: Array.from({ length: 11 }, () => "pixel-8"), ...plain }],
+		["more ids than the catalogue and the custom devices", { deviceIds: Array.from({ length: 31 }, () => "pixel-8"), ...plain }],
 		["an unknown format", { deviceIds: ["pixel-8"], format: "svg", markers: false }],
 		["no format", { deviceIds: ["pixel-8"], markers: false }],
 		["markers that are not a yes or no", { deviceIds: ["pixel-8"], format: "png", markers: "all" }],
 	])("refuses %s", (_label, raw) => {
-		expect(readExportRequest(raw)).toBeNull();
+		expect(readExportRequest(raw, CATALOGUE)).toBeNull();
 	});
 });
 
@@ -140,6 +270,32 @@ describe("APP_EMULATOR_CAPTURE_DEVICE", () => {
 	beforeEach(() => {
 		service.url = "http://localhost:5173";
 		capture.fn = vi.fn(async () => shot);
+		library.custom = [];
+		persona.cookies = vi.fn(async () => [{ name: "sid" }]);
+	});
+
+	it("captures a custom device the main keeps, named by its id", async () => {
+		library.custom = [foldable];
+		const result = await invoke({ deviceId: CUSTOM, path: "/", orientation: "landscape" });
+		expect(result).toMatchObject({ success: true, data: { deviceId: CUSTOM, width: 748, height: 360 } });
+		expect(capture.fn.mock.calls[0][0]).toMatchObject({ id: CUSTOM, name: "Flip 6", width: 748, rotated: true });
+	});
+
+	it("replays a persona's cookies, and says which persona in the result", async () => {
+		const result = await invoke({ deviceId: "pixel-8", path: "/", persona: PERSONA });
+		expect(result).toMatchObject({ success: true, data: { persona: PERSONA, previewSession: false } });
+		expect(capture.fn.mock.calls[0][3]).toEqual({ previewSession: false, persona: [{ name: "sid" }] });
+	});
+
+	it("refuses a persona that cannot be replayed, before rendering", async () => {
+		persona.cookies = vi.fn(async () => {
+			throw new PersonaFailure("persona-elsewhere");
+		});
+		expect(await invoke({ deviceId: "pixel-8", path: "/", persona: PERSONA })).toEqual({
+			success: false,
+			error: "persona-elsewhere",
+		});
+		expect(capture.fn).not.toHaveBeenCalled();
 	});
 
 	it("captures a catalogue device on the server's origin", async () => {
@@ -155,6 +311,7 @@ describe("APP_EMULATOR_CAPTURE_DEVICE", () => {
 				width: 412,
 				height: 915,
 				previewSession: false,
+				persona: null,
 			},
 		});
 		const [device, url, throttling, options] = capture.fn.mock.calls[0];
@@ -242,11 +399,72 @@ describe("APP_EMULATOR_CAPTURE_DEVICE", () => {
 	});
 });
 
+describe("APP_EMULATOR_SCAN_BREAKPOINTS", () => {
+	const scanInvoke = (raw: Record<string, unknown>) =>
+		call(IPC_CHANNELS.APP_EMULATOR_SCAN_BREAKPOINTS, { previewSession: false, persona: null, ...raw });
+	const result = { url: "http://localhost:5173/", breakpoints: [768], steps: [] };
+
+	beforeEach(() => {
+		service.url = "http://localhost:5173";
+		scan.fn = vi.fn(async () => result);
+		library.custom = [];
+		persona.cookies = vi.fn(async () => [{ name: "sid" }]);
+	});
+
+	it("reads the page on the named device, on the server's origin, with the session chosen", async () => {
+		expect(await scanInvoke({ deviceId: "desktop-1080p", path: "/pricing", previewSession: true })).toEqual({
+			success: true,
+			data: { deviceId: "desktop-1080p", ...result },
+		});
+		const [device, url, options] = scan.fn.mock.calls[0];
+		expect(device).toMatchObject({ id: "desktop-1080p" });
+		expect(url).toBe("http://localhost:5173/pricing");
+		expect(options).toEqual({ previewSession: true });
+		library.custom = [foldable];
+		await scanInvoke({ deviceId: CUSTOM, path: "/", persona: PERSONA });
+		expect(scan.fn.mock.calls[1][0]).toMatchObject({ id: CUSTOM });
+		expect(scan.fn.mock.calls[1][2]).toEqual({ previewSession: false, persona: [{ name: "sid" }] });
+	});
+
+	it("refuses before reading anything", async () => {
+		expect(await call(IPC_CHANNELS.APP_EMULATOR_SCAN_BREAKPOINTS, "desktop")).toEqual({
+			success: false,
+			error: "invalid-request",
+		});
+		expect(await scanInvoke({ deviceId: "custom-x", path: "/" })).toEqual({ success: false, error: "unknown-device" });
+		expect(await scanInvoke({ deviceId: "desktop-1080p", path: "//evil.example/" })).toEqual({
+			success: false,
+			error: "invalid-path",
+		});
+		service.url = null;
+		expect(await scanInvoke({ deviceId: "desktop-1080p", path: "/" })).toEqual({ success: false, error: "not-running" });
+		expect(scan.fn).not.toHaveBeenCalled();
+	});
+
+	it("shares the capture's lock, and names its failures", async () => {
+		let release: (value: unknown) => void = () => undefined;
+		capture.fn = vi.fn(() => new Promise((resolve) => (release = resolve)));
+		const running = invoke({ deviceId: "pixel-8", path: "/" });
+		expect(await scanInvoke({ deviceId: "desktop-1080p", path: "/" })).toEqual({ success: false, error: "busy" });
+		release(shot);
+		await running;
+		scan.fn = vi.fn(async () => {
+			throw new DeviceCaptureFailure("load-failed");
+		});
+		expect(await scanInvoke({ deviceId: "desktop-1080p", path: "/" })).toEqual({ success: false, error: "load-failed" });
+		scan.fn = vi.fn(async () => {
+			throw new Error("renderer gone");
+		});
+		expect(await scanInvoke({ deviceId: "desktop-1080p", path: "/" })).toEqual({ success: false, error: "capture-failed" });
+	});
+});
+
 describe("APP_EMULATOR_EXPORT_DEVICE_GRID", () => {
 	const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 
 	beforeEach(async () => {
 		service.url = "http://localhost:5173";
+		library.custom = [];
 		exporting.language = "en";
 		exporting.dialog = vi.fn(async () => ({ canceled: false, filePath: "/home/someone/Pictures/grid.png" }));
 		exporting.compose = vi.fn(async () => png);
@@ -314,6 +532,15 @@ describe("APP_EMULATOR_EXPORT_DEVICE_GRID", () => {
 		expect(tiles[0].markers).toEqual([
 			{ kind: "small-text", selector: "p.tiny", x: 0, y: 0, width: 393 / 852, height: 1 },
 		]);
+	});
+
+	it("exports a custom device under the name the person gave it", async () => {
+		library.custom = [foldable];
+		await invoke({ deviceId: CUSTOM, path: "/" });
+		expect(await exportGrid({ deviceIds: [CUSTOM] })).toMatchObject({ success: true });
+		expect(exporting.compose.mock.calls[0][0][0]).toMatchObject({ label: "Flip 6", detail: "360 × 748 @3x" });
+		library.custom = [];
+		expect(await exportGrid({ deviceIds: [CUSTOM] })).toEqual({ success: false, error: "invalid-request" });
 	});
 
 	it("writes nothing when the person cancels the dialog", async () => {

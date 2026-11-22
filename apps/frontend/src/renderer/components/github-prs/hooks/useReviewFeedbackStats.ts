@@ -140,7 +140,7 @@ export function useReviewFeedbackStats(
 				if (result.success) {
 					setWritten({ path: result.path, rules: result.rules });
 					setError(null);
-				} else {
+				} else if (result.error !== "cancelled") {
 					setError(result.error);
 				}
 			});

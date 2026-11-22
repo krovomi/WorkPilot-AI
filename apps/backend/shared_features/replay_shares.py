@@ -23,7 +23,9 @@ the project's owner can revoke.
   410 and its bundle is dropped from the database.
 
 How many times each link was opened is counted: the app shows it beside the
-link, which is how the team sees whether its shares are read.
+link, which is how the team sees whether its shares are read. The person's
+own links on every project, and the project's usage figures, are served by
+``replay_share_overview.py``.
 """
 
 from __future__ import annotations
@@ -133,9 +135,9 @@ def _public(
     }
 
 
-def _read_bundle(content_base64: str) -> tuple[bytes, str, int]:
-    """The bundle's bytes, its title and its step count; 422 when the bytes
-    are not a bundle the app could import."""
+def _read_bundle(content_base64: str) -> tuple[bytes, str, int, int]:
+    """The bundle's bytes, its title, its step and bookmark counts; 422 when
+    the bytes are not a bundle the app could import."""
     from replay.bundle import BundleError, decode, session_from_bundle
 
     try:
@@ -152,7 +154,7 @@ def _read_bundle(content_base64: str) -> tuple[bytes, str, int]:
     title = session.agent_name or "session"
     if task:
         title = f"{title}: {task}"
-    return data, title[:MAX_TITLE], len(session.steps)
+    return data, title[:MAX_TITLE], len(session.steps), len(session.bookmarks)
 
 
 async def _forget_ended(db: AsyncSession, project_id: str, now: datetime) -> None:
@@ -191,7 +193,9 @@ async def create_share(
 ) -> dict[str, Any]:
     """Keep a bundle with the project; answers the link's token, once."""
     _require_writer(scope, principal)
-    data, title, steps = await asyncio.to_thread(_read_bundle, req.content_base64)
+    data, title, steps, bookmarks = await asyncio.to_thread(
+        _read_bundle, req.content_base64
+    )
     now = datetime.now(UTC)
     await _forget_ended(db, scope.project_id, now)
     active = await db.scalar(
@@ -218,6 +222,7 @@ async def create_share(
         created_at=now,
         expires_at=now + timedelta(days=req.ttl_days),
         open_count=0,
+        bookmarks=bookmarks,
     )
     db.add(row)
     await db.commit()

@@ -5,7 +5,8 @@
  * A server project's held rejections (#361, lot 3): a finding whose rejection
  * waits for a maintainer says so; the panel lists the held rejections, with
  * Approve and Discard for a maintainer only; a reset is a maintainer's; the
- * conventions file is a local project's. In English and in French.
+ * conventions file is saved where the person chooses (lot 4). In English and
+ * in French.
  */
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -68,6 +69,7 @@ function stats(maintainer: boolean, held = HELD): Stats {
 				topReason: null,
 			},
 		],
+		months: [],
 		server: { maintainer, held },
 	};
 }
@@ -101,6 +103,7 @@ describe("held rejections in the panel", () => {
 			common("prReview.feedback.notApplicable"),
 		);
 		expect(screen.queryByText(rf("conventions.write"))).toBeNull();
+		expect(screen.getByText(rf("conventions.saveHint"))).toBeInTheDocument();
 		expect(screen.getByText(rf("resetHint"))).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: rf("resetLabel", { label: "Nit" }) })).toBeInTheDocument();
 
@@ -241,5 +244,42 @@ describe("a held finding", () => {
 			/>,
 		);
 		expect(await screen.findByText(common("prReview.feedback.held"))).toBeInTheDocument();
+	});
+});
+
+describe("the conventions file of a server project (lot 4)", () => {
+	it("is saved where the person chose, and a closed dialog says nothing", async () => {
+		api.writeReviewConventions
+			.mockResolvedValueOnce({ success: false, error: "cancelled" })
+			.mockResolvedValueOnce({
+				success: true,
+				path: "/home/me/repo/review-conventions.md",
+				rules: 1,
+			});
+		await openPanel(stats(false));
+		const save = screen.getByRole("button", { name: rf("conventions.save") });
+
+		fireEvent.click(save);
+		await waitFor(() => expect(api.writeReviewConventions).toHaveBeenCalledTimes(1));
+		await waitFor(() => expect(save).not.toBeDisabled());
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(screen.queryByRole("status")).toBeNull();
+
+		fireEvent.click(save);
+		expect(await screen.findByRole("status")).toHaveTextContent(
+			rf("conventions.written", {
+				path: "/home/me/repo/review-conventions.md",
+				count: 1,
+			}),
+		);
+		expect(api.writeReviewConventions).toHaveBeenCalledWith("p1");
+	});
+
+	it("reads in French", async () => {
+		await i18n.changeLanguage("fr");
+		await openPanel(stats(false));
+		expect(
+			screen.getByRole("button", { name: "Enregistrer review-conventions.md…" }),
+		).toBeInTheDocument();
 	});
 });

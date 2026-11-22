@@ -141,3 +141,61 @@ export type ReplayTeamShareResult =
 export type ReplayTeamShareListResult =
 	| { success: true; shares: ReplayTeamShare[] }
 	| { success: false; error: string; unreachable?: true };
+
+/** A team link of the person, on one of the server's projects (Settings). */
+export interface ReplayMyTeamShare extends ReplayTeamShare {
+	projectId: string;
+	projectName: string;
+}
+
+export type ReplayMyTeamShareListResult =
+	| { success: true; shares: ReplayMyTeamShare[] }
+	| { success: false; error: string; unreachable?: true };
+
+/** What the app counts as one export of a replay. */
+export const REPLAY_EXPORT_KINDS = ["wpreplay", "html", "video", "team_link"] as const;
+export type ReplayExportKind = (typeof REPLAY_EXPORT_KINDS)[number];
+
+/**
+ * How this machine shares its replays, counted on this machine and sent
+ * nowhere (`apps/backend/replay/usage.py`): seven-day windows, oldest first.
+ */
+export interface ReplayUsage {
+	weeks: { start: string; end: string; total: number; byKind: Record<ReplayExportKind, number> }[];
+	exports: number;
+	exportsPerWeek: number;
+	sessions: {
+		total: number;
+		annotated: number;
+		discussed: number;
+		summarized: number;
+		imported: number;
+	};
+	/** Sessions with a bookmark, over all sessions; null without a session. */
+	annotatedRatio: number | null;
+}
+
+/**
+ * A server project's team links over its last weeks, as aggregates only,
+ * computed by that server (`shared_features/replay_share_overview.py`).
+ */
+export interface ReplayTeamUsage {
+	windowDays: number;
+	weeks: { start: string; end: string; created: number; opened: number }[];
+	links: number;
+	openedLinks: number;
+	openRate: number | null;
+	opens: number;
+	active: number;
+	annotated: number;
+	annotatedRatio: number | null;
+	sharers: number;
+}
+
+export type ReplayUsageResult =
+	| { success: true; usage: ReplayUsage }
+	| { success: false; error: string; unreachable?: true };
+
+export type ReplayTeamUsageResult =
+	| { success: true; usage: ReplayTeamUsage }
+	| { success: false; error: string; unreachable?: true };

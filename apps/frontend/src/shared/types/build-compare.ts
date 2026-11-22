@@ -8,9 +8,22 @@
  * sends their medians only, never their names.
  */
 
-export const COMPARE_METRICS = ["minutes", "cost", "qa_iterations", "agents"] as const;
+export const COMPARE_METRICS = [
+	"minutes",
+	"cost",
+	"qa_iterations",
+	"agents",
+	"mutation_score",
+	"ci_first_pass",
+] as const;
 
 export type CompareMetric = (typeof COMPARE_METRICS)[number];
+
+/**
+ * The figures for which more is better, both in percent: the mutation score
+ * of a spec's QA, and the share of specs whose PR passed CI as it was opened.
+ */
+export const HIGHER_IS_BETTER: ReadonlySet<CompareMetric> = new Set(["mutation_score", "ci_first_pass"]);
 
 /** A metric's median, or null when no spec recorded it. */
 export type CompareMedians = Record<CompareMetric, number | null>;
@@ -27,6 +40,11 @@ export interface CompareGroup {
 	medians: CompareMedians | null;
 	/** The figure the best tenth reach, from `min_top` projects; null below. */
 	top: CompareMedians | null;
+	/**
+	 * Percent change of its medians from the window before to the last, from
+	 * `min_group` projects in both; null below, and for a kind's group.
+	 */
+	trend: CompareMedians | null;
 }
 
 export const COMPARE_GROUPS = ["segment", "stack", "team", "all"] as const;
@@ -53,7 +71,11 @@ export interface BuildComparison {
 	min_group: number;
 	/** The fewest projects a top tenth is given for; null when none is. */
 	min_top: number | null;
-	segment: { stack: string; size: string; team: string };
+	/**
+	 * `size_from` / `team_from`: the bucket the project left during the last
+	 * window; while it moves it is compared with both. Null when it did not.
+	 */
+	segment: { stack: string; size: string; team: string; size_from: string | null; team_from: string | null };
 	recent: CompareWindow;
 	previous: CompareWindow;
 	/** Percent change from the previous window to the last. */

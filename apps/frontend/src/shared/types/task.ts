@@ -463,6 +463,7 @@ export interface TaskMetadata {
 		| "linear"
 		| "github"
 		| "gitlab"
+		| "bitbucket"
 		| "visual-canvas"
 		| "tech-debt"
 		| "flaky-tests"
@@ -488,6 +489,8 @@ export interface TaskMetadata {
 	githubBatchTheme?: string; // Theme/title of the GitHub issue batch
 	gitlabIssueIid?: number; // Reference to GitLab issue IID if from GitLab
 	gitlabUrl?: string; // GitLab issue URL
+	bitbucketIssueId?: number; // Bitbucket Cloud issue id if from Bitbucket
+	bitbucketUrl?: string; // Bitbucket issue URL
 	azureDevOpsIdentifier?: string; // Azure DevOps work item identifier (e.g., '12345')
 	azureDevOpsUrl?: string; // Azure DevOps work item URL
 	azureDevOpsState?: string; // Azure DevOps work item state
@@ -957,6 +960,7 @@ export type PipelineProviderId =
 	| "azure-devops"
 	| "github-actions"
 	| "gitlab-ci"
+	| "bitbucket-pipelines"
 	| "jenkins";
 
 /** Normalized state of the latest pipeline run on a task's branch. */

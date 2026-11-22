@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
 	detachThrows: false,
 	refuse: null as string | null,
 	share: vi.fn(async (..._args: unknown[]) => 2),
+	copy: vi.fn(async (..._args: unknown[]) => 1),
 }));
 
 interface FakeSession {
@@ -98,7 +99,10 @@ vi.mock("electron", () => {
 	return { BrowserWindow, session: { fromPartition: vi.fn(() => fakeSession) } };
 });
 
-vi.mock("../preview-session", () => ({ sharePreviewCookies: (...args: unknown[]) => state.share(...args) }));
+vi.mock("../preview-session", () => ({
+	sharePreviewCookies: (...args: unknown[]) => state.share(...args),
+	copyCookies: (...args: unknown[]) => state.copy(...args),
+}));
 
 import { findDevicePreset, orientDevice } from "../../../shared/constants/device-presets";
 import {
@@ -107,7 +111,16 @@ import {
 	findCpuProfile,
 	findNetworkProfile,
 } from "../../../shared/constants/emulation-throttling";
-import { DeviceCaptureFailure, MAX_IMAGE_CHARS, SETTLE_MS, type Throttling, captureDevice } from "../device-capture";
+import {
+	DeviceCaptureFailure,
+	MAX_IMAGE_CHARS,
+	NO_THROTTLING,
+	SETTLE_MS,
+	type Throttling,
+	captureDevice,
+	runProbe,
+	withDevicePage,
+} from "../device-capture";
 
 const iphone = findDevicePreset("iphone-15");
 const desktop = findDevicePreset("desktop-1080p");
@@ -142,6 +155,8 @@ describe("captureDevice", () => {
 		state.detachThrows = false;
 		state.refuse = null;
 		state.share.mockClear();
+		state.copy.mockClear();
+		state.copy.mockImplementation(async () => 1);
 		state.share.mockImplementation(async () => 2);
 	});
 
@@ -365,6 +380,43 @@ describe("captureDevice", () => {
 		});
 		const done = captureDevice(iphone, "http://localhost:5173/", undefined, { previewSession: true });
 		await expect(done).rejects.toEqual(new DeviceCaptureFailure("session-failed"));
+		expect(lastWindow().destroy).toHaveBeenCalled();
+	});
+
+	it("replays a persona's cookies instead of the preview's, before loading", async () => {
+		const persona = [{ name: "sid", value: "test-persona-0000" }];
+		let loadedAfterCopy = false;
+		state.loadURL = () => {
+			loadedAfterCopy = state.copy.mock.calls.length > 0;
+			return Promise.resolve();
+		};
+		const done = captureDevice(iphone, "http://localhost:5173/account", undefined, {
+			previewSession: false,
+			persona: persona as never,
+		});
+		await vi.advanceTimersByTimeAsync(SETTLE_MS);
+		await done;
+		expect(state.copy).toHaveBeenCalledWith(state.session, "http://localhost:5173", persona);
+		expect(state.share).not.toHaveBeenCalled();
+		expect(loadedAfterCopy).toBe(true);
+		state.copy.mockImplementation(async () => {
+			throw new Error("refused");
+		});
+		await expect(
+			captureDevice(iphone, "http://localhost:5173/", undefined, { previewSession: false, persona: persona as never }),
+		).rejects.toEqual(new DeviceCaptureFailure("session-failed"));
+	});
+
+	it("hands the loaded page to a reader of its own, and still destroys the window", async () => {
+		const done = withDevicePage(iphone, "http://localhost:5173/account", NO_THROTTLING, { previewSession: false }, async (page) => {
+			expect(page.origin).toBe("http://localhost:5173");
+			expect(await runProbe(page.wc, "1 + 1")).toEqual({ issues: [], viewportWidth: 393, scrollWidth: 393 });
+			throw new DeviceCaptureFailure("capture-failed");
+		});
+		done.catch(() => undefined);
+		await vi.advanceTimersByTimeAsync(SETTLE_MS);
+		await expect(done).rejects.toEqual(new DeviceCaptureFailure("capture-failed"));
+		expect(lastWindow().probeCode).toBe("1 + 1");
 		expect(lastWindow().destroy).toHaveBeenCalled();
 	});
 });
