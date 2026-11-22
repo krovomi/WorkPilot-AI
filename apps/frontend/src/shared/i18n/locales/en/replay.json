@@ -239,7 +239,8 @@
 			"share_revoked": "This link was revoked. Ask for a new one.",
 			"too_many_shares": "This project already has as many open links as it may keep. Revoke one first.",
 			"empty_reply": "Write something before sending a reply.",
-			"too_many_replies": "This bookmark already has as many replies as it may keep."
+			"too_many_replies": "This bookmark already has as many replies as it may keep.",
+			"bad_usage": "The usage figures came back in an unexpected form."
 		},
 		"video": {
 			"export": "Export a video (WebM)",
@@ -321,5 +322,35 @@
 		"writtenBy": "Written by a model ({{model}}) from the recorded steps, masked like an export.",
 		"recording": "A summary can be asked once the session has finished recording.",
 		"noProvider": "Choose a default provider in Settings to summarize the steps."
+	},
+	"usage": {
+		"kicker": "Usage",
+		"title": "How your replays are shared",
+		"none": "—",
+		"percent": "{{value}}%",
+		"weekOf": "Week of {{date}}",
+		"local": {
+			"perWeek": "Exports per week",
+			"exports": "Exports, last {{weeks}} weeks",
+			"annotated": "Sessions with a bookmark",
+			"discussed": "Bookmarks discussed",
+			"summarized": "Summarized by a model",
+			"imported": "Imported",
+			"weekCount_one": "{{count}} export",
+			"weekCount_other": "{{count}} exports",
+			"where": "Counted on this computer, from its own sessions and the files, pages, videos and links it made. Nothing is sent anywhere."
+		},
+		"team": {
+			"title": "Team links of {{project}}",
+			"links": "Links made, last {{days}} days",
+			"openRate": "Links opened",
+			"opens": "Openings",
+			"active": "Open now",
+			"annotated": "Shared with a bookmark",
+			"sharers": "People sharing",
+			"weekCount_one": "{{count}} link",
+			"weekCount_other": "{{count}} links",
+			"where": "Computed by your WorkPilot server for this project only, as totals: no title, person or link. Nothing is sent anywhere else."
+		}
 	}
 }

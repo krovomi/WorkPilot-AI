@@ -169,6 +169,11 @@ export const VIEW_HINTS: Readonly<Record<string, ViewHint>> = {
 		hint: "the repository's GitLab merge requests",
 		words: ["merge request", "mrs gitlab"],
 	},
+	"bitbucket-issues": { hint: "the repository's Bitbucket issues", words: ["issues bitbucket"] },
+	"bitbucket-pull-requests": {
+		hint: "the repository's Bitbucket pull requests and pipelines",
+		words: ["prs bitbucket", "pipelines bitbucket"],
+	},
 	context: {
 		hint: "the project's memory and context for agents",
 		words: ["contexte", "context", "memoire du projet", "memory"],

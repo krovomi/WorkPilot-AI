@@ -1,0 +1,117 @@
+{
+	"checking": "Checking the Bitbucket connection…",
+	"refresh": "Refresh",
+	"openInBitbucket": "Open in Bitbucket",
+	"notConnected": {
+		"title": "Bitbucket is not connected",
+		"description": "Turn Bitbucket on in the project settings and give it a token and a repository.",
+		"openSettings": "Open Bitbucket settings"
+	},
+	"tabs": {
+		"pullRequests": "Pull requests",
+		"pipelines": "Pipelines"
+	},
+	"issues": {
+		"filter": "Issue state",
+		"filters": {
+			"open": "Open",
+			"closed": "Closed",
+			"all": "All"
+		},
+		"search": "Search issues",
+		"check": "Select issue #{{id}}",
+		"importChecked_one": "Import {{count}} as a task",
+		"importChecked_other": "Import {{count}} as tasks",
+		"importOne": "Import as a task",
+		"importResult": "{{imported}} imported, {{failed}} failed.",
+		"none": "No issues in this state.",
+		"noMatch": "No issue matches the search.",
+		"select": "Select an issue to see it here.",
+		"noDescription": "No description.",
+		"trackerOff": "The issue tracker is off",
+		"trackerOffDescription": "This Bitbucket repository has no issue tracker. Turn it on in the repository settings on bitbucket.org.",
+		"states": {
+			"new": "New",
+			"open": "Open",
+			"resolved": "Resolved",
+			"on hold": "On hold",
+			"invalid": "Invalid",
+			"duplicate": "Duplicate",
+			"wontfix": "Won't fix",
+			"closed": "Closed"
+		},
+		"kinds": {
+			"bug": "Bug",
+			"enhancement": "Enhancement",
+			"proposal": "Proposal",
+			"task": "Task"
+		}
+	},
+	"comments": {
+		"title": "Comments",
+		"loading": "Loading comments…",
+		"none": "No comments."
+	},
+	"pullRequests": {
+		"filter": "Pull request state",
+		"states": {
+			"OPEN": "Open",
+			"MERGED": "Merged",
+			"DECLINED": "Declined",
+			"SUPERSEDED": "Superseded"
+		},
+		"draft": "draft",
+		"none": "No pull requests in this state.",
+		"select": "Select a pull request to see it here.",
+		"noDescription": "No description.",
+		"branches": "{{source}} into {{destination}}",
+		"files": "Changed files",
+		"loadingDiff": "Loading the changes…",
+		"diffTruncated": "The diff is too long: only its beginning is shown."
+	},
+	"pipelines": {
+		"build": "Build #{{number}}",
+		"none": "No pipelines yet.",
+		"states": {
+			"SUCCESSFUL": "Successful",
+			"FAILED": "Failed",
+			"ERROR": "Error",
+			"STOPPED": "Stopped",
+			"IN_PROGRESS": "Running",
+			"PENDING": "Pending",
+			"PAUSED": "Paused",
+			"EXPIRED": "Expired",
+			"NOT_RUN": "Not run"
+		}
+	},
+	"errors": {
+		"checkConnection": "Could not check the Bitbucket connection.",
+		"loadIssues": "Could not load the Bitbucket issues.",
+		"import": "Could not import the issues.",
+		"loadPullRequests": "Could not load the pull requests.",
+		"loadDetail": "Could not load all of this pull request.",
+		"loadPipelines": "Could not load the pipelines."
+	},
+	"settings": {
+		"title": "Bitbucket Integration",
+		"description": "Connect a Bitbucket Cloud repository for its issues, pull requests and pipelines",
+		"enable": "Enable Bitbucket",
+		"enableDescription": "Show this repository's issues and pull requests, and open a task's pull request on Bitbucket.",
+		"username": "Username or email",
+		"usernameDescription": "With an API token or an app password, the account's email or username. Leave it empty for a repository or workspace access token.",
+		"token": "Token",
+		"tokenDescription": "An API token, an app password or an access token with read access to issues, pull requests and pipelines, and write access to pull requests to open them. It is stored encrypted.",
+		"workspace": "Workspace",
+		"repo": "Repository",
+		"repoDescription": "Filled from the project's bitbucket.org remote when empty. You can also paste workspace/repository or a clone URL.",
+		"connectionStatus": "Connection status",
+		"checkConnection": "Test",
+		"checkUsesSaved": "The test uses the saved settings.",
+		"notChecked": "Not tested yet",
+		"checking": "Checking…",
+		"connectedTo": "Connected to {{repo}}",
+		"notConnected": "Not connected",
+		"autoSync": "Load issues when the project opens",
+		"autoSyncDescription": "Fetch the Bitbucket issues as soon as the project is opened."
+	}
+}

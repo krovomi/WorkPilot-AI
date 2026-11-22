@@ -44,7 +44,8 @@ export function gridCaption(
 	if (network.conditions) parts.push(matrix.network[network.id]);
 	if (cpu.rate > 1) parts.push(interpolate(matrix.cpuSlowdown, { rate: cpu.rate }));
 	return {
-		label: (devices as Record<string, string>)[device.id] ?? device.id,
+		// Un appareil personnalisé porte le nom que la personne lui a donné ; `fillText` le dessine comme du texte.
+		label: device.name ?? (devices as Record<string, string>)[device.id] ?? device.id,
 		detail: parts.join(" · "),
 	};
 }
