@@ -160,6 +160,11 @@ _IGNORED = (
     # How often this machine opened a memory's history (``lifecycle.metrics``):
     # a per-machine count, rewritten at every reading.
     ".workpilot-brain/lifecycle-views.json",
+    # Where each project of this machine lives, and which memory conflicts
+    # were announced from here (`lifecycle.announce`), with their lock files:
+    # one machine's folders and claims. The vault's journal says the rest.
+    ".workpilot-brain/projects.json*",
+    ".workpilot-brain/announced.json*",
 )
 
 _ATTRIBUTES = "knowledge/projects/*/memory/.lifecycle/journal/*.md merge=union"

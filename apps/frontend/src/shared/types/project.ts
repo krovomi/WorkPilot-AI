@@ -440,6 +440,8 @@ export interface ProjectEnvConfig {
 	// Generic webhook (flat JSON POST)
 	notifyWebhookEnabled?: boolean;
 	notifyWebhookUrl?: string;
+	/** Also announce a memory conflict a teammate's sync queued (`WORKPILOT_MEMORY_CONFLICT_NOTIFY`). */
+	memoryConflictNotify?: boolean;
 
 	// Per-agent MCP overrides (add/remove MCPs from specific agents)
 	agentMcpOverrides?: AgentMcpOverrides;

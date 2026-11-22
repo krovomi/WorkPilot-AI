@@ -34,7 +34,11 @@ describe("createMemoryLifecycleAPI", () => {
 			],
 			[() => api.suggestMemoryResolution("p1", CONFLICT), [C.CONTEXT_MEMORY_SUGGEST_RESOLUTION, "p1", CONFLICT]],
 			[() => api.setMemoryScope("p1", MEMORY, "apps/"), [C.CONTEXT_MEMORY_SET_SCOPE, "p1", MEMORY, "apps/"]],
-			[() => api.setMemoryMaintainers("p1", ["Bob"]), [C.CONTEXT_MEMORY_SET_MAINTAINERS, "p1", ["Bob"]]],
+			[() => api.setMemoryMaintainers("p1", ["Bob"]), [C.CONTEXT_MEMORY_SET_MAINTAINERS, "p1", ["Bob"], undefined]],
+			[
+				() => api.setMemoryMaintainers("p1", ["Bob"], "team:ops"),
+				[C.CONTEXT_MEMORY_SET_MAINTAINERS, "p1", ["Bob"], "team:ops"],
+			],
 			[() => api.revertMemoryDecision("p1", "0123456789ab"), [C.CONTEXT_MEMORY_REVERT, "p1", "0123456789ab"]],
 		];
 		for (const [call, expected] of calls) {

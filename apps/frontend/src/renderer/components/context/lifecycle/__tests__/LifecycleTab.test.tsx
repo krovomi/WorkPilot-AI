@@ -21,6 +21,7 @@ function view(): MemoryLifecycleView {
 		revertible: {},
 		lastUndo: null,
 		maintainers: [],
+		maintainerScopes: {},
 		canArbitrate: true,
 		metrics: null,
 		journal: [
