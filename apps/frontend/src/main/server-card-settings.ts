@@ -35,10 +35,23 @@ export interface ServerCardSettings {
 	blockedBy?: string[] | null;
 	/** The mark of a phone-app setup card (`mobile-setup.ts`). */
 	mobileBootstrap?: TaskMetadata["mobileBootstrap"] | null;
+	/** A card set aside (« Abandonnée »), when, why, and the task it points to. */
+	abandoned?: boolean | null;
+	abandonedAt?: string | null;
+	abandonedReason?: string | null;
+	abandonedResolution?: string | null;
+	abandonedLink?: string | null;
 }
 
 /** Metadata fields the server stores as they are given (`shared_board/settings.py`). */
 const LIST_KEYS = ["mobileTargets", "blockedBy"] as const;
+/** The abandon fields (`shared/utils/task-lifecycle.ts`); resuming clears them. */
+const ABANDON_KEYS = [
+	"abandonedAt",
+	"abandonedReason",
+	"abandonedResolution",
+	"abandonedLink",
+] as const;
 
 interface CardRef {
 	project: { id: string };
@@ -84,6 +97,10 @@ export function settingsFromMetadata(
 	}
 	if ("mobileBootstrap" in metadata) {
 		settings.mobileBootstrap = metadata.mobileBootstrap ?? null;
+	}
+	if ("abandoned" in metadata) settings.abandoned = metadata.abandoned ?? null;
+	for (const key of ABANDON_KEYS) {
+		if (key in metadata) settings[key] = metadata[key] || null;
 	}
 	return Object.keys(settings).length > 0 ? settings : null;
 }

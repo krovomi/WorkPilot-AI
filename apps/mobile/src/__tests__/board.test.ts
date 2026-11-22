@@ -79,6 +79,25 @@ describe("columns", () => {
 		expect(groups.find((g) => g.column === "done")?.cards.map((c) => c.id)).toEqual(["a"]);
 	});
 
+	it("draws a failed run in Failed and a card set aside in Abandoned, as the desktop", () => {
+		const groups = groupByColumn([
+			card({ id: "e", column: "error" }),
+			card({ id: "q", column: "human_review", outcome: "failed" }),
+			card({ id: "x", column: "in_progress", outcome: "abandoned" }),
+		]);
+		expect(groups.map((g) => g.column)).toEqual([
+			"backlog",
+			"in_progress",
+			"ai_review",
+			"human_review",
+			"failed",
+			"done",
+			"abandoned",
+		]);
+		expect(groups.find((g) => g.column === "failed")?.cards.map((c) => c.id)).toEqual(["e", "q"]);
+		expect(groups.find((g) => g.column === "in_progress")?.cards).toEqual([]);
+	});
+
 	it("puts a card of a column a newer server added in the backlog", () => {
 		const groups = groupByColumn([card({ id: "n", column: "on_hold" as never })]);
 		expect(groups.find((g) => g.column === "backlog")?.cards.map((c) => c.id)).toEqual(["n"]);
@@ -129,6 +148,7 @@ describe("availableActions", () => {
 		expect(availableActions(card({ column: "pr_created" }), reviewed, [])).toEqual(["merge"]);
 		expect(availableActions(card({ column: "build_failed" }), reviewed, [])).toEqual(["retry", "requestChanges"]);
 		expect(availableActions(card({ column: "error" }), reviewed, [])).toEqual(["retry", "requestChanges"]);
+		expect(availableActions(card({ column: "queue", outcome: "abandoned" }), reviewed, [])).toEqual([]);
 		expect(availableActions(card({ column: "done" }), reviewed, [])).toEqual([]);
 	});
 

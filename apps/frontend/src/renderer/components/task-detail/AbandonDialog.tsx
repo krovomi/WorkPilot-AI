@@ -27,6 +27,8 @@ const PICKABLE = ABANDON_RESOLUTIONS.filter((r) => r !== "pr_closed");
 const LINKED: ReadonlySet<AbandonResolution> = new Set(["duplicate", "replaced"]);
 /** At most this many tasks are offered as the duplicate or the replacement. */
 const MAX_LINK_CHOICES = 200;
+/** The server keeps a note of this many characters at most (`shared_board/settings.py`). */
+const MAX_REASON = 2000;
 
 interface AbandonDialogProps {
 	readonly open: boolean;
@@ -142,6 +144,7 @@ export function AbandonDialog({
 								placeholder={t("tasks:abandon.reasonPlaceholder")}
 								aria-label={t("tasks:abandon.reasonLabel")}
 								className="min-h-20 resize-none"
+								maxLength={MAX_REASON}
 								disabled={isAbandoning}
 							/>
 						</div>

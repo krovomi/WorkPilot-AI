@@ -298,3 +298,54 @@ async def test_the_form_reads_the_mobile_profile_of_the_clone(tmp_path):
 
     assert profile["isMobile"] is False
     assert profile["frameworks"][0]["id"] == "dotnet-maui"
+
+
+@pytest.mark.asyncio
+async def test_a_card_is_set_aside_for_every_member_and_resumed(tmp_path):
+    """« Abandonnée » on the shared board: the reason reaches every member."""
+    from shared_board.api import get_card, update_card_settings
+    from shared_board.settings import CardSettings
+
+    member, clone, card_id = await _create(tmp_path)
+    aside = CardSettings(
+        abandoned=True,
+        abandonedAt="2026-11-22T10:00:00.000Z",
+        abandonedReason="Covered by the auth rewrite",
+        abandonedResolution="replaced",
+        abandonedLink="server:p1:002-auth-rewrite",
+    )
+    async with await _db() as db:
+        shown = await update_card_settings(card_id, aside, _request(), member, db)
+    assert shown["abandoned"] is True
+    assert shown["abandonedResolution"] == "replaced"
+    metadata = _metadata(clone, card_id)
+    assert metadata["abandonedLink"] == "server:p1:002-auth-rewrite"
+    assert metadata["abandonedAt"] == "2026-11-22T10:00:00.000Z"
+
+    resume = CardSettings(
+        abandoned=False,
+        abandonedReason=None,
+        abandonedResolution=None,
+        abandonedLink=None,
+    )
+    async with await _db() as db:
+        await update_card_settings(card_id, resume, _request(), member, db)
+    metadata = _metadata(clone, card_id)
+    assert metadata["abandoned"] is False
+    for key in ("abandonedReason", "abandonedResolution", "abandonedLink"):
+        assert key not in metadata
+    assert (await get_card(card_id, member))["settings"]["abandonedReason"] is None
+
+
+def test_a_strange_abandon_is_refused():
+    from pydantic import ValidationError
+    from shared_board.settings import CardSettings
+
+    with pytest.raises(ValidationError):
+        CardSettings(abandonedResolution="deleted")
+    with pytest.raises(ValidationError):
+        CardSettings(abandonedLink="../other")
+    with pytest.raises(ValidationError):
+        CardSettings(abandonedAt="yesterday")
+    with pytest.raises(ValidationError):
+        CardSettings(abandonedReason="x" * 2001)

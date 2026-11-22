@@ -28,7 +28,11 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 ## Colonnes
 
 `TASK_STATUS_COLUMNS` (`shared/constants/task.ts:13`) :
-`backlog` · `queue` · `in_progress` · `ai_review` · `human_review` · `build_failed` · `pr_created` · `done`
+`backlog` · `queue` · `in_progress` · `ai_review` · `human_review` · `failed` · `build_failed` · `pr_created` · `done` · `abandoned`
+
+`failed` (« Échec ») et `abandoned` (« Abandonnée ») sont calculées, pas des statuts :
+`getBoardColumn(task)` y range une erreur, une revue finie sur un échec et une tâche abandonnée ;
+leurs dépôts passent par `hooks/useOutcomeDrop.ts` ([kanban-outcome-columns.md](../../../../../../docs/architecture/kanban-outcome-columns.md)).
 
 `build_failed` (« Build rouge ») est piloté par la CI (`main/ci-pipeline-service.ts`) : une
 tâche y entre quand le pipeline de sa branche `workpilot/<spec>` passe au rouge et en sort, vers
@@ -41,8 +45,8 @@ qu'elle est vide (`useVisibleKanbanColumns`) ; une carte sans `metadata.prUrl` n
 déplacée à la main (`canMoveTaskTo`). Un ordre de colonnes ou des préférences enregistrés avant
 l'ajout d'une colonne la reçoivent (`normalizeColumnOrder`, `withNewColumnPreferences`).
 
-Un statut n'a pas de colonne à lui : `getVisualColumn()` projette `error → human_review`.
-`getVisualColumn`, `VALID_BULK_TRANSITIONS` (déplacements en masse) et `manualMoveTargets`
+Un statut n'a pas de colonne à lui : `getVisualColumn()` projette `error → failed`.
+`getBoardColumn`, `getVisualColumn`, `VALID_BULK_TRANSITIONS` (déplacements en masse) et `manualMoveTargets`
 (menus « Déplacer vers ») vivent dans `../../lib/kanban-columns.ts`.
 
 `IMPORT_ALLOWED_COLUMNS` restreint les cibles d'import (Azure DevOps / Jira) à

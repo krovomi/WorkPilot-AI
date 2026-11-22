@@ -68,6 +68,7 @@ export function columnColor(theme: Theme, column: Column): string {
 			return theme.success;
 		case "build_failed":
 		case "error":
+		case "failed":
 			return theme.danger;
 		default:
 			return theme.textFaint;

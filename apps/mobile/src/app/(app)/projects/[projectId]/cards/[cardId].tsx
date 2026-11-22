@@ -15,7 +15,7 @@ import {
 	startCard,
 	stopCard,
 } from "../../../../../board/actions";
-import { ACTIVE_COLUMNS } from "../../../../../board/columns";
+import { ACTIVE_COLUMNS, boardColumn } from "../../../../../board/columns";
 import { ApprovalSection } from "../../../../../card/ApprovalSection";
 import { ChangesSection } from "../../../../../card/ChangesSection";
 import { LogsSection } from "../../../../../card/LogsSection";
@@ -150,8 +150,8 @@ export default function CardScreen() {
 			<Stack.Screen options={{ headerTitle: card.id.split("-")[0] }} />
 			<View style={{ gap: SPACE.sm }}>
 				<View style={styles.columnRow}>
-					<View style={[styles.dot, { backgroundColor: columnColor(theme, card.column) }]} />
-					<Text style={{ color: theme.textMuted }}>{t(`columns.${card.column}`)}</Text>
+					<View style={[styles.dot, { backgroundColor: columnColor(theme, boardColumn(card)) }]} />
+					<Text style={{ color: theme.textMuted }}>{t(`columns.${boardColumn(card)}`)}</Text>
 					{card.kind ? <Text style={{ color: theme.textFaint }}>· {t(`kinds.${card.kind}`)}</Text> : null}
 				</View>
 				<Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
