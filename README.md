@@ -213,7 +213,7 @@ The code is then rendered, compared with the mockup and corrected until it match
 </tr>
 </table>
 
-**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, start or stop the agents, read the dashboard, Insights, roadmap and ideas.
+**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, set its criticality or lend your approval, start or stop the agents, read the dashboard, Insights, roadmap and ideas; sign in with a password, Microsoft Entra or the server's single sign-on.
 
 ![Mobile app: board, card and dashboard](.github/assets/screenshots/mobile.png)
 
@@ -265,13 +265,13 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - Notifications on Slack, Teams, Discord, Google Chat, webhooks, ntfy and Telegram.
 
 **Team**
-- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT, Microsoft Entra or any OpenID Connect sign-in (Okta, Google, Keycloak...), spec approval by someone other than the card's author, by as many approvers as the card's criticality needs, approvals lent for a holiday ([operations guide](docs/server-operations.md)).
+- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT, Microsoft Entra or any OpenID Connect sign-in (Okta, Google, Keycloak...), spec approval by someone other than the card's author, by as many approvers as the card's criticality needs, approvals lent for a holiday, a second group of approvers told when a plan waits too long, and each audited action tied to the sign-in it was made under ([operations guide](docs/server-operations.md)).
 - **Mobile app** for iOS and Android, team chat, invitation-only sign-up.
 
 **Cost and monitoring**
 - Cost budgets enforced while tasks run: a project budget per period and a limit per task, checked before every agent session on every provider; the task pauses at its limit, can step down to a lighter model of the same provider, and a task that spends without progress is paused too.
 - Circuit breaker and kill switch: an agent that repeats the same tool call with the same result is paused on every provider, and "Stop all agents" (sidebar button, Ctrl+Shift+.) pauses every running task, each resumed from its card.
-- Governance in `workpilot.policy.yaml`: allowed hours in an explicit time zone, forbidden and review-required files, token budgets per hour and per task, the circuit breaker's limit, applied to every agent on every provider and between Swarm waves; an invalid file pauses every task, and every decision (breaker trips included) goes to an audit trail with daily and weekly counts, exported as CSV or JSON from Settings > Guardrails.
+- Governance in `workpilot.policy.yaml`: allowed hours in an explicit time zone, forbidden and review-required files, token budgets per hour and per task, the circuit breaker's limit, applied to every agent on every provider and between Swarm waves; an invalid file pauses every task, and every decision (breaker trips included) goes to an audit trail with daily and weekly counts, exported as CSV or JSON from Settings > Guardrails. On a team server, the same page (and the mobile app) reads the project's policy there, approves a waiting call in the name of your account and roles (`files.reviewers` can require one), and "Stop all agents" also stops the runs you started on the server.
 - Smart Estimation that learns each repository: the estimate of a task is corrected by what its merged specs actually cost (cost, tokens, QA iterations, files changed), shown as a range with its confidence and a breakdown by dimension, with your own adjustment and a reset; every provider feeds the same history.
 - Analytics dashboard with "How you compare" (a project against its past and your other projects of the same stack, size and team size, per spec and per kind of work, with the top 10%, a weekly sparkline and a PDF team report, nothing sent anywhere), cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler with a monthly budget and an ESG export, OpenTelemetry GenAI traces for every provider.
 

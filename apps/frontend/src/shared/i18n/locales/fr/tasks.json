@@ -325,7 +325,8 @@
 			"droppedSimple": "Tâche « {{title}} » déposée.",
 			"cancelled": "Déplacement annulé.",
 			"columnPickedUp": "Colonne {{column}} saisie. Utilisez les flèches pour réordonner.",
-			"columnReordered": "Colonne {{column}} déplacée."
+			"columnReordered": "Colonne {{column}} déplacée.",
+			"cardFocus": "{{position}} sur {{count}}, {{column}}"
 		},
 		"filter": {
 			"button": "Filtrer",
@@ -415,6 +416,31 @@
 			"member": "Membre",
 			"owner": "Propriétaire"
 		},
+		"bulk": {
+			"label": "Cartes sélectionnées",
+			"saveFailed_one": "{{count}} carte n'a pas pu être modifiée",
+			"saveFailed_other": "{{count}} cartes n'ont pas pu être modifiées"
+		},
+		"undoLabels": {
+			"type": "changement de type",
+			"priority": "changement de priorité",
+			"move_one": "déplacement de {{count}} carte",
+			"move_other": "déplacement de {{count}} cartes",
+			"delete_one": "suppression de {{count}} carte",
+			"delete_other": "suppression de {{count}} cartes",
+			"rename": "renommage"
+		},
+		"undone": "Annulé : {{label}}",
+		"undoStale": "Annulation incomplète ({{label}}) : une carte a changé depuis",
+		"undoNothing": "Rien à annuler",
+		"cardMenu": {
+			"label": "Actions de la carte",
+			"open": "Ouvrir",
+			"edit": "Modifier…",
+			"type": "Type",
+			"priority": "Priorité",
+			"saveFailed": "La modification n'a pas pu être enregistrée"
+		},
 		"quickAdd": {
 			"addCard": "Ajouter une carte",
 			"addQueued": "Ajouter et mettre en file",
@@ -437,6 +463,40 @@
 			"created_one": "Carte créée dans {{column}}",
 			"created_other": "{{count}} cartes créées dans {{column}}",
 			"createFailed": "La carte n'a pas pu être créée. Le texte est gardé : réessayez."
+		},
+		"rename": {
+			"label": "Titre de la carte"
+		},
+		"shortcuts": {
+			"open": "Raccourcis clavier",
+			"title": "Raccourcis clavier",
+			"description": "Les touches du tableau. Elles attendent pendant que vous écrivez ou qu'un menu ou une fenêtre est ouvert.",
+			"groups": {
+				"cards": "Cartes",
+				"selection": "Sélection",
+				"board": "Tableau"
+			},
+			"rows": {
+				"navigate": "Passer d'une carte à l'autre",
+				"open": "Ouvrir la carte",
+				"rename": "Renommer la carte (ou double-clic sur son titre)",
+				"menu": "Menu de la carte (ou clic droit)",
+				"toggle": "Ajouter ou retirer une carte",
+				"range": "Sélectionner une plage dans une colonne",
+				"column": "Sélectionner la colonne",
+				"clear": "Vider la sélection",
+				"delete": "Supprimer la sélection",
+				"add": "Nouvelle carte dans Planification",
+				"undo": "Annuler la dernière modification",
+				"help": "Afficher cette liste (ou ?)"
+			},
+			"keys": {
+				"enter": "Entrée",
+				"shift": "Maj",
+				"click": "Clic",
+				"escape": "Échap",
+				"delete": "Suppr"
+			}
 		}
 	},
 	"queue": {

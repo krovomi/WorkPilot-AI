@@ -1129,8 +1129,13 @@ describe("environment for the Python backend", () => {
 		["ollama", "", {}],
 		["cursor", "https://c.example", { CURSOR_API_KEY: "k1", CURSOR_BASE_URL: "https://c.example" }],
 		["cursor", "", { CURSOR_API_KEY: "k1" }],
-		["openrouter", "https://openrouter.ai/api", { LLM_API_KEY: "k1", LLM_BASE_URL: "https://openrouter.ai/api" }],
-		["openrouter", "", { LLM_API_KEY: "k1" }],
+		["openrouter", "https://openrouter.ai/api", { OPENROUTER_API_KEY: "k1", OPENROUTER_BASE_URL: "https://openrouter.ai/api" }],
+		["openrouter", "", { OPENROUTER_API_KEY: "k1" }],
+		["huggingface", "https://router.huggingface.co/v1", {
+			HUGGINGFACE_API_KEY: "k1",
+			HUGGINGFACE_BASE_URL: "https://router.huggingface.co/v1",
+		}],
+		["huggingface", "", { HUGGINGFACE_API_KEY: "k1" }],
 	])("exports the active %s profile (base URL %j)", async (provider, baseUrl, expected) => {
 		const manager = await activeProfile(provider, baseUrl);
 		expect(manager.getEnvironmentVariables()).toEqual({
@@ -1186,6 +1191,77 @@ describe("environment for the Python backend", () => {
 		store.settings = { selectedProvider: "copilot" };
 		expect(new CredentialManager().getEnvironmentVariables("  ")).toEqual({
 			SELECTED_LLM_PROVIDER: "copilot",
+		});
+	});
+});
+
+describe("model gateways (OpenRouter, Hugging Face)", () => {
+	it("tests a gateway key on its account endpoint, never on the model list", async () => {
+		store.settings = { globalOpenRouterApiKey: "sk-or-test-0000" };
+		fetchRoutes.push((url) => (url === "https://openrouter.ai/api/v1/key" ? json({ data: {} }) : undefined));
+		const result = await new CredentialManager().testProvider("openrouter");
+		expect(result.success).toBe(true);
+		expect(fetchCalls.map((c) => c.url)).toEqual(["https://openrouter.ai/api/v1/key"]);
+		expect(fetchCalls[0].init?.headers).toEqual({ Authorization: "Bearer sk-or-test-0000" });
+	});
+
+	it("checks a Hugging Face token on whoami, even from a profile with another URL", async () => {
+		setProfiles([profile("hf", "https://router.huggingface.co/v1", "hf_test_0000")]);
+		fetchRoutes.push(() => json({ error: "Invalid credentials" }, 401, "Unauthorized"));
+		const result = await new CredentialManager().testProvider("huggingface");
+		expect(result.success).toBe(false);
+		expect(result.message).toContain("401");
+		expect(fetchCalls.map((c) => c.url)).toEqual(["https://huggingface.co/api/whoami-v2"]);
+	});
+
+	it("validates an active gateway profile on the account endpoint", async () => {
+		setProfiles([profile("p", "https://openrouter.ai/api/v1", "sk-or-test-0000")]);
+		const manager = new CredentialManager();
+		await manager.setActiveProvider("openrouter", "api_key", "p");
+		fetchRoutes.push((url) => (url === "https://openrouter.ai/api/v1/key" ? json({}) : undefined));
+		await expect(manager.validateActiveCredentials()).resolves.toBe(true);
+		expect(fetchCalls.map((c) => c.url)).toEqual(["https://openrouter.ai/api/v1/key"]);
+	});
+
+	it("hands the backend the gateway key from the settings", () => {
+		store.settings = { selectedProvider: "huggingface", globalHuggingFaceApiKey: "hf_test_0000" };
+		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "huggingface",
+			HUGGINGFACE_API_KEY: "hf_test_0000",
+		});
+		store.settings = { selectedProvider: "openrouter", globalOpenRouterApiKey: "sk-or-test-0000" };
+		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "openrouter",
+			OPENROUTER_API_KEY: "sk-or-test-0000",
+		});
+	});
+
+	it("hands the backend the model chosen on the gateway page", () => {
+		store.settings = {
+			selectedProvider: "huggingface",
+			globalHuggingFaceApiKey: "hf_test_0000",
+			globalHuggingFaceModel: " moonshotai/Kimi-K3.1-Pro ",
+			globalOllamaModel: "llama3.3",
+		};
+		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "huggingface",
+			HUGGINGFACE_API_KEY: "hf_test_0000",
+			HUGGINGFACE_MODEL: "moonshotai/Kimi-K3.1-Pro",
+		});
+		store.settings = {
+			selectedProvider: "openrouter",
+			openRouterSort: "price",
+			openRouterDenyDataCollection: true,
+			huggingFaceRoutingPolicy: "cheapest",
+		};
+		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "openrouter",
+			OPENROUTER_PROVIDER_SORT: "price",
+			OPENROUTER_DATA_COLLECTION: "deny",
+		});
+		store.settings = { selectedProvider: "openrouter", globalOpenRouterModel: "  " };
+		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "openrouter",
 		});
 	});
 });

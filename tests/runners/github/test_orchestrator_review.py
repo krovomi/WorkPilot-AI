@@ -584,9 +584,9 @@ VERDICTS = {
         {
             "context": {"merge_state_status": "BEHIND"},
             "findings": [
-                finding("h", HIGH),
-                finding("m", MEDIUM),
-                finding("l", LOW),
+                finding("h", HIGH, title="Unbounded cache"),
+                finding("m", MEDIUM, title="Missing timeout"),
+                finding("l", LOW, title="Unused import"),
             ],
         },
         MergeVerdict.NEEDS_REVISION,
@@ -676,7 +676,13 @@ VERDICTS = {
         "**🟠 Needs revision** - 2 structural/other issue(s) require attention.",
     ),
     "high, medium and low findings": (
-        {"findings": [finding("h", HIGH), finding("m", MEDIUM), finding("l", LOW)]},
+        {
+            "findings": [
+                finding("h", HIGH, title="Unbounded cache"),
+                finding("m", MEDIUM, title="Missing timeout"),
+                finding("l", LOW, title="Unused import"),
+            ]
+        },
         MergeVerdict.NEEDS_REVISION,
         "2 issue(s) must be addressed (1 required, 1 recommended), 1 suggestions",
         [],
@@ -690,7 +696,12 @@ VERDICTS = {
         "**🟠 Needs revision** - 1 issue(s) require attention.",
     ),
     "low findings only": (
-        {"findings": [finding("l", LOW), finding("k", LOW)]},
+        {
+            "findings": [
+                finding("l", LOW, title="Unused import"),
+                finding("k", LOW, title="Typo in a docstring"),
+            ]
+        },
         MergeVerdict.READY_TO_MERGE,
         "No blocking issues. 2 non-blocking suggestion(s) to consider",
         [],
@@ -740,11 +751,12 @@ def test_the_verdict_follows_what_the_review_found(review, case):
 
 
 def test_the_summary_counts_findings_structure_and_ai_comments(review):
+    # Distinct remarks: the self-check merges one remark reported twice.
     review.findings = [
-        finding("c", CRITICAL),
-        finding("h1", HIGH),
-        finding("h2", HIGH),
-        finding("l", LOW),
+        finding("c", CRITICAL, title="Data loss on restart"),
+        finding("h1", HIGH, title="Unbounded cache"),
+        finding("h2", HIGH, title="Missing timeout"),
+        finding("l", LOW, title="Unused import"),
     ]
     review.structural = [structural(f"s{i}", LOW, title=f"Issue {i}") for i in range(7)]
     review.triages = [

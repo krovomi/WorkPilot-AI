@@ -6,10 +6,20 @@ import { ApiError, ServerClient } from "../api/client";
 import { api } from "../api/endpoints";
 import { normaliseServerUrl } from "../api/server-url";
 import { entraIdToken } from "../auth/entra";
+import { ssoIdToken } from "../auth/sso";
 import { useSession } from "../auth/session";
 import { describeError } from "../i18n";
 import { Button, ErrorBanner, Field, KeyboardAvoiding } from "../ui/components";
 import { SPACE, useTheme } from "../ui/theme";
+
+/** How a person signs in: a local account, Microsoft Entra, or the server's OpenID Connect provider. */
+type Way = "local" | "microsoft" | "sso";
+
+const REFUSED: Record<Way, string> = {
+	local: "signIn.badCredentials",
+	microsoft: "signIn.entraRefused",
+	sso: "signIn.ssoRefused",
+};
 
 export default function SignIn() {
 	const { t } = useTranslation();
@@ -18,11 +28,11 @@ export default function SignIn() {
 	const [server, setServer] = useState(session.serverUrl ?? "");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
-	const [busy, setBusy] = useState<"password" | "microsoft" | null>(null);
+	const [busy, setBusy] = useState<Way | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
-	/** Check the address, read what the server offers, then sign in one way or the other. */
-	const attempt = async (how: "password" | "microsoft") => {
+	/** Check the address, read what the server offers, then sign in one way or another. */
+	const attempt = async (how: Way) => {
 		const url = normaliseServerUrl(server);
 		if (!url.ok) {
 			setError(t(url.reason === "insecure" ? "signIn.insecureUrl" : "signIn.invalidUrl"));
@@ -38,7 +48,13 @@ export default function SignIn() {
 					return;
 				}
 				const idToken = await entraIdToken(config);
-				if (idToken) await session.signInWithEntra(url.url, idToken);
+				if (idToken) await session.signInWithIdToken(url.url, idToken, "entra");
+				return;
+			}
+			if (how === "sso") {
+				// Throws `sso_disabled` when the server offers no usable provider.
+				const idToken = await ssoIdToken(config);
+				if (idToken) await session.signInWithIdToken(url.url, idToken, "sso");
 				return;
 			}
 			if (!config.local_enabled) {
@@ -47,17 +63,14 @@ export default function SignIn() {
 			}
 			await session.signIn(url.url, email.trim(), password);
 		} catch (err) {
-			// A 401 here is a refused password or Microsoft account, not an ended session.
-			const message =
-				err instanceof ApiError && err.status === 401
-					? t(how === "password" ? "signIn.badCredentials" : "signIn.entraRefused")
-					: describeError(err);
+			// A 401 here is a refused password or account, not an ended session.
+			const message = err instanceof ApiError && err.status === 401 ? t(REFUSED[how]) : describeError(err);
 			setError(t("signIn.failed", { message }));
 		} finally {
 			setBusy(null);
 		}
 	};
-	const submit = () => attempt("password");
+	const submit = () => attempt("local");
 
 	const ready = server.trim() && email.trim() && password;
 	return (
@@ -102,7 +115,7 @@ export default function SignIn() {
 					<ErrorBanner message={error} />
 					<Button
 						label={t("signIn.submit")}
-						busy={busy === "password"}
+						busy={busy === "local"}
 						disabled={!ready || !!busy}
 						onPress={() => void submit()}
 					/>
@@ -113,6 +126,13 @@ export default function SignIn() {
 						busy={busy === "microsoft"}
 						disabled={!server.trim() || !!busy}
 						onPress={() => void attempt("microsoft")}
+					/>
+					<Button
+						label={t("signIn.sso")}
+						variant="secondary"
+						busy={busy === "sso"}
+						disabled={!server.trim() || !!busy}
+						onPress={() => void attempt("sso")}
 					/>
 				</ScrollView>
 			</KeyboardAvoiding>

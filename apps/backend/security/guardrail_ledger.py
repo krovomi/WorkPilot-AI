@@ -233,8 +233,9 @@ def _alive(approval: dict[str, Any]) -> bool:
 
 def consume_approval(
     project: Path, decision: GuardrailDecision, target: dict[str, str]
-) -> bool:
-    """Whether the person approved this call; an approval is used once."""
+) -> dict[str, Any] | None:
+    """The person's approval of this call, marked used (it lets one call
+    through), or ``None`` when there is none."""
     approvals = _load_approvals(project)
     wanted = {r.id for r in decision.triggered if r.action.value == "require_approval"}
     for approval in approvals:
@@ -252,15 +253,26 @@ def consume_approval(
         try:
             _save_approvals(project, approvals)
         except OSError:
-            return False  # an approval that cannot be marked used is not used
-        return True
-    return False
+            return None  # an approval that cannot be marked used is not used
+        return approval
+    return None
 
 
 def answer(
-    project: Path, request_id: str, approved: bool, by: str = "user"
+    project: Path,
+    request_id: str,
+    approved: bool,
+    by: str = "user",
+    *,
+    by_id: str | None = None,
+    roles: list[str] | None = None,
 ) -> dict[str, Any] | None:
-    """The person's answer to a pending request; ``None`` if there is no such request."""
+    """The person's answer to a pending request; ``None`` if there is no such request.
+
+    On the desktop ``by`` is the local user's word, not a verified identity.
+    A server passes the account that answered (``by_id``) and the roles it
+    held then, which is what makes the approver a named, checked person.
+    """
     request = next(
         (
             e
@@ -281,6 +293,9 @@ def answer(
         "target": request.get("target", {}).get("key"),
         "summary": request.get("target", {}).get("summary"),
         "by": by,
+        "byId": by_id,
+        "roles": list(roles or []),
+        "verified": by_id is not None,
         "at": _now().isoformat(),
         "expires_at": (_now() + APPROVAL_TTL).isoformat(),
         "used_at": None,
@@ -288,6 +303,16 @@ def answer(
     approvals = [a for a in approvals if a.get("request") != request_id] + [entry]
     _save_approvals(project, approvals)
     return entry
+
+
+def pending(project: Path) -> list[dict[str, Any]]:
+    """The requests still waiting for an answer, newest first (at most 50)."""
+    return activity(project, limit=0)["pending"]
+
+
+def find_pending(project: Path, request_id: str) -> dict[str, Any] | None:
+    """One request still waiting for an answer, or ``None``."""
+    return next((e for e in pending(project) if e.get("id") == request_id), None)
 
 
 def activity(project: Path, limit: int = 100) -> dict[str, Any]:

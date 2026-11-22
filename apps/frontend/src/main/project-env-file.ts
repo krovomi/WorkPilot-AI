@@ -39,7 +39,7 @@ export const READABLE_PROJECT_ENV_SECRET_KEYS: ReadonlySet<string> = new Set(
 /** Configuration, except for the HTTP headers where a bearer token goes. */
 const CUSTOM_MCP_SERVERS_KEY = "CUSTOM_MCP_SERVERS";
 
-interface ProjectLocation {
+export interface ProjectLocation {
 	path: string;
 	autoBuildPath?: string | null;
 }

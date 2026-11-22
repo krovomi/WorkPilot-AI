@@ -172,6 +172,7 @@ export function SectionRouter({
 							gitHubConnectionStatus={gitHubConnectionStatus}
 							isCheckingGitHub={isCheckingGitHub}
 							projectPath={project.path}
+							projectId={project.id}
 							settings={settings}
 							setSettings={setSettings}
 						/>
@@ -198,6 +199,7 @@ export function SectionRouter({
 							gitLabConnectionStatus={gitLabConnectionStatus}
 							isCheckingGitLab={isCheckingGitLab}
 							projectPath={project.path}
+							projectId={project.id}
 							settings={settings}
 							setSettings={setSettings}
 						/>

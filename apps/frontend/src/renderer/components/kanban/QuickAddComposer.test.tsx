@@ -181,6 +181,27 @@ describe("quick add in a column", () => {
 		});
 	});
 
+	it("takes back a type and a priority picked by mistake", async () => {
+		renderColumn();
+		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Type" }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Bug" }));
+		await userEvent.click(screen.getByRole("button", { name: "Type" }));
+		await userEvent.click(
+			await screen.findByRole("menuitem", { name: "No type (detected automatically)" }),
+		);
+		await userEvent.click(screen.getByRole("button", { name: "Priority" }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: "High" }));
+		await userEvent.click(screen.getByRole("button", { name: "Priority" }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: "No priority" }));
+		await userEvent.type(box(), "Plain card{Enter}");
+
+		await waitFor(() => expect(api.fn("createTask")).toHaveBeenCalledTimes(1));
+		const metadata = api.fn("createTask").mock.calls[0][3];
+		expect(metadata.kind).toBeUndefined();
+		expect(metadata.priority).toBeUndefined();
+	});
+
 	it("queues what it creates in File d'attente", async () => {
 		renderColumn({ status: "queue" });
 		const [headerPlus] = screen.getAllByRole("button", { name: "Add and queue" });
@@ -241,6 +262,12 @@ describe("quick add in a column", () => {
 
 		fireEvent.keyDown(document.body, { key: "n", ctrlKey: true });
 		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		const dialog = document.createElement("div");
+		dialog.setAttribute("role", "dialog");
+		document.body.appendChild(dialog);
+		fireEvent.keyDown(document.body, { key: "n" });
+		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		dialog.remove();
 		fireEvent.keyDown(document.body, { key: "n" });
 		expect(box()).toBeInTheDocument();
 	});

@@ -215,7 +215,7 @@ Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ress
 </tr>
 </table>
 
-**App mobile (iOS et Android)** : avec un serveur d'équipe, le tableau partagé dans votre poche : ouvrir une carte, approuver un plan, lancer ou arrêter les agents, lire le tableau de bord, les Insights, la feuille de route et les idées.
+**App mobile (iOS et Android)** : avec un serveur d'équipe, le tableau partagé dans votre poche : ouvrir une carte, approuver un plan, régler sa criticité ou prêter son approbation, lancer ou arrêter les agents, lire le tableau de bord, les Insights, la feuille de route et les idées ; se connecter par mot de passe, Microsoft Entra ou l'authentification unique du serveur.
 
 ![App mobile : tableau, carte et tableau de bord](.github/assets/screenshots/mobile.png)
 
@@ -267,13 +267,13 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - Notifications sur Slack, Teams, Discord, Google Chat, webhooks, ntfy et Telegram.
 
 **Équipe**
-- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT, Microsoft Entra ou tout fournisseur OpenID Connect (Okta, Google, Keycloak…), spec approuvée par une autre personne que l'auteur de la carte, par autant d'approbateurs que sa criticité en demande, approbations prêtées pendant une absence ([guide d'exploitation](docs/server-operations.md)).
+- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT, Microsoft Entra ou tout fournisseur OpenID Connect (Okta, Google, Keycloak…), spec approuvée par une autre personne que l'auteur de la carte, par autant d'approbateurs que sa criticité en demande, approbations prêtées pendant une absence, un second groupe d'approbateurs prévenu quand un plan attend trop, et chaque action du journal rattachée à la connexion sous laquelle elle a été faite ([guide d'exploitation](docs/server-operations.md)).
 - **App mobile** pour iOS et Android, chat d'équipe, inscription sur invitation uniquement.
 
 **Coûts et suivi**
 - Budgets de coût appliqués pendant l'exécution : un budget du projet par période et un plafond par tâche, vérifiés avant chaque session d'agent sur tous les fournisseurs ; la tâche se met en pause à son plafond, peut passer à un modèle plus léger du même fournisseur, et une tâche qui dépense sans avancer est mise en pause elle aussi.
 - Coupe-circuit et arrêt d'urgence : un agent qui répète le même appel d'outil avec le même résultat est mis en pause sur tous les fournisseurs, et « Arrêter tous les agents » (bouton de la barre latérale, Ctrl+Maj+.) met en pause chaque tâche en cours, à reprendre depuis sa carte.
-- Gouvernance dans `workpilot.policy.yaml` : heures permises dans un fuseau explicite, fichiers interdits ou soumis à revue, budgets de jetons par heure et par tâche, limite du coupe-circuit, appliqués à chaque agent sur tous les fournisseurs et entre les vagues du Swarm ; un fichier invalide met chaque tâche en pause, et chaque décision (coupe-circuit compris) entre dans un journal d'audit, compté par jour et par semaine, exportable en CSV ou JSON depuis Réglages > Garde-fous.
+- Gouvernance dans `workpilot.policy.yaml` : heures permises dans un fuseau explicite, fichiers interdits ou soumis à revue, budgets de jetons par heure et par tâche, limite du coupe-circuit, appliqués à chaque agent sur tous les fournisseurs et entre les vagues du Swarm ; un fichier invalide met chaque tâche en pause, et chaque décision (coupe-circuit compris) entre dans un journal d'audit, compté par jour et par semaine, exportable en CSV ou JSON depuis Réglages > Garde-fous. Sur un serveur d'équipe, la même page (et l'app mobile) y lit la politique du projet, approuve un appel en attente au nom de votre compte et de ses rôles (`files.reviewers` peut en exiger un), et « Arrêter tous les agents » arrête aussi les runs que vous y avez lancés.
 - Smart Estimation qui apprend chaque dépôt : l'estimation d'une tâche est corrigée par ce qu'ont réellement consommé ses specs fusionnées (coût, tokens, itérations de QA, fichiers modifiés), affichée en fourchette avec sa confiance et un détail par dimension, avec votre propre ajustement et une remise à zéro ; tous les providers alimentent le même historique.
 - Tableau de bord analytique avec « Où vous en êtes » (un projet comparé à son passé et à vos autres projets de même pile, de même taille et de même équipe, par spec et par type de travail, avec les 10 % les meilleurs, une courbe par semaine et un rapport d'équipe en PDF, sans rien envoyer), estimateur de coûts, Formula Lab (estimation du coût et de la réussite par provider, modèle et effort), moniteur de limites de débit avec bascule de compte, profileur carbone avec un budget mensuel et un export ESG, traces OpenTelemetry GenAI pour chaque provider.
 

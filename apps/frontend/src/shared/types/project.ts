@@ -315,6 +315,8 @@ export interface ProjectEnvConfig {
 	githubEnabled: boolean;
 	githubToken?: string;
 	githubRepo?: string; // Format: owner/repo
+	/** A saved forge account (forge-accounts) whose token the project uses; "" = its own token. */
+	githubAccountId?: string;
 	githubAutoSync?: boolean; // Auto-sync issues on project load
 	githubAuthMethod?: "oauth" | "pat"; // How the token was obtained
 
@@ -322,6 +324,8 @@ export interface ProjectEnvConfig {
 	gitlabEnabled: boolean;
 	gitlabInstanceUrl?: string; // Default: https://gitlab.com, or self-hosted URL
 	gitlabToken?: string;
+	/** A saved GitLab account: its token and instance replace the project's. */
+	gitlabAccountId?: string;
 	gitlabProject?: string; // Format: group/project or numeric ID
 	gitlabAutoSync?: boolean; // Auto-sync issues on project load
 	gitlabAuthMethod?: "oauth" | "pat"; // How the token was obtained
@@ -337,6 +341,8 @@ export interface ProjectEnvConfig {
 	// Azure DevOps Integration
 	azureDevOpsEnabled: boolean;
 	azureDevOpsPat?: string; // Personal Access Token
+	/** A saved Azure DevOps account: its PAT and organization replace the project's. */
+	azureDevOpsAccountId?: string;
 	azureDevOpsOrgUrl?: string; // Organization URL (e.g., https://dev.azure.com/your-org)
 	azureDevOpsProject?: string; // Default project name
 	azureDevOpsRepository?: string; // Repository name

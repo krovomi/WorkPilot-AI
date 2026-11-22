@@ -325,7 +325,8 @@
 			"droppedSimple": "Dropped task \"{{title}}\".",
 			"cancelled": "Move cancelled.",
 			"columnPickedUp": "Picked up column {{column}}. Use arrow keys to reorder.",
-			"columnReordered": "Column {{column}} moved."
+			"columnReordered": "Column {{column}} moved.",
+			"cardFocus": "{{position}} of {{count}}, {{column}}"
 		},
 		"filter": {
 			"button": "Filter",
@@ -415,6 +416,31 @@
 			"member": "Member",
 			"owner": "Owner"
 		},
+		"bulk": {
+			"label": "Selected cards",
+			"saveFailed_one": "{{count}} card could not be changed",
+			"saveFailed_other": "{{count}} cards could not be changed"
+		},
+		"undoLabels": {
+			"type": "type change",
+			"priority": "priority change",
+			"move_one": "move of {{count}} card",
+			"move_other": "move of {{count}} cards",
+			"delete_one": "deletion of {{count}} card",
+			"delete_other": "deletion of {{count}} cards",
+			"rename": "rename"
+		},
+		"undone": "Undone: {{label}}",
+		"undoStale": "Could not fully undo ({{label}}): a card has changed since",
+		"undoNothing": "Nothing to undo",
+		"cardMenu": {
+			"label": "Card actions",
+			"open": "Open",
+			"edit": "Edit…",
+			"type": "Type",
+			"priority": "Priority",
+			"saveFailed": "The change could not be saved"
+		},
 		"quickAdd": {
 			"addCard": "Add a card",
 			"addQueued": "Add and queue",
@@ -437,6 +463,40 @@
 			"created_one": "Card created in {{column}}",
 			"created_other": "{{count}} cards created in {{column}}",
 			"createFailed": "The card could not be created. Your text is kept: try again."
+		},
+		"rename": {
+			"label": "Card title"
+		},
+		"shortcuts": {
+			"open": "Keyboard shortcuts",
+			"title": "Keyboard shortcuts",
+			"description": "Keys of the board. They wait while you type or while a menu or a dialog is open.",
+			"groups": {
+				"cards": "Cards",
+				"selection": "Selection",
+				"board": "Board"
+			},
+			"rows": {
+				"navigate": "Move between cards",
+				"open": "Open the card",
+				"rename": "Rename the card (or double-click its title)",
+				"menu": "Card menu (or right-click)",
+				"toggle": "Add or remove a card",
+				"range": "Select a range in a column",
+				"column": "Select the column",
+				"clear": "Clear the selection",
+				"delete": "Delete the selection",
+				"add": "New card in Planning",
+				"undo": "Undo the last change",
+				"help": "Show this list (or ?)"
+			},
+			"keys": {
+				"enter": "Enter",
+				"shift": "Shift",
+				"click": "Click",
+				"escape": "Esc",
+				"delete": "Delete"
+			}
 		}
 	},
 	"queue": {

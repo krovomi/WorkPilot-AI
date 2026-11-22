@@ -6,8 +6,14 @@ import { execFile, execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { promisify } from "node:util";
 import type { Project } from "../../../shared/types";
+import { isGitHubFullName } from "../../../shared/utils/git-remote-repo";
 import { getToolPath } from "../../cli-tool-manager";
 import { getAugmentedEnv } from "../../env-utils";
+import {
+	detectedGitHubRepo,
+	listGitRemotes,
+} from "../../forge/project-forge-binding";
+import { withForgeAccounts } from "../../forge/forge-credentials";
 import { getProjectEnvPath, readProjectEnvFile } from "../../project-env-file";
 import { isServerHandle, relayGitHubFetch, serverGitHubConfig } from "./server-relay";
 import type { GitHubConfig } from "./types";
@@ -63,7 +69,9 @@ export async function getGitHubTokenForSubprocess(): Promise<string | null> {
 
 /**
  * Get GitHub configuration from project environment file, the repository as
- * `owner/repo` whatever form it was saved in.
+ * `owner/repo` whatever form it was saved in. A project that names no
+ * repository uses the one of its own github.com remote (origin first), never
+ * another project's: `forge/project-forge-binding.ts`.
  * Falls back to gh CLI token if GITHUB_TOKEN not in .env.
  * A server project's calls go through the server (`server-relay.ts`).
  */
@@ -73,9 +81,12 @@ export function getGitHubConfig(project: Project): GitHubConfig | null {
 	if (!envPath || !existsSync(envPath)) return null;
 
 	// Neither reading the file nor asking gh throws: each answers "nothing".
-	const vars = readProjectEnvFile(envPath);
+	const vars = withForgeAccounts(readProjectEnvFile(envPath));
 	// Saved as typed: a clone URL becomes the `owner/repo` of every API path.
-	const repo = normalizeRepoReference(vars.GITHUB_REPO ?? "");
+	const repo =
+		normalizeRepoReference(vars.GITHUB_REPO ?? "") ||
+		detectedGitHubRepo(listGitRemotes(project.path)) ||
+		"";
 	// If no token in .env, try to get it from gh CLI (sync version for sync function)
 	const token = vars.GITHUB_TOKEN || getTokenFromGhCliSync();
 	if (!token || !repo) return null;
@@ -114,8 +125,7 @@ export function normalizeRepoReference(repo: string): string {
  * query).
  */
 export function isRepoFullName(value: string): boolean {
-	const match = /^[A-Za-z0-9-]+\/([A-Za-z0-9._-]+)$/.exec(value);
-	return match !== null && match[1] !== "." && match[1] !== "..";
+	return isGitHubFullName(value);
 }
 
 /**

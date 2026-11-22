@@ -48,6 +48,11 @@ import {
 	parseEnvFile,
 	unownedEnvLines,
 } from "./utils";
+import {
+	applyForgeAccountIds,
+	forgeAccountIdRefusal,
+	readForgeAccountIds,
+} from "../forge/forge-account-env";
 import { readSettingsFile } from "../settings-utils";
 import { backendFetch } from "./_backend-fetch";
 
@@ -318,6 +323,8 @@ export function registerEnvHandlers(
 				? "true"
 				: "false";
 		}
+		// The saved forge account each forge uses (forge/forge-account-env.ts)
+		applyForgeAccountIds(config, existingVars);
 		// GitHub Integration
 		if (config.githubEnabled !== undefined) {
 			existingVars.GITHUB_ENABLED = config.githubEnabled ? "true" : "false";
@@ -682,6 +689,7 @@ ${existingVars.LINEAR_REALTIME_SYNC ? `LINEAR_REALTIME_SYNC=${existingVars.LINEA
 ${existingVars.GITHUB_ENABLED ? `GITHUB_ENABLED=${existingVars.GITHUB_ENABLED}` : "# GITHUB_ENABLED=false"}
 ${existingVars.GITHUB_TOKEN ? `GITHUB_TOKEN=${existingVars.GITHUB_TOKEN}` : "# GITHUB_TOKEN="}
 ${existingVars.GITHUB_REPO ? `GITHUB_REPO=${existingVars.GITHUB_REPO}` : "# GITHUB_REPO=owner/repo"}
+${envLine(existingVars, "GITHUB_ACCOUNT_ID")}
 ${existingVars.GITHUB_AUTO_SYNC ? `GITHUB_AUTO_SYNC=${existingVars.GITHUB_AUTO_SYNC}` : "# GITHUB_AUTO_SYNC=false"}
 
 # =============================================================================
@@ -690,6 +698,7 @@ ${existingVars.GITHUB_AUTO_SYNC ? `GITHUB_AUTO_SYNC=${existingVars.GITHUB_AUTO_S
 ${existingVars[GITLAB_ENV_KEYS.ENABLED] ? `${GITLAB_ENV_KEYS.ENABLED}=${existingVars[GITLAB_ENV_KEYS.ENABLED]}` : `# ${GITLAB_ENV_KEYS.ENABLED}=true`}
 ${envLine(existingVars, GITLAB_ENV_KEYS.INSTANCE_URL, "https://gitlab.com")}
 ${envLine(existingVars, GITLAB_ENV_KEYS.TOKEN)}
+${envLine(existingVars, "GITLAB_ACCOUNT_ID")}
 ${envLine(existingVars, GITLAB_ENV_KEYS.PROJECT, "group/project")}
 ${envLine(existingVars, GITLAB_ENV_KEYS.AUTO_SYNC, "false")}
 
@@ -701,6 +710,7 @@ ${bitbucketEnvSection(existingVars)}
 ${existingVars[AZURE_DEVOPS_ENV_KEYS.ENABLED] ? `${AZURE_DEVOPS_ENV_KEYS.ENABLED}=${existingVars[AZURE_DEVOPS_ENV_KEYS.ENABLED]}` : `# ${AZURE_DEVOPS_ENV_KEYS.ENABLED}=true`}
 ${envLine(existingVars, AZURE_DEVOPS_ENV_KEYS.ORG_URL, "https://dev.azure.com/your-org")}
 ${envLine(existingVars, AZURE_DEVOPS_ENV_KEYS.PAT)}
+${envLine(existingVars, "AZURE_DEVOPS_ACCOUNT_ID")}
 ${existingVars[AZURE_DEVOPS_ENV_KEYS.ENABLED] === "true" ? `${AZURE_DEVOPS_ENV_KEYS.PROJECT}=${existingVars[AZURE_DEVOPS_ENV_KEYS.PROJECT] || ""}` : envLine(existingVars, AZURE_DEVOPS_ENV_KEYS.PROJECT, "MyProject")}
 ${existingVars[AZURE_DEVOPS_ENV_KEYS.ENABLED] === "true" ? `${AZURE_DEVOPS_ENV_KEYS.REPOSITORY}=${existingVars[AZURE_DEVOPS_ENV_KEYS.REPOSITORY] || ""}` : envLine(existingVars, AZURE_DEVOPS_ENV_KEYS.REPOSITORY, "MyRepository")}
 ${existingVars[AZURE_DEVOPS_ENV_KEYS.AUTO_SYNC] ? `${AZURE_DEVOPS_ENV_KEYS.AUTO_SYNC}=${existingVars[AZURE_DEVOPS_ENV_KEYS.AUTO_SYNC]}` : `# ${AZURE_DEVOPS_ENV_KEYS.AUTO_SYNC}=false`}
@@ -937,6 +947,8 @@ ${otherLines.join("\n")}
 				config.githubAutoSync = true;
 			}
 
+			readForgeAccountIds(vars, config);
+
 			// GitLab config
 			if (vars[GITLAB_ENV_KEYS.TOKEN]) {
 				config.gitlabToken = vars[GITLAB_ENV_KEYS.TOKEN];
@@ -1168,6 +1180,8 @@ ${otherLines.join("\n")}
 					error: `Line breaks are not allowed in project settings (${lineBreakAt})`,
 				};
 			}
+			const accountRefusal = forgeAccountIdRefusal(config);
+			if (accountRefusal) return { success: false, error: accountRefusal };
 
 			const project = projectStore.getProject(projectId);
 			if (!project) {

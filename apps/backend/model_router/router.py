@@ -99,6 +99,8 @@ ROUTABLE_PROVIDERS: tuple[str, ...] = (
     "mistral",
     "deepseek",
     "grok",
+    "openrouter",
+    "huggingface",
     "copilot",
     "windsurf",
     "cursor",

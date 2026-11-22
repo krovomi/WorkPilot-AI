@@ -51,6 +51,7 @@ import httpx
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from foundation.loopback_host import LoopbackHostOnly
+from gateway_providers import GATEWAYS, KEY_CHECK_URLS, gateway_env_config
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -433,6 +434,8 @@ def get_env_provider_config(name: str) -> dict | None:
         model_id = default_model.model_id if default_model else "grok-4.3"
         return {"api_key": os.getenv("GROK_API_KEY"), "model": model_id}
 
+    if name in GATEWAYS:  # OpenRouter, Hugging Face (gateway_providers.py)
+        return gateway_env_config(name, get_default(name))
     # Meta (LLaMA) — via Together AI or Replicate
     if name == "meta" and os.getenv("META_API_KEY"):
         default_model = get_default("meta")
@@ -958,18 +961,10 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
             set_validated(provider, api_key, False)
             return {"success": False, "error": _safe_error_message(e)}
 
-    # --- Mistral AI ---
-    if provider == "mistral":
+    # --- Mistral, DeepSeek, Meta (Together AI), Cursor: Bearer on /v1/models ---
+    if provider in ("mistral", "deepseek", "meta", "cursor"):
         try:
-            url = _authorized_base_url("mistral", base_url) + API_MODELS_ENDPOINT
-            return await _test_bearer(url, api_key, provider)
-        except ValueError as e:
-            return {"success": False, "error": _safe_error_message(e)}
-
-    # --- DeepSeek ---
-    if provider == "deepseek":
-        try:
-            url = _authorized_base_url("deepseek", base_url) + API_MODELS_ENDPOINT
+            url = _authorized_base_url(provider, base_url) + API_MODELS_ENDPOINT
             return await _test_bearer(url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -982,22 +977,8 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
 
-    # --- Meta (via Together AI / Replicate — OpenAI-compatible) ---
-    if provider == "meta":
-        try:
-            url = _authorized_base_url("meta", base_url) + API_MODELS_ENDPOINT
-            return await _test_bearer(url, api_key, provider)
-        except ValueError as e:
-            return {"success": False, "error": _safe_error_message(e)}
-
-    # --- Cursor ---
-    if provider == "cursor":
-        try:
-            url = _authorized_base_url("cursor", base_url) + API_MODELS_ENDPOINT
-            return await _test_bearer(url, api_key, provider)
-        except ValueError as e:
-            return {"success": False, "error": _safe_error_message(e)}
-
+    if provider in GATEWAYS:  # their /models answers any key: ask the account
+        return await _test_bearer(KEY_CHECK_URLS[provider], api_key, provider)
     # --- Windsurf (Codeium) ---
     if provider == "windsurf":
         oauth_token = payload.get("oauth_token") or payload.get("api_key")
@@ -1286,6 +1267,10 @@ _VALIDATION_SPECS: dict[str, dict[str, Any]] = {
         "url": "https://api.deepseek.com" + API_MODELS_ENDPOINT,
         "auth_style": "bearer",
         "ok_statuses": (200,),
+    },
+    **{
+        p: {"url": u, "auth_style": "bearer", "ok_statuses": (200,)}
+        for p, u in KEY_CHECK_URLS.items()
     },
 }
 
@@ -1668,26 +1653,6 @@ async def get_provider_usage(provider: str):
 _mount(providers_router, "providers")
 
 
-# --- Analytics API (prefer real DB implementation, fall back to minimal stub) ---
-try:
-    from analytics.database import init_database as _init_analytics_db
-
-    _init_analytics_db()
-    from analytics.api_simple import router as analytics_router
-
-    _mount(analytics_router, "analytics")
-except Exception as e:
-    logging.getLogger(__name__).warning(
-        "Could not load real analytics router (%s), falling back to minimal stub",
-        e,
-    )
-    try:
-        from analytics.api_minimal import router as analytics_router
-
-        _mount(analytics_router, "analytics")
-    except ImportError as e2:
-        logging.getLogger(__name__).warning("Could not import analytics router: %s", e2)
-
 # --- Mission Control API ---
 try:
     from mission_control.api import router as mission_control_router
@@ -1896,14 +1861,6 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import rtk router: {e}")
 
-# --- Watermarks API (is the generated-file cleaner working, and what it stripped) ---
-try:
-    from watermarks.api import router as watermarks_router
-
-    _mount(watermarks_router, "watermarks")
-except ImportError as e:
-    print(f"Warning: Could not import watermarks router: {e}")
-
 # --- Shared board and features (server mode: cards, roadmap..., by project_id) ---
 try:
     from shared_features import mount_all as mount_shared_project_routers
@@ -1962,14 +1919,6 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import github api router: {e}")
 
-# --- System Status API (extracted from this file) ---
-try:
-    from system_status.api import router as system_status_router
-
-    _mount(system_status_router, "system_status")
-except ImportError as e:
-    print(f"Warning: Could not import system_status router: {e}")
-
 # --- Dashboard + Sessions API (extracted from this file) ---
 try:
     from dashboard.api import router as dashboard_router
@@ -1977,14 +1926,6 @@ try:
     _mount(dashboard_router, "dashboard")
 except ImportError as e:
     print(f"Warning: Could not import dashboard router: {e}")
-
-# --- Agent feature endpoints (extracted from this file) ---
-try:
-    from agent_endpoints.api import router as agent_endpoints_router
-
-    _mount(agent_endpoints_router, "agent_endpoints")
-except ImportError as e:
-    print(f"Warning: Could not import agent_endpoints router: {e}")
 
 # --- Event-Driven Hooks System API (extracted from this file) ---
 try:

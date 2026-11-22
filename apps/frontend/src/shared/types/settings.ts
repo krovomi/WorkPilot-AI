@@ -320,7 +320,20 @@ export interface AppSettings {
 	globalAnthropicApiKey?: string;
 	globalGoogleApiKey?: string;
 	globalGroqApiKey?: string;
+	/** OpenRouter key (shared/constants/gateway-providers.ts). */
 	globalOpenRouterApiKey?: string;
+	/** Hugging Face token with "Make calls to Inference Providers". */
+	globalHuggingFaceApiKey?: string;
+	/** Default model of each gateway (an id of its catalogue, e.g. `org/model`). */
+	globalOpenRouterModel?: string;
+	globalHuggingFaceModel?: string;
+	/** Gateway routing (shared/constants/gateway-routing.ts). */
+	/** `""` is the gateway's own choice (a saved value that clears the option). */
+	openRouterSort?: "price" | "throughput" | "latency" | "";
+	openRouterFallbackModels?: string[];
+	openRouterDenyDataCollection?: boolean;
+	openRouterZeroRetention?: boolean;
+	huggingFaceRoutingPolicy?: "fastest" | "cheapest" | "";
 	globalMistralApiKey?: string;
 	globalDeepSeekApiKey?: string;
 	globalMetaLlamaApiKey?: string;

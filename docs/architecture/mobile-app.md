@@ -34,6 +34,7 @@ applications mobiles pour un projet.
 | Tableau de bord | `src/app/(app)/projects/[projectId]/dashboard.tsx` | `GET /api/features/workspace/dashboard` et `.../costs` |
 | Sessions | `src/app/(app)/projects/[projectId]/sessions.tsx` | `GET /api/features/workspace/sessions` (les 100 dernières) |
 | Analyses | `src/app/(app)/projects/[projectId]/analyses/` | `GET /api/features/analyses/<analyse>/report`, `POST .../jobs` pour la lancer, suivie comme un job |
+| Gouvernance | `src/app/(app)/projects/[projectId]/governance.tsx` | `GET /api/features/governance`, `POST .../approvals/{id}` pour approuver ou refuser un appel, `POST .../stop` pour l'arrêt d'urgence (voir « La gouvernance ») |
 | Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout`, `PUT /users/me/preferences` (le thème, `src/ui/ThemeSection.tsx`) |
 | Administration | `src/app/(app)/admin/` | `/admin/members`, `/auth/invitations`, `/admin/groups` (membres et projets), `/admin/roles` et `/admin/permissions` (`src/admin/api.ts`) |
 | Mes jetons sur le serveur | `src/app/(app)/tokens.tsx` | `GET`, `PUT /users/me/secrets`, `DELETE /users/me/secrets/{kind}` |
@@ -43,13 +44,22 @@ Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
 
 | Action | Au serveur |
 |---|---|
-| Démarrer | sans spec : phase `spec` ; avec : phase `build`, précédée de l'approbation si la carte demande une revue |
+| Démarrer | sans spec : phase `spec` ; avec : phase `build`, précédée de l'approbation si la carte demande une revue ; si le serveur répond que la carte attend d'autres approbateurs (`approved: false`), rien ne démarre et l'app dit combien d'approbations la carte a (`ApprovalWaiting`) |
 | Approuver la spec | `POST /api/board/cards/{id}/approve` |
 | Arrêter | annule le run en file ou en cours de la carte |
 | Demander des changements | `POST .../request-changes`, puis phase `build` |
 | Fusionner, créer la PR, relancer le build | phases `merge`, `pr`, `build` |
 | Supprimer | `DELETE /api/board/cards/{id}`, après confirmation |
 | Modifier le titre et la description | `PATCH /api/board/cards/{id}`, tant qu'aucune spec n'est écrite (le serveur refuse ensuite, 409) |
+
+L'écran d'une carte montre son approbation telle que le serveur la tient (`GET .../approvals`,
+`src/card/ApprovalSection.tsx`) : sa criticité, que règle une personne qui a `review.approve`
+(`PUT .../criticality`), le compte d'approbations sur le quorum, qui les a données (et pour qui) et
+les rôles qui manquent ; un serveur plus ancien sans cette route garde la ligne de la carte. La page
+« Approbations prêtées » du tableau (`review.approve`, `src/app/(app)/projects/[projectId]/delegations.tsx`)
+liste les délégations du projet, en termine une et prête la sienne à un autre membre du projet qui
+écrit, pour 1 à 90 jours ; le serveur revérifie le collègue, la période et qui peut terminer
+(voir [spec-approval-sso.md](spec-approval-sso.md#prêter-son-approbation-lot-3)).
 
 L'écran d'une carte montre aussi avec quoi elle tourne (moteur, priorité, objectif, `src/card/SettingsSection.tsx`), en lecture seule : l'app de bureau les règle.
 
@@ -211,6 +221,15 @@ id_token et le remet au serveur, qui en vérifie la signature, l'audience et l'�
 (`src/auth/entra.ts`). L'enregistrement Entra doit déclarer cette URI de redirection pour une
 plateforme « Applications mobiles et de bureau » (voir [CONFIGURATION.md](../CONFIGURATION.md)).
 
+« Se connecter par authentification unique » mène le même flux avec le fournisseur OpenID Connect
+du serveur (`src/auth/sso.ts`) : `/auth/config` donne ses adresses, que le serveur a lues dans le
+document de découverte du fournisseur, et l'`id_token` part à `POST /auth/sso/exchange`. Cette
+réponse vient du réseau : l'app revérifie chaque adresse (https, ou http sur la boucle locale, sans
+identifiants ni fragment), l'identifiant du client et les scopes (`openid` compris) avant d'ouvrir
+le navigateur, comme le main du bureau. Le client du fournisseur doit déclarer `workpilot://auth`.
+Les deux fournisseurs partagent `src/auth/code-flow.ts` : PKCE, le `state` que vérifie
+`expo-auth-session`, et un `nonce` que l'`id_token` doit porter avant d'être envoyé.
+
 ## Administration
 
 Les Réglages ouvrent l'administration de l'organisation où la personne agit, comme la vue du bureau :
@@ -235,6 +254,18 @@ relancent comme un job. Tout cela demande `analytics.read` ; lancer une analyse 
 l'affiche pas tel quel mais en tire des chiffres et des listes bornés (`src/insights/digest.ts`),
 et ignore ce qu'elle ne reconnaît pas.
 
+## La gouvernance
+
+La page Gouvernance d'un projet (lien du Kanban avec `audit.read`) montre ce que le serveur lit
+dans le `workpilot.policy.yaml` de son clone : heures, fichiers interdits, fichiers soumis à revue
+et qui les approuve (les rôles de `files.reviewers`, ou tout membre), budget de jetons, limite du
+coupe-circuit, erreurs d'une politique refusée ; puis les appels qu'attendent ses agents, avec
+Approuver et Refuser, les agents en cours, avec « Arrêter mes agents » et, pour le propriétaire,
+« Arrêter tous les agents du projet » après confirmation, et les vingt dernières décisions avec qui
+les a approuvées. Chaque bouton suit le `may` de la réponse ; le serveur revérifie, et quand il
+refuse une approbation faute de rôle, la page nomme les rôles demandés. L'export du journal reste
+sur le bureau. Conception : [governance-policy.md](governance-policy.md#un-projet-du-mode-serveur-shared_featuresgovernancepy).
+
 ## Les notifications push
 
 Quand un run se termine (réussi ou en échec), la personne qui l'a lancé reçoit une notification sur
@@ -254,7 +285,7 @@ n'est pas encore validé, lu dans `review_state.json` comme le fait le build) n'
 terminé » mais « Plan prêt à valider », avec la catégorie `plan_review`. « Valider et construire »
 ouvre l'app (sur iOS, l'appareil doit d'abord être déverrouillé : `isAuthenticationRequired`), demande
 le verrouillage de l'app, puis appelle les routes du bouton Démarrer : `POST …/approve`, puis un run
-`build`. Le serveur revérifie les droits sur les deux ; un refus s'affiche et la carte s'ouvre. Il
+`build`, seulement si l'approbation suffit. Le serveur revérifie les droits sur les deux ; un refus s'affiche et la carte s'ouvre. Il
 n'y a pas de bouton « Arrêter » : le serveur ne notifie que la fin d'un run, il n'y a alors rien à
 arrêter.
 

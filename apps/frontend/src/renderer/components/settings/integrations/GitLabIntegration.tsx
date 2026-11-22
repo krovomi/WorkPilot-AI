@@ -27,6 +27,8 @@ import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Separator } from "../../ui/separator";
 import { Switch } from "../../ui/switch";
+import { ForgeAccountPicker } from "./ForgeAccountPicker";
+import { ForgeBindingNotice } from "./ForgeBindingNotice";
 
 // Debug logging — disabled (kept as a no-op so call sites stay valid).
 function debugLog(_message: string, _data?: unknown) {
@@ -48,6 +50,8 @@ interface GitLabIntegrationProps {
 	gitLabConnectionStatus: GitLabSyncStatus | null;
 	isCheckingGitLab: boolean;
 	projectPath?: string;
+	/** The project these settings belong to: its remotes are checked against the GitLab project. */
+	projectId?: string;
 	// Project settings for mainBranch (used by kanban tasks and terminal worktrees)
 	settings?: ProjectSettings;
 	setSettings?: React.Dispatch<React.SetStateAction<ProjectSettings>>;
@@ -66,10 +70,13 @@ export function GitLabIntegration({
 	gitLabConnectionStatus,
 	isCheckingGitLab,
 	projectPath,
+	projectId,
 	settings,
 	setSettings,
 }: GitLabIntegrationProps) {
 	const { t } = useTranslation("gitlab");
+	// A saved account lends its token and instance: those fields are not this project's.
+	const usesAccount = Boolean(envConfig?.gitlabAccountId);
 	const [authMode, setAuthMode] = useState<
 		"manual" | "oauth" | "oauth-success"
 	>("manual");
@@ -384,14 +391,26 @@ export function GitLabIntegration({
 
 			{envConfig.gitlabEnabled && (
 				<>
-					{/* Instance URL */}
-					<InstanceUrlInput
-						value={envConfig.gitlabInstanceUrl || "https://gitlab.com"}
-						onChange={(value) => updateEnvConfig({ gitlabInstanceUrl: value })}
+					{/* A saved account of the app, or this project's own token */}
+					<ForgeAccountPicker
+						forge="gitlab"
+						value={envConfig.gitlabAccountId}
+						onChange={(accountId) => updateEnvConfig({ gitlabAccountId: accountId })}
 					/>
+					{usesAccount ? (
+						<ProjectInput
+							value={envConfig.gitlabProject || ""}
+							onChange={(value) => updateEnvConfig({ gitlabProject: value })}
+						/>
+					) : (
+						<InstanceUrlInput
+							value={envConfig.gitlabInstanceUrl || "https://gitlab.com"}
+							onChange={(value) => updateEnvConfig({ gitlabInstanceUrl: value })}
+						/>
+					)}
 
 					{/* OAuth Success State */}
-					{authMode === "oauth-success" && (
+					{!usesAccount && authMode === "oauth-success" && (
 						<div className="space-y-4">
 							<div className="rounded-lg border border-success/30 bg-success/10 p-4">
 								<div className="flex items-center justify-between">
@@ -434,7 +453,7 @@ export function GitLabIntegration({
 					)}
 
 					{/* OAuth Flow */}
-					{authMode === "oauth" && (
+					{!usesAccount && authMode === "oauth" && (
 						<div className="space-y-4">
 							<div className="flex items-center justify-between">
 								<Label className="text-sm font-medium text-foreground">
@@ -465,7 +484,7 @@ export function GitLabIntegration({
 					)}
 
 					{/* Manual Token Entry */}
-					{authMode === "manual" && (
+					{!usesAccount && authMode === "manual" && (
 						<>
 							{/* glab CLI Required Card */}
 							{glabInstalled === false && (
@@ -604,7 +623,18 @@ export function GitLabIntegration({
 						</>
 					)}
 
-					{envConfig.gitlabToken && envConfig.gitlabProject && (
+					<ForgeBindingNotice
+						projectId={projectId}
+						forge="gitlab"
+						current={{
+							gitlabProject: envConfig.gitlabProject ?? "",
+							gitlabInstanceUrl: envConfig.gitlabInstanceUrl ?? "",
+							gitlabAccountId: envConfig.gitlabAccountId ?? "",
+						}}
+						onApply={updateEnvConfig}
+					/>
+
+					{(envConfig.gitlabToken || usesAccount) && envConfig.gitlabProject && (
 						<ConnectionStatus
 							isChecking={isCheckingGitLab}
 							connectionStatus={gitLabConnectionStatus}

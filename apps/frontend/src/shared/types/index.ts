@@ -62,3 +62,4 @@ export * from "./workspace";
 export * from "./cost-budget";
 export * from "./agent-safety";
 export * from "./governance";
+export * from "./forge-binding";

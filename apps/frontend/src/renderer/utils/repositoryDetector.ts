@@ -129,9 +129,19 @@ export async function autoDetectAndUpdateProject(project: Project): Promise<{
 			updates.githubEnabled = true;
 			updates.azureDevOpsEnabled = false;
 			updates.jiraEnabled = false;
+		} else if (detection.provider === "gitlab") {
+			updates.githubEnabled = false;
+			updates.gitlabEnabled = true;
+			updates.azureDevOpsEnabled = false;
+			updates.jiraEnabled = false;
 		} else if (detection.provider === "azure_devops") {
 			updates.githubEnabled = false;
 			updates.azureDevOpsEnabled = true;
+			updates.jiraEnabled = false;
+		} else if (detection.provider === "bitbucket") {
+			updates.githubEnabled = false;
+			updates.azureDevOpsEnabled = false;
+			updates.bitbucketEnabled = true;
 			updates.jiraEnabled = false;
 		}
 

@@ -6,6 +6,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import CurrentUser
+from server.authz.delegation import end_delegations_of
 from server.authz.deps import require_org, require_permission, require_platform_admin
 from server.authz.roles import DEFAULT_ORG_ROLE, ORG_SCOPE
 from server.db.engine import get_db
@@ -345,12 +346,13 @@ async def remove_member(
             ),
         )
     )
+    ended = await end_delegations_of(db, user_id=member_user_id, org_id=org_id)
     await record(
         db,
         action="org.member.removed",
         actor_id=actor.id,
         org_id=org_id,
-        payload={"user_id": member_user_id},
+        payload={"user_id": member_user_id, "delegations_ended": ended},
         request=request,
     )
     await db.commit()

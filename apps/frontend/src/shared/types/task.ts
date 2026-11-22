@@ -36,6 +36,10 @@ export interface StopAllResult {
 	stoppedProcesses: number;
 	/** Tasks whose pause could not be written: stopped all the same. */
 	failedTasks: string[];
+	/** Runs and jobs of server projects, started by this person, stopped there. */
+	serverAgents?: number;
+	/** Server projects that could not be asked to stop (offline, refused). */
+	serverFailed?: number;
 }
 
 /** The voice assistant's spoken « stop » (`AGENTS_STOP_AFTER_STEP`). */

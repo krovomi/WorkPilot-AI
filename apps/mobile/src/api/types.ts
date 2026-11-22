@@ -26,6 +26,13 @@ export interface AuthConfig {
 	entra_enabled: boolean;
 	entra_tenant_id?: string | null;
 	entra_client_id?: string | null;
+	/** The server's OpenID Connect provider (`auth/sso.ts` checks every field again). */
+	sso_enabled?: boolean;
+	sso_name?: string;
+	sso_client_id?: unknown;
+	sso_scopes?: unknown;
+	sso_authorization_endpoint?: unknown;
+	sso_token_endpoint?: unknown;
 }
 
 export interface Organization {
@@ -101,6 +108,48 @@ export interface CardDetails extends Omit<BoardCard, "specId" | "claimedBy" | "c
 	requireReview: boolean;
 	/** Engine, priority, category and goal (`shared_board/settings.py`); absent on an older server. */
 	settings?: CardSettings;
+}
+
+export type Criticality = "low" | "medium" | "high";
+export const CRITICALITIES: readonly Criticality[] = ["low", "medium", "high"];
+
+/** `GET /api/board/cards/{id}/approvals`: where a card's approval stands (`shared_board/approvals.py`). */
+export interface CardApproval {
+	criticality: Criticality;
+	criticalitySource: "set" | "assessed" | "default";
+	needed: number;
+	count: number;
+	roles: string[];
+	missingRoles: string[];
+	approvals: { by: string; for: string | null; at: string; roles: string[] }[];
+	complete: boolean;
+	/** The build may start. */
+	approved: boolean;
+}
+
+/** `POST /api/board/cards/{id}/approve`: the build may start only once `approved`. */
+export interface ApproveResult {
+	approved: boolean;
+	approvedBy: string | null;
+	approval?: Pick<CardApproval, "count" | "needed">;
+}
+
+/** An approval lent on a project (`/api/board/delegations`). */
+export interface Delegation {
+	id: string;
+	from: { id: string; name: string };
+	to: { id: string; name: string };
+	startsAt: string;
+	endsAt: string;
+	active: boolean;
+}
+
+/** `GET /projects/{id}/members`. */
+export interface ProjectMember {
+	user_id: string;
+	email: string;
+	display_name: string;
+	role: string;
 }
 
 export interface CardSettings {
@@ -190,4 +239,58 @@ export interface TaskLogs {
 export interface UiPreferences {
 	theme: ThemeMode | null;
 	colorTheme: ColorThemeId | null;
+}
+
+/** A decision of the policy audit trail (`security/policy_audit.py`). */
+export type PolicyDecision =
+	| "deny"
+	| "review"
+	| "approved"
+	| "warn"
+	| "outside_hours"
+	| "budget_exceeded"
+	| "invalid_policy"
+	| "tool_loop";
+
+export interface PolicyEvent {
+	id?: string;
+	at?: string;
+	task?: string | null;
+	tool?: string | null;
+	target?: string | null;
+	decision: PolicyDecision;
+	rules?: string[];
+	/** Who approved the call: a name, the server's id and roles, for an `approved` decision. */
+	approvedBy?: string | null;
+}
+
+/** A call an agent waits on until someone approves or refuses it. */
+export interface GovernanceRequest {
+	id: string;
+	at?: string;
+	rules?: string[];
+	tool?: string | null;
+	target?: { kind?: string | null; summary?: string | null };
+	task?: string | null;
+}
+
+/**
+ * `GET /api/features/governance` (`shared_features/governance.py`): what the
+ * project's `workpilot.policy.yaml` says, read by the server from its clone,
+ * the calls its agents wait on, its agents, and what this person may do.
+ */
+export interface GovernanceReport {
+	governance: {
+		schedule: { timezone: string; allowedHours: string[]; days: string[]; openNow: boolean } | null;
+		files: { forbidden: string[]; requiresReview: string[]; reviewers?: string[] };
+		budget: { maxTokensPerHour?: number | null; maxTokensPerTask?: number | null } | null;
+		loopDetection?: { maxSameToolCall: number } | null;
+	} | null;
+	errors?: string[];
+	tokensLastHour?: number;
+	events?: PolicyEvent[];
+	metrics?: { blocked24h?: number; breakerTrips7d?: number };
+	pending?: GovernanceRequest[];
+	agents: { mine: number; project: number };
+	may: { approve: boolean; stop: boolean; stopProject: boolean; export: boolean };
 }

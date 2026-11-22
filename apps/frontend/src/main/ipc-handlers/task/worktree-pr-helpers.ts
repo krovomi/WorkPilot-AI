@@ -15,7 +15,7 @@ import type {
 import { getAppLanguage } from "../../app-language";
 import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
-import { readProjectEnv } from "../../project-env-file";
+import { readProjectForgeEnv } from "../../forge/forge-credentials";
 import { parsePythonCommand } from "../../python-detector";
 import {
 	getConfiguredPythonPath,
@@ -50,7 +50,7 @@ import { GIT_BRANCH_REGEX } from "./worktree-git-refs";
 export function loadProjectEnvForSubprocess(
 	project: { path: string; autoBuildPath?: string | null },
 ): Record<string, string> {
-	return readProjectEnv(project);
+	return readProjectForgeEnv(project);
 }
 
 // Maximum PR title length (GitHub's limit is 256 characters)

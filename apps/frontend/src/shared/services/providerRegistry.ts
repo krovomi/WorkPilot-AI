@@ -7,6 +7,7 @@ import { PROVIDER_MODELS_MAP } from "../constants/models";
 import type { AgentCliTool } from "../types/agent-cli";
 import type { APIProfile } from "../types/profile";
 import { detectProvider } from "../utils/provider-detection";
+import { GATEWAY_PROVIDERS } from "../constants/gateway-providers";
 
 export interface Provider {
 	name: string;
@@ -244,6 +245,20 @@ class ProviderRegistry {
 			requiresCLI: false,
 			models: PROVIDER_MODELS_MAP.deepseek || [],
 		});
+
+		// --- Gateways: OpenRouter, Hugging Face (gateway-providers.ts) ---
+		for (const gateway of GATEWAY_PROVIDERS) {
+			this.providers.set(gateway.id, {
+				name: gateway.id,
+				label: gateway.label,
+				description: `${gateway.label}: many vendors' models through one key`,
+				category: "special",
+				requiresApiKey: true,
+				requiresOAuth: false,
+				requiresCLI: false,
+				models: PROVIDER_MODELS_MAP[gateway.id] || [],
+			});
+		}
 
 		// --- AWS Bedrock ---
 		this.providers.set("aws", {
@@ -517,6 +532,8 @@ class ProviderRegistry {
 		if (nameLower.includes("bedrock")) return "aws";
 		if (nameLower.includes("ollama")) return "ollama";
 		if (nameLower.includes("grok")) return "grok";
+		if (nameLower.includes("openrouter")) return "openrouter";
+		if (nameLower.includes("hugging")) return "huggingface";
 		if (nameLower.includes("windsurf")) return "windsurf";
 
 		return "custom";

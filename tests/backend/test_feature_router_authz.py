@@ -121,11 +121,7 @@ class TestEveryRouterIsGuarded:
         assert not missing, f"undeclared permissions: {sorted(set(missing))}"
 
     def test_router_variable_names_are_not_reused_for_different_features(self):
-        """Two features sharing a variable means one of them is mounted wrong.
-
-        ``analytics_router`` is the deliberate exception: provider_api mounts a
-        real implementation and falls back to a minimal stub under the same name.
-        """
+        """Two features sharing a variable means one of them is mounted wrong."""
         by_var: dict[str, set[str]] = {}
         for var, feature in _mount_calls():
             by_var.setdefault(var, set()).add(feature)

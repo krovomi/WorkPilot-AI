@@ -238,7 +238,16 @@
 					"unverified": "● Tool-calling à vérifier",
 					"unverifiedDetail": "— non confirmé d'après le nom ; ouvrez la carte du modèle. Les tailles « ~Go » sont estimées (quant 4-bit)."
 				},
-				"estimatedSize": " · ~{{size}} Go"
+				"estimatedSize": " · ~{{size}} Go",
+				"cloudBadge": "Cloud",
+				"cloudBadgeTitle": "Servi par le routeur Hugging Face, avec appel d’outils",
+				"cloudPrice": "{{price}} par M de jetons",
+				"tryInCloud": "Essayer dans le cloud",
+				"tryInCloudTooltip": "Faire de {{id}} le modèle cloud de Hugging Face, sans rien télécharger",
+				"cloudDefault": "Modèle cloud",
+				"cloudChosen": "{{id}} est maintenant le modèle cloud de Hugging Face. Choisissez le moteur Hugging Face sur une tâche pour l’essayer, sans rien télécharger.",
+				"cloudNeedsToken": "Ajoutez d’abord un jeton Hugging Face dans la page du provider Hugging Face.",
+				"cloudSaveFailed": "Le modèle cloud n’a pas pu être enregistré."
 			},
 			"providers": {
 				"anthropic": "Modèles Anthropic Claude",
@@ -248,6 +257,8 @@
 				"deepseek": "Modèles DeepSeek (DeepSeek-Coder, etc.)",
 				"google": "Accès API Google et Google DeepMind",
 				"grok": "Modèles Grok xAI",
+				"openrouter": "Des centaines de modèles de nombreux éditeurs (Kimi, GLM, DeepSeek, Claude, GPT…) avec une seule clé OpenRouter",
+				"huggingface": "Les modèles ouverts du Hub Hugging Face via Inference Providers, facturés sur votre compte Hugging Face",
 				"loadError": "Échec du chargement de la liste des fournisseurs",
 				"meta": "Modèles officiels Meta AI",
 				"mistral": "Modèles Mistral AI (Mistral, Codéal, etc.)",
@@ -259,7 +270,50 @@
 				"pi": "Agent de code minimaliste, piloté via le CLI pi",
 				"gemini-cli": "Gemini CLI, l'agent open source de Google, piloté via le protocole ACP"
 			},
-			"title": "Comptes"
+			"title": "Comptes",
+			"gatewayCatalog": {
+				"title": "Modèles de {{name}}",
+				"description": "La liste en direct des modèles que {{name}} sert avec appel d’outils, avec leur prix. Cliquez sur l’un d’eux pour en faire le modèle par défaut.",
+				"searchPlaceholder": "Filtrer les modèles…",
+				"empty": "Aucun modèle ne correspond.",
+				"more": "Encore {{count}} : affinez le filtre.",
+				"price": "{{price}} par M de jetons",
+				"context": "contexte de {{size}}",
+				"providers_one": "{{count}} fournisseur",
+				"providers_other": "{{count}} fournisseurs",
+				"default": "Par défaut",
+				"setDefault": "Faire de {{id}} le modèle par défaut",
+				"offline": "Liste hors ligne : {{name}} n’a pas pu être joint.",
+				"loading": "Chargement des modèles…"
+			},
+			"gatewayRouting": {
+				"title": "Routage",
+				"description": {
+					"openrouter": "Comment OpenRouter choisit le fournisseur qui répond, et ce que ce fournisseur peut faire de vos prompts.",
+					"huggingface": "Comment le routeur Hugging Face choisit le fournisseur d’inférence qui répond."
+				},
+				"sort": "Ordre des fournisseurs",
+				"sortDefault": "Choix d’OpenRouter (répartition de charge)",
+				"sorts": {
+					"price": "Le moins cher d’abord",
+					"throughput": "Le débit le plus rapide d’abord",
+					"latency": "La latence la plus basse d’abord"
+				},
+				"denyDataCollection": "Seulement les fournisseurs qui ne conservent pas les prompts et n’entraînent pas dessus",
+				"zeroRetention": "Seulement les fournisseurs sans conservation des données",
+				"fallbacks": "Modèles de secours",
+				"fallbacksHint": "Essayés dans l’ordre quand le modèle par défaut est indisponible, limité ou refuse la requête. {{count}} au plus.",
+				"fallbackAria": "Modèle de secours {{index}}",
+				"fallbackPlaceholder": "éditeur/modèle",
+				"invalidModel": "Pas un identifiant de modèle : {{id}}",
+				"policy": "Politique du routeur",
+				"policyDefault": "Par défaut de Hugging Face",
+				"policies": {
+					"fastest": "Le fournisseur le plus rapide",
+					"cheapest": "Le fournisseur le moins cher"
+				},
+				"saveFailed": "Le routage n’a pas pu être enregistré."
+			}
 		},
 		"agent": {
 			"description": "Modèle par défaut et framework",
@@ -678,7 +732,9 @@
 		"phaseConfiguration": "Configuration des Phases",
 		"phaseConfigurationDescription": "Configurez les modèles et les niveaux de réflexion pour chaque phase du pipeline de développement",
 		"presets": {
-			"auto": { "name": "Auto (Optimisé)" },
+			"auto": {
+				"name": "Auto (Optimisé)"
+			},
 			"complex": {
 				"name": "Tâches complexes",
 				"description": "Pour les implémentations délicates en plusieurs étapes, qui demandent une analyse approfondie"
@@ -1466,7 +1522,8 @@
 		"events": {
 			"plan_review": "Un plan attend son approbation",
 			"review_ready": "Un travail est prêt pour ma revue",
-			"failed": "Un run s'est arrêté sur une erreur"
+			"failed": "Un run s'est arrêté sur une erreur",
+			"approval_escalated": "Un plan a trop attendu ses approbateurs"
 		},
 		"language": "Langue des messages",
 		"enabled": "{{channel}} activé",
@@ -3096,6 +3153,29 @@
 		"exported_one": "{{count}} décision exportée dans {{path}}",
 		"exported_other": "{{count}} décisions exportées dans {{path}}",
 		"exportFailed": "L'export a échoué : {{error}}",
+		"approvedBy": "approuvé par {{name}}",
+		"localApprover": "Sur cet ordinateur, une approbation est donnée en votre nom, sans identité vérifiée. Sur un serveur, le compte qui approuve et ses rôles sont enregistrés.",
+		"serverApprover": "Tout membre du projet qui peut approuver répond, sous son compte du serveur.",
+		"serverReviewers": "Approuvé par un membre qui a l'un de ces rôles : {{roles}}. Quiconque peut approuver peut refuser.",
+		"serverTitle": "Gouvernance du projet du serveur",
+		"serverHint": "Les agents de ce projet tournent sur le serveur : son workpilot.policy.yaml, son journal d'audit, les appels qu'attendent ses agents et son arrêt d'urgence sont lus et exécutés là-bas. Le serveur revérifie vos droits à chaque action.",
+		"agentsLine": "Agents en cours sur le serveur : {{mine}} à vous, {{project}} en tout",
+		"stopMine": "Arrêter mes agents",
+		"stopProject": "Arrêter tous les agents du projet",
+		"stopProjectConfirm_one": "Confirmer : arrêter {{count}} agent, quel que soit qui l'a lancé",
+		"stopProjectConfirm_other": "Confirmer : arrêter {{count}} agents, quel que soit qui les a lancés",
+		"stopped_one": "{{count}} agent arrêté. Sa carte peut être relancée.",
+		"stopped_other": "{{count}} agents arrêtés. Leurs cartes peuvent être relancées.",
+		"stopFailed": "Les agents n'ont pas pu être arrêtés : {{error}}",
+		"pendingTitle_one": "{{count}} appel attend une approbation",
+		"pendingTitle_other": "{{count}} appels attendent une approbation",
+		"approve": "Approuver",
+		"refuse": "Refuser",
+		"answered": {
+			"approved": "Approuvé en votre nom : le prochain appel identique de l'agent passe, une fois.",
+			"refused": "Refusé : l'agent reste refusé sur cet appel."
+		},
+		"answerFailed": "La réponse n'a pas été enregistrée : {{error}}",
 		"decisions": {
 			"deny": "Refusé",
 			"review": "Revue",
@@ -3105,6 +3185,51 @@
 			"budget_exceeded": "Budget atteint",
 			"invalid_policy": "Politique invalide",
 			"tool_loop": "Coupe-circuit"
+		}
+	},
+	"forgeBinding": {
+		"mismatchTitle": "Ce projet pointe sur {{saved}}, qui n'est aucun de ses remotes",
+		"mismatchDescription": "Ce dépôt vient peut-être d'un autre projet. Utiliser le dépôt du remote de ce projet :",
+		"mismatchNoRemote": "Aucun remote de ce projet n'est sur cette forge : ce dépôt appartient sans doute à un autre projet. Vérifiez-le, ou désactivez cette intégration pour ce projet.",
+		"useRemote": "Utiliser {{repo}}",
+		"detected": "Aucun dépôt enregistré : ce projet utilise celui de son remote git, {{repo}}.",
+		"saveDetected": "L'enregistrer dans les réglages"
+	},
+	"forgeAccounts": {
+		"navLabel": "Comptes des forges",
+		"title": "Comptes des forges",
+		"description": "Enregistrez une fois vos comptes GitHub, GitLab, Azure DevOps et Bitbucket (travail, perso, un client…). Chaque projet choisit ensuite celui qu'il utilise dans ses propres réglages. Les jetons restent chiffrés sur cet ordinateur et ne sont plus jamais affichés.",
+		"empty": "Aucun compte de forge enregistré.",
+		"add": "Ajouter un compte",
+		"forge": "Forge",
+		"label": "Nom",
+		"labelPlaceholder": "Travail, Perso, Client X…",
+		"gitlabHost": "Instance GitLab",
+		"azureHost": "Organisation Azure DevOps",
+		"bitbucketUsername": "Nom d'utilisateur ou e-mail (facultatif)",
+		"bitbucketUsernameHint": "Avec un jeton d'API ou un mot de passe d'application, le nom d'utilisateur ou l'e-mail Atlassian qui se connecte. Laisser vide pour un jeton d'accès d'espace de travail ou de dépôt.",
+		"token": "Jeton",
+		"tokenPlaceholder": "Jeton d'accès personnel",
+		"tokenKeep": "Laisser vide pour garder le jeton enregistré",
+		"save": "Enregistrer",
+		"cancel": "Annuler",
+		"tokenSet": "Jeton enregistré",
+		"noToken": "Aucun jeton",
+		"test": "Tester",
+		"testOk": "Connecté en tant que {{username}}",
+		"testFailed": "Échec de la connexion : {{error}}",
+		"edit": "Modifier {{label}}",
+		"delete": "Supprimer {{label}}",
+		"deleteTitle": "Supprimer le compte {{label}} ?",
+		"deleteDescription": "Les projets qui l'utilisent n'auront plus de jeton pour cette forge tant que vous n'aurez pas choisi un autre compte ou saisi un jeton propre au projet.",
+		"picker": {
+			"label": "Compte",
+			"ownToken": "Le jeton propre à ce projet",
+			"withUsername": "{{label}} ({{username}})",
+			"missing": "Compte supprimé",
+			"hint": "Un compte enregistré apporte son jeton et son adresse. Gérez les comptes dans Réglages, Comptes des forges.",
+			"noneHint": "Pour utiliser le même compte dans plusieurs projets, enregistrez-le une fois dans Réglages, Comptes des forges.",
+			"missingHint": "Le compte qu'utilisait ce projet a été supprimé : choisissez-en un autre ou saisissez un jeton pour ce projet."
 		}
 	}
 }

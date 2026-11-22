@@ -17,7 +17,10 @@
 		"nothing_to_stop": "Plus rien ne tournait sur cette carte. Tire pour actualiser.",
 		"entra_disabled": "Ce serveur ne propose pas la connexion Microsoft.",
 		"entra_failed": "La connexion Microsoft n'a pas abouti.",
-		"entra_misconfigured": "Les réglages de connexion Microsoft du serveur sont invalides."
+		"entra_misconfigured": "Les réglages de connexion Microsoft du serveur sont invalides.",
+		"approval_waiting": "Votre approbation est enregistrée : {{given}} sur {{needed}}. Le build démarre quand la carte a toutes les approbations qu'il lui faut.",
+		"sso_disabled": "Ce serveur ne propose pas l'authentification unique.",
+		"sso_failed": "L'authentification unique n'a pas abouti."
 	},
 	"signIn": {
 		"title": "WorkPilot AI",
@@ -29,13 +32,15 @@
 		"submit": "Se connecter",
 		"invalidUrl": "Cette adresse de serveur n'est pas valide.",
 		"insecureUrl": "Utilisez une adresse https://. Le http simple n'est permis que sur votre réseau local.",
-		"localDisabled": "Ce serveur n'accepte que la connexion Microsoft : utilisez Se connecter avec Microsoft.",
+		"localDisabled": "Ce serveur n'accepte pas les mots de passe : connectez-vous avec Microsoft ou par authentification unique.",
 		"failed": "Connexion impossible : {{message}}",
 		"badCredentials": "E-mail ou mot de passe incorrect.",
 		"or": "ou",
 		"microsoft": "Se connecter avec Microsoft",
 		"entraDisabled": "Ce serveur ne propose pas la connexion Microsoft.",
-		"entraRefused": "Le serveur a refusé ce compte Microsoft."
+		"entraRefused": "Le serveur a refusé ce compte Microsoft.",
+		"sso": "Se connecter par authentification unique (SSO)",
+		"ssoRefused": "Le serveur a refusé ce compte."
 	},
 	"unreachable": {
 		"title": "Serveur injoignable",
@@ -235,7 +240,8 @@
 		"jobFailed": "La dernière exécution a échoué. {{error}}",
 		"toCard": "En faire une carte",
 		"openCard": "Ouvrir sa carte",
-		"context": "Contexte"
+		"context": "Contexte",
+		"governance": "Gouvernance"
 	},
 	"roadmap": {
 		"empty": "Pas encore de roadmap. Générez-en une : un agent étudie le projet et propose des phases et des fonctionnalités.",
@@ -340,6 +346,61 @@
 		"tokens": "Tokens",
 		"allTime": "Depuis le début",
 		"noSessions": "Pas encore de session."
+	},
+	"governance": {
+		"intro": "Ce que le workpilot.policy.yaml du projet demande à ses agents sur le serveur. Le serveur revérifie chaque action.",
+		"policy": "Politique",
+		"none": "workpilot.policy.yaml ne fixe ni heures, ni fichiers, ni budget de jetons.",
+		"invalid": "workpilot.policy.yaml est refusé : tant qu'il n'est pas corrigé, aucun agent n'écrit de fichier ni ne lance de commande.",
+		"schedule": "Horaires",
+		"scheduleLine": "{{hours}} ({{timezone}}), {{days}}",
+		"openNow": "Ouvert maintenant",
+		"closedNow": "Fermé maintenant",
+		"noSchedule": "À toute heure",
+		"forbidden": "Fichiers interdits",
+		"requiresReview": "Fichiers qui demandent une approbation",
+		"noFiles": "Aucun",
+		"reviewers": "Approuvé par un membre qui a l'un de ces rôles : {{roles}}. Quiconque peut approuver peut refuser.",
+		"anyMember": "Approuvé par tout membre du projet qui peut approuver les revues, sous son compte du serveur.",
+		"budget": "Budget de jetons",
+		"budgetLine": "{{spent}} jetons sur {{limit}} dans la dernière heure",
+		"taskBudgetLine": "Au plus {{limit}} jetons par tâche",
+		"noBudget": "Pas de limite de jetons",
+		"loopLine": "Met un agent en pause après {{count}} appels d'outil identiques",
+		"agents": "Agents",
+		"agentsLine": "En cours sur le serveur : {{mine}} à vous, {{project}} en tout",
+		"stopMine": "Arrêter mes agents",
+		"stopProject": "Arrêter tous les agents du projet",
+		"stopTitle": "Arrêter tous les agents du projet ?",
+		"stopBody": "Les exécutions et les tâches de tous les membres du projet s'arrêtent tout de suite. Leurs cartes peuvent être relancées.",
+		"stopConfirm": "Tout arrêter",
+		"stopped_one": "{{count}} agent arrêté. Sa carte peut être relancée.",
+		"stopped_other": "{{count}} agents arrêtés. Leurs cartes peuvent être relancées.",
+		"pending_one": "{{count}} appel attend une approbation",
+		"pending_other": "{{count}} appels attendent une approbation",
+		"noPending": "Aucun appel n'attend d'approbation.",
+		"approve": "Approuver",
+		"refuse": "Refuser",
+		"approved": "Approuvé en votre nom : le prochain appel identique de l'agent passe, une fois.",
+		"refused": "Refusé : l'agent reste refusé sur cet appel.",
+		"needsRole": "La politique demande l'un de ces rôles pour approuver : {{roles}}.",
+		"decisions": "Dernières décisions",
+		"noDecisions": "Aucune décision pour l'instant.",
+		"blocked_one": "{{count}} action d'agent arrêtée dans les dernières 24 h",
+		"blocked_other": "{{count}} actions d'agent arrêtées dans les dernières 24 h",
+		"trips_one": "{{count}} déclenchement du coupe-circuit sur les 7 derniers jours",
+		"trips_other": "{{count}} déclenchements du coupe-circuit sur les 7 derniers jours",
+		"approvedBy": "approuvé par {{name}}",
+		"decision": {
+			"deny": "Refusé",
+			"review": "Revue",
+			"approved": "Approuvé",
+			"warn": "Averti",
+			"outside_hours": "Hors horaires",
+			"budget_exceeded": "Budget atteint",
+			"invalid_policy": "Politique invalide",
+			"tool_loop": "Coupe-circuit"
+		}
 	},
 	"analyses": {
 		"intro": "Chaque analyse tourne sur le serveur, sur le code du projet ; toute l'équipe du projet lit son dernier rapport.",
@@ -565,5 +626,36 @@
 		"operator": "Opérateur",
 		"analyst": "Analyste",
 		"viewer": "Lecteur"
+	},
+	"approval": {
+		"count": "{{given}} approbations sur {{needed}}",
+		"criticality": "Criticité",
+		"levels": {
+			"low": "Faible",
+			"medium": "Moyenne",
+			"high": "Haute"
+		},
+		"sources": {
+			"set": "Choisie par une personne",
+			"assessed": "Évaluée d'après le plan",
+			"default": "Valeur par défaut du serveur"
+		},
+		"missingRoles": "Il manque encore : {{roles}}",
+		"by": "{{by}}, {{at}}",
+		"byFor": "{{by}} pour {{for}}, {{at}}"
+	},
+	"delegations": {
+		"title": "Approbations prêtées",
+		"hint": "Prêtez votre approbation à un collègue pendant votre absence. Il approuve en votre nom jusqu'à la date de fin.",
+		"current": "En cours et prévues",
+		"item": "{{from}} → {{to}}, du {{start}} au {{end}}",
+		"active": "En cours",
+		"planned": "Prévue",
+		"end": "Terminer",
+		"empty": "Aucune approbation n'est prêtée sur ce projet.",
+		"lendTitle": "Prêter mon approbation",
+		"noColleague": "Aucun collègue ne peut approuver sur ce projet.",
+		"days": "Pour combien de jours (1 à 90)",
+		"lend": "Prêter"
 	}
 }
