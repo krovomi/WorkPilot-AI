@@ -25,7 +25,13 @@ from server.auth.jwt_tokens import (
     new_login,
 )
 from server.config import get_settings
-from server.db.models import AuditLog, User
+from server.db.models import (
+    AuditLog,
+    IdentityProvider,
+    OrgMember,
+    User,
+    UserIdentity,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +41,12 @@ ENTRA_NAME = "Microsoft Entra ID"
 MAX_NAME = 80
 MAX_HOST = 253
 LOGIN_ACTIONS = tuple(sorted(f"auth.login.{method}" for method in LOGIN_METHODS))
+#: A refused sign-in, with its method and :data:`REFUSALS` reason.
+REFUSED_ACTION = "auth.login_failed"
+#: Why a sign-in was refused: a wrong password for an existing account, a
+#: disabled account, an address with no local account, or an identity
+#: provider's token the server did not accept.
+REFUSALS = ("bad_password", "disabled", "unknown_account", "provider_refused")
 
 
 def provider_of(method: str | None) -> dict[str, str] | None:
@@ -78,6 +90,56 @@ async def signed_in(
     )
     await db.commit()
     return pair
+
+
+async def refused(
+    db: AsyncSession,
+    *,
+    method: str,
+    reason: str,
+    user_id: str | None,
+    user_agent: str | None,
+    ip: str | None,
+) -> None:
+    """Write a refused sign-in to the audit log (``REFUSED_ACTION``).
+
+    In each organization of the account it was for, so their administrators
+    see attempts on their members; with no account, once, outside any
+    organization (the platform's history). Never the password, never the
+    address typed for an unknown account: the method, the reason, the IP.
+    """
+    orgs: list[str | None] = [None]
+    if user_id is not None:
+        found = list(
+            await db.scalars(
+                select(OrgMember.org_id).where(OrgMember.user_id == user_id)
+            )
+        )
+        orgs = list(found) or [None]
+    for org_id in orgs:
+        db.add(
+            AuditLog(
+                user_id=user_id,
+                org_id=org_id,
+                action=REFUSED_ACTION,
+                ip=(ip or "")[:64] or None,
+                user_agent=(user_agent or "")[:400] or None,
+                login_method=method,
+                payload={"method": method, "reason": reason},
+            )
+        )
+    await db.commit()
+
+
+async def local_account_of(db: AsyncSession, email: str) -> User | None:
+    """The account a local sign-in with ``email`` is for, if there is one."""
+    identity = await db.scalar(
+        select(UserIdentity).where(
+            UserIdentity.provider == IdentityProvider.LOCAL.value,
+            UserIdentity.subject == email.strip().lower(),
+        )
+    )
+    return await db.get(User, identity.user_id) if identity is not None else None
 
 
 def _host(issuer: object) -> str | None:

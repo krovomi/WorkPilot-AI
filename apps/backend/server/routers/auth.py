@@ -23,7 +23,7 @@ from server.auth.local import (
     create_local_user,
 )
 from server.auth.oidc import OidcError, provision_entra_user, validate_id_token
-from server.auth.sign_in import session_of, signed_in
+from server.auth.sign_in import local_account_of, refused, session_of, signed_in
 from server.authz.engine import user_organizations
 from server.authz.principal import get_principal
 from server.authz.tenancy import can_act_in
@@ -76,6 +76,27 @@ async def _signed_in(
     return _token_response(pair, user)
 
 
+async def _refused(
+    db: AsyncSession,
+    request: Request,
+    method: str,
+    reason: str,
+    user_id: str | None = None,
+) -> None:
+    # Whatever the refused attempt left in the session is not kept (read the
+    # account's id before: the rollback expires what the session loaded).
+    await db.rollback()
+    ua, ip = _client_meta(request)
+    await refused(
+        db,
+        method=method,
+        reason=reason,
+        user_id=user_id,
+        user_agent=ua,
+        ip=ip,
+    )
+
+
 @router.get("/config")
 async def auth_config() -> dict:
     """Public: what login methods this server supports (drives the login UI)."""
@@ -125,6 +146,17 @@ async def login(
     try:
         user = await authenticate_local(db, body.email, body.password)
     except LocalAuthError as e:
+        account = await local_account_of(db, body.email)
+        reason = (
+            "unknown_account"
+            if account is None
+            else "bad_password"
+            if account.is_active
+            else "disabled"
+        )
+        await _refused(
+            db, request, "local", reason, account.id if account is not None else None
+        )
         raise HTTPException(status_code=401, detail=str(e))
     return await _signed_in(db, user, request, "local")
 
@@ -138,6 +170,7 @@ async def oidc_exchange(
         claims = validate_id_token(body.id_token)
         user = await provision_entra_user(db, claims)
     except OidcError as e:
+        await _refused(db, request, "entra", "provider_refused")
         raise HTTPException(status_code=401, detail=str(e))
     return await _signed_in(db, user, request, "entra")
 
@@ -152,6 +185,7 @@ async def sso_exchange(
         claims = await oidc_generic.avalidate_id_token(body.id_token)
         user = await oidc_generic.provision_oidc_user(db, claims)
     except OidcError as e:
+        await _refused(db, request, "oidc", "provider_refused")
         raise HTTPException(status_code=401, detail=str(e))
     return await _signed_in(db, user, request, "oidc")
 
