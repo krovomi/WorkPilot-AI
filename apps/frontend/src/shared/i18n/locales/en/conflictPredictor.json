@@ -176,6 +176,50 @@
 			"open_one": "{{count}} conflict still open.",
 			"open_other": "{{count}} conflicts still open.",
 			"ignored": "The merge conflict times of this project could not be read: they start again with the next conflict."
+		},
+		"server": {
+			"intro": "The server plans this project's backlog from its copy of the code and runs it wave after wave: cards that share no file run side by side, in the order that merges best. Opening this view takes the run's next step.",
+			"loading": "Reading the server's waves…",
+			"loadError": "Could not read the server's waves: {{error}}",
+			"actionError": "The server did not do it: {{error}}",
+			"finished": "The last run went through all its waves.",
+			"ignored": "The saved run could not be read, so it was set aside.",
+			"start": "Start the first wave",
+			"noRight": "You don't have the rights to start agents on this project.",
+			"empty": "Nothing in Planning or Queue to plan.",
+			"step": "Check now",
+			"stopConfirm": "Stop the run? The cards it started keep running; no further wave starts.",
+			"running": "Wave {{wave}} of {{total}}",
+			"advance": {
+				"merged": "Next wave once merged",
+				"review": "Next wave once in review"
+			},
+			"failure": {
+				"needs_approval": "waits for its spec to be approved",
+				"claimed": "claimed by someone else",
+				"already_running": "already running",
+				"quota": "over the agent quota",
+				"refused": "the server refused to start it",
+				"missing": "no longer on the board"
+			},
+			"blocked": "waits for a card it depends on",
+			"gone": "no longer on the board",
+			"agentRunning": "agent running",
+			"plan_one": "Plan: {{count}} wave, up to {{parallel}} at a time",
+			"plan_other": "Plan: {{count}} waves, up to {{parallel}} at a time",
+			"mergeChecks": "Trial merges: {{checked}} checked, {{conflicts}} in conflict",
+			"cycles": "Some cards depend on each other in a loop and are left out:",
+			"excluded": {
+				"cycle": "in a dependency loop",
+				"blocked_by_cycle": "depends on a card in a loop"
+			},
+			"history": "Last {{days}} days",
+			"historyIgnored": "The run history could not be read.",
+			"historyLine": "Runs: {{runs}} (stopped: {{stopped}}) · conflicts avoided: {{conflicts}} · risk avoided: {{risk}} · cards started: {{started}}",
+			"lastRun": "Last run finished {{at}}",
+			"conflictsLine": "Merge conflicts resolved: {{resolved}}, median time to resolve {{median}} · still open: {{open}}",
+			"conflictsNone": "No merge conflict resolved · still open: {{open}}",
+			"conflictsIgnored": "The merge conflict times could not be read."
 		}
 	}
 }

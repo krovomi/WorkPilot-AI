@@ -30,4 +30,20 @@ describe("createConflictWavesAPI", () => {
 		await api.loadExecutionWaveHistory("p1");
 		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_HISTORY, "p1");
 	});
+
+	it("invokes the server channels with a project id, and the advance rule as data", async () => {
+		const api = createConflictWavesAPI();
+		await api.getServerWavePlan("p1");
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_SERVER_PLAN, "p1");
+		await api.getServerWaveRun("p1");
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_SERVER_RUN, "p1");
+		await api.startServerWaveRun("p1", "review");
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_SERVER_START, "p1", "review");
+		await api.stepServerWaveRun("p1");
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_SERVER_STEP, "p1");
+		await api.stopServerWaveRun("p1");
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_SERVER_STOP, "p1");
+		await api.getServerWaveHistory("p1");
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.CONFLICT_WAVES_SERVER_HISTORY, "p1");
+	});
 });

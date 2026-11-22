@@ -43,6 +43,8 @@ describe("server project views", () => {
 			"ideation",
 			"insights",
 			"kanban",
+			// Its execution waves, planned and run by the server.
+			"mission-control",
 			"roadmap",
 			"session-history",
 			"tech-debt",

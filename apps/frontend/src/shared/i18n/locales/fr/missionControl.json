@@ -260,5 +260,6 @@
 		"ratio": "× {{value}}",
 		"rebalances": "Rééquilibrages par session",
 		"overrun": "Budgets dépassés"
-	}
+	},
+	"serverDescription": "Un projet du serveur d'équipe : ses agents tournent sur le serveur, qui planifie et exécute ses vagues."
 }
