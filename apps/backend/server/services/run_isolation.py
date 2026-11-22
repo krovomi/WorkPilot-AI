@@ -104,6 +104,16 @@ def project_brain(repos_root: Path, project_id: str) -> Path:
     return project_home(repos_root, project_id) / ".workpilot" / "brain"
 
 
+def served_project_brain(repos_root: Path, project_id: str) -> Path | None:
+    """The project's brain as its members read it: the folder itself, links
+    followed, or ``None`` when it no longer sits in its project's home. A
+    run writes that home, ``.workpilot`` included, so what the server reads
+    there is checked where it leads before a note is opened."""
+    home = _real(project_home(repos_root, project_id))
+    brain = _real(project_brain(repos_root, project_id))
+    return brain if home in brain.parents else None
+
+
 def project_brain_env(repos_root: Path, project_id: str) -> dict[str, str]:
     """The variables that point a run at its project's brain, with or without
     isolation: unset, the brain would be the server user's, one for every

@@ -499,6 +499,22 @@ export const gitlabNavItems: readonly NavItem[] = [
 	},
 ];
 
+// Bitbucket nav items shown when Bitbucket is enabled (local projects only)
+export const bitbucketNavItems: readonly NavItem[] = [
+	{
+		id: "bitbucket-issues",
+		labelKey: "navigation:items.bitbucketIssues",
+		icon: Globe,
+		shortcut: "BI",
+	},
+	{
+		id: "bitbucket-pull-requests",
+		labelKey: "navigation:items.bitbucketPRs",
+		icon: GitPullRequest,
+		shortcut: "BP",
+	},
+];
+
 /**
  * How a menu entry is named, for anything outside the sidebar that has to say
  * which page it is talking about — the activity centre, its toasts.
@@ -512,6 +528,7 @@ const NAV_LABEL_KEYS: Partial<Record<SidebarView, string>> = Object.fromEntries(
 		...navGroups.flatMap((group) => group.items),
 		...githubNavItems,
 		...gitlabNavItems,
+		...bitbucketNavItems,
 		// A hub's entry has its first tab's id: the tab's own name wins.
 		...SIDEBAR_HUBS.flatMap((hub) => hub.tabs.map((tab) => ({ ...tab, id: tab.view }))),
 	].map((item) => [item.id, item.labelKey]),

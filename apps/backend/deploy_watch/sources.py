@@ -1,10 +1,11 @@
-"""Where the watch reads its metrics: Prometheus, Datadog, New Relic, CloudWatch (#366).
+"""Where the watch reads its metrics: Prometheus, Datadog, New Relic, CloudWatch, Grafana (#366).
 
 The project's CI/CD settings pick one source (`CICD_MONITOR_SOURCE`) and hold
 its credentials; `.workpilot/deploy-monitors.yaml` only writes each metric's
 query in that source's language (PromQL, a Datadog query, NRQL, a CloudWatch
-Metrics Insights query or metric math). A repository therefore never chooses
-where a key goes: Prometheus is the URL of the settings, the others are their
+Metrics Insights query or metric math, the expression of a Grafana data
+source). A repository therefore never chooses where a key goes: Prometheus
+and Grafana are the URL of the settings, the others are their
 vendor's own API host (a Datadog site or a New Relic region from a closed
 list, a CloudWatch region by its pattern).
 
@@ -25,11 +26,12 @@ from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
 from .cloudwatch import cloudwatch_value
-from .collectors import MAX_BODY_BYTES, Fetch, prometheus_value
-from .config import is_local_host, valid_url
+from .collectors import prometheus_value
+from .grafana import DATASOURCE_UID, grafana_value
+from .net import MAX_BODY_BYTES, Fetch, is_local_host, valid_url
 
 LOOKBACK = timedelta(minutes=5)
-SOURCES = ("prometheus", "datadog", "newrelic", "cloudwatch")
+SOURCES = ("prometheus", "datadog", "newrelic", "cloudwatch", "grafana")
 DATADOG_SITES = frozenset(
     {
         "datadoghq.com",
@@ -58,7 +60,10 @@ _LABELS = {
     "datadog": "Datadog",
     "newrelic": "New Relic",
     "cloudwatch": "CloudWatch",
+    "grafana": "Grafana",
 }
+# The sources whose URL the settings give: they may be on the machine.
+_URL_SOURCES = frozenset({"prometheus", "grafana"})
 
 
 @dataclass(frozen=True)
@@ -68,7 +73,7 @@ class MetricSource:
     kind: str
     # Where the queries go: the settings' Prometheus URL, or the vendor's API.
     url: str
-    # Datadog site, New Relic account id, CloudWatch region.
+    # Datadog site, New Relic account id, CloudWatch region, Grafana data source.
     account: str = ""
     key: str = field(default="", repr=False)
     second_key: str = field(default="", repr=False)
@@ -80,8 +85,8 @@ class MetricSource:
 
     @property
     def local(self) -> bool:
-        """Read without leaving the site: only a Prometheus can be."""
-        return self.kind == "prometheus" and is_local_host(self.url)
+        """Read without leaving the site: only a Prometheus or a Grafana can be."""
+        return self.kind in _URL_SOURCES and is_local_host(self.url)
 
     def value(self, query: str, fetch: Fetch, now: datetime) -> float | None:
         if self.kind == "prometheus":
@@ -90,6 +95,9 @@ class MetricSource:
             return _datadog(self, query, fetch, now)
         if self.kind == "newrelic":
             return _newrelic(self, query, fetch)
+        if self.kind == "grafana":
+            values = grafana_value(self.url, self.key, self.account, query, fetch, now)
+            return None if values is None else _finite_sum(values)
         return cloudwatch_value(
             self.account,
             (self.key, self.second_key, self.session_token),
@@ -264,11 +272,26 @@ def _cloudwatch_source(env: dict, problems: list[str]) -> MetricSource | None:
     )
 
 
+def _grafana_source(env: dict, problems: list[str]) -> MetricSource | None:
+    url = str(env.get("CICD_MONITOR_GRAFANA_URL") or "").strip().rstrip("/")
+    uid = str(env.get("CICD_MONITOR_GRAFANA_DATASOURCE_UID") or "").strip()
+    if not valid_url(url):
+        problems.append("CICD_MONITOR_GRAFANA_URL: not an http(s) URL")
+        return None
+    if not DATASOURCE_UID.match(uid):
+        problems.append("CICD_MONITOR_GRAFANA_DATASOURCE_UID: not a data source uid")
+        return None
+    return MetricSource(
+        "grafana", url, uid, key=str(env.get("CICD_MONITOR_GRAFANA_TOKEN") or "")
+    )
+
+
 _BUILDERS = {
     "prometheus": _prometheus,
     "datadog": _datadog_source,
     "newrelic": _newrelic_source,
     "cloudwatch": _cloudwatch_source,
+    "grafana": _grafana_source,
 }
 
 

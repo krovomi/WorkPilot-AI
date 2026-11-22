@@ -72,22 +72,23 @@ const answer = {
 	window_days: 30,
 	min_group: 2,
 	min_top: 10,
-	segment: { stack: "csharp", size: "medium", team: "solo" },
-	recent: { specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3 },
-	previous: { specs: 1, minutes: 80, cost: 3, qa_iterations: null, agents: 2 },
-	trend: { minutes: -50, cost: -50, qa_iterations: null, agents: 50 },
+	segment: { stack: "csharp", size: "medium", team: "solo", size_from: "small", team_from: null },
+	recent: { specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3, mutation_score: null, ci_first_pass: null },
+	previous: { specs: 1, minutes: 80, cost: 3, qa_iterations: null, agents: 2, mutation_score: null, ci_first_pass: null },
+	trend: { minutes: -50, cost: -50, qa_iterations: null, agents: 50, mutation_score: null, ci_first_pass: null },
 	weeks: [
-		{ specs: 0, minutes: null, cost: null, qa_iterations: null, agents: null },
-		{ specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3 },
+		{ specs: 0, minutes: null, cost: null, qa_iterations: null, agents: null, mutation_score: null, ci_first_pass: null },
+		{ specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3, mutation_score: null, ci_first_pass: null },
 	],
 	groups: {
-		segment: { projects: 1, medians: null, top: null },
-		stack: { projects: 2, medians: { minutes: 30, cost: 1, qa_iterations: null, agents: 2 }, top: null },
-		team: { projects: 1, medians: null, top: null },
+		segment: { projects: 1, medians: null, top: null, trend: null },
+		stack: { projects: 2, medians: { minutes: 30, cost: 1, qa_iterations: null, agents: 2, mutation_score: null, ci_first_pass: null }, top: null, trend: null },
+		team: { projects: 1, medians: null, top: null, trend: null },
 		all: {
 			projects: 12,
-			medians: { minutes: 35, cost: 1.2, qa_iterations: 2, agents: 2 },
-			top: { minutes: 10, cost: 0.3, qa_iterations: null, agents: 1 },
+			medians: { minutes: 35, cost: 1.2, qa_iterations: 2, agents: 2, mutation_score: null, ci_first_pass: null },
+			top: { minutes: 10, cost: 0.3, qa_iterations: null, agents: 1, mutation_score: null, ci_first_pass: null },
+			trend: { minutes: -4, cost: 2, qa_iterations: null, agents: null, mutation_score: 3, ci_first_pass: -10 },
 		},
 	},
 	kinds: [
@@ -97,13 +98,13 @@ const answer = {
 			minutes: 40,
 			cost: 1.5,
 			qa_iterations: 1,
-			agents: 3,
-			group: { projects: 1, medians: null, top: null },
+			agents: 3, mutation_score: null, ci_first_pass: null,
+			group: { projects: 1, medians: null, top: null, trend: null },
 		},
 	],
 	projects: [
-		{ name: "Shop", stack: "csharp", size: "medium", team: "solo", specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3, current: true },
-		{ name: "Blog", stack: "php", size: "small", team: "unknown", specs: 1, minutes: 10, cost: 0.2, qa_iterations: null, agents: 1, current: false },
+		{ name: "Shop", stack: "csharp", size: "medium", team: "solo", specs: 2, minutes: 40, cost: 1.5, qa_iterations: 1, agents: 3, mutation_score: null, ci_first_pass: null, current: true },
+		{ name: "Blog", stack: "php", size: "small", team: "unknown", specs: 1, minutes: 10, cost: 0.2, qa_iterations: null, agents: 1, mutation_score: null, ci_first_pass: null, current: false },
 	],
 };
 
@@ -129,11 +130,15 @@ describe("toBuildComparison", () => {
 		const hostile = toBuildComparison({
 			window_days: -3,
 			min_group: "5",
-			segment: { stack: "x".repeat(500), size: 7 },
-			recent: { specs: 1.5, minutes: Number.NaN, cost: -1, qa_iterations: "2", agents: Infinity },
+			segment: { stack: "x".repeat(500), size: 7, size_from: "", team_from: "y".repeat(90) },
+			recent: { specs: 1.5, minutes: Number.NaN, cost: -1, qa_iterations: "2", agents: Infinity, mutation_score: 101, ci_first_pass: 100 },
 			previous: "none",
 			trend: { minutes: -20, cost: Number.POSITIVE_INFINITY },
-			groups: { segment: "x", stack: { projects: -1, medians: [], top: "best" } },
+			groups: {
+				segment: "x",
+				stack: { projects: -1, medians: [], top: "best", trend: [] },
+				team: { projects: 6, medians: { mutation_score: 140, ci_first_pass: 40 }, trend: { minutes: -12, cost: "up" } },
+			},
 			min_top: -4,
 			weeks: [...Array.from({ length: 30 }, () => ({ specs: 1, minutes: -5 }))],
 			kinds: [
@@ -151,10 +156,16 @@ describe("toBuildComparison", () => {
 		});
 		expect(hostile?.window_days).toBe(1);
 		expect(hostile?.min_group).toBe(1);
-		expect(hostile?.segment).toEqual({ stack: "x".repeat(40), size: "unknown", team: "unknown" });
+		expect(hostile?.segment).toEqual({
+			stack: "x".repeat(40),
+			size: "unknown",
+			team: "unknown",
+			size_from: null,
+			team_from: "y".repeat(40),
+		});
 		expect(hostile?.min_top).toBeNull();
 		expect(hostile?.weeks).toHaveLength(12);
-		expect(hostile?.weeks[0]).toEqual({ specs: 1, minutes: null, cost: null, qa_iterations: null, agents: null });
+		expect(hostile?.weeks[0]).toEqual({ specs: 1, minutes: null, cost: null, qa_iterations: null, agents: null, mutation_score: null, ci_first_pass: null });
 		// Only a short identifier names a kind; the lists are bounded.
 		expect(hostile?.kinds[0]).toEqual({
 			kind: "hotfix",
@@ -163,20 +174,37 @@ describe("toBuildComparison", () => {
 			cost: null,
 			qa_iterations: null,
 			agents: null,
+			mutation_score: null, ci_first_pass: null,
 			group: {
 				projects: 3,
-				medians: { minutes: null, cost: null, qa_iterations: null, agents: null },
-				top: { minutes: null, cost: 0.1, qa_iterations: null, agents: null },
+				medians: { minutes: null, cost: null, qa_iterations: null, agents: null, mutation_score: null, ci_first_pass: null },
+				top: { minutes: null, cost: 0.1, qa_iterations: null, agents: null, mutation_score: null, ci_first_pass: null },
+				trend: null,
 			},
 		});
 		expect(hostile?.kinds).toHaveLength(13);
-		expect(hostile?.recent).toEqual({ specs: 0, minutes: null, cost: null, qa_iterations: null, agents: null });
+		// A figure in percent is at most 100.
+		expect(hostile?.recent).toEqual({
+			specs: 0,
+			minutes: null,
+			cost: null,
+			qa_iterations: null,
+			agents: null,
+			mutation_score: null,
+			ci_first_pass: 100,
+		});
 		expect(hostile?.previous.specs).toBe(0);
-		expect(hostile?.trend).toEqual({ minutes: -20, cost: null, qa_iterations: null, agents: null });
-		expect(hostile?.groups.segment).toEqual({ projects: 0, medians: null, top: null });
-		expect(hostile?.groups.stack).toEqual({ projects: 0, medians: null, top: null });
-		expect(hostile?.groups.team).toEqual({ projects: 0, medians: null, top: null });
-		expect(hostile?.groups.all).toEqual({ projects: 0, medians: null, top: null });
+		expect(hostile?.trend).toEqual({ minutes: -20, cost: null, qa_iterations: null, agents: null, mutation_score: null, ci_first_pass: null });
+		const empty = { projects: 0, medians: null, top: null, trend: null };
+		expect(hostile?.groups.segment).toEqual(empty);
+		expect(hostile?.groups.stack).toEqual(empty);
+		expect(hostile?.groups.team).toEqual({
+			projects: 6,
+			medians: { minutes: null, cost: null, qa_iterations: null, agents: null, mutation_score: null, ci_first_pass: 40 },
+			top: null,
+			trend: { minutes: -12, cost: null, qa_iterations: null, agents: null, mutation_score: null, ci_first_pass: null },
+		});
+		expect(hostile?.groups.all).toEqual(empty);
 		expect(hostile?.projects[0]).toMatchObject({ name: "?", stack: "other", size: "unknown", team: "unknown", current: false });
 		expect(hostile?.projects).toHaveLength(MAX_OTHERS);
 	});

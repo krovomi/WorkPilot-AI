@@ -41,6 +41,7 @@ vi.mock("../generated-review/review-run", () => ({
 	openReviewRun: () => Promise.reject(new Error("no review run in this test")),
 }));
 
+import { WRITE_HISTORY, sha256 } from "../design-loop-history";
 import { detectProjectStack } from "../design-to-code-stack";
 import { DesignToCodeService, projectDirFor } from "../design-to-code-service";
 
@@ -114,6 +115,27 @@ describe("writeFiles", () => {
 		expect(readFileSync(path.join(worktree, "src", "Header.tsx"), "utf-8")).toBe("new header");
 		expect(existsSync(path.join(worktree, "src", "components", "pricing", "Hero.tsx"))).toBe(true);
 		expect(existsSync(path.join(project, "src"))).toBe(false);
+	});
+
+	it("keeps the hash of each file written on the card, for the loop's figures", async () => {
+		symlinkSync(outside, path.join(worktree, "linked"), "dir");
+		await writeFiles(new DesignToCodeService(), "p1", [
+			{ path: "src/Header.tsx", content: "new header" },
+			{ path: "linked/through-link.txt", content: "x" },
+		]);
+		const journal = path.join(project, WRITE_HISTORY);
+		const line = JSON.parse(readFileSync(journal, "utf-8").trim());
+		expect(line.specId).toBe("001-design");
+		expect(line.files).toEqual([{ path: "src/Header.tsx", sha256: sha256("new header") }]);
+	});
+
+	it("keeps no hash when nothing was committed", async () => {
+		run.finish.mockResolvedValueOnce({ ...review, committed: false });
+		const outcome = await writeFiles(new DesignToCodeService(), "p1", [
+			{ path: "Hero.tsx", content: "x" },
+		]);
+		expect(outcome.review).toBeNull();
+		expect(existsSync(path.join(project, WRITE_HISTORY))).toBe(false);
 	});
 
 	it("replaces a longer file entirely, with nothing of the old one left", async () => {

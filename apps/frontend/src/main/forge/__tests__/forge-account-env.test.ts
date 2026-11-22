@@ -15,6 +15,7 @@ vi.mock("../forge-accounts", () => ({
 				gh: { id: "gh", forge: "github" },
 				gl: { id: "gl", forge: "gitlab" },
 				az: { id: "az", forge: "azure_devops" },
+				bb: { id: "bb", forge: "bitbucket" },
 			})[id],
 	}),
 }));
@@ -29,7 +30,12 @@ describe("forge account ids in project settings", () => {
 	it("accepts saved accounts of the right forge, and clearing", () => {
 		expect(forgeAccountIdRefusal({})).toBeNull();
 		expect(
-			forgeAccountIdRefusal({ githubAccountId: "gh", gitlabAccountId: "gl", azureDevOpsAccountId: "" }),
+			forgeAccountIdRefusal({
+				githubAccountId: "gh",
+				gitlabAccountId: "gl",
+				azureDevOpsAccountId: "",
+				bitbucketAccountId: "bb",
+			}),
 		).toBeNull();
 	});
 
@@ -37,6 +43,7 @@ describe("forge account ids in project settings", () => {
 		[{ githubAccountId: "gl" }, "Unknown account (githubAccountId)"],
 		[{ gitlabAccountId: "missing" }, "Unknown account (gitlabAccountId)"],
 		[{ azureDevOpsAccountId: 7 }, "Invalid account (azureDevOpsAccountId)"],
+		[{ bitbucketAccountId: "gh" }, "Unknown account (bitbucketAccountId)"],
 	])("refuses %o", (config, reason) => {
 		expect(forgeAccountIdRefusal(config as never)).toBe(reason);
 	});
@@ -49,7 +56,7 @@ describe("forge account ids in project settings", () => {
 
 	it("reads the ids the project names", () => {
 		const config: Record<string, unknown> = {};
-		readForgeAccountIds({ GITHUB_ACCOUNT_ID: " gh ", GITLAB_ACCOUNT_ID: "" }, config);
-		expect(config).toEqual({ githubAccountId: "gh" });
+		readForgeAccountIds({ GITHUB_ACCOUNT_ID: " gh ", GITLAB_ACCOUNT_ID: "", BITBUCKET_ACCOUNT_ID: "bb" }, config);
+		expect(config).toEqual({ githubAccountId: "gh", bitbucketAccountId: "bb" });
 	});
 });

@@ -479,6 +479,14 @@ class GitHubOrchestrator:
             )
 
             findings, merged_findings = self_critique.merge_redundant(findings)
+            # Then two remarks asking for opposite changes keep the stronger;
+            # importing core installs the agent runtime the check asks.
+            import core.agent_runtime  # noqa: F401
+            from runners.github.services import contradiction_check
+
+            findings, contradicted = await contradiction_check.drop_contradictions(
+                findings
+            )
 
             # What this project rejected often enough is downgraded or dropped
             # here, after the review, so it holds on every provider (#361).
@@ -550,6 +558,7 @@ class GitHubOrchestrator:
                 risk_assessment=risk_assessment,
                 ci_status=ci_status,
             ) + self_critique.summary_note(merged_findings)
+            summary += contradiction_check.summary_note(contradicted)
 
             # Get HEAD SHA for follow-up review tracking
             head_sha = self.bot_detector.get_last_commit_sha(pr_context.commits)
@@ -1042,6 +1051,10 @@ class GitHubOrchestrator:
             )
 
             self_critique.apply_to_followup(result)
+            import core.agent_runtime  # noqa: F401 - the runtime the check asks
+            from runners.github.services import contradiction_check
+
+            await contradiction_check.apply_to_followup(result)
 
             followup_ci = followup_context.ci_status or {}
             apply_to_followup(

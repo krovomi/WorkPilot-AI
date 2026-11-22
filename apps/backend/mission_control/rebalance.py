@@ -10,7 +10,9 @@ A run ends in one of three ways worth acting on, each with its own remedy:
 * **the agent failed** (an error that is not its provider's): its model goes
   one tier up on the same provider, ``fast`` → ``standard`` → ``flagship``;
 * **the agent loops**: its answer repeats the same passage over and over
-  (``detect_loop``); the run is stopped and its model goes one tier up.
+  (``detect_loop``), or its decision tree the same steps: the same tool
+  called with the same input, the same thought (``detect_step_loop``); the
+  run is stopped and its model goes one tier up.
 
 When no higher tier exists, the work goes to another provider at the same
 tier. Nothing is decided from the error text beyond the closed list of
@@ -70,6 +72,24 @@ def detect_loop(text: str) -> bool:
         if window[:-size] == window[size:] and len(set(window[:size])) >= (
             LOOP_DISTINCT
         ):
+            return True
+    return False
+
+
+# The decision tree's loop: the same block of one to STEP_PERIOD_MAX steps
+# (a thought, a tool call with its input) STEP_REPEATS times in a row.
+STEP_REPEATS = 4
+STEP_PERIOD_MAX = 3
+
+
+def detect_step_loop(steps: list[str]) -> bool:
+    """True when the last steps are one block of steps repeated, ``steps`` oldest first."""
+    for period in range(1, STEP_PERIOD_MAX + 1):
+        span = period * STEP_REPEATS
+        if span > len(steps):
+            return False
+        window = steps[-span:]
+        if all(window[i] == window[i % period] for i in range(span)):
             return True
     return False
 
@@ -199,6 +219,7 @@ __all__ = [
     "Rebalance",
     "capable",
     "detect_loop",
+    "detect_step_loop",
     "plan_rebalance",
     "reason_of",
     "tier_of",

@@ -1220,6 +1220,7 @@
 			"allowed": "Allowed catalog servers: {{ids}}.",
 			"allowedNone": "No catalog server is allowed.",
 			"minScore": "Lowest security score: {{min}}.",
+			"confineBelow": "Servers with a security score under {{min}}, and servers outside the catalog, run confined (OS sandbox, network limited to the hosts they list).",
 			"customBlocked": "Servers outside the catalog are refused.",
 			"invalidTitle": "The project's MCP policy (.workpilot/mcp-policy.json) is invalid: no server can be installed until it is fixed.",
 			"invalid": {

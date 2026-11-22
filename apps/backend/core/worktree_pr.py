@@ -1531,6 +1531,10 @@ class WorktreePRMixin:
             return self._get_existing_azure_pr_url(spec_name, target_branch)
         if provider == "gitlab":
             return self._get_existing_mr_url(spec_name, target_branch)
+        if provider == "bitbucket":
+            from core.bitbucket_pr import existing_bitbucket_pr_url
+
+            return existing_bitbucket_pr_url(self, spec_name, target_branch)
         # Default to GitHub (gh CLI handles the common case).
         return self._get_existing_pr_url(spec_name, target_branch)
 
@@ -1849,6 +1853,19 @@ class WorktreePRMixin:
                 body=body,
                 **group_kwargs,
             )
+        elif provider == "bitbucket":
+            from core.bitbucket_pr import create_bitbucket_pull_request
+
+            pr_result = create_bitbucket_pull_request(
+                self,
+                spec_name,
+                target_branch,
+                title,
+                draft,
+                body,
+                remote=push_result.get("remote"),
+                **group_kwargs,
+            )
         else:
             # Unknown provider
             return PushAndCreatePRResult(
@@ -1857,10 +1874,10 @@ class WorktreePRMixin:
                 remote=push_result.get("remote"),
                 branch=push_result.get("branch"),
                 provider=provider,
-                error="Unable to determine git hosting provider. Supported: GitHub, GitLab, Azure DevOps.",
+                error="Unable to determine git hosting provider. Supported: GitHub, GitLab, Azure DevOps, Bitbucket.",
             )
 
-        if marks is not None and pr_result.get("success"):
+        if marks is not None and pr_result.get("success") and provider != "bitbucket":
             apply_group_label(
                 provider,
                 get_gh_executable() if provider == "github" else get_glab_executable(),

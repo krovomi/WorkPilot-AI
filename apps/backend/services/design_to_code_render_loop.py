@@ -3,10 +3,11 @@
 ``run_render_loop`` takes a successful ``PipelineResult`` and refines its files
 with ``design_to_code.loop``: it picks the vision route the person's provider
 allows (``design_to_code.vision``), builds the page the browser opens, and
-hands the loop a ``correct`` callable: the Claude subscription answers in the
-edits' schema (``design_to_code_edit_calls``), Claude's API, OpenAI, Gemini,
-LM Studio and llama.cpp through the service's own vision calls, Ollama through
-``docintel``'s local vision model. The files of the best version replace the generated ones; the loop's
+hands the loop a ``correct`` callable answered in the edits' schema on every
+route (``design_to_code_edit_calls``): the Claude subscription through the
+SDK's structured output, Claude's API, OpenAI, Gemini, LM Studio and llama.cpp
+through the service's own vision calls with ``forced=True``, Ollama through
+``docintel``'s local vision model with the schema as its ``format``. The files of the best version replace the generated ones; the loop's
 report is returned for the page, and a loop that cannot run says why instead
 of failing the run.
 """
@@ -54,7 +55,11 @@ from design_to_code.vision import (
     decide_route,
 )
 from PIL import UnidentifiedImageError
-from services.design_to_code_edit_calls import SCHEMA_ROUTES, ask_claude_for_edits
+from services.design_to_code_edit_calls import (
+    EDITS_SCHEMA,
+    SCHEMA_ROUTES,
+    ask_claude_for_edits,
+)
 from services.design_to_code_stacks import get_stack
 
 #: Component types whose pixels never match a generated placeholder, or change
@@ -245,6 +250,8 @@ def make_corrector(service: Any, route: VisionRoute) -> Callable[[str, bytes], A
     """The loop's ``correct``: the composite picture and the prompt to one vision
     call, answered with the tokens the provider reported (``service.last_usage``)."""
 
+    forced = route.route in SCHEMA_ROUTES
+
     async def ask_local(prompt: str, png: bytes) -> str:
         from docintel.engines.ollama_vision import ask
         from docintel.settings import VISION_MODEL_ENV
@@ -253,7 +260,9 @@ def make_corrector(service: Any, route: VisionRoute) -> Callable[[str, bytes], A
             image = Path(folder) / "compare.png"
             image.write_bytes(png)
             env = {**os.environ, VISION_MODEL_ENV: route.model}
-            text, reason = await asyncio.to_thread(ask, image, prompt, env)
+            text, reason = await asyncio.to_thread(
+                ask, image, prompt, env, schema=EDITS_SCHEMA if forced else None
+            )
         if not text:
             raise CorrectionError(f"local vision model: {reason}")
         return text
@@ -267,7 +276,7 @@ def make_corrector(service: Any, route: VisionRoute) -> Callable[[str, bytes], A
     async def ask_model(prompt: str, png: bytes) -> Reply:
         data_url = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
         try:
-            if route.route in SCHEMA_ROUTES:
+            if route.route == "claude_subscription":
                 answer = await ask_claude_for_edits(
                     route.model, prompt, png, project_path=service.project_path
                 )
@@ -285,16 +294,18 @@ def make_corrector(service: Any, route: VisionRoute) -> Callable[[str, bytes], A
     async def ask_service(data_url: str, prompt: str) -> str:
         if route.route == "claude_api":
             return await service._call_claude_vision(
-                os.environ["ANTHROPIC_API_KEY"], data_url, prompt
+                os.environ["ANTHROPIC_API_KEY"], data_url, prompt, forced=forced
             )
         if route.route == "openai":
             return await service._call_openai_vision(
-                os.environ["OPENAI_API_KEY"], data_url, prompt
+                os.environ["OPENAI_API_KEY"], data_url, prompt, forced=forced
             )
         if route.route in LOCAL_ROUTES:
-            return await service._call_local_vision(route.route, data_url, prompt)
+            return await service._call_local_vision(
+                route.route, data_url, prompt, forced=forced
+            )
         key = os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"]
-        return await service._call_gemini_vision(key, data_url, prompt)
+        return await service._call_gemini_vision(key, data_url, prompt, forced=forced)
 
     return correct
 

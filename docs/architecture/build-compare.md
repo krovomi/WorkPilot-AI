@@ -1,15 +1,15 @@
 ---
 feature: Comparaisons de builds (Build Analytics)
 summary: >-
-  « Où vous en êtes » compare un projet à son passé et à d'autres projets (par pile, taille, équipe,
-  type de travail) sur des chiffres par spec lus dans leurs dossiers, sans service central : les
-  projets de la personne sur le bureau, ceux de l'organisation qu'elle peut lire sur un serveur, en
-  médianes seulement, à partir de 5 projets ; rapport d'équipe en PDF.
+  « Où vous en êtes » compare un projet à son passé et à d'autres projets (pile, taille, équipe,
+  type de travail) sur des chiffres par spec lus dans leurs dossiers, sans service central ni
+  télémétrie : ceux de la personne sur le bureau, ceux de l'organisation qu'elle peut lire sur un
+  serveur, en médianes, à partir de 5 projets ; rythme face aux pairs, rapport PDF.
 ---
 
 # Comparaisons de builds (`shared_features/build_compare.py`)
 
-Issue #359, lots 1 et 3. Build Analytics montrait les chiffres d'un projet sans dire s'ils étaient bons.
+Issue #359, lots 1, 3 et 4. Build Analytics montrait les chiffres d'un projet sans dire s'ils étaient bons.
 L'onglet « Où vous en êtes » (*How you compare*) répond, en comparant le projet à lui-même (les 30
 derniers jours contre les 30 d'avant) et à d'autres projets de même pile et de même taille.
 
@@ -23,7 +23,10 @@ lu là où les agents l'écrivent déjà :
   par `shared_features/usage_ledger.py`, le lecteur déjà durci des vues serveur (ouverture sans
   suivre les liens, tailles plafonnées, budget de lecture total) ;
 - `.workpilot/specs/<carte>/implementation_plan.json`, pour `qa_signoff.qa_session`, lu par le même
-  `read_json`, 500 plans et 32 Mo au plus par projet.
+  `read_json`, 500 plans et 32 Mo au plus par projet ;
+- `mutation_gate.json` et `pr_followup.json` du même dossier de spec (racine et espace de build),
+  par le même lecteur : 2 Mo par fichier et 16 Mo par projet pour le premier, qui liste chaque
+  mutant ; 200 Ko et 8 Mo pour le second.
 
 ## Des chiffres qui valent sur toutes les piles et tous les providers
 
@@ -35,9 +38,22 @@ Par spec (un `spec_id` qui a au moins une session d'agent dans le registre) :
 | coût (USD) | somme des sessions, telles que le catalogue de prix les a valorisées |
 | itérations de QA | `qa_signoff.qa_session` du plan (le plus grand entre la racine et l'espace de build) |
 | agents | types d'agent distincts (`agent_type`) qui ont travaillé dessus |
+| score de mutation (%) | `score` de la dernière porte de mutation de la QA (`mutation_gate.json`), quand elle a lancé des mutants |
+| CI verte du premier coup (%) | `first_ci` du suivi de la PR (`pr_followup.json`) : la CI est-elle passée sur la PR telle qu'elle a été ouverte |
 
 Aucun ne dépend du langage ni du provider : une spec Ollama et une spec Claude se comparent. Le
-chiffre d'un projet pour une fenêtre est la **médiane** de ses specs commencées dedans. Les 8
+chiffre d'un projet pour une fenêtre est la **médiane** de ses specs commencées dedans ; pour la
+CI, c'est la part, en pourcentage, de ses specs au résultat noté qui sont passées. Plus bas est
+mieux, sauf pour ces deux derniers (`HIGHER_IS_BETTER`, `build_compare_quality.py`) : leur
+tendance est verte quand elle monte, et le dixième le meilleur d'un groupe est leur dernier
+décile.
+
+Le suivi de la PR (`pr_followup/loop.py`) écrit `first_ci` une fois, au premier regard où chaque
+check de la tête est fini et avant tout tour de correction de sa part (`policy.first_ci_verdict`) :
+`failed` si un check propre à la PR a échoué, `passed` sinon ; rien quand les seuls échecs sont
+rouges sur la branche de base aussi, rien non plus pour une PR fusionnée ou fermée avant. Le suivi
+ne lit que GitHub pour l'instant : une spec dont la PR n'a pas été suivie n'a pas ce chiffre. Le
+test joue le suivi contre une forge factice (`tests/pr_followup/test_first_ci.py`). Les 8
 dernières semaines du projet (`weeks`), une médiane chacune, dessinent la courbe de chaque chiffre.
 
 Les projets sont rangés par **segment** : la pile principale (`project/stack.py`, la seule porte
@@ -55,9 +71,24 @@ pile, tous. Seuls les projets qui ont une spec dans les 30 derniers jours compte
   fichier, 8 Mo par projet). Le tableau « Par type de travail » met les specs de chaque type du
   projet face à la médiane des autres projets pour le même type, sous le même seuil de groupe.
 
-Chaque groupe donne aussi son **dixième le meilleur** (`top`, 1er décile, plus bas est mieux), à
+Chaque groupe donne aussi sa **tendance** (`trend`), d'une fenêtre à l'autre, à partir de
+`min_group` projets du groupe dans chacune, et son **dixième le meilleur** (`top`, 1er décile, plus bas est mieux), à
 partir de `min_top` projets qui ont le chiffre : 10 sur le bureau, 20 sur un serveur (`MIN_TOP`),
 pour que ce dixième tienne au moins deux projets et ne soit jamais le chiffre du meilleur seul.
+
+« Votre rythme face à vos pairs » (`analytics/compare-pace.ts`) lit la tendance du projet contre
+celle du groupe le plus étroit qui en a une pour ce chiffre (même segment, même pile, même
+équipe, tous) : plus vite, moins vite, ou au même rythme à moins de 5 points près.
+
+### Changement de segment
+
+Un projet qui passe de petit à moyen dépôt, ou de 2-5 à 6-20 personnes, ne saute pas d'un groupe à
+l'autre : pendant une fenêtre (30 jours) après le changement, il est comparé aux projets de
+**l'ancien et du nouveau** segment (`segments.moved`), et la réponse le dit (`segment.size_from`,
+`team_from`). Ce qu'il était il y a une fenêtre est relu dans git, sans aucun relevé : les fichiers
+du dernier commit d'avant (`git rev-list --before`, puis `git ls-tree`), les auteurs des 90 jours
+d'avant (`git log --since --until`). Venir de `unknown` (dépôt trop jeune) n'est pas un
+changement. La pile n'est pas lissée : la relire à une date demanderait d'extraire l'arbre.
 
 ## Bureau : les projets de la personne
 
@@ -92,14 +123,11 @@ comme des chaînes bornées, demande où l'enregistrer dans une boîte native et
 écrivain que le rapport de conformité (`compliance/report-export.ts`) : tout échappé, page sans
 script ni ressource distante, fenêtre cachée sans JavaScript.
 
-## Reste à faire (#359)
+## Hors de portée (#359)
 
 - **Partage entre organisations, sur adhésion** : comparer à d'autres organisations demanderait
   qu'elles publient volontairement leurs agrégats vers un service commun, hébergé par quelqu'un ;
-  écarté par conception (aucune télémétrie centrale), rien n'est construit.
-- **Taux de CI vert du premier coup** : le résultat des CI n'est pas enregistré localement
-  (`cicd_runs.json` ne dit que lancé ou échoué) ; il faut d'abord l'enregistrer par spec, ce qui
-  demande une forge et une CI réelles pour être vérifié.
-- **Score de mutation** après génération de tests : aucune feature ne l'enregistre encore.
-- **Lissage d'un changement de segment** (petit → moyen dépôt) : chaque comparaison prend le
-  segment du jour ; garder l'historique des segments demanderait un relevé de plus.
+  écarté par décision produit (comparaison au sein d'une organisation, aucune télémétrie). Seul
+  un changement de cette décision le rouvrirait, avec l'hébergement du service.
+- **Mesures d'usage de l'issue** (taux d'adhésion, consultations, PDF générés) : ce serait de la
+  télémétrie, écartée par la même décision.

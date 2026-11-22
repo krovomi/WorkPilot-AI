@@ -15,6 +15,7 @@ import type {
 	CardKind,
 	Criticality,
 	Delegation,
+	ExecutionWavePlan,
 	GovernanceReport,
 	MyPermissions,
 	ProjectMember,
@@ -23,6 +24,8 @@ import type {
 	SteeringMessage,
 	TaskLogs,
 	UiPreferences,
+	WaveHistory,
+	WaveRunAnswer,
 } from "./types";
 import type { ThemePrefs } from "../ui/theme-ids";
 import type { Memory } from "../context/index-file";
@@ -215,6 +218,21 @@ export function api(client: ServerClient) {
 				featurePath("governance", "/stop", projectId),
 				{ scope },
 			),
+		/** The waves of the backlog, as the server plans them now. */
+		wavePlan: (projectId: string) =>
+			client.request<ExecutionWavePlan>("GET", featurePath("execution-waves", "/plan", projectId)),
+		waveRun: (projectId: string) =>
+			client.request<WaveRunAnswer>("GET", featurePath("execution-waves", "/run", projectId)),
+		/** Plans the backlog and starts its first wave, as the person signed in. */
+		startWaveRun: (projectId: string, advanceWhen: "merged" | "review") =>
+			client.request<WaveRunAnswer>("POST", featurePath("execution-waves", "/run", projectId), { advanceWhen }),
+		/** Starts what may start now; the next wave once this one settled. */
+		stepWaveRun: (projectId: string) =>
+			client.request<WaveRunAnswer>("POST", featurePath("execution-waves", "/run/step", projectId)),
+		stopWaveRun: (projectId: string) =>
+			client.request<WaveRunAnswer>("DELETE", featurePath("execution-waves", "/run", projectId)),
+		waveHistory: (projectId: string) =>
+			client.request<WaveHistory>("GET", featurePath("execution-waves", "/history", projectId)),
 		secretKinds: async () => (await client.request<{ kinds: string[] }>("GET", "/users/me/secrets")).kinds,
 		setSecret: (kind: SecretKind, value: string) =>
 			client.request<{ saved: boolean }>("PUT", "/users/me/secrets", { kind, value }),

@@ -173,3 +173,24 @@ def decide(
         base_failing=theirs,
         threads=threads,
     )
+
+
+def first_ci_verdict(
+    snapshot: PRSnapshot, base_failing_names: frozenset[str] | None
+) -> str:
+    """What the CI said of the head, once every check on it has finished:
+    "passed", or "failed" when a check of the PR's own failed. "" while a
+    check runs, without checks, on an unreadable forge, once the PR is merged
+    or closed, and when the only failures are red on the base branch too:
+    those say nothing of the PR."""
+    if (
+        snapshot.error
+        or snapshot.state.upper() != "OPEN"
+        or not snapshot.checks
+        or snapshot.checks_in(CheckState.PENDING)
+    ):
+        return ""
+    failing = {c.name for c in snapshot.checks_in(CheckState.FAILED)}
+    if failing - (base_failing_names or frozenset()):
+        return "failed"
+    return "" if failing else "passed"

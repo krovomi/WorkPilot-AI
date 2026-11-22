@@ -26,6 +26,7 @@ import {
 	Stats,
 	type Tone,
 } from "../charter";
+import { ConflictTimesSummary } from "./ConflictTimesSummary";
 import { MergeCheckNotices, RunHistorySummary, RunWavesList, SavedRunNotice } from "./WavesNotices";
 
 const TOLERANCES = [0, 1, 2, 4] as const;
@@ -205,6 +206,9 @@ export function WavesView() {
 				)}
 
 				{history && history.projectId === projectId && <RunHistorySummary history={history} />}
+				{history?.projectId === projectId && history.conflicts && (
+					<ConflictTimesSummary times={history.conflicts} />
+				)}
 
 				{error && (
 					<Notice tone="red" icon={AlertTriangle} role="alert">

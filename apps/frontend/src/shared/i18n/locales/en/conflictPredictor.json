@@ -168,6 +168,14 @@
 			"summary": "Last {{days}} days: {{runs}} runs ended ({{stopped}} stopped), {{conflicts}} conflicts avoided (risk {{risk}} taken out), {{started}} specs started.",
 			"last": "Last run ended {{finishedAt}}.",
 			"ignored": "The run history of this project could not be read: it starts again with the next run."
+		},
+		"conflictTimes": {
+			"resolved_one": "Last {{days}} days: {{count}} merge conflict resolved, in {{median}} from the conflict to the merge.",
+			"resolved_other": "Last {{days}} days: {{count}} merge conflicts resolved, median {{median}} from the conflict to the merge.",
+			"noneResolved": "Last {{days}} days: no merge conflict resolved.",
+			"open_one": "{{count}} conflict still open.",
+			"open_other": "{{count}} conflicts still open.",
+			"ignored": "The merge conflict times of this project could not be read: they start again with the next conflict."
 		}
 	}
 }

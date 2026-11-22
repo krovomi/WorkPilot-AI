@@ -39,16 +39,26 @@
 		"approveLabel": "Approuver le rejet de « {{label}} »",
 		"discardLabel": "Écarter le rejet de « {{label}} »"
 	},
+	"months": {
+		"title": "Par mois",
+		"month": "Mois",
+		"reviews": "PR revues",
+		"findingsPerPr": "Résultats par PR",
+		"rulesLearned": "Règles apprises",
+		"hint": "Compté depuis les revues enregistrées (la dernière revue de chaque PR, au mois où elle a tourné) et depuis ces retours (une règle compte au mois où elle a atteint le seuil), ici ou sur le serveur de ton équipe. Rien n'est envoyé ailleurs."
+	},
 	"conventions": {
 		"write": "Générer review-conventions.md",
 		"hint": "Écrit les règles déduites de ces retours dans .workpilot/review-conventions.md, sans aucun modèle. Les mêmes retours donnent toujours le même fichier.",
+		"save": "Enregistrer review-conventions.md…",
+		"saveHint": "Construit depuis les retours que garde le serveur, sans modèle. La copie du projet sur le serveur n'est la copie de travail de personne : enregistre-le dans la tienne et commite-le là.",
 		"written_one": "Écrit dans {{path}} ({{count}} règle).",
 		"written_other": "Écrit dans {{path}} ({{count}} règles)."
 	},
 	"errors": {
 		"invalid": "Cette demande n'a pas pu être lue.",
 		"not_found": "Ce projet ou ce type de résultat est introuvable.",
-		"server_project": "Le fichier de conventions ne s'écrit que pour un projet local : le clone d'un projet serveur n'est la copie de travail de personne.",
+		"server_project": "Ce n'est pas disponible pour un projet serveur.",
 		"write_failed": "La modification n'a pas pu être enregistrée."
 	}
 }

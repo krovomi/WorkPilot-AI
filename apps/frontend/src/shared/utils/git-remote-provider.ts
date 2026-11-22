@@ -6,7 +6,12 @@
  * is compared whole, or as a subdomain of the forge's domain.
  */
 
-export type RemoteProvider = "github" | "gitlab" | "azure_devops" | "unknown";
+export type RemoteProvider =
+	| "github"
+	| "gitlab"
+	| "azure_devops"
+	| "bitbucket"
+	| "unknown";
 
 /** The lower-cased host of `https://host/…`, `ssh://user@host:22/…` or `user@host:path`. */
 export function gitRemoteHost(url: string): string {
@@ -29,5 +34,6 @@ export function providerFromRemoteUrl(url: string): RemoteProvider {
 		isDomainOrSubdomain(host, "visualstudio.com")
 	)
 		return "azure_devops";
+	if (isDomainOrSubdomain(host, "bitbucket.org")) return "bitbucket";
 	return "unknown";
 }

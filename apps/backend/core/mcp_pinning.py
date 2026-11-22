@@ -117,11 +117,12 @@ def _say(verdict: Verdict) -> None:
     logger.warning("[mcp-pins] %s", message)
 
 
-async def _list(cfg: dict) -> list[ToolSnapshot] | None:
+async def _list(cfg: dict, project_dir: Path | str) -> list[ToolSnapshot] | None:
     from core.mcp_tools import MCPToolManager  # noqa: PLC0415
 
+    # The project, for a confined server's sandbox: the probe starts it too.
     async with asyncio.timeout(PROBE_TIMEOUT):
-        async with MCPToolManager(None, [cfg], pin=False) as manager:
+        async with MCPToolManager(str(project_dir), [cfg], pin=False) as manager:
             return manager.listed().get(str(cfg.get("id")))
 
 
@@ -143,7 +144,9 @@ def probe_tools(project_dir: Path | str, cfg: dict) -> list[ToolSnapshot] | None
     # with a loop of its own.
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         try:
-            tools = pool.submit(asyncio.run, _list(cfg)).result(PROBE_TIMEOUT + 5)
+            tools = pool.submit(asyncio.run, _list(cfg, project_dir)).result(
+                PROBE_TIMEOUT + 5
+            )
         except (TimeoutError, OSError, RuntimeError, ValueError) as exc:
             logger.warning("[mcp-pins] probe of '%s' failed: %s", cfg.get("id"), exc)
             tools = None
@@ -165,11 +168,34 @@ def pinned_servers(
     verdicts = pin_verdicts(
         project_dir, [(cfg, probe_tools(project_dir, cfg)) for cfg in configs]
     )
-    return {
+    exposed = {
         sid: entry
         for sid, entry in servers.items()
         if (v := verdicts.get(sid)) is not None and v.exposed
     }
+    return _confined(project_dir, exposed, {str(c.get("id")): c for c in configs})
+
+
+def _confined(
+    project_dir: Path | str, servers: dict[str, dict], configs: dict[str, dict]
+) -> dict[str, dict]:
+    """The SDK entries, a confined server's launched under the OS sandbox.
+
+    A confined server that cannot be (`core.mcp_confinement`) is left out.
+    """
+    from core.mcp_confinement import confine_hosts, confined_launch  # noqa: PLC0415
+
+    out: dict[str, dict] = {}
+    for sid, entry in servers.items():
+        if "command" not in entry or confine_hosts(configs.get(sid, {})) is None:
+            out[sid] = entry
+            continue
+        launch = confined_launch(
+            configs.get(sid, {}), entry["command"], entry.get("args", []), project_dir
+        )
+        if launch is not None:
+            out[sid] = {**entry, "command": launch[0], "args": launch[1]}
+    return out
 
 
 def _reset_probe_cache() -> None:

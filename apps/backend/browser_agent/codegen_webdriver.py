@@ -41,6 +41,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .codegen_data import TestData, constant_name, file_name, py_data_lines
 from .codegen_text import (
     css_string,
     java_literal,
@@ -275,10 +276,16 @@ def _dropped(step: RecordedStep) -> RecordedStep:
     )
 
 
-def _value(step: RecordedStep, quote: Callable[[str], str], secret: str) -> str:
-    return (
-        secret.format(quote(step.secret_env)) if step.secret_env else quote(step.value)
-    )
+def typed_value(
+    step: RecordedStep,
+    quote: Callable[[str], str],
+    secret: str,
+    data: Callable[[str], str],
+) -> str:
+    """The value a fill or a list takes: its secret, its key in the data, or itself."""
+    if step.secret_env:
+        return secret.format(quote(step.secret_env))
+    return data(step.data_key) if step.data_key else quote(step.value)
 
 
 # --- Selenium, Python --------------------------------------------------------------
@@ -305,7 +312,9 @@ def _py_locate(step: RecordedStep, loc: Locator) -> str:
 
 
 def _py_action(step: RecordedStep, el: str, target: str) -> str:
-    value = _value(step, py_literal, "os.environ[{}]")
+    value = typed_value(
+        step, py_literal, "os.environ[{}]", lambda key: f"TEST_DATA[{py_literal(key)}]"
+    )
     if step.kind == "click":
         return f"{el}.click()"
     if step.kind == "hover":
@@ -462,7 +471,7 @@ def extras(table: dict[str, str], needs: set[str]) -> list[str]:
 
 
 def selenium_python(
-    name: str, steps: list[RecordedStep], env: list[str]
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData
 ) -> tuple[str, int]:
     body, skipped = walk(steps, _PYTHON)
     needs = uses(steps)
@@ -470,8 +479,13 @@ def selenium_python(
         f'"""Recorded with the WorkPilot Browser Agent: {slug(name, " ")}."""',
         "",
     ]
-    if env:
-        lines += ["import os", ""]
+    std = (
+        (["import json"] if data else [])
+        + (["import os"] if env else [])
+        + (["from pathlib import Path"] if data else [])
+    )
+    if std:
+        lines += [*std, ""]
     lines += [
         "import pytest",
         "from selenium import webdriver",
@@ -490,6 +504,7 @@ def selenium_python(
         *extras(_PYTHON_EXTRA, needs),
         "",
         "",
+        *py_data_lines(name, data),
     ]
     if env:
         lines.append("# Secrets are read from the environment: " + ", ".join(env) + ".")
@@ -525,7 +540,9 @@ def _java_locate(step: RecordedStep, loc: Locator) -> str:
 
 
 def _java_action(step: RecordedStep, el: str, target: str) -> str:
-    value = _value(step, java_literal, "secret({})")
+    value = typed_value(
+        step, java_literal, "secret({})", lambda key: f"TestData.{constant_name(key)}"
+    )
     if step.kind == "click":
         return f"{el}.click();"
     if step.kind == "hover":
@@ -716,8 +733,24 @@ _JAVA_SECRET = """
 """
 
 
+def java_data_lines(data: TestData) -> list[str]:
+    """The block of constants a Java test reads its typed values from."""
+    if not data:
+        return []
+    return [
+        "",
+        "\t/** The values typed while recording: edit them here. */",
+        "\tprivate static final class TestData {",
+        *(
+            f"\t\tstatic final String {constant_name(v.key)} = {java_literal(v.value)};"
+            for v in data.values
+        ),
+        "\t}",
+    ]
+
+
 def selenium_java(
-    name: str, steps: list[RecordedStep], env: list[str]
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData
 ) -> tuple[str, int]:
     body, skipped = walk(steps, _JAVA)
     needs = uses(steps)
@@ -737,6 +770,7 @@ def selenium_java(
         f"class {pascal(name)}Test {{",
         *_JAVA_HELPERS.splitlines(),
         *extras(_JAVA_EXTRA, needs),
+        *java_data_lines(data),
     ]
     if env:
         lines += _JAVA_SECRET.format(names=", ".join(env)).splitlines()
@@ -785,7 +819,7 @@ def _js_locate(step: RecordedStep, loc: Locator) -> str:
 
 
 def _js_action(step: RecordedStep, el: str, target: str) -> str:
-    value = _value(step, literal, "secret({})")
+    value = typed_value(step, literal, "secret({})", js_data)
     if step.kind == "click":
         return f"await {el}.click();"
     if step.kind == "hover":
@@ -925,17 +959,31 @@ function secret(name<<: string>>)<<: string>> {{
 """
 
 
+def js_data(key: str) -> str:
+    """A typed value read from the test's data, in JavaScript or TypeScript."""
+    return f"TEST_DATA[{literal(key)}]"
+
+
 def wdio_code(
-    name: str, steps: list[RecordedStep], env: list[str], ts: bool
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData, ts: bool
 ) -> tuple[str, int]:
     """WebdriverIO with Mocha, in JavaScript or (``ts``) TypeScript."""
     body, skipped = walk(steps, WDIO)
     lines = [
+        *(['import { readFileSync } from "node:fs";'] if data else []),
         'import { $, $$, browser, expect } from "@wdio/globals";',
         "",
         *_JS_HELPERS.splitlines(),
         *extras(_JS_EXTRA, uses(steps)),
     ]
+    if data:
+        lines += [
+            "",
+            f"// The values typed while recording, from {file_name(name)} next to this file.",
+            "const TEST_DATA = JSON.parse(",
+            f'\treadFileSync(new URL({literal(file_name(name))}, import.meta.url), "utf-8"),',
+            ");",
+        ]
     if env:
         lines += _JS_SECRET.format(names=", ".join(env)).splitlines()
     lines += [
@@ -950,6 +998,6 @@ def wdio_code(
 
 
 def webdriverio(
-    name: str, steps: list[RecordedStep], env: list[str]
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData
 ) -> tuple[str, int]:
-    return wdio_code(name, steps, env, ts=False)
+    return wdio_code(name, steps, env, data, ts=False)

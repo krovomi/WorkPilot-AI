@@ -9,6 +9,7 @@ import {
 	acceptedFindings,
 	invalidPolicy,
 	parseMcpPolicy,
+	policyConfines,
 	policyNeedsScore,
 	policyRefusal,
 	STRICTEST_POLICY,
@@ -62,6 +63,9 @@ describe("parseMcpPolicy", () => {
 			['{"minScore": -1}', "schema", "minScore"],
 			['{"minScore": 50.5}', "schema", "minScore"],
 			['{"minScore": "60"}', "schema", "minScore"],
+			['{"confineBelow": 101}', "schema", "confineBelow"],
+			['{"confineBelow": 49.5}', "schema", "confineBelow"],
+			['{"confineBelow": "50"}', "schema", "confineBelow"],
 			['{"blockCustomServers": "yes"}', "schema", "blockCustomServers"],
 			['{"acceptedFindings": {}}', "schema", "acceptedFindings"],
 			['{"acceptedFindings": ["x"]}', "schema", "acceptedFindings"],
@@ -158,5 +162,17 @@ describe("policyRefusal", () => {
 			score: 69,
 			minScore: 70,
 		});
+	});
+
+	it("reads confineBelow, and confines a server under it or outside the catalog (lot 5)", () => {
+		const state = parseMcpPolicy('{"confineBelow": 50}');
+		expect(state).toEqual({ state: "active", policy: { confineBelow: 50, blockCustomServers: false } });
+		expect(policyConfines(state, { entry: null })).toBe(true);
+		expect(policyConfines(state, { entry: github })).toBe(true);
+		expect(policyConfines(state, { entry: github, score: 49 })).toBe(true);
+		expect(policyConfines(state, { entry: github, score: 50 })).toBe(false);
+		expect(policyConfines(parseMcpPolicy("{}"), { entry: null })).toBe(false);
+		expect(policyConfines(invalidPolicy("schema"), { entry: null })).toBe(false);
+		expect(policyConfines({ state: "none" }, { entry: null })).toBe(false);
 	});
 });

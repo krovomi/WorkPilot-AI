@@ -138,6 +138,11 @@ class AgentSlot:
     rebalances: int = 0
     tried_providers: list[str] = field(default_factory=list)
     loop_detected: bool = False
+    # A helper beside a stuck agent (``helper.py``): the agent it helps, and on
+    # the stuck agent the helper started for its current task.
+    helper_of: str = ""
+    helper_of_name: str = ""
+    helper_id: str = ""
 
     def start(self, task: str = ""):
         """Mark agent as running, on a fresh answer (tokens stay cumulative)."""
@@ -220,4 +225,7 @@ class AgentSlot:
             "estimated_tokens": self.estimated_tokens,
             "rebalances": self.rebalances,
             "loop_detected": self.loop_detected,
+            "helper_of": self.helper_of,
+            "helper_of_name": self.helper_of_name,
+            "helper_id": self.helper_id,
         }

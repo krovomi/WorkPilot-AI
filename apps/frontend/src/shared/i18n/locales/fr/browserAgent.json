@@ -141,6 +141,20 @@
 		"savedTo": "Enregistré dans {{path}}",
 		"envVars": "Définissez ces variables d'environnement avant de lancer le test : {{names}}",
 		"skipped": "{{count}} étape(s) sans sélecteur exprimable par ce framework, laissée(s) en commentaire.",
+		"data": {
+			"file": "Les valeurs saisies pendant l'enregistrement sont lues dans {{path}}, écrit à côté du test : modifiez-les là.",
+			"block": "Les valeurs saisies pendant l'enregistrement sont dans le bloc TestData en haut du test : modifiez-les là.",
+			"keys": "Valeurs saisies",
+			"kinds": {
+				"email": "e-mail",
+				"date": "date",
+				"number": "nombre",
+				"phone": "téléphone",
+				"url": "adresse",
+				"name": "nom",
+				"text": "texte"
+			}
+		},
 		"window": "la page",
 		"dropOn": "sur {{target}}",
 		"dialog": {

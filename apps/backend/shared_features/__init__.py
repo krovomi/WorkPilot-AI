@@ -2,7 +2,8 @@
 (``shared_board``) and, declared in ``registry``, its roadmap, its ideation,
 its index and the views that follow, as their files on the server's clone and
 their runners as jobs; its Insights conversations (``insights``); its
-memories (``context``); its GitHub repository or GitLab project, with each
+memories (``context``), with their journal, trash and pins
+(``context_lifecycle``); its GitHub repository or GitLab project, with each
 person's own token (``forge``, ``forge_gitlab``), and the AI review of its
 pull or merge requests as a job on the clone (``forge_review``), with the
 feedback on their findings (``forge_review_feedback``); its analyses
@@ -13,10 +14,10 @@ its dashboard, analytics, sessions and costs, computed from its runs, its jobs a
 ledgers its agents keep in the clone (``workspace``, ``usage_ledger``); its
 automation rules, run by the server process (``automations``); the agent
 sessions its members share with it, behind links that expire
-(``replay_shares``), with each person's own links and the project's usage
-figures (``replay_share_overview``); its agents' governance: the policy, the
-audit trail its agents write in the clone, the approvals they wait on and its
-kill switch (``governance``).
+(``replay_shares``); its agents' governance: the policy, the audit trail its
+agents write in the clone, the approvals they wait on and its kill switch
+(``governance``); the execution waves of its backlog and the run that starts
+them in that order (``execution_waves``, ``waves``).
 
 See ``docs/architecture/server-mode.md``.
 """
@@ -40,6 +41,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.automations.api import router as automations
     from shared_features.changelog import router as changelog
     from shared_features.context import router as context
+    from shared_features.context_lifecycle import router as context_lifecycle
     from shared_features.forge import router as forge
     from shared_features.forge_gitlab import router as forge_gitlab
     from shared_features.forge_review import GITHUB, GITLAB
@@ -64,6 +66,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(ideation, "ideation")
     mount(insights, "insights")
     mount(context, "context")
+    mount(context_lifecycle, "context")
     mount(forge, "forge")
     mount(forge_gitlab, "forge")
     mount(GITHUB.router, "forge")
@@ -75,3 +78,4 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(replay_shares, "replay_shares")
     mount(replay_overview, "replay_shares")
     mount(governance, "governance")
+    mount(execution_waves, "execution_waves")

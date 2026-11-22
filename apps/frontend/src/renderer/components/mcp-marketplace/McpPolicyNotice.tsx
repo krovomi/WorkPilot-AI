@@ -100,7 +100,8 @@ export function McpPolicyBanner({
 		);
 	}
 
-	const { allowedServers, minScore, blockCustomServers, acceptedFindings } = policy.policy;
+	const { allowedServers, minScore, blockCustomServers, acceptedFindings, confineBelow } =
+		policy.policy;
 	return (
 		<Notice tone="blue" icon={ShieldCheck} className={className}>
 			<p>{t("mcpMarketplace.policy.active")}</p>
@@ -113,6 +114,11 @@ export function McpPolicyBanner({
 			)}
 			{minScore !== undefined && (
 				<p className="text-xs opacity-80">{t("mcpMarketplace.policy.minScore", { min: minScore })}</p>
+			)}
+			{confineBelow !== undefined && (
+				<p className="text-xs opacity-80">
+					{t("mcpMarketplace.policy.confineBelow", { min: confineBelow })}
+				</p>
 			)}
 			{blockCustomServers && (
 				<p className="text-xs opacity-80">{t("mcpMarketplace.policy.customBlocked")}</p>
