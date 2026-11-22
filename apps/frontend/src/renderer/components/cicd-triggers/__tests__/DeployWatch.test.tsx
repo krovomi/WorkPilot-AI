@@ -449,6 +449,16 @@ describe("CICDTriggersDashboard with a watch", () => {
 		expect(invoke).toHaveBeenCalledWith("cicdTriggers:setConfig", "/projects/shop", {
 			alert_email_to: "oncall@example.com",
 		});
+
+		await act(async () => {
+			fireEvent.change(screen.getByLabelText("cicdTriggers:flag.rollback_flag_provider"), {
+				target: { value: "launchdarkly" },
+			});
+			await vi.advanceTimersByTimeAsync(10);
+		});
+		expect(invoke).toHaveBeenCalledWith("cicdTriggers:setConfig", "/projects/shop", {
+			rollback_flag_provider: "launchdarkly",
+		});
 	});
 
 	it("links services, shows the figures and records a word on a verdict (lot 4)", async () => {

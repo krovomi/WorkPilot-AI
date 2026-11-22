@@ -189,6 +189,13 @@ describe("the feature flag of a rollback", () => {
 		expect(screen.queryByText(/watch\.flag\.done/)).toBeNull();
 	});
 
+	it("still says the flag is off when its name was not kept", () => {
+		render(
+			<DeployWatchPanel watch={watch({ rollback: "started", strategy: "flag" })} busy={false} onRollback={vi.fn()} />,
+		);
+		expect(screen.getByText('cicdTriggers:watch.rollback.startedFlag{"flag":""}')).toBeTruthy();
+	});
+
 	it("says the flag failed when the deployment went back instead", () => {
 		const { rerender } = render(
 			<DeployWatchPanel
