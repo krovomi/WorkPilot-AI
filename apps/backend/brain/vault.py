@@ -49,6 +49,11 @@ __all__ = ["Brain", "SEED_DIR"]
 
 SEED_DIR = Path(__file__).resolve().parent / "seed"
 
+_WITHHELD = (
+    "Note non vérifiée : son dernier commit n'est signé par aucune clé de "
+    "confiance du projet, son contenu n'est pas donné aux agents."
+)
+
 _README = """# WorkPilot Brain
 
 Un seul cerveau, tous tes agents. Ce dossier est un vault Obsidian (ouvre-le dans
@@ -412,7 +417,12 @@ class Brain:
         return BrainGraph.load(self.root)
 
     def recall(
-        self, query: str, limit: int = 5, *, audience: Audience | None = None
+        self,
+        query: str,
+        limit: int = 5,
+        *,
+        audience: Audience | None = None,
+        include_unverified: bool = False,
     ) -> dict[str, Any]:
         """Levels 1 and 2 of graph-first recall: graph hits, then their frontmatter.
 
@@ -420,6 +430,10 @@ class Brain:
         file deserves opening is the whole point of the first two. With an
         *audience* (`lifecycle.scopes.Audience`, an agent's build), a note
         scoped elsewhere is left out (`lifecycle.scopes.recalled`).
+
+        A project note no trusted key signed (`lifecycle.provenance`) is left
+        out — what recall answers goes to agents — unless a person asks
+        (``include_unverified``): it is then marked ``verified: False``.
         """
         self.before_read()
         # Asked for more when some may be left out, so that the limit still fills.
@@ -429,6 +443,7 @@ class Brain:
         if not hits:
             hits = self._index_search(query, wanted)
             level = "index"
+        hits = self._signed_only(hits, include_unverified)
         kept: list[dict[str, Any]] = []
         for hit in hits:
             if len(kept) >= limit:
@@ -458,6 +473,22 @@ class Brain:
             "hits": kept,
             "next": "brain_read_note(path) sur le source_file utile — seulement si ceci ne suffit pas",
         }
+
+    def _signed_only(
+        self, hits: list[dict[str, Any]], include_unverified: bool
+    ) -> list[dict[str, Any]]:
+        from .lifecycle.provenance import unverified_among
+
+        sources = [str(h["source_file"]) for h in hits if h.get("source_file")]
+        hidden = unverified_among(self.root, sources)
+        if not hidden:
+            return hits
+        if not include_unverified:
+            return [h for h in hits if str(h.get("source_file") or "") not in hidden]
+        for hit in hits:
+            if str(hit.get("source_file") or "") in hidden:
+                hit["verified"] = False
+        return hits
 
     def _meta_of(self, source: Any) -> dict[str, Any] | None:
         """The frontmatter of a note hit; ``None`` for anything else. An image
@@ -511,7 +542,10 @@ class Brain:
                 break
         return out
 
-    def read(self, rel: str) -> dict[str, Any]:
+    def read(self, rel: str, *, include_unverified: bool = False) -> dict[str, Any]:
+        """One note. A project note no trusted key signed is withheld — its
+        text and frontmatter are a stranger's until a teammate's key vouches
+        for them — unless a person asks (``include_unverified``)."""
         self.before_read()
         path = Path(rel)
         if path.is_absolute() or ".." in path.parts:
@@ -519,7 +553,23 @@ class Brain:
         if path.suffix != ".md":
             path = path.with_suffix(".md")
         note = read_note(self.root, path)
-        return {"path": note.rel, "frontmatter": note.meta, "body": note.body}
+        from .lifecycle.provenance import unverified_among
+
+        if not unverified_among(self.root, [note.rel]):
+            return {"path": note.rel, "frontmatter": note.meta, "body": note.body}
+        if include_unverified:
+            return {
+                "path": note.rel,
+                "frontmatter": note.meta,
+                "body": note.body,
+                "verified": False,
+            }
+        return {
+            "path": note.rel,
+            "frontmatter": {},
+            "body": _WITHHELD,
+            "verified": False,
+        }
 
     def status(self) -> dict[str, Any]:
         counts: dict[str, int] = {}

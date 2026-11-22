@@ -120,8 +120,21 @@ def _has_identity(root: Path) -> bool:
     )
 
 
+def _signing_failed(root: Path, stderr: str) -> bool:
+    """A commit refused because the signature it was configured to carry failed."""
+    if "failed to write commit object" not in (stderr or ""):
+        return False
+    return _git(root, "config", "--bool", "commit.gpgsign").stdout.strip() == "true"
+
+
 def _commit(root: Path, message: str, result: SyncResult | None = None) -> bool:
     """Commit everything on disk. A refusal is recorded on *result*.
+
+    The commit is signed when the person's git configuration says so
+    (``commit.gpgsign`` with ``gpg.format`` and ``user.signingkey``), with
+    the key they already sign their code with: nothing here creates a key or
+    turns signing on. A team that lists its trusted signers reads a signed
+    note as verified (`lifecycle.provenance`).
 
     It used to be ignored, and a commit that failed left the working tree
     dirty: the rebase after it refused ("unstaged changes"), the merge
@@ -133,6 +146,15 @@ def _commit(root: Path, message: str, result: SyncResult | None = None) -> bool:
         return False
     ident = [] if _has_identity(root) else _AUTHOR
     done = _git(root, *ident, "commit", "-q", "-m", message)
+    if done.returncode != 0 and _signing_failed(root, done.stderr):
+        # Signing is the person's own git setting, never forced here; a key
+        # it cannot reach (no agent, a removed file) must not stop the
+        # brain. The commit goes unsigned, and a team that lists its
+        # trusted signers sees the note as unverified (`lifecycle.provenance`).
+        logger.warning("brain: commit signing failed; this commit is not signed")
+        done = _git(
+            root, *ident, "-c", "commit.gpgsign=false", "commit", "-q", "-m", message
+        )
     if done.returncode != 0 and result is not None:
         result.step = "commit"
         result.error = (done.stderr or added.stderr).strip()[-500:] or "commit refused"
@@ -168,6 +190,11 @@ _IGNORED = (
     # The vectors a local embeddings model gave this machine's notes
     # (`lifecycle.embeddings`): a cache, rebuilt by any machine that has one.
     ".workpilot-brain/embeddings.json",
+    # What git said of each commit's signature (`lifecycle.provenance`), and
+    # the trusted signers in git's ``allowed_signers`` form: derived on each
+    # machine from the vault's list and its history.
+    ".workpilot-brain/signatures.json*",
+    ".workpilot-brain/allowed_signers*",
 )
 
 _ATTRIBUTES = "knowledge/projects/*/memory/.lifecycle/journal/*.md merge=union"

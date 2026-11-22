@@ -512,4 +512,4 @@ class TestSettingsRoute:
 def test_the_cache_is_git_ignored():
     from brain import sync
 
-    assert sync._IGNORED[-1] == embeddings.CACHE_FILE
+    assert embeddings.CACHE_FILE in sync._IGNORED

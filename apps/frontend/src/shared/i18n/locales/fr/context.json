@@ -267,7 +267,8 @@
 			"escalated": "contredite à nouveau peu après une décision",
 			"maintainers-changed": "les mainteneurs ont changé",
 			"scoped": "l'endroit où elle s'applique a changé",
-			"conflict-announced": "annoncé sur les canaux du projet"
+			"conflict-announced": "annoncé sur les canaux du projet",
+			"signers-changed": "les signataires de confiance ont changé"
 		},
 		"errors": {
 			"failed": "l'action a échoué",
@@ -319,6 +320,24 @@
 		},
 		"decisions": {
 			"title": "Décisions"
+		},
+		"signers": {
+			"title": "Signataires de confiance",
+			"none": "Aucun signataire de confiance : toutes les notes vont aux agents, comme avant.",
+			"list": "De confiance : {{names}}",
+			"edit": "Modifier la liste",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"placeholder": "Une par ligne : nom ssh-ed25519 AAAA… ou nom empreinte GPG",
+			"hint": "Une note synchronisée par un coéquipier ne va aux agents que si son dernier commit est signé par l'une de ces clés (la clé SSH ou GPG avec laquelle son git signe déjà ses commits).",
+			"maintainerOnly": "Seul un mainteneur modifie cette liste.",
+			"unverified_one": "{{count}} mémoire n'est pas vérifiée : lisible ici, tenue hors des prompts des agents.",
+			"unverified_other": "{{count}} mémoires ne sont pas vérifiées : lisibles ici, tenues hors des prompts des agents.",
+			"rejected_one": "{{count}} modification de cette liste n'est signée par aucune clé listée : elle est ignorée.",
+			"rejected_other": "{{count}} modifications de cette liste ne sont signées par aucune clé listée : elles sont ignorées.",
+			"notSigning": "Cette machine ne signe pas ses commits : une fois synchronisées, les notes écrites ici ne sont pas vérifiées pour l'équipe. Active la signature des commits dans git (commit.gpgsign).",
+			"badge": "Non vérifiée",
+			"badgeHint": "Sa dernière modification n'est signée par aucune clé de confiance : tenue hors des prompts des agents."
 		}
 	}
 }

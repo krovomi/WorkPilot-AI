@@ -18,6 +18,11 @@ export const memoryLifecycleMock = {
 			pinned: 0,
 			pinLimit: 50,
 			retentionDays: 30,
+			signers: [],
+			signersRejected: 0,
+			signing: false,
+			canEditSigners: true,
+			unverified: [],
 		},
 	}),
 	getMemoryHistory: async () => ({ success: true as const, data: [] }),
@@ -46,6 +51,10 @@ export const memoryLifecycleMock = {
 		error: "Not available in browser mock",
 	}),
 	setMemoryMaintainers: async () => ({
+		success: false as const,
+		error: "Not available in browser mock",
+	}),
+	setMemorySigners: async () => ({
 		success: false as const,
 		error: "Not available in browser mock",
 	}),

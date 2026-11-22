@@ -382,12 +382,81 @@ C'est pourquoi le contrat d'imports de `brain` s'élargit à `agent_runtime` (un
 `security` (`clean_untrusted`) : aucun des deux ne remonte vers `brain`, le plus grand cycle ne
 change pas.
 
+## Des notes vérifiées par la signature git (`signers.py`, `provenance.py`)
+
+Le vault voyage par un distant git : quiconque peut y pousser met une note devant chaque agent de
+l'équipe, et « la confiance est celle du distant » ne suffit pas à une équipe qui veut plus. Les
+clés sont celles que chacun a déjà pour signer ses commits git (SSH ou GPG) : aucune clé à créer,
+à distribuer ni à garder par WorkPilot.
+
+- **Signer.** `sync._commit` laisse git signer quand la configuration de la personne le dit
+  (`commit.gpgsign`, `gpg.format`, `user.signingkey`) ; rien ne l'active, rien ne crée de clé.
+  Une clé hors de portée (pas d'agent, fichier disparu) ne bloque pas le cerveau : le commit part
+  sans signature, avec un avertissement dans le journal du processus, et l'équipe voit la note
+  non vérifiée.
+- **La liste** est un fichier du vault, à côté des mainteneurs :
+  `.lifecycle/trusted-signers.md`, une ligne `- <nom> <clé>` par clé (clé publique SSH
+  `<type> <base64>`, ou empreinte GPG de 40 ou 64 chiffres hexadécimaux), 50 au plus. Elle se
+  modifie depuis l'onglet (**Signataires de confiance**), est journalisée (`designate`,
+  `signers-changed`) et, comme une paire escaladée, n'est modifiée que par un mainteneur quand le
+  projet en a (`maintainer-only`).
+- **Le verdict de chaque note.** Après une synchronisation, à la lecture, la dernière
+  modification de chaque note du dossier du projet (`knowledge/projects/<projet>/`) est attribuée
+  à son commit (`git log --name-only`, les merges mis à part) et sa signature lue par git
+  lui-même (`%G?`, `%GF` : la mécanique de `git verify-commit`, `gpg.ssh.allowedSignersFile`
+  pointé par `-c` sur les clés SSH de la liste, `gpg.ssh.program` sur le `ssh-keygen` du système,
+  un programme qui ne sait que signer ne vérifiant pas). Arguments en liste, sans shell.
+
+  | Verdict | Quand |
+  |---|---|
+  | `own` | écrite ici et pas encore synchronisée : un changement sur le disque, ou un commit qu'aucun distant n'a |
+  | `verified` | son dernier commit est signé, signature bonne (`G`, `U`), par une clé dont l'empreinte est sur la liste |
+  | `unverified` | tout le reste : sans signature, une autre clé, une signature que git ne peut pas vérifier (clé GPG absente du trousseau), une copie de conflit (le texte de l'autre côté) |
+
+- **Lisible, pas injectée.** Une note non vérifiée reste lisible là où une personne lit la
+  mémoire, avec la marque « non vérifiée » : onglet Mémoires (et sa recherche), historique d'une
+  mémoire, journal de l'onglet Cycle de vie (qui compte aussi ces notes), `POST /api/brain/recall`.
+  Elle n'arrive à aucun agent : `ProjectMemory` la saute (pièges, conventions, sessions, recherche,
+  indices du graphe), `Brain.recall` la laisse de côté et `Brain.read` retient son texte et son
+  frontmatter, le serveur MCP `workpilot-brain` fait de même et retire ses nœuds de
+  `query_graph` / `get_node`, `mem_search` ne l'indexe pas, et le learning loop ne met pas ses
+  patterns dans un prompt (`get_patterns_for_phase`) tout en les gardant dans son magasin, qu'il
+  réécrit. Aucune règle automatique ne tranche une paire dont une note est non vérifiée (son
+  épingle ou sa date sont la parole de son auteur) : elle attend une personne.
+- **La liste se protège elle-même.** Une modification poussée par quelqu'un d'autre ne compte
+  que si une clé déjà sur la liste l'a signée ; la première liste d'un projet ouvre l'opt-in telle
+  quelle. Sinon, quiconque peut pousser une note pourrait aussi pousser une liste à sa clé, ou une
+  liste vide. La modification de la personne (sur le disque, ou un commit qu'aucun distant n'a)
+  compte toujours ; l'onglet dit combien de modifications reçues ont été écartées. L'éditeur part
+  de la liste en vigueur, pas du fichier : enregistrer ne valide pas une modification écartée.
+- **Opt-in, par projet.** Sans liste, ou avec une liste vide, rien ne change : aucune note n'a de
+  verdict et toutes vont aux agents comme avant. Un cerveau qui n'a jamais rien reçu (aucune
+  référence distante) n'exécute même pas git pour le savoir. Quand la liste existe mais que git ne
+  répond pas, rien de reçu ne va aux agents (échec fermé).
+- **Ce qui n'est pas couvert.** Une note hors du dossier d'un projet (le reste du vault, les
+  instructions partagées) n'est couverte par aucune liste. Un commit local, ou une fusion, posé
+  sur une modification reçue s'en porte garant, comme un commit signé en git. Les projets du
+  serveur n'ont pas de liste : leur cerveau n'est jamais synchronisé, et aucune commande git n'y
+  est lancée depuis une route.
+- **Le cache** des signatures est celui de la machine : `.workpilot-brain/signatures.json`
+  (ignoré par git), par commit : `G`, `U` (bonne signature, clé connue ou non) et `N` (aucune).
+  Le verdict est recalculé à partir de ces faits et de la liste du moment : retirer une clé de la
+  liste lui retire la confiance aussitôt. Ce que git n'a pas pu vérifier (`E`) est redemandé.
+  Les clés SSH de la liste, au format `allowed_signers` de git, sont écrites à côté
+  (`.workpilot-brain/allowed_signers`, ignoré aussi).
+
+Vérifié avec de vrais dépôts temporaires et de vraies signatures SSH (clés jetables faites par
+`ssh-keygen` dans le dossier du test, `tests/brain/test_memory_signatures.py`) ; les runners Linux
+et macOS de la CI posent `WORKPILOT_EXPECT_SSH_SIGNING`, sous lequel un `ssh-keygen` absent est un
+échec et non un test sauté. GPG est vérifié par empreinte (pas de trousseau de test).
+
 ## Surfaces
 
 - `GET /api/brain/memory/lifecycle` (avec les entrées reprenables et les chiffres),
   `GET …/history`, `POST …/forget`, `…/restore`, `…/pin`, `…/revert`, `…/scope`, `…/maintainers`,
-  `…/conflicts/resolve`, `…/conflicts/suggest` (`brain/lifecycle/api.py`, inclus dans le routeur
-  du cerveau : refusé en mode serveur comme lui, le projet est un nom lu dans `project_dir`).
+  `…/conflicts/resolve`, `…/conflicts/suggest`, `…/signers` (`brain/lifecycle/api.py`, inclus
+  dans le routeur du cerveau : refusé en mode serveur comme lui, le projet est un nom lu dans
+  `project_dir`).
 - Serveur : `/api/features/context/memory/{lifecycle,history,forget,restore,pin,scope,revert}`
   (`shared_features/context_lifecycle.py`, ci-dessus).
 - Desktop : canaux `CONTEXT_MEMORY_*` (`main/ipc-handlers/context/memory-lifecycle-handlers.ts`,
@@ -446,9 +515,8 @@ Rien pour #348. Pour #352, ce qui attend une décision du mainteneur du projet :
 
 - Embeddings sans Ollama (LM Studio, llama.cpp) et sur un projet du serveur : la passe ne lit
   que l'Ollama local, et un projet du serveur n'a pas de file de conflits.
-- Signature des instantanés et liste blanche des sources : que devient une note non signée, et
-  comment la clé de chaque coéquipier lui parvient (aujourd'hui, la confiance est celle du
-  distant git choisi).
+- Signatures : une liste par projet couvre le dossier de ce projet ; les notes du reste du vault
+  (connaissances hors projet, instructions partagées) n'en ont pas encore.
 - Les projets du serveur n'ont pas de file de conflits (leur cerveau n'est jamais
   synchronisé), donc pas d'annonce ni de mainteneurs par portée.
 - Les patterns du learning loop (leur injecteur et la source `PatternSource` de `mem_search`)

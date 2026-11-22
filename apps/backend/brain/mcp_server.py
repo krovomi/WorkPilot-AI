@@ -268,6 +268,33 @@ def _trusted_default() -> bool:
     return os.environ.get(ORIGIN_ENV, "").strip().lower() != "workpilot"
 
 
+def _signed_nodes(brain: Brain, found: Any) -> Any:
+    """A graph answer without the nodes of notes no trusted key signed: their
+    titles are a stranger's words until a teammate's key vouches for them
+    (`lifecycle.provenance`). A path between nodes is ids only, and stays."""
+    from .lifecycle.provenance import unverified_among
+
+    graph = brain.graph()
+
+    def source(node_id: Any) -> str:
+        return str((graph.nodes.get(str(node_id)) or {}).get("source_file") or "")
+
+    if isinstance(found, list) and all(isinstance(n, dict) for n in found):
+        hidden = unverified_among(brain.root, [source(n.get("id")) for n in found])
+        return [n for n in found if source(n.get("id")) not in hidden]
+    if isinstance(found, dict):
+        near = found.get("neighbors") or []
+        ids = [found.get("id"), *(n.get("id") for n in near)]
+        hidden = unverified_among(brain.root, [source(i) for i in ids])
+        if source(found.get("id")) in hidden:
+            return None
+        return {
+            **found,
+            "neighbors": [n for n in near if source(n.get("id")) not in hidden],
+        }
+    return found
+
+
 def _call(
     brain: Brain,
     name: str,
@@ -299,7 +326,7 @@ def _call(
     }
     if name in graph_tools:
         brain.before_read()
-        return graph_tools[name]()
+        return _signed_nodes(brain, graph_tools[name]())
     if name == "brain_recall":
         return brain.recall(
             args["query"], limit=_line_arg(args.get("limit")) or 5, audience=recalling()
@@ -347,11 +374,11 @@ def _call(
 def _query_graph(
     brain: Brain, args: dict[str, Any], audience: scopes.Audience
 ) -> list[dict[str, Any]]:
-    """``query_graph``, less the notes scoped away from *audience*; asked for
-    more first, so that the limit still fills."""
+    """``query_graph``, less the notes scoped away from *audience* and those no
+    trusted key signed; asked for more first, so that the limit still fills."""
     limit = _line_arg(args.get("limit")) or 8
     hits = brain.graph().query(args["query"], limit=max(limit * 4, 20))
-    return brain.recalled(hits, audience, limit)
+    return brain.recalled(_signed_nodes(brain, hits), audience, limit)
 
 
 def _result(msg_id: Any, result: Any) -> dict[str, Any]:

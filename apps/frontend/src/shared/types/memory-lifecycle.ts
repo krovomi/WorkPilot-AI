@@ -133,6 +133,14 @@ export interface MemoryLifecycleMetrics {
 	too_aggressive: boolean;
 }
 
+/** A key whose signed commits the memory trusts (`brain/lifecycle/signers.py`). */
+export interface TrustedSigner {
+	name: string;
+	kind: "ssh" | "gpg";
+	/** `SHA256:…` for SSH, the hexadecimal fingerprint for GPG. */
+	fingerprint: string;
+}
+
 export interface MemoryLifecycleView {
 	journal: MemoryJournalEntry[];
 	/** Entry id → how it can be taken back. */
@@ -151,6 +159,16 @@ export interface MemoryLifecycleView {
 	pinned: number;
 	pinLimit: number;
 	retentionDays: number;
+	/** The trusted signers in effect here; empty: every note is trusted as before. */
+	signers: TrustedSigner[];
+	/** Changes to the list someone pushed that no listed key signed: ignored. */
+	signersRejected: number;
+	/** Whether this machine's git signs its commits. */
+	signing: boolean;
+	/** Whether the person here may change the list (the maintainers, when there are some). */
+	canEditSigners: boolean;
+	/** The memories no trusted key signed: readable, kept from agents. */
+	unverified: string[];
 }
 
 export type MemoryConflictChoice = "a" | "b" | "custom" | "dismiss";

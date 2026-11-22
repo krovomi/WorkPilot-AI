@@ -35,6 +35,11 @@ function view(over: Partial<MemoryLifecycleView> = {}): MemoryLifecycleView {
 		pinned: 2,
 		pinLimit: 50,
 		retentionDays: 30,
+		signers: [],
+		signersRejected: 0,
+		signing: false,
+		canEditSigners: true,
+		unverified: [],
 		trash: [],
 		conflicts: [],
 		journal: [

@@ -38,6 +38,7 @@ import { useProjectStore } from "../../stores/project-store";
 import { kickQueue, useTaskStore } from "../../stores/task-store";
 import { useBoardUndoStore } from "../../stores/board-undo-store";
 import { usePendingDeleteStore } from "../../stores/pending-delete-store";
+import { useTaskReadinessStore } from "../../stores/task-readiness-store";
 import { KanbanBoard } from "../KanbanBoard";
 import { Toaster } from "../ui/toaster";
 import { TooltipProvider } from "../ui/tooltip";
@@ -172,6 +173,8 @@ beforeAll(() => {
 beforeEach(() => {
 	localStorage.clear();
 	installApi();
+	// A card the pre-analysis held in one test would keep its dialog open in the next.
+	useTaskReadinessStore.setState({ held: [], accepted: new Set() });
 	useProjectStore.setState({
 		projects: [
 			{
@@ -754,6 +757,25 @@ describe("KanbanBoard — selection and bulk actions", () => {
 		await waitFor(() => expect(screen.getAllByText(/1 task\(s\) moved successfully/).length).toBeGreaterThan(0));
 		// The slot it freed does not start it again at once.
 		expect(api.fn("updateTaskStatus").mock.calls.map((call) => [call[0], call[1]])).toEqual([["a", "queue"]]);
+	});
+
+	it("holds a short card the pre-analysis stops, alone or in a dragged selection", async () => {
+		const user = userEvent.setup();
+		const notReady = { ready: false, questions: [{ id: "q1", question: "Which page?" }] };
+		installApi({ checkTaskReadiness: vi.fn(async () => ({ success: true, data: notReady })) });
+		renderBoard([makeTask({ id: "a", title: "A" }), makeTask({ id: "b", title: "B" }), makeTask({ id: "c", title: "C" })]);
+		await drag.end("c", "in_progress");
+		expect(await screen.findByText("Which page?")).toBeInTheDocument();
+		// Its dialog says why: no "operation failed" on top.
+		expect(screen.queryByText("Operation failed")).toBeNull();
+		await user.click(screen.getByRole("button", { name: "Later" }));
+		await select(user, "A");
+		await select(user, "B");
+		drag.start("a");
+		await drag.end("a", "in_progress");
+		// One slot: A would start and is held, B goes to wait in the queue.
+		expect((await screen.findAllByText(/1 card waits for your answers before it starts\./)).length).toBeGreaterThan(0);
+		expect(api.fn("updateTaskStatus").mock.calls.map((call) => [call[0], call[1]])).toEqual([["b", "queue"]]);
 	});
 
 	it("asks before completing reviewed cards, then opens the PR flow", async () => {

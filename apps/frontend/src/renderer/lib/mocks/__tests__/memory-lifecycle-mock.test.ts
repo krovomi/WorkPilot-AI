@@ -22,6 +22,11 @@ describe("the memory lifecycle browser mock", () => {
 				pinned: 0,
 				pinLimit: 50,
 				retentionDays: 30,
+				signers: [],
+				signersRejected: 0,
+				signing: false,
+				canEditSigners: true,
+				unverified: [],
 			},
 		});
 		expect(await memoryLifecycleMock.getMemoryHistory()).toEqual({ success: true, data: [] });
@@ -37,6 +42,7 @@ describe("the memory lifecycle browser mock", () => {
 			memoryLifecycleMock.revertMemoryDecision,
 			memoryLifecycleMock.setMemoryScope,
 			memoryLifecycleMock.setMemoryMaintainers,
+			memoryLifecycleMock.setMemorySigners,
 		]) {
 			expect(await change()).toEqual({ success: false, error: "Not available in browser mock" });
 		}

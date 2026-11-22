@@ -80,6 +80,24 @@ export function scopeText(value: unknown): string | null {
 	return text === null || hasControl(text) ? null : text;
 }
 
+export const MAX_SIGNERS = 50;
+/** An RSA-4096 public key with its name is about 750 characters. */
+const MAX_SIGNER_LENGTH = 1_200;
+
+/** The trusted signers' lines (`<name> <key>`): at most 50, each one line under
+ * its cap, or `null`. The backend parses each key. */
+export function signerLines(value: unknown): string[] | null {
+	if (!Array.isArray(value) || value.length > MAX_SIGNERS) return null;
+	const ok = value.every(
+		(line) =>
+			typeof line === "string" &&
+			line.trim().length > 0 &&
+			line.length <= MAX_SIGNER_LENGTH &&
+			!hasControl(line),
+	);
+	return ok ? value.map((line: string) => line.trim()) : null;
+}
+
 /** The maintainers' names: at most 20, each one line under its cap, or `null`. */
 export function maintainerNames(value: unknown): string[] | null {
 	if (!Array.isArray(value) || value.length > MAX_MAINTAINERS) return null;

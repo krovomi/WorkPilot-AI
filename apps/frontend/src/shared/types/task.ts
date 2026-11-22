@@ -163,6 +163,22 @@ export interface Subtask {
 	requestedAt?: string;
 }
 
+/** A check of the machine that a start would fail (pre-analysis before « En cours »). */
+export type TaskReadinessProblem = "no_git" | "no_commit" | "no_auth";
+
+/**
+ * The pre-analysis of a card about to start (docs/architecture/task-readiness.md):
+ * quick checks always, an AI review only for a short card.
+ */
+export interface TaskReadiness {
+	/** False when the card should not start as it is. */
+	ready: boolean;
+	/** The machine check that failed: starting now would fail. */
+	problem?: TaskReadinessProblem;
+	/** The review of a short card: what to answer before it starts. */
+	questions?: SpecInterviewQuestion[];
+}
+
 /**
  * A clarifying question produced by the pre-planning spec interview.
  * Answers are appended to the task description before planning starts.

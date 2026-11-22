@@ -39,6 +39,7 @@ describe("createMemoryLifecycleAPI", () => {
 				() => api.setMemoryMaintainers("p1", ["Bob"], "team:ops"),
 				[C.CONTEXT_MEMORY_SET_MAINTAINERS, "p1", ["Bob"], "team:ops"],
 			],
+			[() => api.setMemorySigners("p1", ["alice ABCD"]), [C.CONTEXT_MEMORY_SET_SIGNERS, "p1", ["alice ABCD"]]],
 			[() => api.revertMemoryDecision("p1", "0123456789ab"), [C.CONTEXT_MEMORY_REVERT, "p1", "0123456789ab"]],
 		];
 		for (const [call, expected] of calls) {

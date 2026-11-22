@@ -284,6 +284,8 @@ export interface MemoryEpisode {
 	pinned?: boolean;
 	/** Where the memory applies (a part of the code); empty: everywhere. */
 	applies_to?: string;
+	/** `false`: no trusted key signed its last change; kept from agents (`brain/lifecycle/provenance.py`). */
+	verified?: boolean;
 	// For PR reviews - extracted from content for quick access
 	prNumber?: number;
 	repo?: string;
@@ -294,6 +296,8 @@ export interface ContextSearchResult {
 	content: string;
 	score: number;
 	type: string;
+	/** `false`: no trusted key signed its last change. */
+	verified?: boolean;
 }
 
 export interface ProjectContextData {

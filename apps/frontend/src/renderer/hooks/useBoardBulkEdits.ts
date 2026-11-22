@@ -16,8 +16,9 @@ import { persistTaskStatus, useTaskStore } from "../stores/task-store";
 import { toast } from "./use-toast";
 
 /** What a group move did besides moving: cards left waiting, cards left in place. */
-function groupMoveDetails(plan: GroupMovePlan, slots: number, t: TFunction): string | undefined {
+function groupMoveDetails(plan: GroupMovePlan, slots: number, t: TFunction, held = 0): string | undefined {
 	const lines = [];
+	if (held > 0) lines.push(t("tasks:kanban.groupMove.held", { count: held }));
 	if (plan.queued > 0) lines.push(t("tasks:kanban.groupMove.queued", { count: plan.queued, slots }));
 	if (plan.skipped > 0) lines.push(t("tasks:kanban.groupMove.skipped", { count: plan.skipped }));
 	return lines.length > 0 ? lines.join(" ") : undefined;
@@ -116,14 +117,15 @@ export function useBoardBulkEdits({
 				return;
 			}
 			let failed = 0;
+			let held = 0;
 			const moved = [];
 			for (const { task, to } of plan.moves) {
 				if (to === "queue" && task.status === "in_progress") heldInQueue.add(task.id);
-				if ((await persistTaskStatus(task.id, to)).success) {
-					moved.push({ id: task.id, from: task.status, to });
-				} else {
-					failed++;
-				}
+				const result = await persistTaskStatus(task.id, to);
+				if (result.success) moved.push({ id: task.id, from: task.status, to });
+				// Held by the pre-analysis: its dialog asks what the card needs.
+				else if (result.held) held++;
+				else failed++;
 			}
 			// On top of their new column, in the selection's order.
 			const store = useTaskStore.getState();
@@ -141,7 +143,7 @@ export function useBoardBulkEdits({
 			}
 			toast({
 				title: t("tasks:kanban.bulkMoveSuccess", { count: moved.length }),
-				description: groupMoveDetails(plan, maxParallelTasks, t),
+				description: groupMoveDetails(plan, maxParallelTasks, t, held),
 			});
 			deselectAllTasks();
 		},

@@ -1,7 +1,8 @@
-import { History, Undo2 } from "lucide-react";
+import { History, ShieldAlert, Undo2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { MemoryJournalEntry, MemoryRevertMode } from "../../../../shared/types";
 import { formatAppDateTime } from "../../../lib/date-format";
+import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { entryLabel, shortPath } from "./lifecycle-labels";
 
@@ -12,6 +13,24 @@ interface MemoryTimelineProps {
 	/** Entry id → how a person can take it back (the project journal). */
 	readonly revertible?: Record<string, MemoryRevertMode>;
 	readonly onRevert?: (entryId: string) => void;
+	/** The memories no trusted key signed: their entries carry the mark. */
+	readonly unverified?: ReadonlySet<string>;
+}
+
+/** The "unverified" mark of a memory no trusted key signed. */
+export function UnverifiedBadge() {
+	const { t } = useTranslation(["context"]);
+	return (
+		<Badge
+			variant="outline"
+			className="gap-1 text-xs text-warning"
+			title={t("context:lifecycle.signers.badgeHint")}
+			data-testid="memory-unverified"
+		>
+			<ShieldAlert className="h-3 w-3" />
+			{t("context:lifecycle.signers.badge")}
+		</Badge>
+	);
 }
 
 /** Journal entries, newest first: one memory's timeline, or the project's. */
@@ -20,6 +39,7 @@ export function MemoryTimeline({
 	showNote = false,
 	revertible = {},
 	onRevert,
+	unverified,
 }: MemoryTimelineProps) {
 	const { t } = useTranslation(["context"]);
 	if (entries.length === 0) {
@@ -40,6 +60,11 @@ export function MemoryTimeline({
 								{formatAppDateTime(entry.ts)}
 							</span>{" "}
 							{entryLabel(t, entry)}
+							{unverified?.has(entry.note) && (
+								<span className="ml-2">
+									<UnverifiedBadge />
+								</span>
+							)}
 						</div>
 						{showNote && (
 							<div className="truncate text-muted-foreground">
