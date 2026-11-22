@@ -43,6 +43,7 @@ import type {
 	TaskComplexity,
 	TaskImpact,
 	TaskPriority,
+	TestPlacementMode,
 	ThinkingLevel,
 } from "../../shared/types";
 import type { ContextPolicy } from "../../shared/types/task";
@@ -91,6 +92,7 @@ import {
 	autoSplitValueFrom,
 	isAutoSplitValueValid,
 } from "./task-form/AutoSplitFields";
+import { placementModeOf } from "./suite-placement/suite-hold";
 import {
 	autoSplitCeilingFor,
 	kindFromCategory,
@@ -278,6 +280,9 @@ export function TaskEditDialog({
 	// TDD override (per-task)
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
 	const [verifyLoop, setVerifyLoop] = useState(task.metadata?.verifyLoop ?? true);
+	const [testPlacement, setTestPlacement] = useState<TestPlacementMode | undefined>(() =>
+		placementModeOf(task.metadata?.testPlacement),
+	);
 	const [autoSplit, setAutoSplit] = useState<AutoSplitValue>(() =>
 		autoSplitValueFrom(task.metadata),
 	);
@@ -366,6 +371,7 @@ export function TaskEditDialog({
 		);
 		setTddMode(task.metadata?.tddMode ?? false);
 		setVerifyLoop(task.metadata?.verifyLoop ?? true);
+		setTestPlacement(placementModeOf(task.metadata?.testPlacement));
 		setAutoSplit(autoSplitValueFrom(task.metadata));
 		setVerifyWindow(task.metadata?.verifyWindow ?? "");
 		setVerifyScenario(task.metadata?.verifyScenario ?? "");
@@ -463,6 +469,8 @@ export function TaskEditDialog({
 		const engineChanged = JSON.stringify(engine) !== initialEngineRef.current;
 		const splitBefore = autoSplitMetadata(autoSplitValueFrom(task.metadata));
 		const splitAfter = autoSplitMetadata(autoSplit);
+		const testPlacementChanged =
+			testPlacement !== placementModeOf(task.metadata?.testPlacement);
 		const autoSplitChanged =
 			splitBefore.noSplit !== splitAfter.noSplit ||
 			splitBefore.splitMaxLines !== splitAfter.splitMaxLines;
@@ -485,6 +493,7 @@ export function TaskEditDialog({
 					(task.metadata?.requireReviewBeforeCoding ?? false) ||
 				tddMode !== (task.metadata?.tddMode ?? false) ||
 				verifyLoop !== (task.metadata?.verifyLoop ?? true) ||
+				testPlacementChanged ||
 				autoSplitChanged ||
 				verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "") ||
 				verifyScenario.trim() !== (task.metadata?.verifyScenario ?? "") ||
@@ -548,6 +557,8 @@ export function TaskEditDialog({
 		if (verifyLoop !== (task.metadata?.verifyLoop ?? true)) {
 			metadataUpdates.verifyLoop = verifyLoop;
 		}
+		// `undefined` removes the key: the task follows the project's placement again.
+		if (isDuplicate || testPlacementChanged) metadataUpdates.testPlacement = testPlacement;
 		// `undefined` removes the key: the task is back on the project's ceiling.
 		if (isDuplicate || autoSplitChanged) Object.assign(metadataUpdates, splitAfter);
 		if (verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "")) {
@@ -798,6 +809,8 @@ export function TaskEditDialog({
 				autoSplitProjectDisabled={projectAutoSplit?.enabled === false}
 				verifyLoop={verifyLoop}
 				onVerifyLoopChange={setVerifyLoop}
+				testPlacement={testPlacement}
+				onTestPlacementChange={setTestPlacement}
 				verifyWindow={verifyWindow}
 				onVerifyWindowChange={setVerifyWindow}
 				verifyScenario={verifyScenario}
