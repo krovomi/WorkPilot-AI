@@ -35,7 +35,8 @@ depuis le dépôt, comme la CI le fait à chaque PR (job `server-image`).
   pour l'exemple de proxy, qui utilise `!override`.
 - Un accès Internet pendant la construction de l'image : paquets Debian, release de `gh`,
   dépendances Python installées par empreinte (`apps/backend/requirements.lock`).
-- Un nom DNS pour le serveur et les ports 80 et 443.
+- Selon l'hébergement choisi (section suivante) : un nom DNS et les ports 80 et 443 pour un
+  serveur public, le port 80 sur le réseau local sinon.
 - Un accès Git aux dépôts des projets pour le serveur (voir [L'accès Git](#2-laccès-git)).
 - Les identifiants du fournisseur de LLM des builds, par exemple `CLAUDE_CODE_OAUTH_TOKEN`.
 
@@ -43,7 +44,68 @@ Le serveur sort vers : le fournisseur de LLM, les forges (git en SSH ou HTTPS, `
 les instances GitLab), `login.microsoftonline.com` si Entra est réglé, l'émetteur OpenID Connect s'il est réglé, `api.pwnedpasswords.com` si
 la vérification HIBP est active, le serveur SMTP s'il est réglé.
 
+## Choisir où héberger le serveur
+
+Chaque équipe héberge son serveur là où elle le peut ; le code et l'image sont les mêmes, seuls
+l'adresse et le chiffrement changent. `deploy/configure.py` (Python 3.10 ou plus, sur l'hôte, sans
+dépendance) demande le choix et écrit la configuration qui va avec :
+
+```bash
+cd deploy
+python3 configure.py            # pose les questions
+python3 configure.py --hosting public --host workpilot.example.com
+python3 configure.py --hosting lan --host 192.168.1.20
+python3 configure.py --hosting local
+```
+
+| Choix | Pour qui | Adresse que l'app saisit | Ce qui passe sur le réseau |
+|---|---|---|---|
+| `public` : un VPS (OVH, Scaleway, Hetzner…) ou un serveur Linux avec un nom DNS public | une équipe répartie, une formation à distance | `https://<nom>` | HTTPS, certificat Let's Encrypt que Caddy obtient et renouvelle ; le nom doit pointer vers la machine, ports 80 et 443 ouverts |
+| `lan` : une machine du réseau local (serveur de l'entreprise, PC d'un membre) | une équipe dans les mêmes locaux ou sur le même VPN | `http://<nom ou IP>` | HTTP en clair sur le port 80 : mots de passe et jetons lisibles par qui écoute ce réseau ; un réseau de confiance seulement, ou votre certificat (ci-dessous) |
+| `local` : cet ordinateur seul | un essai, une démonstration | `http://localhost` | rien ne sort de la machine |
+
+Le script :
+
+- crée `.env.server` (droits `600`) à partir de `server-env.example` et génère les trois secrets
+  au premier passage, **jamais ensuite** : relancé pour changer d'hébergement, il garde les
+  secrets et toutes vos lignes, et ne remplace que `WORKPILOT_HOSTING`,
+  `WORKPILOT_PUBLIC_BASE_URL` et `WORKPILOT_PUBLIC_STREAM_URL` ;
+- copie `Caddyfile.example` et `docker-compose.override.example.yml` s'il n'en existe pas de
+  copie : le proxy est là dans les trois cas, car c'est lui qui rend le flux en direct joignable
+  ([pourquoi](#pourquoi-le-proxy-partage-le-réseau-du-conteneur-api)). Une adresse en `http://`
+  fait servir à Caddy du HTTP simple sur le port 80, sans certificat ;
+- refuse une adresse IP pour `public` (Let's Encrypt n'en certifie pas) et une adresse avec
+  schéma, port ou chemin.
+
+**Un PC Windows** (choix `lan` ou `local`) : installez Docker Desktop (moteur WSL 2) et lancez les
+mêmes commandes dans PowerShell, `python` à la place de `python3`. Le port 80 peut être pris par
+IIS ou un autre service : libérez-le avant de démarrer. Le PC doit rester allumé pendant que
+l'équipe travaille.
+
+**L'isolation des runs** dépend du noyau, pas de WorkPilot : sur un VPS Linux récent, elle est
+là ; sous Docker Desktop (noyau WSL 2) ou un vieux noyau, vérifiez-la après le démarrage :
+
+```bash
+docker compose --env-file .env.server exec api python -c \
+  'from foundation.landlock import abi_version; print(abi_version())'
+```
+
+Un nombre : chaque run est confiné à son projet. Une erreur : ce noyau ne sait pas le faire et
+tout run échoue avec cette raison. `WORKPILOT_RUN_ISOLATION=off` les lance quand même, sans
+confinement : seulement si chaque personne du serveur a le droit de lire tous ses projets.
+
+**Votre propre certificat** sur le réseau local : passez l'adresse en `https://` dans
+`.env.server` (les deux URL, `wss://` pour le flux) et ajoutez `tls <certificat> <clé>` au
+`Caddyfile`, fichiers montés en lecture seule. L'app de bureau doit faire confiance à l'autorité
+qui l'a émis, ce qui n'a pas été essayé avec une autorité interne.
+
+Chaque personne saisit ensuite l'adresse du serveur dans l'app, à sa connexion : rien d'autre à
+régler côté poste.
+
 ## Premier démarrage
+
+`deploy/configure.py` fait l'étape 1 et la copie du proxy ([TLS](#tls-devant-lapi-et-le-flux)) ;
+la suite est la même pour les trois hébergements.
 
 ### 1. Les secrets
 
@@ -248,6 +310,7 @@ Le bloc `environment:` du compose l'emporte sur `.env.server` pour `WORKPILOT_SE
 | `WORKPILOT_SANDBOX` | `auto` | Le bac à sable de l'OS autour des commandes d'un agent (bubblewrap), pas l'isolation entre projets. L'image ne l'installe pas et le profil seccomp de Docker le bloquerait : en `auto`, les builds tournent et leur carte le dit ; `required` les empêcherait de démarrer. |
 | `WORKPILOT_MAX_CONCURRENT_RUNS` | `3` | Plafond du serveur, runs et jobs ensemble : au-delà, ils attendent leur tour (`queued`). Plafond par organisation : onglet Quotas. |
 | `WORKPILOT_WS_URL` | `ws://127.0.0.1:8765` | Où l'API et les runs publient les événements du flux. Toujours la boucle locale. |
+| `WORKPILOT_HOSTING` | — | `public`, `lan` ou `local`, écrit par `configure.py` avec les deux adresses ci-dessous. Le serveur ne la lit pas : elle dit à qui relit `.env.server` quel choix ces adresses suivent. |
 | `WORKPILOT_PUBLIC_BASE_URL` | — | L'adresse publique, sans `/` final : base des liens d'invitation (sans elle, le lien est relatif) et site du Caddyfile d'exemple. |
 | `WORKPILOT_PUBLIC_STREAM_URL` | — | L'adresse du flux donnée à l'app (`ws://` ou `wss://` seulement, toute autre valeur est ignorée). Sans elle, l'hôte de l'API sur le port 8765. Derrière le proxy d'exemple : `wss://<même hôte>`. |
 | `WORKPILOT_PUSH_ENABLED` | `false` | Notifications de l'app mobile (un run que vous avez lancé a réussi ou échoué) par le service push d'Expo (`exp.host`), qui les passe à Apple et Google : le nom du projet, le numéro de la carte, la phase et son résultat, jamais le texte d'une carte. Sans elle, rien ne sort du serveur. |

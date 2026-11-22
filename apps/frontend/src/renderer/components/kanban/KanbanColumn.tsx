@@ -31,7 +31,8 @@ import { useTranslation } from "react-i18next";
 import { TASK_STATUS_LABELS } from "../../../shared/constants";
 import type { Task, TaskStatus } from "../../../shared/types";
 import { columnPulse } from "../../lib/column-pulse";
-import { isQuickAddColumn } from "../../lib/kanban-columns";
+import { isQuickAddColumn, type QuickAddColumn } from "../../lib/kanban-columns";
+import { QUICK_ADD_LABELS } from "../../lib/quick-add";
 import { columnCapacity } from "../../lib/kanban-column-meta";
 import { installColumnStylesheet } from "../../lib/kanban-column-tokens";
 import { cn } from "../../lib/utils";
@@ -884,21 +885,13 @@ export const DroppableColumn = memo(function DroppableColumn({
 												size="icon"
 												className="h-6 w-6 hover:bg-primary/10 hover:text-primary transition-colors"
 												onClick={openQuickAdd}
-												aria-label={t(
-													status === "queue"
-														? "kanban.quickAdd.addQueued"
-														: "kanban.addTaskAriaLabel",
-												)}
+												aria-label={t(QUICK_ADD_LABELS[status as QuickAddColumn].header)}
 											>
 												<Plus className="h-4 w-4" />
 											</Button>
 										</TooltipTrigger>
 										<TooltipContent side="left">
-											{t(
-												status === "queue"
-													? "kanban.quickAdd.addQueued"
-													: "kanban.quickAdd.addTooltip",
-											)}
+											{t(QUICK_ADD_LABELS[status as QuickAddColumn].tooltip)}
 										</TooltipContent>
 									</Tooltip>
 						)}
@@ -1039,11 +1032,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 								className="kanban-quick-add-row mt-2"
 							>
 								<Plus className="h-3.5 w-3.5" aria-hidden="true" />
-								{t(
-									status === "queue"
-										? "kanban.quickAdd.addQueued"
-										: "kanban.quickAdd.addCard",
-								)}
+								{t(QUICK_ADD_LABELS[status as QuickAddColumn].row)}
 							</button>
 						)}
 					</ScrollArea>

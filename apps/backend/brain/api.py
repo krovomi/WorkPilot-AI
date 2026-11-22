@@ -89,6 +89,10 @@ class SettingsRequest(BaseModel):
     enabled: bool | None = None
     connect: bool = True
     """Create, clone or adopt the brain at the chosen folder now."""
+    conflict_embeddings: bool | None = None
+    """Let a local embeddings model find memory conflicts in other words."""
+    conflict_embeddings_model: str | None = None
+    """The Ollama model it uses; ``""`` for the first one Ollama has."""
 
 
 class InstructionRequest(BaseModel):
@@ -290,7 +294,40 @@ def settings_view() -> dict:
         "wsl": is_wsl(),
         "homeRoots": home_roots(),
         "browseRoot": browse_root(),
+        "conflictEmbeddings": _embeddings_view(),
     }
+
+
+def _embeddings_view() -> dict:
+    from .lifecycle import embeddings
+
+    return {
+        "enabled": embeddings.enabled(),
+        "model": embeddings.configured_model(),
+        "enabledLocked": bool(os.environ.get(embeddings.SWITCH_ENV, "").strip()),
+        "modelLocked": bool(os.environ.get(embeddings.MODEL_ENV, "").strip()),
+    }
+
+
+def _save_embeddings(request: SettingsRequest) -> str | None:
+    """The memory conflicts' local model settings; a refusal code, or ``None``."""
+    from .lifecycle import embeddings
+
+    view = _embeddings_view()
+    model = request.conflict_embeddings_model
+    if model is not None:
+        model = model.strip()
+        if view["modelLocked"]:
+            return "env-locked"
+        if not embeddings.valid_model(model):
+            return "invalid-model"
+    if request.conflict_embeddings is not None and view["enabledLocked"]:
+        return "env-locked"
+    if model is not None:
+        write_config(**{embeddings.CONFIG_MODEL: model or None})
+    if request.conflict_embeddings is not None:
+        write_config(**{embeddings.CONFIG_SWITCH: request.conflict_embeddings})
+    return None
 
 
 @router.get("/settings")
@@ -327,6 +364,9 @@ def save_settings(request: SettingsRequest) -> dict:
 
 
 def _save_settings(request: SettingsRequest) -> dict:
+    code = _save_embeddings(request)
+    if code:
+        return _refusal(code)
     if request.path is not None and brain_source() == "env":
         return _refusal("env-locked")
     remote, code = _checked_remote(request.remote)

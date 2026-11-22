@@ -184,7 +184,10 @@
 				"none": "pas de préférence"
 			},
 			"escalated": "Tranché le {{date}} {{actor}}, et de nouveau contredit : un mainteneur tranche.",
-			"waitingMaintainer": "En attente d'un mainteneur : {{names}}."
+			"waitingMaintainer": "En attente d'un mainteneur : {{names}}.",
+			"foundBy": {
+				"embeddings": "Trouvé par le sens (modèle local)"
+			}
 		},
 		"trash": {
 			"title": "Oubliées récemment",

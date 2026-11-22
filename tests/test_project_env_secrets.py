@@ -59,6 +59,7 @@ READER_MODULES = {
     "apps/backend/libdocs/preflight.py",
     "apps/backend/rtk/settings.py",
     "apps/backend/services/notifications/service.py",
+    "apps/backend/test_placement/settings.py",
     "apps/backend/uiux/settings.py",
     "apps/backend/verify/settings.py",
     "apps/backend/watermarks/settings.py",
@@ -162,6 +163,14 @@ def _uiux(project: Path) -> object:
     return read_settings(project)
 
 
+def _test_placement(project: Path) -> object:
+    from test_placement.settings import load_settings
+
+    # Only the file: an empty environment, as a build started without the
+    # project's environment would see it.
+    return vars(load_settings(project, env={}))
+
+
 READERS: dict[str, Callable[[Path], object]] = {
     "core.client.load_project_mcp_config": _load_mcp_config,
     "core.mcp_tools._read_project_env_servers": _mcp_servers,
@@ -172,6 +181,7 @@ READERS: dict[str, Callable[[Path], object]] = {
     "watermarks.settings.project_env": _watermarks,
     "verify.settings.project_env": _verify,
     "uiux.settings.read_settings": _uiux,
+    "test_placement.settings.load_settings": _test_placement,
 }
 
 

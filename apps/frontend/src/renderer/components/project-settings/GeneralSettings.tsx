@@ -29,6 +29,7 @@ import {
 import { useProviderContext } from "../ProviderContext";
 import { AutoSplitSettings } from "./AutoSplitSettings";
 import { CrossReviewSettings } from "./CrossReviewSettings";
+import { ProjectTestPlacementSettings } from "../suite-placement/ProjectTestPlacementSettings";
 import { RepositorySection } from "./RepositorySection";
 import { WorktreeRecipeSection } from "./WorktreeRecipeSection";
 import { Button } from "../ui/button";
@@ -389,6 +390,7 @@ export function GeneralSettings({
 						</div>
 						<AutoSplitSettings settings={settings} setSettings={setSettings} />
 						<CrossReviewSettings settings={settings} setSettings={setSettings} />
+						<ProjectTestPlacementSettings settings={settings} onChange={setProject} />
 					</section>
 
 					<Separator />

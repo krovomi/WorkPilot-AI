@@ -30,6 +30,14 @@ use Y" is complementary advice, not a clash. A model can refine a flagged pair
 
 English and French markers; the code a note talks about can be in any
 language — only its prose is read.
+
+**Different words, one subject.** When an embeddings model is already on the
+machine (`embeddings.py`), `find_for` also asks it which notes mean the same
+subject, and `compare_meaning` keeps those whose ``negation`` or
+``recommendation`` signal disagrees, without the shared words. Such a pair is
+marked ``found_by: embeddings``; without a model, the lexical pass is all
+there is, as before. ``value`` stays lexical: a setting with two values is
+already found by its name, and a close meaning is not the same setting.
 """
 
 from __future__ import annotations
@@ -41,12 +49,15 @@ from pathlib import Path
 
 from ..notes import Note
 from . import scopes
+from .embeddings import Embedder, similarity
 from .store import iter_live, own_text
 
 __all__ = [
     "Contradiction",
     "CHECKED_FOLDERS",
+    "SIMILAR",
     "compare",
+    "compare_meaning",
     "find_for",
     "statement",
 ]
@@ -57,6 +68,9 @@ records of what happened, not advice that can contradict."""
 
 SUBJECT_OVERLAP = 0.5
 """Share of the shorter note's subject words the other must have too."""
+
+SIMILAR = 0.8
+"""Cosine similarity from which a local model reads two notes as one subject."""
 
 _WORD = re.compile(r"[a-z0-9][a-z0-9_.+#-]*[a-z0-9+#]|[a-z0-9]", re.IGNORECASE)
 _STOP = frozenset(
@@ -115,6 +129,8 @@ class Contradiction:
     """``value``, ``recommendation``, ``negation`` or ``textual``."""
     detail: str = ""
     """What disagrees, for a person: ``timeout: 30 ≠ 60``."""
+    found_by: str = "lexical"
+    """``lexical`` (shared words) or ``embeddings`` (a local model's reading)."""
 
 
 @dataclass
@@ -230,15 +246,23 @@ def _scope(note: Note) -> str:
     return scopes.key(str(note.meta.get("applies_to") or ""))
 
 
+def _as_note(value: Note | str, name: str) -> Note:
+    return value if isinstance(value, Note) else Note(path=Path(name), body=value)
+
+
+def _comparable(a: Note, b: Note) -> bool:
+    """Same scope (or one unscoped), and two different statements."""
+    scope_a, scope_b = _scope(a), _scope(b)
+    if scope_a and scope_b and scope_a != scope_b:
+        return False  # "on auth/ we do this, on payments/ that": not a clash
+    text_a, text_b = statement(a.body), statement(b.body)
+    return bool(text_a and text_b and _fold(text_a) != _fold(text_b))
+
+
 def compare(a: Note | str, b: Note | str) -> Contradiction | None:
     """Whether two notes contradict each other, and how; ``None`` if not."""
-    note_a = a if isinstance(a, Note) else Note(path=Path("a.md"), body=a)
-    note_b = b if isinstance(b, Note) else Note(path=Path("b.md"), body=b)
-    scope_a, scope_b = _scope(note_a), _scope(note_b)
-    if scope_a and scope_b and scope_a != scope_b:
-        return None  # "on auth/ we do this, on payments/ that": not a clash
-    text_a, text_b = statement(note_a.body), statement(note_b.body)
-    if not text_a or not text_b or _fold(text_a) == _fold(text_b):
+    note_a, note_b = _as_note(a, "a.md"), _as_note(b, "b.md")
+    if not _comparable(note_a, note_b):
         return None
     sa, sb = _analyse(note_a.body), _analyse(note_b.body)
 
@@ -286,6 +310,27 @@ def compare(a: Note | str, b: Note | str) -> Contradiction | None:
     return None
 
 
+def compare_meaning(
+    a: Note | str, b: Note | str, cosine: float
+) -> Contradiction | None:
+    """Two notes a local model reads as one subject (*cosine* from `SIMILAR`):
+    whether one says not to, or each recommends something else."""
+    note_a, note_b = _as_note(a, "a.md"), _as_note(b, "b.md")
+    if cosine < SIMILAR or not _comparable(note_a, note_b):
+        return None
+    sa, sb = _analyse(note_a.body), _analyse(note_b.body)
+    near = f"\u2248 {cosine:.2f}"
+    disjoint = bool(sa.objects and sb.objects and not (sa.objects & sb.objects))
+    if disjoint and not sa.negated and not sb.negated:
+        objects = (
+            f"{' '.join(sorted(sa.objects))} \u2260 {' '.join(sorted(sb.objects))}"
+        )
+        return Contradiction("recommendation", f"{objects} ({near})", "embeddings")
+    if sa.negated != sb.negated and not disjoint:
+        return Contradiction("negation", near, "embeddings")
+    return None
+
+
 def _setting_words(settings: dict[str, str]) -> set[str]:
     words: set[str] = set()
     for key, value in settings.items():
@@ -293,8 +338,15 @@ def _setting_words(settings: dict[str, str]) -> set[str]:
     return words
 
 
-def find_for(root: Path, base: Path | str, rel: str) -> list[tuple[str, Contradiction]]:
-    """The live notes of the same kind that the note at *rel* contradicts."""
+def find_for(
+    root: Path, base: Path | str, rel: str, embedder: Embedder | None = None
+) -> list[tuple[str, Contradiction]]:
+    """The live notes of the same kind that the note at *rel* contradicts.
+
+    With an *embedder*, the notes the lexical pass let through are read by
+    the local model too (`compare_meaning`); notes in another scope are not
+    even sent to it.
+    """
     folder = Path(rel).relative_to(Path(base)).parts[0]
     if folder not in CHECKED_FOLDERS:
         return []
@@ -305,10 +357,25 @@ def find_for(root: Path, base: Path | str, rel: str) -> list[tuple[str, Contradi
     except (OSError, ValueError):
         return []
     out = []
+    unflagged: list[tuple[str, Note]] = []
     for other_rel, other in iter_live(root, base, (folder,)):
         if other_rel == rel:
             continue
         found = compare(note, other)
+        if found is not None:
+            out.append((other_rel, found))
+        elif embedder is not None and _comparable(note, other):
+            unflagged.append((other_rel, other))
+    if embedder is None or not unflagged:
+        return out
+    texts = [statement(note.body)] + [statement(o.body) for _, o in unflagged]
+    [mine, *theirs] = embedder.vectors(texts)
+    if mine is None:
+        return out
+    for (other_rel, other), vector in zip(unflagged, theirs, strict=True):
+        if vector is None:
+            continue
+        found = compare_meaning(note, other, similarity(mine, vector))
         if found is not None:
             out.append((other_rel, found))
     return out

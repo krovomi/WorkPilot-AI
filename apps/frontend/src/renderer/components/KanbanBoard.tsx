@@ -62,8 +62,9 @@ import {
 	emptyColumnGroups,
 	getVisualColumn,
 	isQuickAddColumn,
-	VALID_BULK_TRANSITIONS,
 } from "../lib/kanban-columns";
+import { groupMoveTargets } from "../lib/group-move";
+import { DragOverlayCard } from "./kanban/DragOverlayCard";
 import { computeBoardCostForecast } from "../lib/kanban-cost";
 import {
 	indexTasksById,
@@ -122,7 +123,6 @@ import { BulkActionBar } from "./kanban/BulkActionBar";
 import { deleteCardsLater } from "./kanban/deleteCardsLater";
 import { PRFilesModal } from "./PRFilesModal";
 import { QueueSettingsModal } from "./QueueSettingsModal";
-import { TaskCard } from "./TaskCard";
 import { TaskEditDialog } from "./TaskEditDialog";
 import {
 	AlertDialog,
@@ -650,6 +650,8 @@ export function KanbanBoard({
 		return filteredTasks.filter((task) => selectedTaskIds.has(task.id));
 	}, [filteredTasks, selectedTaskIds]);
 
+	// The columns a dragged selection may land in (drop highlight).
+	const groupTargets = useMemo(() => groupMoveTargets(selectedTasks), [selectedTasks]);
 	// Determine which visual column all selected tasks belong to (null = mixed selection)
 	const selectedColumnStatus = useMemo<
 		(typeof TASK_STATUS_COLUMNS)[number] | null
@@ -734,23 +736,6 @@ export function KanbanBoard({
 			}
 		}
 	}, [selectedTaskIds, deselectAllTasks, handleUndoBulkDelete, toast, t, setSelectedTaskIds]);
-
-	const bulkEdits = useBoardBulkEdits({
-		projectId,
-		selectedTasks,
-		deselectAllTasks,
-		openDeleteConfirm: handleOpenDeleteConfirm,
-	});
-	const boardSelection = useMemo(
-		() => ({
-			selectedTaskIds,
-			onSetType: bulkEdits.setType,
-			onSetPriority: bulkEdits.setPriority,
-			onDelete: bulkEdits.deleteSelection,
-			onClear: deselectAllTasks,
-		}),
-		[selectedTaskIds, bulkEdits, deselectAllTasks],
-	);
 
 	// Open BulkPRDialog after user confirms "mark as done" for human_review tasks
 	const handleBulkMarkDoneConfirm = useCallback(() => {
@@ -1352,6 +1337,26 @@ export function KanbanBoard({
 			isProcessingQueueRef.current = false;
 		}
 	}, [maxParallelTasks]);
+
+	const bulkEdits = useBoardBulkEdits({
+		projectId,
+		maxParallelTasks,
+		heldInQueue: manuallyQueuedTaskIdsRef.current,
+		processQueue,
+		selectedTasks,
+		deselectAllTasks,
+		openDeleteConfirm: handleOpenDeleteConfirm,
+	});
+	const boardSelection = useMemo(
+		() => ({
+			selectedTaskIds,
+			onSetType: bulkEdits.setType,
+			onSetPriority: bulkEdits.setPriority,
+			onDelete: bulkEdits.deleteSelection,
+			onClear: deselectAllTasks,
+		}),
+		[selectedTaskIds, bulkEdits, deselectAllTasks],
+	);
 
 	/**
 	 * Move all backlog tasks to queue
@@ -2068,52 +2073,16 @@ export function KanbanBoard({
 			}
 
 			if (!newStatus || newStatus === oldStatus) return;
-			if (newStatus === "pr_created" && !canMoveTaskTo(task, newStatus)) {
-				toast({ title: t("kanban.prOpenNeedsPr"), variant: "destructive" });
+			// A selection moves as one: each card by the single-drop rules (lib/group-move.ts).
+			if (selectedTaskIds.has(activeTaskId) && selectedTaskIds.size > 1) {
+				const target = getVisualColumn(newStatus);
+				// human_review → done goes through the PR flow, after a confirmation.
+				if (selectedColumnStatus === "human_review" && target === "done") setBulkMarkDoneConfirmOpen(true);
+				else await bulkEdits.moveSelection(target);
 				return;
 			}
-
-			// ============================================
-			// BULK DRAG: Move all selected tasks together
-			// ============================================
-			const isDraggedTaskInSelection =
-				selectedTaskIds.has(activeTaskId) && selectedTaskIds.size > 1;
-			if (isDraggedTaskInSelection) {
-				const targetVisualColumn = getVisualColumn(newStatus);
-
-				// Mixed selection: abort with warning
-				if (selectedColumnStatus === null) {
-					toast({
-						title: t("kanban.mixedColumnWarning"),
-						variant: "destructive",
-					});
-					return;
-				}
-
-				// Invalid transition: abort with toast
-				if (
-					!VALID_BULK_TRANSITIONS[selectedColumnStatus].includes(
-						targetVisualColumn,
-					)
-				) {
-					toast({
-						title: t("kanban.invalidBulkTransition"),
-						variant: "destructive",
-					});
-					return;
-				}
-
-				// human_review → done requires confirmation before opening BulkPRDialog
-				if (
-					selectedColumnStatus === "human_review" &&
-					targetVisualColumn === "done"
-				) {
-					setBulkMarkDoneConfirmOpen(true);
-					return;
-				}
-
-				// Valid transition: move all selected tasks
-				await bulkEdits.moveSelection(newStatus);
+			if (newStatus === "pr_created" && !canMoveTaskTo(task, newStatus)) {
+				toast({ title: t("kanban.prOpenNeedsPr"), variant: "destructive" });
 				return;
 			}
 
@@ -2231,7 +2200,7 @@ export function KanbanBoard({
 	);
 
 	return (
-		<div className="flex h-full flex-col" data-board-selecting={selectedTaskIds.size > 0 ? "" : undefined}>
+		<div className="flex h-full flex-col" data-board-selecting={selectedTaskIds.size > 0 ? "" : undefined} data-board-group-drag={isDraggingBulkSelected ? "" : undefined}>
 			{/* Screen-reader live region for drag-and-drop announcements */}
 			<div
 				aria-live="polite"
@@ -2518,23 +2487,14 @@ export function KanbanBoard({
 									overColumnId === status &&
 									(!isDraggingAzureDevOps ||
 										IMPORT_ALLOWED_COLUMNS.has(status)) &&
-									(!isDraggingBulkSelected ||
-										selectedColumnStatus === null ||
-										VALID_BULK_TRANSITIONS[selectedColumnStatus].includes(
-											status,
-										))
+									(!isDraggingBulkSelected || groupTargets.has(status))
 								}
 								isImportForbidden={
 									!isDraggingColumn &&
 									((isDraggingAzureDevOps &&
 										overColumnId === status &&
 										!IMPORT_ALLOWED_COLUMNS.has(status)) ||
-										(isDraggingBulkSelected &&
-											overColumnId === status &&
-											selectedColumnStatus !== null &&
-											!VALID_BULK_TRANSITIONS[selectedColumnStatus].includes(
-												status,
-											)))
+										(isDraggingBulkSelected && overColumnId === status && !groupTargets.has(status)))
 								}
 								onAddClick={isQuickAddColumn(status) ? onNewTaskClick : undefined}
 								onQueueAll={status === "backlog" ? handleQueueAll : undefined}
@@ -2592,19 +2552,7 @@ export function KanbanBoard({
 				{/* Drag overlay - enhanced visual feedback */}
 				<DragOverlay>
 					{activeTask ? (
-						<div className="drag-overlay-card relative">
-							<TaskCard
-								task={activeTask}
-								onClick={() => {
-									/* noop */
-								}}
-							/>
-							{isDraggingBulkSelected && (
-								<div className="absolute -top-2 -right-2 flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-lg border-2 border-background">
-									{selectedTaskIds.size}
-								</div>
-							)}
-						</div>
+						<DragOverlayCard task={activeTask} count={isDraggingBulkSelected ? selectedTaskIds.size : 1} />
 					) : null}
 				</DragOverlay>
 			</DndContext>
