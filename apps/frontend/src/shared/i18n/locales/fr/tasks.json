@@ -252,7 +252,6 @@
 		"undo": "Annuler",
 		"clearSelection": "Effacer la sélection",
 		"mixedColumnWarning": "Colonnes différentes — déplacement impossible",
-		"invalidBulkTransition": "Impossible de déplacer les tâches sélectionnées vers cette colonne",
 		"markAsDone": "Terminer & Créer les PRs",
 		"markAsDoneConfirmTitle": "Terminer les tâches sélectionnées",
 		"markAsDoneConfirmDescription": "Vous êtes sur le point de marquer {{count}} tâche(s) comme terminée(s). Le flux de création de PR va s'ouvrir pour toutes les tâches sélectionnées.",
@@ -261,6 +260,13 @@
 		"tasksToComplete": "Tâches à terminer",
 		"bulkMoveSuccess": "{{count}} tâche(s) déplacée(s) avec succès",
 		"bulkMoveError": "Échec du déplacement de {{failed}} tâche(s) sur {{total}}",
+		"groupMove": {
+			"queued_one": "{{count}} carte attend dans File d'attente : En cours est plein ({{slots}} à la fois).",
+			"queued_other": "{{count}} cartes attendent dans File d'attente : En cours est plein ({{slots}} à la fois).",
+			"skipped_one": "{{count}} carte reste en place (déjà dans cette colonne, ou PR ouverte sans PR).",
+			"skipped_other": "{{count}} cartes restent en place (déjà dans cette colonne, ou PR ouverte sans PR).",
+			"nothing": "Aucune carte à déplacer vers cette colonne"
+		},
 		"dragColumn": "Glisser pour réordonner la colonne",
 		"columnOptions": "Options de la colonne",
 		"collapseColumn": "Réduire la colonne",

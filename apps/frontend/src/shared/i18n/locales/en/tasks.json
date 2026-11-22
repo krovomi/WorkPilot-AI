@@ -252,7 +252,6 @@
 		"undo": "Undo",
 		"clearSelection": "Clear Selection",
 		"mixedColumnWarning": "Different columns — move unavailable",
-		"invalidBulkTransition": "Cannot move selected tasks to this column",
 		"markAsDone": "Complete & Create PRs",
 		"markAsDoneConfirmTitle": "Complete Selected Tasks",
 		"markAsDoneConfirmDescription": "You are about to mark {{count}} task(s) as done. This will open the PR creation flow for all selected tasks.",
@@ -261,6 +260,13 @@
 		"tasksToComplete": "Tasks to complete",
 		"bulkMoveSuccess": "{{count}} task(s) moved successfully",
 		"bulkMoveError": "Failed to move {{failed}} of {{total}} tasks",
+		"groupMove": {
+			"queued_one": "{{count}} card waits in Queue: In Progress is full ({{slots}} at a time).",
+			"queued_other": "{{count}} cards wait in Queue: In Progress is full ({{slots}} at a time).",
+			"skipped_one": "{{count}} card stays put (already in that column, or PR Open without a PR).",
+			"skipped_other": "{{count}} cards stay put (already in that column, or PR Open without a PR).",
+			"nothing": "No card to move to this column"
+		},
 		"dragColumn": "Drag to reorder column",
 		"columnOptions": "Column options",
 		"collapseColumn": "Collapse column",
