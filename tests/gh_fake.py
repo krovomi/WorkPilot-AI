@@ -35,9 +35,10 @@ __all__ = ["FakeGh", "write_fake_gh"]
 _PROGRAM = """
 import json, os, sys, time
 from pathlib import Path
-# gh writes UTF-8; `-I` ignores PYTHONUTF8, so say it here (Windows: cp1252).
-sys.stdout.reconfigure(encoding="utf-8")
-sys.stderr.reconfigure(encoding="utf-8")
+# gh writes UTF-8 and bare LF; `-I` ignores PYTHONUTF8, so say it here
+# (Windows: cp1252, and a text stream turns each "\\n" into "\\r\\n").
+sys.stdout.reconfigure(encoding="utf-8", newline="\\n")
+sys.stderr.reconfigure(encoding="utf-8", newline="\\n")
 here = Path(__file__).parent
 args = sys.argv[1:]
 with open(here / "gh-calls.jsonl", "a", encoding="utf-8") as log:
