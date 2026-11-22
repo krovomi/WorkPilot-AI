@@ -52,7 +52,11 @@ def _recording() -> Recording:
 def test_playwright_typescript() -> None:
     test = export_recording(_recording(), "playwright-ts", "Log in")
     assert test.path == "e2e/log-in.spec.ts" and test.env_vars == ["E2E_PASSWORD"]
+    assert test.data_path == "e2e/log-in.data.json"
+    assert json.loads(test.data_code or "") == {"email": "ada@x.io"}
     assert test.code.splitlines() == [
+        'import { readFileSync } from "node:fs";',
+        'import { dirname, join } from "node:path";',
         'import { expect, test } from "@playwright/test";',
         "",
         "// Secrets are read from the environment: E2E_PASSWORD.",
@@ -62,9 +66,13 @@ def test_playwright_typescript() -> None:
         "\treturn value;",
         "}",
         "",
-        'test("Log in", async ({ page }) => {',
+        "// The values typed while recording are read from log-in.data.json, next to this file.",
+        'test("Log in", async ({ page }, testInfo) => {',
+        "\tconst data: Record<string, string> = JSON.parse(",
+        '\t\treadFileSync(join(dirname(testInfo.file), "log-in.data.json"), "utf-8"),',
+        "\t);",
         '\tawait page.goto("http://localhost:3000/login");',
-        '\tawait page.getByLabel("Email", { exact: true }).fill("ada@x.io");',
+        '\tawait page.getByLabel("Email", { exact: true }).fill(data["email"]);',
         '\tawait page.getByLabel("Password", { exact: true }).fill(secret("E2E_PASSWORD"));',
         '\tawait page.getByTestId("lang").selectOption("fr");',
         '\tawait page.getByRole("button", { name: "Sign in", exact: true }).click();',
@@ -79,11 +87,15 @@ def test_playwright_python_is_valid_python() -> None:
     assert test.path == "tests/e2e/test_log_in.py"
     ast.parse(test.code)
     lines = test.code.splitlines()
-    assert "import os" in lines
+    assert lines[2:5] == ["import json", "import os", "from pathlib import Path"]
     assert "# Secrets are read from the environment: E2E_PASSWORD." in lines
+    assert test.data_path == "tests/e2e/log-in.data.json"
+    assert lines[lines.index("TEST_DATA = json.loads(") + 1] == (
+        '    Path(__file__).with_name("log-in.data.json").read_text(encoding="utf-8")'
+    )
     assert lines[lines.index("def test_log_in(page: Page) -> None:") + 1 :] == [
         '    page.goto("http://localhost:3000/login")',
-        '    page.get_by_label("Email", exact=True).fill("ada@x.io")',
+        '    page.get_by_label("Email", exact=True).fill(TEST_DATA["email"])',
         '    page.get_by_label("Password", exact=True).fill(os.environ["E2E_PASSWORD"])',
         '    page.get_by_test_id("lang").select_option("fr")',
         '    page.get_by_role("button", name="Sign in", exact=True).click()',
@@ -95,13 +107,20 @@ def test_playwright_python_is_valid_python() -> None:
 def test_cypress_falls_through_to_a_selector_it_can_express() -> None:
     test = export_recording(_recording(), "cypress", "Log in")
     assert test.path == "cypress/e2e/log-in.cy.js" and test.skipped == 1
+    assert test.data_path == "cypress/fixtures/recorded/log-in.json"
     assert test.code.splitlines() == [
         "// Secrets are read with Cypress.env (CYPRESS_<NAME> in the environment): E2E_PASSWORD.",
         "",
         'describe("Log in", () => {',
-        '\tit("replays the recorded steps", () => {',
+        "\t// The values typed while recording: a fixture in cypress/fixtures.",
+        "\tbeforeEach(() => {",
+        '\t\tcy.fixture("recorded/log-in.json").as("data");',
+        "\t});",
+        "",
+        '\tit("replays the recorded steps", function () {',
+        "\t\tconst data = this.data;",
         '\t\tcy.visit("http://localhost:3000/login");',
-        '\t\tcy.get("#email").clear().type("ada@x.io", { parseSpecialCharSequences: false });',
+        '\t\tcy.get("#email").clear().type(data["email"], { parseSpecialCharSequences: false });',
         "\t\t// step skipped: no selector Cypress can express",
         '\t\tcy.get("[data-testid=\\"lang\\"]").select("fr");',
         '\t\tcy.contains("button, [role=\\"button\\"], input[type=\\"submit\\"], input[type=\\"button\\"]", "Sign in").click();',
@@ -149,7 +168,8 @@ def test_hostile_page_text_stays_a_string_literal(fmt: str) -> None:
     # Outside its double-quoted literals, the code holds none of the payload.
     outside = re.sub(r'"(?:[^"\\\n]|\\.)*"', "", code)
     # Selenium for Node loads its own library: the only require of the file.
-    outside = outside.replace("require()", "", 2 if fmt == "selenium-js" else 0)
+    # (and node:fs, node:path for its data file).
+    outside = outside.replace("require()", "", 4 if fmt == "selenium-js" else 0)
     for piece in ("require(", "${", "`", "rm -rf", "{enter}"):
         assert piece not in outside, (fmt, piece)
     if fmt == "playwright-python":
@@ -206,14 +226,14 @@ def _transitions() -> Recording:
 def test_playwright_waits_for_what_the_action_caused_inside_frames() -> None:
     ts = export_recording(_transitions(), "playwright-ts").code.splitlines()
     scope = 'page.frameLocator("iframe[name=\\"pay\\"]").frameLocator("#inner").locator("x-card")'
-    assert ts[3:-1] == [
+    assert ts[ts.index("\t);") + 1 : -1] == [
         '\tconst responseS2 = page.waitForResponse((r) => r.request().method() === "POST" '
         '&& new URL(r.url()).pathname === "/api/login");',
         '\tawait page.getByRole("button", { name: "Sign in", exact: true }).click();',
         "\tawait responseS2;",
         '\tawait page.waitForURL((url) => url.href.split(/[?#]/)[0] === "http://localhost:3000/home");',
         f'\tawait expect({scope}.getByPlaceholder("Card", {{ exact: true }})).toBeVisible();',
-        f'\tawait {scope}.getByPlaceholder("Card", {{ exact: true }}).fill("4242");',
+        f'\tawait {scope}.getByPlaceholder("Card", {{ exact: true }}).fill(data["card"]);',
     ]
     py = export_recording(_transitions(), "playwright-python").code
     ast.parse(py)
@@ -227,7 +247,7 @@ def test_playwright_waits_for_what_the_action_caused_inside_frames() -> None:
         '    page.wait_for_url(lambda url: url.split("#")[0].split("?")[0] == '
         '"http://localhost:3000/home")',
         f'    expect({scope}.get_by_placeholder("Card", exact=True)).to_be_visible()',
-        f'    {scope}.get_by_placeholder("Card", exact=True).fill("4242")',
+        f'    {scope}.get_by_placeholder("Card", exact=True).fill(TEST_DATA["card"])',
     ]
 
 
@@ -239,7 +259,7 @@ def test_cypress_waits_for_what_the_action_caused_inside_frames() -> None:
         '.find("#inner").its("0.contentDocument.body")'
         '.should("not.be.empty").then(cy.wrap)'
     )
-    assert lines[2:-2] == [
+    assert lines[lines.index("\t\tconst data = this.data;") + 1 : -2] == [
         '\t\tcy.intercept({ method: "POST", pathname: "/api/login" }).as("s2");',
         '\t\tcy.contains("button, [role=\\"button\\"], input[type=\\"submit\\"], '
         'input[type=\\"button\\"]", "Sign in").click();',
@@ -247,7 +267,7 @@ def test_cypress_waits_for_what_the_action_caused_inside_frames() -> None:
         "\t\tcy.url().should((url) => expect(url.split(/[?#]/)[0]).to.equal("
         '"http://localhost:3000/home"));',
         f'\t\t{frame}.find("x-card").shadow().find("[placeholder=\\"Card\\"]")'
-        '.should("be.visible").clear().type("4242", { parseSpecialCharSequences: false });',
+        '.should("be.visible").clear().type(data["card"], { parseSpecialCharSequences: false });',
     ]
     shadow_only = Recording(
         steps=[RecordedStep("s1", "click", [Selector("text", "Go")], shadow=["x-a"])]
