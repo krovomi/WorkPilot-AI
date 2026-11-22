@@ -1250,6 +1250,8 @@ export const IPC_CHANNELS = {
 	DASHBOARD_COMPARE_EXPORT: "dashboard:compareExport",
 	DASHBOARD_GET_SNAPSHOT: "dashboard:getSnapshot",
 	DESIGN_TO_CODE_DETECT_STACK: "designToCode:detectStack",
+	// The render loop's figures on this project (main/design-loop-history.ts)
+	DESIGN_TO_CODE_LOOP_STATS: "designToCode:loopStats",
 	DESIGN_TO_CODE_PROGRESS: "designToCode:progress",
 	DESIGN_TO_CODE_RUN: "designToCode:run",
 	DESIGN_TO_CODE_WRITE_FILES: "designToCode:writeFiles",

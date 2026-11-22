@@ -380,5 +380,20 @@
 		"count_other": "{{count}} zones hidden (at most {{max}})",
 		"clear": "Clear the zones",
 		"remove": "Remove zone {{index}}"
+	},
+	"figures": {
+		"kicker": "Render loop on this project",
+		"loops_one": "{{count}} loop, {{converged}} converged",
+		"loops_other": "{{count}} loops, {{converged}} converged",
+		"averageScore": "Average score kept: {{score}} %",
+		"averageIterations": "Average corrections to converge: {{value}}",
+		"noConvergence": "No loop has converged yet.",
+		"accepted_one": "Written without retouch: {{kept}} of {{count}} write",
+		"accepted_other": "Written without retouch: {{kept}} of {{count}} writes",
+		"noneDecided": "No write has reached the project yet.",
+		"pending_one": "{{count}} still on its review branch",
+		"pending_other": "{{count}} still on their review branch",
+		"approximation": "Approximate: each file is compared with its hash when it was written; a later change made for another reason counts as a retouch, and a discarded card too.",
+		"local": "Kept in this project's .workpilot folder, on this computer only."
 	}
 }

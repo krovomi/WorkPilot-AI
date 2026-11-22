@@ -38,11 +38,19 @@ vi.mock("../design-import/DesignComposer", () => ({ DesignComposer: () => null }
 vi.mock("../design-import/design-import.css", () => ({}));
 vi.mock("../../../stores/design-to-code-store", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../../../stores/design-to-code-store")>();
-	return { ...actual, detectDesignStack: vi.fn(async () => undefined) };
+	return {
+		...actual,
+		detectDesignStack: vi.fn(async () => undefined),
+		loadDesignLoopStats: vi.fn(async () => undefined),
+	};
 });
 
 import { toast } from "@/hooks/use-toast";
-import { detectDesignStack, useDesignToCodeStore } from "../../../stores/design-to-code-store";
+import {
+	detectDesignStack,
+	loadDesignLoopStats,
+	useDesignToCodeStore,
+} from "../../../stores/design-to-code-store";
 import { useProjectStore } from "../../../stores/project-store";
 import { useVisualToCodeStore } from "../../../stores/visual-to-code-store";
 import { ArchitectureChecks } from "../ArchitectureChecks";
@@ -333,6 +341,9 @@ describe("DesignImportPanel", () => {
 
 		render(<DesignImportPanel />);
 		expect(detectDesignStack).toHaveBeenCalledTimes(1);
+		// The figures are read on each visit: a card may have been merged since.
+		expect(loadDesignLoopStats).toHaveBeenCalledTimes(2);
+		expect(loadDesignLoopStats).toHaveBeenLastCalledWith("p1");
 	});
 
 	it("does not wipe a run still going when the project changes", () => {
