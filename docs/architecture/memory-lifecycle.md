@@ -291,8 +291,32 @@ arrivent chez le coéquipier au prochain pull, et une paire réglée ailleurs so
   règles d'une ref git (ni espace, ni `..`, ni `~^:?*[\`), pour qu'une faute de frappe soit
   refusée plutôt que de ne rien couvrir. C'est la « branche de mémoire » de l'issue, par
   module, par équipe ou par branche : deux notes de portées différentes ne se contredisent
-  jamais. La portée ne filtre pas encore ce qu'un agent rappelle : elle sépare les conflits et
-  désigne les mainteneurs.
+  jamais. La portée sépare les conflits, désigne les mainteneurs et filtre ce qu'un agent
+  rappelle (ci-dessous).
+- **Ce qu'un agent rappelle d'une note portée** (`scopes.recalled`, un seul filtre pour les
+  trois chemins de rappel) :
+
+  | Portée | Rappelée pour |
+  |---|---|
+  | aucune, ou un module | tout build, comme avant |
+  | `branch:<nom>` | un build dont la branche git est celle-là, ou en dessous à un `/` (la règle de `covers` : `branch:release` sert `release/2.0`, pas `release-2.0`) ; jamais quand la branche ne se lit pas (pas de dépôt, HEAD détachée) |
+  | `team:<nom>` | en local (desktop, CLI), tout build, comme avant ; en mode serveur, un run lancé par un membre du groupe de ce nom (sans casse) |
+
+  La branche est celle du worktree de la tâche, lue par `git symbolic-ref` (`foundation`, liste
+  d'arguments). Les trois chemins : la mémoire du projet qu'ouvrent les agents
+  (`memory.store.get_project_memory`, `open_project_memory`, les indices de
+  `get_graph_hints` et leur complément pris dans tout le vault), les outils `brain_recall` et
+  `query_graph` du serveur `workpilot-brain` (sa config reçoit la branche du build,
+  `WORKPILOT_BRAIN_BRANCH` ; lancé par l'agent d'une personne, il lit celle du dossier où il
+  tourne ; dans le processus, `tool_executor` passe le dossier du build), et `mem_search`
+  (`BrainSource`). Un run du serveur reçoit les groupes de la personne qui l'a lancé dans
+  l'organisation du projet (`WORKPILOT_RECALL_TEAMS`, liste JSON posée par `run_manager`, `[]`
+  sans groupe ; la valeur du serveur n'est jamais transmise), et sa présence seule dit « mode
+  serveur ». Les surfaces d'une personne (onglet Mémoires et sa recherche, Cycle de vie,
+  historique, la visite d'onboarding) montrent toujours chaque note avec sa portée ; une
+  écriture relit toutes les notes. C'est un filtre de pertinence, pas un secret : un run lit le
+  cerveau de son projet sur le disque. `get_node` et `brain_read_note` ouvrent ce que l'agent
+  nomme, sans filtre.
 
 ## Le dire à l'équipe (`announce.py`), sur demande
 
@@ -381,6 +405,7 @@ Rien pour #348. Pour #352, ce qui attend une décision du mainteneur du projet :
   distant git choisi).
 - Les projets du serveur n'ont pas de file de conflits (leur cerveau n'est jamais
   synchronisé), donc pas d'annonce ni de mainteneurs par portée.
-- Une portée qui filtrerait aussi ce qu'un agent rappelle (une note `branch:release/2.0` servie
-  seulement à une tâche de cette branche) : aujourd'hui elle sépare les conflits et désigne les
-  mainteneurs.
+- Les patterns du learning loop (leur injecteur et la source `PatternSource` de `mem_search`)
+  ne sont pas encore filtrés par portée : une personne peut porter un tel pattern, mais il est
+  servi à chaque build. Le filtre se pose sur `PatternStorage` sans toucher son écriture, qui
+  relit tous les patterns pour retirer ceux qui ont disparu.
