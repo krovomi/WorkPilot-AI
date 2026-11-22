@@ -12,7 +12,8 @@ import {
 	installRendererApi,
 	type RendererApi,
 } from "../../../__tests__/helpers/renderer-api";
-import type { Task, TaskStatus } from "../../../shared/types";
+import type { Task } from "../../../shared/types";
+import type { TaskStatusColumn } from "../../../shared/constants/task";
 import { useSettingsStore } from "../../stores/settings-store";
 import { TooltipProvider } from "../ui/tooltip";
 import {
@@ -32,7 +33,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
 		projectId: "p1",
 		title: `Task ${id}`,
 		description: "",
-		status: "backlog" as TaskStatus,
+		status: "backlog" as TaskStatusColumn,
 		subtasks: [],
 		logs: [],
 		createdAt: new Date("2026-11-01T10:00:00Z"),
@@ -91,7 +92,7 @@ afterEach(() => {
 });
 
 describe("empty columns", () => {
-	const cases: Array<[TaskStatus, string, string | undefined]> = [
+	const cases: Array<[TaskStatusColumn, string, string | undefined]> = [
 		["backlog", "No tasks planned", "column-backlog"],
 		["queue", "Queue is empty", "column-queue"],
 		["in_progress", "Nothing running", "column-in-progress"],
@@ -100,6 +101,8 @@ describe("empty columns", () => {
 		["build_failed", "No red builds", "column-build-failed"],
 		["pr_created", "No PR waiting", "column-pr-open"],
 		["done", "No completed tasks", "column-done"],
+		["failed", "No failed runs", "column-failed"],
+		["abandoned", "Nothing set aside", "column-abandoned"],
 	];
 
 	it.each(cases)("%s says %s and wears its own accent", (status, message, accent) => {
@@ -110,7 +113,7 @@ describe("empty columns", () => {
 	});
 
 	it("an unknown status falls back to a neutral message and border", () => {
-		const status = "error" as TaskStatus;
+		const status = "error" as string as TaskStatusColumn;
 		expect(getEmptyStateContent(status, (k) => k)).toMatchObject({
 			message: "kanban.emptyDefault",
 		});

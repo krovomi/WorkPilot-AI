@@ -4,6 +4,7 @@
  * styles/kanban-columns.css, design in docs/architecture/kanban-columns.md.
  */
 import {
+	Ban,
 	Bot,
 	CircleCheck,
 	GitPullRequest,
@@ -13,11 +14,12 @@ import {
 	type LucideIcon,
 	OctagonX,
 	Plus,
+	TriangleAlert,
 	UserCheck,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { TaskStatus } from "../../../shared/types";
+import type { TaskStatusColumn } from "../../../shared/constants/task";
 import type { PulseItem } from "../../lib/column-pulse";
 import {
 	type ColumnCapacity,
@@ -25,23 +27,25 @@ import {
 } from "../../lib/kanban-column-meta";
 import { cn } from "../../lib/utils";
 
-const COLUMN_ICONS: Partial<Record<TaskStatus, LucideIcon>> = {
+const COLUMN_ICONS: Partial<Record<TaskStatusColumn, LucideIcon>> = {
 	backlog: Inbox,
 	queue: Hourglass,
 	in_progress: LoaderCircle,
 	ai_review: Bot,
 	human_review: UserCheck,
+	failed: TriangleAlert,
 	build_failed: OctagonX,
 	pr_created: GitPullRequest,
 	done: CircleCheck,
+	abandoned: Ban,
 };
 
-export function columnIcon(status: TaskStatus): LucideIcon {
+export function columnIcon(status: TaskStatusColumn): LucideIcon {
 	return COLUMN_ICONS[status] ?? Inbox;
 }
 
 /** The column's icon on a solid tile of its accent; it turns while agents work. */
-export function ColumnIcon({ status, busy = false }: { status: TaskStatus; busy?: boolean }) {
+export function ColumnIcon({ status, busy = false }: { status: TaskStatusColumn; busy?: boolean }) {
 	const Icon = columnIcon(status);
 	return (
 		<span className="kanban-col-icon" aria-hidden="true">
@@ -149,11 +153,11 @@ export function ColumnGauge({
 
 // Empty state content for each column
 export const getEmptyStateContent = (
-	status: TaskStatus,
+	status: TaskStatusColumn,
 	t: (key: string) => string,
 ): { icon: ReactNode; message: string; subtext?: string } => {
-	// An empty « Build rouge » is good news: it shows a check, not its own icon.
-	const Icon = status === "build_failed" ? CircleCheck : columnIcon(status);
+	// An empty « Build rouge » or « Échec » is good news: a check, not its own icon.
+	const Icon = status === "build_failed" || status === "failed" ? CircleCheck : columnIcon(status);
 	const icon = <Icon className="h-5 w-5" />;
 	switch (status) {
 		case "backlog":
@@ -172,13 +176,17 @@ export const getEmptyStateContent = (
 			return { icon, message: t("kanban.emptyPrOpen"), subtext: t("kanban.emptyPrOpenHint") };
 		case "done":
 			return { icon, message: t("kanban.emptyDone"), subtext: t("kanban.emptyDoneHint") };
+		case "failed":
+			return { icon, message: t("kanban.emptyFailed"), subtext: t("kanban.emptyFailedHint") };
+		case "abandoned":
+			return { icon, message: t("kanban.emptyAbandoned"), subtext: t("kanban.emptyAbandonedHint") };
 		default:
 			return { icon, message: t("kanban.emptyDefault") };
 	}
 };
 
 /** An empty column: its icon in a halo of its accent, or the drop invitation. */
-export function ColumnEmptyState({ status, isOver }: { status: TaskStatus; isOver: boolean }) {
+export function ColumnEmptyState({ status, isOver }: { status: TaskStatusColumn; isOver: boolean }) {
 	const { t } = useTranslation(["tasks", "common"]);
 	const empty = getEmptyStateContent(status, t);
 	return (

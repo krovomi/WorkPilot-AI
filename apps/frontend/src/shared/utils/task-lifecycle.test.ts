@@ -97,10 +97,28 @@ describe("abandon / resume metadata", () => {
 		expect("abandonedReason" in patch).toBe(false);
 	});
 
-	it("resume clears the abandoned flag and reason", () => {
+	it("keeps the resolution, and the linked task only where it means something", () => {
+		const now = new Date("2026-11-22T10:00:00.000Z");
+		expect(
+			buildAbandonMetadata({ resolution: "duplicate", link: " t-9 ", reason: "" }, now),
+		).toEqual({
+			abandoned: true,
+			abandonedAt: "2026-11-22T10:00:00.000Z",
+			abandonedResolution: "duplicate",
+			abandonedLink: "t-9",
+		});
+		const wontDo = buildAbandonMetadata({ resolution: "wont_do", link: "t-9" }, now);
+		expect(wontDo.abandonedResolution).toBe("wont_do");
+		expect("abandonedLink" in wontDo).toBe(false);
+		expect("abandonedResolution" in buildAbandonMetadata()).toBe(false);
+	});
+
+	it("resume clears the abandoned flag, reason, resolution and link", () => {
 		expect(buildResumeMetadata()).toEqual({
 			abandoned: false,
 			abandonedReason: undefined,
+			abandonedResolution: undefined,
+			abandonedLink: undefined,
 		});
 	});
 

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import type { TaskStatusColumn } from "../../shared/constants";
+import { isOutcomeColumn, type TaskStatusColumn } from "../../shared/constants";
+import { getBoardColumn } from "../lib/kanban-columns";
 import type { Task } from "../../shared/types";
 import { useKanbanSettingsStore } from "../stores/kanban-settings-store";
 import { useTaskStore } from "../stores/task-store";
@@ -29,8 +30,23 @@ export function shouldShowPrOpenColumn(tasks: readonly Task[]): boolean {
 }
 
 /**
+ * The outcome columns that hold a task: « Échec » and « Abandonnée » only
+ * show while a run has failed or a task is set aside (archived ones aside).
+ */
+export function occupiedOutcomeColumns(tasks: readonly Task[]): ReadonlySet<TaskStatusColumn> {
+	const columns = new Set<TaskStatusColumn>();
+	for (const task of tasks) {
+		if (task.metadata?.archivedAt) continue;
+		const column = getBoardColumn(task);
+		if (isOutcomeColumn(column)) columns.add(column);
+	}
+	return columns;
+}
+
+/**
  * The user's column order, minus the columns that would stay empty: « Build
- * rouge » on a project without CI, « PR ouverte » while no PR waits.
+ * rouge » on a project without CI, « PR ouverte » while no PR waits, « Échec »
+ * and « Abandonnée » while nothing ended badly.
  *
  * « Build rouge » only fills when a CI pipeline (Azure DevOps, GitHub Actions,
  * GitLab CI, Jenkins) goes red on a task's branch. Without a pipeline it stays
@@ -44,13 +60,15 @@ export function useVisibleKanbanColumns(
 		shouldShowBuildFailedColumn(tasks, state.pipelineStatuses),
 	);
 	const showPrOpen = shouldShowPrOpenColumn(tasks);
+	const outcomes = useMemo(() => occupiedOutcomeColumns(tasks), [tasks]);
 	return useMemo(
 		() =>
 			columnOrder.filter(
 				(status) =>
 					(status !== "build_failed" || showBuildFailed) &&
-					(status !== "pr_created" || showPrOpen),
+					(status !== "pr_created" || showPrOpen) &&
+					(!isOutcomeColumn(status) || outcomes.has(status)),
 			),
-		[columnOrder, showBuildFailed, showPrOpen],
+		[columnOrder, showBuildFailed, showPrOpen, outcomes],
 	);
 }

@@ -19,7 +19,7 @@ describe("planGroupMove", () => {
 		});
 	});
 
-	it("counts an error card as already in Human Review", () => {
+	it("keeps a failed run out of Human Review: it goes back to work", () => {
 		expect(plan([card("a", "error")], "human_review", 0)).toMatchObject({ moves: [], skipped: 1 });
 	});
 

@@ -113,4 +113,29 @@ describe("columnPulse", () => {
 			{ key: "doneThisWeek", values: { count: 1 } },
 		]);
 	});
+
+	it("says why the runs of Failed failed", () => {
+		expect(
+			columnPulse("failed", [
+				task({ status: "error" }),
+				task({ status: "human_review", reviewReason: "errors" }),
+				task({ status: "human_review", reviewReason: "qa_rejected" }),
+				task({ status: "human_review", reviewReason: "prompt_too_long" }),
+			]),
+		).toEqual([
+			{ key: "failedErrors", values: { count: 2 } },
+			{ key: "failedQa", values: { count: 1 } },
+			{ key: "failedContext", values: { count: 1 } },
+		]);
+		expect(columnPulse("failed", [])).toEqual([]);
+	});
+
+	it("counts the abandoned tasks by resolution, an unset one as other", () => {
+		const aside = (abandonedResolution?: "duplicate" | "other") =>
+			task({ metadata: { abandoned: true, abandonedResolution } });
+		expect(columnPulse("abandoned", [aside("duplicate"), aside(), aside("other")])).toEqual([
+			{ key: "resolution_duplicate", values: { count: 1 } },
+			{ key: "resolution_other", values: { count: 2 } },
+		]);
+	});
 });
