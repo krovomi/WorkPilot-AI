@@ -28,7 +28,7 @@ EXPO_OFFLINE=1 pnpm exec expo export --platform web --output-dir dist   # bundle
   `ACTION_PERMISSIONS`), le serveur revérifie tout. Une route ne reçoit qu'un `project_id`.
 - **Les jetons** : le refresh dans `expo-secure-store` (`auth/token-store.ts`), l'accès en mémoire,
   jamais dans un log, une URL ou `AsyncStorage`. Le jeton du flux part dans l'en-tête.
-- **HTTPS** sauf réseau local (`api/server-url.ts`) ; ne pas élargir la liste des hôtes locaux.
+- **HTTPS** sauf réseau local (`api/server-url.ts` : IPv4 privée, `localhost`, `*.local`, nom de machine sans domaine) ; ne pas élargir la liste des hôtes locaux, que suivent `NSAllowsLocalNetworking` (iOS) et `plugins/with-local-network-http.js` (Android).
 - **Navigation** : Expo Router, les écrans dans `src/app/` (`(app)/` = connecté) ; le reste
   (`admin/`, `api/`, `auth/`, `board/`, `card/`, `context/`, `features/`, `forge/`, `insights/`, `new-card/`, `push/`, `ui/`, `i18n/`) hors de `src/app/`.
 - **Les dossiers natifs iOS et Android sont générés** (`expo prebuild`) : ne jamais les créer ni les commiter ;
