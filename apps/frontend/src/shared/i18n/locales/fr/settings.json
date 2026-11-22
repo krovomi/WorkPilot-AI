@@ -1443,7 +1443,12 @@
 		"pollDescription": "Fréquence de vérification du statut du pipeline (minimum 15 s, défaut 60 s)"
 	},
 	"serverSession": {
-		"navLabel": "Ma session sur le serveur",
+		"navLabel": "Serveur d'équipe",
+		"connect": {
+			"title": "Se connecter à un serveur d'équipe",
+			"description": "Vous travaillez en mode local, sur les projets de cet ordinateur seulement. Connectez-vous au serveur WorkPilot de votre équipe pour partager ses projets et son tableau, par mot de passe, invitation, Microsoft ou votre SSO.",
+			"button": "Se connecter à un serveur"
+		},
 		"title": "Ma session sur le serveur",
 		"description": "Qui est connecté au serveur d'équipe sur cet ordinateur, et comment la session a été ouverte, tel que le serveur le dit.",
 		"loading": "Lecture de la session",
