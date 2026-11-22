@@ -34,6 +34,17 @@ export const WATCH_SOURCE_KEYS: Readonly<Record<string, string>> = {
 	monitor_grafana_datasource_uid: "CICD_MONITOR_GRAFANA_DATASOURCE_UID",
 };
 
+/** The feature flag a critical verdict turns off before redeploying (lot 4). */
+export const WATCH_FLAG_KEYS: Readonly<Record<string, string>> = {
+	rollback_flag_provider: "CICD_ROLLBACK_FLAG_PROVIDER",
+	rollback_flag_url: "CICD_ROLLBACK_FLAG_URL",
+	rollback_flag_key: "CICD_ROLLBACK_FLAG_KEY",
+	rollback_flag_project: "CICD_ROLLBACK_FLAG_PROJECT",
+	rollback_flag_environment: "CICD_ROLLBACK_FLAG_ENVIRONMENT",
+	rollback_flag_user: "CICD_ROLLBACK_FLAG_USER",
+	rollback_flag_token: "CICD_ROLLBACK_FLAG_TOKEN",
+};
+
 export const WATCH_ALERT_KEYS: Readonly<Record<string, string>> = {
 	alert_slack_webhook_url: "CICD_ALERT_SLACK_WEBHOOK_URL",
 	alert_pagerduty_routing_key: "CICD_ALERT_PAGERDUTY_ROUTING_KEY",
@@ -57,7 +68,7 @@ export function isCicdSecret(key: string): boolean {
 /** The lot 3 fields as the renderer may see them: secrets masked. */
 export function watchSettingsView(config: Record<string, string>): Record<string, string> {
 	const view: Record<string, string> = {};
-	for (const [field, key] of Object.entries({ ...WATCH_SOURCE_KEYS, ...WATCH_ALERT_KEYS })) {
+	for (const [field, key] of Object.entries({ ...WATCH_SOURCE_KEYS, ...WATCH_ALERT_KEYS, ...WATCH_FLAG_KEYS })) {
 		const value = config[key] ?? "";
 		view[field] = isCicdSecret(key) ? (value ? MASKED_TOKEN : "") : value;
 	}

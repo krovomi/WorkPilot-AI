@@ -8,10 +8,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DeployWatch, DeployWatchFigures as Figures } from "../../../../shared/types/deploy-watch";
+import type { CICDConfig } from "../../../stores/cicd-triggers-store";
+import { DeployFlagSettings } from "../DeployFlagSettings";
 import { DeployLinkSettings } from "../DeployLinkSettings";
 import { DeployWatchFigures, formatDuration, TARGET_SECONDS } from "../DeployWatchFigures";
 import { canReview } from "../DeployWatchExtras";
-import { DeployWatchPanel } from "../DeployWatchPanel";
+import { canRollBack, DeployWatchPanel } from "../DeployWatchPanel";
 
 vi.mock("react-i18next", () => ({
 	useTranslation: () => ({
@@ -37,6 +39,7 @@ function watch(over: Partial<DeployWatch> = {}): DeployWatch {
 		rollbackByPerson: false,
 		linkedCause: "",
 		linkedOnly: false,
+		flagConfigured: false,
 		...over,
 	};
 }
@@ -155,6 +158,94 @@ describe("the watch of a run, lot 4", () => {
 		rerender(<DeployWatchPanel watch={watch({ incident: INCIDENT })} busy={false} onRollback={vi.fn()} />);
 		expect(screen.queryByText("cicdTriggers:watch.investigate.task")).toBeNull();
 		window.removeEventListener("workpilot:navigate-view", listener);
+	});
+});
+
+describe("the feature flag of a rollback", () => {
+	const manualPlan = {
+		provider: "jenkins",
+		reason: "manual",
+		automatic: false,
+		targetRun: "",
+		targetSha: "",
+		targetUrl: "",
+		currentSha: "",
+		targetAt: "",
+	};
+
+	it("says the flag was turned off instead of a redeploy", () => {
+		render(
+			<DeployWatchPanel
+				watch={watch({
+					rollback: "started",
+					strategy: "flag",
+					flag: { provider: "unleash", key: "new-checkout", status: "done" },
+				})}
+				busy={false}
+				onRollback={vi.fn()}
+			/>,
+		);
+		expect(screen.getByText(/watch\.rollback\.startedFlag.*new-checkout/)).toBeTruthy();
+		expect(screen.queryByText(/watch\.flag\.done/)).toBeNull();
+	});
+
+	it("says the flag failed when the deployment went back instead", () => {
+		const { rerender } = render(
+			<DeployWatchPanel
+				watch={watch({
+					rollback: "started",
+					strategy: "deployment",
+					flag: { provider: "unleash", key: "new-checkout", status: "failed" },
+				})}
+				busy={false}
+				onRollback={vi.fn()}
+			/>,
+		);
+		expect(screen.getByText("cicdTriggers:watch.rollback.started")).toBeTruthy();
+		expect(screen.getByText(/watch\.flag\.failed/).className).toContain("text-destructive");
+		rerender(
+			<DeployWatchPanel
+				watch={watch({ rollback: "failed", flag: { provider: "configcat", key: "1", status: "offline" } })}
+				busy={false}
+				onRollback={vi.fn()}
+			/>,
+		);
+		expect(screen.getByText(/watch\.flag\.offline/).className).toContain("wp-meta");
+	});
+
+	it("offers the rollback by flag where the provider cannot redeploy", () => {
+		expect(canRollBack(watch({ plan: manualPlan }))).toBe(false);
+		expect(canRollBack(watch({ plan: manualPlan, flagConfigured: true }))).toBe(true);
+	});
+});
+
+describe("DeployFlagSettings", () => {
+	function config(over: Partial<CICDConfig>): CICDConfig {
+		return { rollback_flag_provider: "", ...over } as CICDConfig;
+	}
+
+	it("asks for the flag once a service is chosen", () => {
+		const onSave = vi.fn();
+		const { rerender } = render(<DeployFlagSettings config={config({})} onSave={onSave} />);
+		expect(screen.queryByLabelText("cicdTriggers:flag.rollback_flag_key")).toBeNull();
+		fireEvent.change(screen.getByLabelText("cicdTriggers:flag.rollback_flag_provider"), {
+			target: { value: "unleash" },
+		});
+		expect(onSave).toHaveBeenLastCalledWith({ rollback_flag_provider: "unleash" });
+		rerender(<DeployFlagSettings config={config({ rollback_flag_provider: "unleash" })} onSave={onSave} />);
+		const key = screen.getByLabelText("cicdTriggers:flag.rollback_flag_key");
+		fireEvent.change(key, { target: { value: " new-checkout " } });
+		fireEvent.blur(key);
+		expect(onSave).toHaveBeenLastCalledWith({ rollback_flag_key: "new-checkout" });
+		expect(screen.queryByLabelText("cicdTriggers:flag.rollback_flag_user")).toBeNull();
+		rerender(<DeployFlagSettings config={config({ rollback_flag_provider: "configcat" })} onSave={onSave} />);
+		expect(screen.getByLabelText("cicdTriggers:flag.rollback_flag_user")).toBeTruthy();
+	});
+
+	it("shows no service without settings", () => {
+		render(<DeployFlagSettings config={null} onSave={vi.fn()} />);
+		expect(screen.getByText("cicdTriggers:flag.none")).toBeTruthy();
+		expect(screen.queryByLabelText("cicdTriggers:flag.rollback_flag_token")).toBeNull();
 	});
 });
 

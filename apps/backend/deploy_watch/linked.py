@@ -104,6 +104,6 @@ def run_linked_rollback(
         migrations=migrations,
     )
     if status == "started":
-        state["rollback_at"] = now().isoformat()
+        state.update(strategy="deployment", rollback_at=now().isoformat())
     _save(project_dir, state, now())
     return result

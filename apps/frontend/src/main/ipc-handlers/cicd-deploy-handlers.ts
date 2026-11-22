@@ -46,7 +46,8 @@ function linksView(project: Project): DeployLinksView {
 export async function rollBackLinkedOf(project: Project, runId: string, run: LinkedRunner): Promise<void> {
 	const watch = readDeployWatch(project.path, runId, true);
 	const since = watch?.plan?.targetAt;
-	if (watch?.rollback !== "started" || !since) return;
+	// A flag turned off redeploys nothing: the linked services stay as they are.
+	if (watch?.rollback !== "started" || watch.strategy === "flag" || !since) return;
 	const order = rollbackOrder(readDeployLinks(linksDir()), project.id);
 	await rollBackLinked({
 		root: project,

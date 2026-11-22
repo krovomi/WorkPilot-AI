@@ -119,7 +119,8 @@
 			"started": "Rollback started: the last good run is running again.",
 			"failed": "The rollback could not start.",
 			"blocked_migrations": "Automatic rollback blocked by a database migration.",
-			"manual": "Rollback by hand."
+			"manual": "Rollback by hand.",
+			"startedFlag": "Rollback started: the feature flag {{flag}} is off, nothing was redeployed."
 		},
 		"byPerson": "(asked from the app)",
 		"plan": {
@@ -190,6 +191,11 @@
 		"investigate": {
 			"selfHealing": "Investigate in Self-Healing",
 			"task": "Open the task"
+		},
+		"flag": {
+			"done": "Feature flag {{flag}} turned off.",
+			"failed": "The feature flag {{flag}} could not be turned off: the deployment was rolled back instead.",
+			"offline": "The feature flag {{flag}} was left on: strict offline mode forbids its service."
 		}
 	},
 	"alerts": {
@@ -230,5 +236,22 @@
 		"person": "By a person",
 		"critical": "Critical",
 		"local": "Computed on this machine from this project's watches; nothing is sent anywhere."
+	},
+	"flag": {
+		"heading": "Feature flag rollback",
+		"description": "When the deployed change sits behind a feature flag, a critical verdict turns the flag off first: nothing is redeployed and a database migration does not stand in the way. If the flag cannot be switched, the deployment is rolled back as usual. The token is stored encrypted.",
+		"rollback_flag_provider": "Flag service",
+		"none": "No flag",
+		"providers": {
+			"unleash": "Unleash",
+			"launchdarkly": "LaunchDarkly",
+			"configcat": "ConfigCat"
+		},
+		"rollback_flag_key": "Flag key (ConfigCat: key or setting id)",
+		"rollback_flag_environment": "Environment (ConfigCat: environment id)",
+		"rollback_flag_project": "Project (LaunchDarkly project key, ConfigCat config id, Unleash project)",
+		"rollback_flag_url": "Service URL (https; LaunchDarkly and ConfigCat default to their own)",
+		"rollback_flag_user": "ConfigCat API user name",
+		"rollback_flag_token": "API token"
 	}
 }

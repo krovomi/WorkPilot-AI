@@ -33,6 +33,7 @@ function watch(over: Partial<DeployWatch>): DeployWatch {
 		rollbackByPerson: false,
 		linkedCause: "",
 		linkedOnly: false,
+		flagConfigured: false,
 		...over,
 	};
 }

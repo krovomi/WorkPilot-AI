@@ -48,6 +48,7 @@ import {
 	isCicdSecret,
 	MASKED_TOKEN,
 	WATCH_ALERT_KEYS,
+	WATCH_FLAG_KEYS,
 	WATCH_SOURCE_KEYS,
 	watchSettingsView,
 } from "../cicd/watch-settings";
@@ -125,6 +126,8 @@ export const CICD_CONFIG_KEYS: Readonly<Record<string, string>> = {
 	// Other metric sources and the alert channels (#366, lot 3).
 	...WATCH_SOURCE_KEYS,
 	...WATCH_ALERT_KEYS,
+	// The feature flag the rollback turns off first (#366, lot 4).
+	...WATCH_FLAG_KEYS,
 };
 
 export { MASKED_TOKEN };

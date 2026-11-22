@@ -117,6 +117,12 @@ export interface DeployWatch {
 	degradedAt?: string;
 	/** When the rollback started (ISO 8601). */
 	rollbackAt?: string;
+	/** The settings name a feature flag the rollback turns off first. */
+	flagConfigured: boolean;
+	/** What the started rollback did: turn the flag off, or redeploy the last good run. */
+	strategy?: "flag" | "deployment";
+	/** The flag the rollback tried to turn off, and what came of it. */
+	flag?: DeployRollbackFlag;
 	/** The linked projects this run's rollback took back with it. */
 	linked?: DeployLinkedRollback[];
 	/** What the person said of a bad verdict, afterwards. */
@@ -125,6 +131,13 @@ export interface DeployWatch {
 	incident?: DeployIncident;
 	/** The configured alert channels and what became of each. */
 	alerts?: Partial<Record<DeployAlertChannel, DeployAlertStatus>>;
+}
+
+export interface DeployRollbackFlag {
+	provider: string;
+	key: string;
+	/** done | failed | offline (strict offline mode, provider off the machine) */
+	status: "done" | "failed" | "offline";
 }
 
 /**

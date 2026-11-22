@@ -152,6 +152,28 @@ describe("parseDeployWatch", () => {
 		expect(parseDeployWatch({ ...STATE, rollback_at: "2026-13-01T10:00:00Z" }, false)?.rollbackAt).toBeUndefined();
 	});
 
+	it("reads the feature flag the rollback turned off", () => {
+		const off = parseDeployWatch(
+			{
+				...STATE,
+				flag_configured: true,
+				strategy: "flag",
+				flag: { provider: "unleash", key: "new-checkout", environment: "production", status: "done" },
+			},
+			false,
+		);
+		expect(off).toMatchObject({
+			flagConfigured: true,
+			strategy: "flag",
+			flag: { provider: "unleash", key: "new-checkout", status: "done" },
+		});
+		const plain = parseDeployWatch({ ...STATE, strategy: "revert", flag: { status: "bogus" } }, false);
+		expect(plain?.flagConfigured).toBe(false);
+		expect(plain?.strategy).toBeUndefined();
+		expect(plain?.flag).toBeUndefined();
+		expect(parseDeployWatch({ ...STATE, strategy: "deployment" }, false)?.strategy).toBe("deployment");
+	});
+
 	it("refuses a link that is not https and a bad run id", () => {
 		const watch = parseDeployWatch({ ...STATE, plan: { target_url: "javascript:alert(1)" } }, false);
 		expect(watch?.plan?.targetUrl).toBe("");

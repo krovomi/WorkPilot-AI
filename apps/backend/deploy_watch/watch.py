@@ -34,6 +34,7 @@ from .alerts import SmtpFactory, send_alerts
 from .collectors import Fetch, default_fetch, health_check
 from .config import WatchSettings, is_local_host, load_settings
 from .evaluate import HealthResult, Level, compare, sample_level, verdict
+from .flags import RollbackFlag, flag_from_env, turn_off
 from .incident import Ask, explain, markdown, summarize
 from .migrations import changed_paths, migration_files
 from .revert import OpenRevertPR, open_revert
@@ -210,6 +211,38 @@ def _report(
     }
 
 
+def _flag_off(
+    state: dict,
+    flag: RollbackFlag,
+    fetch: Fetch,
+    offline: bool,
+    now: Callable[[], datetime],
+) -> bool:
+    """Turn the release's flag off; True when it is, and the rollback is that."""
+    state["flag"] = turn_off(flag, fetch, offline=offline)
+    if state["flag"]["status"] != "done":
+        return False
+    state.update(rollback="started", strategy="flag", rollback_at=now().isoformat())
+    return True
+
+
+def _redeploy(
+    state: dict,
+    env: dict,
+    run: dict,
+    plan: RollbackPlan,
+    fetch: Fetch,
+    now: Callable[[], datetime],
+) -> None:
+    """Run the last good deployment again."""
+    if execute_rollback(env, run, plan, fetch):
+        state.update(
+            rollback="started", strategy="deployment", rollback_at=now().isoformat()
+        )
+    else:
+        state["rollback"] = "failed"
+
+
 def run_watch(
     project_dir: Path,
     run_id: str,
@@ -231,6 +264,7 @@ def run_watch(
     loaded = load_settings(project_dir, env)
     problems.extend(loaded.problems)
     settings = _confine(loaded, offline, problems)
+    flag = flag_from_env(env, problems)
     started = now()
     state: dict = {
         "run_id": run_id,
@@ -246,6 +280,8 @@ def run_watch(
             )
         ).isoformat(),
         "auto_rollback": settings.auto_rollback,
+        # A feature flag the rollback turns off before redeploying anything.
+        "flag_configured": flag is not None,
         "problems": problems,
         "samples": [],
         "verdict": Level.UNKNOWN.value,
@@ -284,15 +320,20 @@ def run_watch(
         migrations = _migrations(project_dir, plan)
         state["plan"] = plan.to_dict()
         state["migrations"] = migrations
-        if not plan.automatic:
+        if (
+            flag
+            and settings.auto_rollback
+            and _flag_off(state, flag, fetch, offline, now)
+        ):
+            pass  # The flag is off: nothing is redeployed.
+        elif flag and not settings.auto_rollback:
+            state["rollback"] = "proposed"
+        elif not plan.automatic:
             state["rollback"] = "manual"
         elif migrations:
             state["rollback"] = "blocked_migrations"
         elif settings.auto_rollback:
-            started_ok = execute_rollback(env, run, plan, fetch)
-            state["rollback"] = "started" if started_ok else "failed"
-            if started_ok:
-                state["rollback_at"] = now().isoformat()
+            _redeploy(state, env, run, plan, fetch, now)
         else:
             state["rollback"] = "proposed"
     if state["verdict"] in (Level.WARNING.value, Level.CRITICAL.value):
@@ -328,17 +369,17 @@ def run_rollback(
     state = read_state(project_dir, run_id)
     if state is None:
         raise WatchError("run not watched")
-    plan = _plan(project_dir, env, run, _offline(project_dir), fetch)
+    offline = _offline(project_dir)
+    plan = _plan(project_dir, env, run, offline, fetch)
     state["plan"] = plan.to_dict()
     state["migrations"] = _migrations(project_dir, plan)
-    if not plan.automatic:
+    flag = flag_from_env(env, [])
+    if flag and _flag_off(state, flag, fetch, offline, now):
+        pass  # The flag is off: nothing is redeployed.
+    elif not plan.automatic:
         state["rollback"] = "manual"
     else:
-        state["rollback"] = (
-            "started" if execute_rollback(env, run, plan, fetch) else "failed"
-        )
-        if state["rollback"] == "started":
-            state["rollback_at"] = now().isoformat()
+        _redeploy(state, env, run, plan, fetch, now)
     state["rollback_by"] = "person"
     _save(project_dir, state, now())
     return state

@@ -217,6 +217,17 @@ describe("CI/CD linked services, figures and reviews", () => {
 		writeWatch(api, RUN, { run_id: RUN, phase: "done", verdict: "critical", rollback: "started", plan: plan("") });
 		await invoke(IPC_CHANNELS.CICD_TRIGGERS_ROLLBACK, api, RUN);
 		expect(state.spawned).toHaveLength(2);
+		// A feature flag turned off redeployed nothing: the linked services stay.
+		writeWatch(api, RUN, {
+			run_id: RUN,
+			phase: "done",
+			verdict: "critical",
+			rollback: "started",
+			strategy: "flag",
+			plan: plan(),
+		});
+		await invoke(IPC_CHANNELS.CICD_TRIGGERS_ROLLBACK, api, RUN);
+		expect(state.spawned).toHaveLength(3);
 	});
 
 	it("rolls the linked projects back after an automatic rollback", async () => {

@@ -26,6 +26,7 @@ import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
 import { Switch } from "../ui/switch";
 import { DeployAlertSettings } from "./DeployAlertSettings";
+import { DeployFlagSettings } from "./DeployFlagSettings";
 import { DeployLinkSettings } from "./DeployLinkSettings";
 import { DeployWatchFigures } from "./DeployWatchFigures";
 import { DeployMonitorSettings } from "./DeployMonitorSettings";
@@ -186,6 +187,10 @@ export function CICDTriggersDashboard(): React.ReactElement {
 									</label>
 								))}
 								<DeployMonitorSettings
+									config={config}
+									onSave={(update) => projectPath && setConfig(projectPath, update)}
+								/>
+								<DeployFlagSettings
 									config={config}
 									onSave={(update) => projectPath && setConfig(projectPath, update)}
 								/>

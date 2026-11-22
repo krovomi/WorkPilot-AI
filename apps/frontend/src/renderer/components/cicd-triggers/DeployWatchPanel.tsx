@@ -37,7 +37,8 @@ export function canRollBack(watch: DeployWatch): boolean {
 	if (RUNNING.has(watch.phase)) return false;
 	if (watch.verdict !== "warning" && watch.verdict !== "critical") return false;
 	if (watch.rollback === "started" || watch.rollback === "manual") return false;
-	return watch.plan?.automatic !== false;
+	// A feature flag can be turned off whatever the provider can redeploy.
+	return watch.flagConfigured || watch.plan?.automatic !== false;
 }
 
 export function isWatchRunning(watch: DeployWatch | undefined): boolean {
@@ -205,11 +206,18 @@ export function DeployWatchPanel({
 			)}
 			{watch.rollback && (
 				<div className={watch.rollback === "failed" ? "text-destructive" : "wp-meta"}>
-					{t(`cicdTriggers:watch.rollback.${watch.rollback}`)}
+					{watch.rollback === "started" && watch.strategy === "flag"
+						? t("cicdTriggers:watch.rollback.startedFlag", { flag: watch.flag?.key ?? "" })
+						: t(`cicdTriggers:watch.rollback.${watch.rollback}`)}
 					{watch.rollbackByPerson && <span className="ml-1">{t("cicdTriggers:watch.byPerson")}</span>}
 					{watch.linkedCause && (
 						<span className="ml-1">{t("cicdTriggers:watch.withProject", { project: watch.linkedCause })}</span>
 					)}
+				</div>
+			)}
+			{watch.flag && watch.strategy !== "flag" && (
+				<div className={watch.flag.status === "failed" ? "text-destructive" : "wp-meta"}>
+					{t(`cicdTriggers:watch.flag.${watch.flag.status}`, { flag: watch.flag.key })}
 				</div>
 			)}
 			{watch.linked && watch.linked.length > 0 && <LinkedRollbacks linked={watch.linked} />}

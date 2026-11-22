@@ -64,6 +64,14 @@ export interface CICDConfig {
 	alert_smtp_port: string;
 	alert_smtp_user: string;
 	alert_smtp_password: string;
+	/** The feature flag a critical verdict turns off (unleash | launchdarkly | configcat). */
+	rollback_flag_provider: string;
+	rollback_flag_url: string;
+	rollback_flag_key: string;
+	rollback_flag_project: string;
+	rollback_flag_environment: string;
+	rollback_flag_user: string;
+	rollback_flag_token: string;
 }
 
 export interface PipelineRun {

@@ -21,6 +21,7 @@ import type {
 	DeployMetricCheck,
 	DeployRevertPr,
 	DeployRevertStatus,
+	DeployRollbackFlag,
 	DeployRollbackPlan,
 	DeployRollbackState,
 	DeployWatch,
@@ -157,6 +158,18 @@ function incident(raw: unknown): DeployIncident | undefined {
 const ALERT_CHANNELS: readonly DeployAlertChannel[] = ["slack", "pagerduty", "email"];
 const ALERT_STATUSES: readonly DeployAlertStatus[] = ["sent", "failed", "invalid", "offline"];
 
+const FLAG_STATUSES: readonly DeployRollbackFlag["status"][] = ["done", "failed", "offline"];
+
+function rollbackFlag(raw: unknown): DeployRollbackFlag | undefined {
+	const f = record(raw);
+	if (!FLAG_STATUSES.includes(f.status as DeployRollbackFlag["status"])) return undefined;
+	return {
+		provider: text(f.provider, 30),
+		key: text(f.key, 200),
+		status: f.status as DeployRollbackFlag["status"],
+	};
+}
+
 function alerts(raw: unknown): DeployWatch["alerts"] {
 	const r = record(raw);
 	const known = ALERT_CHANNELS.filter((c) => ALERT_STATUSES.includes(r[c] as DeployAlertStatus));
@@ -198,6 +211,9 @@ export function parseDeployWatch(raw: unknown, live: boolean): DeployWatch | und
 		rollbackByPerson: s.rollback_by === "person",
 		linkedCause: s.rollback_by === "linked" ? text(s.linked_cause, 100) : "",
 		linkedOnly: s.reason === "linked_rollback",
+		flagConfigured: s.flag_configured === true,
+		...(s.strategy === "flag" || s.strategy === "deployment" ? { strategy: s.strategy } : {}),
+		...(rollbackFlag(s.flag) ? { flag: rollbackFlag(s.flag) } : {}),
 		...(isoTime(s.degraded_at) ? { degradedAt: isoTime(s.degraded_at) } : {}),
 		...(isoTime(s.rollback_at) ? { rollbackAt: isoTime(s.rollback_at) } : {}),
 		...(revertPr(s.revert_pr) ? { revertPr: revertPr(s.revert_pr) } : {}),
