@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -15,7 +17,13 @@ from cost_budget import (
     step_down,
 )
 from cost_budget.degrade import newest
-from cost_budget.spend import period_start, project_root, project_spend, task_spend
+from cost_budget.spend import (
+    period_start,
+    project_root,
+    project_spend,
+    task_spend,
+    usages,
+)
 from foundation.pause_state import is_paused, read_pause_state
 
 NOW = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
@@ -271,3 +279,31 @@ def test_phase_model_steps_down_when_the_budget_says_so(tmp_path, monkeypatch):
     assert phase_config.get_phase_model(_spec(root), "coding") == newest(
         "anthropic", "fast"
     )
+
+
+def _rewrite(root: Path, tokens: int, mtime_ns: int) -> None:
+    ledger = root / ".workpilot" / "cost_data.json"
+    ledger.write_text(
+        json.dumps({"usages": [_usage(1.0, tokens=tokens)], "budgets": {}}),
+        encoding="utf-8",
+    )
+    os.utime(ledger, ns=(mtime_ns, mtime_ns))
+
+
+def test_a_same_size_rewrite_in_one_clock_tick_is_read_again(tmp_path):
+    root = _project(tmp_path, None, [])
+    now = time.time_ns()
+    _rewrite(root, 300, now)
+    assert [u.tokens for u in usages(root)] == [300]
+    # Same size, same modification time: what a coarse clock gives.
+    _rewrite(root, 500, now)
+    assert [u.tokens for u in usages(root)] == [500]
+
+
+def test_a_ledger_written_long_ago_is_read_once(tmp_path):
+    root = _project(tmp_path, None, [])
+    long_ago = time.time_ns() - 3600 * 1_000_000_000
+    _rewrite(root, 300, long_ago)
+    assert [u.tokens for u in usages(root)] == [300]
+    _rewrite(root, 500, long_ago)  # unchanged to the cache: the stamp is the same
+    assert [u.tokens for u in usages(root)] == [300]
