@@ -1,8 +1,9 @@
 /**
  * The Bitbucket settings of a project: the switch shows the fields, each
  * field updates its key, an empty repository is filled from a bitbucket.org
- * remote (and never from another host), and the connection test reports the
- * repository or why it failed.
+ * remote (and never from another host), the connection test reports the
+ * repository or why it failed, and a saved account replaces the username and
+ * token fields.
  *
  * @vitest-environment jsdom
  */
@@ -12,9 +13,14 @@ import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../../../../../shared/i18n";
 import type { ProjectEnvConfig } from "../../../../../shared/types";
+import { useForgeAccountsStore } from "../../../../stores/forge-accounts-store";
 import { BitbucketIntegration } from "../BitbucketIntegration";
 
-let api: { detectRepoProvider: ReturnType<typeof vi.fn>; bitbucket: { checkConnection: ReturnType<typeof vi.fn> } };
+let api: {
+	detectRepoProvider: ReturnType<typeof vi.fn>;
+	listForgeAccounts: ReturnType<typeof vi.fn>;
+	bitbucket: { checkConnection: ReturnType<typeof vi.fn> };
+};
 const config = (extra: Partial<ProjectEnvConfig> = {}) => ({ bitbucketEnabled: true, ...extra }) as ProjectEnvConfig;
 
 function renderIt(envConfig: ProjectEnvConfig | null, projectPath: string | undefined = "/repo") {
@@ -32,7 +38,30 @@ function renderIt(envConfig: ProjectEnvConfig | null, projectPath: string | unde
 
 beforeEach(async () => {
 	await i18n.changeLanguage("en");
+	useForgeAccountsStore.setState({ accounts: [], loaded: false, error: null });
 	api = {
+		listForgeAccounts: vi.fn().mockResolvedValue({
+			success: true,
+			data: [
+				{
+					id: "acct-bb",
+					forge: "bitbucket",
+					label: "Work",
+					host: "https://bitbucket.org",
+					username: "dev@example.com",
+					hasToken: true,
+					createdAt: "2026-11-21T00:00:00Z",
+				},
+				{
+					id: "acct-gh",
+					forge: "github",
+					label: "Personal",
+					host: "https://github.com",
+					hasToken: true,
+					createdAt: "2026-11-21T00:00:00Z",
+				},
+			],
+		}),
 		detectRepoProvider: vi.fn().mockResolvedValue({
 			success: true,
 			data: { provider: "bitbucket", remoteUrl: "git@bitbucket.org:acme/web.git" },
@@ -152,5 +181,26 @@ describe("BitbucketIntegration", () => {
 		fireEvent.click(test);
 		await waitFor(() => expect(test).not.toBeDisabled());
 		expect(screen.getByText("Could not check the Bitbucket connection.")).toBeInTheDocument();
+	});
+
+	it("offers the saved Bitbucket accounts, and one picked hides the username and token", async () => {
+		const { updateEnvConfig, rerender } = renderIt(config({ bitbucketWorkspace: "acme", bitbucketRepo: "web" }));
+		const picker = screen.getByLabelText("Account");
+		await waitFor(() => expect(screen.getByRole("option", { name: "Work (dev@example.com)" })).toBeInTheDocument());
+		expect(screen.queryByRole("option", { name: "Personal" })).not.toBeInTheDocument();
+		fireEvent.change(picker, { target: { value: "acct-bb" } });
+		expect(updateEnvConfig).toHaveBeenCalledWith({ bitbucketAccountId: "acct-bb" });
+
+		rerender(
+			<BitbucketIntegration
+				projectId="p1"
+				projectPath="/repo"
+				envConfig={config({ bitbucketAccountId: "acct-bb", bitbucketWorkspace: "acme", bitbucketRepo: "web" })}
+				updateEnvConfig={updateEnvConfig}
+			/>,
+		);
+		expect(screen.queryByLabelText("Username or email")).not.toBeInTheDocument();
+		expect(screen.queryByLabelText("Token")).not.toBeInTheDocument();
+		expect(screen.getByLabelText("Workspace")).toHaveValue("acme");
 	});
 });

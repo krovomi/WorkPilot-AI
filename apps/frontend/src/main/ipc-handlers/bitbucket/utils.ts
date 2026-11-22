@@ -9,6 +9,7 @@
 
 import type { Project } from "../../../shared/types";
 import { normalizeBitbucketRepo } from "../../../shared/utils/bitbucket-repo";
+import { withForgeAccounts } from "../../forge/forge-credentials";
 import { getProjectEnvPath, readProjectEnvFileAsync } from "../../project-env-file";
 import { BITBUCKET_ENV_KEYS, readBitbucketEnvConfig } from "./env-config";
 
@@ -52,12 +53,15 @@ export function bitbucketConfigFromEnv(vars: Record<string, string>): BitbucketC
 	return { ...ref, token, ...(username ? { username } : {}) };
 }
 
-/** A local project's Bitbucket config; a server project has none (no relay for Bitbucket). */
+/**
+ * A local project's Bitbucket config, with the saved account it names
+ * (`forge-credentials.ts`); a server project has none (no relay for Bitbucket).
+ */
 export async function getBitbucketConfig(project: Project): Promise<BitbucketConfig | null> {
 	if (project.remote) return null;
 	const envPath = getProjectEnvPath(project);
 	if (!envPath) return null;
-	return bitbucketConfigFromEnv(await readProjectEnvFileAsync(envPath));
+	return bitbucketConfigFromEnv(withForgeAccounts(await readProjectEnvFileAsync(envPath)));
 }
 
 export function authorizationHeader(config: Pick<BitbucketConfig, "username" | "token">): string {

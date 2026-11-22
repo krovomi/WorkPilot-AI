@@ -336,6 +336,8 @@ export interface ProjectEnvConfig {
 	bitbucketRepo?: string; // Repository slug, `workspace/repo` or a clone URL
 	bitbucketUsername?: string; // Atlassian account (Basic auth); empty = access token (Bearer)
 	bitbucketToken?: string; // API token, app password or access token
+	/** A saved Bitbucket account (Settings, Forge accounts); its username and token replace the two above. */
+	bitbucketAccountId?: string;
 	bitbucketAutoSync?: boolean;
 
 	// Azure DevOps Integration

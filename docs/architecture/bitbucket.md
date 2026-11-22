@@ -26,6 +26,12 @@ Deux formes d'authentification, choisies par la présence d'un nom d'utilisateur
 `BITBUCKET_USERNAME` + jeton en HTTP Basic (jeton d'API ou mot de passe d'application),
 jeton seul en Bearer (jeton d'accès de dépôt ou d'espace de travail).
 
+Un projet peut aussi nommer un compte Bitbucket enregistré pour l'app (Réglages, Comptes des
+forges) : `BITBUCKET_ACCOUNT_ID`, choisi dans l'écran du projet, qui masque alors les champs
+nom et jeton. `getBitbucketConfig` lit le fichier par `withForgeAccounts`, qui met le nom et le
+jeton du compte à la place de ceux du projet ; un compte supprimé ou d'une autre forge ne donne
+aucun jeton ([`forge-accounts.md`](forge-accounts.md)).
+
 Le dépôt se donne en deux slugs (`BITBUCKET_WORKSPACE`, `BITBUCKET_REPO`), en `ws/repo` ou en
 URL de clone ; il est normalisé à l'écriture (`env-config.ts`). L'écran le remplit depuis le
 remote du projet quand il est vide, et seulement si l'hôte est `bitbucket.org` ou un de ses

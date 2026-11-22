@@ -1,6 +1,7 @@
 /**
- * The Bitbucket Cloud settings of a project: the switch, the account
- * (username + API token or app password, or an access token alone), the
+ * The Bitbucket Cloud settings of a project: the switch, the account (a
+ * saved forge account of the app, or the project's own username + API token
+ * or app password, or an access token alone), the
  * repository and the auto-sync. The token reaches this view masked; typing a
  * new one replaces it, leaving it as it came keeps the stored one. When the
  * repository is empty, the project's bitbucket.org remote fills it. The
@@ -18,6 +19,7 @@ import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Separator } from "../../ui/separator";
 import { Switch } from "../../ui/switch";
+import { ForgeAccountPicker } from "./ForgeAccountPicker";
 
 interface BitbucketIntegrationProps {
 	readonly projectId: string;
@@ -36,6 +38,8 @@ export function BitbucketIntegration({
 	const [status, setStatus] = useState<BitbucketSyncStatus | null>(null);
 	const [isChecking, setIsChecking] = useState(false);
 	const enabled = !!envConfig?.bitbucketEnabled;
+	// A saved account brings its own username and token.
+	const usesAccount = !!envConfig?.bitbucketAccountId;
 	const needsRepo = enabled && !envConfig?.bitbucketWorkspace && !envConfig?.bitbucketRepo;
 
 	// Fill the repository from the project's remote, once, when it is empty.
@@ -85,28 +89,38 @@ export function BitbucketIntegration({
 
 			{enabled && (
 				<>
-					<div className="space-y-2">
-						<Label htmlFor="bitbucket-username" className="text-sm font-medium text-foreground">
-							{t("settings.username")}
-						</Label>
-						<p className="text-xs text-muted-foreground">{t("settings.usernameDescription")}</p>
-						<Input
-							id="bitbucket-username"
-							value={envConfig.bitbucketUsername || ""}
-							onChange={(e) => updateEnvConfig({ bitbucketUsername: e.target.value })}
-							autoComplete="off"
-						/>
-					</div>
+					<ForgeAccountPicker
+						forge="bitbucket"
+						value={envConfig.bitbucketAccountId}
+						onChange={(accountId) => updateEnvConfig({ bitbucketAccountId: accountId })}
+					/>
 
-					<div className="space-y-2">
-						<Label className="text-sm font-medium text-foreground">{t("settings.token")}</Label>
-						<p className="text-xs text-muted-foreground">{t("settings.tokenDescription")}</p>
-						<PasswordInput
-							aria-label={t("settings.token")}
-							value={envConfig.bitbucketToken || ""}
-							onChange={(value) => updateEnvConfig({ bitbucketToken: value })}
-						/>
-					</div>
+					{!usesAccount && (
+						<>
+							<div className="space-y-2">
+								<Label htmlFor="bitbucket-username" className="text-sm font-medium text-foreground">
+									{t("settings.username")}
+								</Label>
+								<p className="text-xs text-muted-foreground">{t("settings.usernameDescription")}</p>
+								<Input
+									id="bitbucket-username"
+									value={envConfig.bitbucketUsername || ""}
+									onChange={(e) => updateEnvConfig({ bitbucketUsername: e.target.value })}
+									autoComplete="off"
+								/>
+							</div>
+
+							<div className="space-y-2">
+								<Label className="text-sm font-medium text-foreground">{t("settings.token")}</Label>
+								<p className="text-xs text-muted-foreground">{t("settings.tokenDescription")}</p>
+								<PasswordInput
+									aria-label={t("settings.token")}
+									value={envConfig.bitbucketToken || ""}
+									onChange={(value) => updateEnvConfig({ bitbucketToken: value })}
+								/>
+							</div>
+						</>
+					)}
 
 					<div className="grid grid-cols-2 gap-3">
 						<div className="space-y-2">

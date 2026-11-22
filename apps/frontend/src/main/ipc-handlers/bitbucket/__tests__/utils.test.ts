@@ -4,7 +4,8 @@
  * The Bitbucket config and REST calls: a request, a pagination `next` link
  * or a redirect only ever reaches https://api.bitbucket.org/2.0, the token
  * only in its Authorization header; a project with Bitbucket off,
- * incomplete or on a server has no config.
+ * incomplete or on a server has no config. A project that names a saved
+ * account works with that account's username and token.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -12,6 +13,20 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "../../../../shared/types";
+
+const accounts = vi.hoisted(() => ({
+	saved: {
+		work: { id: "work", forge: "bitbucket", username: "work@example.com", token: "bb-acct-0000" },
+		lab: { id: "lab", forge: "gitlab", token: "gl-acct-0000" },
+	} as Record<string, { id: string; forge: string; username?: string; token: string }>,
+}));
+
+vi.mock("../../../forge/forge-accounts", () => ({
+	forgeAccountStore: () => ({
+		get: (id: string) => accounts.saved[id],
+		tokenOf: (id: string) => accounts.saved[id]?.token,
+	}),
+}));
 import {
 	authorizationHeader,
 	BitbucketApiError,
@@ -101,6 +116,31 @@ describe("getBitbucketConfig", () => {
 			Object.entries(ENV).map(([k, v]) => `${k}=${v}`).join("\n"),
 		);
 		expect(await getBitbucketConfig(project())).toMatchObject({ workspace: "acme", repo: "web" });
+	});
+
+	const writeEnv = (vars: Record<string, string>) => {
+		mkdirSync(path.join(dir, ".workpilot"), { recursive: true });
+		writeFileSync(
+			path.join(dir, ".workpilot", ".env"),
+			Object.entries(vars).map(([k, v]) => `${k}=${v}`).join("\n"),
+		);
+	};
+
+	it("works with the saved account the project names, in place of its own token", async () => {
+		writeEnv({ ...ENV, BITBUCKET_USERNAME: "own", BITBUCKET_ACCOUNT_ID: "work" });
+		expect(await getBitbucketConfig(project())).toEqual({
+			workspace: "acme",
+			repo: "web",
+			username: "work@example.com",
+			token: "bb-acct-0000",
+		});
+	});
+
+	it("has no token when the named account is gone or of another forge", async () => {
+		writeEnv({ ...ENV, BITBUCKET_ACCOUNT_ID: "gone" });
+		expect(await getBitbucketConfig(project())).toBeNull();
+		writeEnv({ ...ENV, BITBUCKET_ACCOUNT_ID: "lab" });
+		expect(await getBitbucketConfig(project())).toBeNull();
 	});
 
 	it("has none for a server project or one not initialized", async () => {

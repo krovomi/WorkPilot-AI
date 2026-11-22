@@ -16,6 +16,7 @@ export const BITBUCKET_ENV_KEYS = {
 	USERNAME: "BITBUCKET_USERNAME",
 	TOKEN: "BITBUCKET_TOKEN",
 	AUTO_SYNC: "BITBUCKET_AUTO_SYNC",
+	ACCOUNT_ID: "BITBUCKET_ACCOUNT_ID",
 } as const;
 
 type BitbucketFields = Pick<
@@ -91,6 +92,8 @@ export function bitbucketEnvSection(vars: Record<string, string>): string {
 		line(vars, K.REPO, "my-repo"),
 		line(vars, K.USERNAME),
 		line(vars, K.TOKEN),
+		"# A saved Bitbucket account (Settings, Forge accounts) instead of the two lines above:",
+		line(vars, K.ACCOUNT_ID),
 		line(vars, K.AUTO_SYNC, "false"),
 	].join("\n");
 }

@@ -138,7 +138,8 @@ export async function autoDetectAndUpdateProject(project: Project): Promise<{
 			updates.githubEnabled = false;
 			updates.azureDevOpsEnabled = true;
 			updates.jiraEnabled = false;
-		} else if (detection.provider === "bitbucket") {
+		} else {
+			// Bitbucket: "unknown" returned above.
 			updates.githubEnabled = false;
 			updates.azureDevOpsEnabled = false;
 			updates.bitbucketEnabled = true;
