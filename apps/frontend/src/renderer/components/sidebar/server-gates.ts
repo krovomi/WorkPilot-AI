@@ -13,6 +13,9 @@ import type { SidebarView } from "../Sidebar";
  */
 export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>([
 	"kanban",
+	// Its execution waves, planned and run by the server
+	// (`main/conflict-waves/server-waves.ts`); no session of this computer.
+	"mission-control",
 	// Read from the server's runs, jobs and ledgers (main/server-workspace.ts)
 	"dashboard",
 	"analytics",

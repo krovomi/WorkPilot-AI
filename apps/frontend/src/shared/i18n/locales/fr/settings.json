@@ -1440,6 +1440,28 @@
 		"pollLabel": "Intervalle de vérification (secondes)",
 		"pollDescription": "Fréquence de vérification du statut du pipeline (minimum 15 s, défaut 60 s)"
 	},
+	"serverSession": {
+		"navLabel": "Ma session sur le serveur",
+		"title": "Ma session sur le serveur",
+		"description": "Qui est connecté au serveur d'équipe sur cet ordinateur, et comment la session a été ouverte, tel que le serveur le dit.",
+		"loading": "Lecture de la session",
+		"unavailable": "La session ne peut pas être lue sur le serveur",
+		"server": "Serveur",
+		"identity": "Connecté en tant que",
+		"identityValue": "{{name}} ({{email}})",
+		"role": "Rôle",
+		"method": "Ouverte avec",
+		"methods": {
+			"local": "Mot de passe",
+			"entra": "Microsoft Entra ID",
+			"oidc": "Connexion unique : {{name}}",
+			"invite": "Invitation acceptée",
+			"unknown": "Non enregistrée (session ouverte avant que le serveur ne nomme les connexions)"
+		},
+		"issuer": "Fournisseur d'identité",
+		"signedInAt": "Connecté le",
+		"signOut": "Se déconnecter"
+	},
 	"serverTokens": {
 		"navLabel": "Mes jetons sur le serveur",
 		"title": "Mes jetons sur le serveur",
@@ -1645,6 +1667,10 @@
 		"description": "Choisissez l'ordre d'affichage des logs dans la vue détaillée des tâches",
 		"label": "Ordre des logs",
 		"reverseChronological": "Anti-chronologique (plus récent en premier)"
+	},
+	"kanbanColumnSummary": {
+		"label": "Résumé des colonnes",
+		"description": "Affiche une ligne de résumé sous le titre de chaque colonne du Kanban (cartes urgentes, créneaux libres, plans à approuver…)."
 	},
 	"mcp": {
 		"addCustomServer": "Ajouter un serveur personnalisé",

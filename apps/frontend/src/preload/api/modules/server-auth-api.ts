@@ -10,6 +10,7 @@ import type {
 	ServerAccessToken,
 	ServerAccessTokenCreated,
 } from "../../../shared/types";
+import type { ServerSessionInfo } from "../../../shared/types/server-session";
 import type { ColorTheme, SidebarPrefs } from "../../../shared/types/settings";
 import type {
 	NeedsYouChannelKind,
@@ -150,6 +151,8 @@ export interface ServerAuthAPI {
 	 * settings; null when the server has neither.
 	 */
 	pullUiPreferences: () => Promise<ServerUiPreferences | null>;
+	/** How the current session was opened and who it is, as the server reports it. */
+	getSession: () => Promise<IPCResult<ServerSessionInfo>>;
 }
 
 export interface ServerUiPreferences {
@@ -235,6 +238,8 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 	restore: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_RESTORE),
 	pullUiPreferences: () =>
 		invokeIpc<ServerUiPreferences | null>(IPC_CHANNELS.SERVER_AUTH_PULL_UI_PREFERENCES),
+	getSession: () =>
+		invokeIpc<IPCResult<ServerSessionInfo>>(IPC_CHANNELS.SERVER_AUTH_GET_SESSION),
 	onStateChanged: (callback) =>
 		createIpcListener<[ServerAuthState]>(IPC_CHANNELS.SERVER_AUTH_STATE_CHANGED, (state) =>
 			callback(state),

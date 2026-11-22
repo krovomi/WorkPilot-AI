@@ -1,12 +1,12 @@
 /**
- * IPC handlers for multi-user server mode: connection, login (local +
- * Microsoft Entra ID PKCE), session state.
+ * IPC handlers for multi-user server mode: connection, password login,
+ * session state.
  *
- * The Entra flow lives in ../entra-sign-in.ts.
+ * Sign-in with an identity provider of the server (Microsoft Entra ID or its
+ * OpenID Connect provider) lives in ./server-sso-handlers.ts.
  */
 
 import { type BrowserWindow, ipcMain } from "electron";
-import { acquireEntraIdToken } from "../entra-sign-in";
 import {
 	acceptInvite,
 	createInvite,
@@ -14,7 +14,6 @@ import {
 	getServerAuthConfig,
 	listInvites,
 	loginLocal,
-	loginWithEntraIdToken,
 	logout,
 	lookupInvite,
 	restoreSession,
@@ -37,6 +36,7 @@ import {
 	setServerSecret,
 } from "../server-user-secrets";
 import { pullServerInterface } from "../server-menu-layout";
+import { getServerSession } from "../server-session-info";
 import {
 	deleteServerNeedsYouChannel,
 	getServerNeedsYou,
@@ -78,35 +78,6 @@ export function registerServerAuthHandlers(
 			const result = await loginLocal(email, password);
 			notifyRenderer();
 			return result;
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.SERVER_AUTH_LOGIN_ENTRA,
-		async (_e, serverUrl: string) => {
-			setMode("server", serverUrl);
-			const config = await getServerAuthConfig(serverUrl);
-			if (!config.ok) return config;
-			if (!config.data.entra_enabled || !config.data.entra_tenant_id) {
-				return {
-					ok: false as const,
-					error: "Entra ID n'est pas configuré sur ce serveur",
-				};
-			}
-			try {
-				const idToken = await acquireEntraIdToken({
-					entra_tenant_id: config.data.entra_tenant_id,
-					entra_client_id: config.data.entra_client_id as string,
-				});
-				const result = await loginWithEntraIdToken(idToken);
-				notifyRenderer();
-				return result;
-			} catch (err) {
-				return {
-					ok: false as const,
-					error: err instanceof Error ? err.message : String(err),
-				};
-			}
 		},
 	);
 
@@ -175,6 +146,8 @@ export function registerServerAuthHandlers(
 	);
 	// No argument from the renderer: main reads the server and the settings file.
 	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_PULL_UI_PREFERENCES, () => pullServerInterface());
+	// No argument from the renderer: the current session, as the server reports it.
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_GET_SESSION, () => getServerSession());
 
 	ipcMain.handle(IPC_CHANNELS.SERVER_NEEDS_YOU_GET, () => getServerNeedsYou());
 	ipcMain.handle(

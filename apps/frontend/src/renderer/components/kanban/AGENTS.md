@@ -1,6 +1,6 @@
 # AGENTS.md — index du Kanban
 
-`KanbanBoard.tsx` fait ~3 250 lignes, `KanbanColumn.tsx` ~1 080. **Ne pas les ouvrir en entier.** Ce fichier donne les
+`KanbanBoard.tsx` fait ~3 250 lignes, `KanbanColumn.tsx` ~1 140. **Ne pas les ouvrir en entier.** Ce fichier donne les
 points d'entrée : cibler la ligne, lire 40 lignes autour, éditer.
 
 > Règles du frontend : [`docs/rules/frontend.md`](../../../../../../docs/rules/frontend.md) · Index frontend : [`apps/frontend/AGENTS.md`](../../../../AGENTS.md)
@@ -13,8 +13,8 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | Fichier | Lignes | Rôle |
 |---|---|---|
 | `../KanbanBoard.tsx` | ~3 250 | le tableau : drag-and-drop, sélection en masse, file d'attente, dialogues |
-| `KanbanColumn.tsx` | ~1 130 | une colonne : `DroppableColumn`, `WipLimitPopover`, `SortableColumnWrapper`, comparateurs mémo, `COLUMN_RENDER_CAP` (lot L11) |
-| `ColumnBand.tsx` | ~190 | bandeau d'une colonne : icône, compteur, jauge de capacité, état vide ([kanban-columns.md](../../../../../../docs/architecture/kanban-columns.md)) |
+| `KanbanColumn.tsx` | ~1 140 | une colonne : `DroppableColumn`, `WipLimitPopover`, `SortableColumnWrapper`, comparateurs mémo, `COLUMN_RENDER_CAP` (lot L11) |
+| `ColumnBand.tsx` | ~200 | bandeau d'une colonne : icône, compteur, jauge de capacité, ligne de résumé (`lib/column-pulse.ts`), état vide ([kanban-columns.md](../../../../../../docs/architecture/kanban-columns.md)) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
 | `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F182) |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |

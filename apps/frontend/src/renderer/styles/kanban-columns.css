@@ -3,7 +3,7 @@
    globals.css). The body is a neutral surface so the Halo cards carry the
    colour; the header is a band washed with the accent, holding the icon,
    the name, the big count and the capacity gauge. Text colours that sit on
-   the band (--col-ink, --col-warn-ink, --col-on, --col-icon) are computed per
+   the band (--col-ink, --col-warn-ink, --col-muted, --col-on, --col-icon) are computed per
    theme by lib/kanban-column-tokens.ts; each falls back to a theme token. */
 
 .kanban-column {
@@ -103,9 +103,42 @@
 .kanban-col-gauge-label {
   margin-left: 0.25rem;
   font-size: 0.625rem;
-  color: var(--muted-foreground);
+  color: var(--col-muted, var(--muted-foreground));
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* One-line summary under the title (lib/column-pulse.ts). */
+.kanban-col-pulse {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  color: var(--col-muted, var(--muted-foreground));
+  white-space: nowrap;
+}
+
+.kanban-col-pulse > span {
+  flex-shrink: 0;
+}
+
+.kanban-col-pulse > span:last-child {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kanban-col-pulse > span + span::before {
+  content: "·";
+  margin: 0 0.375rem;
+  opacity: 0.6;
+}
+
+.kanban-col-pulse > span[data-warn] {
+  color: var(--col-warn-ink, var(--warning));
+  font-weight: 500;
 }
 
 /* Collapsed column: the whole strip is the band. */

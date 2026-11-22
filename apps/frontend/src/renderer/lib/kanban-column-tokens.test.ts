@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { TASK_STATUS_COLUMNS } from "../../shared/constants/task";
-import { AA_TEXT, contrastRatio, mixColors, parseColor } from "./card-type-tokens";
+import { AA_TEXT, contrastRatio, mixColors, parseColor, readable } from "./card-type-tokens";
 import {
 	BAND_TOP,
 	buildColumnCss,
@@ -66,6 +66,7 @@ describe("column band colours", () => {
 				for (const [what, ratio, min] of [
 					["count", contrastRatio(k.ink, k.band), AA_TEXT],
 					["warning", contrastRatio(k.warnInk, k.band), AA_TEXT],
+					["summary", contrastRatio(k.muted, k.band), AA_TEXT],
 					["tile glyph", contrastRatio(k.onAccent, accent as string), GRAPHIC_CONTRAST],
 					["empty icon", contrastRatio(k.icon, halo), GRAPHIC_CONTRAST],
 				] as const) {
@@ -91,6 +92,10 @@ describe("column band colours", () => {
 		}
 		const partial = { ...theme, tokens: { ...theme.tokens, "--info": "oklch(0.6 0.1 250)" } };
 		expect(columnAccent("in_progress", partial)).toBeNull();
+		const noMuted = { ...theme, tokens: { ...theme.tokens, "--muted-foreground": "" } };
+		expect(columnTokens("#22d3ee", noMuted).muted).toBe(
+			readable(theme.foreground, theme.foreground, columnTokens("#22d3ee", noMuted).band, 1),
+		);
 		expect(buildColumnCss(partial)).not.toContain('"in_progress"');
 	});
 

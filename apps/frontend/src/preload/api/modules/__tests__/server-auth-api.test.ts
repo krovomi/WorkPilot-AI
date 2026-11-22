@@ -21,4 +21,9 @@ describe("createServerAuthAPI", () => {
 			"https://wp.example.test",
 		);
 	});
+
+	it("asks main for the current session with no argument", async () => {
+		await createServerAuthAPI().getSession();
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_AUTH_GET_SESSION);
+	});
 });

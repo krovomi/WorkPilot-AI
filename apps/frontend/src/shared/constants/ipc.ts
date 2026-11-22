@@ -889,6 +889,13 @@ export const IPC_CHANNELS = {
 	CONFLICT_WAVES_RUN_SAVE: "conflictWaves:saveRun",
 	CONFLICT_WAVES_RUN_CLEAR: "conflictWaves:clearRun",
 	CONFLICT_WAVES_HISTORY: "conflictWaves:history",
+	// The same for a server project: planned and run by the server, by project id
+	CONFLICT_WAVES_SERVER_PLAN: "conflictWaves:serverPlan",
+	CONFLICT_WAVES_SERVER_RUN: "conflictWaves:serverRun",
+	CONFLICT_WAVES_SERVER_START: "conflictWaves:serverStart",
+	CONFLICT_WAVES_SERVER_STEP: "conflictWaves:serverStep",
+	CONFLICT_WAVES_SERVER_STOP: "conflictWaves:serverStop",
+	CONFLICT_WAVES_SERVER_HISTORY: "conflictWaves:serverHistory",
 
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",
@@ -1452,6 +1459,8 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_DELETE_SECRET: "server-auth:delete-secret",
 	// The person's theme on the server, read at connection (main/server-ui-preferences.ts).
 	SERVER_AUTH_PULL_UI_PREFERENCES: "server-auth:pull-ui-preferences",
+	// How the current session was opened and who it is (main/server-session-info.ts).
+	SERVER_AUTH_GET_SESSION: "server-auth:get-session",
 	// The person's own "needs you" channels on the server (ntfy, Telegram,
 	// Teams): secrets set, masked, never read back (main/server-needs-you.ts).
 	SERVER_NEEDS_YOU_GET: "server-needs-you:get",

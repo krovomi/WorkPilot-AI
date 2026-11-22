@@ -38,8 +38,10 @@ export interface ColumnTokens {
 	band: string;
 	/** The count and any accent text on the band. */
 	ink: string;
-	/** The count of a full or over-limit column. */
+	/** The count of a full or over-limit column, and a warning in its summary. */
 	warnInk: string;
+	/** The secondary text of the band: its summary line and gauge label. */
+	muted: string;
 	/** The glyph drawn on the solid accent tile. */
 	onAccent: string;
 	/** The icon of an empty column, on its halo. */
@@ -58,6 +60,11 @@ export function columnAccent(
 	return value && parseColor(value) ? value : null;
 }
 
+function mutedOf(s: ColumnSurfaces): string {
+	const muted = s.tokens["--muted-foreground"];
+	return muted && parseColor(muted) ? muted : s.foreground;
+}
+
 export function columnTokens(accent: string, s: ColumnSurfaces): ColumnTokens {
 	const band = mixColors(accent, s.card, BAND_TOP);
 	const columnSurface = mixColors(s.card, s.background, 0.4);
@@ -67,6 +74,7 @@ export function columnTokens(accent: string, s: ColumnSurfaces): ColumnTokens {
 		band,
 		ink: readable(accent, s.foreground, band, 0.72),
 		warnInk: readable(s.warning, s.foreground, band, 0.72),
+		muted: readable(mutedOf(s), s.foreground, band, 1),
 		onAccent:
 			contrastRatio(DARK_GLYPH, accent) >= contrastRatio(LIGHT_GLYPH, accent)
 				? DARK_GLYPH
@@ -81,7 +89,7 @@ export function buildColumnCss(s: ColumnSurfaces): string {
 		if (!accent) return [];
 		const t = columnTokens(accent, s);
 		return [
-			`.kanban-column[data-column-status="${status}"]{--col-ink:${t.ink};--col-warn-ink:${t.warnInk};--col-on:${t.onAccent};--col-icon:${t.icon}}`,
+			`.kanban-column[data-column-status="${status}"]{--col-ink:${t.ink};--col-warn-ink:${t.warnInk};--col-muted:${t.muted};--col-on:${t.onAccent};--col-icon:${t.icon}}`,
 		];
 	}).join("\n");
 }
