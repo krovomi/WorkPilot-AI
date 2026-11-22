@@ -2,12 +2,12 @@
  * Members of the organization: their role, whether the account is active, and
  * the sessions they currently hold.
  */
-import { LogOut, Trash2, UserCheck, UserX } from "lucide-react";
-import { useEffect } from "react";
+import { LogOut, Trash2, UserCheck, UserPlus, UserX } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, Input, Label } from "@/components/ui";
 import { useAdminStore } from "@/stores/admin-store";
-import { usePermission } from "@/stores/permissions-store";
+import { usePermission, usePermissionsStore } from "@/stores/permissions-store";
 
 import { NativeSelect } from "../ui/native-select";
 export function MembersTab() {
@@ -38,11 +38,71 @@ export function MembersTab() {
 		return acc;
 	}, {});
 
+	// Someone who already has an account joins this organization: an invitation
+	// refuses their address. Only a platform administrator sees every account.
+	const isPlatformAdmin = usePermissionsStore((s) => s.isPlatformAdmin);
+	const addMemberByEmail = useAdminStore((s) => s.addMemberByEmail);
+	const adding = useAdminStore((s) => s.loading.addMember ?? false);
+	const [email, setEmail] = useState("");
+	const [roleSlug, setRoleSlug] = useState("contributor");
+	const addForm =
+		canWrite && isPlatformAdmin ? (
+			<form
+				className="wp-card flex flex-col gap-3 p-4 sm:flex-row sm:items-end"
+				onSubmit={(e) => {
+					e.preventDefault();
+					void addMemberByEmail(email.trim(), roleSlug).then((ok) => {
+						if (ok) setEmail("");
+					});
+				}}
+			>
+				<div className="flex-1 space-y-2">
+					<Label htmlFor="add-member-email">{t("members.addExisting.email")}</Label>
+					<Input
+						id="add-member-email"
+						type="email"
+						placeholder="person@example.com"
+						value={email}
+						onChange={(e) => setEmail(e.target.value)}
+					/>
+					<p className="text-xs text-muted-foreground">{t("members.addExisting.help")}</p>
+				</div>
+				<div className="space-y-2">
+					<Label htmlFor="add-member-role">{t("members.columns.role")}</Label>
+					<NativeSelect
+						id="add-member-role"
+						className="h-9 px-3 text-sm"
+						value={roleSlug}
+						onChange={(e) => setRoleSlug(e.target.value)}
+					>
+						{roles
+							.filter((role) => role.scope !== "project")
+							.map((role) => (
+								<option key={role.id} value={role.slug}>
+									{role.name}
+								</option>
+							))}
+					</NativeSelect>
+				</div>
+				<Button type="submit" disabled={!email.trim() || adding}>
+					<UserPlus className="mr-2 h-4 w-4" />
+					{t("members.addExisting.submit")}
+				</Button>
+			</form>
+		) : null;
+
 	if (members.length === 0) {
-		return <p className="text-sm text-muted-foreground">{t("members.empty")}</p>;
+		return (
+			<div className="space-y-4">
+				{addForm}
+				<p className="text-sm text-muted-foreground">{t("members.empty")}</p>
+			</div>
+		);
 	}
 
 	return (
+		<div className="space-y-4">
+		{addForm}
 		<div className="border border-border rounded-md overflow-x-auto">
 			<table className="w-full text-sm">
 				<thead>
@@ -152,6 +212,7 @@ export function MembersTab() {
 					))}
 				</tbody>
 			</table>
+		</div>
 		</div>
 	);
 }

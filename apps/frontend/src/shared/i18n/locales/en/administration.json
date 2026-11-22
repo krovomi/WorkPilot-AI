@@ -53,6 +53,11 @@
 			"status": "Status",
 			"sessions": "Sessions",
 			"actions": "Actions"
+		},
+		"addExisting": {
+			"email": "Add an account that already exists",
+			"help": "For someone who already has an account on this server, in another organization: an invitation refuses their address.",
+			"submit": "Add to the organization"
 		}
 	},
 	"groups": {

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Input, Label } from "@/components/ui";
 import type { InvitationPublic } from "../../../preload/api/modules/server-auth-api";
+import type { RoleSummary } from "../../../preload/api/modules/server-admin-api";
 import { formatAppDateTime } from "@/lib/date-format";
 import { usePermissionsStore } from "@/stores/permissions-store";
 
@@ -31,6 +32,10 @@ export function InvitationsAdmin() {
 	const isPlatformAdmin = usePermissionsStore((s) => s.isPlatformAdmin);
 	const [email, setEmail] = useState("");
 	const [role, setRole] = useState("member");
+	// The role in the organization; empty: the one the access above maps onto
+	// (contributor for a member, viewer for a reader).
+	const [orgRole, setOrgRole] = useState("");
+	const [orgRoles, setOrgRoles] = useState<RoleSummary[]>([]);
 	const [pending, setPending] = useState<InvitationPublic[]>([]);
 	const [lastLink, setLastLink] = useState<string | null>(null);
 	const [lastEmailSent, setLastEmailSent] = useState<boolean | null>(null);
@@ -66,6 +71,23 @@ export function InvitationsAdmin() {
 		void refresh();
 	}, [refresh]);
 
+	// Listing the roles needs `org.role.read`: without it, only the default
+	// role is offered, and the server still decides.
+	useEffect(() => {
+		let cancelled = false;
+		void window.electronAPI.serverAdmin
+			?.listRoles()
+			.then((result) => {
+				if (!cancelled && result.ok) {
+					setOrgRoles(result.data.filter((r) => r.scope !== "project"));
+				}
+			})
+			.catch(() => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
 	const handleCreate = useCallback(async () => {
 		setError(null);
 		setLastLink(null);
@@ -74,6 +96,7 @@ export function InvitationsAdmin() {
 			const result = await window.electronAPI.serverAuth.createInvite({
 				email: email.trim(),
 				role,
+				org_role: orgRole || null,
 			});
 			if (result.ok) {
 				setLastLink(result.data.invite_link);
@@ -88,7 +111,7 @@ export function InvitationsAdmin() {
 		} finally {
 			setBusy(false);
 		}
-	}, [email, role, refresh, failure]);
+	}, [email, role, orgRole, refresh, failure]);
 
 	const handleRevoke = useCallback(
 		async (id: string) => {
@@ -158,6 +181,26 @@ export function InvitationsAdmin() {
 							)}
 						</NativeSelect>
 					</div>
+					{orgRoles.length > 0 && (
+						<div className="space-y-2">
+							<Label htmlFor="invite-org-role">
+								{t("invitationsAdmin.orgRole")}
+							</Label>
+							<NativeSelect
+								id="invite-org-role"
+								className="h-9 px-3 text-sm"
+								value={orgRole}
+								onChange={(e) => setOrgRole(e.target.value)}
+							>
+								<option value="">{t("invitationsAdmin.orgRoleDefault")}</option>
+								{orgRoles.map((r) => (
+									<option key={r.id} value={r.slug}>
+										{r.name}
+									</option>
+								))}
+							</NativeSelect>
+						</div>
+					)}
 					<Button onClick={handleCreate} disabled={!email.trim() || busy}>
 						{busy ? (
 							<Loader2 className="mr-2 h-4 w-4 animate-spin" />
