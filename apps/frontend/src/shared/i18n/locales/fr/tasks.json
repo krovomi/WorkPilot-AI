@@ -450,6 +450,7 @@
 		"quickAdd": {
 			"addCard": "Ajouter une tâche",
 			"addQueued": "Ajouter et mettre en file",
+			"addStarted": "Ajouter et démarrer",
 			"addTooltip": "Ajouter une tâche (N)",
 			"ariaLabel": "Décrire la nouvelle tâche",
 			"placeholder": "Décrivez la tâche… Collez une liste pour créer une tâche par ligne.",
@@ -463,6 +464,9 @@
 			"queue": "Mettre en file",
 			"createMany_one": "Créer {{count}} tâche",
 			"createMany_other": "Créer {{count}} tâches",
+			"start": "Démarrer",
+			"startMany_one": "Démarrer {{count}} tâche",
+			"startMany_other": "Démarrer {{count}} tâches",
 			"moreOptions": "Plus d'options…",
 			"close": "Fermer (Échap)",
 			"hint": "Entrée pour créer · Maj+Entrée pour aller à la ligne · Échap pour fermer",
