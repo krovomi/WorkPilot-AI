@@ -145,12 +145,24 @@ les huit rôles intégrés. Dans l'app de bureau, connectez-vous avec l'adresse 
 (`https://workpilot.example.com`), puis **Administration → Organisations** : basculez vers
 celle-ci ou créez-en une autre.
 
-Pour faire entrer quelqu'un : **Administration → Invitations** (administrateur de la plateforme).
+Pour faire entrer quelqu'un : **Administration → Invitations** (permission
+`org.invitation.write`). L'accès (membre, lecteur, ou administrateur du serveur pour un
+administrateur de la plateforme seulement) et, si les rôles se lisent, le **rôle dans
+l'organisation** (Relecteur, Mainteneur, un rôle de l'organisation…) se choisissent à
+l'invitation ; sans rôle choisi, un membre devient Contributeur et un lecteur Lecteur.
 Le lien (`<WORKPILOT_PUBLIC_BASE_URL>/invite?token=…`) n'est pas une page web : la personne le
 colle dans l'app, qui crée son compte. Il part par e-mail si SMTP est réglé, sinon l'app
-l'affiche pour que vous le transmettiez ; il sert une fois, pendant 72 heures par défaut. L'app
-n'a pas encore d'écran pour ajouter un compte existant à une organisation : c'est la route
-`POST /admin/members` (permission `org.member.write`, l'identifiant du compte et un rôle).
+l'affiche pour que vous le transmettiez ; il sert une fois, pendant 72 heures par défaut.
+
+Une invitation refuse l'adresse d'un compte qui existe déjà. Pour faire entrer dans une seconde
+organisation quelqu'un qui a un compte : **Administration → Membres → Ajouter un compte qui
+existe déjà**, par son adresse et avec un rôle (administrateur de la plateforme, le seul qui
+voit tous les comptes ; route `POST /admin/members` avec `email`, ou `user_id` pour un
+administrateur d'organisation qui connaît l'identifiant).
+
+Une organisation que vous créez n'a pas encore d'administrateur : vous l'êtes par votre rôle de
+plateforme. Donnez le rôle **Administrator** de l'organisation à la personne qui la gérera
+(Membres), ou invitez-la avec ce rôle.
 
 ## TLS devant l'API et le flux
 
@@ -486,7 +498,6 @@ Ce qui n'existe pas encore, à la date de ce guide :
 - aucune rotation de la clé maître des secrets ; une seule clé JWT à la fois ;
 - le budget mensuel de tokens n'est pas compté ;
 - un run de carte interrompu par un arrêt du serveur n'est pas soldé automatiquement ;
-- l'app n'a pas d'écran pour ajouter un compte existant à une organisation ;
 - aucune image du serveur n'est publiée : elle se construit depuis le dépôt ;
 - le journal d'audit n'est jamais purgé ;
 - les vues GitHub d'un projet serveur ne visent que github.com (`api.github.com`).

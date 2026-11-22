@@ -2199,7 +2199,9 @@
 		"expires": "expires",
 		"revoke": "Revoke",
 		"copyLink": "Copy the link",
-		"copyFailed": "The link could not be copied"
+		"copyFailed": "The link could not be copied",
+		"orgRole": "Role in the organization",
+		"orgRoleDefault": "Default for this access"
 	},
 	"jiraImport": {
 		"title": "Import Jira Issues",
