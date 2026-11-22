@@ -103,6 +103,15 @@ class TestRepositoryFiles:
 
         assert "git attributes not written" in caplog.text
 
+    def test_this_machine_s_memory_counters_are_ignored(self, tmp_path):
+        from brain.lifecycle.metrics import VIEWS_FILE
+
+        ensure_ignored(tmp_path)
+
+        lines = (tmp_path / ".gitignore").read_text(encoding="utf-8").splitlines()
+        assert VIEWS_FILE in lines
+        assert ".workpilot-brain/conflicts.json" in lines
+
     def test_an_ignore_file_that_cannot_be_read_is_left_alone(
         self, tmp_path, monkeypatch
     ):
