@@ -153,7 +153,9 @@ describe("saveTarget", () => {
 		const link = path.join(dir, "link");
 		symlinkSync(real, link, "dir");
 		const resolved = await saveTarget(path.join(link, "demo"));
-		expect(resolved).toBe(path.join(realpathSync(real), "demo.webm"));
+		// The native realpath, as saveTarget uses: on Windows it expands an 8.3
+		// short name of the temp folder (RUNNER~1), which realpathSync keeps.
+		expect(resolved).toBe(path.join(realpathSync.native(real), "demo.webm"));
 		expect(await saveTarget(path.join(real, "demo.WEBM"))).toMatch(/demo\.WEBM$/);
 	});
 
@@ -171,7 +173,7 @@ describe("saveTarget", () => {
 		expect(await saveTarget(`${dir}/a\0.webm`)).toBeNull();
 		expect(await saveTarget(`${dir}/..`)).toBeNull();
 		expect(await saveTarget(path.join(dir, "kept.webm"))).toBe(
-			path.join(realpathSync(dir), "kept.webm"),
+			path.join(realpathSync.native(dir), "kept.webm"),
 		);
 	});
 });
