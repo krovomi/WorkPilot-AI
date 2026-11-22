@@ -97,6 +97,11 @@ lit la route (`src/main/server-session-info.ts`) et ne garde pour le renderer qu
 de forme connue : méthode en liste fermée, hôte en caractères de nom d'hôte, date lisible ; aucun
 jeton ne quitte le main.
 
+Sur le téléphone, la section « Ma session » des Réglages (`apps/mobile/src/auth/SessionSection.tsx`)
+montre la même chose sous le nom et l'adresse de la personne, au-dessus du bouton de déconnexion
+qu'avaient déjà les Réglages. L'app lit la route avec son client et ne garde que les mêmes champs
+bornés (`src/auth/my-session.ts`) ; l'identifiant de la connexion n'est jamais affiché.
+
 ## L'approbation d'une spec
 
 `POST /api/board/cards/{id}/approve` et `request-changes` portent `review.approve`
@@ -298,5 +303,4 @@ Reste de l'issue #363 :
   dépendance native (`xmlsec`) à justifier et à construire sur les trois OS ; un lot à lui ;
 - le SCIM 2.0 (comptes et groupes poussés par le fournisseur vers les rôles) : un protocole de
   provisionnement entier (ressources `Users` et `Groups`, filtres, `PATCH`), avec son propre jeton
-  par fournisseur, une surface publique nouvelle à concevoir et sécuriser à part ;
-- l'app mobile ne montre pas encore la connexion de sa session (`GET /auth/me/session` la donne).
+  par fournisseur, une surface publique nouvelle à concevoir et sécuriser à part.

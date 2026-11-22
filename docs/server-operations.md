@@ -3,7 +3,8 @@
 Ce guide s'adresse à la personne qui installe et fait vivre le serveur WorkPilot d'une équipe :
 le déployer, le mettre derrière TLS, le sauvegarder, le mettre à jour, le surveiller. Il décrit ce
 que font aujourd'hui [`deploy/`](../deploy/) et le code ; ce qui n'existe pas encore est dit comme
-tel ([Limites connues](#limites-connues)). Pourquoi le serveur est construit ainsi :
+tel ([Limites connues](#limites-connues)). Le parcours de l'équipe, avec des exemples de
+réglages et de l'API : [`server-guide.md`](server-guide.md). Pourquoi le serveur est construit ainsi :
 [`architecture/server-mode.md`](architecture/server-mode.md). Les mêmes variables, en anglais :
 [`CONFIGURATION.md`](CONFIGURATION.md#4-multi-user-server-mode--tenants-roles-and-permissions).
 

@@ -23,7 +23,7 @@ from browser_agent.codegen_text import (
 )
 from browser_agent.recording import RecordedStep, Recording, Selector
 
-from tests.browser_agent.literal_decoders import cs_decode, java_decode, xpath_decode
+from tests.browser_agent.literal_decoders import java_decode, xpath_decode
 
 HOSTILE = (
     'a"b\'c\\d\ne\rf\tg ${process.env.HOME} `tick` \\u0022 \\" '
@@ -78,18 +78,8 @@ def _typed(value: str) -> Recording:
 
 @pytest.mark.parametrize("fmt", FORMATS)
 def test_a_typed_value_reads_back_exactly_from_the_test_data(fmt: str) -> None:
-    """The data file is JSON literals; a block of constants, the language's own."""
+    """The data file is JSON literals, in every language: the code never holds the value."""
     test = export_recording(_typed(HOSTILE), fmt)
-    if fmt == "selenium-java":
-        line = next(x for x in test.code.splitlines() if "String NOTE = " in x)
-        assert java_decode(line.split(" = ", 1)[1].rstrip(";")) == HOSTILE
-        assert test.data_code is None
-        return
-    if fmt == "selenium-csharp":
-        line = next(x for x in test.code.splitlines() if "string Note = " in x)
-        assert cs_decode(line.split(" = ", 1)[1].rstrip(";")) == HOSTILE
-        assert test.data_code is None
-        return
     assert "${process" not in test.code and "`tick`" not in test.code
     assert test.data_code is not None and test.data_code.isascii()
     assert json.loads(test.data_code) == {"note": HOSTILE}
