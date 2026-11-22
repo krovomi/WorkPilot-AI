@@ -1276,6 +1276,18 @@ def _review_contradiction_check_off_by_default(monkeypatch):
     monkeypatch.setenv("WORKPILOT_REVIEW_CONTRADICTION_CHECK", "0")
 
 
+# A sync's review of the memory conflicts asks a local Ollama for embeddings
+# when one is running (`brain/lifecycle/embeddings.py`): on a developer
+# machine with a model pulled, every sync test would read that model. Its own
+# tests (`tests/brain/test_memory_embeddings.py`) turn it back on, against a
+# fake local server.
+
+
+@pytest.fixture(autouse=True)
+def _memory_embeddings_off_by_default(monkeypatch):
+    monkeypatch.setenv("BRAIN_CONFLICT_EMBEDDINGS", "off")
+
+
 # The desktop app starts every Python runner with PYTHONUTF8=1 and
 # PYTHONIOENCODING=utf-8 (`apps/frontend/src/main/utils/python-runner-env.ts`).
 # A test that starts a runner from this environment gets the same switches:

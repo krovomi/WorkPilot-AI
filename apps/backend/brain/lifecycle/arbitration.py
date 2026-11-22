@@ -34,8 +34,11 @@ the queue itself. The decision is not: the canonical note, the archived
 variants and the journal are in the vault, so a teammate's next sync brings
 them, and a queued pair whose notes were settled elsewhere drops out.
 
-No model is called here: a sync must work offline and the same for every
-provider. A person may ask one for an opinion on a queued pair (`advisor.py`).
+No generation model is called here: a sync must work offline and the same
+for every provider. A person may ask one for an opinion on a queued pair
+(`advisor.py`). An embeddings model already pulled in the local Ollama, when
+there is one, finds pairs written in different words (`embeddings.py`); they
+are settled or queued like the others, marked ``found_by: embeddings``.
 """
 
 from __future__ import annotations
@@ -51,7 +54,7 @@ from typing import Any
 
 from ..memories import redact
 from ..notes import Note, inside, now_iso, read_note, slugify, write_note
-from . import identity, maintainers, scopes
+from . import embeddings, identity, maintainers, scopes
 from .contradictions import CHECKED_FOLDERS, compare, find_for, statement
 from .journal import JournalEntry, append, preview_of
 from .journal import read as read_journal
@@ -398,9 +401,12 @@ def _item(
     textual: bool,
     signal: str,
     detail: str,
+    found_by: str | None = None,
 ) -> dict[str, Any]:
     """One queued pair, as the Lifecycle tab shows it."""
+    marked = {"found_by": found_by} if found_by else {}
     return {
+        **marked,
         "id": pair,
         "base": base,
         "project": str(a[1].meta.get("project") or base.split("/")[2]),
@@ -426,6 +432,7 @@ def _consider(
     signal: str,
     detail: str,
     summary: dict[str, int],
+    found_by: str | None = None,
 ) -> None:
     pair = _pair_id(a_rel, b_rel)
     if pair in data["dismissed"] or any(i.get("id") == pair for i in data["open"]):
@@ -454,7 +461,9 @@ def _consider(
         )
         summary["auto"] += 1
         return
-    item = _item(pair, base, folder, (a_rel, a), (b_rel, b), textual, signal, detail)
+    item = _item(
+        pair, base, folder, (a_rel, a), (b_rel, b), textual, signal, detail, found_by
+    )
     code = "textual-conflict" if textual else "contradiction-detected"
     if earlier is not None:
         # No rule settles it again: a maintainer does (`maintainers.py`).
@@ -488,6 +497,8 @@ def review_pull(
 ) -> dict[str, int]:
     """Settle or queue what a pull brought into the project memories. Never raises."""
     summary = {"checked": 0, "auto": 0, "queued": 0}
+    embedder: embeddings.Embedder | None = None
+    opened = False
     try:
         data = _load(root)
         textual: dict[tuple[str, str], None] = {}
@@ -525,7 +536,9 @@ def review_pull(
                 continue
             if not _exists(root, rel):
                 continue
-            for other, found in find_for(root, where[0], rel):
+            if not opened:  # once a pull brought a note to compare
+                embedder, opened = embeddings.open_embedder(root), True
+            for other, found in find_for(root, where[0], rel, embedder):
                 if not (_exists(root, rel) and _exists(root, other)):
                     break  # settled by an earlier pair of this pull
                 _consider(
@@ -539,10 +552,14 @@ def review_pull(
                     signal=found.signal,
                     detail=found.detail,
                     summary=summary,
+                    found_by=found.found_by,
                 )
         _save(root, data)
     except (OSError, ValueError) as exc:
         logger.warning("brain: contradictions after the pull not reviewed: %s", exc)
+    finally:
+        if embedder is not None:
+            embedder.save()
     return summary
 
 

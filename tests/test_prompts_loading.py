@@ -408,3 +408,24 @@ def test_the_targeted_review_without_a_known_runner_says_so(project, spec_dir):
     prompt = prompts.get_qa_reviewer_targeted_prompt(spec_dir, project, scope)
 
     assert "<the project's runner> <tests>" in prompt
+
+
+def test_the_full_review_runs_the_touched_tests_before_any_long_suite(
+    project, spec_dir
+):
+    prompt = prompts.get_qa_reviewer_prompt(spec_dir, project)
+
+    touched = prompt.index("### 3.0: Touched Tests First (fail fast)")
+    assert touched < prompt.index("### 3.1: Unit Tests") < prompt.index("### 7.1:")
+    # Every stack gets its own selection, not one tool's.
+    for selection in (
+        "vitest related",
+        "--findRelatedTests",
+        "pytest",
+        "go test",
+        "cargo test",
+        "dotnet test",
+        "mvn",
+    ):
+        assert selection in prompt[touched:], selection
+    assert "skip 3.1 to 3.4 and Phase 7.1" in prompt
