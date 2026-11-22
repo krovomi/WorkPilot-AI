@@ -82,6 +82,30 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=12)
 
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetLookup(BaseModel):
+    # POST (not GET) so the token never lands in a URL / proxy access log.
+    token: str = Field(min_length=16, max_length=200)
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=16, max_length=200)
+    new_password: str = Field(min_length=12, max_length=1024)
+
+
+class PasswordResetIssued(BaseModel):
+    """A link a platform admin issued for an account."""
+
+    email: str
+    expires_at: datetime
+    email_sent: bool
+    # Only when the email did not go: the admin hands the link over.
+    reset_link: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Invitations (invitation-only self-service signup)
 # ---------------------------------------------------------------------------
