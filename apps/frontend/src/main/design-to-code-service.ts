@@ -25,6 +25,7 @@ import {
 	type DesignWriteOutcome,
 } from "../shared/types/design-to-code";
 import { getAppLanguage } from "./app-language";
+import { recordLoop, recordWrite } from "./design-loop-history";
 import { renderLoopArgs } from "./design-render-loop-args";
 import { findOpenReviewCard } from "./generated-review/review-card";
 import { findLocalProject, openReviewRun, type ReviewRun } from "./generated-review/review-run";
@@ -299,7 +300,10 @@ export class DesignToCodeService {
 			// The scratch folder only held the image.
 			rmSync(workDir, { recursive: true, force: true });
 		}
-		return projectDir ? markExisting(result, reviewRoot(projectDir)) : result;
+		if (!projectDir) return result;
+		// The loop's figures stay in the project, on this computer.
+		if (result?.render_loop) recordLoop(projectDir, result.render_loop);
+		return markExisting(result, reviewRoot(projectDir));
 	}
 
 	/**
@@ -370,6 +374,15 @@ export class DesignToCodeService {
 				summary: STEP_SUMMARY[getAppLanguage() === "fr" ? "fr" : "en"](subject),
 			});
 			outcome.review = review.committed ? review : null;
+			if (outcome.review) {
+				// Each file's hash as written, to tell later whether it was retouched.
+				const written = new Set(outcome.written.map((w) => w.path));
+				recordWrite(
+					projectDir,
+					outcome.review.specId,
+					accepted.filter((f) => written.has(f.path)),
+				);
+			}
 			return outcome;
 		} catch (error) {
 			await run.abandon().catch(() => undefined);

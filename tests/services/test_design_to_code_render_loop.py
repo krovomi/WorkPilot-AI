@@ -21,7 +21,7 @@ from design_to_code.render import RenderError
 from design_to_code.vision import VisionRoute
 from PIL import Image
 from services import design_to_code_render_loop as glue
-from services.design_to_code_edit_calls import EditAnswer
+from services.design_to_code_edit_calls import EDITS_SCHEMA, EditAnswer
 from services.design_to_code_service import (
     ComponentSpec,
     DesignSpec,
@@ -94,8 +94,9 @@ def world(monkeypatch, tmp_path):
     asked: list[tuple[str, str]] = []
     answers: list[str] = []
 
-    async def claude(self, key, image, prompt):
+    async def claude(self, key, image, prompt, *, forced=False):
         asked.append((key, image))
+        assert forced
         if answers:
             return answers.pop(0)
         return json.dumps(
@@ -252,8 +253,9 @@ def test_a_local_model_that_runs_corrects_on_the_machine(world, monkeypatch) -> 
     )
     seen: dict = {}
 
-    def ask(image, prompt, env):
+    def ask(image, prompt, env, *, schema=None):
         seen["model"] = env["DOCINTEL_VISION_MODEL"]
+        seen["schema"] = schema
         seen["png"] = Path(image).read_bytes()[:4]
         return json.dumps(
             {"edits": [{"path": "index.html", "find": ORANGE, "replace": RED}]}
@@ -263,6 +265,7 @@ def test_a_local_model_that_runs_corrects_on_the_machine(world, monkeypatch) -> 
     report = _loop(world, _result())
     assert report["status"] == "converged" and report["route"] == "ollama"
     assert seen["png"] == b"\x89PNG" and world["asked"] == []
+    assert seen["schema"] == EDITS_SCHEMA
 
 
 def test_no_browser_skips_the_loop(world) -> None:
@@ -284,8 +287,8 @@ def test_each_route_asks_its_own_call_and_the_subscription_its_schema(
     calls: list[tuple] = []
 
     def record(name):
-        async def call(self, *args):
-            calls.append((name, *args[:-2]))
+        async def call(self, *args, forced=False):
+            calls.append((name, *args[:-2], forced))
             self.last_usage = Usage(1, 2)
             assert args[-2].startswith("data:image/png;base64,")
             return name
@@ -322,11 +325,11 @@ def test_each_route_asks_its_own_call_and_the_subscription_its_schema(
     ]
     assert calls == [
         ("schema", "m", b"png", True),
-        ("_call_claude_vision", "sk-ant-test-0000"),
-        ("_call_openai_vision", "sk-test-0001"),
-        ("_call_gemini_vision", "gm-test-0000"),
-        ("_call_local_vision", "lm-studio"),
-        ("_call_local_vision", "llama-cpp"),
+        ("_call_claude_vision", "sk-ant-test-0000", True),
+        ("_call_openai_vision", "sk-test-0001", True),
+        ("_call_gemini_vision", "gm-test-0000", True),
+        ("_call_local_vision", "lm-studio", True),
+        ("_call_local_vision", "llama-cpp", True),
     ]
     assert (replies[0].text, replies[0].usage) == ("structured", Usage(3, 4))
     assert (replies[1].text, replies[1].usage) == ("_call_claude_vision", Usage(1, 2))
@@ -364,7 +367,8 @@ def test_a_local_model_without_an_answer_is_a_correction_error(
     monkeypatch, tmp_path
 ) -> None:
     monkeypatch.setattr(
-        "docintel.engines.ollama_vision.ask", lambda image, prompt, env: ("", "timeout")
+        "docintel.engines.ollama_vision.ask",
+        lambda image, prompt, env, schema=None: ("", "timeout"),
     )
     with pytest.raises(CorrectionError, match="local vision model: timeout"):
         asyncio.run(_correct(DesignToCodeService(str(tmp_path)), "ollama")("p", b"png"))
@@ -574,7 +578,8 @@ def test_the_correction_carries_the_tokens_its_provider_reported(
 
     service = DesignToCodeService(str(tmp_path))
     monkeypatch.setattr(
-        "docintel.engines.ollama_vision.ask", lambda image, prompt, env: ("local", "")
+        "docintel.engines.ollama_vision.ask",
+        lambda image, prompt, env, schema=None: ("local", ""),
     )
     service.last_usage = Usage(1, 1)
     reply = asyncio.run(_correct(service, "ollama")("p", b"png"))
