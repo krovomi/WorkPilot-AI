@@ -4,8 +4,11 @@
  * The phone sends a password and then bearer tokens to this address, so it
  * must be HTTPS. Plain HTTP is accepted only for a server on the same
  * machine or the local network (a developer's laptop, an office box), where
- * there is no certificate to get; iOS and Android refuse cleartext to any
- * other host anyway.
+ * there is no certificate to get: a private IPv4 literal, `localhost`, a
+ * `.local` name, or the bare name of a machine (`build-box`), which only the
+ * network's own resolver answers. That is the set iOS lets an app reach in
+ * clear (`NSAllowsLocalNetworking`, app.json); Android allows cleartext for
+ * the app (`plugins/with-local-network-http.js`) and relies on this check.
  */
 
 export type ServerUrlResult = { ok: true; url: string } | { ok: false; reason: "invalid" | "insecure" };
@@ -23,6 +26,8 @@ const PRIVATE_V4 = [
 export function isLocalHost(hostname: string): boolean {
 	const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
 	if (host === "localhost" || host === "::1" || host.endsWith(".local")) return true;
+	// A machine's bare name ("build-box"): no public DNS name has a single label.
+	if (/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(host) && !/^\d+$/.test(host)) return true;
 	// A private range only counts on an IPv4 literal: "10.example.com" is a public name.
 	if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return false;
 	return PRIVATE_V4.some((range) => range.test(host));

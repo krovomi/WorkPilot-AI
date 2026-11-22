@@ -12,6 +12,11 @@
 			"bundleIdentifier": "io.github.krovomi.workpilot",
 			"config": {
 				"usesNonExemptEncryption": false
+			},
+			"infoPlist": {
+				"NSAppTransportSecurity": {
+					"NSAllowsLocalNetworking": true
+				}
 			}
 		},
 		"android": {
@@ -30,6 +35,7 @@
 			"output": "single"
 		},
 		"plugins": [
+			"./plugins/with-local-network-http",
 			"expo-router",
 			"expo-status-bar",
 			"expo-secure-store",

@@ -143,7 +143,11 @@ sortirait du clone n'est pas suivi.
   reste stockée et l'app propose de réessayer ; seul un refus du serveur (401, 403) l'efface.
 - **HTTPS obligatoire** (`src/api/server-url.ts`) : l'app envoie un mot de passe puis des jetons à
   l'adresse saisie. Le http simple n'est accepté que vers la machine ou le réseau local (littéral IPv4
-  privé, `localhost`, `*.local`), où il n'y a pas de certificat à obtenir.
+  privé, `localhost`, `*.local`, nom de machine sans domaine comme `build-box`, qu'aucun DNS public
+  ne résout), où il n'y a pas de certificat à obtenir. C'est l'ensemble qu'iOS laisse joindre en
+  clair (`NSAllowsLocalNetworking`, `app.json`) ; Android ne sait pas le décrire dans sa
+  configuration réseau, donc l'app y autorise le clair (`plugins/with-local-network-http.js`) et
+  `server-url.ts` reste le seul contrôle. Un nom avec domaine (`srv.entreprise.lan`) demande HTTPS.
 - **L'organisation** part dans `X-WorkPilot-Org`, comme depuis l'app de bureau : l'en-tête choisit
   parmi les organisations de la personne, le serveur vérifie l'appartenance à chaque requête.
 
