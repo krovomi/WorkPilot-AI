@@ -14,6 +14,7 @@
 | `folds.py` | the pattern a learning-loop merge folded in, kept so that the merge can be separated |
 | `metrics.py` | restores, pins, conflicts and their resolution time, from the journal |
 | `api.py` | ``/api/brain/memory/*`` (a server project's: ``shared_features/context_lifecycle.py``) |
+| `embeddings.py` | the same pair in other words, read by an embeddings model the local Ollama already has (optional) |
 
 Everything lives under ``knowledge/projects/<project>/memory/.lifecycle/`` —
 inside the vault, so it syncs; hidden, so no agent recalls it. The conflict
