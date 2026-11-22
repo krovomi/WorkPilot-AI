@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from server.authz.groups import project_group_names
 from server.config import get_settings
 from server.db.engine import get_session_factory
 from server.db.models import AgentRun, SpecIndex, User
@@ -45,6 +46,11 @@ from server.services.usage_records import finish_collecting, usage_channel
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
+
+#: The groups of the person who started a run, a JSON list of names: the run
+#: recalls the ``team:`` memories of those groups, and of no other
+#: (``brain.lifecycle.scopes.TEAMS_ENV``).
+RECALL_TEAMS_ENV = "WORKPILOT_RECALL_TEAMS"
 
 #: Error of a run the server was running when it stopped.
 INTERRUPTED = "Interrupted: the server stopped while the run was queued or running"
@@ -368,9 +374,11 @@ class RunManager:
         jobs (``server.services.project_jobs``) included."""
         return self._get_semaphore()
 
-    async def run_env(self, user_id: str, run_id: str) -> dict[str, str]:
+    async def run_env(
+        self, user_id: str, run_id: str, project_id: str | None = None
+    ) -> dict[str, str]:
         """The environment of one agent process, as :meth:`_build_env`."""
-        return await self._build_env(user_id, run_id)
+        return await self._build_env(user_id, run_id, project_id)
 
     async def start_run(
         self,
@@ -539,9 +547,12 @@ class RunManager:
             logger.info("Settled %d run(s) interrupted by a server stop", settled)
         return settled
 
-    async def _build_env(self, user_id: str, run_id: str) -> dict[str, str]:
+    async def _build_env(
+        self, user_id: str, run_id: str, project_id: str | None = None
+    ) -> dict[str, str]:
         """Run env: the server env without its own secrets, the run's WS token,
-        and the launcher's integration secrets (``server.services.run_env``)."""
+        the launcher's integration secrets (``server.services.run_env``) and
+        their groups in the project's organization (`RECALL_TEAMS_ENV`)."""
 
         env = run_environment(
             os.environ,
@@ -551,6 +562,10 @@ class RunManager:
             },
         )
         async with get_session_factory()() as db:
+            teams = (
+                await project_group_names(db, user_id, project_id) if project_id else []
+            )
+            env[RECALL_TEAMS_ENV] = json.dumps(teams, ensure_ascii=False)
             for kind, env_name in USER_SECRET_ENV.items():
                 try:
                     value = await get_user_secret(db, user_id, kind)
@@ -620,7 +635,7 @@ class RunManager:
                         pr,
                         may_skip_review,
                     )
-                    env = await self._build_env(user_id, run_id)
+                    env = await self._build_env(user_id, run_id, project_id)
                     # Always set, empty for "every platform": the server's own
                     # environment must not choose for a card.
                     env.update(card_environment(server_path, spec_name))

@@ -14,6 +14,7 @@ import type {
 	TaskPriority,
 } from "../../shared/types";
 import { buildEngineMetadata } from "../../shared/utils/task-engine";
+import type { QuickAddColumn } from "./kanban-columns";
 
 /** A line this long or shorter reads as a title; longer is a description. */
 export const QUICK_ADD_TITLE_MAX = 120;
@@ -88,3 +89,31 @@ export function quickAddMetadata({
 	if (type) Object.assign(metadata, cardTypeChoiceMetadata(type));
 	return metadata;
 }
+
+/** The words of the quick add in each column (i18n keys of the `tasks` namespace). */
+export const QUICK_ADD_LABELS: Record<
+	QuickAddColumn,
+	{ header: string; tooltip: string; row: string; create: string; createMany: string }
+> = {
+	backlog: {
+		header: "kanban.addTaskAriaLabel",
+		tooltip: "kanban.quickAdd.addTooltip",
+		row: "kanban.quickAdd.addCard",
+		create: "kanban.quickAdd.create",
+		createMany: "kanban.quickAdd.createMany",
+	},
+	queue: {
+		header: "kanban.quickAdd.addQueued",
+		tooltip: "kanban.quickAdd.addQueued",
+		row: "kanban.quickAdd.addQueued",
+		create: "kanban.quickAdd.queue",
+		createMany: "kanban.quickAdd.createMany",
+	},
+	in_progress: {
+		header: "kanban.quickAdd.addStarted",
+		tooltip: "kanban.quickAdd.addStarted",
+		row: "kanban.quickAdd.addStarted",
+		create: "kanban.quickAdd.start",
+		createMany: "kanban.quickAdd.startMany",
+	},
+};

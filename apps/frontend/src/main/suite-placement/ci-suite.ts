@@ -86,7 +86,7 @@ export async function commitRun(
 
 export type GitRun = (cwd: string, args: string[], timeout: number) => Promise<string>;
 
-const defaultGit: GitRun = async (cwd, args, timeout) => {
+export const defaultGitRun: GitRun = async (cwd, args, timeout) => {
 	const { stdout } = await execFileAsync(getToolPath("git"), args, {
 		cwd,
 		encoding: "utf-8",
@@ -103,7 +103,7 @@ export type PushResult =
 /** Push the worktree's task branch to `origin`, never forced. */
 export async function pushTaskBranch(
 	worktreePath: string,
-	git: GitRun = defaultGit,
+	git: GitRun = defaultGitRun,
 ): Promise<PushResult> {
 	const branch = (await git(worktreePath, ["rev-parse", "--abbrev-ref", "HEAD"], GIT_TIMEOUT_MS)).trim();
 	const sha = (await git(worktreePath, ["rev-parse", "HEAD"], GIT_TIMEOUT_MS)).trim().toLowerCase();

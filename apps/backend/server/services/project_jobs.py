@@ -282,7 +282,7 @@ class ProjectJobs:
                 await _set_status(job_id, "running")
                 _notify(project_id, feature, job_id, "running", user_id)
                 with tempfile.TemporaryDirectory(prefix="workpilot-job-") as scratch:
-                    env = await manager.run_env(user_id, job_id)
+                    env = await manager.run_env(user_id, job_id, project_id)
                     for name, content in inputs.items():
                         Path(scratch, name).write_text(content, encoding="utf-8")
                     resolved = [

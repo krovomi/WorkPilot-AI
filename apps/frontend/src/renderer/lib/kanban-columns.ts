@@ -20,11 +20,12 @@ export function getVisualColumn(status: TaskStatus): TaskStatusColumn {
 }
 
 /**
- * The two columns a person creates cards in (quick add, the "+" of the
- * header). The others are agent, CI or pull-request phases: a card created
- * there would describe nothing real.
+ * The columns a person creates cards in (quick add, the "+" of the header).
+ * A card created in « En cours » starts at once, or waits in the queue when
+ * every slot is taken. The others are agent, CI or pull-request phases: a
+ * card created there would describe nothing real.
  */
-export const QUICK_ADD_COLUMNS = ["backlog", "queue"] as const;
+export const QUICK_ADD_COLUMNS = ["backlog", "queue", "in_progress"] as const;
 export type QuickAddColumn = (typeof QUICK_ADD_COLUMNS)[number];
 
 export function isQuickAddColumn(status: TaskStatus): status is QuickAddColumn {

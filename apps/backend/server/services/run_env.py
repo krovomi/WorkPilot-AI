@@ -90,6 +90,9 @@ RUN_ENV: frozenset[str] = frozenset(
         # The run's usage pipe (``usage_records.UsageChannel``): a value the
         # server had would point the run at a descriptor that is not its own.
         "WORKPILOT_USAGE_FD",
+        # The groups of the run's starter, whose ``team:`` memories it
+        # recalls (``brain.lifecycle.scopes.TEAMS_ENV``).
+        "WORKPILOT_RECALL_TEAMS",
     }
 )
 

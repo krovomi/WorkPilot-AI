@@ -796,6 +796,8 @@ uses no network.
 | `UTILITY_THINKING_BUDGET` | off | Thinking budget, in tokens, of the same calls; empty or `0` turns it off. |
 | `INSIGHT_EXTRACTION_ENABLED` | `true` | After each coder session, an LLM pass extracts insights into the project memory. Only `true`, `1` or `yes` keep it on (`on` turns it off). It also needs a Claude token. |
 | `INSIGHT_EXTRACTOR_MODEL` | `DEFAULT_EXTRACTION_MODEL` ([analysis/insight_extractor.py](../apps/backend/analysis/insight_extractor.py)) | Model of that pass. It always runs on Claude: give a Claude model id. |
+| `BRAIN_CONFLICT_EMBEDDINGS` | on | After a brain sync, an embeddings model that the local Ollama already has also reads the received gotchas and patterns, to flag two notes that disagree in different words ([memory-lifecycle.md](architecture/memory-lifecycle.md)). `0`, `false`, `no` or `off` turns it off; unset, the switch in Settings > Brain decides (`brain.json`). Nothing is pulled and nothing leaves the machine: only `OLLAMA_BASE_URL` on a loopback address is asked, with a timeout, so strict offline mode allows it. Without Ollama or an embeddings model, only shared words count, as before. At most 200 notes are sent per sync; vectors are cached in `.workpilot-brain/embeddings.json` (ignored by git). |
+| `BRAIN_CONFLICT_EMBEDDINGS_MODEL` | first pulled | The Ollama model of that pass (`nomic-embed-text`, `bge-m3`…; `x` also matches `x:latest`). Unset, the model named in Settings > Brain, else the first embeddings model Ollama lists, multilingual ones first. A model Ollama does not have turns the pass off: it is never pulled. |
 
 ## Forges, notifications and MCP servers
 
@@ -906,6 +908,8 @@ Opt-in features. Those marked *API* are read by the local API: put them in
 | `WORKPILOT_AUTO_PROMOTE_THRESHOLD` | off | *API.* Integer from 0 to 100. Enables "Accept & skip human review" in the QA promotion dialog when the build's QA score reaches it; the score is 0 unless QA signed off. Nothing moves a card on its own. |
 | `AUTO_TEST_GENERATION` | on | `false`, and only `false`, removes the "automated tests" section from each subtask's coding prompt. That section tells the coder which kinds of tests to write, with the test libraries the project already has. |
 | `AUTO_FIX_MAX_ATTEMPTS` | 5 | CLI: attempts of `run.py --spec … --auto-fix` when `--auto-fix-max-attempts` is not given. |
+| `WORKPILOT_BRAIN_BRANCH` | unset | Set by WorkPilot, not by a person: the git branch of the build a `workpilot-brain` MCP server was started for (empty when it could not be read). Its `brain_recall` and `query_graph` leave out a memory scoped `branch:` to another branch, or to any branch when it is empty. Unset (a person's own agent), the server reads the branch of the folder it runs in. See [memory-lifecycle.md](architecture/memory-lifecycle.md). |
+| `WORKPILOT_RECALL_TEAMS` | unset | Set by the server for each run, never passed from its own environment: the groups of the person who started it in the project's organization, a JSON list of names (`[]` for none). A run's agents recall a memory scoped `team:<name>` only when one of those groups has that name. Unset (desktop, CLI), `team:` memories are recalled by every build. |
 
 ## Debug and console output
 

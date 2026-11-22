@@ -52,8 +52,25 @@ branche mis en file après le push.
 | aucun run après 3 min | `triggerRun` une fois : GitHub, les workflows vus sur `pull_request` qui acceptent `workflow_dispatch` ; Azure, les définitions vues sur `pullRequest` ; GitLab et Bitbucket, le pipeline de la branche décrit par son propre fichier. Jamais un pipeline de déploiement. |
 | aucun run après 20 min | `not_started` ; la route CI de ce projet est mise de côté 24 h, les suites suivantes restent sur la machine |
 
+## Dans l'app (`renderer/components/suite-placement/`)
+
+- **Projet** (réglages généraux) : un interrupteur Automatique / Manuel. Automatique (le défaut)
+  laisse `test_placement` décider et propose « pousser la branche sans pull request »
+  (`testPlacementBranchPush`, activé par défaut) ; Manuel propose « cette machine » ou « la CI de
+  la forge » (`testPlacement`).
+- **Carte** (création, modification) : « Réglage du projet » (rien d'écrit), Automatique, ou un
+  choix manuel, écrit en `testPlacement` dans `task_metadata.json` ; `qa/suite_placement.py` le
+  lit et il passe avant le projet.
+- **Badge** (`SuitePlacementBadge`) : rien quand la suite a tourné ici comme d'habitude ; sinon
+  « en file d'attente », « sur la CI / le serveur », puis le verdict de la CI sur le commit
+  poussé (en cours, verte, rouge, non lancée). La raison de la décision est au survol.
+- **Fusion** : tant que `ciSuite.state` vaut `pending`, le bouton de fusion est désactivé et un
+  bandeau le dit, avec le lien du run (`isHeldBySuite`). Rouge, la carte part en « Build rouge » ;
+  non lancée, la carte le dit et la fusion reste possible (la personne décide).
+
+`project-store.ts` porte `ciSuite` (validé par `readCiSuite`) et `suitePlacement` (validé par le
+schéma zod de `placement-file.ts`) sur chaque tâche ; un enregistrement mal formé est ignoré.
+
 ## Ce qui n'est pas encore fait
 
-- L'interrupteur Automatique / Manuel du projet et de la carte, la raison sur la carte, et le
-  badge « suite en cours » qui retient la PR et la fusion jusqu'au vert.
 - La suite remise au serveur WorkPilot.

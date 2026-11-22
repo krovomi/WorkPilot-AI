@@ -165,6 +165,9 @@ _IGNORED = (
     # one machine's folders and claims. The vault's journal says the rest.
     ".workpilot-brain/projects.json*",
     ".workpilot-brain/announced.json*",
+    # The vectors a local embeddings model gave this machine's notes
+    # (`lifecycle.embeddings`): a cache, rebuilt by any machine that has one.
+    ".workpilot-brain/embeddings.json",
 )
 
 _ATTRIBUTES = "knowledge/projects/*/memory/.lifecycle/journal/*.md merge=union"

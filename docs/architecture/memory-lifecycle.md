@@ -33,6 +33,7 @@ knowledge/projects/<projet>/memory/
 <cerveau>/.workpilot-brain/conflicts.json             la file « à trancher » de cette machine (ignorée par git)
 <cerveau>/.workpilot-brain/projects.json              où vit chaque projet de cette machine (ignoré par git)
 <cerveau>/.workpilot-brain/announced.json             les paires annoncées d'ici à l'équipe (ignoré par git)
+<cerveau>/.workpilot-brain/embeddings.json            les vecteurs du modèle d'embeddings local, par note (ignoré par git)
 ```
 
 **Dans le vault, donc synchronisé.** Le journal, la corbeille et l'archive voyagent avec les notes :
@@ -291,8 +292,32 @@ arrivent chez le coéquipier au prochain pull, et une paire réglée ailleurs so
   règles d'une ref git (ni espace, ni `..`, ni `~^:?*[\`), pour qu'une faute de frappe soit
   refusée plutôt que de ne rien couvrir. C'est la « branche de mémoire » de l'issue, par
   module, par équipe ou par branche : deux notes de portées différentes ne se contredisent
-  jamais. La portée ne filtre pas encore ce qu'un agent rappelle : elle sépare les conflits et
-  désigne les mainteneurs.
+  jamais. La portée sépare les conflits, désigne les mainteneurs et filtre ce qu'un agent
+  rappelle (ci-dessous).
+- **Ce qu'un agent rappelle d'une note portée** (`scopes.recalled`, un seul filtre pour les
+  trois chemins de rappel) :
+
+  | Portée | Rappelée pour |
+  |---|---|
+  | aucune, ou un module | tout build, comme avant |
+  | `branch:<nom>` | un build dont la branche git est celle-là, ou en dessous à un `/` (la règle de `covers` : `branch:release` sert `release/2.0`, pas `release-2.0`) ; jamais quand la branche ne se lit pas (pas de dépôt, HEAD détachée) |
+  | `team:<nom>` | en local (desktop, CLI), tout build, comme avant ; en mode serveur, un run lancé par un membre du groupe de ce nom (sans casse) |
+
+  La branche est celle du worktree de la tâche, lue par `git symbolic-ref` (`foundation`, liste
+  d'arguments). Les trois chemins : la mémoire du projet qu'ouvrent les agents
+  (`memory.store.get_project_memory`, `open_project_memory`, les indices de
+  `get_graph_hints` et leur complément pris dans tout le vault), les outils `brain_recall` et
+  `query_graph` du serveur `workpilot-brain` (sa config reçoit la branche du build,
+  `WORKPILOT_BRAIN_BRANCH` ; lancé par l'agent d'une personne, il lit celle du dossier où il
+  tourne ; dans le processus, `tool_executor` passe le dossier du build), et `mem_search`
+  (`BrainSource`). Un run du serveur reçoit les groupes de la personne qui l'a lancé dans
+  l'organisation du projet (`WORKPILOT_RECALL_TEAMS`, liste JSON posée par `run_manager`, `[]`
+  sans groupe ; la valeur du serveur n'est jamais transmise), et sa présence seule dit « mode
+  serveur ». Les surfaces d'une personne (onglet Mémoires et sa recherche, Cycle de vie,
+  historique, la visite d'onboarding) montrent toujours chaque note avec sa portée ; une
+  écriture relit toutes les notes. C'est un filtre de pertinence, pas un secret : un run lit le
+  cerveau de son projet sur le disque. `get_node` et `brain_read_note` ouvrent ce que l'agent
+  nomme, sans filtre.
 
 ## Le dire à l'équipe (`announce.py`), sur demande
 
@@ -370,17 +395,63 @@ change pas.
   (`components/context/lifecycle/`), et Épingler / Oublier / Historique sur chaque mémoire de
   l'onglet Mémoires, pour un projet local comme pour un projet du serveur.
 
+## Les mêmes paires, formulées autrement (`embeddings.py`), si un modèle est déjà là
+
+Le détecteur demande des mots en commun : « toujours lancer les migrations avant les tests » contre
+« ne jamais appliquer le schéma avant la suite de tests » n'en a aucun, et passait. Quand Ollama a
+**déjà** un modèle d'embeddings, `review_pull` lui demande les vecteurs des notes reçues et des
+notes vivantes du même dossier que la passe lexicale a laissées passer ; une paire dont la
+similarité cosinus atteint `SIMILAR` (0,8) et dont un signal `negation` ou `recommendation` dit le
+désaccord (`contradictions.compare_meaning`, sans exiger de mots communs) entre dans le même
+arbitrage que les autres : mêmes règles sûres, même file, même escalade. Elle porte
+`found_by: embeddings` (`lexical` pour les autres paires d'un pull), que l'onglet montre
+(« Trouvé par le sens »), et sa similarité en détail (`≈ 0.91`). `value` reste lexical : deux
+valeurs d'un réglage se trouvent par son nom, et un sens voisin n'est pas le même réglage.
+
+- **Aucun téléchargement, aucune dépendance.** Ni sentence-transformers ni torch : le modèle est
+  un de ceux qu'Ollama a déjà tirés (`/api/tags`), demandé sur `/api/embed`. Celui des réglages
+  s'il y est (`x` vaut `x:latest`), sinon le premier modèle d'embeddings de la liste
+  (`ollama_model_detector.is_embedding_model`), les multilingues d'abord (`bge-m3`,
+  `multilingual-e5`, `nomic-embed-text`…) ; un modèle cloud n'est jamais pris. Un modèle nommé
+  qu'Ollama n'a pas coupe la passe : il n'est jamais tiré.
+- **La machine, jamais le réseau.** L'adresse est `offline_policy.local_endpoint("ollama")`, qui
+  refuse tout ce qui n'est pas une boucle locale ; ni proxy ni redirection, un délai sur chaque
+  appel (2 s pour la liste, 10 s par lot). Un modèle local est ce vers quoi la politique hors
+  ligne stricte route : la passe tourne donc aussi sous elle.
+- **Rien ne casse.** Pas d'Ollama, pas de modèle d'embeddings, un serveur arrêté, lent ou qui
+  répond mal : la passe s'arrête là, sans erreur, et la détection est lexicale comme avant.
+  Une réponse est lue comme des nombres (taille, dimension et finitude vérifiées), rien d'autre.
+- **Borné.** Au plus `MAX_EMBEDDED` (200) notes envoyées par revue, la note reçue d'abord ; un
+  vecteur est gardé par modèle et empreinte de la déclaration dans
+  `.workpilot-brain/embeddings.json` (cette machine, ignoré par git, 2 000 vecteurs au plus, les
+  plus récents), donc le pull suivant n'envoie que ce qui a changé. Le fichier est ouvert par
+  `notes.inside` : un lien qui sortirait du cerveau n'est pas suivi.
+- **Une note est une donnée.** Ce qui part est sa déclaration, expurgée (`memories.redact`) et
+  coupée à 2 000 caractères ; deux notes de portées disjointes (`scopes.py`) ne sont même pas
+  envoyées.
+- **Réglages** : `BRAIN_CONFLICT_EMBEDDINGS` (`off` coupe) et `BRAIN_CONFLICT_EMBEDDINGS_MODEL`,
+  sinon `brain.json` (`conflictEmbeddings`, `conflictEmbeddingsModel`), que Réglages → Cerveau
+  écrit ; une variable posée rend son contrôle en lecture seule.
+- **Le prix.** Le détecteur lexical rend le même verdict sur chaque machine ; cette passe dépend
+  du modèle de la machine. Elle ne fait qu'*ajouter* des paires à trancher, jamais en retirer, et
+  une paire réglée ailleurs arrive par le vault comme toute décision.
+
+C'est pourquoi le contrat d'imports de `brain` s'élargit à `offline_policy` et
+`ollama_model_detector`, deux feuilles que `docintel` lisait déjà : le plus grand cycle ne change
+pas, et `brain` n'importe toujours ni `core` ni `services`.
+
 ## Ce qui reste (lots suivants)
 
 Rien pour #348. Pour #352, ce qui attend une décision du mainteneur du projet :
 
-- Embeddings locaux pour rapprocher deux formulations équivalentes : une dépendance lourde
-  (modèle de phrases à télécharger) à justifier.
+- Embeddings sans Ollama (LM Studio, llama.cpp) et sur un projet du serveur : la passe ne lit
+  que l'Ollama local, et un projet du serveur n'a pas de file de conflits.
 - Signature des instantanés et liste blanche des sources : que devient une note non signée, et
   comment la clé de chaque coéquipier lui parvient (aujourd'hui, la confiance est celle du
   distant git choisi).
 - Les projets du serveur n'ont pas de file de conflits (leur cerveau n'est jamais
   synchronisé), donc pas d'annonce ni de mainteneurs par portée.
-- Une portée qui filtrerait aussi ce qu'un agent rappelle (une note `branch:release/2.0` servie
-  seulement à une tâche de cette branche) : aujourd'hui elle sépare les conflits et désigne les
-  mainteneurs.
+- Les patterns du learning loop (leur injecteur et la source `PatternSource` de `mem_search`)
+  ne sont pas encore filtrés par portée : une personne peut porter un tel pattern, mais il est
+  servi à chaque build. Le filtre se pose sur `PatternStorage` sans toucher son écriture, qui
+  relit tous les patterns pour retirer ceux qui ont disparu.
