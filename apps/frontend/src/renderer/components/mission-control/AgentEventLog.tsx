@@ -2,7 +2,8 @@
  * AgentEventLog — Scrollable live event feed for Mission Control.
  *
  * Shows recent orchestrator events with timestamps, types, and agent references.
- * A live rebalancing (#344) says why and to which model; one not done, why not.
+ * A live rebalancing (#344) says why and to which model; one not done, why not;
+ * a loop, where it was read.
  */
 
 import {
@@ -65,7 +66,10 @@ const EVENT_COLORS: Record<MCEvent["type"], string> = {
 
 /** What a rebalancing event says beyond its title; null for other events. */
 function rebalanceLine(event: MCEvent, t: TFunction): string | null {
-	const { reason, action, skipped, from, to } = event.data;
+	const { reason, action, skipped, from, to, source } = event.data;
+	if (event.type === "agent_loop_detected" && source) {
+		return t(`missionControl:rebalance.loopSources.${source}`);
+	}
 	if (!reason) return null;
 	const why = t(`missionControl:rebalance.reasons.${reason}`);
 	if (event.type === "agent_rebalanced" && action) {

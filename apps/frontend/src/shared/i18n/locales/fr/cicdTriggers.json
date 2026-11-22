@@ -62,13 +62,14 @@
 		"monitor_deploy_wait_minutes": "Attente du déploiement (minutes)",
 		"auto_rollback": "Rollback automatique sur un verdict critique",
 		"autoRollbackHint": "Désactivé : le rollback est proposé ici. Activé : GitHub Actions et Azure Pipelines reviennent à la dernière exécution réussie, sauf si le changement contient une migration de base de données.",
-		"fileHint": "Métriques et seuils : .workpilot/deploy-monitors.yaml (requête dans le langage de la source, type error_rate, latency, throughput ou custom, warning et critical en pourcentage). revert_pr: true ouvre une PR qui reverte le commit déployé après un verdict critique ; explain_incident: false tient le modèle hors du rapport d'incident.",
+		"fileHint": "Métriques et seuils : .workpilot/deploy-monitors.yaml (requête dans le langage de la source, type error_rate, latency, throughput ou custom, warning et critical en pourcentage ; canary_query compare le canary au parc stable à chaque mesure). revert_pr: true ouvre une PR qui reverte le commit déployé après un verdict critique ; explain_incident: false tient le modèle hors du rapport d'incident.",
 		"monitor_source": "Source des métriques",
 		"sources": {
 			"prometheus": "Prometheus",
 			"datadog": "Datadog",
 			"newrelic": "New Relic",
-			"cloudwatch": "Amazon CloudWatch"
+			"cloudwatch": "Amazon CloudWatch",
+			"grafana": "Grafana"
 		},
 		"monitor_datadog_site": "Site Datadog",
 		"monitor_datadog_api_key": "Clé d'API Datadog",
@@ -84,8 +85,12 @@
 			"prometheus": "La requête de chaque métrique est en PromQL ; un vecteur est additionné.",
 			"datadog": "La requête de chaque métrique est une requête de métrique Datadog ; le point le plus récent de chaque série sur les cinq dernières minutes est additionné.",
 			"newrelic": "La requête de chaque métrique est en NRQL, avec sa clause SINCE ; les nombres du résultat sont additionnés.",
-			"cloudwatch": "La requête de chaque métrique est une requête Metrics Insights ou une expression mathématique ; la valeur la plus récente de chaque résultat sur les cinq dernières minutes est additionnée."
-		}
+			"cloudwatch": "La requête de chaque métrique est une requête Metrics Insights ou une expression mathématique ; la valeur la plus récente de chaque résultat sur les cinq dernières minutes est additionnée.",
+			"grafana": "La requête de chaque métrique est l'expression de la source de données (PromQL pour Prometheus ou Mimir, LogQL pour Loki) ; la valeur la plus récente de chaque frame sur les cinq dernières minutes est additionnée."
+		},
+		"monitor_grafana_url": "URL de Grafana",
+		"monitor_grafana_token": "Jeton de compte de service Grafana",
+		"monitor_grafana_datasource_uid": "uid de la source de données Grafana"
 	},
 	"watch": {
 		"notConfigured": "Non surveillé : aucun health check ni aucune métrique configurés.",
@@ -114,7 +119,8 @@
 			"started": "Rollback lancé : la dernière exécution réussie tourne à nouveau.",
 			"failed": "Le rollback n'a pas pu démarrer.",
 			"blocked_migrations": "Rollback automatique bloqué par une migration de base de données.",
-			"manual": "Rollback à faire à la main."
+			"manual": "Rollback à faire à la main.",
+			"startedFlag": "Rollback lancé : le feature flag {{flag}} est coupé, rien n'a été redéployé."
 		},
 		"byPerson": "(demandé depuis l'app)",
 		"plan": {
@@ -161,6 +167,35 @@
 				"pagerduty": "PagerDuty",
 				"email": "e-mail"
 			}
+		},
+		"metricCanary": "{{name}} (canary) : stable {{baseline}} → canary {{current}} ({{change}} %, {{level}})",
+		"withProject": "(avec {{project}})",
+		"linkedByHand": "Rollback à faire à la main aussi pour les services liés : {{projects}}.",
+		"confirmLinked": "Relancer le dernier bon déploiement ? Ceux-ci reviennent en arrière avec lui : {{projects}}.",
+		"linked": {
+			"started": "{{project}} : rollback démarré.",
+			"failed": "{{project}} : le rollback n'a pas pu démarrer.",
+			"blocked_migrations": "{{project}} : rollback bloqué par une migration de base de données.",
+			"manual": "{{project}} : rollback à faire à la main.",
+			"not_deployed_since": "{{project}} : pas déployé depuis la bonne version, rien à remettre en arrière.",
+			"missing": "{{project}} : le projet n'est plus dans l'app.",
+			"error": "{{project}} : pas de réponse de son rollback.",
+			"migrations": "Migrations : {{files}}.",
+			"openTarget": "dernière bonne exécution"
+		},
+		"review": {
+			"question": "Ce verdict était-il juste ?",
+			"false_positive": "Fausse alerte",
+			"confirmed": "Vrai problème"
+		},
+		"investigate": {
+			"selfHealing": "Enquêter dans Self-Healing",
+			"task": "Ouvrir la tâche"
+		},
+		"flag": {
+			"done": "Feature flag {{flag}} coupé.",
+			"failed": "Le feature flag {{flag}} n'a pas pu être coupé : le déploiement a été remis en arrière à la place.",
+			"offline": "Le feature flag {{flag}} est resté actif : le mode hors-ligne strict interdit son service."
 		}
 	},
 	"alerts": {
@@ -176,5 +211,47 @@
 		"alert_smtp_user": "Utilisateur SMTP (facultatif)",
 		"alert_smtp_password": "Mot de passe SMTP (facultatif)",
 		"offlineHint": "Hors-ligne strict : seuls un webhook ou un serveur SMTP sur cette machine ou à une adresse privée sont utilisés ; PagerDuty n'est pas appelé."
+	},
+	"links": {
+		"heading": "Services remis en arrière avec celui-ci",
+		"description": "Quand un rollback de ce projet démarre, les projets activés ici reviennent aussi en arrière, chacun avec ses propres réglages CI/CD, là où ils étaient à la dernière bonne exécution de ce projet. Un projet qui n'a pas été déployé depuis reste tel quel.",
+		"none": "Aucun autre projet dans l'app."
+	},
+	"figures": {
+		"heading": "Chiffres de la surveillance",
+		"watches": "Déploiements surveillés",
+		"verdicts": "Mauvais verdicts",
+		"verdictsValue": "{{critical}} critiques, {{warning}} dégradés",
+		"rollbacks": "Rollbacks",
+		"rollbacksValue": "{{automatic}} automatiques, {{person}} demandés par une personne",
+		"incidentsAvoided": "Incidents évités",
+		"timeToRollback": "De la dégradation au rollback",
+		"timeValue": "moyenne {{mean}}, médiane {{median}} ({{count}} mesurés)",
+		"falseAlarms": "Fausses alertes",
+		"falseAlarmsValue": "{{rate}} % ({{count}} sur {{reviewed}} verdicts jugés ; {{rollbacks}} rollback(s) inutile(s))",
+		"noReview": "aucun verdict jugé pour le moment",
+		"slow": "La médiane dépasse l'objectif de trois minutes : raccourcissez l'attente ou l'intervalle dans .workpilot/deploy-monitors.yaml, ou activez le rollback automatique.",
+		"month": "Mois",
+		"automatic": "Automatiques",
+		"person": "Par une personne",
+		"critical": "Critiques",
+		"local": "Calculés sur cette machine à partir des surveillances de ce projet ; rien n'est envoyé nulle part."
+	},
+	"flag": {
+		"heading": "Rollback par feature flag",
+		"description": "Quand le changement déployé est derrière un feature flag, un verdict critique coupe d'abord ce flag : rien n'est redéployé et une migration de base de données ne bloque pas. Si le flag ne peut pas être coupé, le déploiement est remis en arrière comme d'habitude. Le jeton est gardé chiffré.",
+		"rollback_flag_provider": "Service de flags",
+		"none": "Aucun flag",
+		"providers": {
+			"unleash": "Unleash",
+			"launchdarkly": "LaunchDarkly",
+			"configcat": "ConfigCat"
+		},
+		"rollback_flag_key": "Clé du flag (ConfigCat : clé ou id du réglage)",
+		"rollback_flag_environment": "Environnement (ConfigCat : id de l'environnement)",
+		"rollback_flag_project": "Projet (clé de projet LaunchDarkly, id de config ConfigCat, projet Unleash)",
+		"rollback_flag_url": "URL du service (https ; LaunchDarkly et ConfigCat ont la leur par défaut)",
+		"rollback_flag_user": "Nom d'utilisateur de l'API ConfigCat",
+		"rollback_flag_token": "Jeton d'API"
 	}
 }

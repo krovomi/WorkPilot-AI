@@ -5,8 +5,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const selected = vi.hoisted(() => ({ id: "p1" as string | null }));
 vi.mock("../project-store", () => ({
-	useProjectStore: { getState: () => ({ selectedProjectId: "p1" }) },
+	useProjectStore: { getState: () => ({ selectedProjectId: selected.id }) },
 }));
 
 import type { DesignStackDetection, DesignToCodeResult } from "../../../shared/types/design-to-code";
@@ -14,6 +15,7 @@ import { buildDesignTaskDescription } from "../../components/visual-to-code/desi
 import { stepOfPhase, stepStates } from "../../lib/design-import-steps";
 import {
 	detectDesignStack,
+	loadDesignLoopStats,
 	runDesignToCodePipeline,
 	useDesignToCodeStore,
 	writeDesignFilesToProject,
@@ -23,6 +25,18 @@ const api = {
 	runDesignToCodePipeline: vi.fn(),
 	detectDesignStack: vi.fn(),
 	writeDesignFiles: vi.fn(),
+	getDesignLoopStats: vi.fn(),
+};
+
+const STATS = {
+	loops: 2,
+	converged: 1,
+	averageScore: 0.9,
+	averageIterations: 2,
+	writes: 1,
+	kept: 1,
+	pending: 0,
+	retouched: 0,
 };
 
 function result(overrides: Partial<DesignToCodeResult> = {}): DesignToCodeResult {
@@ -58,6 +72,8 @@ function result(overrides: Partial<DesignToCodeResult> = {}): DesignToCodeResult
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	selected.id = "p1";
+	api.getDesignLoopStats.mockResolvedValue(STATS);
 	(globalThis as unknown as { electronAPI: typeof api }).electronAPI = api;
 	useDesignToCodeStore.setState({
 		...useDesignToCodeStore.getInitialState(),
@@ -222,6 +238,45 @@ describe("design-to-code store", () => {
 			{ path: "tests/visual/header.spec.ts", content: "test()" },
 		]);
 		expect(useDesignToCodeStore.getState()).toMatchObject({ selectedStep: "project", writing: false });
+	});
+
+	it("reads the loop's figures again after a loop or a write that reached a card", async () => {
+		useDesignToCodeStore.setState({ imageData: "data:image/png;base64,AA" });
+		api.runDesignToCodePipeline.mockResolvedValue(result());
+		await runDesignToCodePipeline();
+		expect(api.getDesignLoopStats).not.toHaveBeenCalled();
+		api.runDesignToCodePipeline.mockResolvedValue(
+			result({ render_loop: { status: "converged" } as DesignToCodeResult["render_loop"] }),
+		);
+		await runDesignToCodePipeline();
+		expect(api.getDesignLoopStats).toHaveBeenCalledTimes(1);
+
+		api.writeDesignFiles.mockResolvedValue({ written: [], refused: [] });
+		await writeDesignFilesToProject();
+		expect(api.getDesignLoopStats).toHaveBeenCalledTimes(1);
+		api.writeDesignFiles.mockResolvedValue({ written: [], refused: [], review: { specId: "001" } });
+		await writeDesignFilesToProject();
+		await vi.waitFor(() => expect(api.getDesignLoopStats).toHaveBeenCalledTimes(2));
+		expect(useDesignToCodeStore.getState().loopStats).toEqual(STATS);
+	});
+
+	it("keeps the figures of the selected project only", async () => {
+		await loadDesignLoopStats(null);
+		expect(useDesignToCodeStore.getState().loopStats).toBeNull();
+		expect(api.getDesignLoopStats).not.toHaveBeenCalled();
+
+		selected.id = "p2";
+		await loadDesignLoopStats("p1");
+		expect(useDesignToCodeStore.getState().loopStats).toBeNull();
+
+		selected.id = "p1";
+		api.getDesignLoopStats.mockResolvedValueOnce(undefined);
+		await loadDesignLoopStats("p1");
+		expect(useDesignToCodeStore.getState().loopStats).toBeNull();
+
+		api.getDesignLoopStats.mockRejectedValueOnce(new Error("ipc"));
+		await loadDesignLoopStats("p1");
+		expect(useDesignToCodeStore.getState().loopStats).toBeNull();
 	});
 
 	it("survives a project whose stack cannot be read", async () => {

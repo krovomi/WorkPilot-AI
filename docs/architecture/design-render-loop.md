@@ -10,7 +10,7 @@ summary: >-
 
 # Import Design : la boucle de rendu et d'auto-correction
 
-Issue #379, lots 1 à 3. Le code généré depuis une maquette n'était jamais regardé : rien ne
+Issue #379, lots 1 à 3 et 5. Le code généré depuis une maquette n'était jamais regardé : rien ne
 disait qu'il lui ressemblait. La boucle le rend, mesure l'écart, montre au modèle ce qui diffère
 et recommence, dans des bornes fixes. L'interrupteur est sur l'étape « Code » de la page.
 
@@ -26,7 +26,7 @@ apps/backend/design_to_code/          paquet feuille (n'importe que models_regis
   passes.py      passe responsive (trois largeurs) et passe des états (survol, focus)
   pass_fix.py    une correction d'après les constats des passes, gardée si elle aide
 apps/backend/services/design_to_code_render_loop.py   le raccord au service d'Import Design
-apps/backend/services/design_to_code_edit_calls.py    la correction de l'abonnement, en schéma imposé
+apps/backend/services/design_to_code_edit_calls.py    le schéma imposé des corrections, pour chaque provider
 apps/backend/prompts/design_to_code_iteration.md      le prompt de correction
 apps/backend/prompts/design_to_code_pass_fix.md       le prompt de correction d'après les passes
 apps/frontend/.../design-import/IterationPanel.tsx    le panneau des itérations
@@ -34,6 +34,8 @@ apps/frontend/.../design-import/LoopReport.tsx        dépense, passe responsive
 apps/frontend/.../design-import/LoopOptions.tsx       itérations, seuil, budgets, passes
 apps/frontend/.../design-import/MaskLayer.tsx         les zones tracées sur la maquette
 apps/frontend/src/main/design-render-loop-args.ts      les options revérifiées avant le runner
+apps/frontend/src/main/design-loop-history.ts          les chiffres de la boucle, gardés dans le projet
+apps/frontend/.../design-import/LoopFigures.tsx       ces chiffres, sous la maquette
 ```
 
 ## Le déroulé
@@ -105,13 +107,23 @@ elle est refusée avec sa raison (`unknown_file`, `not_found`, `ambiguous`), et 
 illisible ne change rien. Rechercher-remplacer plutôt que fichiers entiers : un fichier complet
 dépasserait la réponse plafonnée d'un appel de vision et y serait tronqué.
 
-**Réponse imposée** (`design_to_code_edit_calls.py`). Avec l'abonnement Claude, le modèle ne
-répond pas en texte : la correction passe par `core.simple_client`, l'image en bloc de contenu
-et `output_format` réglé sur le schéma JSON des modifications, que le SDK valide et redemande
-(sa sortie structurée est un appel d'outil forcé, d'où deux tours). Le type d'agent est celui
-de `commit_message`, sans aucun outil. La sortie structurée repasse par `parse_answer`, comme
-toute réponse ; un modèle qui répond en texte quand même est lu de la même façon. Les autres
-routes gardent le JSON dans le texte des appels de vision du service (voir « Pas encore fait »).
+**Réponse imposée** (`design_to_code_edit_calls.py`). Sur chaque route, le modèle ne répond pas
+en texte libre mais dans le schéma JSON des modifications (`EDITS_SCHEMA`, `SCHEMA_ROUTES` couvre
+toutes les routes). Avec l'abonnement Claude, la correction passe par `core.simple_client`,
+l'image en bloc de contenu et `output_format` réglé sur ce schéma, que le SDK valide et redemande
+(sa sortie structurée est un appel d'outil forcé, d'où deux tours) ; le type d'agent est celui de
+`commit_message`, sans aucun outil. Les autres routes sont les appels de vision du service, qui
+parlent à l'API HTTP de chaque provider (les clients d'agent de `core.client` n'envoient que du
+texte) ; la boucle les appelle avec `forced=True`, et le module donne pour chacun les champs de
+la requête et le lecteur de la réponse : Claude par clé, un outil `submit_edits` et
+`tool_choice` de type `tool`, lu dans `tool_use.input` ; OpenAI (et Copilot), une fonction et
+`tool_choice`, lue dans `tool_calls[0].function.arguments` ; Gemini, une `functionDeclarations`
+(types du schéma en majuscules, le sous-ensemble OpenAPI de Gemini) et `toolConfig` en mode
+`ANY`, lue dans `functionCall.args` ; LM Studio et llama.cpp, `response_format` de type
+`json_schema` ; Ollama, le schéma en `format` de `docintel.engines.ollama_vision.ask`. L'analyse
+de la maquette, elle, garde ses appels en texte. Toute réponse repasse par `parse_answer` ; un
+modèle ou un serveur qui répond en texte quand même (pas d'appel d'outil dans la réponse) est lu
+depuis son texte, comme avant.
 
 La route suit le provider choisi pour la page, sans jamais en prendre un autre : Claude (clé ou
 abonnement), OpenAI (et Copilot), Google, Ollama, LM Studio, llama.cpp. Une clé absente, un provider sans route de
@@ -196,6 +208,37 @@ budget déjà épuisé l'empêche (`budget`). Le rapport `pass_fix` donne le sta
 avant et après, les modifications appliquées ou refusées, le score et la dépense ; une
 correction gardée remplace aussi le rapport des passes.
 
+## Les chiffres de la boucle (`design-loop-history.ts`)
+
+Les métriques de l'issue (score après la boucle, itérations pour converger, part du code accepté
+sans retouche) sont tenues par projet, sur cet ordinateur : ni télémétrie, ni route du serveur (le
+mode serveur n'a pas d'Import Design). Le main écrit deux journaux d'une ligne JSON chacun sous
+`.workpilot/design-to-code/` du projet choisi : `loop-history.jsonl` reçoit une ligne par boucle
+qui a tourné (statut, score de la version gardée, nombre de corrections, la version 0 n'en étant
+pas une, route ; une boucle sautée n'a rien mesuré et n'y entre pas), au retour du runner ;
+`writes.jsonl` reçoit, quand `writeFiles` a commité sur une carte de revue, l'id de la carte et
+le SHA-256 de chaque fichier écrit. Le canal `designToCode:loopStats` (un id de projet, jamais un
+chemin) en tire, sur les 500 dernières boucles et les 50 dernières écritures : le nombre de
+boucles et de convergences, le score moyen gardé de toutes les boucles, le nombre moyen de
+corrections de celles qui ont convergé, et le devenir des écritures. La carte `LoopFigures.tsx`,
+sous la maquette, les affiche ; la page les relit à chaque visite, après une boucle et après une
+écriture.
+
+« Accepté sans retouche » est une approximation, lue au moment de l'affichage : une écriture est
+`kept` quand chaque fichier du dossier du projet a encore l'empreinte écrite, `pending` quand ils
+ne l'ont que dans le worktree de la carte, encore là (rien n'est fusionné dans ce dossier), et
+`retouched` sinon. Un fichier modifié après la fusion pour une autre raison compte donc comme
+retouché, une fusion faite sur la forge et pas encore tirée dans ce dossier reste `pending` (puis
+`retouched` une fois le worktree nettoyé), et une carte abandonnée compte comme retouchée. La
+part affichée est `kept / (kept + retouched)` ; les `pending` sont donnés à part.
+
+Les journaux vivent dans un dossier de projet, qui n'est pas fiable : chaque chemin est résolu
+dans le projet (liens compris, `resolveWritableUnder`) avant d'écrire ou de lire, l'ajout passe
+par un descripteur `O_NOFOLLOW` qui n'écrit que dans un fichier ordinaire, chaque ligne relue est
+vérifiée champ par champ (statut connu, score dans `[0, 1]`, id de carte et empreintes au bon
+format), seul le dernier 2 Mo d'un journal est lu, et un fichier de plus de 1 Mo n'est pas haché.
+Un projet en lecture seule ne garde pas de chiffres, sans erreur.
+
 ## Le suivi des écarts
 
 Un écart est identifié par sa zone, son type et son axe. Il est `open` tant qu'il se mesure,
@@ -218,7 +261,7 @@ d'itérations, le seuil et les deux budgets en listes de choix (`RENDER_LOOP_CHO
 passes et la correction d'après les passes. Sous la maquette, quand la boucle est active,
 `MaskLayer.tsx` trace les zones exclues du score : « Masquer une zone », puis un glisser sur
 l'image ; chaque zone a son bouton pour la retirer, et changer de maquette les efface. Sous les
-passes, une ligne dit ce qu'est devenue la correction d'après elles. Aucun canal IPC nouveau : la requête porte `renderLoop`, que le main ne transmet que s'il
+passes, une ligne dit ce qu'est devenue la correction d'après elles. La boucle n'a pas de canal IPC à elle : la requête porte `renderLoop`, que le main ne transmet que s'il
 vaut strictement `true`, et `renderLoopOptions`, dont le main (`renderLoopArgs`) ne transmet
 qu'un nombre fini dans ses bornes (`RENDER_LOOP_BOUNDS`, entier quand il le faut), un `true`
 strict et les zones valides (au plus 12) ; le reste est laissé au défaut du runner, qui revérifie les bornes.
@@ -229,11 +272,14 @@ strict et les zones valides (au plus 12) ; le reste est laissé au défaut du ru
 avec un correcteur scripté, budget sur les formes de chaque provider, passes sur un faux
 navigateur qui dessine survol et focus, correction d'après les passes avec chacune de ses
 issues), `tests/services/test_design_to_code_render_loop.py`,
-`tests/services/test_design_to_code_edit_calls.py` (sortie structurée sur un faux client du SDK),
-`tests/services/test_design_to_code_vision_usage.py`, `tests/test_design_to_code_runner_cli.py` ;
+`tests/services/test_design_to_code_edit_calls.py` (sortie structurée sur un faux client du SDK,
+lecteurs de chaque forme de réponse), `tests/services/test_design_to_code_vision_usage.py` (la
+réponse imposée de chaque route sur un faux serveur `httpx.MockTransport`),
+`tests/docintel/test_ocr_engines_wire.py` (le `format` d'Ollama), `tests/test_design_to_code_runner_cli.py` ;
 côté app, `IterationPanel.test.tsx`, `LoopReport.test.tsx`, `LoopOptions.test.tsx`,
-`MaskLayer.test.tsx`, `design-import.test.tsx`, `design-to-code-store.test.ts`,
-`design-to-code-run.test.ts`.
+`MaskLayer.test.tsx`, `LoopFigures.test.tsx`, `design-import.test.tsx`,
+`design-to-code-store.test.ts`, `design-to-code-run.test.ts`, `design-to-code-write.test.ts`,
+`design-loop-history.test.ts`, `design-to-code-handlers.test.ts`, `design-to-code-api.test.ts`.
 
 ## Pas encore fait (suite de #379)
 
@@ -247,11 +293,6 @@ côté app, `IterationPanel.test.tsx`, `LoopReport.test.tsx`, `LoopOptions.test.
   que l'app ne livre pas et qu'elle ne peut pas télécharger en hors-ligne strict, et aucun des
   providers de la page n'offre ici d'embeddings d'image (Gemini ne les donne que par Vertex AI,
   avec un compte Google Cloud).
-- Réponse imposée (appel d'outil forcé) pour Claude par clé d'API, OpenAI, Gemini, LM Studio,
-  llama.cpp et Ollama : les clients d'agent de `core.client` n'envoient qu'un prompt texte, sans
-  image, et le chemin du SDK, seul à porter une image et un schéma de réponse, demande la
-  connexion Claude Code, qu'une clé d'API seule ne donne pas. Ces routes gardent le JSON dans le
-  texte des appels de vision du service ; il faut d'abord que `core` sache porter une image et
-  un outil imposé pour ces providers.
-- Vérifier le prompt sur au moins trois providers de vision réels : il faut leurs comptes
-  payants ; les tests jouent leurs formats sur de faux serveurs et un faux client du SDK.
+- Vérifier le prompt et la réponse imposée sur au moins trois providers de vision réels (Claude
+  par clé, OpenAI, Gemini) : il faut leurs comptes payants ; les tests jouent leurs formats
+  (appel d'outil forcé compris) sur de faux serveurs et un faux client du SDK.

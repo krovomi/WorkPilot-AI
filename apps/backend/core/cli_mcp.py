@@ -39,6 +39,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from core.mcp_confinement import CONFINED_MARK
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -80,11 +82,16 @@ def cli_mcp_servers(
     except (OSError, ValueError, ImportError, RuntimeError) as exc:
         logger.warning("[cli-mcp] custom MCP servers not handed to the CLI: %s", exc)
         return []
-    return [
-        cfg
+    from core.mcp_confinement import confined_server  # noqa: PLC0415
+
+    # A confined server is handed over already wrapped in the OS sandbox,
+    # and left out when it cannot be (`core.mcp_confinement`).
+    exposed = [
+        confined_server(cfg, project_dir)
         for cfg in servers
         if (v := verdicts.get(str(cfg.get("id")))) is not None and v.exposed
     ]
+    return [cfg for cfg in exposed if cfg is not None]
 
 
 def _str_map(value: object) -> dict[str, str]:
@@ -102,6 +109,26 @@ def _skip(server: Mapping[str, Any], cli: str, why: str) -> None:
 def _toml(value: str) -> str:
     # A plain value (`_PLAIN`) needs no escape inside a TOML basic string.
     return f'"{value}"'
+
+
+def _toml_quoted(value: str) -> str:
+    # A JSON string is a TOML basic string (same escapes, \uXXXX included).
+    return json.dumps(value)
+
+
+def _launch_words(server: Mapping[str, Any], command: str, argv: list[str]) -> bool:
+    """Whether ``command`` and ``argv`` may reach the Codex command line.
+
+    A confined server's launcher is the OS sandbox WorkPilot built
+    (`core.mcp_confinement`): paths and a profile, quoted whole. There is no
+    sandbox on Windows, so no ``cmd.exe`` to read it; a confined server on
+    Windows is refused all the same.
+    """
+    if server.get(CONFINED_MARK) is True:
+        from foundation.platform import is_windows  # noqa: PLC0415
+
+        return not is_windows()
+    return all(_PLAIN.match(v) for v in [command, *argv])
 
 
 def codex_mcp_overrides(
@@ -142,7 +169,7 @@ def codex_mcp_overrides(
             command = str(server.get("command") or "npx")
             argv = [str(a) for a in server.get("args") or []]
             variables = _str_map(server.get("env"))
-            if not all(_PLAIN.match(v) for v in [command, *argv]) or not all(
+            if not _launch_words(server, command, argv) or not all(
                 _ENV_NAME.match(n) for n in variables
             ):
                 _skip(server, "Codex", "a launcher argument is not plain")
@@ -153,9 +180,10 @@ def codex_mcp_overrides(
             if clash:
                 _skip(server, "Codex", f"it would replace the value of {clash[0]}")
                 continue
+            quote = _toml_quoted if server.get(CONFINED_MARK) is True else _toml
             entry = [
-                f"{key}.command={_toml(command)}",
-                f"{key}.args=[{','.join(_toml(a) for a in argv)}]",
+                f"{key}.command={quote(command)}",
+                f"{key}.args=[{','.join(quote(a) for a in argv)}]",
             ]
             if variables:
                 env.update(variables)

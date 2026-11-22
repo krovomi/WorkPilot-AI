@@ -196,8 +196,9 @@ async def test_a_title_without_a_task_and_a_name_from_the_email(tmp_path):
     )
     assert created["share"]["title"] == "coder"
     assert created["share"]["created_by"] == "u-1@x"
-    _data, title, _steps = _read_bundle(_bundle(task="x" * 500))
+    _data, title, _steps, bookmarks = _read_bundle(_bundle(task="x" * 500))
     assert len(title) == 200
+    assert bookmarks == 0
 
 
 async def test_a_wrong_token_another_project_or_an_unknown_id_is_not_found(tmp_path):

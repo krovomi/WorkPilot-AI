@@ -3,7 +3,9 @@
  * verdict, the last sample, and the rollback (proposed, started, refused by a
  * migration, or by hand with a link to the last good run); after a bad
  * verdict, the incident report, the revert PR of the deployed commit and
- * what became of the alerts (Slack, PagerDuty, e-mail).
+ * what became of the alerts (Slack, PagerDuty, e-mail). Lot 4: the linked
+ * services the rollback takes back, a person's word on the verdict, and the
+ * way to investigate (`DeployWatchExtras.tsx`).
  */
 
 import { AlertTriangle, ExternalLink, GitPullRequest, Undo2 } from "lucide-react";
@@ -14,10 +16,12 @@ import type {
 	DeployAlertChannel,
 	DeployIncident,
 	DeployRevertPr,
+	DeployVerdictReview,
 	DeployWatch,
 	DeployWatchLevel,
 } from "../../../shared/types/deploy-watch";
 import { CharterButton, Chip, Notice, type Tone } from "../charter";
+import { canReview, InvestigateLinks, LinkedRollbacks, VerdictReview } from "./DeployWatchExtras";
 
 const VERDICT_TONES: Record<DeployWatchLevel, Tone> = {
 	ok: "green",
@@ -33,7 +37,8 @@ export function canRollBack(watch: DeployWatch): boolean {
 	if (RUNNING.has(watch.phase)) return false;
 	if (watch.verdict !== "warning" && watch.verdict !== "critical") return false;
 	if (watch.rollback === "started" || watch.rollback === "manual") return false;
-	return watch.plan?.automatic !== false;
+	// A feature flag can be turned off whatever the provider can redeploy.
+	return watch.flagConfigured || watch.plan?.automatic !== false;
 }
 
 export function isWatchRunning(watch: DeployWatch | undefined): boolean {
@@ -130,9 +135,26 @@ interface DeployWatchPanelProps {
 	readonly watch: DeployWatch;
 	readonly busy: boolean;
 	readonly onRollback: () => void;
+	/** The projects a rollback of this one takes back with it. */
+	readonly linkedNames?: readonly string[];
+	readonly onReview?: (review: DeployVerdictReview | null) => void;
+	/** The task whose PR this run deployed. */
+	readonly taskId?: string;
 }
 
-export function DeployWatchPanel({ watch, busy, onRollback }: DeployWatchPanelProps): React.ReactElement {
+/** The rollback stays with a person here: the linked services need one too. */
+function linkedByHand(watch: DeployWatch, names: readonly string[]): boolean {
+	return names.length > 0 && !watch.linked && (watch.rollback === "manual" || watch.rollback === "blocked_migrations");
+}
+
+export function DeployWatchPanel({
+	watch,
+	busy,
+	onRollback,
+	linkedNames = [],
+	onReview,
+	taskId,
+}: DeployWatchPanelProps): React.ReactElement {
 	const { t } = useTranslation(["cicdTriggers"]);
 	const [confirming, setConfirming] = useState(false);
 
@@ -161,7 +183,7 @@ export function DeployWatchPanel({ watch, busy, onRollback }: DeployWatchPanelPr
 				<ul className="space-y-0.5">
 					{watch.lastMetrics.map((m) => (
 						<li key={m.name} className="wp-meta">
-							{t("cicdTriggers:watch.metric", {
+							{t(m.canary ? "cicdTriggers:watch.metricCanary" : "cicdTriggers:watch.metric", {
 								name: m.name,
 								baseline: formatValue(m.baseline),
 								current: formatValue(m.current),
@@ -184,8 +206,24 @@ export function DeployWatchPanel({ watch, busy, onRollback }: DeployWatchPanelPr
 			)}
 			{watch.rollback && (
 				<div className={watch.rollback === "failed" ? "text-destructive" : "wp-meta"}>
-					{t(`cicdTriggers:watch.rollback.${watch.rollback}`)}
+					{watch.rollback === "started" && watch.strategy === "flag"
+						? t("cicdTriggers:watch.rollback.startedFlag", { flag: watch.flag?.key ?? "" })
+						: t(`cicdTriggers:watch.rollback.${watch.rollback}`)}
 					{watch.rollbackByPerson && <span className="ml-1">{t("cicdTriggers:watch.byPerson")}</span>}
+					{watch.linkedCause && (
+						<span className="ml-1">{t("cicdTriggers:watch.withProject", { project: watch.linkedCause })}</span>
+					)}
+				</div>
+			)}
+			{watch.flag && watch.strategy !== "flag" && (
+				<div className={watch.flag.status === "failed" ? "text-destructive" : "wp-meta"}>
+					{t(`cicdTriggers:watch.flag.${watch.flag.status}`, { flag: watch.flag.key })}
+				</div>
+			)}
+			{watch.linked && watch.linked.length > 0 && <LinkedRollbacks linked={watch.linked} />}
+			{linkedByHand(watch, linkedNames) && (
+				<div className="wp-meta">
+					{t("cicdTriggers:watch.linkedByHand", { projects: linkedNames.join(", ") })}
 				</div>
 			)}
 			{watch.plan && !watch.plan.automatic && (
@@ -203,15 +241,21 @@ export function DeployWatchPanel({ watch, busy, onRollback }: DeployWatchPanelPr
 				</a>
 			)}
 			{watch.incident && <IncidentReport incident={watch.incident} />}
+			{watch.incident && <InvestigateLinks taskId={taskId} />}
 			{watch.revertPr && <RevertPrLine revert={watch.revertPr} />}
 			{watch.alerts && <AlertsLine alerts={watch.alerts} />}
 			{watch.rollback === "started" && !revertOpened(watch.revertPr) && (
 				<div className="wp-meta">{t("cicdTriggers:watch.revertHint")}</div>
 			)}
+			{onReview && canReview(watch) && <VerdictReview watch={watch} onReview={onReview} />}
 			{canRollBack(watch) &&
 				(confirming ? (
 					<div className="flex flex-wrap items-center gap-2">
-						<span>{t("cicdTriggers:watch.confirm")}</span>
+						<span>
+							{linkedNames.length > 0
+								? t("cicdTriggers:watch.confirmLinked", { projects: linkedNames.join(", ") })
+								: t("cicdTriggers:watch.confirm")}
+						</span>
 						<CharterButton
 							size="sm"
 							variant="danger"

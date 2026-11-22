@@ -11,9 +11,7 @@ from deploy_watch.config import (
     Kind,
     MetricRule,
     Worse,
-    is_local_host,
     load_settings,
-    valid_url,
 )
 from deploy_watch.evaluate import (
     HealthResult,
@@ -23,6 +21,7 @@ from deploy_watch.evaluate import (
     sample_level,
     verdict,
 )
+from deploy_watch.net import is_local_host, valid_url
 
 
 def _write(project: Path, text: str) -> None:
@@ -142,6 +141,12 @@ metrics:
     worse: sideways
   - name: long
     query: "%s"
+  - name: canary
+    query: stable
+    canary_query: " canary "
+  - name: badcanary
+    query: stable
+    canary_query: 3
   - not a mapping
 """
             % ("x" * 2001),
@@ -157,7 +162,9 @@ metrics:
         assert settings.deploy_wait_minutes == 2
         assert settings.stabilization_seconds == 120
         assert settings.interval_seconds == 10
-        assert [m.name for m in settings.metrics] == ["errors", "orders"]
+        assert [m.name for m in settings.metrics] == ["errors", "orders", "canary"]
+        assert settings.metrics[2].canary_query == "canary"
+        assert settings.metrics[0].canary_query == ""
         orders = settings.metrics[1]
         assert orders.kind is Kind.CUSTOM
         assert orders.worse is Worse.DOWN
@@ -168,7 +175,7 @@ metrics:
         )
         errors = settings.metrics[0]
         assert errors.min_absolute == 0.005
-        assert len(settings.problems) == 6
+        assert len(settings.problems) == 7
 
     def test_env_duration_clamped_and_yaml_window_used(self, tmp_path):
         _write(tmp_path, "window_minutes: 20\n")

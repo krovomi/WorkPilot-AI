@@ -1,8 +1,8 @@
 /**
  * Live rebalancing and its history, from the person's side (#344): the
  * session's budget and rebalancings with the switch that turns them off, the
- * card of an agent that was moved or looped, the event log's account of each
- * decision, and what past sessions measured.
+ * card of an agent that was moved, looped or got a helper, the event log's
+ * account of each decision, and what past sessions measured.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -130,7 +130,7 @@ describe("AgentPanel", () => {
 	it("says the agent was rebalanced and that its answer looped", () => {
 		render(<AgentPanel agent={agent({ rebalances: 2, loop_detected: true })} isSelected={false} {...handlers} />);
 		expect(screen.getByText("Rebalanced 2 times")).toBeInTheDocument();
-		expect(screen.getByText("Answer looped")).toBeInTheDocument();
+		expect(screen.getByText("Looping")).toBeInTheDocument();
 	});
 
 	it("shows only what happened", () => {
@@ -140,9 +140,28 @@ describe("AgentPanel", () => {
 		expect(screen.queryByText(/Rebalanced/)).toBeNull();
 		rerender(<AgentPanel agent={agent({ rebalances: 1 })} isSelected={false} {...handlers} />);
 		expect(screen.getByText("Rebalanced once")).toBeInTheDocument();
-		expect(screen.queryByText("Answer looped")).toBeNull();
+		expect(screen.queryByText("Looping")).toBeNull();
 		rerender(<AgentPanel agent={agent({ rebalances: 0 })} isSelected={false} {...handlers} />);
 		expect(screen.queryByTestId("mission-control-agent-rebalanced")).toBeNull();
+	});
+
+	it("says which agent a helper helps, never its prompt", () => {
+		const prompt = "Another agent was given the task below and could not finish it";
+		const { rerender } = render(
+			<AgentPanel
+				agent={agent({ role: "debugger", helper_of: "a0", helper_of_name: "Coder", current_task: prompt })}
+				isSelected={false}
+				{...handlers}
+			/>,
+		);
+		expect(screen.getByText("Helping Coder")).toBeInTheDocument();
+		expect(screen.getByText("Works out why Coder got stuck, then does its task")).toBeInTheDocument();
+		expect(screen.queryByText(prompt)).toBeNull();
+		rerender(
+			<AgentPanel agent={agent({ helper_id: "h1", current_task: "Fix the login" })} isSelected={false} {...handlers} />,
+		);
+		expect(screen.getByText("Helper started")).toBeInTheDocument();
+		expect(screen.getByText("Fix the login")).toBeInTheDocument();
 	});
 });
 
@@ -160,6 +179,12 @@ describe("AgentEventLog", () => {
 				data: { agent_id: "a1", reason: "rate_limited", skipped: "over_budget" },
 			},
 			{ type: "agent_loop_detected", timestamp: 3, data: { agent_id: "a1" } },
+			{ type: "agent_loop_detected", timestamp: 6, data: { agent_id: "a1", source: "steps" } },
+			{
+				type: "agent_rebalanced",
+				timestamp: 7,
+				data: { agent_id: "a1", reason: "provider_failed", action: "helper", from: "Opus", to: "GPT" },
+			},
 			// Odd records say nothing more than their title.
 			{ type: "agent_rebalanced", timestamp: 4, data: { agent_id: "a1", reason: "failed" } },
 			{ type: "agent_failed", timestamp: 5, data: { agent_id: "a1", reason: "failed" } },
@@ -171,8 +196,12 @@ describe("AgentEventLog", () => {
 		expect(
 			screen.getByText("Provider rate limit or quota: the session is over its budget"),
 		).toBeInTheDocument();
-		expect(screen.getByText("Answer is looping")).toBeInTheDocument();
-		expect(screen.getAllByText("Agent rebalanced")).toHaveLength(2);
+		expect(screen.getAllByText("Agent is looping")).toHaveLength(2);
+		expect(
+			screen.getByText("Read in the decision tree: the same steps over and over"),
+		).toBeInTheDocument();
+		expect(screen.getByText("Provider unavailable: handed to a helper agent, Opus → GPT")).toBeInTheDocument();
+		expect(screen.getAllByText("Agent rebalanced")).toHaveLength(3);
 		expect(screen.queryByText(/^The run failed/)).toBeNull();
 	});
 });

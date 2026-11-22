@@ -1,7 +1,8 @@
 /**
  * `.workpilot/review-conventions.md` (#361, lot 2): deduced from the dataset
  * without a model, the same dataset giving the same file, finding titles
- * unable to add markup, and the file written inside the project only.
+ * unable to add markup, and the file written inside the project only. A
+ * server project's is saved where the person chose in a native dialog (lot 4).
  */
 import {
 	mkdirSync,
@@ -20,11 +21,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../../project-store", () => ({
 	projectStore: { getProjects: () => [] },
 }));
+const showSaveDialog = vi.hoisted(() => vi.fn());
+vi.mock("../../../electron-utils", () => ({ showSaveDialog }));
 
 import {
 	buildConventions,
 	CONVENTIONS_RELATIVE_PATH,
 	escapeInline,
+	saveConventionsAs,
 	writeConventions,
 } from "../review-conventions";
 import { parseDataset } from "../review-feedback-dataset";
@@ -196,5 +200,65 @@ describe("writeConventions", () => {
 				name.endsWith(".tmp"),
 			),
 		).toEqual([]);
+	});
+});
+
+describe("saveConventionsAs", () => {
+	beforeEach(() => showSaveDialog.mockReset());
+
+	it("saves the file where the person chose and answers its full path", async () => {
+		// A dialog only offers a folder that exists.
+		mkdirSync(path.join(root, "checkout"));
+		const chosen = path.join(root, "checkout", "review-conventions.md");
+		showSaveDialog.mockResolvedValue({ canceled: false, filePath: chosen });
+
+		const result = await saveConventionsAs(parseDataset(dataset(SPEC)), 3);
+
+		expect(result).toEqual({ success: true, path: chosen, rules: 3 });
+		expect(readFileSync(chosen, "utf-8")).toContain("# Review conventions");
+		expect(showSaveDialog).toHaveBeenCalledWith({
+			defaultPath: "review-conventions.md",
+			filters: [{ name: "Markdown", extensions: ["md"] }],
+		});
+		expect(readdirSync(path.dirname(chosen))).toEqual(["review-conventions.md"]);
+	});
+
+	it("answers cancelled when the dialog is closed", async () => {
+		showSaveDialog.mockResolvedValueOnce({ canceled: true, filePath: "" });
+		showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: undefined });
+
+		for (let i = 0; i < 2; i += 1) {
+			await expect(saveConventionsAs([], 3)).resolves.toEqual({
+				success: false,
+				error: "cancelled",
+			});
+		}
+	});
+
+	it("never saves through a link, and answers a failed write", async () => {
+		const target = path.join(root, "outside.md");
+		writeFileSync(target, "keep\n");
+		const link = path.join(root, "link.md");
+		let linked = true;
+		try {
+			symlinkSync(target, link);
+		} catch {
+			linked = false; // No symlinks on this machine.
+		}
+		if (linked) {
+			showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: link });
+			await expect(saveConventionsAs([], 3)).resolves.toEqual({
+				success: false,
+				error: "write_failed",
+			});
+			expect(readFileSync(target, "utf-8")).toBe("keep\n");
+		}
+		const folder = path.join(root, "a-folder.md");
+		mkdirSync(folder);
+		showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: folder });
+		await expect(saveConventionsAs([], 3)).resolves.toEqual({
+			success: false,
+			error: "write_failed",
+		});
 	});
 });

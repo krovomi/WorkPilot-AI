@@ -144,7 +144,7 @@
 		"description": "Every decision on the project's memory, the forgotten memories you can restore, and the sync conflicts to resolve",
 		"refresh": "Refresh",
 		"error": "Could not read the memory's lifecycle: {{error}}",
-		"serverProject": "The lifecycle of a server project's memory is not available yet.",
+		"serverProject": "This project's memory is its own brain on the server. No teammate's sync feeds it, so there is no conflict between notes to resolve here.",
 		"pins": "{{count}} / {{limit}} pinned",
 		"entry": "{{action}} {{actor}} — {{reason}}",
 		"conflicts": {

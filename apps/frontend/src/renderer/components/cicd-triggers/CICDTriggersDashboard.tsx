@@ -26,6 +26,9 @@ import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
 import { Switch } from "../ui/switch";
 import { DeployAlertSettings } from "./DeployAlertSettings";
+import { DeployFlagSettings } from "./DeployFlagSettings";
+import { DeployLinkSettings } from "./DeployLinkSettings";
+import { DeployWatchFigures } from "./DeployWatchFigures";
 import { DeployMonitorSettings } from "./DeployMonitorSettings";
 import { DeployWatchPanel, isWatchRunning } from "./DeployWatchPanel";
 
@@ -64,7 +67,14 @@ export function CICDTriggersDashboard(): React.ReactElement {
 		rollback,
 		rollingBack,
 		clearError,
+		links,
+		loadLinks,
+		saveLinks,
+		figures,
+		loadFigures,
+		reviewVerdict,
 	} = useCICDTriggersStore();
+	const linkedNames = (links?.linked ?? []).map((p) => p.name);
 
 	const [branch, setBranch] = useState("");
 	const [prUrl, setPrUrl] = useState("");
@@ -73,7 +83,9 @@ export function CICDTriggersDashboard(): React.ReactElement {
 		if (!projectPath) return;
 		loadConfig(projectPath);
 		loadRuns(projectPath);
-	}, [projectPath, loadConfig, loadRuns]);
+		loadLinks(projectPath);
+		loadFigures(projectPath);
+	}, [projectPath, loadConfig, loadRuns, loadLinks, loadFigures]);
 
 	const provider = config?.provider ?? "";
 	const watching = runs.some((run) => isWatchRunning(run.watch));
@@ -178,11 +190,24 @@ export function CICDTriggersDashboard(): React.ReactElement {
 									config={config}
 									onSave={(update) => projectPath && setConfig(projectPath, update)}
 								/>
+								<DeployFlagSettings
+									config={config}
+									onSave={(update) => projectPath && setConfig(projectPath, update)}
+								/>
 								<DeployAlertSettings
 									config={config}
 									onSave={(update) => projectPath && setConfig(projectPath, update)}
 								/>
+								<DeployLinkSettings
+									links={links}
+									onSave={(ids) => projectPath && saveLinks(projectPath, ids)}
+								/>
 							</Panel>
+							{figures && figures.watches > 0 && (
+								<Panel>
+									<DeployWatchFigures figures={figures} />
+								</Panel>
+							)}
 						</Column>
 
 						<Column
@@ -243,6 +268,11 @@ export function CICDTriggersDashboard(): React.ReactElement {
 													watch={run.watch}
 													busy={rollingBack === run.id}
 													onRollback={() => projectPath && rollback(projectPath, run.id)}
+													linkedNames={linkedNames}
+													onReview={(review) =>
+														projectPath && reviewVerdict(projectPath, run.id, review)
+													}
+													taskId={run.task_id}
 												/>
 											)}
 										</Panel>

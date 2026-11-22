@@ -132,7 +132,9 @@
 			"minutes": "Build time",
 			"cost": "Cost (USD)",
 			"qaIterations": "QA iterations",
-			"agents": "Agents"
+			"agents": "Agents",
+			"mutationScore": "Mutation score",
+			"firstCi": "First-run CI pass"
 		},
 		"sizes": {
 			"small": "Small repo",
@@ -144,7 +146,7 @@
 		"otherStack": "Other stack",
 		"smallGroup_one": "A group's median shows from {{count}} active project.",
 		"smallGroup_other": "A group's median shows from {{count}} active projects: below that, only its size.",
-		"lowerIsBetter": "Lower is better for every figure. A spec's build time runs from its first agent session to its last.",
+		"lowerIsBetter": "Lower is better, except for the mutation score and the first-run CI pass rate, where higher is. A spec's build time runs from its first agent session to its last.",
 		"yourProjects": "Your other projects",
 		"noOtherProjects": "None of your other projects built a spec in this period.",
 		"teams": {
@@ -174,6 +176,15 @@
 			"note_one": "Each cell: this project, then the median of the other projects for the same kind, from {{count}} project.",
 			"note_other": "Each cell: this project, then the median of the other projects for the same kind, from {{count}} projects."
 		},
-		"ciPending": "First-run CI pass rate is not recorded yet, so it is not compared."
+		"qualitySources": "The mutation score comes from the spec's mutation gate in QA, the first-run CI pass from the follow-through of its pull request: whether the CI passed on the pull request as it was opened, before any fix. A spec without them is not counted for them.",
+		"groupTrend": "trend: {{value}}",
+		"movedChip": "{{from}} → {{to}}",
+		"moving": "This project moved from {{from}} to {{to}} in the last {{days}} days: until that is older than {{days}} days, it is compared with projects of both.",
+		"pace": {
+			"title": "Your pace against your peers",
+			"faster": "{{metric}}: {{own}} for this project, {{group}} for the median of “{{groupName}}”. You are improving faster.",
+			"slower": "{{metric}}: {{own}} for this project, {{group}} for the median of “{{groupName}}”. Your peers are improving faster.",
+			"same": "{{metric}}: {{own}} for this project, {{group}} for the median of “{{groupName}}”. About the same pace."
+		}
 	}
 }

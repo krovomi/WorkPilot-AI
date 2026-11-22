@@ -19,19 +19,20 @@
  * ni texte, ni chemin. Il choisit le format (`GRID_EXPORT_FORMATS`) et si les
  * éléments fautifs sont encadrés : les cadres viennent du rapport que le main
  * a gardé avec la capture.
+ *
+ * Un appareil personnalisé (`custom-devices.ts`) se nomme comme un appareil du
+ * catalogue ; un persona (`personas.ts`) se nomme par son id, et ses cookies
+ * sont déchiffrés ici, jamais envoyés au renderer. La relecture aux points de
+ * rupture (`breakpoint-scan.ts`) reçoit les mêmes champs qu'une capture, sans
+ * bridage, et partage son verrou.
  */
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ipcMain } from "electron";
-import {
-	DEVICE_PRESETS,
-	findDevicePreset,
-	findOrientation,
-	orientDevice,
-	orientationOf,
-} from "../../shared/constants/device-presets";
+import { DEVICE_PRESETS, findOrientation, orientDevice, orientationOf } from "../../shared/constants/device-presets";
 import { findCpuProfile, findNetworkProfile } from "../../shared/constants/emulation-throttling";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import type { BreakpointScanRequest, BreakpointScanResult } from "../../shared/types/device-library";
 import type {
 	DeviceCaptureError,
 	DeviceCaptureRequest,
@@ -42,13 +43,24 @@ import type {
 	DevicePreset,
 	ResponsiveReport,
 } from "../../shared/types/device-matrix";
+import { CUSTOM_DEVICE_LIMITS, PERSONA_ID } from "../../shared/utils/custom-device";
 import { issueMarkers } from "../../shared/utils/issue-markers";
 import { getAppLanguage } from "../app-language";
 import { appEmulatorService } from "../app-emulator-service";
-import { DeviceCaptureFailure, type Throttling, captureDevice } from "../device-matrix/device-capture";
+import { scanBreakpoints } from "../device-matrix/breakpoint-scan";
+import { findDevice, listCustomDevices } from "../device-matrix/custom-devices";
+import {
+	type CaptureOptions,
+	DeviceCaptureFailure,
+	type Throttling,
+	captureDevice,
+} from "../device-matrix/device-capture";
 import { type GridTile, composeGrid } from "../device-matrix/grid-export";
 import { gridCaption } from "../device-matrix/grid-labels";
+import { PersonaFailure, personaCookies } from "../device-matrix/personas";
 import { showSaveDialog } from "../electron-utils";
+import { registerDeviceLibraryHandlers } from "./device-library-handlers";
+import { registerLiveViewHandlers } from "./live-view-handlers";
 
 const MAX_PATH = 2048;
 export const GRID_EXPORT_FORMATS: readonly DeviceGridExportFormat[] = ["png", "pdf"];
@@ -59,15 +71,59 @@ const EXPORT_FILTERS: Record<DeviceGridExportFormat, { name: string; extensions:
 
 const fail = (error: DeviceCaptureError): DeviceCaptureResult => ({ success: false, error });
 const failExport = (error: DeviceGridExportError): DeviceGridExportResult => ({ success: false, error });
+const failScan = (error: DeviceCaptureError): BreakpointScanResult => ({ success: false, error });
+
+/** Le choix de session d'une requête : un booléen et un id de persona ou `null`, l'un ou l'autre. */
+function readSessionChoice(fields: Record<string, unknown>): Pick<DeviceCaptureRequest, "previewSession" | "persona"> | null {
+	const { previewSession, persona } = fields;
+	if (typeof previewSession !== "boolean") return null;
+	if (persona !== null && typeof persona !== "string") return null;
+	if (previewSession && persona !== null) return null;
+	return { previewSession, persona };
+}
 
 /** La requête telle que le main l'accepte, ou `null`. */
 export function readCaptureRequest(raw: unknown): DeviceCaptureRequest | null {
 	if (!raw || typeof raw !== "object") return null;
-	const { deviceId, path: pagePath, network, cpu, orientation, previewSession } = raw as Record<string, unknown>;
+	const fields = raw as Record<string, unknown>;
+	const { deviceId, path: pagePath, network, cpu, orientation } = fields;
 	if (typeof deviceId !== "string" || typeof pagePath !== "string") return null;
 	if (typeof network !== "string" || typeof cpu !== "string") return null;
-	if (typeof orientation !== "string" || typeof previewSession !== "boolean") return null;
-	return { deviceId, path: pagePath, network, cpu, orientation, previewSession };
+	if (typeof orientation !== "string") return null;
+	const choice = readSessionChoice(fields);
+	if (!choice) return null;
+	return { deviceId, path: pagePath, network, cpu, orientation, ...choice };
+}
+
+/** La relecture demandée : un appareil, un chemin, un choix de session ; `null` sinon. */
+export function readScanRequest(raw: unknown): BreakpointScanRequest | null {
+	if (!raw || typeof raw !== "object") return null;
+	const fields = raw as Record<string, unknown>;
+	if (typeof fields.deviceId !== "string" || typeof fields.path !== "string") return null;
+	const choice = readSessionChoice(fields);
+	if (!choice) return null;
+	return { deviceId: fields.deviceId, path: fields.path, ...choice };
+}
+
+/**
+ * Ce que la page emprunte : la session de l'aperçu, ou les cookies déchiffrés
+ * d'un persona enregistré pour cet hôte. Un échec est nommé.
+ */
+export async function sessionOptions(
+	choice: Pick<DeviceCaptureRequest, "previewSession" | "persona">,
+	url: string,
+): Promise<CaptureOptions> {
+	if (choice.persona === null) return { previewSession: choice.previewSession };
+	if (!PERSONA_ID.test(choice.persona)) throw new DeviceCaptureFailure("unknown-persona");
+	try {
+		return { previewSession: false, persona: await personaCookies(choice.persona, url) };
+	} catch (error: unknown) {
+		const code = error instanceof PersonaFailure ? error.code : null;
+		if (code === "unknown-persona" || code === "persona-locked" || code === "persona-elsewhere") {
+			throw new DeviceCaptureFailure(code);
+		}
+		throw new DeviceCaptureFailure("session-failed");
+	}
 }
 
 export interface GridExportOrder {
@@ -81,11 +137,12 @@ export interface GridExportOrder {
  * format de la liste et un booléen ; `null` pour tout autre chose (un id
  * inconnu compris).
  */
-export function readExportRequest(raw: unknown): GridExportOrder | null {
+export function readExportRequest(raw: unknown, known: ReadonlySet<string>): GridExportOrder | null {
 	if (!raw || typeof raw !== "object") return null;
 	const { deviceIds, format, markers } = raw as Record<string, unknown>;
-	if (!Array.isArray(deviceIds) || deviceIds.length === 0 || deviceIds.length > DEVICE_PRESETS.length) return null;
-	if (!deviceIds.every((id) => findDevicePreset(id) !== undefined)) return null;
+	const most = DEVICE_PRESETS.length + CUSTOM_DEVICE_LIMITS.maxDevices;
+	if (!Array.isArray(deviceIds) || deviceIds.length === 0 || deviceIds.length > most) return null;
+	if (!deviceIds.every((id) => typeof id === "string" && known.has(id))) return null;
 	const chosen = GRID_EXPORT_FORMATS.find((known) => known === format);
 	if (!chosen || typeof markers !== "boolean") return null;
 	return { deviceIds: [...new Set(deviceIds as string[])], format: chosen, markers };
@@ -119,6 +176,9 @@ interface KeptCapture extends Throttling {
 }
 
 export function registerDeviceMatrixHandlers(): void {
+	// Les appareils personnalisés et les personas que les captures nomment, et les vues vivantes.
+	registerDeviceLibraryHandlers();
+	registerLiveViewHandlers();
 	let busy = false;
 	/** La dernière capture de chaque appareil (au plus une par appareil du catalogue). */
 	const kept = new Map<string, KeptCapture>();
@@ -126,7 +186,7 @@ export function registerDeviceMatrixHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.APP_EMULATOR_CAPTURE_DEVICE, async (_event, raw: unknown): Promise<DeviceCaptureResult> => {
 		const request = readCaptureRequest(raw);
 		if (!request) return fail("invalid-request");
-		const device = findDevicePreset(request.deviceId);
+		const device = await findDevice(request.deviceId);
 		if (!device) return fail("unknown-device");
 		const network = findNetworkProfile(request.network);
 		const cpu = findCpuProfile(request.cpu);
@@ -141,7 +201,8 @@ export function registerDeviceMatrixHandlers(): void {
 		if (busy) return fail("busy");
 		busy = true;
 		try {
-			const shot = await captureDevice(turned, url, { network, cpu }, { previewSession: request.previewSession });
+			const options = await sessionOptions(request, url);
+			const shot = await captureDevice(turned, url, { network, cpu }, options);
 			kept.set(device.id, { device: turned, image: shot.image, report: shot.report, network, cpu });
 			return {
 				success: true,
@@ -154,6 +215,7 @@ export function registerDeviceMatrixHandlers(): void {
 					width: turned.width,
 					height: turned.height,
 					previewSession: request.previewSession,
+					persona: request.persona,
 				},
 			};
 		} catch (error: unknown) {
@@ -164,9 +226,34 @@ export function registerDeviceMatrixHandlers(): void {
 	});
 
 	ipcMain.handle(
+		IPC_CHANNELS.APP_EMULATOR_SCAN_BREAKPOINTS,
+		async (_event, raw: unknown): Promise<BreakpointScanResult> => {
+			const request = readScanRequest(raw);
+			if (!request) return failScan("invalid-request");
+			const device = await findDevice(request.deviceId);
+			if (!device) return failScan("unknown-device");
+			const serverUrl = appEmulatorService.getUrl();
+			if (!serverUrl) return failScan("not-running");
+			const url = resolveCaptureUrl(serverUrl, request.path);
+			if (!url) return failScan("invalid-path");
+			if (busy) return failScan("busy");
+			busy = true;
+			try {
+				const scan = await scanBreakpoints(device, url, await sessionOptions(request, url));
+				return { success: true, data: { deviceId: device.id, ...scan } };
+			} catch (error: unknown) {
+				return failScan(error instanceof DeviceCaptureFailure ? error.code : "capture-failed");
+			} finally {
+				busy = false;
+			}
+		},
+	);
+
+	ipcMain.handle(
 		IPC_CHANNELS.APP_EMULATOR_EXPORT_DEVICE_GRID,
 		async (_event, raw: unknown): Promise<DeviceGridExportResult> => {
-			const order = readExportRequest(raw);
+			const known = new Set([...DEVICE_PRESETS, ...(await listCustomDevices())].map((device) => device.id));
+			const order = readExportRequest(raw, known);
 			if (!order) return failExport("invalid-request");
 			const captures = order.deviceIds.flatMap((id) => kept.get(id) ?? []);
 			if (captures.length === 0) return failExport("nothing-to-export");
