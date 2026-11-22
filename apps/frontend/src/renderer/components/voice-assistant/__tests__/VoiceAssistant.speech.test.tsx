@@ -111,12 +111,13 @@ describe("VoiceAssistant: spoken answers, the wake word's sentence, the language
 		open();
 		await say("bla bla");
 		await screen.findByText("voiceAssistant:results.unknown:bla bla");
-		expect(speech.said()).toContain("voiceAssistant:results.unknown:bla bla");
+		// Each answer is said by an effect after its stage renders: wait for it.
+		await waitFor(() => expect(speech.said()).toContain("voiceAssistant:results.unknown:bla bla"));
 
 		fireEvent.click(screen.getByLabelText("voiceAssistant:actions.listen"));
 		await say("Crée une tâche pour ajouter un export CSV");
 		await screen.findByLabelText("voiceAssistant:confirm.title");
-		expect(speech.said()).toContain("voiceAssistant:confirm.heading");
+		await waitFor(() => expect(speech.said()).toContain("voiceAssistant:confirm.heading"));
 		fireEvent.click(screen.getByText("voiceAssistant:actions.create"));
 		await waitFor(() => expect(useVoiceAssistantStore.getState().isOpen).toBe(false));
 		expect(speech.said()).toContain("voiceAssistant:results.created:Ajouter un export CSV");
@@ -124,7 +125,7 @@ describe("VoiceAssistant: spoken answers, the wake word's sentence, the language
 		act(() => useVoiceAssistantStore.getState().open());
 		await say("stop");
 		await screen.findByText("voiceAssistant:stop.explain");
-		expect(speech.said()).toContain("voiceAssistant:stop.confirm");
+		await waitFor(() => expect(speech.said()).toContain("voiceAssistant:stop.confirm"));
 		fireEvent.click(screen.getByText("voiceAssistant:stop.yes"));
 		await waitFor(() => expect(speech.said()).toContain("voiceAssistant:stop.stopping:1"));
 	});

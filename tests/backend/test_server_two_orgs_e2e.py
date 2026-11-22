@@ -596,6 +596,9 @@ def _path_values(
         "name": "roadmap.json",
         "rule_id": "r-000000000001",
         "subtask_id": "subtask-1",
+        "delegation_id": str(uuid.uuid4()),
+        "request_id": str(uuid.uuid4()),
+        "share_id": str(uuid.uuid4()),
     }
 
 
