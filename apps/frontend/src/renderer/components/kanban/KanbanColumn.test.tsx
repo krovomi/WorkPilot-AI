@@ -236,7 +236,7 @@ describe("WIP limit", () => {
 		const count = container.querySelector(".kanban-col-count");
 		expect(count).toHaveTextContent("3/2");
 		expect(count).toHaveAttribute("data-warn");
-		expect(within(container).getByText("3 cards, limit 2")).toBeInTheDocument();
+		expect(within(container).getByText("3 tasks, limit 2")).toBeInTheDocument();
 		expect(container.querySelector(".kanban-col-gauge-bar > span")).toHaveStyle({ width: "100%" });
 	});
 
@@ -280,8 +280,21 @@ describe("column summary", () => {
 
 	it("is hidden when the setting is off", () => {
 		useSettingsStore.setState({ settings: { ...initial, kanbanColumnSummary: false } });
-		renderColumn({ tasks: urgent() });
+		const { container } = renderColumn({ tasks: urgent() });
 		expect(screen.queryByLabelText("Column summary")).toBeNull();
+		expect(container.querySelector(".kanban-col-meta")).toBeNull();
+	});
+
+	it("keeps the gauge row when the setting is off and the column has a limit", () => {
+		useSettingsStore.setState({ settings: { ...initial, kanbanColumnSummary: false } });
+		const { container } = renderColumn({ tasks: urgent(), wipLimit: 3 });
+		expect(container.querySelector(".kanban-col-meta .kanban-col-gauge")).not.toBeNull();
+		expect(screen.queryByLabelText("Column summary")).toBeNull();
+	});
+
+	it("keeps an empty row in a column with nothing to sum up, so the cards line up", () => {
+		const { container } = renderColumn({ status: "ai_review", tasks: [makeTask("a")] });
+		expect(container.querySelector(".kanban-col-meta")).toBeEmptyDOMElement();
 	});
 });
 

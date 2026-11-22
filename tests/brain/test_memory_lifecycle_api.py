@@ -191,6 +191,22 @@ def test_scope_and_maintainers_through_the_api(client, monkeypatch):
         "/api/brain/memory/lifecycle", params={"project_dir": PROJECT}
     ).json()
     assert view["maintainers"] == ["Bob"] and view["can_arbitrate"] is False
+    assert view["maintainer_scopes"] == {}
+    got = client.post(
+        "/api/brain/memory/maintainers",
+        json={"project_dir": PROJECT, "names": ["Alice"], "scope": "Team: API"},
+    ).json()
+    assert got == {"success": True, "maintainers": ["Alice"]}
+    view = client.get(
+        "/api/brain/memory/lifecycle", params={"project_dir": PROJECT}
+    ).json()
+    assert view["maintainers"] == ["Bob"]
+    assert view["maintainer_scopes"] == {"team:API": ["Alice"]}
+    got = client.post(
+        "/api/brain/memory/maintainers",
+        json={"project_dir": PROJECT, "names": ["Alice"], "scope": "branch:a b"},
+    ).json()
+    assert got["code"] == "invalid"
     got = client.post(
         "/api/brain/memory/maintainers",
         json={"project_dir": PROJECT, "names": ["bad\nname"]},

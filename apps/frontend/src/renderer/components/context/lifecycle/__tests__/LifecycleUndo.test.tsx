@@ -25,6 +25,8 @@ const METRICS: MemoryLifecycleMetrics = {
 	resolved_month: 1,
 	mean_resolution_hours: 4.5,
 	history_views: 7,
+	consensus_month: 2,
+	consensus_live: 5,
 	too_aggressive: true,
 };
 
@@ -64,6 +66,7 @@ function view(over: Partial<MemoryLifecycleView> = {}): MemoryLifecycleView {
 		revertible: { aaaaaaaaaaaa: "undo", bbbbbbbbbbbb: "unmerge" },
 		lastUndo: "aaaaaaaaaaaa",
 		maintainers: [],
+		maintainerScopes: {},
 		canArbitrate: true,
 		metrics: METRICS,
 		...over,
@@ -138,6 +141,7 @@ describe("the figures", () => {
 		expect(card).toHaveTextContent("3 conflicts in 30 days: 2 settled by the rules, 1 by a person");
 		expect(card).toHaveTextContent("4.5 h on average before a person decides");
 		expect(card).toHaveTextContent("7 histories opened on this computer");
+		expect(card).toHaveTextContent("2 consensus notes written in 30 days, 5 still in use");
 		expect(card).toHaveTextContent(/automatic removals may be too aggressive/);
 	});
 
@@ -145,12 +149,22 @@ describe("the figures", () => {
 		await i18n.changeLanguage("fr");
 		api.getMemoryLifecycle.mockResolvedValue({
 			success: true,
-			data: view({ metrics: { ...METRICS, mean_resolution_hours: null, too_aggressive: false } }),
+			data: view({
+				metrics: {
+					...METRICS,
+					mean_resolution_hours: null,
+					too_aggressive: false,
+					// An older backend: no consensus figures.
+					consensus_month: undefined,
+					consensus_live: undefined,
+				},
+			}),
 		});
 		render(<LifecycleTab projectId="p1" />);
 		const card = await screen.findByTestId("memory-lifecycle-metrics");
 		expect(card).toHaveTextContent("Comportement du cycle de vie");
 		expect(card).not.toHaveTextContent("en moyenne");
 		expect(card).not.toHaveTextContent("trop agressifs");
+		expect(card).toHaveTextContent("0 notes de consensus écrites en 30 jours, 0 toujours en usage");
 	});
 });

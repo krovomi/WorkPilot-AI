@@ -51,7 +51,7 @@ from typing import Any
 
 from ..memories import redact
 from ..notes import Note, inside, now_iso, read_note, slugify, write_note
-from . import identity, maintainers
+from . import identity, maintainers, scopes
 from .contradictions import CHECKED_FOLDERS, compare, find_for, statement
 from .journal import JournalEntry, append, preview_of
 from .journal import read as read_journal
@@ -65,9 +65,11 @@ __all__ = [
     "QUEUE_FILE",
     "earlier_decision",
     "open_conflicts",
+    "pair_scope",
     "requeue",
     "resolve",
     "review_pull",
+    "with_maintainers",
 ]
 
 QUEUE_FILE = ".workpilot-brain/conflicts.json"
@@ -227,6 +229,42 @@ def open_conflicts(root: Path, base: str | None = None) -> list[dict[str, Any]]:
     return [item for item in live if base is None or item.get("base") == base]
 
 
+def pair_scope(root: Path, item: dict[str, Any]) -> str:
+    """Where a queued pair applies: the scope its notes share, else the one set.
+
+    Read from the notes, not the queue: a scope written since the pair was
+    queued is the one its maintainers are looked up by.
+    """
+    for side in ("a", "b"):
+        try:
+            note = read_note(root, _path_of(item, side))
+        except (OSError, ValueError):
+            continue
+        value = scopes.normalise(str(note.meta.get("applies_to") or ""))
+        if value:
+            return value
+    return ""
+
+
+def with_maintainers(
+    root: Path, items: list[dict[str, Any]], who: dict[str, str]
+) -> list[dict[str, Any]]:
+    """Each escalated pair with who settles it: its scope's maintainers."""
+    for item in items:
+        escalated = item.get("escalated")
+        if not isinstance(escalated, dict):
+            continue
+        scope = pair_scope(root, item)
+        names = maintainers.read(root, str(item.get("base") or ""), scope=scope)
+        item["escalated"] = {
+            **escalated,
+            "scope": scope,
+            "maintainers": names,
+            "can_arbitrate": maintainers.allows(names, who),
+        }
+    return items
+
+
 # -- one pair --------------------------------------------------------------
 
 
@@ -251,6 +289,7 @@ def _side(rel: str, note: Note) -> dict[str, Any]:
         "confidence": _confidence(note),
         "agents": _strings(note.meta.get("agents"))[:5],
         "tasks": _strings(note.meta.get("tasks"))[:5],
+        "applies_to": scopes.normalise(str(note.meta.get("applies_to") or "")) or "",
     }
 
 
@@ -602,7 +641,7 @@ def resolve(
     ):
         return {"ok": False, "code": "invalid"}
     if isinstance(entry.get("escalated"), dict):
-        names = maintainers.read(root, base)
+        names = maintainers.read(root, base, scope=pair_scope(root, entry))
         if not maintainers.allows(names, identity.person(root)):
             return {"ok": False, "code": "maintainer-only", "maintainers": names}
     data["open"] = [i for i in data["open"] if i.get("id") != conflict_id]

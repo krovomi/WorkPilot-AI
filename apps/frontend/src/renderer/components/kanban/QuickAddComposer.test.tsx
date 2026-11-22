@@ -94,7 +94,7 @@ afterEach(() => {
 	api.restore();
 });
 
-const box = () => screen.getByRole("textbox", { name: "Describe the new card" });
+const box = () => screen.getByRole("textbox", { name: "Describe the new task" });
 
 describe("quick add in a column", () => {
 	it("opens from the header + and creates a card on Enter", async () => {
@@ -118,18 +118,18 @@ describe("quick add in a column", () => {
 
 	it("opens from the row under the cards and closes on Escape", async () => {
 		renderColumn({ tasks: [makeTask("a")] });
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		expect(box()).toHaveFocus();
 		await userEvent.keyboard("{Escape}");
-		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Describe the new task" })).toBeNull();
 	});
 
 	it("gives back the text closed without creating", async () => {
 		renderColumn();
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		await userEvent.type(box(), "Half a thought");
 		await userEvent.click(screen.getByRole("button", { name: "Close (Esc)" }));
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		expect(box()).toHaveValue("Half a thought");
 	});
 
@@ -137,7 +137,7 @@ describe("quick add in a column", () => {
 		const outside = document.createElement("button");
 		document.body.append(outside);
 		renderColumn();
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		await userEvent.type(box(), "Half a thought");
 		// The box's own menus live in portals: picking there keeps it open.
 		await userEvent.click(screen.getByRole("button", { name: "Type" }));
@@ -147,8 +147,8 @@ describe("quick add in a column", () => {
 		fireEvent.pointerDown(box());
 		expect(box()).toBeInTheDocument();
 		fireEvent.pointerDown(outside);
-		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		expect(screen.queryByRole("textbox", { name: "Describe the new task" })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		expect(box()).toHaveValue("Half a thought");
 		expect(screen.getByRole("button", { name: "Type" })).toHaveTextContent("Bug");
 		expect(screen.getByRole("button", { name: "Priority" })).toHaveTextContent("High");
@@ -157,12 +157,12 @@ describe("quick add in a column", () => {
 
 	it("creates one card per pasted line", async () => {
 		renderColumn();
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		box().focus();
 		await userEvent.paste("- Export CSV\n- Fix the label filter\n- Document webhooks");
-		const toggle = screen.getByRole("button", { name: "One card per line (3)" });
+		const toggle = screen.getByRole("button", { name: "One task per line (3)" });
 		expect(toggle).toHaveAttribute("aria-pressed", "true");
-		await userEvent.click(screen.getByRole("button", { name: "Create 3 cards" }));
+		await userEvent.click(screen.getByRole("button", { name: "Create 3 tasks" }));
 
 		await waitFor(() => expect(api.fn("createTask")).toHaveBeenCalledTimes(3));
 		expect(api.fn("createTask").mock.calls.map((call) => call[1])).toEqual([
@@ -174,10 +174,10 @@ describe("quick add in a column", () => {
 
 	it("keeps a pasted list as one card when asked", async () => {
 		renderColumn();
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		box().focus();
 		await userEvent.paste("Context line\nSecond line");
-		await userEvent.click(screen.getByRole("button", { name: "One card per line (2)" }));
+		await userEvent.click(screen.getByRole("button", { name: "One task per line (2)" }));
 		await userEvent.click(screen.getByRole("button", { name: "Create" }));
 		await waitFor(() => expect(api.fn("createTask")).toHaveBeenCalledTimes(1));
 		expect(api.fn("createTask").mock.calls[0].slice(1, 3)).toEqual([
@@ -188,7 +188,7 @@ describe("quick add in a column", () => {
 
 	it("records the type and priority picked in the box", async () => {
 		renderColumn();
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		await userEvent.click(screen.getByRole("button", { name: "Type" }));
 		await userEvent.click(await screen.findByRole("menuitem", { name: "Bug" }));
 		await userEvent.click(screen.getByRole("button", { name: "Priority" }));
@@ -205,7 +205,7 @@ describe("quick add in a column", () => {
 
 	it("takes back a type and a priority picked by mistake", async () => {
 		renderColumn();
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		await userEvent.click(screen.getByRole("button", { name: "Type" }));
 		await userEvent.click(await screen.findByRole("menuitem", { name: "Bug" }));
 		await userEvent.click(screen.getByRole("button", { name: "Type" }));
@@ -249,29 +249,29 @@ describe("quick add in a column", () => {
 			createTask: vi.fn(async () => ({ success: false, error: "disk full" })),
 		});
 		renderColumn();
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		await userEvent.type(box(), "Something{Enter}");
 		expect(await screen.findByRole("alert")).toHaveTextContent(
-			"The card could not be created",
+			"The task could not be created",
 		);
 		expect(box()).toHaveValue("Something");
 	});
 
 	it("hands the text to the full wizard", async () => {
 		const { props } = renderColumn();
-		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
 		await userEvent.type(box(), "Needs attachments");
 		await userEvent.click(screen.getByRole("button", { name: "More options…" }));
 		expect(props.onAddClick).toHaveBeenCalledTimes(1);
 		expect(loadDraft(projectId)?.description).toBe("Needs attachments");
-		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Describe the new task" })).toBeNull();
 	});
 
 	it("opens on a double-click in the empty space, not on a card", async () => {
 		const { container } = renderColumn({ tasks: [makeTask("a")] });
 		const card = container.querySelector(".kanban-card");
 		if (card) fireEvent.doubleClick(card);
-		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Describe the new task" })).toBeNull();
 		const area = container.querySelector("[data-column-status] .flex-1.min-h-0");
 		expect(area).not.toBeNull();
 		if (area) fireEvent.doubleClick(area);
@@ -284,16 +284,16 @@ describe("quick add in a column", () => {
 		document.body.appendChild(input);
 		input.focus();
 		fireEvent.keyDown(input, { key: "n" });
-		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Describe the new task" })).toBeNull();
 		input.remove();
 
 		fireEvent.keyDown(document.body, { key: "n", ctrlKey: true });
-		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Describe the new task" })).toBeNull();
 		const dialog = document.createElement("div");
 		dialog.setAttribute("role", "dialog");
 		document.body.appendChild(dialog);
 		fireEvent.keyDown(document.body, { key: "n" });
-		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Describe the new task" })).toBeNull();
 		dialog.remove();
 		fireEvent.keyDown(document.body, { key: "n" });
 		expect(box()).toBeInTheDocument();
@@ -302,10 +302,10 @@ describe("quick add in a column", () => {
 	it("is not offered in agent columns nor without a way to add", () => {
 		for (const status of ["in_progress", "ai_review", "human_review", "done"] as const) {
 			const { unmount } = renderColumn({ status });
-			expect(screen.queryByRole("button", { name: "Add a card" })).toBeNull();
+			expect(screen.queryByRole("button", { name: "Add a task" })).toBeNull();
 			unmount();
 		}
 		renderColumn({ onAddClick: undefined });
-		expect(screen.queryByRole("button", { name: "Add a card" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Add a task" })).toBeNull();
 	});
 });

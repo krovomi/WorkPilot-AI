@@ -28,6 +28,8 @@ function side(name: string, text: string) {
 	};
 }
 
+const EARLIER = { at: "2026-11-18T10:00:00+00:00", by: "Alice", actor: "user", reason_code: "person-chose" };
+
 const ESCALATED: MemoryConflict = {
 	id: "0123456789abcdef",
 	kind: "gotcha",
@@ -35,7 +37,7 @@ const ESCALATED: MemoryConflict = {
 	detail: "",
 	textual: false,
 	detected_at: "2026-11-20T10:00:00+00:00",
-	escalated: { at: "2026-11-18T10:00:00+00:00", by: "Alice", actor: "user", reason_code: "person-chose" },
+	escalated: EARLIER,
 	a: side("always", "Always run the migrations."),
 	b: side("never", "Never run the migrations."),
 };
@@ -49,6 +51,7 @@ function view(over: Partial<MemoryLifecycleView> = {}): MemoryLifecycleView {
 		lastUndo: null,
 		metrics: null,
 		maintainers: ["Bob"],
+		maintainerScopes: {},
 		canArbitrate: false,
 		trash: [],
 		conflicts: [ESCALATED],
@@ -178,13 +181,13 @@ describe("a memory's scope", () => {
 		);
 		expect(screen.getByText("Applies to apps/billing/")).toBeInTheDocument();
 		fireEvent.click(screen.getByRole("button", { name: "Scope" }));
-		const input = screen.getByRole("textbox", { name: /Where it applies/ });
+		const input = screen.getByRole("combobox", { name: /Where it applies/ });
 		expect(input).toHaveValue("apps/billing/");
 		fireEvent.change(input, { target: { value: "apps/auth/" } });
 		fireEvent.click(screen.getByRole("button", { name: "Save" }));
 		await waitFor(() => expect(changed).toHaveBeenCalled());
 		expect(api.setMemoryScope).toHaveBeenCalledWith("p1", ID, "apps/auth/");
-		expect(screen.queryByRole("textbox", { name: /Where it applies/ })).toBeNull();
+		expect(screen.queryByRole("combobox", { name: /Where it applies/ })).toBeNull();
 	});
 
 	it("keeps the field open when the scope is refused, and closes it on a second click", async () => {
@@ -192,11 +195,91 @@ describe("a memory's scope", () => {
 		render(<MemoryActions projectId="p1" memoryId={ID} pinned={false} onChanged={vi.fn()} />);
 		expect(screen.queryByText(/Applies to/)).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Scope" }));
-		expect(screen.getByRole("textbox", { name: /Where it applies/ })).toHaveValue("");
+		expect(screen.getByRole("combobox", { name: /Where it applies/ })).toHaveValue("");
 		fireEvent.click(screen.getByRole("button", { name: "Save" }));
 		expect(await screen.findByRole("alert")).toHaveTextContent("invalid request");
-		expect(screen.getByRole("textbox", { name: /Where it applies/ })).toBeInTheDocument();
+		expect(screen.getByRole("combobox", { name: /Where it applies/ })).toBeInTheDocument();
 		fireEvent.click(screen.getByRole("button", { name: "Scope" }));
-		expect(screen.queryByRole("textbox", { name: /Where it applies/ })).toBeNull();
+		expect(screen.queryByRole("combobox", { name: /Where it applies/ })).toBeNull();
+	});
+});
+
+describe("maintainers per scope (#352)", () => {
+	it("lists each scope's maintainers and edits one list", async () => {
+		api.getMemoryLifecycle.mockResolvedValue({
+			success: true,
+			data: view({ maintainerScopes: { "apps/billing/": ["Carol"], "team:payments": ["Dan"] } }),
+		});
+		api.setMemoryMaintainers.mockResolvedValue({ success: true, data: ["Carol", "Eve"] });
+		render(<LifecycleTab projectId="p1" />);
+		expect(await screen.findByText("For apps/billing/: Carol")).toBeInTheDocument();
+		expect(screen.getByText("For team:payments: Dan")).toBeInTheDocument();
+		// The top list first, then one per scope.
+		fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[1]);
+		const input = screen.getByRole("textbox", { name: "Names or e-mails, separated by commas" });
+		expect(input).toHaveValue("Carol");
+		expect(screen.queryByRole("textbox", { name: "Module, team:name or branch:name" })).toBeNull();
+		fireEvent.change(input, { target: { value: "Carol, Eve" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save" }));
+		await waitFor(() =>
+			expect(api.setMemoryMaintainers).toHaveBeenCalledWith("p1", ["Carol", "Eve"], "apps/billing/"),
+		);
+	});
+
+	it("adds a list for a scope once the scope is typed", async () => {
+		api.setMemoryMaintainers.mockResolvedValue({ success: true, data: ["Dan"] });
+		render(<LifecycleTab projectId="p1" />);
+		fireEvent.click(await screen.findByRole("button", { name: "Add a list for a scope" }));
+		const save = screen.getByRole("button", { name: "Save" });
+		expect(save).toBeDisabled();
+		fireEvent.change(screen.getByRole("textbox", { name: "Module, team:name or branch:name" }), {
+			target: { value: " branch:release/2.0 " },
+		});
+		fireEvent.change(screen.getByRole("textbox", { name: "Names or e-mails, separated by commas" }), {
+			target: { value: "Dan" },
+		});
+		expect(save).toBeEnabled();
+		fireEvent.click(save);
+		await waitFor(() =>
+			expect(api.setMemoryMaintainers).toHaveBeenCalledWith("p1", ["Dan"], "branch:release/2.0"),
+		);
+	});
+
+	it("lets the scope's maintainer settle an escalated pair, whatever the top list", async () => {
+		const scoped: MemoryConflict = {
+			...ESCALATED,
+			escalated: { ...EARLIER, scope: "apps/billing/", maintainers: ["Alice"], can_arbitrate: true },
+		};
+		api.getMemoryLifecycle.mockResolvedValue({
+			success: true,
+			data: view({ conflicts: [scoped], canArbitrate: false }),
+		});
+		render(<LifecycleTab projectId="p1" />);
+		const notice = await screen.findByTestId("memory-conflict-escalated");
+		expect(notice).not.toHaveTextContent("Waiting for a maintainer");
+		expect(screen.getByRole("button", { name: "Not a conflict" })).toBeEnabled();
+	});
+
+	it("names the scope's maintainers to wait for", async () => {
+		const scoped: MemoryConflict = {
+			...ESCALATED,
+			escalated: { ...EARLIER, maintainers: ["Carol"], can_arbitrate: false },
+		};
+		api.getMemoryLifecycle.mockResolvedValue({ success: true, data: view({ conflicts: [scoped] }) });
+		render(<LifecycleTab projectId="p1" />);
+		expect(await screen.findByTestId("memory-conflict-escalated")).toHaveTextContent(
+			"Waiting for a maintainer: Carol.",
+		);
+	});
+});
+
+describe("team and branch scopes (#352)", () => {
+	it("suggests the team and branch prefixes in the Scope field", () => {
+		render(<MemoryActions projectId="p1" memoryId={`${BASE}/gotchas/x.md`} pinned={false} onChanged={vi.fn()} />);
+		fireEvent.click(screen.getByRole("button", { name: "Scope" }));
+		const input = screen.getByRole("combobox", { name: /Where it applies/ });
+		const list = screen.getByTestId("memory-scope-suggestions");
+		expect(input).toHaveAttribute("list", list.id);
+		expect([...list.querySelectorAll("option")].map((o) => o.value)).toEqual(["team:", "branch:"]);
 	});
 });

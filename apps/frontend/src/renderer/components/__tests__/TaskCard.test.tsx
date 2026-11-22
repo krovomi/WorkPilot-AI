@@ -1274,7 +1274,7 @@ describe("TaskCard — type colour and hover preview", () => {
 describe("TaskCard — right-click menu and quick edits", () => {
 	const cardOf = (title = "Add login page") =>
 		screen.getByRole("option", { name: title });
-	const menu = () => screen.getByRole("menu", { name: "Card actions" });
+	const menu = () => screen.getByRole("menu", { name: "Task menu" });
 
 	function saving() {
 		api.restore();
@@ -1439,7 +1439,7 @@ describe("TaskCard — right-click menu and quick edits", () => {
 		const actions = await screen.findByRole("menu");
 		fireEvent.click(actions);
 		fireEvent.contextMenu(actions);
-		expect(screen.queryByRole("menu", { name: "Card actions" })).toBeNull();
+		expect(screen.queryByRole("menu", { name: "Task menu" })).toBeNull();
 		await user.click(screen.getByRole("menuitem", { name: "Sync from branch" }));
 		fireEvent.click(await screen.findByRole("dialog"));
 		expect(onClick).not.toHaveBeenCalled();
@@ -1462,7 +1462,7 @@ describe("TaskCard — renaming in place", () => {
 	const cardOf = (title = "Add login page") =>
 		screen.getByRole("option", { name: title });
 	const titleOf = () => screen.getByRole("heading", { name: "Add login page" });
-	const box = () => screen.getByRole("textbox", { name: "Card title" });
+	const box = () => screen.getByRole("textbox", { name: "Task title" });
 
 	function saving() {
 		api.restore();
@@ -1497,7 +1497,7 @@ describe("TaskCard — renaming in place", () => {
 		expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", {
 			title: "Add the login page",
 		});
-		expect(screen.queryByRole("textbox", { name: "Card title" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Task title" })).toBeNull();
 		expect(document.activeElement).toBe(cardOf());
 	});
 
@@ -1562,10 +1562,10 @@ describe("TaskCard — renaming in place", () => {
 		fireEvent.keyDown(cardOf(), { key: "F2" });
 		fireEvent.click(titleOf(), { detail: 1 });
 		expect(onClick).toHaveBeenCalledTimes(1);
-		expect(screen.queryByRole("textbox", { name: "Card title" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Task title" })).toBeNull();
 		unmount();
 		renderCard({ task: makeTask({ title: `Broken${JSON_ERROR_TITLE_SUFFIX}` }) });
 		fireEvent.keyDown(screen.getByRole("option"), { key: "F2" });
-		expect(screen.queryByRole("textbox", { name: "Card title" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Task title" })).toBeNull();
 	});
 });

@@ -132,6 +132,20 @@ describe("ENV_GET masking and the webhook test", () => {
 		expect(config.gitlabToken).toBeUndefined();
 	});
 
+	it("writes and reads the memory-conflict notice switch (#352)", async () => {
+		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", { notifyWebhookEnabled: true });
+		expect(envFile()).toContain("# WORKPILOT_MEMORY_CONFLICT_NOTIFY=false");
+		expect((await getConfig()).memoryConflictNotify).toBeUndefined();
+
+		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", { memoryConflictNotify: true });
+		expect(envFile()).toContain("\nWORKPILOT_MEMORY_CONFLICT_NOTIFY=true\n");
+		expect((await getConfig()).memoryConflictNotify).toBe(true);
+
+		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", { memoryConflictNotify: false });
+		expect(envFile()).toContain("\nWORKPILOT_MEMORY_CONFLICT_NOTIFY=false\n");
+		expect((await getConfig()).memoryConflictNotify).toBeUndefined();
+	});
+
 	it("keeps every token when the whole masked config comes back", async () => {
 		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
 			claudeOAuthToken: "sk-ant-oat01-secret",

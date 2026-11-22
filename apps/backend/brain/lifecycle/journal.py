@@ -77,6 +77,7 @@ ACTIONS = (
     "resolve",
     "conflict",
     "designate",
+    "notify",
 )
 
 ACTORS = ("user", "agent", "sync", "learning-loop", "lifecycle")
@@ -107,6 +108,7 @@ REASONS = (
     "escalated",
     "maintainers-changed",
     "scoped",
+    "conflict-announced",
 )
 
 _VERBS = {
@@ -123,6 +125,7 @@ _VERBS = {
     "resolve": "conflit résolu",
     "conflict": "conflit détecté",
     "designate": "mainteneurs désignés",
+    "notify": "conflit annoncé à l'équipe",
 }
 _WHO = {
     "user": "par la personne",
