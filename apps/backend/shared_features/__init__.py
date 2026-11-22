@@ -42,6 +42,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.changelog import router as changelog
     from shared_features.context import router as context
     from shared_features.context_lifecycle import router as context_lifecycle
+    from shared_features.execution_waves import router as execution_waves
     from shared_features.forge import router as forge
     from shared_features.forge_gitlab import router as forge_gitlab
     from shared_features.forge_review import GITHUB, GITLAB
