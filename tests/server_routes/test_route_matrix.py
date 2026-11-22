@@ -307,6 +307,15 @@ RULES: dict[tuple[str, str], Rule] = {
         "review.approve"
     ),
     ("POST", "/api/features/governance/stop"): scoped("agent.cancel"),
+    # Execution waves of a server project: reading the plan, the run and its
+    # history is the board's read; starting the run and taking its steps start
+    # agents; stopping it leaves running cards alone.
+    ("GET", "/api/features/execution-waves/plan"): scoped("task.read"),
+    ("GET", "/api/features/execution-waves/run"): scoped("task.read"),
+    ("POST", "/api/features/execution-waves/run"): scoped("agent.execute"),
+    ("POST", "/api/features/execution-waves/run/step"): scoped("agent.execute"),
+    ("DELETE", "/api/features/execution-waves/run"): scoped("task.write"),
+    ("GET", "/api/features/execution-waves/history"): scoped("task.read"),
 }
 
 #: Values for the path parameters: ids that exist nowhere, except the
