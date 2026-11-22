@@ -267,7 +267,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - Notifications sur Slack, Teams, Discord, Google Chat, webhooks, ntfy et Telegram.
 
 **Équipe**
-- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT, Microsoft Entra ou tout fournisseur OpenID Connect (Okta, Google, Keycloak…), spec approuvée par une autre personne que l'auteur de la carte, par autant d'approbateurs que sa criticité en demande, approbations prêtées pendant une absence, un second groupe d'approbateurs prévenu quand un plan attend trop, et chaque action du journal rattachée à la connexion sous laquelle elle a été faite ([guide d'exploitation](docs/server-operations.md)).
+- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT, Microsoft Entra ou tout fournisseur OpenID Connect (Okta, Google, Keycloak…), spec approuvée par une autre personne que l'auteur de la carte, par autant d'approbateurs que sa criticité en demande, approbations prêtées pendant une absence, un second groupe d'approbateurs prévenu quand un plan attend trop, et chaque action du journal rattachée à la connexion sous laquelle elle a été faite ; hébergé là où chaque équipe le peut (un VPS en HTTPS, une machine du réseau local ou un seul ordinateur, au choix de `deploy/configure.py`), avec des quotas par organisation dont un budget mensuel de tokens ([guide de mise en place et d'usage](docs/server-guide.md), [guide d'exploitation](docs/server-operations.md)).
 - **App mobile** pour iOS et Android, chat d'équipe, inscription sur invitation uniquement.
 
 **Coûts et suivi**
@@ -367,6 +367,7 @@ Pour signaler une vulnérabilité, suivez [docs/SECURITY.md](docs/SECURITY.md), 
 | [Utilisation en CLI](docs/CLI-USAGE.md) | Usage sans interface et en CI (en anglais) |
 | [Architecture](docs/ARCHITECTURE.md) | Agents, workflows, état et couches de sécurité |
 | [Justifications de conception](docs/architecture/) | Pourquoi chaque feature est construite ainsi, un fichier par feature |
+| [Guide du serveur d'équipe](docs/server-guide.md) | Paramétrer, configurer et utiliser le serveur d'équipe, avec exemples et formats : `.env.server`, rôles, projets, quotas, app, téléphone, MCP, API |
 | [Exploitation du serveur](docs/server-operations.md) | Faire tourner le serveur d'équipe : déploiement, TLS, sauvegardes, mises à jour, quotas |
 | [Linux](docs/linux.md) · [Développement sous Windows](docs/windows-development.md) | Notes par plateforme (en anglais) |
 | [Contribuer](docs/CONTRIBUTING.md) | Environnement de développement, style de code, tests, pull requests (en anglais) |
