@@ -77,6 +77,7 @@ import {
 import { ReplayComparisonVideo } from "./ReplayComparisonVideo";
 import { ReplayStepsSummary } from "./ReplayStepsSummary";
 import { ReplayOpenLinkButton } from "./ReplayTeamShare";
+import { ReplayUsageMetrics } from "./ReplayUsageMetrics";
 import { TimeTravelPanel } from "./TimeTravelPanel";
 import { formatAppDateTime } from "@/lib/date-format";
 
@@ -765,6 +766,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 						onDelete={(id) => deleteSession(id)}
 						onCompare={(a, b) => compareSessionsAction(a, b)}
 					/>
+					<ReplayUsageMetrics />
 				</Page>
 			</ModuleStage>
 		);

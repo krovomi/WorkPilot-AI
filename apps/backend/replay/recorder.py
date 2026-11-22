@@ -45,6 +45,11 @@ class ReplayRecorder:
         self._active_sessions: dict[str, ReplaySession] = {}
         self._step_counter: dict[str, int] = {}
 
+    @property
+    def storage_dir(self) -> Path:
+        """The folder that holds one JSON file per saved session."""
+        return self._storage_dir
+
     # -------------------------------------------------------------------
     # Session lifecycle
     # -------------------------------------------------------------------

@@ -946,6 +946,10 @@ export const IPC_CHANNELS = {
 	REPLAY_LIST_TEAM_SHARES: "replay:listTeamShares",
 	REPLAY_REVOKE_TEAM_SHARE: "replay:revokeTeamShare",
 	REPLAY_OPEN_TEAM_SHARE: "replay:openTeamShare",
+	REPLAY_LIST_MY_TEAM_SHARES: "replay:listMyTeamShares",
+	// How replays are shared, counted on this machine or on the person's server
+	REPLAY_GET_USAGE: "replay:getUsage",
+	REPLAY_GET_TEAM_USAGE: "replay:getTeamUsage",
 	// Session History — the same records, as history cards
 	SESSION_HISTORY_LIST: "sessionHistory:list",
 
