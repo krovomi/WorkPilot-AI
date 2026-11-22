@@ -8,6 +8,7 @@ stand-in browser in-process.
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import io
 import json
@@ -143,10 +144,57 @@ def test_only_loopback_hosts_are_local(runner) -> None:
 
 async def test_stdin_stops_on_a_stop_line_or_its_end(runner, monkeypatch) -> None:
     monkeypatch.setattr(sys, "stdin", io.StringIO("noise\nstop\nlater\n"))
-    await runner._stdin_stop()
-    assert sys.stdin.readline() == "later\n"
+    control = runner.Control()
+    await control.listen()
+    assert control.stopped.is_set() and sys.stdin.readline() == "later\n"
     monkeypatch.setattr(sys, "stdin", io.StringIO(""))
-    await runner._stdin_stop()
+    ended = runner.Control()
+    await ended.listen()
+    assert ended.stopped.is_set()
+
+
+async def test_a_dialog_is_asked_of_the_app_and_answered_on_stdin(
+    runner, capsys
+) -> None:
+    gate = asyncio.Event()
+    lines = [
+        # An answer to a dialog already gone, then lines that are not answers.
+        'dialog {"id": 7, "accept": true}\n',
+        "dialog not json\n",
+        'dialog {"id": 1, "accept": "yes"}\n',
+        'dialog {"id": "1", "accept": true}\n',
+        'dialog {"id": 1, "accept": true, "text": "Neo"}\n',
+        'dialog {"id": 2, "accept": false, "text": 4}\n',
+        "stop\n",
+    ]
+
+    async def read() -> str:
+        await gate.wait()
+        return lines.pop(0)
+
+    control = runner.Control(read)
+    listening = asyncio.ensure_future(control.listen())
+    asking = asyncio.ensure_future(
+        control.ask_dialog({"type": "prompt", "message": "Name?"})
+    )
+    await asyncio.sleep(0)
+    gate.set()
+    assert await asking == (True, "Neo")
+    assert await control.ask_dialog({"type": "alert", "message": "!"}) == (False, "")
+    await listening
+    out = capsys.readouterr().out.splitlines()
+    assert _line(out[:1], "RECORDER_DIALOG:") == {
+        "id": 1,
+        "type": "prompt",
+        "message": "Name?",
+    }
+    assert runner.read_answer("x" * (runner.MAX_ANSWER + 1)) is None
+
+
+async def test_a_dialog_nobody_answers_is_dismissed(runner, monkeypatch) -> None:
+    monkeypatch.setattr(runner, "DIALOG_TIMEOUT_S", 0.01)
+    control = runner.Control()
+    assert await control.ask_dialog({"type": "alert", "message": ""}) is None
 
 
 class Frame:
@@ -192,10 +240,11 @@ def test_a_session_streams_its_steps_then_its_summary(
     controller = Controller()
     monkeypatch.setattr(runner, "_controller", lambda _project: controller)
 
-    async def stopped() -> None:
-        return None
+    async def stop_line() -> str:
+        return "stop\n"
 
-    monkeypatch.setattr(runner, "_stdin_stop", stopped)
+    real = runner.Control
+    monkeypatch.setattr(runner, "Control", lambda: real(stop_line))
     code = runner.main(
         ["record", "--url", "http://localhost:3000", "--project", str(tmp_path)]
     )

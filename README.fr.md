@@ -215,7 +215,7 @@ Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ress
 </tr>
 </table>
 
-**App mobile (iOS et Android)** : avec un serveur d'équipe, le tableau partagé dans votre poche : ouvrir une carte, approuver un plan, lancer ou arrêter les agents, lire le tableau de bord, les Insights, la feuille de route et les idées.
+**App mobile (iOS et Android)** : avec un serveur d'équipe, le tableau partagé dans votre poche : ouvrir une carte, approuver un plan, régler sa criticité ou prêter son approbation, lancer ou arrêter les agents, lire le tableau de bord, les Insights, la feuille de route et les idées ; se connecter par mot de passe, Microsoft Entra ou l'authentification unique du serveur.
 
 ![App mobile : tableau, carte et tableau de bord](.github/assets/screenshots/mobile.png)
 
@@ -233,7 +233,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - **Mode objectif** (terminé quand une commande le dit, par exemple `dotnet test` qui sort en 0), **revue croisée** par un second moteur, **spec par l'exemple** pour les Web API ASP.NET Core, **montées de version .NET** une version à la fois jusqu'à .NET 11.
 - **Vérification à l'exécution** avec vidéos de preuve et comparaison avec la branche de base ; **portes strictes** contre les paquets inventés, les tests sans mordant et pour les preuves formelles ; [REA](docs/architecture/rea.md) lit le build laissé par une tâche, sans le lancer, et signale ce qu'il expose, et en .NET une API publique que la tâche a cassée.
 - **Matrice d'appareils** dans l'émulateur : la page affichée, rendue sur plusieurs téléphones, tablettes, ordinateurs et un téléviseur à la fois (fenêtre, densité, user agent, tactile), côte à côte, au besoin sur un réseau bridé (4G, 3G rapide, 3G lente) et un processeur ralenti, avec les bugs responsive classiques signalés sur chacun : défilement de côté, médias trop larges, cibles tactiles de moins de 44 px, texte de moins de 12 px, éléments qui se chevauchent, texte coupé, navigation mobile inaccessible, chacun encadré sur la capture ; téléphones et tablettes aussi en paysage, au besoin avec les cookies de l'aperçu pour une page derrière une connexion, ouverte d'elle-même sur quatre appareils à la revue d'une carte dont les changements touchent l'interface ; la grille s'exporte en PNG ou en PDF ([matrice d'appareils](docs/architecture/device-matrix.md)).
-- **Enregistreur du Browser Agent** : pilotez une page à la main et obtenez un test Playwright (TypeScript ou Python), Cypress, Selenium (Python ou Java) ou WebdriverIO qui traverse iframes et shadow roots et attend ce que chaque action a provoqué, avec des sélecteurs robustes et les secrets lus dans des variables d'environnement, proposé sur une branche de revue.
+- **Enregistreur du Browser Agent** : pilotez une page à la main (survols, défilements, glisser-déposer et boîtes de dialogue répondues dans l'app compris) et obtenez un test Playwright (TypeScript ou Python), Cypress, Selenium (Python, Java, C#, Ruby ou JavaScript) ou WebdriverIO (JavaScript ou TypeScript) qui traverse iframes et shadow roots et attend ce que chaque action a provoqué, avec des sélecteurs robustes et les secrets lus dans des variables d'environnement, proposé sur une branche de revue. Lancez-le là, rejouez l'enregistrement pour reprendre les sélecteurs qui ont changé, et laissez le modèle rapide du provider nommer le test et classer les vérifications.
 - Projets **WinDev, WebDev et WinDev Mobile** sauvegardés au format texte : les agents ne modifient que le code WLangage, une porte de la QA renvoie tout ce que seul l'éditeur peut écrire, et le WLangage est coloré dans la vue des diffs ([WinDev](docs/architecture/windev.md)).
 - **Suivi des PR** : un check rouge ou un fil de revue sur la PR de la tâche repart vers le fixer, jamais forcé, jamais fusionné.
 - **Provenance** : quelles lignes l'IA a écrites et avec quel modèle, un SBOM des paquets ajoutés, la traçabilité exigence-test.
@@ -267,7 +267,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - Notifications sur Slack, Teams, Discord, Google Chat, webhooks, ntfy et Telegram.
 
 **Équipe**
-- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT, Microsoft Entra ou tout fournisseur OpenID Connect (Okta, Google, Keycloak…), spec approuvée par une autre personne que l'auteur de la carte, par autant d'approbateurs que sa criticité en demande, approbations prêtées pendant une absence ([guide d'exploitation](docs/server-operations.md)).
+- **Mode serveur** : un serveur pour l'équipe, toutes les features partagées en direct, organisations isolées, rôles, groupes et administrateurs, connexion JWT, Microsoft Entra ou tout fournisseur OpenID Connect (Okta, Google, Keycloak…), spec approuvée par une autre personne que l'auteur de la carte, par autant d'approbateurs que sa criticité en demande, approbations prêtées pendant une absence, un second groupe d'approbateurs prévenu quand un plan attend trop, et chaque action du journal rattachée à la connexion sous laquelle elle a été faite ([guide d'exploitation](docs/server-operations.md)).
 - **App mobile** pour iOS et Android, chat d'équipe, inscription sur invitation uniquement.
 
 **Coûts et suivi**

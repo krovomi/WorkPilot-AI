@@ -7,7 +7,11 @@
  * exports wait for instead of pausing. A selector that matches several
  * elements carries the element's place among them (`nth`). A step with
  * `after` is a check the recorder proposes after that action: the person
- * keeps it or not.
+ * keeps it or not. A step may also hover, scroll (no selector: the window),
+ * drag onto another element (`drop`), pick several options (`values`), and
+ * carry the answer the person gave in the app to the dialog its action
+ * opened (`dialog`); an iframe inside open shadow roots names their hosts
+ * (`frameShadow`, one list per frame).
  *
  * Steps are made by the Python recorder (`apps/backend/browser_agent/`) from
  * what the page reported, so their text is page content: data, shown as text,
@@ -17,7 +21,17 @@
 
 import type { GeneratedReview } from "./generated-review";
 
-export const RECORDED_STEP_KINDS = ["navigate", "click", "fill", "select", "press", "assert_text"] as const;
+export const RECORDED_STEP_KINDS = [
+	"navigate",
+	"click",
+	"fill",
+	"select",
+	"press",
+	"assert_text",
+	"hover",
+	"scroll",
+	"drag",
+] as const;
 export type RecordedStepKind = (typeof RECORDED_STEP_KINDS)[number];
 
 export const SELECTOR_STRATEGIES = ["testid", "role", "label", "placeholder", "text", "css"] as const;
@@ -29,7 +43,11 @@ export const TEST_FORMATS = [
 	"cypress",
 	"selenium-python",
 	"selenium-java",
+	"selenium-csharp",
+	"selenium-ruby",
+	"selenium-js",
 	"webdriverio",
+	"webdriverio-ts",
 ] as const;
 export type TestFormat = (typeof TEST_FORMATS)[number];
 
@@ -41,7 +59,12 @@ export const MAX_RECORDED_STEPS = 300;
 const MAX_TEXT = 2048;
 const STEP_ID = /^s\d{1,6}$/;
 const ENV_NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
-const MAX_CHAIN = 4;
+const MAX_CHAIN = 8;
+const MAX_VALUES = 20;
+const MAX_SCROLL = 10_000_000;
+export const DRAG_MODES = ["html5", "pointer"] as const;
+export const DIALOG_TYPES = ["alert", "confirm", "prompt", "beforeunload"] as const;
+export type DialogType = (typeof DIALOG_TYPES)[number];
 const MAX_SELECTOR = 300;
 export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 export type HttpMethod = (typeof HTTP_METHODS)[number];
@@ -86,6 +109,34 @@ export interface RecordedStep {
 	readonly waitHidden?: string;
 	/** A proposed check (`assert_text`): the id of the action it follows. */
 	readonly after?: string;
+	/** The options picked in a multiple-choice list. */
+	readonly values?: readonly string[];
+	/** Where a `scroll` step scrolls to. */
+	readonly scrollX?: number;
+	readonly scrollY?: number;
+	/** The element a `drag` step drops onto, and how the page listened to the drag. */
+	readonly drop?: readonly RecordedSelector[];
+	readonly dragMode?: (typeof DRAG_MODES)[number];
+	/** The answer the person gave to the dialog the action opened. */
+	readonly dialog?: DialogAnswer;
+	/** The open shadow hosts above each iframe of `frames`. */
+	readonly frameShadow?: readonly (readonly string[])[];
+}
+
+export interface DialogAnswer {
+	readonly type: DialogType;
+	readonly accept: boolean;
+	readonly text?: string;
+	/** The dialog's message: page text, shown as text. */
+	readonly message?: string;
+}
+
+/** A dialog the page opened while recording, waiting for the person's answer. */
+export interface PendingDialog {
+	readonly id: number;
+	readonly type: DialogType;
+	readonly message: string;
+	readonly defaultValue: string;
 }
 
 export type RecorderStatus = "idle" | "starting" | "recording" | "stopping";
@@ -94,6 +145,7 @@ export type RecorderEvent =
 	| { readonly type: "step"; readonly step: RecordedStep }
 	| { readonly type: "started"; readonly url: string }
 	| { readonly type: "stopped"; readonly reason: string; readonly truncated: boolean }
+	| { readonly type: "dialog"; readonly dialog: PendingDialog }
 	| { readonly type: "error"; readonly message: string };
 
 export interface RecorderExportRequest {
@@ -142,13 +194,10 @@ function requestWait(value: unknown): RecordedStep["waitRequest"] {
 	return { method: r.method, path: r.path };
 }
 
-/** A step as the runner printed it, or null when it is not one. */
-export function parseRecordedStep(raw: unknown): RecordedStep | null {
-	if (!raw || typeof raw !== "object") return null;
-	const r = raw as Record<string, unknown>;
-	if (typeof r.id !== "string" || !STEP_ID.test(r.id) || !isOneOf(RECORDED_STEP_KINDS, r.kind)) return null;
+/** The selectors of a step as the runner printed them: closed strategies, bounded. */
+export function parseSelectors(raw: unknown): RecordedSelector[] {
 	const selectors: RecordedSelector[] = [];
-	for (const item of Array.isArray(r.selectors) ? r.selectors.slice(0, 6) : []) {
+	for (const item of Array.isArray(raw) ? raw.slice(0, 6) : []) {
 		const s = (item ?? {}) as Record<string, unknown>;
 		const value = text(s.value, 300);
 		if (!isOneOf(SELECTOR_STRATEGIES, s.strategy) || !value) continue;
@@ -161,10 +210,51 @@ export function parseRecordedStep(raw: unknown): RecordedStep | null {
 			...(placed && { nth: s.nth as number }),
 		});
 	}
+	return selectors;
+}
+
+function isScroll(value: unknown): value is number {
+	return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_SCROLL;
+}
+
+/** The answer to a dialog, as the runner printed it, or undefined. */
+function dialogAnswer(value: unknown): DialogAnswer | undefined {
+	if (!value || typeof value !== "object") return undefined;
+	const d = value as Record<string, unknown>;
+	if (!isOneOf(DIALOG_TYPES, d.type) || typeof d.accept !== "boolean") return undefined;
+	return {
+		type: d.type,
+		accept: d.accept,
+		...(d.accept && d.type === "prompt" && text(d.text, 1000) && { text: text(d.text, 1000) }),
+		...(text(d.message, 200) && { message: text(d.message, 200) }),
+	};
+}
+
+/** The shadow hosts above each of `frames` iframes: undefined when absent, null when malformed. */
+function frameShadowOf(value: unknown, frames: number): string[][] | undefined | null {
+	if (value === undefined) return undefined;
+	if (!Array.isArray(value) || value.length !== frames) return null;
+	const chains = value.map((item) => cssChain(item) ?? null);
+	if (chains.some((chain) => chain === null)) return null;
+	return chains as string[][];
+}
+
+/** A step as the runner printed it, or null when it is not one. */
+export function parseRecordedStep(raw: unknown): RecordedStep | null {
+	if (!raw || typeof raw !== "object") return null;
+	const r = raw as Record<string, unknown>;
+	if (typeof r.id !== "string" || !STEP_ID.test(r.id) || !isOneOf(RECORDED_STEP_KINDS, r.kind)) return null;
+	const selectors = parseSelectors(r.selectors);
 	const frames = cssChain(r.frames);
 	const shadow = cssChain(r.shadow);
-	if (frames === null || shadow === null) return null;
+	const frameShadow = frameShadowOf(r.frameShadow, frames?.length ?? 0);
+	if (frames === null || shadow === null || frameShadow === null) return null;
 	const waitRequest = requestWait(r.waitRequest);
+	const drop = parseSelectors(r.drop);
+	const dialog = dialogAnswer(r.dialog);
+	const values = Array.isArray(r.values) && r.values.length > 1 && r.values.length <= MAX_VALUES
+		? r.values.map((v) => text(v, 200))
+		: [];
 	const step: RecordedStep = {
 		id: r.id,
 		kind: r.kind,
@@ -183,9 +273,36 @@ export function parseRecordedStep(raw: unknown): RecordedStep | null {
 			r.waitHidden.length <= MAX_SELECTOR &&
 			LOADER.test(r.waitHidden) && { waitHidden: r.waitHidden }),
 		...(r.kind === "assert_text" && typeof r.after === "string" && STEP_ID.test(r.after) && { after: r.after }),
+		...(r.kind === "select" && values.length && { values }),
+		...(r.kind === "scroll" && isScroll(r.scrollX) && isScroll(r.scrollY) && { scrollX: r.scrollX, scrollY: r.scrollY }),
+		...(r.kind === "drag" && drop.length && isOneOf(DRAG_MODES, r.dragMode) && { drop, dragMode: r.dragMode }),
+		...(dialog && { dialog }),
+		...(frameShadow?.some((hosts) => hosts.length) && { frameShadow }),
 	};
 	if (step.kind === "navigate") return step.url ? step : null;
-	return selectors.length ? step : null;
+	if (step.kind === "scroll" && step.scrollX === undefined) return null;
+	if (step.kind === "drag" && !step.drop) return null;
+	// Only a scroll of the top window names no element.
+	return selectors.length || (step.kind === "scroll" && !frames?.length && !shadow?.length) ? step : null;
+}
+
+/** The person's answer to a pending dialog, as the renderer sent it, or null (S6). */
+export function readDialogAnswer(raw: unknown): { id: number; accept: boolean; text: string } | null {
+	if (!raw || typeof raw !== "object") return null;
+	const r = raw as Record<string, unknown>;
+	if (typeof r.id !== "number" || !Number.isSafeInteger(r.id) || r.id < 1) return null;
+	if (typeof r.accept !== "boolean") return null;
+	if (r.text !== undefined && typeof r.text !== "string") return null;
+	return { id: r.id, accept: r.accept, text: text(r.text, 1000) };
+}
+
+/** A dialog the runner asks the app to answer, or null. */
+export function parsePendingDialog(raw: unknown): PendingDialog | null {
+	if (!raw || typeof raw !== "object") return null;
+	const r = raw as Record<string, unknown>;
+	if (typeof r.id !== "number" || !Number.isSafeInteger(r.id) || r.id < 1) return null;
+	if (!isOneOf(DIALOG_TYPES, r.type)) return null;
+	return { id: r.id, type: r.type, message: text(r.message, 200), defaultValue: text(r.defaultValue, 200) };
 }
 
 /** The export request as the renderer sent it, or null when it is not well formed (S6). */

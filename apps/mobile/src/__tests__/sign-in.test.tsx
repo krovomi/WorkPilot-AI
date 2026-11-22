@@ -8,6 +8,8 @@ import { Text } from "react-native";
 
 const mockEntraIdToken = jest.fn();
 jest.mock("../auth/entra", () => ({ entraIdToken: (...args: unknown[]) => mockEntraIdToken(...args) }));
+const mockSsoIdToken = jest.fn();
+jest.mock("../auth/sso", () => ({ ssoIdToken: (...args: unknown[]) => mockSsoIdToken(...args) }));
 
 const user = { id: "u1", email: "ada@x.io", display_name: "Ada", role: "member" };
 
@@ -92,7 +94,7 @@ describe("sign-in screen", () => {
 		await fireEvent.changeText(screen.getByLabelText("Password"), "secret");
 		// The keyboard's return key signs in like the button.
 		await fireEvent(screen.getByLabelText("Password"), "submitEditing");
-		expect(await screen.findByText("This server only accepts Microsoft sign-in: use Sign in with Microsoft.")).toBeTruthy();
+		expect(await screen.findByText("This server doesn't accept passwords: sign in with Microsoft or with single sign-on.")).toBeTruthy();
 		expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/auth/login"))).toBe(false);
 	});
 
@@ -196,5 +198,63 @@ describe("Microsoft sign-in", () => {
 			),
 		);
 		expect(await screen.findByText("Sign-in failed: The server refused this Microsoft account.")).toBeTruthy();
+	});
+});
+
+describe("single sign-on", () => {
+	const realFetch = globalThis.fetch;
+	const sso = { local_enabled: false, entra_enabled: false, sso_enabled: true, sso_name: "Okta" };
+	afterEach(() => {
+		globalThis.fetch = realFetch;
+		mockSsoIdToken.mockReset();
+	});
+
+	async function pressSso(fetchMock: jest.Mock) {
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		await app();
+		await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("signedOut:"));
+		await fireEvent.changeText(screen.getByLabelText("Server address"), "wp.example.com");
+		await fireEvent.press(screen.getByRole("button", { name: "Sign in with single sign-on" }));
+	}
+
+	it("hands the provider's id_token to the server's SSO exchange", async () => {
+		mockSsoIdToken.mockResolvedValue("sso-token");
+		const fetchMock = jest.fn((url: string) => {
+			if (url.endsWith("/auth/config")) return respond(sso);
+			if (url.endsWith("/auth/sso/exchange"))
+				return respond({ access_token: "a", refresh_token: "r", expires_in: 900, user });
+			if (url.endsWith("/auth/me/permissions"))
+				return respond({ user_id: "u1", is_platform_admin: false, org_id: "org-a", permissions: [], organizations: [] });
+			return respond({ detail: "unexpected" }, 500);
+		});
+		await pressSso(fetchMock);
+		await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("signedIn:org-a"));
+		expect(mockSsoIdToken).toHaveBeenCalledWith(sso);
+		const exchange = fetchMock.mock.calls.find(([url]) => url.endsWith("/auth/sso/exchange"));
+		expect(JSON.parse(String((exchange as unknown as [string, RequestInit])[1].body))).toEqual({ id_token: "sso-token" });
+		expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/auth/oidc/exchange"))).toBe(false);
+	});
+
+	it("stays signed out when the person closes the provider's page", async () => {
+		mockSsoIdToken.mockResolvedValue(null);
+		const fetchMock = jest.fn((_url: string) => respond(sso));
+		await pressSso(fetchMock);
+		await waitFor(() => expect(mockSsoIdToken).toHaveBeenCalled());
+		expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/auth/sso/exchange"))).toBe(false);
+		expect(screen.queryByText(/Sign-in failed/)).toBeNull();
+	});
+
+	it("says when the server offers no single sign-on", async () => {
+		mockSsoIdToken.mockRejectedValueOnce(new Error("sso_disabled"));
+		await pressSso(jest.fn(() => respond({ local_enabled: true, entra_enabled: false })));
+		expect(await screen.findByText("Sign-in failed: This server doesn't offer single sign-on.")).toBeTruthy();
+	});
+
+	it("says the server refused the account", async () => {
+		mockSsoIdToken.mockResolvedValue("sso-token");
+		await pressSso(
+			jest.fn((url: string) => (url.endsWith("/auth/config") ? respond(sso) : respond({ detail: "Email not verified" }, 401))),
+		);
+		expect(await screen.findByText("Sign-in failed: The server refused this account.")).toBeTruthy();
 	});
 });

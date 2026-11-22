@@ -351,6 +351,8 @@ the same way, next to Entra. The server reads the provider's discovery document
 | `WORKPILOT_SELF_APPROVAL` | `when-alone` | Whether the author of a card approves its own spec: `allow`, `deny`, or `when-alone` (only while the others who may approve on the project could not give the approvals the card needs). Any other value is logged and replaced by the default. |
 | `WORKPILOT_APPROVAL_QUORUM` | `low=1,medium=1,high=1` | How many people approve a card, by its criticality, e.g. `low=1,medium=2,high=3` (1 to 10; a level left out needs 1). A card is `medium` unless an approver sets it, or its spec's assessment says it is complex (`high`). |
 | `WORKPILOT_APPROVAL_ROLES` | — | The roles one of a card's approvers must hold, by criticality, as role slugs joined by `+`, e.g. `high=tech-lead+security` (5 per level at most). |
+| `WORKPILOT_APPROVAL_ESCALATION_HOURS` | — (never) | How long a card's plan waits for its approvals before a second group of approvers hears of it, in hours: `24` for every criticality, or `low=72,medium=24,high=4` (0 to 720; a level left out never escalates). The wait starts when the spec run ended; a card escalates once per spec run. |
+| `WORKPILOT_APPROVAL_ESCALATION_ROLES` | `owner+admin` | The second group: the organization's people who hold one of these roles (slugs joined by `+`, 5 at most) and may approve on the project, other than the card's author and those who approved it. They hear of it on their "Needs you" channels. |
 
 The provider sign-in is on only when both `WORKPILOT_OIDC_ISSUER` and
 `WORKPILOT_OIDC_CLIENT_ID` are set; neither is a secret.

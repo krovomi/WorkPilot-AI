@@ -29,6 +29,8 @@ import {
 	ScanLine,
 } from "../charter";
 import { Textarea } from "../ui/textarea";
+import { ServerApprovalPanel } from "./ServerApprovalPanel";
+import { ServerDelegationsPanel } from "./ServerDelegationsPanel";
 
 
 /**
@@ -59,6 +61,9 @@ export function SpecApprovalDashboard(): React.ReactElement {
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [feedback, setFeedback] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	// Bumped after a decision on a server card, to read its approvals again.
+	const [approvalRevision, setApprovalRevision] = useState(0);
+	const isServer = Boolean(activeProject?.remote);
 
 	const selected = pending.find((task) => task.id === selectedId) ?? null;
 
@@ -84,12 +89,17 @@ export function SpecApprovalDashboard(): React.ReactElement {
 		if (!selected) return;
 		setIsSubmitting(true);
 		try {
-			const ok = await submitReview(
-				selected.id,
-				approved,
-				approved ? undefined : feedback.trim(),
-			);
-			if (!ok) {
+			const note = approved ? undefined : feedback.trim();
+			if (isServer) {
+				// A server card may wait for more approvals: say how many it has,
+				// in the words the main process chose, rather than "failed".
+				const result = await globalThis.electronAPI.submitReview(selected.id, approved, note);
+				setApprovalRevision((n) => n + 1);
+				if (!result.success) {
+					setError(result.error ?? t("specApproval:decision.failed"));
+					return;
+				}
+			} else if (!(await submitReview(selected.id, approved, note))) {
 				setError(t("specApproval:decision.failed"));
 				return;
 			}
@@ -163,6 +173,11 @@ export function SpecApprovalDashboard(): React.ReactElement {
 									))}
 								</div>
 							)}
+							{isServer && activeProject && (
+								<div className="mt-3">
+									<ServerDelegationsPanel projectId={activeProject.id} />
+								</div>
+							)}
 						</Column>
 
 						<Column
@@ -188,6 +203,12 @@ export function SpecApprovalDashboard(): React.ReactElement {
 								<ScanLine label={t("specApproval:content.loading")} />
 							) : content?.spec_md || content?.implementation_plan_json ? (
 								<div className="space-y-3">
+									{isServer && (
+										<ServerApprovalPanel
+											key={`${selected.id}-${approvalRevision}`}
+											taskId={selected.id}
+										/>
+									)}
 									{content.spec_md && (
 										<Panel>
 											<span className="wp-kicker">{t("specApproval:content.spec")}</span>

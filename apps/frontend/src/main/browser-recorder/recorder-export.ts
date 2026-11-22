@@ -50,13 +50,32 @@ export interface ExportDeps {
 	readonly writeFile: (file: string, code: string) => void;
 }
 
+/** The last test proposed on a review card, by project: what `recorder-run.ts` runs. */
+export interface ReviewedTest {
+	readonly root: string;
+	readonly path: string;
+	readonly format: TestFormat;
+	readonly specId: string;
+	readonly envVars: readonly string[];
+}
+
+const reviewed = new Map<string, ReviewedTest>();
+
+export function lastReviewedTest(projectPath: string): ReviewedTest | undefined {
+	return reviewed.get(projectPath);
+}
+
 const EXTENSIONS: Record<TestFormat, string> = {
 	"playwright-ts": "ts",
 	"playwright-python": "py",
 	cypress: "js",
 	"selenium-python": "py",
 	"selenium-java": "java",
+	"selenium-csharp": "cs",
+	"selenium-ruby": "rb",
+	"selenium-js": "cjs",
 	webdriverio: "js",
+	"webdriverio-ts": "ts",
 };
 
 export async function chooseFileInDialog(defaultName: string): Promise<string | undefined> {
@@ -155,6 +174,13 @@ export async function exportRecording(
 			const review = await run.finish({
 				message: `test(e2e): add recorded test ${name}`,
 				summary: `Browser Agent recording "${name}" as ${request.format} (${steps.length} steps): ${test.path}`,
+			});
+			reviewed.set(projectPath, {
+				root: run.root,
+				path: test.path,
+				format: request.format,
+				specId: review.specId,
+				envVars: test.envVars,
 			});
 			return { success: true, code: test.code, path: test.path, envVars: test.envVars, skipped: test.skipped, review };
 		} catch (error) {

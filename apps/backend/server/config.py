@@ -184,6 +184,55 @@ def _approval_roles(value: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
     return tuple(roles)
 
 
+#: The longest a card waits before it escalates: 30 days.
+MAX_ESCALATION_HOURS = 720
+#: Who hears of a card that waited too long, unless the deployment names others.
+DEFAULT_ESCALATION_ROLES = ("owner", "admin")
+
+
+def _escalation_hours(value: str) -> tuple[tuple[str, int], ...]:
+    """Hours a card of each criticality waits before it escalates; 0 is never.
+
+    ``24`` for every level, or ``low=72,medium=24,high=4``; a level left out
+    never escalates.
+    """
+    value = value.strip()
+    if value.isdigit():
+        given = dict.fromkeys(CRITICALITIES, value)
+    else:
+        given = _per_criticality("WORKPILOT_APPROVAL_ESCALATION_HOURS", value)
+    hours: list[tuple[str, int]] = []
+    for level in CRITICALITIES:
+        raw = given.get(level, "0")
+        wait = int(raw) if raw.isdigit() else -1
+        if not 0 <= wait <= MAX_ESCALATION_HOURS:
+            logger.warning(
+                "Invalid WORKPILOT_APPROVAL_ESCALATION_HOURS for %s: %r, never",
+                level,
+                raw[:20],
+            )
+            wait = 0
+        hours.append((level, wait))
+    return tuple(hours)
+
+
+def _escalation_roles(value: str) -> tuple[str, ...]:
+    """The role slugs of the second group of approvers (``owner+admin`` unless set)."""
+    slugs: list[str] = []
+    for raw in value.replace(",", "+").split("+"):
+        slug = raw.strip().lower()
+        if not slug:
+            continue
+        if _ROLE_SLUG.match(slug) and slug not in slugs:
+            slugs.append(slug)
+        else:
+            logger.warning(
+                "Ignoring role %r in WORKPILOT_APPROVAL_ESCALATION_ROLES",
+                raw.strip()[:80],
+            )
+    return tuple(slugs[:5]) or DEFAULT_ESCALATION_ROLES
+
+
 def _stream_url(value: str) -> str:
     value = value.strip().rstrip("/")
     return value if value.startswith(("ws://", "wss://")) else ""
@@ -232,6 +281,12 @@ class ServerSettings:
     # ``WORKPILOT_APPROVAL_ROLES``).
     approval_quorum: tuple[tuple[str, int], ...]
     approval_roles: tuple[tuple[str, tuple[str, ...]], ...]
+    # How long a card waits for its approvals before the second group of
+    # approvers hears of it, per criticality (0: never), and who that group is:
+    # the holders of these roles who may approve on the project
+    # (``services/approval_escalation.py``). Off unless set.
+    approval_escalation_hours: tuple[tuple[str, int], ...]
+    approval_escalation_roles: tuple[str, ...]
 
     # Fernet key (urlsafe base64, 32 bytes) used to encrypt per-user
     # integration secrets (Azure PAT, Jira token) at rest.
@@ -299,6 +354,10 @@ class ServerSettings:
         return bool(self.oidc_issuer and self.oidc_client_id)
 
     @property
+    def escalation_enabled(self) -> bool:
+        return any(hours for _, hours in self.approval_escalation_hours)
+
+    @property
     def email_enabled(self) -> bool:
         return bool(self.smtp_host and self.smtp_from)
 
@@ -344,6 +403,12 @@ class ServerSettings:
             ),
             approval_roles=_approval_roles(
                 os.environ.get("WORKPILOT_APPROVAL_ROLES", "")
+            ),
+            approval_escalation_hours=_escalation_hours(
+                os.environ.get("WORKPILOT_APPROVAL_ESCALATION_HOURS", "")
+            ),
+            approval_escalation_roles=_escalation_roles(
+                os.environ.get("WORKPILOT_APPROVAL_ESCALATION_ROLES", "")
             ),
             secrets_master_key=os.environ.get("WORKPILOT_SECRETS_MASTER_KEY", ""),
             repos_root=repos_root,

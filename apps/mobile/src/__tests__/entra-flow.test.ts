@@ -6,6 +6,7 @@ let mockCodeVerifier: string | undefined = "verifier-1";
 const mockRequests: Record<string, unknown>[] = [];
 
 jest.mock("expo-web-browser", () => ({ maybeCompleteAuthSession: jest.fn() }));
+jest.mock("expo-crypto", () => ({ randomUUID: () => "nonce-1" }));
 jest.mock("expo-auth-session", () => ({
 	ResponseType: { Code: "code" },
 	Prompt: { SelectAccount: "select_account" },
@@ -22,6 +23,13 @@ jest.mock("expo-auth-session", () => ({
 		};
 	}),
 }));
+
+/** An id_token whose payload carries `claims` (unsigned: the phone does not verify it, the server does). */
+function idToken(claims: Record<string, unknown>): string {
+	const payload = btoa(JSON.stringify(claims)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+	return `h.${payload}.s`;
+}
+const ID_TOKEN = idToken({ nonce: "nonce-1" });
 
 const config = {
 	local_enabled: true,
@@ -46,8 +54,8 @@ describe("entraIdToken", () => {
 
 	it("runs a PKCE code flow on the tenant's issuer and trades the code with the verifier", async () => {
 		mockPrompt.mockResolvedValue({ type: "success", params: { code: "code-1" } });
-		exchange.mockResolvedValue({ idToken: "id-token-1" });
-		await expect(entraIdToken(config)).resolves.toBe("id-token-1");
+		exchange.mockResolvedValue({ idToken: ID_TOKEN });
+		await expect(entraIdToken(config)).resolves.toBe(ID_TOKEN);
 		expect(AuthSession.fetchDiscoveryAsync).toHaveBeenCalledWith(
 			"https://login.microsoftonline.com/contoso.onmicrosoft.com/v2.0",
 		);
@@ -58,6 +66,7 @@ describe("entraIdToken", () => {
 			responseType: "code",
 			usePKCE: true,
 			prompt: "select_account",
+			extraParams: { nonce: "nonce-1" },
 		});
 		expect(exchange).toHaveBeenCalledWith(
 			{
@@ -73,7 +82,7 @@ describe("entraIdToken", () => {
 	it("sends no extra parameter without a code verifier", async () => {
 		mockCodeVerifier = undefined;
 		mockPrompt.mockResolvedValue({ type: "success", params: { code: "code-1" } });
-		exchange.mockResolvedValue({ idToken: "id-token-1" });
+		exchange.mockResolvedValue({ idToken: ID_TOKEN });
 		await entraIdToken(config);
 		expect(exchange.mock.calls[0][0].extraParams).toBeUndefined();
 	});
@@ -95,5 +104,13 @@ describe("entraIdToken", () => {
 		mockPrompt.mockResolvedValue({ type: "success", params: { code: "code-1" } });
 		exchange.mockResolvedValue({ accessToken: "a" });
 		await expect(entraIdToken(config)).rejects.toThrow("entra_failed");
+	});
+
+	it("refuses an id_token issued for another sign-in", async () => {
+		mockPrompt.mockResolvedValue({ type: "success", params: { code: "code-1" } });
+		for (const token of [idToken({ nonce: "other" }), idToken({}), "h.%%%.s", "no-dots", idToken(null as never)]) {
+			exchange.mockResolvedValueOnce({ idToken: token });
+			await expect(entraIdToken(config)).rejects.toThrow("entra_failed");
+		}
 	});
 });

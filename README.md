@@ -213,7 +213,7 @@ The code is then rendered, compared with the mockup and corrected until it match
 </tr>
 </table>
 
-**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, start or stop the agents, read the dashboard, Insights, roadmap and ideas.
+**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, set its criticality or lend your approval, start or stop the agents, read the dashboard, Insights, roadmap and ideas; sign in with a password, Microsoft Entra or the server's single sign-on.
 
 ![Mobile app: board, card and dashboard](.github/assets/screenshots/mobile.png)
 
@@ -231,7 +231,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - **Goal mode** (done when a command says so, e.g. `dotnet test` exits 0), **cross review** by a second engine, **spec by example** for ASP.NET Core Web APIs, **.NET upgrades** one release at a time up to .NET 11.
 - **Runtime verification** with proof videos and a comparison against the base branch; **hard gates** for invented packages, toothless tests and formal proofs; [REA](docs/architecture/rea.md) reads the build a task leaves, without running it, and reports what it exposes, and on .NET flags a public API the task broke.
 - **Device matrix** in the App Emulator: the page shown, rendered on several phones, tablets, desktops and a TV at once (viewport, pixel ratio, user agent, touch), side by side, optionally on a throttled network (4G, Fast 3G, Slow 3G) and a slowed-down CPU, with the classic responsive bugs flagged on each: sideways scrolling, oversized media, touch targets under 44 px, text under 12 px, overlapping elements, cut-off text, unreachable mobile navigation, each boxed on the capture; phones and tablets also in landscape, optionally with the preview's cookies for a signed-in page, opened by itself on four devices when a card whose changes touch the interface is under review; the grid exports as a PNG or a PDF ([device matrix](docs/architecture/device-matrix.md)).
-- **Browser Agent recorder**: drive a page by hand and get a Playwright (TypeScript or Python), Cypress, Selenium (Python or Java) or WebdriverIO test that goes into iframes and shadow roots and waits for what each action caused, with robust selectors, secrets read from environment variables, proposed on a review branch.
+- **Browser Agent recorder**: drive a page by hand (hovers, scrolls, drag and drop and dialogs you answer in the app included) and get a Playwright (TypeScript or Python), Cypress, Selenium (Python, Java, C#, Ruby or JavaScript) or WebdriverIO (JavaScript or TypeScript) test that goes into iframes and shadow roots and waits for what each action caused, with robust selectors, secrets read from environment variables, proposed on a review branch. Run it there, replay the recording to update the selectors that changed, and let the provider's fast model name the test and rank the checks.
 - **WinDev, WebDev and WinDev Mobile** projects saved in text format: agents edit only the WLangage code, a QA gate sends back anything only the editor may write, and WLangage is coloured in the diff viewer ([WinDev](docs/architecture/windev.md)).
 - **PR follow-through**: a red check or a review thread on the task's PR goes back to the fixer, never forced, never merged.
 - **Provenance**: which lines the AI wrote and with which model, an SBOM of the packages added, requirement-to-test traceability.
@@ -265,7 +265,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - Notifications on Slack, Teams, Discord, Google Chat, webhooks, ntfy and Telegram.
 
 **Team**
-- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT, Microsoft Entra or any OpenID Connect sign-in (Okta, Google, Keycloak...), spec approval by someone other than the card's author, by as many approvers as the card's criticality needs, approvals lent for a holiday ([operations guide](docs/server-operations.md)).
+- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT, Microsoft Entra or any OpenID Connect sign-in (Okta, Google, Keycloak...), spec approval by someone other than the card's author, by as many approvers as the card's criticality needs, approvals lent for a holiday, a second group of approvers told when a plan waits too long, and each audited action tied to the sign-in it was made under ([operations guide](docs/server-operations.md)).
 - **Mobile app** for iOS and Android, team chat, invitation-only sign-up.
 
 **Cost and monitoring**

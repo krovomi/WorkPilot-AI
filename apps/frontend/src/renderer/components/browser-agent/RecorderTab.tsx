@@ -9,6 +9,7 @@ import {
 	Hourglass,
 	KeyRound,
 	Layers,
+	MessageSquare,
 	ListX,
 	Square,
 	X,
@@ -22,21 +23,16 @@ import { useProjectStore } from "@/stores/project-store";
 import { CharterButton, Chip, EmptyStage, Notice, Panel, Tabs } from "../charter";
 import { GeneratedReviewBanner } from "../generated-review/GeneratedReviewBanner";
 import { Input } from "../ui/input";
+import { RecorderAssistButton } from "./RecorderAssistButton";
+import { RecorderDialog } from "./RecorderDialog";
+import { RecorderRun } from "./RecorderRun";
+import { selectorSummary, stepDetail } from "./recorder-steps";
 import { RecorderSuggestions } from "./RecorderSuggestions";
+
+export { selectorSummary, stepDetail };
 
 interface RecorderTabProps {
 	readonly projectPath: string;
-}
-
-/** How the step finds its element, as a short line: the first, most robust selector (and its place, `#n`). */
-export function selectorSummary(step: RecordedStep): string {
-	const selector = step.selectors[0];
-	if (!selector) return step.url ?? "";
-	const found =
-		selector.strategy === "role"
-			? `${selector.role} "${selector.value}"`
-			: `${selector.strategy} "${selector.value}"`;
-	return selector.nth === undefined ? found : `${found} #${selector.nth + 1}`;
 }
 
 function StepDetail({ step }: { readonly step: RecordedStep }) {
@@ -50,7 +46,14 @@ function StepDetail({ step }: { readonly step: RecordedStep }) {
 		);
 	}
 	if (step.key) return <kbd className="wp-meta">{step.key}</kbd>;
-	const detail = step.kind === "navigate" ? "" : (step.value ?? step.text);
+	if (step.kind === "drag" && step.drop) {
+		return (
+			<span className="wp-meta min-w-0 truncate">
+				{t("browserAgent:recorder.dropOn", { target: selectorSummary({ ...step, selectors: step.drop }) })}
+			</span>
+		);
+	}
+	const detail = stepDetail(step);
 	return detail ? <code className="wp-meta truncate">{detail}</code> : null;
 }
 
@@ -66,6 +69,16 @@ export function StepNotes({ step }: { readonly step: RecordedStep }) {
 			: []),
 		...(step.waitHidden ? [{ icon: Hourglass, text: t("browserAgent:recorder.waits.hidden") }] : []),
 		...(step.waitUrl ? [{ icon: Hourglass, text: t("browserAgent:recorder.waits.url", { url: step.waitUrl }) }] : []),
+		...(step.dialog
+			? [
+					{
+						icon: MessageSquare,
+						text: t(`browserAgent:recorder.answered.${step.dialog.accept ? "accept" : "dismiss"}`, {
+							kind: t(`browserAgent:recorder.dialog.${step.dialog.type}`),
+						}),
+					},
+				]
+			: []),
 	];
 	if (!notes.length) return null;
 	return (
@@ -156,6 +169,8 @@ export function RecorderTab({ projectPath }: RecorderTabProps) {
 				)}
 			</Panel>
 
+			<RecorderDialog />
+
 			{recorder.error && (
 				<Notice tone="red" icon={AlertTriangle} role="alert">
 					{recorder.error}
@@ -180,7 +195,11 @@ export function RecorderTab({ projectPath }: RecorderTabProps) {
 								<Chip tone="blue" dot={false}>
 									{t(`browserAgent:recorder.kinds.${step.kind}`)}
 								</Chip>
-								<code className="min-w-0 truncate font-mono text-xs">{selectorSummary(step)}</code>
+								{step.kind === "scroll" && !step.selectors.length ? (
+									<span className="wp-meta">{t("browserAgent:recorder.window")}</span>
+								) : (
+									<code className="min-w-0 truncate font-mono text-xs">{selectorSummary(step)}</code>
+								)}
 								<StepDetail step={step} />
 								<StepNotes step={step} />
 								<button
@@ -212,6 +231,7 @@ export function RecorderTab({ projectPath }: RecorderTabProps) {
 						placeholder={t("browserAgent:recorder.namePlaceholder")}
 						className="h-8 text-sm"
 					/>
+					<RecorderAssistButton projectPath={projectPath} />
 					<Tabs<TestFormat>
 						label={t("browserAgent:recorder.formatLabel")}
 						value={recorder.format}
@@ -251,6 +271,8 @@ export function RecorderTab({ projectPath }: RecorderTabProps) {
 					<p className="wp-meta">{t("browserAgent:recorder.reviewHint")}</p>
 				</div>
 			</Panel>
+
+			<RecorderRun projectPath={projectPath} />
 
 			{outcome && (
 				<div className="space-y-3" data-testid="recorder-outcome">

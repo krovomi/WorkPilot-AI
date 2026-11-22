@@ -7,7 +7,9 @@
  * export later sends the runner only steps it made itself: the renderer only
  * picks which ones to keep, by id. A check the recorder proposes after an
  * action (a step with `after`) is kept apart, at most `MAX_SUGGESTIONS`, and
- * is exported only when the renderer names it. The runner gets the static environment
+ * is exported only when the renderer names it. A dialog the page opens
+ * (`RECORDER_DIALOG:`) waits for the person's answer in the app, which goes
+ * back to the runner on its stdin, for that dialog's id only. The runner gets the static environment
  * (no provider, no key, no Claude profile, S1): it calls no model, and the
  * page it opens is someone else's code.
  */
@@ -18,7 +20,9 @@ import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import {
 	MAX_RECORDED_STEPS,
 	MAX_SUGGESTIONS,
+	parsePendingDialog,
 	parseRecordedStep,
+	readDialogAnswer,
 	type RecordedStep,
 	type RecorderEvent,
 } from "../../shared/types/browser-recorder";
@@ -30,6 +34,7 @@ export const STEP_PREFIX = "RECORDER_STEP:";
 export const DONE_PREFIX = "RECORDER_DONE:";
 export const EXPORT_PREFIX = "RECORDER_EXPORT:";
 export const ERROR_PREFIX = "RECORDER_ERROR:";
+export const DIALOG_PREFIX = "RECORDER_DIALOG:";
 const MAX_URL = 2048;
 
 export type SpawnRunner = (args: string[]) => Promise<ChildProcess>;
@@ -55,19 +60,22 @@ export const spawnRecorderRunner: SpawnRunner = async (args) => {
 	return spawn(python, [runner, ...args], { cwd: backend, env: pythonStaticRunnerEnv(backend) });
 };
 
-function broadcastToWindows(event: RecorderEvent): void {
+/** Sends a recorder event to every window. */
+export function broadcastRecorderEvent(event: RecorderEvent): void {
 	for (const win of BrowserWindow.getAllWindows()) {
 		win.webContents.send(IPC_CHANNELS.BROWSER_AGENT_RECORD_EVENT, event);
 	}
 }
 
-const defaultDeps: RecorderDeps = { spawnRunner: spawnRecorderRunner, broadcast: broadcastToWindows };
+const defaultDeps: RecorderDeps = { spawnRunner: spawnRecorderRunner, broadcast: broadcastRecorderEvent };
 
 interface Session {
 	projectPath: string;
 	steps: RecordedStep[];
 	suggestions: RecordedStep[];
 	child: ChildProcess | null;
+	/** The id of the dialog waiting for an answer. */
+	dialog: number | null;
 }
 
 let session: Session | null = null;
@@ -128,7 +136,7 @@ export async function startRecording(
 	if (!url) return { success: false, error: "Only an http:// or https:// address can be recorded." };
 	if (session?.child) return { success: false, error: "A recording is already running." };
 
-	const current: Session = { projectPath, steps: [], suggestions: [], child: null };
+	const current: Session = { projectPath, steps: [], suggestions: [], child: null, dialog: null };
 	session = current;
 	let child: ChildProcess;
 	try {
@@ -145,6 +153,11 @@ export async function startRecording(
 				? upsert(current.suggestions, step, MAX_SUGGESTIONS)
 				: step && upsert(current.steps, step, MAX_RECORDED_STEPS);
 			if (step && kept) deps.broadcast({ type: "step", step });
+		} else if (line.startsWith(DIALOG_PREFIX)) {
+			const dialog = parsePendingDialog(parseJson(line.slice(DIALOG_PREFIX.length)));
+			if (!dialog) return;
+			current.dialog = dialog.id;
+			deps.broadcast({ type: "dialog", dialog });
 		} else if (line.startsWith(DONE_PREFIX)) {
 			const done = (parseJson(line.slice(DONE_PREFIX.length)) ?? {}) as Record<string, unknown>;
 			ended = true;
@@ -178,11 +191,49 @@ export function stopRecording(): { success: boolean } {
 	return { success: true };
 }
 
+/** Sends the person's answer to the dialog the running recorder is waiting on (S6: read again here). */
+export function answerDialog(raw: unknown): { success: boolean } {
+	const answer = readDialogAnswer(raw);
+	const child = session?.child;
+	if (!answer || !session || session.dialog !== answer.id || !child?.stdin || child.stdin.destroyed) {
+		return { success: false };
+	}
+	session.dialog = null;
+	child.stdin.write(`dialog ${JSON.stringify(answer)}\n`);
+	return { success: true };
+}
+
 /** The steps (and kept checks) of `projectPath`'s last recording whose ids are in `ids`, in that order. */
 export function recordedSteps(projectPath: string, ids: readonly string[]): RecordedStep[] {
 	if (!session || session.projectPath !== projectPath) return [];
 	const byId = new Map([...session.steps, ...session.suggestions].map((step) => [step.id, step]));
 	return ids.map((id) => byId.get(id)).filter((step): step is RecordedStep => step !== undefined);
+}
+
+/** The steps of `projectPath`'s last recording, in order, once it has stopped (not its proposed checks). */
+export function sessionSteps(projectPath: string): RecordedStep[] {
+	if (!session || session.projectPath !== projectPath || session.child) return [];
+	return [...session.steps];
+}
+
+/** The checks proposed during `projectPath`'s last recording, once it has stopped. */
+export function sessionSuggestions(projectPath: string): RecordedStep[] {
+	if (!session || session.projectPath !== projectPath || session.child) return [];
+	return [...session.suggestions];
+}
+
+/** Gives a step of the stopped recording new selectors: the step updated, or null. */
+export function updateStepSelectors(
+	projectPath: string,
+	id: string,
+	selectors: RecordedStep["selectors"],
+): RecordedStep | null {
+	if (!session || session.projectPath !== projectPath || session.child) return null;
+	const index = session.steps.findIndex((step) => step.id === id);
+	if (index < 0) return null;
+	const step = { ...session.steps[index], selectors };
+	session.steps[index] = step;
+	return step;
 }
 
 /** For tests: forget the session. */

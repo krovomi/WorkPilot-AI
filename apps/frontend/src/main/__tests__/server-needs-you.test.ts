@@ -61,6 +61,7 @@ describe("server needs-you channels", () => {
 			plan_review: false,
 			review_ready: true,
 			failed: true,
+			approval_escalated: true,
 		});
 		expect(result.data?.locale).toBe("fr");
 	});
@@ -125,7 +126,12 @@ describe("server needs-you channels", () => {
 			locale: "de",
 		});
 		expect(mocks.authedFetch).toHaveBeenCalledWith("/users/me/needs-you/preferences", "PUT", {
-			events: { plan_review: true, review_ready: true, failed: false },
+			events: {
+				plan_review: true,
+				review_ready: true,
+				failed: false,
+				approval_escalated: true,
+			},
 			locale: "en",
 		});
 	});
