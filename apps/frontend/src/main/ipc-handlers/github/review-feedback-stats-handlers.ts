@@ -7,8 +7,9 @@
  * have the shape of one and be a kind of remark the dataset holds
  * (`recordReset`). A server project's feedback lives on the server
  * (`review-feedback-server.ts`), which also holds a member's rejections until
- * a maintainer decides; its conventions file is not written here (the server's
- * clone is nobody's working copy): that call answers `server_project`.
+ * a maintainer decides; its conventions file is built from the server's
+ * dataset and saved where the person chooses in a native dialog (the server's
+ * clone is nobody's working copy).
  */
 
 import { ipcMain } from "electron";
@@ -23,19 +24,18 @@ import { FINDING_ID, SIGNATURE } from "./review-feedback-dataset";
 import {
 	decideServerHeld,
 	resetServerRule,
+	saveServerConventions,
 	serverFeedbackStats,
 } from "./review-feedback-server";
 import { computeStats, configuredThreshold } from "./review-feedback-stats";
 import { isPrNumber, readRecords, recordReset } from "./review-feedback-store";
 import { withProjectOrNull } from "./utils/project-middleware";
 
-type Refusal = { success: false; error: "invalid" | "server_project" };
+type Refusal = { success: false; error: "invalid" };
 
+/** Called once a server project was answered: what is left is a local one. */
 function refusal(projectId: unknown): Refusal | null {
 	if (typeof projectId !== "string") return { success: false, error: "invalid" };
-	if (serverProjectOf(projectId)) {
-		return { success: false, error: "server_project" };
-	}
 	return null;
 }
 
@@ -117,6 +117,8 @@ export function registerReviewFeedbackStatsHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.GITHUB_PR_REVIEW_CONVENTIONS_WRITE,
 		async (_event, projectId: unknown): Promise<ReviewConventionsResult> => {
+			const remote = serverProjectOf(projectId);
+			if (remote) return saveServerConventions(remote);
 			const refused = refusal(projectId);
 			if (refused) return refused;
 			const result = await withProjectOrNull(projectId as string, async (project) =>

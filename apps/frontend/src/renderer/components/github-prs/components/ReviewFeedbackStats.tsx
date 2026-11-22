@@ -3,7 +3,8 @@
  * acceptance rate per category, the kinds of finding the reviewer now
  * downgrades or hides, a reset for each, and the conventions file. On a
  * server project (lot 3), the rejections held for a maintainer; a reset is a
- * maintainer's, and the conventions file is a local project's only. Folded by
+ * maintainer's, and the conventions file is saved where the person chooses
+ * (lot 4), since the server's clone is nobody's working copy. Folded by
  * default and loaded when opened: a PR view does not read the dataset for it.
  */
 
@@ -174,6 +175,7 @@ export function ReviewFeedbackStats({ projectId }: { projectId: string }) {
 	const { t } = useTranslation("reviewFeedback");
 	const state = useReviewFeedbackStats(projectId);
 	const [open, setOpen] = useState(false);
+	const server = Boolean(state.stats?.server);
 
 	const toggle = () => {
 		const next = !open;
@@ -223,7 +225,6 @@ export function ReviewFeedbackStats({ projectId }: { projectId: string }) {
 					)}
 					<StatsBody state={state} />
 					<ReviewFeedbackHeld state={state} />
-					{!state.stats?.server && (
 					<div className="space-y-1 border-t border-border/50 pt-2">
 						<Button
 							type="button"
@@ -234,9 +235,9 @@ export function ReviewFeedbackStats({ projectId }: { projectId: string }) {
 							onClick={() => void state.writeConventions()}
 						>
 							<FileText className="h-3 w-3 mr-1" />
-							{t("conventions.write")}
+							{t(server ? "conventions.save" : "conventions.write")}
 						</Button>
-						<p>{t("conventions.hint")}</p>
+						<p>{t(server ? "conventions.saveHint" : "conventions.hint")}</p>
 						{state.written && (
 							<p className="text-success" role="status">
 								{t("conventions.written", {
@@ -246,7 +247,6 @@ export function ReviewFeedbackStats({ projectId }: { projectId: string }) {
 							</p>
 						)}
 					</div>
-					)}
 				</>
 			)}
 		</section>

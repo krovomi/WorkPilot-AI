@@ -42,13 +42,15 @@
 	"conventions": {
 		"write": "Generate review-conventions.md",
 		"hint": "Writes the rules deduced from this feedback to .workpilot/review-conventions.md, without any model. The same feedback always gives the same file.",
+		"save": "Save review-conventions.md…",
+		"saveHint": "Built from the feedback the server keeps, without any model. The server's copy of the project is nobody's working copy: save it in yours and commit it there.",
 		"written_one": "Written to {{path}} ({{count}} rule).",
 		"written_other": "Written to {{path}} ({{count}} rules)."
 	},
 	"errors": {
 		"invalid": "This request could not be read.",
 		"not_found": "This project or this kind of finding was not found.",
-		"server_project": "The conventions file is written only for a local project: a server project's clone is nobody's working copy.",
+		"server_project": "This is not available for a server project.",
 		"write_failed": "The change could not be saved."
 	}
 }

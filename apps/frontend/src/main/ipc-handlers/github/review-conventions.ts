@@ -11,7 +11,8 @@
  * the file it is one bounded line, its Markdown and HTML characters escaped,
  * so it cannot add a link, a heading or markup. The file is written inside
  * the project, refused when it is a link (`writableFileUnder`), through a
- * temporary file renamed over it.
+ * temporary file renamed over it. A server project's file is built from the
+ * server's dataset and saved where the person chooses (`saveConventionsAs`).
  */
 
 import { randomUUID } from "node:crypto";
@@ -29,6 +30,7 @@ import {
 	tallyBySignature,
 	topReason,
 } from "./review-feedback-dataset";
+import { showSaveDialog } from "../../electron-utils";
 import { learnedRules } from "./review-feedback-stats";
 import { readRecords, writableFileUnder } from "./review-feedback-store";
 
@@ -136,14 +138,8 @@ export function buildConventions(
 	};
 }
 
-/** Write the file in the project; the path in the answer is relative to it. */
-export function writeConventions(
-	projectPath: string,
-	threshold: number,
-): ReviewConventionsResult {
-	const file = writableFileUnder(projectPath, CONVENTIONS_RELATIVE_PATH);
-	if (!file) return { success: false, error: "write_failed" };
-	const { markdown, rules } = buildConventions(readRecords(projectPath), threshold);
+/** Write `markdown` to `file` at once; false when it could not be. */
+function replaceWith(file: string, markdown: string): boolean {
 	// A fresh name, created exclusively: never through a file or link already there.
 	const temp = `${file}.${randomUUID()}.tmp`;
 	try {
@@ -152,11 +148,46 @@ export function writeConventions(
 		renameSync(temp, file);
 	} catch {
 		rmSync(temp, { force: true });
-		return { success: false, error: "write_failed" };
+		return false;
 	}
+	return true;
+}
+
+/** Write the file in the project; the path in the answer is relative to it. */
+export function writeConventions(
+	projectPath: string,
+	threshold: number,
+): ReviewConventionsResult {
+	const file = writableFileUnder(projectPath, CONVENTIONS_RELATIVE_PATH);
+	if (!file) return { success: false, error: "write_failed" };
+	const { markdown, rules } = buildConventions(readRecords(projectPath), threshold);
+	if (!replaceWith(file, markdown)) return { success: false, error: "write_failed" };
 	return {
 		success: true,
 		path: CONVENTIONS_RELATIVE_PATH.split(path.sep).join("/"),
 		rules,
 	};
+}
+
+/**
+ * A server project's file (lot 4): its clone is nobody's working copy, so the
+ * person picks where to save it, in a native dialog, usually their own
+ * checkout, to commit it there. The path comes from the dialog, never from
+ * the renderer; a link there is refused. The answer names the full path.
+ */
+export async function saveConventionsAs(
+	records: readonly FeedbackRecord[],
+	threshold: number,
+): Promise<ReviewConventionsResult> {
+	const { markdown, rules } = buildConventions(records, threshold);
+	const { canceled, filePath } = await showSaveDialog({
+		defaultPath: path.basename(CONVENTIONS_RELATIVE_PATH),
+		filters: [{ name: "Markdown", extensions: ["md"] }],
+	});
+	if (canceled || !filePath) return { success: false, error: "cancelled" };
+	const file = writableFileUnder(path.dirname(filePath), path.basename(filePath));
+	if (!file || !replaceWith(file, markdown)) {
+		return { success: false, error: "write_failed" };
+	}
+	return { success: true, path: file, rules };
 }

@@ -118,7 +118,11 @@ export type ReviewFeedbackStatsResult =
 	| { success: true; stats: ReviewFeedbackStats }
 	| { success: false; error: ReviewFeedbackError };
 
-/** `.workpilot/review-conventions.md`, written on request. */
+/**
+ * `.workpilot/review-conventions.md`, written on request. A server project's
+ * is saved where the person chooses (`path` is then the full path); closing
+ * that dialog answers `cancelled`.
+ */
 export type ReviewConventionsResult =
 	| { success: true; path: string; rules: number }
-	| { success: false; error: ReviewFeedbackError };
+	| { success: false; error: ReviewFeedbackError | "cancelled" };
