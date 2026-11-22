@@ -22,6 +22,9 @@ pin probe, the MCP App view session), it is started under the OS sandbox of
 A confined server is never started any other way. Without a sandbox on this
 machine (Windows, no bubblewrap, ``WORKPILOT_SANDBOX=off``), or without a
 project to build the policy from, it is not started, and the log says why.
+`machine_confinement` says the same to the app (``runners/mcp_sandbox_runner.py``),
+which names the reason next to each confined server: never a silent start
+without the sandbox, and no switch to start one so.
 Nothing here widens what `core.custom_mcp_validation` accepts: the launcher
 is still checked there, and only WorkPilot builds the command that wraps it.
 """
@@ -30,6 +33,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +46,7 @@ __all__ = [
     "confine_hosts",
     "confined_launch",
     "confined_server",
+    "machine_confinement",
     "valid_confine",
 ]
 
@@ -105,6 +110,49 @@ def confine_hosts(server: Mapping[str, Any]) -> list[str] | None:
     return [str(h) for h in hosts] if isinstance(hosts, list) else []
 
 
+@dataclass(frozen=True)
+class MachineConfinement:
+    """Whether a confined server can start on this machine, and if not, why.
+
+    ``kind``: ``available``, ``off`` (``WORKPILOT_SANDBOX=off``), or the
+    sandbox's own (``unsupported``, ``missing``, ``refused``). ``reason`` is
+    stable English, for the log and as the detail under the app's sentence.
+    """
+
+    available: bool
+    kind: str
+    backend: str | None
+    reason: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "available": self.available,
+            "kind": self.kind,
+            "backend": self.backend,
+            "reason": self.reason,
+        }
+
+
+def machine_confinement() -> MachineConfinement:
+    """Whether this machine starts a confined server (the probe is cached)."""
+    import os_sandbox  # noqa: PLC0415
+    from os_sandbox.launch import UNSUPPORTED, probe  # noqa: PLC0415
+
+    if os_sandbox.sandbox_mode() == os_sandbox.OFF:
+        return MachineConfinement(
+            False, "off", None, f"the OS sandbox is off ({os_sandbox.MODE_ENV}=off)"
+        )
+    status = probe()
+    if status.available:
+        return MachineConfinement(True, "available", status.backend, None)
+    return MachineConfinement(
+        False,
+        status.kind or UNSUPPORTED,
+        status.backend,
+        status.reason or "this machine has no OS sandbox",
+    )
+
+
 def _refuse(server: Mapping[str, Any], why: str) -> None:
     logger.warning(
         "[mcp-confine] MCP server '%s' not started: it must run confined, and %s",
@@ -130,17 +178,13 @@ def confined_launch(
     if not project_dir:
         _refuse(server, "there is no project to confine it to")
         return None
-    import os_sandbox  # noqa: PLC0415
     from os_sandbox.hosts import HostAllowlist  # noqa: PLC0415
-    from os_sandbox.launch import probe, sandboxed  # noqa: PLC0415
+    from os_sandbox.launch import sandboxed  # noqa: PLC0415
     from os_sandbox.policy import build_policy  # noqa: PLC0415
 
-    if os_sandbox.sandbox_mode() == os_sandbox.OFF:
-        _refuse(server, f"the OS sandbox is off ({os_sandbox.MODE_ENV}=off)")
-        return None
-    status = probe()
-    if not status.available:
-        _refuse(server, status.reason or "this machine has no OS sandbox")
+    machine = machine_confinement()
+    if not machine.available:
+        _refuse(server, machine.reason or "this machine has no OS sandbox")
         return None
     allowlist = HostAllowlist.build(hosts, _LAUNCHER_REGISTRIES.get(command, ()))
     try:

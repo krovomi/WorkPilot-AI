@@ -1,9 +1,10 @@
-"""A server project team's security reviews of catalogue MCP servers (#369, lot 5).
+"""An organization's security reviews of catalogue MCP servers (#369, lots 5 and 6).
 
 The MCP Marketplace scores a server from what it can read (registry, OSV, the
 published code); a review is what the team saw using it: "works, but sends
 requests the docs do not mention". A member leaves one review per catalogue
-server, and the project's members read them in the marketplace.
+server, and the organization's members read them in the marketplace, from
+any of its projects.
 
 - **What is kept**: the catalogue id the review is about (checked against
   the id pattern; the catalogue ships with the app, not with the server), a
@@ -11,15 +12,19 @@ server, and the project's members read them in the marketplace.
   control characters and runs of spaces folded, `MAX_COMMENT` characters at
   most. It is shown as text and never handed to a model.
 - **Who reaches it**: every route takes a ``project_id`` and resolves it
-  (``resolve_project_scope``): another tenant's project answers 404, and a
-  review never leaves its project. Reading is ``marketplace.read``; writing
-  one's own review or deleting it is ``marketplace.write`` (contributor,
-  reviewer and above). Deleting someone else's is the project owner's or an
-  organization administrator's.
-- **Bounds**: `MAX_REVIEWS` per project; a list answers `MAX_LISTED` at most.
+  (``resolve_project_scope``): another tenant's project answers 404, and the
+  caller must be on the project. The reviews are those of the project's
+  organization (``scope.org_id``), never another's: a review never leaves
+  its organization. Reading is ``marketplace.read``; writing one's own
+  review or deleting it is ``marketplace.write`` (maintainers and
+  administrators). Deleting someone else's is an organization
+  administrator's (``org.member.write``): a review is the organization's,
+  not one project's, so a project owner does not moderate it.
+- **Bounds**: `MAX_REVIEWS` per organization; a list answers `MAX_LISTED`
+  at most.
 
-Sharing reviews between organizations is not done: nothing leaves an
-organization today.
+Sharing reviews between organizations is not done, by decision: nothing
+leaves an organization.
 """
 
 from __future__ import annotations
@@ -33,7 +38,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.authz.principal import Principal, get_principal
 from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
-from server.db.models import McpServerReview, ProjectRole
+from server.db.models import McpServerReview
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +48,10 @@ router = APIRouter(prefix="/api/features/mcp-reviews", tags=["features"])
 VERDICTS = ("safe", "caution", "unsafe")
 #: A catalogue id, as `shared/mcp-catalog/install-policy.ts` names one.
 SERVER_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$"
+#: Writing (and deleting) one's own review.
+WRITE = "marketplace.write"
+#: Deleting anyone's: the organization's administrators.
+MODERATE = "org.member.write"
 MAX_COMMENT = 1000
 MAX_REVIEWS = 2000
 MAX_LISTED = 500
@@ -81,17 +90,12 @@ def _iso(moment: datetime | None) -> str | None:
     return aware.isoformat() if aware else None
 
 
-def _is_moderator(scope: ProjectScope, principal: Principal) -> bool:
-    """The project's owner, or an organization administrator who reaches it
-    without a membership row."""
-    if scope.project_role is None:
-        return principal.is_platform_admin or principal.has("project.member.write")
-    return scope.project_role == ProjectRole.OWNER.value
+def _is_moderator(principal: Principal) -> bool:
+    """An administrator of the organization the reviews belong to."""
+    return principal.has(MODERATE)
 
 
-def _public(
-    row: McpServerReview, principal: Principal, scope: ProjectScope
-) -> dict[str, Any]:
+def _public(row: McpServerReview, principal: Principal) -> dict[str, Any]:
     mine = row.author_id is not None and row.author_id == principal.id
     return {
         "id": row.id,
@@ -102,7 +106,7 @@ def _public(
         "created_at": _iso(row.created_at),
         "updated_at": _iso(row.updated_at),
         "mine": mine,
-        "can_delete": mine or _is_moderator(scope, principal),
+        "can_delete": mine or _is_moderator(principal),
     }
 
 
@@ -113,16 +117,17 @@ async def list_reviews(
     principal: Principal = Depends(get_principal),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """The project's reviews, the latest first; of one server when named."""
-    query = select(McpServerReview).where(
-        McpServerReview.project_id == scope.project_id
-    )
+    """The organization's reviews, the latest first; of one server when named."""
+    query = select(McpServerReview).where(McpServerReview.org_id == scope.org_id)
     if server_id is not None:
         query = query.where(McpServerReview.server_id == server_id)
     rows = await db.scalars(
         query.order_by(McpServerReview.updated_at.desc()).limit(MAX_LISTED)
     )
-    return {"reviews": [_public(row, principal, scope) for row in rows.all()]}
+    return {
+        "reviews": [_public(row, principal) for row in rows.all()],
+        "can_write": principal.has(WRITE),
+    }
 
 
 @router.put("")
@@ -136,7 +141,7 @@ async def put_review(
     now = datetime.now(UTC)
     row = await db.scalar(
         select(McpServerReview).where(
-            McpServerReview.project_id == scope.project_id,
+            McpServerReview.org_id == scope.org_id,
             McpServerReview.server_id == body.server_id,
             McpServerReview.author_id == principal.id,
         )
@@ -145,23 +150,25 @@ async def put_review(
         count = await db.scalar(
             select(func.count())
             .select_from(McpServerReview)
-            .where(McpServerReview.project_id == scope.project_id)
+            .where(McpServerReview.org_id == scope.org_id)
         )
         if (count or 0) >= MAX_REVIEWS:
             raise HTTPException(status_code=422, detail="too_many_reviews")
         row = McpServerReview(
-            project_id=scope.project_id,
+            org_id=scope.org_id,
             server_id=body.server_id,
             author_id=principal.id,
             created_at=now,
         )
         db.add(row)
+    # The project it was last written from: kept for a downgrade, never shown.
+    row.project_id = scope.project_id
     row.author_name = (principal.display_name or principal.email)[:200]
     row.verdict = body.verdict
     row.comment = clean_comment(body.comment)
     row.updated_at = now
     await db.commit()
-    return {"review": _public(row, principal, scope)}
+    return {"review": _public(row, principal)}
 
 
 @router.delete("/{review_id}")
@@ -171,14 +178,15 @@ async def delete_review(
     principal: Principal = Depends(get_principal),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, bool]:
-    """Remove a review: its author's, or the project owner's, to do."""
+    """Remove a review: its author's, or an organization administrator's, to do."""
     row = await db.get(McpServerReview, review_id)
-    if row is None or row.project_id != scope.project_id:
+    # Another organization's review is reported as missing, as its project is.
+    if row is None or row.org_id != scope.org_id:
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
-    if row.author_id != principal.id and not _is_moderator(scope, principal):
+    if row.author_id != principal.id and not _is_moderator(principal):
         raise HTTPException(
             status_code=403,
-            detail="Only its author or the project owner can delete it",
+            detail="Only its author or an organization administrator can delete it",
         )
     await db.delete(row)
     await db.commit()

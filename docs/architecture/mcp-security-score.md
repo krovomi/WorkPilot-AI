@@ -3,11 +3,11 @@ feature: "Marketplace MCP : score, alertes et politique"
 summary: >-
   Score 0-100 d'un serveur du catalogue sur sept dimensions ; faits npm, PyPI et OSV lus par le
   main, jamais en hors-ligne strict ; analyse de l'archive publiée ; alertes quotidiennes ; liste
-  blanche (.workpilot/mcp-policy.json) appliquée par le main ; sous confineBelow, serveur lancé
-  confiné (os_sandbox, hôtes listés) par tous les providers, ou pas lancé.
+  blanche (.workpilot/mcp-policy.json) ; sous confineBelow, serveur lancé confiné (os_sandbox),
+  ou pas lancé et l'app dit pourquoi ; avis d'équipe par organisation (mode serveur).
 ---
 
-# Score de sécurité du Marketplace MCP (issue #369, lots 1 à 3 et 5)
+# Score de sécurité du Marketplace MCP (issue #369, lots 1 à 3, 5 et 6)
 
 Chaque carte du Marketplace MCP montre un badge « Sécurité N/100 ». Le score vient d'abord du
 catalogue seul, calculé dans le renderer, sans réseau ; ouvrir les détails de la carte demande au
@@ -201,46 +201,78 @@ venue du renderer ne fait pas revenir en arrière le main.
   dans le projet (le worktree), `<tmp>/workpilot` et les caches de paquets ; identifiants cachés.
 - **Échec fermé** : sans bac à sable (Windows, bwrap absent ou refusé), avec
   `WORKPILOT_SANDBOX=off`, sans projet, ou si la politique ne peut se préparer, le serveur n'est
-  pas lancé, et le log dit pourquoi. Le test de connexion d'Agent Tools ne lance jamais un serveur
+  pas lancé, et le log dit pourquoi. Il n'existe aucun interrupteur pour lancer quand même sans
+  confinement un serveur marqué ; `WORKPILOT_SANDBOX=off` n'en est pas un, il le refuse aussi.
+  Le test de connexion d'Agent Tools ne lance jamais un serveur
   confiné, même envoyé sans son `confine` (le main relit celui du projet, `mustRunConfined`) : il
   dit qu'il ne l'a pas testé.
+- **Le refus se voit dans l'app** (lot 6) : `machine_confinement` (`core/mcp_confinement.py`) est
+  la réponse que le backend applique au lancement (bac à sable coupé, ou `probe()` d'`os_sandbox`,
+  dont chaque échec porte un genre : `unsupported`, `missing`, `refused`) ;
+  `runners/mcp_sandbox_runner.py` l'imprime, et le main la lit par `mcpMarketplace:getSandbox`
+  (`main/mcp-security/sandbox-status.ts` : lancé par son chemin, sans shell, avec
+  `pythonRunnerEnv` ; relu champ par champ ; gardé pour la vie de l'app, redemandé par
+  « Vérifier à nouveau » ; un échec de la question, `unknown`, n'est pas gardé). Pas de second
+  détecteur dans le main. Sous chaque serveur marqué de la liste des installés et d'Agent Tools,
+  et dans le bandeau d'une politique qui confine, l'app dit en `en` et `fr` qu'il ne se lance pas
+  ici et pourquoi (« Pourquoi ? » : bac à sable coupé, système sans bac à sable, programme
+  `bubblewrap` ou `seatbelt` absent ou refusé, avec le détail anglais du backend en texte)
+  (`McpSandboxRefusal.tsx`, `mcp-sandbox-store.ts`). Rien ne s'affiche tant que le bac à sable
+  marche, ni pour un serveur qui n'est pas confiné.
 - **Tests** : `tests/core/test_mcp_confinement.py` (refus du champ, refus de lancement, chaque
-  chemin), `confine-guard.test.ts`, `mcp-handlers-confined.test.ts`.
+  chemin), `tests/core/test_mcp_machine_confinement.py` (genres du refus, runner),
+  `confine-guard.test.ts`, `mcp-handlers-confined.test.ts`, `sandbox-status.test.ts`,
+  `McpSandboxRefusal.test.tsx`.
 
-## Avis de l'équipe (mode serveur, lot 5)
+## Avis de l'organisation (mode serveur, lots 5 et 6)
 
 Le score dit ce qui se lit de l'extérieur (registre, OSV, code publié) ; un avis dit ce qu'une
 équipe a vu en utilisant le serveur : « marche, mais appelle un hôte que la doc ne cite pas ». Dans
-un projet du serveur, la carte d'un serveur du catalogue montre, sous son score, les avis des
-membres du projet (`renderer/components/mcp-marketplace/McpServerReviews.tsx`) ; hors mode serveur
-elle n'en montre aucun.
+un projet du serveur, la carte d'un serveur du catalogue montre, sous son score, les avis de
+l'organisation du projet (`renderer/components/mcp-marketplace/McpServerReviews.tsx`) ; hors mode
+serveur elle n'en montre aucun.
 
 - **Ce qui est gardé** (`apps/backend/shared_features/mcp_reviews.py`, table `mcp_server_reviews`) :
-  l'id du catalogue (vérifié sur le motif des ids, le catalogue étant livré avec l'app et non avec
-  le serveur), un verdict d'une liste fermée (`safe`, `caution`, `unsafe`) et un commentaire de
-  texte brut, caractères de contrôle retirés, espaces repliés, 1 000 caractères au plus. Il est
-  affiché comme texte et n'est jamais donné à un modèle. Un membre a un avis par serveur : en
-  écrire un second remplace le premier. 2 000 avis par projet au plus ; une liste en rend 500.
-- **Qui y touche** : un avis ne quitte jamais son projet (`project_id` résolu par
-  `resolve_project_scope`, un projet d'un autre tenant répond 404). Lire est `marketplace.read` ;
-  écrire ou supprimer le sien est `marketplace.write`, accordé aux rôles contributeur et relecteur
-  (et donc mainteneur et administrateur), pas aux rôles lecteur, analyste et opérateur. Supprimer
-  l'avis d'un autre revient au propriétaire du projet ou à un administrateur de l'organisation.
+  l'organisation, l'id du catalogue (vérifié sur le motif des ids, le catalogue étant livré avec
+  l'app et non avec le serveur), un verdict d'une liste fermée (`safe`, `caution`, `unsafe`) et un
+  commentaire de texte brut, caractères de contrôle retirés, espaces repliés, 1 000 caractères au
+  plus. Il est affiché comme texte et n'est jamais donné à un modèle. Un membre a un avis par
+  serveur et par organisation : en écrire un second, depuis n'importe quel projet de
+  l'organisation, remplace le premier. 2 000 avis par organisation au plus ; une liste en rend 500.
+  Le projet d'où l'avis a été écrit en dernier est gardé (vidé si le projet est supprimé), jamais
+  montré : il sert au retour arrière de la migration.
+- **Par organisation, pas par projet** (décision de Leub, lot 6) : un serveur du catalogue est le
+  même dans tous les projets d'une organisation, et ce qu'un projet en a vu vaut pour les autres.
+  Le lot 5 gardait les avis par projet en attendant cette décision. L'Alembic `0043` rattache
+  chaque avis à l'organisation de son projet et ne garde, pour une personne qui avait laissé un
+  avis sur le même serveur dans deux projets d'une organisation, que le plus récent.
+- **Jamais hors de l'organisation** : chaque route prend un `project_id`, résolu par
+  `resolve_project_scope` (un projet d'un autre tenant répond 404, un projet de l'organisation où
+  l'appelant n'est pas répond 403) ; les avis lus, écrits, comptés ou supprimés sont ceux de
+  l'organisation de ce projet (`scope.org_id`), et l'avis d'une autre organisation répond 404
+  même à son administrateur. Rien n'est partagé entre organisations.
+- **Qui y touche** : lire est `marketplace.read` (tous les rôles) ; écrire ou supprimer le sien
+  est `marketplace.write`, accordé aux mainteneurs, administrateurs et propriétaires de
+  l'organisation ; les membres (contributeur, le rôle par défaut), relecteurs, opérateurs,
+  analystes et lecteurs lisent seulement. Supprimer l'avis d'un autre revient à un
+  administrateur de l'organisation (`org.member.write`) : un avis est celui de l'organisation, le
+  propriétaire d'un projet ne le modère pas.
 - **Côté app** : le renderer ne donne qu'un id de projet, un id du catalogue, un verdict et un
   commentaire, ou un id d'avis ; `main/mcp-reviews.ts` les revérifie, ne parle qu'au serveur d'un
-  projet qu'il a listé (`getServerProject`) et relit la réponse champ par champ. Un lecteur du
-  projet lit les avis sans formulaire ; l'interface ne fait que masquer, le serveur refuse.
+  projet qu'il a listé (`getServerProject`) et relit la réponse champ par champ. La liste dit si
+  le serveur laisse écrire l'appelant (`can_write`) : sans ce droit, les avis se lisent sans
+  formulaire ; l'interface ne fait que masquer, le serveur refuse.
 
 ## Pas encore fait (suite de #369)
 
 - **Confinement sous `confineBelow`** : la politique s'applique quand l'app écrit la liste des
   serveurs ; un serveur écrit dans le `.env` hors de l'app n'est confiné qu'au prochain
   enregistrement de la liste. Le backend ne recalcule pas le score (il vit dans le main). Pas de
-  bac à sable sous Windows (AppContainer prévu par `os_sandbox/`) : un serveur confiné n'y tourne pas.
-- **Avis au-delà du projet** : les avis de l'équipe restent dans leur projet. Les partager entre
-  les projets d'une organisation, ou entre organisations (avis communautaires), est une décision à
-  prendre (Leub) : rien ne quitte une organisation aujourd'hui, et un avis public demande un
-  service hébergé que l'app n'a pas. Les avis ne changent pas non plus le score.
+  bac à sable sous Windows (AppContainer prévu par `os_sandbox/`) : un serveur confiné n'y tourne
+  pas, et l'app le dit (lot 6).
+- **Avis entre organisations** (avis communautaires, publics) : refusé par décision (lot 6), rien
+  ne quitte une organisation ; un avis public demanderait de plus un service hébergé que l'app
+  n'a pas. Les avis ne changent pas non plus le score.
 - **Signature cryptographique de l'éditeur** (provenance npm, sigstore) : vérifier une
   attestation demande une bibliothèque sigstore, nouvelle dépendance à justifier ; l'éditeur reste
   noté par `official`.

@@ -13,6 +13,7 @@ import type { McpPolicyRefusal, McpPolicyState } from "../../../shared/types/mcp
 import type { McpSecurityScore } from "../../../shared/types/mcp-security";
 import { useMcpMarketplaceStore } from "../../stores/mcp-marketplace-store";
 import { Notice } from "../charter";
+import { McpPolicySandboxLine } from "./McpSandboxRefusal";
 
 /** The policy of `projectId`, once the main has read it. */
 function usePolicy(projectId: string | null): McpPolicyState | null {
@@ -120,6 +121,7 @@ export function McpPolicyBanner({
 					{t("mcpMarketplace.policy.confineBelow", { min: confineBelow })}
 				</p>
 			)}
+			{confineBelow !== undefined && <McpPolicySandboxLine />}
 			{blockCustomServers && (
 				<p className="text-xs opacity-80">{t("mcpMarketplace.policy.customBlocked")}</p>
 			)}

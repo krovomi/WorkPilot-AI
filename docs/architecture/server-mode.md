@@ -526,18 +526,20 @@ le domaine des analyses. Le détail : [changelog.md](changelog.md).
 | Lire les commits d'une plage | `GET /api/features/changelog/commits?mode=&type=&…` | `insight.read` ; plage refusée (422) hors du modèle fermé |
 | Corriger le changelog partagé | `PUT /api/features/changelog/report` | `insight.write`, rôle `member` ou plus ; refusé (409) pendant une génération |
 
-**Les avis de l'équipe sur un serveur MCP du catalogue sont ceux du projet.** Dans le Marketplace MCP
-d'un projet du serveur, chaque membre laisse un avis par serveur du catalogue (sûr, prudence,
-dangereux, et un commentaire en texte brut) ; les membres du projet les lisent, l'auteur ou le
-propriétaire du projet en supprime un. Table `mcp_server_reviews` (Alembic `0041`), feature
+**Les avis sur un serveur MCP du catalogue sont ceux de l'organisation.** Dans le Marketplace MCP
+d'un projet du serveur, chaque membre laisse un avis par serveur du catalogue et par organisation
+(sûr, prudence, dangereux, et un commentaire en texte brut), depuis n'importe lequel de ses
+projets ; les membres de l'organisation les lisent depuis chacun de ses projets, aucune autre
+organisation ne les voit. L'auteur ou un administrateur de l'organisation en supprime un. Table
+`mcp_server_reviews` (Alembic `0041`, rattachée à l'organisation par `0043`), feature
 `mcp_reviews` (`shared_features/mcp_reviews.py`), domaine `marketplace` ; l'app passe par
-`main/mcp-reviews.ts`. Conception : [mcp-security-score.md](mcp-security-score.md#avis-de-léquipe-mode-serveur-lot-5).
+`main/mcp-reviews.ts`. Conception : [mcp-security-score.md](mcp-security-score.md#avis-de-lorganisation-mode-serveur-lots-5-et-6).
 
 | Action | Route | Il faut |
 |---|---|---|
-| Lire les avis d'un projet, ou d'un serveur | `GET /api/features/mcp-reviews?server_id=` | `marketplace.read` |
-| Écrire son avis (le remplace) | `PUT /api/features/mcp-reviews` | `marketplace.write` (contributeur, relecteur et au-dessus) |
-| Supprimer un avis | `DELETE /api/features/mcp-reviews/{review_id}` | `marketplace.write` ; le sien, ou propriétaire du projet, ou administrateur de l'organisation |
+| Lire les avis de l'organisation du projet, ou d'un serveur | `GET /api/features/mcp-reviews?server_id=` | `marketplace.read` ; la réponse dit aussi si l'appelant peut écrire (`can_write`) |
+| Écrire son avis (le remplace) | `PUT /api/features/mcp-reviews` | `marketplace.write` (mainteneur, administrateur, propriétaire) |
+| Supprimer un avis | `DELETE /api/features/mcp-reviews/{review_id}` | `marketplace.write` ; le sien, ou administrateur de l'organisation (`org.member.write`) ; l'avis d'une autre organisation répond 404 |
 
 **Les automatisations tournent sur le serveur.** Les règles d'un projet du serveur (une issue
 GitHub ou GitLab étiquetée, la CI de la forge au rouge, une heure, une PR ou une MR d'un autre)
