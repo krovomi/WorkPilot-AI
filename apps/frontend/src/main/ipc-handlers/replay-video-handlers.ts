@@ -24,6 +24,7 @@ import type {
 	ReplayVideoResult,
 } from "../../shared/types/replay-share";
 import { showSaveDialog } from "../electron-utils";
+import { recordReplayExport } from "../replay-usage";
 import { backendFetch } from "./_backend-fetch";
 import { isReplayId } from "./replay-handlers";
 
@@ -210,6 +211,7 @@ async function recordAndSave(
 	if (!target || !(await writeVideo(target, content))) {
 		return { success: false, error: "bad_target" };
 	}
+	await recordReplayExport("video");
 	return {
 		success: true,
 		filePath: target,

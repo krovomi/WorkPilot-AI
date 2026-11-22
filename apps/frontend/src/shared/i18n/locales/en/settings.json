@@ -3231,5 +3231,13 @@
 			"noneHint": "To use the same account in several projects, save it once in Settings, Forge accounts.",
 			"missingHint": "The account this project used was deleted: pick another one or enter a token for this project."
 		}
+	},
+	"serverReplayLinks": {
+		"navLabel": "Replay links",
+		"title": "My replay team links",
+		"description": "Every team link to a replay you made, on every project of this server you are still a member of. Revoke a link here to end it at once: whoever has it can no longer open it.",
+		"refresh": "Refresh",
+		"empty": "You have not made any team link yet.",
+		"project": "Project: {{project}}"
 	}
 }

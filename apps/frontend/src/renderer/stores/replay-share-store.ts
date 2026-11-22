@@ -52,6 +52,8 @@ const KNOWN_ERRORS = new Set([
 	"share_expired",
 	"share_revoked",
 	"too_many_shares",
+	// Usage figures (#347): an answer main could not read.
+	"bad_usage",
 ]);
 
 const appLanguage = (): "en" | "fr" =>

@@ -2,14 +2,14 @@
 feature: "Rejeu d'agent : partage, lien d'équipe, signets, vidéo"
 summary: >-
   Une session s'exporte masquée en `.wpreplay`, en page HTML sans script ou en vidéo WebM ou
-  MP4 (seule ou côte à côte avec une autre) ; en mode serveur, un membre la confie au projet par
-  un lien révocable à durée de vie, dont le serveur ne garde que l'empreinte du jeton ; l'import
-  reconstruit tout, borné ; signets, réponses et résumé vivent dans la session.
+  MP4 ; en mode serveur, un lien d'équipe révocable, dont le serveur ne garde que l'empreinte du
+  jeton, et que son auteur révoque aussi depuis les Réglages ; l'import reconstruit tout, borné ;
+  signets, réponses et résumé vivent dans la session ; l'usage se compte sur place, sans télémétrie.
 ---
 
 # Partager un rejeu d'agent
 
-> Issue : #347. Règles : [`security.md`](../rules/security.md) (S1, S2, S6),
+> Issue : #347. Règles : [`security.md`](../rules/security.md) (S1, S2, S5, S6),
 > [`frontend.md`](../rules/frontend.md) (IPC, i18n). Voisin : [variantes et rejeux](variants-and-replays.md).
 
 Le rejeu (`apps/backend/replay/`) enregistre chaque session d'agent dans
@@ -28,20 +28,27 @@ apps/backend/replay/
   video.py       la page jouée étape par étape dans Chromium, enregistrée en WebM
   mp4.py         le WebM encodé de nouveau en MP4 par le ffmpeg du système
   summary.py     le résumé des étapes par un modèle, pour une session sans raisonnement
+  usage.py       l'usage compté sur la machine : relevé des exports, sessions annotées
   api.py         POST /replay/sessions/{id}/export, POST /replay/import,
                  POST et DELETE /replay/sessions/{id}/bookmarks[/{bid}/replies],
                  POST /replay/sessions/{id}/video, POST /replay/compare/video,
-                 POST /replay/sessions/{id}/summary
+                 POST /replay/sessions/{id}/summary,
+                 GET /replay/usage, POST /replay/usage/exports
 apps/backend/shared_features/replay_shares.py   les liens d'équipe (mode serveur)
-apps/backend/server/db/alembic/versions/0017_replay_shares.py
+apps/backend/shared_features/replay_share_overview.py   les liens d'une personne, l'usage d'un projet
+apps/backend/server/db/alembic/versions/0017_replay_shares.py, 0020_replay_share_bookmarks.py
 apps/backend/foundation/platform/browser.py   chrome_executable, partagé avec verify
 apps/frontend/src/main/ipc-handlers/replay-share-handlers.ts   boîtes natives, fichiers, signets
 apps/frontend/src/main/ipc-handlers/replay-video-handlers.ts   vidéos et résumé
 apps/frontend/src/main/replay-team-share.ts                    lien d'équipe, côté app
 apps/frontend/src/main/ipc-handlers/replay-team-share-handlers.ts
-apps/frontend/src/renderer/stores/replay-share-store.ts, replay-team-share-store.ts
+apps/frontend/src/main/replay-usage.ts, ipc-handlers/replay-usage-handlers.ts   les chiffres d'usage
+apps/frontend/src/renderer/stores/replay-share-store.ts, replay-team-share-store.ts,
+  replay-usage-store.ts
 apps/frontend/src/renderer/components/agent-replay/ReplaySharing.tsx, ReplayTeamShare.tsx,
-  ReplayBookmarkReplies.tsx, ReplayComparisonVideo.tsx, ReplayStepsSummary.tsx
+  ReplayBookmarkReplies.tsx, ReplayComparisonVideo.tsx, ReplayStepsSummary.tsx,
+  ReplayUsageMetrics.tsx
+apps/frontend/src/renderer/components/settings/ServerReplayLinksSettings.tsx
 ```
 
 ## Le bundle `.wpreplay`
@@ -217,27 +224,68 @@ un : un membre d'un projet du serveur confie la session au projet et reçoit un 
   partage, jamais dans une URL qu'un proxy journaliserait. L'app ne montre le lien qu'une fois,
   à sa création.
 - **Durée et révocation** : de 1 à 30 jours (7 par défaut ; l'app offre 1, 7 et 30) ; l'auteur ou le propriétaire du
-  projet le révoque depuis la boîte de partage. Un lien révoqué ou expiré répond 410 et son
+  projet le révoque depuis la boîte de partage, et l'auteur aussi depuis les Réglages (plus bas). Un lien révoqué ou expiré répond 410 et son
   bundle quitte la base ; au plus 200 liens ouverts par projet, et les liens finis depuis
   30 jours sont oubliés.
 - **Qui l'atteint** : chaque route prend un `project_id` résolu par `resolve_project_scope`
   (un autre tenant reçoit 404). Lister et ouvrir demandent `lab.read` (tout rôle du projet) et
   le jeton ; créer, `lab.write` et le rôle `member` ; révoquer, être l'auteur ou le
-  propriétaire. Il n'y a pas de lecteur public : une route sans permission est interdite (S5),
-  et la page HTML hors ligne sert déjà celui qui n'a pas de compte.
+  propriétaire. Il n'y a pas de lecteur public (décision plus bas).
 - **L'ouverture** : collé dans « Ouvrir un lien d'équipe » à côté d'Import, le lien est
   analysé par le main (schéma, hôte du serveur connecté, projet connu) et le bundle reçu passe
   par `/replay/import` comme un fichier : reconstruit, borné, sous un nouvel id.
 - **La mesure** : le serveur compte les ouvertures de chaque lien, et l'app l'affiche à côté du
-  lien ; l'équipe voit si ses partages sont lus.
+  lien ; l'équipe voit si ses partages sont lus. Il garde aussi le nombre de signets du bundle
+  reçu (colonne `bookmarks`, révision `0020` ; inconnu pour un lien plus ancien), pour l'usage du
+  projet.
+
+### Tous ses liens, depuis les Réglages
+
+La boîte de partage ne montre que les liens d'un projet. « Liens de rejeu », dans les Réglages
+en mode serveur, montre ceux que la personne a créés sur **tous** les projets du serveur
+(`GET /api/features/replay-shares/mine`, `lab.read`, sans `project_id`) : seulement les siens
+(`created_by`), seulement dans l'organisation où elle agit, et seulement sur un projet qu'elle
+atteint encore, chacun autorisé de nouveau par `load_project_scope`, la porte de toute route qui
+prend un `project_id` ; un projet qu'elle a quitté n'est pas listé. Chaque ligne donne le
+projet, l'état, l'échéance et les ouvertures ; « Révoquer » passe par la route du projet
+(`DELETE /{share}?project_id=`), qui revérifie l'auteur. Le bundle n'est pas chargé pour la
+liste (`defer`).
+
+## L'usage, compté sur place
+
+L'issue demandait des métriques (exports par semaine, taux d'ouverture des liens, part des rejeux
+annotés). **Décision de Leub (2026-11-21)** : elles se calculent là où vivent les rejeux, et nulle
+part ailleurs. Il n'y a aucune télémétrie ; rien n'est envoyé à un service.
+
+- **Sur la machine** (`replay/usage.py`, `GET /replay/usage`) : un relevé à côté des sessions
+  (`replays/usage/exports.json`, hors du `*.json` que lit le store) garde une entrée par export
+  vraiment produit, avec son heure et son genre en liste fermée (`wpreplay`, `html`, `video`,
+  `team_link`) : ni id de session, ni titre, ni chemin. Le main la pose
+  (`POST /replay/usage/exports`) une fois le fichier écrit ou le lien créé ; une boîte fermée
+  sans enregistrer ne compte pas, et un backend muet laisse l'export non compté sans le gêner.
+  Le relevé garde un an, 5 000 entrées au plus, écrit sous verrou (`foundation/json_ledger`). Le
+  rapport donne huit semaines glissantes d'exports par genre, la moyenne par semaine, et les
+  sessions du store : combien, combien avec un signet (et la part), avec une réponse, résumées,
+  importées.
+- **Sur le serveur, pour un projet** (`GET /api/features/replay-shares/usage`, `lab.read`, tout
+  rôle du projet, `project_id` résolu, un autre tenant reçoit 404) : sur quatre semaines, les
+  liens créés par semaine, la part ouverte au moins une fois, les ouvertures, les liens ouverts
+  en ce moment, la part annotée, le nombre de personnes qui partagent. Des totaux seulement : ni
+  titre, ni personne, ni lien. Quatre semaines parce que tout lien créé dans cette fenêtre est
+  encore gardé (il est oublié 30 jours après sa fin).
+
+La vue Agent Replay les affiche sous la liste des enregistrements, avec une ligne qui dit où ils
+ont été comptés ; les chiffres du serveur n'apparaissent que pour un projet du serveur choisi.
+Le main revérifie chaque réponse (entiers positifs, ratios entre 0 et 1, dates lisibles).
 
 ## IPC
 
-Treize canaux (`replay:exportSession`, `replay:importSession`, `replay:addBookmark`,
+Seize canaux (`replay:exportSession`, `replay:importSession`, `replay:addBookmark`,
 `replay:removeBookmark`, `replay:addBookmarkReply`, `replay:removeBookmarkReply`,
 `replay:exportVideo`, `replay:exportComparisonVideo`, `replay:summarizeSession`,
 `replay:shareToTeam`, `replay:listTeamShares`, `replay:revokeTeamShare`,
-`replay:openTeamShare`), un module de preload typé, des handlers qui revalident : id de session,
+`replay:openTeamShare`, `replay:listMyTeamShares`, `replay:getUsage`,
+`replay:getTeamUsage`), un module de preload typé, des handlers qui revalident : id de session,
 de signet, de réponse, de projet et de partage `[A-Za-z0-9_-]`, format, langue et durée en
 liste fermée, options booléennes, étape entière bornée, textes bornés, nom de provider de forme
 fermée, lien analysé dans le main. Le renderer ne donne jamais de chemin ; le nom de fichier proposé vient du
@@ -245,13 +293,16 @@ backend et passe par `path.basename`. Le main n'écrit que ce qui a été demand
 `.wpreplay`, une page pour l'HTML, borné comme un bundle) et lit un bundle par une seule poignée
 de fichier : le fichier vérifié est celui qui est lu, jamais au-delà de la borne.
 
+## Décision : pas de lecteur public sans compte
+
+L'issue proposait un lecteur public minimal, pour ouvrir un rejeu sans WorkPilot. **Décision de
+Leub (2026-11-21)** : il n'y en aura pas. L'export HTML hors ligne couvre ce besoin : une page
+sans script, masquée, qui s'ouvre partout sans compte ni SDK, comme la vidéo. Un lecteur public
+servi par le serveur serait la seule route sans permission de son API (S5) et exposerait une
+session de projet à quiconque tient l'URL ; le lien d'équipe reste réservé aux membres du projet.
+
 ## Pas encore fait
 
-- **Lecteur public d'un lien, sans compte** : chaque route du serveur porte une permission
-  (S5). Celui qui n'a pas de compte reçoit la page HTML ou la vidéo.
-- **Révocation depuis les Réglages** : un lien se révoque dans la boîte de partage, où la
-  liste des liens du projet est affichée ; une page des Réglages qui liste tous les liens de
-  tous les projets reste à faire.
-- **Métriques globales d'usage** (exports par semaine, part des rejeux annotés) : l'app ne
-  compte que les ouvertures de chaque lien d'équipe. Il n'y a pas de télémétrie où compter le
-  reste sans en créer une, ce qui est une décision à part.
+Rien de ce que l'issue demande : le format, le masquage, la page, la vidéo côte à côte, les
+signets discutés, le résumé, le lien d'équipe révocable (depuis la boîte de partage et les
+Réglages) et l'usage compté sur place sont livrés ; le lecteur public est écarté (plus haut).
