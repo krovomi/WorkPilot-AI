@@ -118,14 +118,14 @@ def alert_text(state: dict, project: str, language: str) -> tuple[str, list[str]
     rollback = state.get("rollback")
     if rollback in words["rollback"]:
         lines.append(words["rollback"][rollback])
-    plan = state.get("plan") if isinstance(state.get("plan"), dict) else {}
+    plan = state.get("plan")
+    plan = plan if isinstance(plan, dict) else {}
     if rollback in ("manual", "failed", "blocked_migrations") and _https(
         plan.get("target_url")
     ):
         lines.append(words["last_good"].format(url=plan["target_url"]))
-    revert = (
-        state.get("revert_pr") if isinstance(state.get("revert_pr"), dict) else None
-    )
+    revert = state.get("revert_pr")
+    revert = revert if isinstance(revert, dict) else None
     if revert:
         opened = revert.get("status") in ("opened", "exists")
         if opened and _https(revert.get("url")):
@@ -222,7 +222,8 @@ def _pagerduty(
             },
         },
     }
-    revert = state.get("revert_pr") if isinstance(state.get("revert_pr"), dict) else {}
+    revert = state.get("revert_pr")
+    revert = revert if isinstance(revert, dict) else {}
     if _https(revert.get("url")):
         payload["links"] = [{"href": revert["url"], "text": "Revert PR"}]
     return "sent" if _post_json(fetch, PAGERDUTY_HOSTS[region], payload) else "failed"
