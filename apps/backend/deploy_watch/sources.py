@@ -152,8 +152,10 @@ def _datadog(
         },
     )
     doc = _read_json(fetch, request)
-    series = doc.get("series") if isinstance(doc, dict) else None
-    if doc is None or not isinstance(series, list) or doc.get("status") == "error":
+    if not isinstance(doc, dict):
+        return None
+    series = doc.get("series")
+    if not isinstance(series, list) or doc.get("status") == "error":
         return None
     newest: list[object] = []
     for item in series:

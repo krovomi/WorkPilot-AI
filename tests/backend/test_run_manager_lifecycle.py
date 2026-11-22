@@ -160,3 +160,48 @@ async def test_cancel_answers_false_for_a_run_it_does_not_hold():
     from server.services.run_manager import RunManager
 
     assert await RunManager().cancel_run("unknown-run") is False
+
+
+@pytest.mark.asyncio
+async def test_a_run_whose_process_already_ended_is_stopped_without_an_error():
+    """Windows raises ProcessLookupError on terminate() for a process that has
+    exited but is not reaped yet; Stop must still answer that it stopped."""
+    from server.services.run_manager import RunManager
+
+    class _Ended:
+        def terminate(self):
+            raise ProcessLookupError()
+
+    manager = RunManager()
+    manager._tracked.add("run-1")
+    manager._active["run-1"] = _Ended()
+
+    assert await manager.cancel_run("run-1") is True
+    assert "run-1" in manager._cancelled
+
+
+@pytest.mark.asyncio
+async def test_a_second_stop_names_only_the_runs_it_stopped():
+    """A run stopped a moment ago is still held while it winds down: a second
+    Stop on the project must not stop or count it again."""
+    from server.services.run_manager import RunManager
+
+    class _Proc:
+        def __init__(self):
+            self.terminated = 0
+
+        def terminate(self):
+            self.terminated += 1
+
+    manager = RunManager()
+    procs = {"run-1": _Proc(), "run-2": _Proc()}
+    for run_id, proc in procs.items():
+        manager._tracked.add(run_id)
+        manager._active[run_id] = proc
+        manager._projects[run_id] = "p-1"
+        manager._starters[run_id] = "u-bob" if run_id == "run-1" else "u-ada"
+
+    assert await manager.stop_runs("p-1", "u-bob") == ["run-1"]
+    assert await manager.stop_runs("p-1") == ["run-2"]
+    assert procs["run-1"].terminated == 1
+    assert procs["run-2"].terminated == 1
