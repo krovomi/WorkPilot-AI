@@ -1115,12 +1115,25 @@ export const IPC_CHANNELS = {
 	// Device matrix: one preset rendered, captured and read by the main (#383)
 	APP_EMULATOR_CAPTURE_DEVICE: "app-emulator:capture-device",
 	APP_EMULATOR_CONFIG: "app-emulator:config",
+	// Device matrix: custom devices and personas kept by the main (#383)
+	APP_EMULATOR_DELETE_CUSTOM_DEVICE: "app-emulator:delete-custom-device",
+	APP_EMULATOR_DELETE_PERSONA: "app-emulator:delete-persona",
 	APP_EMULATOR_DETECT: "app-emulator:detect",
+	// Device matrix: live views, emulated by the main and scrolled together (#383)
+	APP_EMULATOR_EMULATE_LIVE_VIEW: "app-emulator:emulate-live-view",
 	APP_EMULATOR_ERROR: "app-emulator:error",
 	// Device matrix: the grid of the main's last captures, saved where the person chooses (#383)
 	APP_EMULATOR_EXPORT_DEVICE_GRID: "app-emulator:export-device-grid",
+	APP_EMULATOR_LIST_CUSTOM_DEVICES: "app-emulator:list-custom-devices",
+	APP_EMULATOR_LIST_PERSONAS: "app-emulator:list-personas",
 	APP_EMULATOR_OUTPUT: "app-emulator:output",
+	APP_EMULATOR_READ_LIVE_SCROLL: "app-emulator:read-live-scroll",
 	APP_EMULATOR_READY: "app-emulator:ready",
+	APP_EMULATOR_SAVE_CUSTOM_DEVICE: "app-emulator:save-custom-device",
+	APP_EMULATOR_SAVE_PERSONA: "app-emulator:save-persona",
+	// Device matrix: one page read at several widths, around its own breakpoints (#383)
+	APP_EMULATOR_SCAN_BREAKPOINTS: "app-emulator:scan-breakpoints",
+	APP_EMULATOR_SET_LIVE_SCROLL: "app-emulator:set-live-scroll",
 	APP_EMULATOR_START: "app-emulator:start",
 	APP_EMULATOR_STATUS: "app-emulator:status",
 	APP_EMULATOR_STATUS_UPDATE: "app-emulator:status-update",

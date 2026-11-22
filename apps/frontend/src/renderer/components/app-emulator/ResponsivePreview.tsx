@@ -571,7 +571,13 @@ export function ResponsivePreview({
 			</div>
 			{matrix && (
 				<div className="min-h-0 flex-1">
-					<DeviceMatrix serverUrl={url} currentUrl={currentUrl} onCapture={onCapture} auto={autoMatrix} />
+					<DeviceMatrix
+						serverUrl={url}
+						currentUrl={currentUrl}
+						onCapture={onCapture}
+						auto={autoMatrix}
+						refreshKey={refreshKey}
+					/>
 				</div>
 			)}
 			{loading && (
