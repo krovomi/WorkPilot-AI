@@ -2888,15 +2888,15 @@
 			"ci": "The forge's CI"
 		},
 		"modeHints": {
-			"auto": "WorkPilot measures this machine (CPU, RAM, GPU, VRAM, running tasks) against what the suite took the last times. Without room, the suite goes to the CI or the WorkPilot server, else waits its turn here.",
+			"auto": "Tests run on this machine when it isn't too busy. Otherwise they go to your repository's CI or the WorkPilot server, or wait their turn here.",
 			"machine": "The full suite always runs on the machine that runs WorkPilot.",
 			"ci": "The task's branch is pushed (without a pull request when there is none yet) and the forge's CI runs the full suite. The change's own tests still run here."
 		},
 		"project": {
 			"label": "Where long test suites run",
 			"manual": "Manual",
-			"autoHint": "Automatic: run here when the machine has room, otherwise on the forge's CI or the WorkPilot server, otherwise queued here. Turn off to choose yourself.",
-			"manualHint": "Manual: you choose where every task's full suite runs.",
+			"autoHint": "Tests run on this machine when it isn't too busy. Otherwise they go to your repository's CI or the WorkPilot server, or wait their turn so the machine doesn't slow down.",
+			"manualHint": "You choose where each task's tests run.",
 			"branchPush": "Push the task's branch without a pull request to run the CI",
 			"branchPushHint": "Lets the suite start on the CI as soon as QA ends, without waiting for you to create the pull request."
 		},

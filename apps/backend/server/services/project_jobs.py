@@ -43,6 +43,7 @@ from server.services.run_manager import (
     get_run_manager,
     wait_until_ended,
 )
+from server.services.usage_records import finish_collecting, usage_channel
 from sqlalchemy import select
 
 FEATURE_KEY = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
@@ -281,7 +282,7 @@ class ProjectJobs:
                 await _set_status(job_id, "running")
                 _notify(project_id, feature, job_id, "running", user_id)
                 with tempfile.TemporaryDirectory(prefix="workpilot-job-") as scratch:
-                    env = await manager.run_env(user_id, job_id)
+                    env = await manager.run_env(user_id, job_id, project_id)
                     for name, content in inputs.items():
                         Path(scratch, name).write_text(content, encoding="utf-8")
                     resolved = [
@@ -293,21 +294,33 @@ class ProjectJobs:
                     argv = confine(
                         resolved, project_id, server_path, Path(scratch), env
                     )
+                    channel = await usage_channel(project_id, user_id, job_id=job_id)
+                    env.update(channel.env)
                     # A job that hands its output to ``on_finish`` keeps its
                     # stderr (logs, tracebacks) out of it: only the reason
                     # when it fails.
-                    proc = await asyncio.create_subprocess_exec(
-                        *argv,
-                        cwd=str(BACKEND_DIR),
-                        env=env,
-                        stdin=asyncio.subprocess.DEVNULL,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=(
-                            asyncio.subprocess.PIPE
-                            if on_finish
-                            else asyncio.subprocess.STDOUT
-                        ),
-                    )
+                    spawned = False
+                    try:
+                        proc = await asyncio.create_subprocess_exec(
+                            *argv,
+                            cwd=str(BACKEND_DIR),
+                            env=env,
+                            stdin=asyncio.subprocess.DEVNULL,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=(
+                                asyncio.subprocess.PIPE
+                                if on_finish
+                                else asyncio.subprocess.STDOUT
+                            ),
+                            pass_fds=channel.pass_fds,
+                        )
+                        spawned = True
+                    finally:
+                        if not spawned:
+                            # No process holds the pipe: release both ends.
+                            channel.close()
+                    channel.started()
+                    counting = asyncio.create_task(channel.collect())
                     self._active[job_id] = proc
                     # Cancelled while the process was being set up: ``cancel``
                     # found nothing to stop yet.
@@ -336,6 +349,7 @@ class ProjectJobs:
 
                     await asyncio.gather(read_stdout(), read_stderr())
                     await proc.wait()
+                    await finish_collecting(counting)
                 if job_id in self._cancelled:
                     status, error = "cancelled", None
                 elif proc.returncode == 0:

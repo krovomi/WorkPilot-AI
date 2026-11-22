@@ -17,6 +17,14 @@ const projects: Project[] = [];
 const recordTaskOutcome = vi.fn();
 const handleUiEvent = vi.fn();
 const resetForNewRun = vi.fn();
+const refreshGreenCards = vi.fn();
+const rerunQaReview = vi.fn();
+vi.mock("../suite-placement/base-refresh", () => ({
+	refreshGreenCards: (...args: unknown[]) => refreshGreenCards(...args),
+}));
+vi.mock("../suite-placement/qa-rerun", () => ({
+	rerunQaReview: (...args: unknown[]) => rerunQaReview(...args),
+}));
 
 vi.mock("../ci-pipeline-providers", () => ({
 	resolvePipelineProvider: async () => ({
@@ -293,5 +301,24 @@ describe("a task's suite sent to the CI", () => {
 		expect(readPlanFile().ciSuite).toMatchObject({ state: "failed" });
 		expect(readPlanFile().statusBeforeBuildFailed).toBe("human_review");
 		expect(startTaskExecution).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("after a merge", () => {
+	it("refreshes the other green cards, through the CI when it is followed", async () => {
+		setTask("human_review");
+		refreshGreenCards.mockReset().mockResolvedValue({ [SPEC]: "ci" });
+		rerunQaReview.mockReset().mockResolvedValue(true);
+		const { ciPipelineService } = await loadService();
+
+		const outcomes = await ciPipelineService.refreshAfterMerge(projects[0], "t0");
+
+		expect(outcomes).toEqual({ [SPEC]: "ci" });
+		const [project, list, merged, deps] = refreshGreenCards.mock.calls[0];
+		expect([project, list, merged]).toEqual([projects[0], tasks, "t0"]);
+		expect(deps.ciFollowed(projects[0])).toBe(true);
+		expect(deps.baseOf(projects[0], tasks[0])).toMatch(/^[\w./-]+$/);
+		await deps.rerunQa(tasks[0], projects[0]);
+		expect(rerunQaReview).toHaveBeenCalledWith(tasks[0], projects[0], expect.anything(), expect.any(Function));
 	});
 });

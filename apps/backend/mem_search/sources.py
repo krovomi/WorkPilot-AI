@@ -237,7 +237,10 @@ class BrainSource:
     The index is built from the vault's ``graph.json`` — a node's label, tags and
     frontmatter — so no note body is read until its detail is asked for. Build
     notes, memory notes (gotchas, patterns, codebase, sessions, outcomes) and
-    whatever else the project's agents filed there are all one source.
+    whatever else the project's agents filed there are all one source. A note
+    scoped to another branch or team is not (`brain.lifecycle.scopes.recalled`):
+    its scope is in its frontmatter, so each note's is read once, small as
+    notes are; a task log never is.
     """
 
     name = "brain"
@@ -245,7 +248,8 @@ class BrainSource:
     def __init__(self, project_dir: Path):
         from brain.tasks import project_name, project_rel
 
-        self.project = project_name(Path(project_dir))
+        self.project_dir = Path(project_dir)
+        self.project = project_name(self.project_dir)
         self.prefix = project_rel(self.project).parent.as_posix() + "/"
         self._brain = None
         self._nodes: list[dict] | None = None
@@ -275,7 +279,7 @@ class BrainSource:
                 brain._refresh()
             # The learning loop's patterns are `PatternSource`'s, with their
             # evidence; listing them here too would show each one twice.
-            self._nodes = [
+            nodes = [
                 node
                 for node in brain.graph().nodes.values()
                 if str(node.get("source_file") or "").startswith(self.prefix)
@@ -283,6 +287,11 @@ class BrainSource:
                 and "learning-loop"
                 not in ((node.get("metadata") or {}).get("tags") or [])
             ]
+            from brain.lifecycle import scopes
+
+            self._nodes = brain.recalled(
+                nodes, scopes.audience(self.project_dir), len(nodes)
+            )
         except Exception as exc:  # noqa: BLE001
             logger.debug("could not read the brain graph: %s", exc)
         return self._nodes

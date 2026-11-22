@@ -455,7 +455,7 @@ Un champ vide ne limite rien, et une organisation sans quota n'a aucune limite.
 | Membres maximum | ajouter un membre au-delà répond 409 |
 | Projets maximum | créer un projet au-delà répond 409 |
 | Exécutions simultanées maximum | runs et jobs de l'organisation en file ou en cours ; au-delà, lancer répond 429 |
-| Budget mensuel de tokens, blocage | enregistrés, mais la consommation n'est pas encore comptée (toujours 0) : ce budget ne bloque rien aujourd'hui |
+| Budget mensuel de tokens, blocage | tokens d'entrée, de sortie et de cache de tous les runs et jobs de l'organisation depuis le 1er du mois (UTC) ; une fois le budget atteint, lancer répond 402 si le blocage est coché, sinon le dépassement se lit dans Quotas et Vue d'ensemble |
 
 Le plafond du serveur (`WORKPILOT_MAX_CONCURRENT_RUNS`) s'applique en plus, à toutes les
 organisations ensemble.
@@ -559,7 +559,7 @@ Ce qui n'existe pas encore, à la date de ce guide :
 - l'adresse d'écoute du serveur de streaming n'est pas réglable (`localhost` dans le conteneur),
   d'où un proxy dans l'espace réseau d'`api` ;
 - aucune rotation de la clé maître des secrets ; une seule clé JWT à la fois ;
-- le budget mensuel de tokens n'est pas compté ;
+- la consommation de tokens n'a pas encore de vue par personne ni par modèle (elle est enregistrée par run et par job, table `usage_records`) ;
 - un run de carte interrompu par un arrêt du serveur n'est pas soldé automatiquement ;
 - aucune image du serveur n'est publiée : elle se construit depuis le dépôt ;
 - le journal d'audit n'est jamais purgé ;

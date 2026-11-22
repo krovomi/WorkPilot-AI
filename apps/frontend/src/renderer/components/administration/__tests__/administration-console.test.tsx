@@ -327,6 +327,9 @@ describe("OverviewTab", () => {
 		expect(screen.getByTitle("2026-11-15: 0")).toHaveStyle({ height: "0%" });
 		expect(screen.getByText("11-16")).toBeInTheDocument();
 
+		// No budget: the month's tokens are shown without a limit.
+		expect(screen.getByText("Monthly token budget")).toBeInTheDocument();
+
 		// 3 of 10 members, projects without a limit, 2 of 2 runs (at the ceiling).
 		expect(screen.getByText("3 / 10")).not.toHaveClass("text-destructive");
 		expect(screen.getByText("4 (no limit)")).toBeInTheDocument();
@@ -592,6 +595,14 @@ describe("QuotasTab", () => {
 		);
 		// The server's answer becomes what is shown.
 		await waitFor(() => expect(screen.getByLabelText("Maximum members")).toHaveValue(10));
+	});
+
+	it("shows the tokens this month's runs used against the budget", async () => {
+		bridge.getQuotas.mockImplementation(() =>
+			ok({ ...QUOTA, monthly_token_budget: 5000, used_tokens_this_month: 1200 }),
+		);
+		render(<QuotasTab />);
+		expect(await screen.findByText("1200 used this month")).toBeInTheDocument();
 	});
 
 	it("shows no usage before the quotas are loaded", () => {

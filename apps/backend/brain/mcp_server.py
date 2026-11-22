@@ -18,6 +18,9 @@ The tools are the recall ladder and the write path, nothing else:
 | `brain_write_note`, `brain_remember` | write, then commit / pull / push |
 | `brain_sync`, `brain_status` | pull + push now; where the brain is and how fresh |
 
+``brain_recall`` and ``query_graph`` leave out a memory scoped to another
+branch or team than the build's (`RECALL_TOOLS`, `lifecycle.scopes.recalled`).
+
 The ``instructions`` field of ``initialize`` carries the rules of use, so an
 agent that was never bridged still learns them the moment it connects.
 """
@@ -36,6 +39,7 @@ from typing import Any
 from foundation.paging import FOOTER_RESERVE, page_lines, render_page
 
 from .home import digest_path
+from .lifecycle import scopes
 from .memories import instructions as list_instructions
 from .vault import Brain
 
@@ -56,6 +60,11 @@ SERVER_INSTRUCTIONS = (
 )
 
 _STR = {"type": "string"}
+
+RECALL_TOOLS = ("brain_recall", "query_graph")
+"""The tools that leave out a note scoped to another branch or team
+(`lifecycle.scopes.recalled`). ``get_node`` and ``brain_read_note`` open what
+the agent names."""
 
 #: The most of a note or a skill one call returns. A longer one comes a page at
 #: a time, followed by the offset that reads on (`foundation.paging`): an
@@ -267,17 +276,22 @@ def _call(
     trusted: bool | None = None,
     task: str | None = None,
     max_chars: int | None = None,
+    audience: scopes.Audience | None = None,
 ) -> Any:
     if trusted is None:
         trusted = _trusted_default()
+
+    def recalling() -> scopes.Audience:
+        # The build WorkPilot started this server for, else the folder an
+        # agent of the person's started it in (`scopes.audience`).
+        return audience if audience is not None else scopes.audience(".")
+
     if max_chars is None:
         max_chars = read_max_chars()
     if task is None:
         task = os.environ.get(TASK_ENV, "").strip() or None
     graph_tools: dict[str, Callable[[], Any]] = {
-        "query_graph": lambda: brain.graph().query(
-            args["query"], limit=_line_arg(args.get("limit")) or 8
-        ),
+        "query_graph": lambda: _query_graph(brain, args, recalling()),
         "get_node": lambda: brain.graph().get_node(args["id"]),
         "shortest_path": lambda: brain.graph().shortest_path(
             args["source"], args["target"]
@@ -287,7 +301,9 @@ def _call(
         brain.before_read()
         return graph_tools[name]()
     if name == "brain_recall":
-        return brain.recall(args["query"], limit=_line_arg(args.get("limit")) or 5)
+        return brain.recall(
+            args["query"], limit=_line_arg(args.get("limit")) or 5, audience=recalling()
+        )
     if name == "brain_read_note":
         note = brain.read(args["path"])
         return {**note, "body": _page(note["body"], args, max_chars)}
@@ -326,6 +342,16 @@ def _call(
     if name == "brain_status":
         return brain.status()
     raise KeyError(name)
+
+
+def _query_graph(
+    brain: Brain, args: dict[str, Any], audience: scopes.Audience
+) -> list[dict[str, Any]]:
+    """``query_graph``, less the notes scoped away from *audience*; asked for
+    more first, so that the limit still fills."""
+    limit = _line_arg(args.get("limit")) or 8
+    hits = brain.graph().query(args["query"], limit=max(limit * 4, 20))
+    return brain.recalled(hits, audience, limit)
 
 
 def _result(msg_id: Any, result: Any) -> dict[str, Any]:

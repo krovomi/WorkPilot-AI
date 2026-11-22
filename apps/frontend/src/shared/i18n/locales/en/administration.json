@@ -152,6 +152,7 @@
 		"unlimited": "Unlimited",
 		"unlimitedUsage": "{{used}} (no limit)",
 		"currentlyUsed": "{{count}} in use",
+		"usedThisMonth": "{{count}} used this month",
 		"enforceHardStop": "Block new runs once the token budget is spent",
 		"hardStopHint": "When unchecked, exceeding the budget is reported but runs still start."
 	}

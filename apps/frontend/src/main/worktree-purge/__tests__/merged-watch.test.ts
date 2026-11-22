@@ -18,6 +18,7 @@ vi.mock("../../ipc-handlers/task/split-merge-watch", () => ({ offlineStrict: () 
 vi.mock("../../ipc-handlers/utils", () => ({ safeSendToRenderer: vi.fn() }));
 vi.mock("../../pr-state", () => ({ readPrState: vi.fn() }));
 vi.mock("../../ipc-handlers/cicd-triggers-handlers", () => ({ autoTriggerForTask: vi.fn() }));
+vi.mock("../../ci-pipeline-service", () => ({ ciPipelineService: { refreshAfterMerge: vi.fn() } }));
 vi.mock("../purge", () => ({
 	mergedSpecIds: (_p: Project, list: Task[]) =>
 		list.filter((t) => t.metadata?.prMergedAt).map((t) => t.specId),

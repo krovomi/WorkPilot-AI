@@ -859,6 +859,23 @@
 				"byKindTitle": "Lines to review per PR, by kind of task",
 				"byKindHelp": "Code counts in full, tests and documentation count half, generated files and lockfiles don't count. Defaults follow code review studies: past 200 to 400 lines or an hour, a reviewer finds fewer defects. Leave empty for the default.",
 				"neverSplit": "Investigations, spikes and operations are never split: they open no code to review."
+			},
+			"groups": {
+				"agent": {
+					"description": "The model that works on tasks and what it reads from the project."
+				},
+				"planning": {
+					"title": "Before coding",
+					"description": "How a task is prepared: its size and what is written before any code."
+				},
+				"coding": {
+					"title": "While coding",
+					"description": "How the agent writes the code."
+				},
+				"checks": {
+					"title": "Before review",
+					"description": "What is checked before a task reaches review, and where its tests run."
+				}
 			}
 		},
 		"autoBuild": {
@@ -2036,7 +2053,12 @@
 		"pollDescription": "How often the pipeline status is checked (minimum 15s, default 60s)"
 	},
 	"serverSession": {
-		"navLabel": "My session on the server",
+		"navLabel": "Team server",
+		"connect": {
+			"title": "Sign in to a team server",
+			"description": "You are working in local mode, on this computer's projects only. Sign in to your team's WorkPilot server to share its projects and board, with a password, an invitation, Microsoft or your SSO.",
+			"button": "Sign in to a server"
+		},
 		"title": "My session on the server",
 		"description": "Who is signed in to the team server on this computer, and how the session was opened, as the server reports it.",
 		"loading": "Loading the session",
