@@ -277,14 +277,16 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "windev": set(),
     # Mission Control's composition (docs/architecture/mission-control-composition.md):
     # the model registry, the price catalog, the context windows, the provider
-    # matrix, the stack and the card's kind, the untrusted-content fence and the
-    # API's path checks. It runs no agent (the main process calls the model),
+    # matrix, the stack and the card's kind, the untrusted-content fence, the
+    # API's path checks and the local Ollama's own word on tools (offline_policy,
+    # a leaf of the toolbox). It runs no agent (the main process calls the model),
     # so nothing that reaches core or agents.
     "mission_control": {
         "context_mgmt",
         "cost_intelligence",
         "foundation",
         "models_registry",
+        "offline_policy",
         "phase_config",
         "project",
         "public_model_registry",
