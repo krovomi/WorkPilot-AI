@@ -11,7 +11,7 @@ running the backend.
 | ``POST /forget`` · ``/restore`` · ``/pin`` | a person's decision on one memory |
 | ``POST /revert`` | undo an automatic decision of the last hour, or separate a merge (`undo.py`) |
 | ``POST /scope`` | where one memory applies (``applies_to``) |
-| ``POST /maintainers`` | who settles an escalated conflict (`maintainers.py`) |
+| ``POST /maintainers`` | who settles an escalated conflict, for the whole memory or one scope (`maintainers.py`) |
 | ``POST /conflicts/resolve`` | keep A, keep B, write the canonical note, or "not a conflict" |
 | ``POST /conflicts/suggest`` | a model's opinion on one queued pair (`advisor.py`) |
 
@@ -115,6 +115,7 @@ def lifecycle(project_dir: str = "", limit: int = 100) -> dict:
     # an entry that may be older than the page shown.
     entries = journal.read(brain.root, base, limit=5000)
     modes = undo.revertible(brain.root, base, entries)
+    who = identity.person(brain.root)
     return {
         "success": True,
         "journal": [e.to_dict() for e in entries[:limit]],
@@ -122,9 +123,12 @@ def lifecycle(project_dir: str = "", limit: int = 100) -> dict:
         "last_undo": undo.last_undo(entries, modes),
         "metrics": metrics.compute(brain.root, base, entries),
         "trash": store.trash(brain.root, base),
-        "conflicts": arbitration.open_conflicts(brain.root, base.as_posix()),
-        "maintainers": (names := maintainers.read(brain.root, base)),
-        "can_arbitrate": maintainers.allows(names, identity.person(brain.root)),
+        "conflicts": arbitration.with_maintainers(
+            brain.root, arbitration.open_conflicts(brain.root, base.as_posix()), who
+        ),
+        "maintainers": (lists := maintainers.read_all(brain.root, base)).get("", []),
+        "maintainer_scopes": {scope: names for scope, names in lists.items() if scope},
+        "can_arbitrate": maintainers.allows(lists.get("", []), who),
         "pinned": store.pinned_count(brain.root, base),
         "pin_limit": store.PIN_LIMIT,
         "retention_days": store.retention_days(),
@@ -228,6 +232,8 @@ def set_scope(request: ScopeRequest) -> dict:
 class MaintainersRequest(BaseModel):
     project_dir: str = ""
     names: list[str] = []
+    scope: str = ""
+    """A module, ``team:x`` or ``branch:y`` (`scopes.py`); empty: the list at the top."""
 
 
 @router.post("/maintainers")
@@ -236,7 +242,7 @@ def set_maintainers(request: MaintainersRequest) -> dict:
     if isinstance(scope, dict):
         return scope
     brain, base = scope
-    kept = maintainers.write(brain.root, base, request.names)
+    kept = maintainers.write(brain.root, base, request.names, scope=request.scope)
     if kept is None:
         return {"success": False, "error": "invalid", "code": "invalid"}
     _sync(brain, "brain: designate the memory maintainers")

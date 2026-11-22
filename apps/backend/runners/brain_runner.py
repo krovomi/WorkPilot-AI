@@ -39,6 +39,10 @@ from brain.agents import AGENTS  # noqa: E402
 from brain.connect import connect_all  # noqa: E402
 from brain.memories import bridge, discover, ingest  # noqa: E402
 
+# Loading the notifications installs the channels a sync announces a queued
+# memory conflict on, when the project opted in (`brain.lifecycle.announce`).
+from services import notifications as _notifications  # noqa: E402, F401
+
 RESULT_MARKER = "__BRAIN_RESULT__:"
 
 ACTIONS = (

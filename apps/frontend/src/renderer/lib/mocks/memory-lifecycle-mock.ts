@@ -11,6 +11,7 @@ export const memoryLifecycleMock = {
 			lastUndo: null,
 			metrics: null,
 			maintainers: [],
+			maintainerScopes: {},
 			canArbitrate: true,
 			trash: [],
 			conflicts: [],
