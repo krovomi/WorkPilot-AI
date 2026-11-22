@@ -238,7 +238,13 @@ class TestReading:
     ):
         monkeypatch.setenv("WORKPILOT_REVIEW_FEEDBACK_THRESHOLD", "4")
         empty = asyncio.run(fb.feedback_overview(_request(), _scope(clone)))
-        assert empty == {"dataset": "", "threshold": 4, "held": [], "maintainer": False}
+        assert empty == {
+            "dataset": "",
+            "threshold": 4,
+            "held": [],
+            "maintainer": False,
+            "reviews": [],
+        }
 
         _set(clone, role="owner")
         _set(clone, finding_id="f-2", verdict="not_applicable")
@@ -349,3 +355,75 @@ def test_the_router_is_mounted_with_the_forge_feature():
     assert ("POST", "/api/features/forge/github/reviews/{number}/feedback") in paths
     assert ("POST", "/api/features/forge/github/reviews/feedback/held") in paths
     assert os.path.basename(fb.__file__) == "forge_review_feedback.py"
+
+
+class TestReviewCounts:
+    """The findings count of each saved review, for the monthly figures (lot 4)."""
+
+    def _review(self, clone: Path, name: str, content: str) -> None:
+        (clone / ".workpilot" / "github" / "pr" / name).write_text(
+            content, encoding="utf-8"
+        )
+
+    def test_each_saved_review_its_count_and_date_newest_first(self, clone):
+        at = "2026-10-03T10:00:00.123456" + "x" * 30
+        self._review(
+            clone,
+            "review_7.json",
+            json.dumps({"reviewed_at": at, "findings": [1, 2, 3]}),
+        )
+        self._review(
+            clone,
+            "review_9.json",
+            json.dumps({"reviewed_at": "2026-11-01T00:00:00", "findings": []}),
+        )
+        self._review(clone, "review_8.json", "{broken")
+        self._review(
+            clone,
+            "review_10.json",
+            json.dumps({"findings": "many", "reviewed_at": "x"}),
+        )
+        self._review(clone, "review_11.json", json.dumps([1]))
+        self._review(
+            clone, "review_010.json", json.dumps({"reviewed_at": at, "findings": []})
+        )
+        self._review(clone, "notes.json", "{}")
+
+        counts = fb.review_counts(_scope(clone))
+
+        # review_5 (the fixture) has no date; the others are not reviews.
+        assert counts == [
+            {"pr": 9, "at": "2026-11-01T00:00:00", "findings": 0},
+            {"pr": 7, "at": at[:40], "findings": 3},
+        ]
+        overview = asyncio.run(fb.feedback_overview(_request(), _scope(clone)))
+        assert overview["reviews"] == counts
+
+    def test_the_newest_reviews_only(self, clone, monkeypatch):
+        monkeypatch.setattr(fb, "MAX_COUNTED_REVIEWS", 1)
+        for number in (6, 12):
+            self._review(
+                clone,
+                f"review_{number}.json",
+                json.dumps({"reviewed_at": "2026-11-01T00:00:00", "findings": [0]}),
+            )
+
+        assert [c["pr"] for c in fb.review_counts(_scope(clone))] == [12]
+
+    def test_no_review_folder_counts_nothing(self, tmp_path):
+        assert fb.review_counts(_scope(tmp_path)) == []
+
+    def test_a_review_folder_that_leaves_the_clone_is_refused(self, tmp_path):
+        clone = tmp_path / "clone"
+        (clone / ".workpilot" / "github").mkdir(parents=True)
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        (elsewhere / "review_3.json").write_text(
+            json.dumps({"reviewed_at": "2026-11-01T00:00:00", "findings": [1]}),
+            encoding="utf-8",
+        )
+        (clone / ".workpilot" / "github" / "pr").symlink_to(
+            elsewhere, target_is_directory=True
+        )
+
+        assert _status(lambda: fb.review_counts(_scope(clone))) == 409

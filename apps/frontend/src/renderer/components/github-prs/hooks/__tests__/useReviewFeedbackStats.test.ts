@@ -105,6 +105,18 @@ describe("useReviewFeedbackStats", () => {
 		expect(result.current.writing).toBe(false);
 	});
 
+	it("says nothing when the save dialog is closed", async () => {
+		api.writeReviewConventions.mockResolvedValueOnce({
+			success: false,
+			error: "cancelled",
+		});
+		const { result } = renderHook(() => useReviewFeedbackStats("p1"));
+		await act(() => result.current.writeConventions());
+		expect(result.current.error).toBeNull();
+		expect(result.current.written).toBeNull();
+		expect(result.current.writing).toBe(false);
+	});
+
 	it("drops an answer for a project the view has left", async () => {
 		let answer: (value: unknown) => void = () => undefined;
 		api.getReviewFeedbackStats.mockReturnValue(

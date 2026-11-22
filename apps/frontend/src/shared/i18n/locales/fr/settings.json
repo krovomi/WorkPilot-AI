@@ -1523,7 +1523,8 @@
 			"plan_review": "Un plan attend son approbation",
 			"review_ready": "Un travail est prêt pour ma revue",
 			"failed": "Un run s'est arrêté sur une erreur",
-			"approval_escalated": "Un plan a trop attendu ses approbateurs"
+			"approval_escalated": "Un plan a trop attendu ses approbateurs",
+			"review_feedback_held": "Le rejet d'une remarque de revue par un membre attend un mainteneur"
 		},
 		"language": "Langue des messages",
 		"enabled": "{{channel}} activé",
