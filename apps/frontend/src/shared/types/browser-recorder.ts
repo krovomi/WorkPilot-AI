@@ -19,6 +19,7 @@
  * lists and bounds below; the main process reads every runner line through it.
  */
 
+import type { TestDataValue, TestFixture } from "./browser-recorder-data";
 import type { GeneratedReview } from "./generated-review";
 
 export const RECORDED_STEP_KINDS = [
@@ -164,6 +165,10 @@ export interface RecorderExportOutcome {
 	readonly path?: string;
 	readonly envVars?: readonly string[];
 	readonly skipped?: number;
+	/** The values typed while recording, by key: the test reads them from its data. */
+	readonly dataValues?: readonly TestDataValue[];
+	/** The data file written next to the test (relative on a review card, absolute in a chosen folder). */
+	readonly fixture?: TestFixture;
 	readonly review?: GeneratedReview | null;
 	/** The person closed the save dialog. */
 	readonly cancelled?: boolean;

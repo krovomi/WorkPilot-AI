@@ -14,11 +14,14 @@ import type {
 	ReplayExportOptions,
 	ReplayFileResult,
 	ReplayImportResult,
+	ReplayMyTeamShareListResult,
 	ReplaySummary,
 	ReplaySummaryRequest,
 	ReplayTeamShareListResult,
 	ReplayTeamShareRequest,
 	ReplayTeamShareResult,
+	ReplayTeamUsageResult,
+	ReplayUsageResult,
 	ReplayVideoOptions,
 	ReplayVideoResult,
 } from "../../../shared/types/replay-share";
@@ -107,6 +110,12 @@ export interface ReplayAPI {
 	) => Promise<ReplayResult<object>>;
 	/** A pasted team link, opened from this server and imported here. */
 	openReplayTeamShare: (link: string) => Promise<ReplayImportResult>;
+	/** The person's own team links, on every project of the server. */
+	listMyReplayTeamShares: () => Promise<ReplayMyTeamShareListResult>;
+	/** How this machine shares its replays, counted here and sent nowhere. */
+	getReplayUsage: () => Promise<ReplayUsageResult>;
+	/** A server project's team links, as aggregates computed by that server. */
+	getReplayTeamUsage: (projectId: string) => Promise<ReplayTeamUsageResult>;
 }
 
 export const createReplayAPI = (): ReplayAPI => ({
@@ -149,4 +158,8 @@ export const createReplayAPI = (): ReplayAPI => ({
 	revokeReplayTeamShare: (projectId, shareId) =>
 		invokeIpc(IPC_CHANNELS.REPLAY_REVOKE_TEAM_SHARE, projectId, shareId),
 	openReplayTeamShare: (link) => invokeIpc(IPC_CHANNELS.REPLAY_OPEN_TEAM_SHARE, link),
+	listMyReplayTeamShares: () => invokeIpc(IPC_CHANNELS.REPLAY_LIST_MY_TEAM_SHARES),
+	getReplayUsage: () => invokeIpc(IPC_CHANNELS.REPLAY_GET_USAGE),
+	getReplayTeamUsage: (projectId) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_GET_TEAM_USAGE, projectId),
 });

@@ -308,6 +308,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # write in the clone, the approvals they wait on and its kill switch
         # (shared_features/governance.py): reading it is the audit domain.
         "governance": "audit",
+        # A server project's execution waves (shared_features/execution_waves.py):
+        # the plan of its backlog and the run that starts it wave after wave.
+        "execution_waves": "task",
         # What a task's attachments and the project's ADRs say. Read-only and
         # addressed like spec_traceability, so it answers to the same domain.
         "docintel": "task",
@@ -370,6 +373,7 @@ SERVER_FEATURES: frozenset[str] = frozenset(
         "replay_shares",
         "governance",
         "mcp_reviews",
+        "execution_waves",
     }
 )
 

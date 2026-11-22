@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 import re
 
+from core.mcp_confinement import CONFINE_FIELD, valid_confine
+
 logger = logging.getLogger(__name__)
 
 
@@ -241,6 +243,7 @@ def validate_custom_mcp_server(server: dict) -> bool:
         "headers",
         "env",
         "description",
+        CONFINE_FIELD,
     }
     if server["type"] == "http" and "env" in server:
         logger.warning("HTTP-type MCP server cannot carry 'env'")
@@ -249,5 +252,5 @@ def validate_custom_mcp_server(server: dict) -> bool:
     if unexpected_fields:
         logger.warning(f"Custom MCP server has unexpected fields: {unexpected_fields}")
         return False
-
-    return True
+    # A confined server (`core.mcp_confinement`): command only, hosts checked.
+    return valid_confine(server)

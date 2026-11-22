@@ -21,6 +21,8 @@ const api = {
 	importReplaySession: vi.fn(),
 	addReplayBookmark: vi.fn(),
 	removeReplayBookmark: vi.fn(),
+	getReplayUsage: vi.fn(async () => ({ success: false, error: "none" })),
+	getReplayTeamUsage: vi.fn(async () => null),
 };
 
 function step(index: number): ReplayStep {

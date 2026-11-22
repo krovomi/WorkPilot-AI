@@ -986,6 +986,10 @@ class ReplayShare(Base):
     last_opened_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # How many bookmarks the shared session carries, for the project's usage
+    # figures (``replay_share_overview.py``); unknown for a share made before
+    # revision 0020.
+    bookmarks: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class McpServerReview(Base):

@@ -1,7 +1,7 @@
 """MCP server reviews: a project team's security reviews of catalogue servers.
 
 Revision ID: 0041_mcp_server_reviews
-Revises: 0019_login_sessions
+Revises: 0020_replay_share_bookmarks
 Create Date: 2026-11-22
 
 One new table, nothing changed in the existing ones. Like ``0017``, the step
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0041_mcp_server_reviews"
-down_revision = "0019_login_sessions"
+down_revision = "0020_replay_share_bookmarks"
 branch_labels = None
 depends_on = None
 

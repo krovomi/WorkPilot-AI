@@ -1516,7 +1516,14 @@
 		"healthCheckFailed": "Health check failed",
 		"connectionTestFailed": "Connection test failed",
 		"errorNameNoId": "The name needs at least one letter or digit",
-		"removeHeader": "Remove header {{name}}"
+		"removeHeader": "Remove header {{name}}",
+		"confine": {
+			"label": "Run confined (OS sandbox)",
+			"hint": "The server starts only in the OS sandbox: it writes only in the project and reaches only the hosts below and the registry its launcher installs from. Where there is no sandbox (Windows), it does not start.",
+			"hosts": "Hosts it may reach",
+			"hostsHint": "Separated by spaces or commas: api.example.com, *.example.com, or a local 127.0.0.1:5432."
+		},
+		"confinedNotTested": "Not tested: this server runs confined, and only an agent starts it, in the OS sandbox."
 	},
 	"terminalFonts": {
 		"title": "Terminal Fonts",
@@ -2105,7 +2112,8 @@
 			"plan_review": "A plan waits for approval",
 			"review_ready": "Work is ready for my review",
 			"failed": "A run stopped on an error",
-			"approval_escalated": "A plan waited too long for its approvers"
+			"approval_escalated": "A plan waited too long for its approvers",
+			"review_feedback_held": "A member's rejection of a review finding waits for a maintainer"
 		},
 		"language": "Language of the messages",
 		"enabled": "{{channel}} on",
@@ -3231,5 +3239,13 @@
 			"noneHint": "To use the same account in several projects, save it once in Settings, Forge accounts.",
 			"missingHint": "The account this project used was deleted: pick another one or enter a token for this project."
 		}
+	},
+	"serverReplayLinks": {
+		"navLabel": "Replay links",
+		"title": "My replay team links",
+		"description": "Every team link to a replay you made, on every project of this server you are still a member of. Revoke a link here to end it at once: whoever has it can no longer open it.",
+		"refresh": "Refresh",
+		"empty": "You have not made any team link yet.",
+		"project": "Project: {{project}}"
 	}
 }

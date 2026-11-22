@@ -114,6 +114,29 @@ def test_a_run_learns_into_its_own_project_s_brain(tmp_path):
     assert read_memories(theirs, "", 20) == {"available": False, "memories": []}
 
 
+def test_a_brain_folder_that_leads_out_of_its_home_is_not_read(tmp_path):
+    from server.services.run_isolation import project_brain, project_home
+    from shared_features.context import read_memories
+
+    mine = _scope(tmp_path, "proj-a", "alpha")
+    theirs = _scope(tmp_path, "proj-b", "beta")
+    _run_learns(theirs, "The deploy key rotates on Fridays", dict(os.environ))
+    repos = tmp_path / "repos"
+    assert project_brain(repos, "proj-b").is_dir()
+
+    # A run of proj-a writes its home as it likes: its .workpilot now leads
+    # to another project's.
+    home = project_home(repos, "proj-a")
+    home.mkdir(parents=True)
+    (home / ".workpilot").symlink_to(
+        project_home(repos, "proj-b") / ".workpilot", target_is_directory=True
+    )
+
+    assert read_memories(mine, "", 20) == {"available": False, "memories": []}
+    assert read_memories(mine, "deploy", 20) == {"available": False, "results": []}
+    assert read_memories(theirs, "deploy", 20)["results"]
+
+
 def test_each_run_is_pointed_at_its_brain_whatever_the_server_says(
     tmp_path, monkeypatch
 ):

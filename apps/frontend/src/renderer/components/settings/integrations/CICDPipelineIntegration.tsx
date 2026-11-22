@@ -53,6 +53,7 @@ export function CICDPipelineIntegration({
 		azure: "Azure DevOps",
 		github: "GitHub",
 		gitlab: "GitLab",
+		bitbucket: "Bitbucket",
 	};
 
 	const enabled = providerValue !== "none";
@@ -80,6 +81,7 @@ export function CICDPipelineIntegration({
 						<SelectItem value="azure">Azure DevOps Pipelines</SelectItem>
 						<SelectItem value="github">GitHub Actions</SelectItem>
 						<SelectItem value="gitlab">GitLab CI</SelectItem>
+						<SelectItem value="bitbucket">Bitbucket Pipelines</SelectItem>
 						<SelectItem value="jenkins">Jenkins</SelectItem>
 						<SelectItem value="none">{t("cicd.providerNone")}</SelectItem>
 					</SelectContent>

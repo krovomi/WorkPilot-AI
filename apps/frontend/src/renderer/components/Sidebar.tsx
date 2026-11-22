@@ -121,6 +121,7 @@ import { openNavView } from "./sidebar/nav-actions";
 import { buildNavIndex, useNavIndexStore } from "./sidebar/nav-index";
 import {
 	administrationNavGroup,
+	bitbucketNavItems,
 	githubNavItems,
 	gitlabNavItems,
 	hubTabItems,
@@ -145,6 +146,8 @@ export type SidebarView =
 	| "gitlab-issues"
 	| "github-prs"
 	| "gitlab-merge-requests"
+	| "bitbucket-issues"
+	| "bitbucket-pull-requests"
 	| "changelog"
 	| "insights"
 	| "worktrees"
@@ -321,6 +324,7 @@ export function Sidebar({
 	// Subscribe to project-env-store for reactive GitHub/GitLab tab visibility
 	const envGitHub = useProjectEnvStore((state) => state.envConfig?.githubEnabled ?? false);
 	const envGitLab = useProjectEnvStore((state) => state.envConfig?.gitlabEnabled ?? false);
+	const envBitbucket = useProjectEnvStore((state) => state.envConfig?.bitbucketEnabled ?? false);
 
 	// Server mode: the administration console, and the views a server project
 	// offers (`sidebar/server-gates.ts`), its forge's (GitHub or GitLab) among them.
@@ -332,6 +336,8 @@ export function Sidebar({
 	const forge = serverForge(selectedProject);
 	const githubEnabled = serverProject ? forge === "github" : envGitHub;
 	const gitlabEnabled = serverProject ? forge === "gitlab" : envGitLab;
+	// Bitbucket has no server relay: its views are for local projects only.
+	const bitbucketEnabled = !serverProject && envBitbucket;
 
 	// Track the last loaded project ID to avoid redundant loads
 	const lastLoadedProjectIdRef = useRef<string | null>(null);
@@ -350,6 +356,9 @@ export function Sidebar({
 			if (gitlabEnabled) {
 				integrationGroup.items.push(...gitlabNavItems);
 			}
+			if (bitbucketEnabled) {
+				integrationGroup.items.push(...bitbucketNavItems);
+			}
 		}
 
 		if (canAdminister) {
@@ -364,6 +373,7 @@ export function Sidebar({
 		sidebarPrefs.hideExperimental,
 		githubEnabled,
 		gitlabEnabled,
+		bitbucketEnabled,
 		canAdminister,
 		serverProject,
 		forge,

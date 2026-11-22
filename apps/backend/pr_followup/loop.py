@@ -17,7 +17,7 @@ from foundation.git_executable import run_git
 
 from .guards import Violation, check_fix_diff
 from .model import Check, PRSnapshot, ReviewThread
-from .policy import Decision, DecisionKind, FollowupConfig, decide
+from .policy import Decision, DecisionKind, FollowupConfig, decide, first_ci_verdict
 from .state import FollowupState, load_state, save_state
 
 FIX_REQUEST = "QA_FIX_REQUEST.md"
@@ -97,6 +97,9 @@ async def run_round(
         base_failing = await forge.base_failing_names(snap.base_branch)
 
     decision = decide(snap, state, cfg, base_failing)
+    if not state.first_ci and state.rounds == 0:
+        # Before any fix of ours: what the CI said of the PR as it was opened.
+        state.first_ci = first_ci_verdict(snap, base_failing)
     if snap.error or snap.checks:
         state.no_checks_polls = 0
     else:

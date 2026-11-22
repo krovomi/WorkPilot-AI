@@ -34,11 +34,13 @@ vi.mock("electron", () => ({
 import { registerReplayTeamShareHandlers } from "../ipc-handlers/replay-team-share-handlers";
 import {
 	buildShareLink,
+	listMyTeamShares,
 	MAX_SHARED_BYTES,
 	openTeamShare,
 	parseShareLink,
 	shareToTeam,
 	teamShareBody,
+	toMyTeamShare,
 	toTeamShare,
 } from "../replay-team-share";
 
@@ -201,6 +203,10 @@ describe("REPLAY_SHARE_TO_TEAM", () => {
 			"POST",
 			{ content_base64: GZIP.toString("base64"), ttl_days: 7 },
 		);
+		// The link is counted on this machine, by its kind only.
+		const [counted, counting] = fetchMock.mock.calls[1];
+		expect(String(counted)).toContain("/replay/usage/exports");
+		expect(JSON.parse(String(counting.body))).toEqual({ kind: "team_link" });
 	});
 
 	it("refuses before asking anything", async () => {
@@ -314,6 +320,49 @@ describe("REPLAY_LIST_TEAM_SHARES and REPLAY_REVOKE_TEAM_SHARE", () => {
 			"Invalid share id",
 		);
 		expect(mocks.authedFetch).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe("REPLAY_LIST_MY_TEAM_SHARES", () => {
+	const mine = (extra: object = {}) =>
+		row({ project_id: PROJECT, project_name: "Shop", ...extra });
+
+	it("lists the person's links on every project, checked again", async () => {
+		mocks.authedFetch.mockResolvedValueOnce({
+			ok: true,
+			data: {
+				shares: [
+					mine(),
+					mine({ project_id: "../etc" }),
+					mine({ project_name: "" }),
+					row(),
+					mine({ id: "bad" }),
+				],
+			},
+		});
+		const result = await call(IPC_CHANNELS.REPLAY_LIST_MY_TEAM_SHARES);
+		expect(result).toMatchObject({
+			success: true,
+			shares: [
+				{ id: SHARE, projectId: PROJECT, projectName: "Shop", canRevoke: true },
+				{ id: SHARE, projectId: PROJECT, projectName: PROJECT },
+			],
+		});
+		expect(mocks.authedFetch).toHaveBeenCalledWith("/api/features/replay-shares/mine", "GET");
+		expect(toMyTeamShare("not a share")).toBeNull();
+	});
+
+	it("needs a signed-in server, and passes on a failure or a bad answer", async () => {
+		mocks.isServerMode.mockReturnValueOnce(false);
+		expect(await listMyTeamShares()).toEqual({ success: false, error: "not_signed_in" });
+		mocks.getServerUrl.mockReturnValueOnce(null);
+		expect(await listMyTeamShares()).toEqual({ success: false, error: "not_signed_in" });
+		mocks.authedFetch.mockResolvedValueOnce({ ok: false, error: "HTTP 403" });
+		expect(await listMyTeamShares()).toEqual({ success: false, error: "HTTP 403" });
+		mocks.authedFetch.mockResolvedValueOnce({ ok: true, data: { shares: "x" } });
+		expect(await listMyTeamShares()).toEqual({ success: false, error: "bad_share" });
+		mocks.authedFetch.mockResolvedValueOnce({ ok: true, data: null });
+		expect(await listMyTeamShares()).toEqual({ success: false, error: "bad_share" });
 	});
 });
 

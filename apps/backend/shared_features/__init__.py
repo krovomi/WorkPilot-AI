@@ -2,7 +2,8 @@
 (``shared_board``) and, declared in ``registry``, its roadmap, its ideation,
 its index and the views that follow, as their files on the server's clone and
 their runners as jobs; its Insights conversations (``insights``); its
-memories (``context``); its GitHub repository or GitLab project, with each
+memories (``context``), with their journal, trash and pins
+(``context_lifecycle``); its GitHub repository or GitLab project, with each
 person's own token (``forge``, ``forge_gitlab``), and the AI review of its
 pull or merge requests as a job on the clone (``forge_review``), with the
 feedback on their findings (``forge_review_feedback``); its analyses
@@ -16,7 +17,8 @@ sessions its members share with it, behind links that expire
 (``replay_shares``); its agents' governance: the policy, the audit trail its
 agents write in the clone, the approvals they wait on and its kill switch
 (``governance``); its team's security reviews of catalogue MCP servers
-(``mcp_reviews``).
+(``mcp_reviews``); the execution waves of its backlog and the run that starts
+them in that order (``execution_waves``, ``waves``).
 
 See ``docs/architecture/server-mode.md``.
 """
@@ -40,6 +42,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.automations.api import router as automations
     from shared_features.changelog import router as changelog
     from shared_features.context import router as context
+    from shared_features.context_lifecycle import router as context_lifecycle
     from shared_features.forge import router as forge
     from shared_features.forge_gitlab import router as forge_gitlab
     from shared_features.forge_review import GITHUB, GITLAB
@@ -49,6 +52,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_features.insights import router as insights
     from shared_features.mcp_reviews import router as mcp_reviews
     from shared_features.registry import FEATURES
+    from shared_features.replay_share_overview import router as replay_overview
     from shared_features.replay_shares import router as replay_shares
     from shared_features.roadmap import router as roadmap
     from shared_features.workspace import router as workspace
@@ -64,6 +68,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(ideation, "ideation")
     mount(insights, "insights")
     mount(context, "context")
+    mount(context_lifecycle, "context")
     mount(forge, "forge")
     mount(forge_gitlab, "forge")
     mount(GITHUB.router, "forge")
@@ -73,5 +78,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(changelog, "analyses")
     mount(workspace, "workspace")
     mount(replay_shares, "replay_shares")
+    mount(replay_overview, "replay_shares")
     mount(governance, "governance")
     mount(mcp_reviews, "mcp_reviews")
+    mount(execution_waves, "execution_waves")

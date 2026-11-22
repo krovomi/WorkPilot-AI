@@ -171,6 +171,37 @@ class TestRunWatch:
         assert len(state["samples"]) == 2
         assert (state["rollback"], state["migrations"]) == ("proposed", [])
         assert state["plan"]["target_run"] == "10"
+        # Where the critical samples began, for the time-to-rollback figure.
+        assert state["degraded_at"] == state["samples"][0]["at"]
+        assert "rollback_at" not in state
+
+    def test_canary_is_compared_with_the_stable_fleet(self, tmp_path, fake_fetch):
+        monitors = MONITORS.replace(
+            "query: errors}", "query: stable, canary_query: canary}"
+        )
+        project = _project(tmp_path, monitors=monitors)
+
+        def prom(request):
+            canary = "canary" in request.full_url
+            # The fleet got no worse than before; the canary doubles its errors.
+            return 200, json.dumps(_vector(0.04 if canary else 0.02)).encode()
+
+        clock = Clock()
+        state = run_watch(
+            project,
+            RUN_ID,
+            _env(CICD_MONITOR_HEALTH_URL=""),
+            fetch=fake_fetch({PROM: prom}),
+            sleep=clock.sleep,
+            now=clock,
+        )
+        check = state["samples"][0]["metrics"][0]
+        assert (check["baseline"], check["current"], check["against"]) == (
+            0.02,
+            0.04,
+            "stable",
+        )
+        assert state["verdict"] == "critical"
 
     def test_auto_rollback(self, tmp_path, fake_fetch, monkeypatch):
         project = _project(tmp_path, monitors=MONITORS)
@@ -195,6 +226,7 @@ class TestRunWatch:
         assert state["rollback"] == "started"
         assert state["migrations"] is None
         assert started == [plan]
+        assert state["rollback_at"] == clock.now.isoformat()
 
         monkeypatch.setattr(watch, "execute_rollback", lambda *a: False)
         state = run_watch(
@@ -351,6 +383,7 @@ class TestRunRollback:
         monkeypatch.setattr(watch, "execute_rollback", lambda *a: True)
         state = run_rollback(project, RUN_ID, {}, fetch=fake_fetch(), now=Clock())
         assert (state["rollback"], state["rollback_by"]) == ("started", "person")
+        assert state["rollback_at"] == "2026-11-15T10:00:00+00:00"
         monkeypatch.setattr(watch, "execute_rollback", lambda *a: False)
         assert (
             run_rollback(project, RUN_ID, {}, fetch=fake_fetch())["rollback"]

@@ -10,6 +10,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { DesignBounds } from "../../../../shared/types/design-to-code";
 import { useDesignToCodeStore } from "../../../stores/design-to-code-store";
+import { LoopFigures } from "./LoopFigures";
 import { MaskLayer } from "./MaskLayer";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"];
@@ -227,6 +228,8 @@ export function SourceColumn() {
 					</div>
 				</div>
 			)}
+
+			<LoopFigures />
 		</section>
 	);
 }

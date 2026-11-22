@@ -14,6 +14,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+# Shorter than this, a thought is a heartbeat, not a step of the reasoning.
+MIN_THOUGHT_CHARS = 30
+
 
 class NodeType(str, Enum):
     """Type of decision node."""
@@ -168,6 +171,25 @@ class DecisionTree:
             self._nodes[pid].children.append(node.id)
             self._nodes[pid].status = NodeStatus.COMPLETED
         return node
+
+    def steps(self, limit: int) -> list[str]:
+        """The last ``limit`` thoughts and tool calls, oldest first, as comparable keys.
+
+        Only the current run's: a result (an answer, an error, a rebalancing)
+        ends a run. A thought too short to be one (a "Thinking..." heartbeat)
+        is not a step.
+        """
+        keys: list[str] = []
+        for node in reversed(self._nodes.values()):
+            if len(keys) == limit or node.node_type in (NodeType.RESULT, NodeType.ROOT):
+                break
+            if node.node_type == NodeType.TOOL_CALL:
+                keys.append(f"tool\0{node.tool_name}\0{node.tool_input}")
+            elif node.node_type == NodeType.THINKING:
+                thought = " ".join(node.description.lower().split())
+                if len(thought) >= MIN_THOUGHT_CHARS:
+                    keys.append(f"thought\0{thought}")
+        return keys[::-1]
 
     @property
     def node_count(self) -> int:

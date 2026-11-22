@@ -6,12 +6,13 @@ import { useCICDTriggersStore } from "../cicd-triggers-store";
 
 const rollbackDeployment = vi.fn();
 const invoke = vi.fn();
+const getDeployFigures = vi.fn(async () => ({ success: true, data: { watches: 1 } }));
 
 beforeEach(() => {
 	rollbackDeployment.mockReset();
 	invoke.mockReset();
 	invoke.mockResolvedValue({ success: true, data: [{ id: "42" }] });
-	(globalThis as unknown as { electronAPI: unknown }).electronAPI = { rollbackDeployment, invoke };
+	(globalThis as unknown as { electronAPI: unknown }).electronAPI = { rollbackDeployment, invoke, getDeployFigures };
 	useCICDTriggersStore.setState({ error: null, rollingBack: null, runs: [] });
 });
 

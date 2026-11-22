@@ -62,7 +62,7 @@ from typing import Any
 from .lifecycle import journal as lifecycle_journal
 from .lifecycle import store as lifecycle_store
 from .memories import redact
-from .notes import inside, read_note, slugify
+from .notes import Note, inside, read_note, slugify
 from .runtime import enabled as brain_enabled
 from .tasks import project_name, project_name_from, project_rel
 from .vault import Brain
@@ -239,7 +239,7 @@ class ProjectMemory:
     ) -> None:
         self.actor = actor
         """Who the journal says acted (`lifecycle.journal.ACTORS`)."""
-        self._explained: dict[str, tuple[str, str, str]] = {}
+        self._explained: dict[str, tuple[str, str, str, list[str]]] = {}
         self.spec_dir = Path(spec_dir) if spec_dir else None
         self.project_dir = Path(project_dir) if project_dir else None
         if project:
@@ -368,14 +368,72 @@ class ProjectMemory:
             return None
 
     def explain_next(
-        self, kind: str, slug: str, *, action: str, reason_code: str, reason: str = ""
+        self,
+        kind: str,
+        slug: str,
+        *,
+        action: str,
+        reason_code: str,
+        reason: str = "",
+        related: list[str] | None = None,
     ) -> None:
-        """How the journal should word the next write of this note (a merge)."""
+        """How the journal should word the next write of this note (a merge),
+        and the notes it names (the folds a merge kept, `lifecycle.folds`)."""
         self._explained[f"{KINDS[kind]}/{slugify(slug)}"] = (
             action,
             reason_code,
             reason,
+            list(related or []),
         )
+
+    def keep_folded(
+        self,
+        into: str,
+        pattern: dict[str, Any],
+        *,
+        title: str,
+        body: str,
+        share: dict[str, Any],
+    ) -> str | None:
+        """Keep a learning-loop pattern folded into the pattern *into*, so that
+        a person can separate them (`lifecycle.folds`). Its kept path, or
+        ``None`` when there is no brain or the ids are not patterns."""
+        from .lifecycle import folds
+
+        brain = self._get_brain(create=False)
+        pattern_id = str(pattern.get("pattern_id") or "").strip()
+        if brain is None or not pattern_id:
+            return None
+        kind = KINDS["pattern"]
+        evidence = {
+            k: (redact(v) if isinstance(v, str) else v)
+            for k, v in pattern.items()
+            if k != "effectiveness_rate"
+        }
+        stamp = datetime.now(UTC).isoformat(timespec="seconds")
+        note = Note(
+            path=self.base / kind / f"{slugify(pattern_id)}.md",
+            meta={
+                "title": redact(title)[:80],
+                "kind": "knowledge",
+                "memory": "pattern",
+                "project": self.project,
+                "tags": ["memory", "pattern", slugify(self.project), "learning-loop"],
+                "created": stamp,
+                "updated": stamp,
+                LEARNED: evidence,
+            },
+            body=redact(body),
+        )
+        canonical = (self.base / kind / f"{slugify(into)}.md").as_posix()
+        try:
+            kept = folds.keep(brain.root, self.base, canonical, note, share=share)
+        except (OSError, ValueError) as exc:
+            logger.warning("brain: folded pattern not kept: %s", exc)
+            return None
+        if kept:
+            self._pending += 1
+        return kept
 
     def _journal_write(
         self, brain: Brain, rel: str, title: str, body: str, before: str | None
@@ -385,9 +443,11 @@ class ProjectMemory:
         if before is not None and before == now:
             return
         key = rel.split("/memory/", 1)[-1].removesuffix(".md")
-        action, code, reason = self._explained.pop(
+        action, code, reason, related = self._explained.pop(
             key,
-            ("create", "recorded", "") if before is None else ("update", "edited", ""),
+            ("create", "recorded", "", [])
+            if before is None
+            else ("update", "edited", "", []),
         )
         lifecycle_journal.append(
             brain.root,
@@ -400,6 +460,7 @@ class ProjectMemory:
                 preview=lifecycle_journal.preview_of(now),
                 reason_code=code,
                 reason=reason,
+                related=related,
             ),
         )
 

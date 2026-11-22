@@ -101,15 +101,16 @@ describe("the Context view", () => {
 		expect(api.getMemoryLifecycle).toHaveBeenCalledWith("p1");
 	});
 
-	it("offers no action and no lifecycle for a server project's memory", () => {
+	it("offers the actions and the lifecycle of a server project's memory", async () => {
 		storeWith({ enabled: true, available: true, onServer: true });
 		render(<Context projectId="p1" />);
 		fireEvent.click(screen.getByRole("tab", { name: "Memories" }));
 		expect(screen.getByText(/Session #7/)).toBeInTheDocument();
-		expect(screen.queryByRole("button", { name: "Pin" })).not.toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Pin" })).toBeInTheDocument();
 
 		fireEvent.click(screen.getByRole("tab", { name: "Lifecycle" }));
-		expect(screen.getByText(/not available yet/)).toBeInTheDocument();
-		expect(api.getMemoryLifecycle).not.toHaveBeenCalled();
+		expect(await screen.findByText(/own brain on the server/)).toBeInTheDocument();
+		expect(api.getMemoryLifecycle).toHaveBeenCalledWith("p1");
+		expect(screen.queryByText("No conflict waiting.")).not.toBeInTheDocument();
 	});
 });

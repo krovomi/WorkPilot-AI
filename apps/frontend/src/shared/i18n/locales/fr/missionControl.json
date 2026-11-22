@@ -107,7 +107,7 @@
 		"agent_failed": "Agent en échec",
 		"agent_rebalanced": "Agent rééquilibré",
 		"agent_rebalance_skipped": "Agent non rééquilibré",
-		"agent_loop_detected": "Réponse en boucle"
+		"agent_loop_detected": "Agent en boucle"
 	},
 	"compose": {
 		"tabManual": "Manuel",
@@ -208,7 +208,10 @@
 	"rebalance": {
 		"badge_one": "Rééquilibré une fois",
 		"badge_other": "Rééquilibré {{count}} fois",
-		"loopBadge": "Réponse en boucle",
+		"loopBadge": "En boucle",
+		"helperBadge": "Aide {{name}}",
+		"helpedBadge": "Agent d'appoint lancé",
+		"helperTask": "Cherche pourquoi {{name}} est bloqué, puis fait sa tâche",
 		"moved": "{{reason}} : {{action}}, {{from}} → {{to}}",
 		"notMoved": "{{reason}} : {{skipped}}",
 		"reasons": {
@@ -220,13 +223,18 @@
 		"actions": {
 			"retry_profile": "relancé sur un autre profil Claude",
 			"reroute": "passé à un autre provider",
-			"escalate": "passé à un modèle plus puissant"
+			"escalate": "passé à un modèle plus puissant",
+			"helper": "confié à un agent d'appoint"
 		},
 		"skipped": {
 			"limit": "déjà rééquilibré autant de fois que permis pour cette tâche",
 			"over_budget": "la session a dépassé son budget",
 			"no_alternative": "aucun autre provider ni modèle plus puissant ne peut tenir le rôle",
 			"disabled": "le rééquilibrage automatique est coupé"
+		},
+		"loopSources": {
+			"answer": "Lue dans la réponse",
+			"steps": "Lue dans l'arbre de décision : les mêmes étapes, encore et encore"
 		}
 	},
 	"health": {

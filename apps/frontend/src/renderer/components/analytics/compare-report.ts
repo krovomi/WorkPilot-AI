@@ -15,6 +15,7 @@ import {
 } from "@shared/types/build-compare";
 import type { TFunction } from "i18next";
 import { formatMetric, formatTrend, METRIC_KEYS } from "./compare-format";
+import { moveSentences, paceLines, paceSentence } from "./compare-pace";
 
 export function compareReport(
 	comparison: BuildComparison,
@@ -40,7 +41,10 @@ export function compareReport(
 		server
 			? t("analytics:compare.privacyServer", { count: comparison.min_group })
 			: t("analytics:compare.privacyLocal"),
+		...moveSentences(comparison, t),
 		t("analytics:compare.lowerIsBetter"),
+		t("analytics:compare.qualitySources"),
+		...paceLines(comparison).map((line) => paceSentence(line, t)),
 	];
 	const groupColumns = COMPARE_GROUPS.map(
 		(group) =>
@@ -64,11 +68,13 @@ export function compareReport(
 				formatMetric(m, comparison.previous[m]),
 				formatTrend(comparison.trend[m]),
 				...COMPARE_GROUPS.map((group) => {
-					const { medians, top } = comparison.groups[group];
-					const median = medians ? formatMetric(m, medians[m]) : "—";
-					return top && top[m] !== null
-						? `${median} · ${t("analytics:compare.top", { value: formatMetric(m, top[m]) })}`
-						: median;
+					const { medians, top, trend } = comparison.groups[group];
+					const parts = [medians ? formatMetric(m, medians[m]) : "—"];
+					if (top && top[m] !== null) parts.push(t("analytics:compare.top", { value: formatMetric(m, top[m]) }));
+					if (trend && trend[m] !== null) {
+						parts.push(t("analytics:compare.groupTrend", { value: formatTrend(trend[m]) }));
+					}
+					return parts.join(" · ");
 				}),
 			]),
 		},
