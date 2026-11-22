@@ -460,9 +460,7 @@ def detected_steps(
     notes: list[str] = []
     steps: list[tuple[str, ...]] = []
     for stack in _STACKS:
-        for step in stack(folders, notes):
-            if step not in steps:
-                steps.append(step)
+        steps.extend(stack(folders, notes))
     if len(steps) > limit:
         notes.append(
             f"{len(steps)} commands detected, the first {limit} kept; "

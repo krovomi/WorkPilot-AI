@@ -352,3 +352,48 @@ def test_an_unreadable_folder_is_skipped(tmp_path, monkeypatch):
 
     monkeypatch.setattr(recipe_detect.os, "scandir", scandir)
     assert _steps(tmp_path) == [("npm", "install")]
+
+
+class _Entry:
+    """A directory entry the platform may not let a test create (link, pipe)."""
+
+    def __init__(self, name: str, *, link: bool = False) -> None:
+        self.name = name
+        self.link = link
+
+    def is_symlink(self) -> bool:
+        if self.name == "broken":
+            raise OSError("gone")
+        return self.link
+
+    def is_file(self) -> bool:
+        return False
+
+    def is_dir(self) -> bool:
+        return False
+
+
+def test_links_special_and_unreadable_entries_are_skipped(tmp_path, monkeypatch):
+    _files(tmp_path, {"package.json": "{}"})
+    real = recipe_detect.os.scandir
+    extra = [
+        _Entry("go.mod", link=True),  # a link to a file outside the project
+        _Entry("Cargo.toml"),  # a pipe or a socket
+        _Entry("broken"),
+    ]
+
+    def scandir(path):
+        return [*real(path), *extra]
+
+    monkeypatch.setattr(recipe_detect.os, "scandir", scandir)
+    assert _steps(tmp_path) == [("npm", "install")]
+
+
+def test_an_unreadable_pubspec_is_a_dart_project(tmp_path, monkeypatch):
+    _files(tmp_path, {"pubspec.yaml": "dependencies:\n  flutter:\n"})
+
+    def read_text(self, *args, **kwargs):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(recipe_detect.Path, "read_text", read_text)
+    assert _steps(tmp_path) == [("dart", "pub", "get")]
