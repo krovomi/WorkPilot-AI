@@ -1266,9 +1266,9 @@
 		},
 		"reviews": {
 			"title": "Team reviews",
-			"hint": "What your team saw using this server. Only members of this server project read them.",
+			"hint": "What your organization saw using this server, shared by all its projects. Only members of this organization read them; maintainers and administrators write them.",
 			"loading": "Loading the reviews",
-			"none": "No one on the team has reviewed this server yet.",
+			"none": "No one in the organization has reviewed this server yet.",
 			"by": "by {{author}}",
 			"unknownAuthor": "a former member",
 			"delete": "Delete this review",
@@ -1284,9 +1284,22 @@
 				"unsafe": "Unsafe"
 			},
 			"errors": {
-				"too_many_reviews": "This project holds as many reviews as it can.",
+				"too_many_reviews": "This organization holds as many reviews as it can.",
 				"review_not_found": "This review no longer exists.",
 				"failed": "The server refused or could not be reached."
+			}
+		},
+		"sandbox": {
+			"refused": "Not started on this machine: this server must run confined, in the OS sandbox, and there is none here. It is never started without it.",
+			"policyRefused": "On this machine, the servers this policy confines do not start: there is no OS sandbox here.",
+			"why": "Why?",
+			"recheck": "Check again",
+			"kinds": {
+				"off": "The OS sandbox is turned off (WORKPILOT_SANDBOX=off).",
+				"unsupported": "This system has no OS sandbox WorkPilot can use yet (Windows, for now).",
+				"missing": "The sandbox program ({{backend}}) is not installed on this machine.",
+				"refused": "The sandbox program ({{backend}}) is installed, but the system refused to run it.",
+				"unknown": "WorkPilot could not check this machine's OS sandbox."
 			}
 		}
 	},
@@ -1585,7 +1598,25 @@
 		"localAccountButton": "Sign in",
 		"localModeButton": "Local mode",
 		"haveInvite": "I have an invitation",
+		"forgotPassword": "Forgot password?",
 		"failed": "Could not sign in"
+	},
+	"passwordReset": {
+		"title": "Reset your password",
+		"askDescription": "Enter your account's email: if the server knows it, it sends you a link to choose a new password.",
+		"setDescription": "Paste the link you received, then choose your new password. You will be signed out everywhere else.",
+		"noEmail": "This server cannot send email. Ask a server administrator for a reset link (Administration, Members), then choose \"I have a link\".",
+		"send": "Send the link",
+		"sent": "If an account uses this address, a link is on its way. It works once and expires soon.",
+		"haveLink": "I have a link",
+		"needLink": "I need a link",
+		"link": "Reset link or code",
+		"forAccount": "For the account {{email}}",
+		"newPassword": "New password",
+		"save": "Set my password",
+		"invalidLink": "This reset link is invalid or has expired",
+		"failed": "The password could not be reset",
+		"done": "Your password was changed. Sign in with the new one."
 	},
 	"acceptInvite": {
 		"title": "Create your account",

@@ -19,6 +19,7 @@ import {
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { McpWatchBadge, McpWatchDetails } from "./McpInstalledAlerts";
+import { McpConfinedRefusal } from "./McpSandboxRefusal";
 
 export function McpInstalledList() {
 	const { t } = useTranslation(["common"]);
@@ -129,6 +130,7 @@ export function McpInstalledList() {
 								<Trash2 className="h-4 w-4" />
 							</Button>
 						</div>
+						<McpConfinedRefusal server={server} className="mt-3" />
 						{serverWatch && <McpWatchDetails watch={serverWatch} projectId={projectId} />}
 						</div>
 					);

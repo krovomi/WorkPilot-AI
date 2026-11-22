@@ -10,6 +10,11 @@ import { useAdminStore } from "@/stores/admin-store";
 import { usePermission, usePermissionsStore } from "@/stores/permissions-store";
 
 import { NativeSelect } from "../ui/native-select";
+import {
+	MemberPasswordResetButton,
+	PasswordResetNotice,
+	type ResetNotice,
+} from "./MemberPasswordReset";
 export function MembersTab() {
 	const { t } = useTranslation("administration");
 	const members = useAdminStore((s) => s.members);
@@ -45,6 +50,8 @@ export function MembersTab() {
 	const adding = useAdminStore((s) => s.loading.addMember ?? false);
 	const [email, setEmail] = useState("");
 	const [roleSlug, setRoleSlug] = useState("contributor");
+	// The last reset link a platform administrator issued, or why it failed.
+	const [resetNotice, setResetNotice] = useState<ResetNotice | null>(null);
 	const addForm =
 		canWrite && isPlatformAdmin ? (
 			<form
@@ -103,6 +110,7 @@ export function MembersTab() {
 	return (
 		<div className="space-y-4">
 		{addForm}
+		{resetNotice && <PasswordResetNotice notice={resetNotice} />}
 		<div className="border border-border rounded-md overflow-x-auto">
 			<table className="w-full text-sm">
 				<thead>
@@ -172,6 +180,13 @@ export function MembersTab() {
 										>
 											<LogOut className="h-4 w-4" />
 										</Button>
+									)}
+									{isPlatformAdmin && member.is_active && (
+										<MemberPasswordResetButton
+											userId={member.user_id}
+											name={member.display_name}
+											onResult={setResetNotice}
+										/>
 									)}
 									{canWrite && (
 										<>

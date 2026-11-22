@@ -40,8 +40,11 @@ WORKPILOT_PASSWORD_MIN_LENGTH=12
 # query; the full password never leaves the server). Off by default.
 WORKPILOT_PASSWORD_HIBP_CHECK=false
 
-# SMTP for invitation emails (leave WORKPILOT_SMTP_HOST empty to disable;
-# the admin UI then shows a copyable invite link instead).
+# How long a forgotten-password link stays usable, in minutes (5 to 1440).
+WORKPILOT_PASSWORD_RESET_TTL_MINUTES=60
+
+# SMTP for invitation and forgotten-password emails (leave WORKPILOT_SMTP_HOST
+# empty to disable; the admin UI then shows a copyable link instead).
 WORKPILOT_SMTP_HOST=
 WORKPILOT_SMTP_PORT=587
 WORKPILOT_SMTP_USER=

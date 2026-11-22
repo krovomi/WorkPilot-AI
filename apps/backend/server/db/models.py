@@ -857,6 +857,34 @@ class Invitation(Base):
     )
 
 
+class PasswordReset(Base):
+    """A single-use, short-lived link to set a new local password.
+
+    Asked for by the person (an email to their address) or issued by a
+    platform admin. As for :class:`Invitation`, only the SHA-256 hash of the
+    token is stored; a newer link, or a successful reset, closes the others.
+    """
+
+    __tablename__ = "password_resets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # The platform admin who issued it; None when the person asked for it.
+    created_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class AuditLog(Base):
     """Administrative and security events.
 
@@ -993,24 +1021,29 @@ class ReplayShare(Base):
 
 
 class McpServerReview(Base):
-    """A member's security review of a catalogue MCP server, kept with a
-    server project (#369, lot 5).
+    """A member's security review of a catalogue MCP server, shared within
+    one organization (#369, lots 5 and 6).
 
-    One review per person, project and server (``server_id`` is the id of the
-    app's MCP catalogue): writing again replaces it. ``verdict`` is one of a
-    closed list (``mcp_reviews.VERDICTS``); ``comment`` is plain text, shown
-    as text, never fed to a model. Reviews stay inside their project.
+    One review per person, organization and server (``server_id`` is the id
+    of the app's MCP catalogue): writing again replaces it. Every project of
+    the organization reads it; no other organization does. ``project_id`` is
+    the project it was last written from, kept for a downgrade and never
+    shown. ``verdict`` is one of a closed list (``mcp_reviews.VERDICTS``);
+    ``comment`` is plain text, shown as text, never fed to a model.
     """
 
     __tablename__ = "mcp_server_reviews"
     __table_args__ = (
-        UniqueConstraint("project_id", "server_id", "author_id", name="uq_mcp_review"),
-        Index("ix_mcp_server_reviews_project", "project_id", "server_id"),
+        UniqueConstraint("org_id", "server_id", "author_id", name="uq_mcp_org_review"),
+        Index("ix_mcp_server_reviews_org", "org_id", "server_id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    project_id: Mapped[str] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE")
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
     )
     server_id: Mapped[str] = mapped_column(String(100))
     author_id: Mapped[str | None] = mapped_column(

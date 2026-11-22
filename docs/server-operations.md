@@ -329,9 +329,10 @@ Le bloc `environment:` du compose l'emporte sur `.env.server` pour `WORKPILOT_SE
 | `WORKPILOT_APPROVAL_ESCALATION_HOURS` | — (jamais) | Combien de temps le plan d'une carte attend ses approbations avant qu'un second groupe d'approbateurs en soit prévenu, en heures : `24` pour toutes les criticités, ou `low=72,medium=24,high=4` (de 0 à 720 ; un niveau absent ne s'escalade jamais). L'attente part de la fin du run de spec ; une carte s'escalade une fois par run de spec. |
 | `WORKPILOT_APPROVAL_ESCALATION_ROLES` | `owner+admin` | Le second groupe : les personnes de l'organisation qui tiennent l'un de ces rôles (slugs joints par `+`, 5 au plus) et peuvent approuver sur le projet, hors l'auteur de la carte et ceux qui l'ont approuvée. Elles en sont prévenues sur leurs canaux « Besoin de toi ». |
 | `WORKPILOT_INVITATION_TTL_HOURS` | `72` | Durée de validité d'un lien d'invitation. |
+| `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | `60` | Durée de validité d'un lien de mot de passe oublié, ramenée entre 5 et 1440 minutes. |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | `12` | Longueur minimale d'un mot de passe local ; ne fait que monter le plancher de 12. |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | Refuse un nouveau mot de passe connu de Have I Been Pwned (seuls cinq caractères de son empreinte SHA-1 sortent ; service injoignable, le mot de passe est accepté). |
-| `WORKPILOT_SMTP_*` | — | E-mail des invitations ; détail dans [CONFIGURATION.md](CONFIGURATION.md#invitation-email-smtp). Gardez STARTTLS ou TLS actif. |
+| `WORKPILOT_SMTP_*` | — | E-mail des invitations et des liens de mot de passe oublié (sans SMTP, l'écran renvoie vers un administrateur) ; détail dans [CONFIGURATION.md](CONFIGURATION.md#invitation-email-smtp). Gardez STARTTLS ou TLS actif. |
 | `WORKPILOT_ADMIN_PASSWORD` | — | Lu par `create_admin` au lieu de demander le mot de passe ; à retirer une fois le compte créé. |
 | `WORKPILOT_WS_ALLOWED_ORIGINS` | origines de développement locales | Origines de navigateur admises sur le flux. Une connexion sans en-tête `Origin`, comme celle que l'app ouvre depuis son processus principal, n'est pas filtrée. |
 | `CLAUDE_CODE_OAUTH_TOKEN` et autres identifiants de provider | — | Ceux du déploiement, passés à chaque run. En mode serveur, les routes qui configurent les providers répondent 403. Un run a pour `HOME` le home de son projet : un identifiant posé par une connexion interactive dans le home de l'utilisateur du serveur ne lui parvient pas. |
@@ -475,6 +476,12 @@ la suppression d'une organisation.
 **Administration → Membres** : changer le rôle d'une personne, la retirer de l'organisation,
 désactiver son compte, révoquer ses sessions (elle doit se reconnecter). Le rôle de plateforme
 (`admin`, `member`, `viewer`) se change par `POST /admin/users/{id}/platform-role`.
+
+**Mot de passe oublié** : la personne demande un lien depuis l'écran de connexion, qui part par
+e-mail si SMTP est réglé. Sinon, un administrateur de la plateforme l'émet depuis **Membres** (icône
+de clé) ou `POST /admin/users/{id}/password-reset`, et le transmet. Le lien sert une fois, ferme
+toutes les sessions du compte une fois le mot de passe changé, et seule son empreinte est gardée en
+base (table `password_resets`). Détail : [server-guide.md](server-guide.md#un-mot-de-passe-oublié).
 
 ### Accès MCP des apps d'IA
 

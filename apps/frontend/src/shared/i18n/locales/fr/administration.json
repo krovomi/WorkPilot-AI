@@ -40,6 +40,15 @@
 		"recentFailures": "Échecs récents"
 	},
 	"members": {
+		"passwordReset": {
+			"action": "Réinitialiser le mot de passe",
+			"actionNamed": "Réinitialiser le mot de passe de {{name}}",
+			"sent": "Un lien de réinitialisation a été envoyé par e-mail à {{email}}.",
+			"copyLink": "Aucun e-mail n'est parti : transmettez vous-même ce lien à {{email}}. Il sert une fois, jusqu'au {{expires}}.",
+			"copy": "Copier le lien",
+			"copied": "Copié",
+			"failed": "Le lien de réinitialisation n'a pas pu être créé"
+		},
 		"empty": "Aucun membre pour l'instant.",
 		"active": "Actif",
 		"inactive": "Désactivé",

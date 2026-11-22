@@ -684,6 +684,7 @@ export const IPC_CHANNELS = {
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project
+	MCP_MARKETPLACE_GET_SANDBOX: "mcpMarketplace:getSandbox", // Whether this machine starts a confined server (#369)
 
 	// Hugging Face Hub discovery (via the official HF MCP server)
 	HUGGINGFACE_SEARCH_MODELS: "huggingface:searchModels", // Live model search on the Hub
@@ -1447,6 +1448,12 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_LOGIN_SSO: "server-auth:login-sso",
 	SERVER_AUTH_LOGOUT: "server-auth:logout",
 	SERVER_AUTH_LOOKUP_INVITE: "server-auth:lookup-invite",
+	// A forgotten password (main/server-password-reset.ts): ask for a link,
+	// read it, set the new password; a platform admin issues a link.
+	SERVER_AUTH_REQUEST_PASSWORD_RESET: "server-auth:request-password-reset",
+	SERVER_AUTH_LOOKUP_PASSWORD_RESET: "server-auth:lookup-password-reset",
+	SERVER_AUTH_CONFIRM_PASSWORD_RESET: "server-auth:confirm-password-reset",
+	SERVER_AUTH_ISSUE_PASSWORD_RESET: "server-auth:issue-password-reset",
 	SERVER_AUTH_RESTORE: "server-auth:restore",
 	SERVER_AUTH_REVOKE_INVITE: "server-auth:revoke-invite",
 	SERVER_AUTH_SET_MODE: "server-auth:set-mode",

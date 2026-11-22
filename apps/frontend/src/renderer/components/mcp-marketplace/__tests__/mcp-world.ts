@@ -9,6 +9,7 @@ import i18n from "../../../../shared/i18n";
 import { loadMcpCatalog } from "../../../../shared/mcp-catalog/install";
 import type { McpMarketplaceServer } from "../../../../shared/types/mcp-marketplace";
 import { useMcpMarketplaceStore } from "../../../stores/mcp-marketplace-store";
+import { useMcpSandboxStore } from "../../../stores/mcp-sandbox-store";
 import { useProjectStore } from "../../../stores/project-store";
 
 export const CATALOG = loadMcpCatalog();
@@ -19,6 +20,15 @@ export function entry(id: string): McpMarketplaceServer {
 
 const MARKETPLACE = useMcpMarketplaceStore.getState();
 const PROJECTS = useProjectStore.getState();
+const SANDBOX = useMcpSandboxStore.getState();
+
+/** This machine's sandbox, as the main answers by default: working. */
+export const SANDBOX_WORKS = {
+	available: true,
+	kind: "available",
+	backend: "bubblewrap",
+	reason: null,
+} as const;
 
 export type MainApi = Record<string, ReturnType<typeof vi.fn>>;
 
@@ -32,14 +42,16 @@ export async function resetWorld(): Promise<MainApi> {
 		getMcpInstallPolicy: vi.fn(async () => ({ success: true, data: { state: "none" } })),
 		getMcpInstalledWatch: vi.fn(async () => ({ success: true, data: { servers: [] } })),
 		acknowledgeMcpAlerts: vi.fn(async () => ({ success: true, data: true })),
-		listMcpReviews: vi.fn(async () => ({ success: true, data: [] })),
+		listMcpReviews: vi.fn(async () => ({ success: true, data: { reviews: [], canWrite: true } })),
 		putMcpReview: vi.fn(async () => ({ success: true })),
 		deleteMcpReview: vi.fn(async () => ({ success: true, data: true })),
+		getMcpSandboxStatus: vi.fn(async () => ({ success: true, data: SANDBOX_WORKS })),
 	};
 	(globalThis as { electronAPI?: unknown }).electronAPI = api;
 	useMcpMarketplaceStore.setState(MARKETPLACE, true);
 	useMcpMarketplaceStore.setState({ filters: { ...MARKETPLACE.filters } });
 	useProjectStore.setState(PROJECTS, true);
+	useMcpSandboxStore.setState(SANDBOX, true);
 	await i18n.changeLanguage("en");
 	return api;
 }
