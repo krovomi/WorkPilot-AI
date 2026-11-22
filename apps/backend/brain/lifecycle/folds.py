@@ -203,7 +203,8 @@ def unfold(
         try:
             canonical = memory_rel(base, str(info.get("canonical") or ""))
         except ValueError:
-            pass
+            # A canonical path outside the memory folder is not unshared.
+            canonical = None
         if canonical and inside(root, canonical).is_file():
             _unshare(root, canonical, _share(info.get("share")))
         _journal(
