@@ -1,14 +1,13 @@
 ---
 feature: "Surveillance après déploiement et rollback"
 summary: >-
-  Après un pipeline lancé depuis les déclencheurs CI/CD, health check et métriques (Prometheus,
-  Datadog, New Relic, CloudWatch) comparés à avant ; deux mesures critiques
-  d'affilée proposent (ou lancent) un rollback vers la dernière bonne exécution ; une migration
-  le bloque. Un mauvais verdict donne un rapport d'incident, des alertes (app, Slack, e-mail,
-  PagerDuty), une PR de revert sur demande.
+  Après un pipeline lancé depuis les déclencheurs CI/CD, health check et métriques (cinq
+  sources) comparés à avant, ou canary contre parc stable ; deux mesures critiques d'affilée
+  proposent (ou lancent) le rollback, services liés compris ; une migration le bloque. Puis
+  rapport d'incident, alertes, PR de revert, et chiffres calculés sur la machine.
 ---
 
-# Surveillance après déploiement et rollback (issue #366, lots 1 à 3)
+# Surveillance après déploiement et rollback (issue #366, lots 1 à 4)
 
 Les déclencheurs CI/CD lançaient un pipeline et s'arrêtaient là. Désormais, quand les réglages
 CI/CD du projet nomment quelque chose à surveiller, chaque exécution déclenchée (à la main, à
@@ -23,7 +22,15 @@ l'ouverture d'une PR d'agent ou à sa fusion) est suivie.
 3. **Fenêtre** : `window_minutes` (15), une mesure toutes les `interval_seconds` (60). Chaque
    mesure compare chaque métrique à sa référence (`evaluate.py`) ; un health check en échec est
    critique. Une mesure critique isolée est un avertissement, **deux d'affilée** donnent le
-   verdict critique et arrêtent la fenêtre.
+   verdict critique et arrêtent la fenêtre. L'état garde `degraded_at`, le début de ces mesures
+   critiques, et `rollback_at`, le départ du rollback (lot 4, pour les chiffres).
+
+   **Analyse canary** (lot 4) : une métrique qui porte une `canary_query` (la même mesure sur le
+   canary seul, par exemple `track="canary"`) n'est plus comparée à sa référence d'avant le
+   déploiement mais, à chaque mesure, au parc stable (`query`) au même instant : un pic de
+   trafic ou l'heure de la journée touchent les deux. Les mêmes seuils s'appliquent ; la page
+   écrit « stable → canary ». Le déplacement du trafic par paliers reste au contrôleur (voir
+   « Pas encore fait »).
 4. **Rollback** sur un verdict critique (`rollback.py`) :
 
 | Fournisseur | Ce que fait WorkPilot |
@@ -79,6 +86,45 @@ sur la page, avec une confirmation. La branche garde le commit fautif : la page 
    texte, c'est l'escalade). L'état garde `alerts` : `sent`, `failed`, `invalid` (réglage
    refusé) ou `offline` par canal, que la page affiche.
 
+10. **Services liés** (`linked.py`, `main/cicd/deploy-links.ts`, `linked-rollback.ts`, lot 4) :
+    voir la section suivante.
+11. **Enquête** (lot 4) : le rapport d'incident mène à Self-Healing et, pour une exécution
+    lancée après la PR d'un agent, à la tâche dont la PR a été déployée (la spec coupable).
+
+## Rollback coordonné des services liés (lot 4)
+
+Sur la page CI/CD d'un projet, la personne active les autres projets de l'app qui reviennent
+en arrière avec lui (le frontend avec son backend, un worker). Le lien est un réglage de l'app,
+`deploy-links.json` dans son dossier de données, par id de projet : jamais un fichier du dépôt,
+qui pourrait sinon faire revenir en arrière le projet d'un autre. Au plus 20 liens par projet.
+
+Quand le rollback d'un projet **démarre** (de lui-même ou parce qu'une personne l'a confirmé),
+le main descend les liens, du plus proche au plus lointain, chaque projet une fois (une boucle
+de liens s'arrête où elle a commencé, au plus 20 projets). Pour chacun, il lance
+`deploy_watch_runner.py --action rollback-linked` dans ce projet, avec **ses propres** réglages
+CI/CD, le moment où le premier revient (`plan.target_at`, création de sa dernière bonne
+exécution) et son nom. Le runner prend la plus ancienne exécution que WorkPilot a lancée dans ce
+projet depuis ce moment et la traite comme une exécution surveillée : rollback vers la dernière
+réussie avant elle (le projet revient où il était), bloqué par une migration, à la main pour
+GitLab, Jenkins ou en hors-ligne strict. Rien de lancé depuis : rien à faire
+(`not_deployed_since`). L'état de cette exécution note `rollback_by: "linked"` et le projet
+d'origine ; un état qu'une surveillance encore ouverte écrit n'est pas touché. Ce que chaque
+projet a fait est écrit dans `.workpilot/deploy_watches/<id>.linked.json` du premier et
+s'affiche sous son verdict. Un rollback qui reste à la main (manuel, bloqué) laisse aussi les
+services liés à la main : la page les nomme. La confirmation du rollback les nomme d'avance.
+
+## Chiffres (lot 4)
+
+Les métriques de l'issue (rollbacks automatiques par mois, délai entre un déploiement dégradé et
+son rollback, objectif trois minutes, incidents évités, faux positifs) sont calculées par le
+main (`main/cicd/deploy-figures.ts`) à partir des états de `.workpilot/deploy_watches/` (les
+500 plus récents) : **aucune télémétrie**, rien ne quitte la machine. Un mauvais verdict se juge
+sur la page, « fausse alerte » ou « vrai problème », gardé dans
+`.workpilot/deploy_watches/reviews.json` : c'est le taux de faux positifs, et un rollback jugé
+fausse alerte n'est pas un incident évité. Le délai va de `degraded_at` à `rollback_at` (le
+départ du rollback, pas sa fin, que WorkPilot ne suit pas) ; un rollback parti avec un service
+lié compte parmi les automatiques.
+
 ## Sources de métriques (`sources.py`, `cloudwatch.py`, lot 3)
 
 `CICD_MONITOR_SOURCE` choisit la source ; chaque requête du fichier YAML s'écrit dans son langage
@@ -90,6 +136,7 @@ et donne un nombre.
 | Datadog | site (liste fermée), clé d'API, clé d'application | `api.<site>` | point le plus récent de chaque série sur 5 min, additionnés |
 | New Relic | région `us`/`eu`, id de compte, clé d'API utilisateur | `api(.eu).newrelic.com/graphql` | nombres du résultat NRQL additionnés ; la requête est une variable GraphQL |
 | CloudWatch | région (motif), clé d'accès, secret, jeton de session | `monitoring.<région>.amazonaws.com` | `GetMetricData` (Metrics Insights ou metric math), valeur la plus récente de chaque résultat sur 5 min, additionnées |
+| Grafana (lot 4) | URL, jeton de compte de service, uid de la source de données | l'URL des réglages | `POST /api/ds/query`, la requête comme `expr` de la source (PromQL, LogQL) ; valeur la plus récente de chaque frame sur 5 min, additionnées |
 
 CloudWatch est signé en Signature Version 4 à la main (vérifié contre les exemples publiés
 d'AWS), sans SDK ; sa réponse XML est lue par `defusedxml`. Pas de réponse, une réponse
@@ -109,22 +156,25 @@ Depuis une référence nulle (taux d'erreur à 0), toute hausse au-delà du brui
 ## Qui décide de quoi (frontières)
 
 - **Réglages CI/CD du projet** (`.workpilot/.env` chiffré, page CI/CD) : URL du health check,
-  URL et jeton Prometheus, fenêtre, attente, rollback automatique. Un dépôt ne peut ni choisir où
-  part un jeton, ni activer un rollback en committant un fichier.
+  la source de métriques et ses clés, fenêtre, attente, rollback automatique. Un dépôt ne peut ni
+  choisir où part un jeton, ni activer un rollback en committant un fichier.
+- **Réglages de l'app** (`deploy-links.json`) : les services liés. Le renderer ne donne que des
+  ids de projets de l'app, revérifiés ; un projet lié reçoit ses propres réglages, jamais ceux
+  du premier.
 - **`.workpilot/deploy-monitors.yaml`** (peut être committé) : les métriques (nom, requête
-  PromQL, type, seuils), les durées, `revert_pr` et `explain_incident`. Le fichier ne fait que
+  dans le langage de la source, `canary_query`, type, seuils), les durées, `revert_pr` et `explain_incident`. Le fichier ne fait que
   dire oui à la PR : la forge, la branche et les identifiants sont ceux du dépôt local, jamais
   du fichier, et la PR attend la revue d'une personne. Borné (64 Ko, 20 métriques, requêtes de 2 000
   caractères) ; une entrée invalide est ignorée et nommée sur la page.
 - **Réseau** (`collectors.py`, `sources.py`, `rollback.py`, `alerts.py`) : 10 s, 1 Mo, aucune
-  redirection suivie ; le jeton Prometheus ne part qu'en https ou vers la machine ; Datadog,
+  redirection suivie ; les jetons Prometheus et Grafana ne partent qu'en https ou vers la machine ; Datadog,
   New Relic, CloudWatch et PagerDuty sont leurs hôtes fixes, choisis par une liste fermée ou un
   motif, jamais par le fichier du dépôt ; les API des fournisseurs CI sont leurs hôtes fixes
   (api.github.com, dev.azure.com, l'hôte GitLab configuré en https). Les clés des sources, le
   webhook Slack, la clé PagerDuty et le mot de passe SMTP sont des secrets du `.env` de projet
   (`encrypted`), masqués pour le renderer (`main/cicd/watch-settings.ts`).
-- **Hors-ligne strict** : seuls un health check et un Prometheus sur la machine ou une adresse
-  privée sont lus (Datadog, New Relic et CloudWatch sont ignorés et nommés), aucun fournisseur
+- **Hors-ligne strict** : seuls un health check et un Prometheus ou un Grafana sur la machine ou
+  une adresse privée sont lus (Datadog, New Relic et CloudWatch sont ignorés et nommés), aucun fournisseur
   n'est appelé (rollback à la main), une alerte ne part que vers un webhook ou un SMTP local,
   jamais vers PagerDuty ; une politique illisible compte comme stricte.
 - **Renderer** : il ne nomme qu'un dossier de projet enregistré et un id d'exécution
@@ -148,13 +198,9 @@ github.com et l'id avant de les mettre dans un chemin d'API.
 
 ## Pas encore fait (suite de #366)
 
-- **Canary par paliers** (5 → 25 → 50 → 100 %, Flagger, Argo Rollouts, AWS CodeDeploy) : le
-  déplacement du trafic appartient au contrôleur du cluster ou à CodeDeploy, qui font déjà leur
-  propre analyse. Suivre leur état demande un accès au cluster ou à un compte AWS qu'on ne peut
-  ni fournir ni vérifier ici ; à faire avec un cluster de test.
-- **Rollback coordonné de plusieurs services** : les réglages CI/CD d'un projet nomment un
-  seul pipeline. Lier des services entre projets (et leur graphe de dépendances) est un choix de
-  la personne dans l'app, pas d'un fichier du dépôt, qui pourrait sinon déclencher le rollback
-  d'un autre projet : une conception à part.
-- **Grafana** comme source : il passe en général par Prometheus, déjà lu ; une source Grafana
-  directe n'a pas été demandée par l'usage.
+- **Canary par paliers piloté par un contrôleur** (5 → 25 → 50 → 100 %, Flagger, Argo Rollouts,
+  AWS CodeDeploy, et le rollback du seul canary) : déplacer le trafic et revenir sur le canary
+  appartiennent au contrôleur du cluster ou à CodeDeploy. Lire et piloter leur état demande un
+  cluster Kubernetes ou un compte AWS, qu'on ne peut ni fournir ni vérifier ici. Ce qui en est
+  faisable sans eux, la comparaison canary contre parc stable, est livré (lot 4). À décider :
+  quel contrôleur viser d'abord, avec un cluster de test pour le vérifier.
