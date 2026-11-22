@@ -68,6 +68,8 @@ export const DEFAULT_APP_SETTINGS = {
 	sentryEnabled: true,
 	// Auto-name Claude terminals based on initial message (enabled by default)
 	autoNameClaudeTerminals: true,
+	// One-line summary under each Kanban column title
+	kanbanColumnSummary: true,
 };
 
 // ============================================

@@ -413,6 +413,8 @@ export interface AppSettings {
 	autoNameClaudeTerminals?: boolean;
 	// Track which version warnings have been shown (e.g., ["2.7.5"])
 	seenVersionWarnings?: string[];
+	// One-line summary under each Kanban column title (default on)
+	kanbanColumnSummary?: boolean;
 	// Sidebar collapsed state (icons only when true)
 	sidebarCollapsed?: boolean;
 	// Sidebar width in pixels when expanded (default 256)

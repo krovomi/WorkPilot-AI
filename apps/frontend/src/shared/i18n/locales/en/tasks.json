@@ -503,6 +503,30 @@
 			"wip": "limit {{limit}}",
 			"slotsAria": "{{count}} of {{limit}} parallel slots in use",
 			"wipAria": "{{count}} cards, limit {{limit}}"
+		},
+		"pulse": {
+			"urgent_one": "{{count}} urgent",
+			"urgent_other": "{{count}} urgent",
+			"high_one": "{{count}} high priority",
+			"high_other": "{{count}} high priority",
+			"next": "Next: {{title}}",
+			"plansToApprove_one": "{{count}} plan to approve",
+			"plansToApprove_other": "{{count}} plans to approve",
+			"toReview_one": "{{count}} to review",
+			"toReview_other": "{{count}} to review",
+			"needsFix_one": "{{count}} to fix",
+			"needsFix_other": "{{count}} to fix",
+			"doneThisWeek_one": "{{count}} this week",
+			"doneThisWeek_other": "{{count}} this week",
+			"label": "Column summary",
+			"planning_one": "{{count}} planning",
+			"planning_other": "{{count}} planning",
+			"coding_one": "{{count}} coding",
+			"coding_other": "{{count}} coding",
+			"qa_one": "{{count}} in QA",
+			"qa_other": "{{count}} in QA",
+			"paused_one": "{{count}} paused",
+			"paused_other": "{{count}} paused"
 		}
 	},
 	"queue": {

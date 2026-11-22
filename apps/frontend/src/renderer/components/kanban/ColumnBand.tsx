@@ -18,6 +18,7 @@ import {
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TaskStatus } from "../../../shared/types";
+import type { PulseItem } from "../../lib/column-pulse";
 import {
 	type ColumnCapacity,
 	MAX_GAUGE_SEGMENTS,
@@ -81,6 +82,27 @@ export function ColumnCount({
  * How full the column is: one segment per parallel task for « En cours »,
  * a bar for a WIP limit (or more slots than fit as segments).
  */
+/** The one-line summary under the column title (lib/column-pulse.ts). */
+export function ColumnPulse({ items }: { items: PulseItem[] }) {
+	const { t } = useTranslation("tasks");
+	if (items.length === 0) return null;
+	const text = items.map((item) => t(`kanban.pulse.${item.key}`, item.values));
+	return (
+		<p
+			className="kanban-col-pulse"
+			role="note"
+			aria-label={t("kanban.pulse.label")}
+			title={text.join(" · ")}
+		>
+			{items.map((item, i) => (
+				<span key={item.key} data-warn={item.warn ? "" : undefined}>
+					{text[i]}
+				</span>
+			))}
+		</p>
+	);
+}
+
 export function ColumnGauge({
 	count,
 	capacity,

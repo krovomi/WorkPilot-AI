@@ -3,8 +3,8 @@ feature: Colonnes du Kanban (style Bandeau)
 summary: >-
   En-tête de colonne en bandeau teinté de la couleur de la colonne : icône sur une tuile pleine,
   gros compteur, jauge de capacité (créneaux d'« En cours », limite WIP) qui passe à l'ambre ;
-  corps neutre pour laisser la couleur aux cartes Halo ; état vide, cible de dépôt et colonne
-  repliée à la couleur de la colonne ; textes du bandeau corrigés au thème jusqu'à 4,5:1.
+  ligne de résumé calculée depuis les cartes, masquable ; corps neutre pour les cartes Halo ;
+  état vide, cible de dépôt et colonne repliée à la couleur de la colonne ; textes à 4,5:1.
 ---
 
 # Colonnes du Kanban (style Bandeau)
@@ -45,18 +45,29 @@ calcule par colonne et par thème, en oklab :
 | Variable | Sur | Cible |
 |---|---|---|
 | `--col-ink` | le haut du bandeau | 4,5:1 (compteur) |
-| `--col-warn-ink` | le haut du bandeau | 4,5:1 (compteur plein ou dépassé) |
+| `--col-warn-ink` | le haut du bandeau | 4,5:1 (compteur plein ou dépassé, alerte du résumé) |
+| `--col-muted` | le haut du bandeau | 4,5:1 (ligne de résumé, libellé de la jauge) |
 | `--col-on` | la tuile pleine de l'accent | noir ou blanc, le plus contrasté |
 | `--col-icon` | le halo de l'état vide | 3:1 (élément graphique, WCAG 1.4.11) |
 
 Les accents de `COLUMN_ACCENTS` répètent les règles `.column-*` de `globals.css`, qui restent la
 source du liseré des cartes ; `kanban-column-meta.test.ts` vérifie qu'ils concordent et
-`kanban-column-tokens.test.ts` mesure les quatre cibles sur les 7 thèmes en clair et en sombre.
+`kanban-column-tokens.test.ts` mesure les cinq cibles sur les 7 thèmes en clair et en sombre.
 Sans feuille générée (tests, couleur de thème illisible), chaque variable retombe sur un jeton du
 thème.
 
-## Suite prévue
+## Ligne de résumé
 
-Lot 2 : une ligne de résumé sous le titre, calculée depuis les cartes (priorités hautes,
-prochaine carte de la file, agents actifs, plans à valider, terminées cette semaine), masquable
-dans Paramètres › Kanban.
+Sous le titre, une ligne dit ce que contient la colonne sans ouvrir de carte. Elle est calculée
+par `lib/column-pulse.ts` depuis les cartes que la colonne a déjà, sans appel au modèle ni IPC :
+
+| Colonne | Résumé |
+|---|---|
+| À faire | cartes urgentes (en alerte), puis haute priorité |
+| File d'attente | prochaine carte, puis les priorités |
+| En cours | où en sont les agents : planification, code, QA, en pause (en alerte) ; la jauge dit déjà les créneaux |
+| Revue humaine | plans à approuver, à relire, à corriger (en alerte : erreur, QA refusée, contexte trop long) |
+| Terminé | terminées depuis lundi 00:00, heure locale |
+
+Les autres colonnes n'en ont pas. Le texte est coupé par une ellipse et entier dans l'infobulle.
+Le réglage `kanbanColumnSummary` (Paramètres › Affichage, activé par défaut) la masque.
