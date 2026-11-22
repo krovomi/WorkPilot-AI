@@ -494,7 +494,9 @@ test("Alice approves a card's spec from the phone, builds it, and sends it back"
 	await expect(approve).toBeVisible({ timeout: 90_000 });
 	await expect(alice.getByText("Spec written by the fake agent")).toBeVisible();
 	await approve.click();
-	await expect(alice.getByText("Approved by alice")).toBeVisible({ timeout: 30_000 });
+	// The approval section read from the server: the count, then who approved.
+	await expect(alice.getByText("1 of 1 approvals")).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText(/^alice, /)).toBeVisible();
 	await shot(alice, "19-approved");
 
 	// The build checks that approval, then the card waits for the team's
