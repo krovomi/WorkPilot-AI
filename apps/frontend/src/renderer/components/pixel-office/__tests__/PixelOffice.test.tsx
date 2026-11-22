@@ -538,6 +538,29 @@ describe("PixelOffice providers, seasons and scenes", () => {
 		expect((canvasProbe.props as unknown as { decor: string[] }).decor).toEqual(["whiteboard"]);
 	});
 
+	it("hides the decor the person hid, and wears a skin only once earned", () => {
+		const shipped = Array.from({ length: 5 }, (_, i) =>
+			task({
+				id: `r${i}`,
+				status: "done",
+				updatedAt: new Date(),
+				metadata: { kind: "refactoring" },
+			} as Partial<Task>),
+		);
+		room({ terminals: [terminal({})], tasks: shipped });
+		usePixelOfficeStore.getState().updateSettings({ agentSkin: "classic", hiddenDecor: [] });
+		mount();
+		const props = () => canvasProbe.props as unknown as { decor: string[]; skin: string };
+		expect(props().skin).toBe("classic");
+		fireEvent.click(screen.getByRole("button", { name: "Choose how the office looks" }));
+		fireEvent.click(screen.getByRole("switch", { name: "a whiteboard" }));
+		expect(usePixelOfficeStore.getState().settings.hiddenDecor).toEqual(["whiteboard"]);
+		expect(props().decor).toEqual([]);
+		// Neon is locked here: chosen elsewhere, the office still dresses by provider.
+		act(() => usePixelOfficeStore.getState().updateSettings({ agentSkin: "neon" }));
+		expect(props().skin).toBe("provider");
+	});
+
 	it("tells a scene when a task changes hands, and lets the person turn scenes off", () => {
 		room({ tasks: [task({})] });
 		mount();

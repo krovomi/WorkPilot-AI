@@ -18,7 +18,12 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FAMILY_SHIRTS } from "../../lib/pixel-office-providers";
+import {
+	type AgentSkin,
+	agentShirt,
+	shownDecor,
+	wornSkin,
+} from "../../lib/pixel-office-skins";
 import {
 	onOfficeSignal,
 	type PixelAgent,
@@ -39,6 +44,7 @@ import { KioskOverlay } from "./KioskOverlay";
 import { NarrativeFeed } from "./NarrativeFeed";
 import { OfficeScenesMenu } from "./OfficeScenesMenu";
 import { ProviderLegend } from "./ProviderLegend";
+import { CosmeticsPanel } from "./CosmeticsPanel";
 import { SeasonPanel } from "./SeasonPanel";
 import { TeamBoardPanel } from "./TeamBoardPanel";
 import { closeChimes, playChime } from "./office-sounds";
@@ -115,9 +121,10 @@ interface WaitingQueueProps {
 	readonly agents: PixelAgent[];
 	readonly onAgentClick: (agentId: string, x: number) => void;
 	readonly calm: boolean;
+	readonly skin: AgentSkin;
 }
 
-function WaitingQueue({ agents, onAgentClick, calm }: WaitingQueueProps) {
+function WaitingQueue({ agents, onAgentClick, calm, skin }: WaitingQueueProps) {
 	const { t } = useTranslation(["pixelOffice"]);
 	const stripRef = useRef<HTMLDivElement>(null);
 
@@ -212,7 +219,7 @@ function WaitingQueue({ agents, onAgentClick, calm }: WaitingQueueProps) {
 								<MiniPixelChar
 									characterIndex={agent.characterIndex}
 									calm={calm}
-									shirt={agent.providerFamily && FAMILY_SHIRTS[agent.providerFamily]}
+									shirt={agentShirt(agent.providerFamily, skin)}
 								/>
 							</div>
 							{/* Violet glow dot */}
@@ -363,6 +370,12 @@ export function PixelOffice({
 		achievements.projectTasks,
 		achievements.incidents,
 		achievements.now,
+	);
+	// The cosmetics chosen: a locked skin is not worn, hidden decor not drawn.
+	const skin = wornSkin(settings.agentSkin, season.decorIds);
+	const decorShown = useMemo(
+		() => shownDecor(season.decorIds, settings.hiddenDecor),
+		[season.decorIds, settings.hiddenDecor],
 	);
 	const scenes = useOfficeNarratives({
 		projectId,
@@ -656,6 +669,12 @@ export function PixelOffice({
 						progress={season.progress}
 						decor={season.decor}
 					/>
+					<CosmeticsPanel
+						earned={season.decorIds}
+						hidden={settings.hiddenDecor}
+						skin={settings.agentSkin}
+						onChange={updateSettings}
+					/>
 					<OfficeScenesMenu
 						enabled={settings.narratives}
 						ai={settings.narrativesAi}
@@ -800,7 +819,8 @@ export function PixelOffice({
 								height={dimensions.height}
 								emptyDeskLabel={t("pixelOffice:canvas.emptyDesk")}
 								calm={calm}
-								decor={season.decorIds}
+								decor={decorShown}
+								skin={skin}
 								onAgentClick={handleAgentClick}
 							/>
 						)}
@@ -820,6 +840,7 @@ export function PixelOffice({
 							agents={pendingAgents}
 							onAgentClick={handlePendingAgentClick}
 							calm={calm}
+							skin={skin}
 						/>
 
 						{/* Backdrop */}

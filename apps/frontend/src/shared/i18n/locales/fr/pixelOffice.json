@@ -252,5 +252,17 @@
 			"first_review": "Première revue de la tâche d'un collègue",
 			"ten_reviews": "Dix revues de tâches de collègues"
 		}
+	},
+	"cosmetics": {
+		"open": "Choisir l'apparence du bureau",
+		"skins": "Personnages",
+		"skin": {
+			"provider": "Couleurs du fournisseur",
+			"classic": "Leurs propres couleurs",
+			"neon": "Néon"
+		},
+		"neonLocked": "Le néon est une récompense : atteignez une fois chaque objectif de saison pour le porter.",
+		"neonEarned": "Néon gagné : chaque objectif de saison a été atteint.",
+		"decor": "Décor gagné"
 	}
 }

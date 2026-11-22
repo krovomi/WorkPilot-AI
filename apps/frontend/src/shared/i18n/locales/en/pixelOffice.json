@@ -252,5 +252,17 @@
 			"first_review": "First review of a teammate's task",
 			"ten_reviews": "Ten reviews of teammates' tasks"
 		}
+	},
+	"cosmetics": {
+		"open": "Choose how the office looks",
+		"skins": "Characters",
+		"skin": {
+			"provider": "Provider colours",
+			"classic": "Their own colours",
+			"neon": "Neon"
+		},
+		"neonLocked": "Neon is a reward: meet every season goal once to wear it.",
+		"neonEarned": "Neon earned: every season goal has been met.",
+		"decor": "Earned decor"
 	}
 }
