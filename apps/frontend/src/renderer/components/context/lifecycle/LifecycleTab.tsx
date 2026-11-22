@@ -118,7 +118,12 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 						{t("context:lifecycle.conflicts.title")}
 					</h3>
 					{view && (
-						<MaintainersEditor projectId={projectId} maintainers={view.maintainers} onSaved={reload} />
+						<MaintainersEditor
+							projectId={projectId}
+							maintainers={view.maintainers}
+							scopes={view.maintainerScopes}
+							onSaved={reload}
+						/>
 					)}
 					{view && view.conflicts.length === 0 && (
 						<p className="text-xs text-muted-foreground">{t("context:lifecycle.conflicts.empty")}</p>
@@ -129,8 +134,9 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 							projectId={projectId}
 							conflict={conflict}
 							onResolved={reload}
-							canArbitrate={view.canArbitrate}
-							maintainers={view.maintainers}
+							// An escalated pair is settled by its scope's maintainers.
+							canArbitrate={conflict.escalated?.can_arbitrate ?? view.canArbitrate}
+							maintainers={conflict.escalated?.maintainers ?? view.maintainers}
 						/>
 					))}
 				</section>

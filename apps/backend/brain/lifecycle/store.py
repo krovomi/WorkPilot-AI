@@ -37,6 +37,7 @@ from typing import Any
 
 from ..notes import Note, inside, read_note, slugify, write_note
 from .journal import LIFECYCLE_DIR, JournalEntry, append, preview_of
+from .scopes import normalise
 
 __all__ = [
     "FOLDERS",
@@ -75,8 +76,6 @@ EXPIRING_DAYS = 7
 _DEFAULT_RETENTION = 30
 _PINNED_FACTOR = 3
 _LINKS = re.compile(r"\n+## Liens\n.*\Z", re.DOTALL)
-_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
-MAX_SCOPE = 200
 
 
 def retention_days() -> int:
@@ -273,12 +272,13 @@ def scope(
 
     Two notes scoped to different places never contradict each other
     (`contradictions.compare`): "on ``auth/`` we do this, on ``payments/``
-    that" — the issue's memory branches, by module. ``code``: ``not-found``,
-    ``invalid``.
+    that" — the issue's memory branches, by module, team (``team:x``) or git
+    branch (``branch:y``), as `scopes.normalise` writes them. ``code``:
+    ``not-found``, ``invalid``.
     """
     rel = memory_rel(base, memory_id)
-    value = str(applies_to or "").strip()
-    if len(value) > MAX_SCOPE or _CONTROL.search(value):
+    value = normalise(applies_to)
+    if value is None:
         return {"ok": False, "code": "invalid"}
     if not inside(root, rel).is_file():
         return {"ok": False, "code": "not-found"}

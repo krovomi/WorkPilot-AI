@@ -163,6 +163,7 @@ describe("valid calls reach /api/brain/memory/*", () => {
 				lastUndo: null,
 				metrics: null,
 				maintainers: [],
+				maintainerScopes: {},
 				canArbitrate: true,
 				trash: [],
 				conflicts: [],
@@ -270,6 +271,7 @@ describe("pins, conflicts and the arbiter's opinion", () => {
 				lastUndo: null,
 				metrics: null,
 				maintainers: [],
+				maintainerScopes: {},
 				canArbitrate: true,
 				trash: [],
 				conflicts: [],
@@ -506,6 +508,37 @@ describe("a memory's scope and the maintainers", () => {
 		});
 	});
 
+	it("sends one scope's list, and refuses a scope that is not one line", async () => {
+		state.backendFetch.mockResolvedValueOnce({ success: true, maintainers: ["Carol"] });
+		expect(
+			await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, "p1", ["Carol"], "team:payments"),
+		).toEqual({ success: true, data: ["Carol"] });
+		const [, init] = state.backendFetch.mock.calls[0];
+		expect(JSON.parse(init.body)).toEqual({
+			project_dir: "/work/shop",
+			names: ["Carol"],
+			scope: "team:payments",
+		});
+		for (const hostile of ["a\nb", "x".repeat(201), 7]) {
+			expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, "p1", ["Carol"], hostile)).toEqual(
+				INVALID,
+			);
+		}
+		expect(state.backendFetch).toHaveBeenCalledTimes(1);
+	});
+
+	it("reads the lists of each scope", async () => {
+		state.backendFetch.mockResolvedValueOnce({
+			success: true,
+			maintainers: [],
+			maintainer_scopes: { "apps/": ["Carol"] },
+		});
+		const view = (await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "p1")) as {
+			data: { maintainerScopes: Record<string, string[]> };
+		};
+		expect(view.data.maintainerScopes).toEqual({ "apps/": ["Carol"] });
+	});
+
 	it("says whether the person here may settle an escalated pair", async () => {
 		state.backendFetch.mockResolvedValueOnce({ success: true, maintainers: ["Bob"], can_arbitrate: false });
 		const view = (await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "p1")) as {
@@ -525,7 +558,10 @@ describe("a server project's memory is its own brain, on the server", () => {
 			})
 			.mockResolvedValueOnce({ ok: true, data: { success: true, entries: [{ id: "e" }] } });
 		const view = await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "remote");
-		expect(view).toMatchObject({ success: true, data: { pinned: 2, maintainers: [] } });
+		expect(view).toMatchObject({
+			success: true,
+			data: { pinned: 2, maintainers: [], maintainerScopes: {} },
+		});
 		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_HISTORY, "remote", MEMORY)).toEqual({
 			success: true,
 			data: [{ id: "e" }],

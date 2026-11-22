@@ -210,7 +210,7 @@
 			"history": "Historique",
 			"hideHistory": "Masquer l'historique",
 			"scope": "Portée",
-			"scopePlaceholder": "Où elle s'applique (ex. apps/billing/) ; vide : partout",
+			"scopePlaceholder": "Où elle s'applique : un module (apps/billing/), team:nom ou branch:nom ; vide : partout",
 			"saveScope": "Enregistrer",
 			"scopeBadge": "S'applique à {{scope}}"
 		},
@@ -227,7 +227,8 @@
 			"archive": "Archivée",
 			"resolve": "Conflit tranché",
 			"conflict": "Conflit détecté",
-			"designate": "Mainteneurs désignés"
+			"designate": "Mainteneurs désignés",
+			"notify": "Conflit annoncé à l'équipe"
 		},
 		"actor": {
 			"user": "par toi",
@@ -262,7 +263,8 @@
 			"unmerged": "séparée de la note dans laquelle elle avait été fusionnée",
 			"escalated": "contredite à nouveau peu après une décision",
 			"maintainers-changed": "les mainteneurs ont changé",
-			"scoped": "l'endroit où elle s'applique a changé"
+			"scoped": "l'endroit où elle s'applique a changé",
+			"conflict-announced": "annoncé sur les canaux du projet"
 		},
 		"errors": {
 			"failed": "l'action a échoué",
@@ -298,7 +300,8 @@
 			"conflicts": "{{count}} conflits en 30 jours : {{auto}} réglés par les règles, {{resolved}} par une personne",
 			"resolution": "{{hours}} h en moyenne avant qu'une personne tranche",
 			"views": "{{count}} historiques ouverts sur cet ordinateur",
-			"tooAggressive": "Beaucoup de mémoires ont été restaurées cette semaine : les retraits automatiques sont peut-être trop agressifs."
+			"tooAggressive": "Beaucoup de mémoires ont été restaurées cette semaine : les retraits automatiques sont peut-être trop agressifs.",
+			"consensus": "{{count}} notes de consensus écrites en 30 jours, {{live}} toujours en usage"
 		},
 		"maintainers": {
 			"list": "Mainteneurs : {{names}}",
@@ -306,7 +309,10 @@
 			"edit": "Modifier",
 			"placeholder": "Noms ou e-mails, séparés par des virgules",
 			"save": "Enregistrer",
-			"cancel": "Annuler"
+			"cancel": "Annuler",
+			"scoped": "Pour {{scope}} : {{names}}",
+			"addScope": "Ajouter une liste pour une portée",
+			"scopePlaceholder": "Module, team:nom ou branch:nom"
 		},
 		"decisions": {
 			"title": "Décisions"

@@ -210,7 +210,7 @@
 			"history": "History",
 			"hideHistory": "Hide history",
 			"scope": "Scope",
-			"scopePlaceholder": "Where it applies (e.g. apps/billing/); empty: everywhere",
+			"scopePlaceholder": "Where it applies: a module (apps/billing/), team:name or branch:name; empty: everywhere",
 			"saveScope": "Save",
 			"scopeBadge": "Applies to {{scope}}"
 		},
@@ -227,7 +227,8 @@
 			"archive": "Archived",
 			"resolve": "Conflict resolved",
 			"conflict": "Conflict detected",
-			"designate": "Maintainers designated"
+			"designate": "Maintainers designated",
+			"notify": "Conflict announced to the team"
 		},
 		"actor": {
 			"user": "by you",
@@ -262,7 +263,8 @@
 			"unmerged": "separated from the note it was merged into",
 			"escalated": "contradicted again soon after a decision",
 			"maintainers-changed": "the maintainers changed",
-			"scoped": "where it applies changed"
+			"scoped": "where it applies changed",
+			"conflict-announced": "announced on the project's channels"
 		},
 		"errors": {
 			"failed": "the action failed",
@@ -298,7 +300,8 @@
 			"conflicts": "{{count}} conflicts in 30 days: {{auto}} settled by the rules, {{resolved}} by a person",
 			"resolution": "{{hours}} h on average before a person decides",
 			"views": "{{count}} histories opened on this computer",
-			"tooAggressive": "Many memories were restored this week: the automatic removals may be too aggressive."
+			"tooAggressive": "Many memories were restored this week: the automatic removals may be too aggressive.",
+			"consensus": "{{count}} consensus notes written in 30 days, {{live}} still in use"
 		},
 		"maintainers": {
 			"list": "Maintainers: {{names}}",
@@ -306,7 +309,10 @@
 			"edit": "Edit",
 			"placeholder": "Names or e-mails, separated by commas",
 			"save": "Save",
-			"cancel": "Cancel"
+			"cancel": "Cancel",
+			"scoped": "For {{scope}}: {{names}}",
+			"addScope": "Add a list for a scope",
+			"scopePlaceholder": "Module, team:name or branch:name"
 		},
 		"decisions": {
 			"title": "Decisions"

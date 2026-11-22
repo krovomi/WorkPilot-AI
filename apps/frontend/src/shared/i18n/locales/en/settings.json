@@ -2010,7 +2010,9 @@
 				"name": "Generic webhook",
 				"hint": "Raw JSON POST to any HTTP endpoint (custom integrations)"
 			}
-		}
+		},
+		"triggerMemoryConflict": "When a teammate's sync brings a memory that contradicts another one",
+		"triggerMemoryConflictHint": "Opt-in: posts the two notes' titles, a short cleaned preview and their authors' names (never an e-mail)."
 	},
 	"cicd": {
 		"title": "CI/CD Pipeline",

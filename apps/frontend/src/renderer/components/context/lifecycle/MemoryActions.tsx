@@ -1,5 +1,5 @@
 import { History, MapPin, Pin, PinOff, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MemoryJournalEntry } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
@@ -19,6 +19,9 @@ interface MemoryActionsProps {
 	readonly onChanged: () => void;
 }
 
+/** The scope forms besides a module path (`brain/lifecycle/scopes.py`). */
+const SCOPE_PREFIXES = ["team:", "branch:"] as const;
+
 /** Pin, forget (restorable) and the timeline of one memory. */
 export function MemoryActions({
 	projectId,
@@ -34,6 +37,7 @@ export function MemoryActions({
 	const [reason, setReason] = useState("");
 	const [history, setHistory] = useState<MemoryJournalEntry[] | null>(null);
 	const [scope, setScope] = useState<string | null>(null);
+	const suggestions = useId();
 
 	const run = async (action: () => Promise<{ success: boolean; error?: string }>) => {
 		setBusy(true);
@@ -141,10 +145,17 @@ export function MemoryActions({
 					<Input
 						value={scope}
 						maxLength={200}
+						list={suggestions}
 						placeholder={t("context:lifecycle.actions.scopePlaceholder")}
 						aria-label={t("context:lifecycle.actions.scopePlaceholder")}
 						onChange={(event) => setScope(event.target.value)}
 					/>
+					{/* A module is typed as a path; a team or a branch starts with its prefix. */}
+					<datalist id={suggestions} data-testid="memory-scope-suggestions">
+						{SCOPE_PREFIXES.map((prefix) => (
+							<option key={prefix} value={prefix} />
+						))}
+					</datalist>
 					<Button size="sm" disabled={busy} onClick={() => saveScope(scope)}>
 						{t("context:lifecycle.actions.saveScope")}
 					</Button>
