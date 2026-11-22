@@ -4,6 +4,8 @@
  * provider in Settings), on any provider `runOneShotLLM` reaches. The request
  * is checked again here (`parseNarrativeRequest`); a refusal, a failure or an
  * empty answer is `{ success: false }`, and the office keeps its template.
+ * On a server project, the team leaderboard and the person's consent to show
+ * on it (`server-pixel-office.ts`).
  */
 
 import { ipcMain } from "electron";
@@ -16,6 +18,7 @@ import {
 	narrativeText,
 	parseNarrativeRequest,
 } from "../pixel-office-narrator";
+import { getTeamBoard, setTeamConsent } from "../server-pixel-office";
 import { getPageFeatureSettings } from "../services/page-llm-config";
 
 /** A scene that arrives later than this is no longer the latest one. */
@@ -40,5 +43,13 @@ export async function narrate(raw: unknown): Promise<NarrativeResult> {
 export function registerPixelOfficeHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.PIXEL_OFFICE_NARRATE, (_event, request: unknown) =>
 		narrate(request),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.PIXEL_OFFICE_TEAM_BOARD,
+		(_event, projectId: unknown, request: unknown) => getTeamBoard(projectId, request),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.PIXEL_OFFICE_TEAM_CONSENT,
+		(_event, projectId: unknown, visible: unknown) => setTeamConsent(projectId, visible),
 	);
 }

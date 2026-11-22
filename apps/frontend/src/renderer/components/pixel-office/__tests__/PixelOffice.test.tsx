@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Task } from "../../../../shared/types";
 import type { SwarmStatus } from "../../../../shared/types/swarm";
 import { usePixelOfficeStore } from "../../../stores/pixel-office-store";
+import { useProjectStore } from "../../../stores/project-store";
 import { useSwarmStore } from "../../../stores/swarm-store";
 import { useTaskStore } from "../../../stores/task-store";
 import { type Terminal, useTerminalStore } from "../../../stores/terminal-store";
@@ -44,6 +45,7 @@ const initial = {
 	terminals: useTerminalStore.getState(),
 	tasks: useTaskStore.getState(),
 	swarm: useSwarmStore.getState(),
+	projects: useProjectStore.getState(),
 };
 
 let resize: ResizeObserverCallback | null;
@@ -143,6 +145,7 @@ afterEach(() => {
 	useTerminalStore.setState(initial.terminals, true);
 	useTaskStore.setState(initial.tasks, true);
 	useSwarmStore.setState(initial.swarm, true);
+	useProjectStore.setState(initial.projects, true);
 });
 
 describe("PixelOffice room", () => {
@@ -159,6 +162,29 @@ describe("PixelOffice room", () => {
 			cwd: PROJECT,
 			projectPath: PROJECT,
 		});
+	});
+
+	it("opens no terminal on a server project's mirror and offers its team board", () => {
+		useProjectStore.setState({
+			projects: [
+				{
+					id: "p1",
+					name: "shop",
+					path: PROJECT,
+					remote: { repoUrl: "https://x/shop.git", defaultBranch: "main", role: "member" },
+				} as never,
+			],
+		});
+		mount();
+		for (const button of screen.getAllByRole("button", { name: "New terminal" })) {
+			expect((button as HTMLButtonElement).disabled).toBe(true);
+		}
+		expect(screen.getByRole("button", { name: "Show the team leaderboard" })).toBeTruthy();
+	});
+
+	it("shows no team board for a project of this computer", () => {
+		mount();
+		expect(screen.queryByRole("button", { name: "Show the team leaderboard" })).toBeNull();
 	});
 
 	it("opens a new terminal where its sibling works", async () => {

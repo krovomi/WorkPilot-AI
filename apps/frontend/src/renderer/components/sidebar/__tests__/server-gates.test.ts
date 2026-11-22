@@ -43,6 +43,8 @@ describe("server project views", () => {
 			"ideation",
 			"insights",
 			"kanban",
+			// Its cards, and the team leaderboard the server computes.
+			"pixel-office",
 			"roadmap",
 			"session-history",
 			"tech-debt",

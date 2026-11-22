@@ -24,6 +24,7 @@ import {
 	type PixelAgent,
 	usePixelOfficeStore,
 } from "../../stores/pixel-office-store";
+import { useProjectStore } from "../../stores/project-store";
 import { useSwarmStore } from "../../stores/swarm-store";
 import { loadTasks, useTaskStore } from "../../stores/task-store";
 import { useTerminalStore } from "../../stores/terminal-store";
@@ -39,6 +40,7 @@ import { NarrativeFeed } from "./NarrativeFeed";
 import { OfficeScenesMenu } from "./OfficeScenesMenu";
 import { ProviderLegend } from "./ProviderLegend";
 import { SeasonPanel } from "./SeasonPanel";
+import { TeamBoardPanel } from "./TeamBoardPanel";
 import { closeChimes, playChime } from "./office-sounds";
 import { shippedToday } from "./office-stats";
 import { PixelOfficeCanvas } from "./PixelOfficeCanvas";
@@ -282,6 +284,11 @@ export function PixelOffice({
 	const addTerminal = useTerminalStore((s) => s.addTerminal);
 	const removeTerminal = useTerminalStore((s) => s.removeTerminal);
 	const canAddTerminal = useTerminalStore((s) => s.canAddTerminal);
+	// A server project: its cards come from the server, its folder here is
+	// the app's mirror, so no terminal opens on it.
+	const remote = useProjectStore((s) =>
+		s.projects.some((p) => p.id === projectId && !!p.remote),
+	);
 
 	const tasks = useTaskStore((s) => s.tasks);
 	const tasksLoading = useTaskStore((s) => s.isLoading);
@@ -344,6 +351,7 @@ export function PixelOffice({
 		projectPath,
 		tasks,
 		ready: !tasksLoading,
+		remote,
 	});
 	const refreshAchievements = achievements.refresh;
 	const kioskRefresh = useCallback(() => {
@@ -638,9 +646,10 @@ export function PixelOffice({
 				<div className="flex items-center gap-1">
 					<AddAgentButton
 						onClick={handleAddAgent}
-						disabled={!canAddTerminal(projectPath)}
+						disabled={remote || !canAddTerminal(projectPath)}
 					/>
 					<div className="w-px h-5 bg-border mx-1" />
+					{remote && <TeamBoardPanel projectId={projectId} />}
 					<AchievementsPanel unlocked={achievements.unlocked} />
 					<SeasonPanel
 						season={season.season}
@@ -780,7 +789,7 @@ export function PixelOffice({
 						</p>
 						<AddAgentButton
 							onClick={handleAddAgent}
-							disabled={!canAddTerminal(projectPath)}
+							disabled={remote || !canAddTerminal(projectPath)}
 						/>
 					</div>
 				) : (

@@ -837,6 +837,9 @@ export const IPC_CHANNELS = {
 	// Pipeline Generator (Feature 23) — AI-powered CI/CD pipeline generation
 	// Pixel Office: a mini-scene written by the page's model
 	PIXEL_OFFICE_NARRATE: "pixelOffice:narrate",
+	// Pixel Office on a server project: the team leaderboard, and showing one's name on it
+	PIXEL_OFFICE_TEAM_BOARD: "pixelOffice:teamBoard",
+	PIXEL_OFFICE_TEAM_CONSENT: "pixelOffice:teamConsent",
 
 	PIPELINE_GENERATOR_GENERATE: "pipelineGenerator:generate",
 	PIPELINE_GENERATOR_CANCEL: "pipelineGenerator:cancel",
