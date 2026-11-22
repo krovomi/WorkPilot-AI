@@ -1,13 +1,20 @@
 #!/usr/bin/env node
 /**
  * Captures the phone app's screenshot strip of the README
- * (.github/assets/screenshots/mobile.png).
+ * (.github/assets/screenshots/mobile.png): four screens, each in another of
+ * the app's colour themes and modes, captioned, at the phone's own
+ * proportions (390 × 844 points, an iPhone 14 screen without the browser's
+ * bars), never stretched.
  *
  * It serves the app's web bundle and answers its server calls with the invented
  * data below (Playwright routes): nothing real is contacted, no account needed.
+ * The theme comes from the account's preferences (`/users/me/preferences`),
+ * as it does on a real phone.
  *
  *   (cd apps/mobile && pnpm install && EXPO_OFFLINE=1 pnpm run export:web)
  *   node scripts/readme-screenshots/capture-mobile.cjs
+ *
+ * SCREENS=1 also keeps each screen alone (mobile-<name>.png) in OUT.
  */
 const fs = require("node:fs");
 const http = require("node:http");
@@ -15,8 +22,10 @@ const path = require("node:path");
 
 const REPO = path.resolve(__dirname, "..", "..");
 const FRONTEND = path.join(REPO, "apps", "frontend");
-const { chromium, devices } = require(
-	require.resolve("@playwright/test", { paths: [FRONTEND] }),
+const MOBILE = path.join(REPO, "apps", "mobile");
+// The mobile project's Playwright (its E2E suite), else the desktop's.
+const { chromium } = require(
+	require.resolve("@playwright/test", { paths: [MOBILE, FRONTEND] }),
 );
 
 const DIST =
@@ -111,6 +120,16 @@ const cards = [
 		},
 	),
 	card(
+		"022-rate-limit",
+		"Rate-limit the public API",
+		"in_progress",
+		"bug_fix",
+		3,
+		4,
+		14,
+		"Chloé Petit",
+	),
+	card(
 		"020-csv-export",
 		"Export reports as CSV",
 		"ai_review",
@@ -195,7 +214,19 @@ const user = {
 };
 const org = { id: "o-acme", name: "Acme", slug: "acme", my_role: "admin" };
 
-function answer(url, method) {
+const approvals = {
+	criticality: "standard",
+	criticalitySource: "assessed",
+	needed: 1,
+	count: 1,
+	roles: [],
+	missingRoles: [],
+	approvals: [{ by: "Alice Martin", for: null, at: iso(500), roles: [] }],
+	complete: true,
+	approved: true,
+};
+
+function answer(url, method, prefs) {
 	const u = new URL(url);
 	const p = u.pathname;
 	if (p === "/auth/config")
@@ -231,7 +262,7 @@ function answer(url, method) {
 				name: "acme-storefront",
 				repo_url: "https://example.com/acme/storefront.git",
 				default_branch: "main",
-				my_role: "admin",
+				my_role: "owner",
 				forge: "github",
 			},
 			{
@@ -245,7 +276,8 @@ function answer(url, method) {
 			},
 		];
 	if (p.endsWith("/steering")) return { messages: [] };
-	if (p === "/users/me/preferences") return {};
+	if (p === "/users/me/preferences") return prefs;
+	if (/\/api\/board\/cards\/[^/]+\/approvals$/.test(p)) return approvals;
 	if (p.startsWith("/projects/") && p.includes("/runs")) return runs;
 	if (p.startsWith("/projects/"))
 		return {
@@ -356,24 +388,154 @@ function serveDist() {
 		.listen(APP_PORT, "127.0.0.1");
 }
 
-/** Lays the phone screens side by side, in rounded frames, as one picture. */
+const PHONE = { width: 390, height: 844 };
+
+/** The four screens of the strip, each in a theme of its own. */
+const SHOTS = [
+	{
+		name: "board",
+		caption: "Board",
+		theme: "Default · light",
+		prefs: { theme: "light", colorTheme: "default" },
+	},
+	{
+		name: "card",
+		caption: "Card",
+		theme: "Default · dark",
+		prefs: { theme: "dark", colorTheme: "default" },
+	},
+	{
+		name: "dashboard",
+		caption: "Dashboard",
+		theme: "Ocean · light",
+		prefs: { theme: "light", colorTheme: "ocean" },
+	},
+	{
+		name: "settings",
+		caption: "Appearance",
+		theme: "Forest · dark",
+		prefs: { theme: "dark", colorTheme: "forest" },
+	},
+];
+
+/**
+ * Lays the phone screens side by side, in rounded frames of the phone's own
+ * proportions, each with its caption, as one picture.
+ */
 async function strip(browser, shots) {
+	const gap = 36;
+	const pad = 48;
+	const width =
+		pad * 2 + shots.length * (PHONE.width + 16) + (shots.length - 1) * gap;
 	const page = await browser.newPage({
-		viewport: { width: 1780, height: 1249 },
+		viewport: { width, height: 1040 },
+		deviceScaleFactor: 2,
 	});
 	const frames = shots
 		.map(
-			(png) =>
-				`<div class="phone"><img src="data:image/png;base64,${png.toString("base64")}"></div>`,
+			({ png, shot }) => `<figure>
+				<div class="phone"><img src="data:image/png;base64,${png.toString("base64")}"></div>
+				<figcaption><b>${shot.caption}</b><span>${shot.theme}</span></figcaption>
+			</figure>`,
 		)
 		.join("");
 	await page.setContent(`<!doctype html><style>
-		body { margin: 0; background: #111116; display: flex; gap: 40px; padding: 40px; }
-		.phone { border: 6px solid #34343c; border-radius: 54px; overflow: hidden; width: 540px; height: 1169px; }
-		.phone img { width: 100%; height: 100%; display: block; }
+		body { margin: 0; background: #111116; display: flex; gap: ${gap}px; padding: ${pad}px ${pad}px 36px;
+			font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+		figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+		.phone { border: 8px solid #2a2a31; border-radius: 52px; overflow: hidden;
+			width: ${PHONE.width}px; height: ${PHONE.height}px; box-shadow: 0 0 0 1px #3a3a44; }
+		.phone img { width: ${PHONE.width}px; height: ${PHONE.height}px; display: block; }
+		figcaption { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #e6e6e6; }
+		figcaption b { font-size: 20px; }
+		figcaption span { font-size: 15px; color: #9aa3ab; }
 	</style>${frames}`);
-	await page.screenshot({ path: path.join(OUT, "mobile.png") });
+	const body = await page.locator("body").boundingBox();
+	await page.screenshot({
+		path: path.join(OUT, "mobile.png"),
+		clip: { x: 0, y: 0, width, height: Math.ceil(body.height) },
+	});
 	await page.close();
+}
+
+/** A phone signed in to the invented server, in `prefs`'s theme. */
+async function signedInPhone(browser, prefs) {
+	const context = await browser.newContext({
+		viewport: PHONE,
+		screen: PHONE,
+		deviceScaleFactor: 2,
+		isMobile: true,
+		hasTouch: true,
+		locale: "en-US",
+		colorScheme: prefs.theme === "dark" ? "dark" : "light",
+	});
+	await context.route(`${SERVER}/**`, async (route) => {
+		const req = route.request();
+		const cors = { "access-control-allow-origin": "*" };
+		if (req.method() === "OPTIONS") {
+			return route.fulfill({
+				status: 204,
+				headers: {
+					...cors,
+					"access-control-allow-headers": "*",
+					"access-control-allow-methods": "*",
+				},
+			});
+		}
+		const body = answer(req.url(), req.method(), prefs);
+		if (body === null)
+			console.warn("not in the demo data:", req.method(), req.url());
+		return route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			headers: cors,
+			body: JSON.stringify(body ?? {}),
+		});
+	});
+	const page = await context.newPage();
+	page.on("pageerror", (e) =>
+		console.warn("pageerror:", e.message.slice(0, 160)),
+	);
+	await page.goto(`http://127.0.0.1:${APP_PORT}/`);
+	await page.getByLabel("Server address").fill(SERVER);
+	await page.getByLabel("Email").fill(user.email);
+	await page.getByLabel("Password").fill("demo-password");
+	await page.getByRole("button", { name: "Sign in", exact: true }).click();
+	await page
+		.getByRole("button", { name: "acme-storefront" })
+		.waitFor({ timeout: 30_000 });
+	return { context, page };
+}
+
+/** Opens the project's board on its "In Progress" column. */
+async function openBoard(page) {
+	await page.getByRole("button", { name: "acme-storefront" }).click();
+	await page
+		.getByRole("tab", { name: /In Progress/ })
+		.click({ timeout: 30_000 });
+	await page.waitForTimeout(1200);
+}
+
+/** Brings the phone to the screen of `name`. */
+async function show(page, name) {
+	if (name === "settings") {
+		await page.getByRole("button", { name: "Settings" }).click();
+		await page
+			.getByText("Appearance", { exact: false })
+			.first()
+			.scrollIntoViewIfNeeded();
+		await page
+			.getByText("Color theme", { exact: false })
+			.first()
+			.scrollIntoViewIfNeeded();
+		return;
+	}
+	await openBoard(page);
+	if (name === "card") {
+		await page.getByRole("button", { name: "One-page checkout" }).click();
+	} else if (name === "dashboard") {
+		await page.getByRole("tab", { name: "Dashboard" }).click();
+	}
 }
 
 (async () => {
@@ -390,60 +552,18 @@ async function strip(browser, shots) {
 			: {},
 	);
 	try {
-		const context = await browser.newContext({
-			...devices["iPhone 14"],
-			locale: "en-US",
-			colorScheme: "light",
-		});
-		await context.route(`${SERVER}/**`, async (route) => {
-			const req = route.request();
-			const cors = { "access-control-allow-origin": "*" };
-			if (req.method() === "OPTIONS") {
-				return route.fulfill({
-					status: 204,
-					headers: {
-						...cors,
-						"access-control-allow-headers": "*",
-						"access-control-allow-methods": "*",
-					},
-				});
-			}
-			const body = answer(req.url(), req.method());
-			if (body === null)
-				console.warn("not in the demo data:", req.method(), req.url());
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				headers: cors,
-				body: JSON.stringify(body ?? {}),
-			});
-		});
-		const page = await context.newPage();
-		page.on("pageerror", (e) =>
-			console.warn("pageerror:", e.message.slice(0, 160)),
-		);
-		await page.goto(`http://127.0.0.1:${APP_PORT}/`);
-		await page.getByLabel("Server address").fill(SERVER);
-		await page.getByLabel("Email").fill(user.email);
-		await page.getByLabel("Password").fill("demo-password");
-		await page.getByRole("button", { name: "Sign in", exact: true }).click();
-		await page
-			.getByRole("button", { name: "acme-storefront" })
-			.click({ timeout: 30_000 });
-		await page
-			.getByRole("tab", { name: /In Progress/ })
-			.click({ timeout: 30_000 });
-		await page.waitForTimeout(1500);
-		const board = await page.screenshot();
-		await page.getByRole("button", { name: "One-page checkout" }).click();
-		await page.waitForTimeout(2000);
-		const card = await page.screenshot();
-		await page.mouse.click(26, 32); // the header's back arrow
-		await page.waitForTimeout(1500);
-		await page.getByText("Dashboard", { exact: true }).first().click();
-		await page.waitForTimeout(2000);
-		const dashboard = await page.screenshot();
-		await strip(browser, [board, card, dashboard]);
+		const shots = [];
+		for (const shot of SHOTS) {
+			const { context, page } = await signedInPhone(browser, shot.prefs);
+			await show(page, shot.name);
+			await page.waitForTimeout(1800);
+			const png = await page.screenshot();
+			if (process.env.SCREENS)
+				fs.writeFileSync(path.join(OUT, `mobile-${shot.name}.png`), png);
+			shots.push({ png, shot });
+			await context.close();
+		}
+		await strip(browser, shots);
 		console.log("saved mobile.png");
 	} finally {
 		await browser.close();

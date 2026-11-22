@@ -1,16 +1,17 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useApi } from "../../../../auth/session";
-import { useLoad } from "../../../../hooks/useLoad";
-import { count, Figures, money, top } from "../../../../insights/Figures";
-import { Button, ErrorBanner, Loading, Section } from "../../../../ui/components";
-import { SPACE, useTheme } from "../../../../ui/theme";
-import { statusLabel } from "../../../../i18n/labels";
+import { useProjectId } from "../../../../../project/ProjectId";
+import { useApi } from "../../../../../auth/session";
+import { useLoad } from "../../../../../hooks/useLoad";
+import { count, Figures, money, StatTile, top } from "../../../../../insights/Figures";
+import { Button, ErrorBanner, Loading, Section } from "../../../../../ui/components";
+import { SPACE, useTheme } from "../../../../../ui/theme";
+import { statusLabel } from "../../../../../i18n/labels";
 
 export default function Dashboard() {
-	const { projectId } = useLocalSearchParams<{ projectId: string }>();
+	const projectId = useProjectId();
 	const { t, i18n } = useTranslation();
 	const theme = useTheme();
 	const api = useApi();
@@ -32,12 +33,14 @@ export default function Dashboard() {
 			<View style={styles.links}>
 				<Button
 					label={t("dashboard.sessions")}
+					icon="activity"
 					variant="secondary"
 					style={{ flex: 1 }}
 					onPress={() => router.push({ pathname: "/projects/[projectId]/sessions", params: { projectId } })}
 				/>
 				<Button
 					label={t("dashboard.analyses")}
+					icon="cpu"
 					variant="secondary"
 					style={{ flex: 1 }}
 					onPress={() => router.push({ pathname: "/projects/[projectId]/analyses", params: { projectId } })}
@@ -45,7 +48,20 @@ export default function Dashboard() {
 			</View>
 			{data ? (
 				<>
-					<Section title={t("dashboard.cards")}>
+					<View style={styles.links}>
+						<StatTile
+							label={t("dashboard.tiles.qa")}
+							value={`${Math.round(data.snapshot.qa_first_pass_rate)} %`}
+							color={theme.success}
+						/>
+						<StatTile label={t("dashboard.tiles.spent", { days: data.costs.period_days })} value={money(data.costs.total_cost)} />
+						<StatTile
+							label={t("dashboard.tiles.done")}
+							value={count(data.snapshot.tasks_by_status.completed ?? 0, lang)}
+							color={theme.accent}
+						/>
+					</View>
+					<Section title={t("dashboard.cards")} icon="trello">
 						<Figures
 							rows={top(data.snapshot.tasks_by_status, 12).map(([status, n]) => ({
 								label: statusLabel(status),
@@ -56,7 +72,7 @@ export default function Dashboard() {
 							<Text style={{ color: theme.textMuted }}>{t("dashboard.noCards")}</Text>
 						) : null}
 					</Section>
-					<Section title={t("dashboard.quality")}>
+					<Section title={t("dashboard.quality")} icon="award">
 						<Figures
 							rows={[
 								{ label: t("dashboard.qaFirstPass"), value: `${Math.round(data.snapshot.qa_first_pass_rate)} %` },
@@ -66,7 +82,7 @@ export default function Dashboard() {
 							]}
 						/>
 					</Section>
-					<Section title={t("dashboard.costs", { days: data.costs.period_days })}>
+					<Section title={t("dashboard.costs", { days: data.costs.period_days })} icon="dollar-sign">
 						<Figures
 							rows={[
 								{ label: t("dashboard.total"), value: money(data.costs.total_cost) },
@@ -85,7 +101,7 @@ export default function Dashboard() {
 							]}
 						/>
 					</Section>
-					<Section title={t("dashboard.allTime")}>
+					<Section title={t("dashboard.allTime")} icon="clock">
 						<Figures
 							rows={[
 								{ label: t("dashboard.total"), value: money(data.snapshot.total_cost) },

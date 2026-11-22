@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError, ServerClient } from "../api/client";
 import { api } from "../api/endpoints";
@@ -11,6 +11,9 @@ import { useSession } from "../auth/session";
 import { describeError } from "../i18n";
 import { Button, ErrorBanner, Field, KeyboardAvoiding } from "../ui/components";
 import { SPACE, useTheme } from "../ui/theme";
+
+// The app's own icon, as on the home screen.
+const APP_ICON = require("../../assets/icon.png");
 
 /** How a person signs in: a local account, Microsoft Entra, or the server's OpenID Connect provider. */
 type Way = "local" | "microsoft" | "sso";
@@ -78,6 +81,7 @@ export default function SignIn() {
 			<KeyboardAvoiding>
 				<ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 					<View style={styles.header}>
+						<Image source={APP_ICON} style={styles.logo} accessibilityIgnoresInvertColors />
 						<Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
 							{t("signIn.title")}
 						</Text>
@@ -122,6 +126,7 @@ export default function SignIn() {
 					<Text style={{ color: theme.textFaint, textAlign: "center" }}>{t("signIn.or")}</Text>
 					<Button
 						label={t("signIn.microsoft")}
+						icon="grid"
 						variant="secondary"
 						busy={busy === "microsoft"}
 						disabled={!server.trim() || !!busy}
@@ -129,6 +134,7 @@ export default function SignIn() {
 					/>
 					<Button
 						label={t("signIn.sso")}
+						icon="shield"
 						variant="secondary"
 						busy={busy === "sso"}
 						disabled={!server.trim() || !!busy}
@@ -143,5 +149,6 @@ export default function SignIn() {
 const styles = StyleSheet.create({
 	content: { padding: SPACE.xl, gap: SPACE.lg, flexGrow: 1, justifyContent: "center" },
 	header: { gap: SPACE.sm, marginBottom: SPACE.md },
+	logo: { width: 64, height: 64, borderRadius: 16, marginBottom: SPACE.sm },
 	title: { fontSize: 32, fontWeight: "800" },
 });

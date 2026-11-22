@@ -57,16 +57,15 @@ afterEach(() => {
 });
 
 describe("governance", () => {
-	it("is linked from the board for someone who may read the audit trail", async () => {
+	it("is a row of the project's More tab for someone who may read the audit trail", async () => {
 		// The app is in the foreground, as on a phone that just opened it.
 		Object.defineProperty(AppState, "currentState", { value: "active", configurable: true });
 		fakeServer(
 			{ "GET /api/board/cards": { cards: [] }, "GET /projects/p1": { id: "p1", name: "Shop", forge: null }, [ROUTE]: REPORT },
 			ALL,
 		);
-		const app = await openApp("/projects/p1");
-		expect(await screen.findAllByText("No card here.")).toBeTruthy();
-		await fireEvent.press(screen.getByText("Governance"));
+		const app = await openApp("/projects/p1/more");
+		await fireEvent.press(await screen.findByRole("button", { name: "Governance" }));
 		await waitFor(() => expect(app.getPathname()).toBe("/projects/p1/governance"));
 	});
 

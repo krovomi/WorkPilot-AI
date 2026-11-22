@@ -213,9 +213,9 @@ The code is then rendered, compared with the mockup and corrected until it match
 </tr>
 </table>
 
-**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, set its criticality or lend your approval, start or stop the agents, read the dashboard, Insights, roadmap and ideas; sign in with a password, Microsoft Entra or the server's single sign-on.
+**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, set its criticality or lend your approval, start or stop the agents, read the dashboard, Insights, roadmap and ideas; sign in with a password, Microsoft Entra or the server's single sign-on. Each project opens on tabs (board, Insights, forge, dashboard, more), and the desktop's seven color themes, light or dark, follow your account from device to device.
 
-![Mobile app: board, card and dashboard](.github/assets/screenshots/mobile.png)
+![Mobile app: the board in Default light, a card in Default dark, the dashboard in Ocean light and the appearance settings in Forest dark](.github/assets/screenshots/mobile.png)
 
 ---
 

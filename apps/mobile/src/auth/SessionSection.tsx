@@ -13,7 +13,7 @@ import { ErrorBanner, Section } from "../ui/components";
 import { formatDate } from "../ui/format";
 import { SPACE, useTheme } from "../ui/theme";
 import { type MySession, toMySession } from "./my-session";
-import { useApi, useSession } from "./session";
+import { useApi } from "./session";
 
 function Row({ label, value }: { label: string; value: string }) {
 	const theme = useTheme();
@@ -46,7 +46,6 @@ function Details({ session }: { session: MySession }) {
 export function SessionSection() {
 	const { t } = useTranslation();
 	const theme = useTheme();
-	const { user } = useSession();
 	const api = useApi();
 	const load = useCallback(async () => toMySession(await api.mySession()), [api]);
 	const { data, error, loading } = useLoad(load);
@@ -58,9 +57,7 @@ export function SessionSection() {
 	else details = <ErrorBanner message={t("mySession.unavailable")} />;
 
 	return (
-		<Section title={t("mySession.title")}>
-			<Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>{user?.display_name}</Text>
-			<Text style={{ color: theme.textMuted }}>{user?.email}</Text>
+		<Section title={t("mySession.title")} icon="key">
 			{details}
 		</Section>
 	);

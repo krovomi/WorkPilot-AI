@@ -1,25 +1,29 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import type { Forge } from "../../../../../forge/forge";
 import type { ForgeIssue, ForgePull } from "../../../../../forge/types";
 import { useForge } from "../../../../../forge/useForge";
+import { useProjectId } from "../../../../../project/ProjectId";
 import { useLoad } from "../../../../../hooks/useLoad";
 import { describeError } from "../../../../../i18n";
 import { ErrorBanner, Loading } from "../../../../../ui/components";
 import { formatDate } from "../../../../../ui/format";
-import { RADIUS, SPACE, useTheme } from "../../../../../ui/theme";
+import { Icon } from "../../../../../ui/Icon";
+import { EmptyState } from "../../../../../ui/kit";
+import { elevation, RADIUS, SPACE, useTheme } from "../../../../../ui/theme";
 
 type Tab = "issues" | "pulls";
 
 export default function ForgeScreen() {
-	const { projectId } = useLocalSearchParams<{ projectId: string }>();
+	const projectId = useProjectId();
 	const { t } = useTranslation();
 	const { forge, loading, error } = useForge(projectId);
 	const [tab, setTab] = useState<Tab>("pulls");
 	if (loading) return <Loading />;
-	if (!forge) return <ErrorBanner message={error ? describeError(error) : t("forge.none")} />;
+	// The tab is hidden for a project off any forge: without one here, its read failed.
+	if (!forge) return <ErrorBanner error={error} />;
 	return (
 		<View style={{ flex: 1 }}>
 			<Stack.Screen options={{ title: t(`forge.${forge.kind}`) }} />
@@ -33,7 +37,7 @@ function Tabs({ forge, tab, onTab }: { forge: Forge; tab: Tab; onTab: (tab: Tab)
 	const { t } = useTranslation();
 	const theme = useTheme();
 	return (
-		<View style={styles.tabs} accessibilityRole="tablist">
+		<View style={[styles.tabs, { backgroundColor: theme.elevated }]} accessibilityRole="tablist">
 			{(["pulls", "issues"] as const).map((key) => {
 				const selected = key === tab;
 				return (
@@ -42,15 +46,14 @@ function Tabs({ forge, tab, onTab }: { forge: Forge; tab: Tab; onTab: (tab: Tab)
 						accessibilityRole="tab"
 						accessibilityState={{ selected }}
 						onPress={() => onTab(key)}
-						style={[
-							styles.tab,
-							{
-								backgroundColor: selected ? theme.accentSoft : theme.surface,
-								borderColor: selected ? theme.accent : theme.border,
-							},
-						]}
+						style={[styles.tab, selected ? { backgroundColor: theme.surface } : null]}
 					>
-						<Text style={{ color: theme.text, fontWeight: selected ? "700" : "500" }}>
+						<Icon
+							name={key === "issues" ? "alert-circle" : "git-pull-request"}
+							size={16}
+							color={selected ? theme.accent : theme.textMuted}
+						/>
+						<Text style={{ color: selected ? theme.text : theme.textMuted, fontWeight: selected ? "700" : "500" }}>
 							{key === "issues" ? t("forge.issues") : t(`forge.pulls_${forge.kind}`)}
 						</Text>
 					</Pressable>
@@ -79,7 +82,10 @@ function ForgeList({ forge, projectId, tab }: { forge: Forge; projectId: string;
 			ListHeaderComponent={error ? <ErrorBanner message={describeError(error)} /> : undefined}
 			ListEmptyComponent={
 				error ? undefined : (
-					<Text style={{ color: theme.textMuted }}>{tab === "issues" ? t("forge.noIssues") : t("forge.noPulls")}</Text>
+					<EmptyState
+						icon={tab === "issues" ? "alert-circle" : "git-pull-request"}
+						title={tab === "issues" ? t("forge.noIssues") : t("forge.noPulls")}
+					/>
 				)
 			}
 			renderItem={({ item }) => (
@@ -94,10 +100,10 @@ function ForgeList({ forge, projectId, tab }: { forge: Forge; projectId: string;
 							params: { projectId, number: String(item.number) },
 						})
 					}
-					style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
+					style={[styles.row, { backgroundColor: theme.surface }, elevation(theme)]}
 				>
 					<Text style={{ color: theme.text, fontWeight: "600" }} numberOfLines={2}>
-						#{item.number} {item.title}
+						<Text style={{ color: theme.textFaint }}>#{item.number}</Text> {item.title}
 					</Text>
 					<Text style={{ color: theme.textFaint, fontSize: 12 }}>
 						{[
@@ -115,8 +121,16 @@ function ForgeList({ forge, projectId, tab }: { forge: Forge; projectId: string;
 }
 
 const styles = StyleSheet.create({
-	tabs: { flexDirection: "row", gap: SPACE.sm, padding: SPACE.lg, paddingBottom: 0 },
-	tab: { flex: 1, alignItems: "center", borderWidth: 1, borderRadius: RADIUS.md, paddingVertical: SPACE.sm },
+	tabs: { flexDirection: "row", gap: 3, padding: 3, margin: SPACE.lg, marginBottom: 0, borderRadius: RADIUS.md },
+	tab: {
+		flex: 1,
+		flexDirection: "row",
+		gap: 6,
+		alignItems: "center",
+		justifyContent: "center",
+		borderRadius: RADIUS.md - 2,
+		minHeight: 40,
+	},
 	list: { padding: SPACE.lg, gap: SPACE.sm, paddingBottom: SPACE.xl * 2 },
-	row: { borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.md, padding: SPACE.md, gap: SPACE.xs },
+	row: { borderRadius: RADIUS.lg, padding: SPACE.md, gap: SPACE.xs },
 });
