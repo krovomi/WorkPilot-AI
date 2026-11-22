@@ -206,7 +206,7 @@ afterEach(() => {
 });
 
 describe("KanbanBoard — columns", () => {
-	it("puts each task in its column, errors under human review, newest first", () => {
+	it("puts each task in its column, errors under Failed, newest first", () => {
 		renderBoard([
 			makeTask({ id: "a", title: "Old plan", createdAt: new Date("2026-11-01") }),
 			makeTask({ id: "b", title: "New plan", createdAt: new Date("2026-11-09") }),
@@ -218,12 +218,16 @@ describe("KanbanBoard — columns", () => {
 		});
 		expect(backlog.map((h) => h.textContent)).toEqual(["New plan", "Old plan"]);
 		expect(
-			within(column("human_review")).getByRole("heading", { name: "Broken" }),
+			within(column("failed")).getByRole("heading", { name: "Broken" }),
 		).toBeInTheDocument();
 		expect(
 			within(column("done")).getByRole("heading", { name: "Shipped" }),
 		).toBeInTheDocument();
 		expect(within(column("queue")).getByText("Queue is empty")).toBeInTheDocument();
+		// Abandoned has no card, so it is not drawn.
+		expect(
+			document.querySelector('[data-column-status="abandoned"]'),
+		).not.toBeInTheDocument();
 	});
 
 	it("follows the stored manual order and puts new cards on top", () => {
@@ -268,7 +272,7 @@ describe("KanbanBoard — columns", () => {
 		expect(titles).toEqual(["Alpha", "Zeta"]);
 	});
 
-	it("hides archived cards until asked, and abandoned ones on demand", async () => {
+	it("hides archived cards until asked, and draws abandoned ones in their column", async () => {
 		const user = userEvent.setup();
 		renderBoard([
 			makeTask({ id: "arch", title: "Old", status: "done", metadata: { archivedAt: "2026-11-01" } as never }),
@@ -280,10 +284,11 @@ describe("KanbanBoard — columns", () => {
 		);
 		expect(screen.getByRole("heading", { name: "Old" })).toBeInTheDocument();
 
-		expect(screen.getByRole("heading", { name: "Set aside" })).toBeInTheDocument();
-		await user.click(screen.getByRole("button", { name: /1 abandoned/ }));
 		expect(
-			screen.queryByRole("heading", { name: "Set aside" }),
+			within(column("abandoned")).getByRole("heading", { name: "Set aside" }),
+		).toBeInTheDocument();
+		expect(
+			within(column("backlog")).queryByRole("heading", { name: "Set aside" }),
 		).not.toBeInTheDocument();
 	});
 

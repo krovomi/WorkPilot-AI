@@ -98,7 +98,9 @@
 		"build_failed": "Red Build",
 		"pr_created": "Open PR",
 		"done": "Done",
-		"error": "Error"
+		"error": "Error",
+		"failed": "Failed",
+		"abandoned": "Abandoned"
 	},
 	"kinds": {
 		"none": "Unspecified",

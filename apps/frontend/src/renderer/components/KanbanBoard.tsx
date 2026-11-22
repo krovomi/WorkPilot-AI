@@ -18,7 +18,6 @@ import {
 } from "@dnd-kit/sortable";
 import {
 	AlertTriangle,
-	Ban,
 	CheckCheck,
 	ChevronsRight,
 	Coins,
@@ -30,10 +29,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	TASK_STATUS_COLUMNS,
-	TASK_STATUS_LABELS,
-} from "../../shared/constants";
+import { isOutcomeColumn, TASK_STATUS_COLUMNS, TASK_STATUS_LABELS } from "../../shared/constants";
 import type {
 	IPCResult,
 	PlanConflictReport,
@@ -57,12 +53,9 @@ import { useBoardSelection } from "../hooks/useBoardSelection";
 import { isLightCard, recordMoves } from "../lib/card-edits";
 import { usePendingDeleteStore } from "../stores/pending-delete-store";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
-import {
-	canMoveTaskTo,
-	emptyColumnGroups,
-	getVisualColumn,
-	isQuickAddColumn,
-} from "../lib/kanban-columns";
+import { canMoveTaskTo, emptyColumnGroups, getBoardColumn, getVisualColumn, isQuickAddColumn } from "../lib/kanban-columns";
+import { useOutcomeDrop } from "../hooks/useOutcomeDrop";
+import { AbandonRequestDialog } from "./kanban/AbandonRequestDialog";
 import { groupMoveTargets } from "../lib/group-move";
 import { DragOverlayCard } from "./kanban/DragOverlayCard";
 import { computeBoardCostForecast } from "../lib/kanban-cost";
@@ -199,8 +192,7 @@ export function KanbanBoard({
 	const { announcement, announce } = useKanbanAccessibility();
 	const [activeTask, setActiveTask] = useState<Task | null>(null);
 	const [overColumnId, setOverColumnId] = useState<string | null>(null);
-	const { showArchived, toggleShowArchived, hideAbandoned, toggleHideAbandoned } =
-		useViewState();
+	const { showArchived, toggleShowArchived } = useViewState();
 
 	// --- Accessibility helpers (screen-reader drag-and-drop announcements) ---
 	const getColumnLabel = useCallback(
@@ -425,28 +417,14 @@ export function KanbanBoard({
 	// Cards deleted but still in their undo delay (kanban/deleteCardsLater.tsx).
 	const pendingDeletes = usePendingDeleteStore((s) => s.ids);
 	const filteredTasks = useMemo(() => {
-		// Archive gate first, then (optionally) the abandoned gate, then the
-		// user-selected search/source/category/priority filters from the filter bar.
-		// Abandoned tasks are shown greyed by default; hideAbandoned removes them.
-		let base = showArchived
-			? tasks
-			: tasks.filter((t) => !t.metadata?.archivedAt);
-		if (hideAbandoned) {
-			base = base.filter((t) => t.metadata?.abandoned !== true);
-		}
+		// Archive gate first, then the search/source/category/priority filters of
+		// the filter bar. Abandoned tasks have their own column (« Abandonnée »).
+		const base = showArchived ? tasks : tasks.filter((t) => !t.metadata?.archivedAt);
 		return base.filter(
 			(t) => !pendingDeletes.has(t.id) && taskMatchesFilters(t, kanbanFilters),
 		);
-	}, [tasks, showArchived, hideAbandoned, kanbanFilters, pendingDeletes]);
+	}, [tasks, showArchived, kanbanFilters, pendingDeletes]);
 
-	// Count of abandoned tasks currently on the board (drives the filter toggle).
-	const abandonedCount = useMemo(
-		() =>
-			tasks.filter(
-				(t) => t.metadata?.abandoned === true && !t.metadata?.archivedAt,
-			).length,
-		[tasks],
-	);
 
 	// Calculate archived count for Done column button
 	const archivedCount = useMemo(
@@ -564,11 +542,11 @@ export function KanbanBoard({
 	const taskOrder = useTaskStore((state) => state.taskOrder);
 
 	const tasksByStatus = useMemo(() => {
-		// error tasks are shown in the 'human_review' column (see getVisualColumn)
+		// Each task in its board column: failed runs and abandoned tasks have their own (getBoardColumn)
 		const grouped = emptyColumnGroups();
 
 		filteredTasks.forEach((task) => {
-			const targetColumn = getVisualColumn(task.status);
+			const targetColumn = getBoardColumn(task);
 			if (grouped[targetColumn]) {
 				grouped[targetColumn].push(task);
 			}
@@ -652,13 +630,14 @@ export function KanbanBoard({
 
 	// The columns a dragged selection may land in (drop highlight).
 	const groupTargets = useMemo(() => groupMoveTargets(selectedTasks), [selectedTasks]);
+	const outcomeDrop = useOutcomeDrop(selectedTasks);
 	// Determine which visual column all selected tasks belong to (null = mixed selection)
 	const selectedColumnStatus = useMemo<
 		(typeof TASK_STATUS_COLUMNS)[number] | null
 	>(() => {
 		if (selectedTaskIds.size === 0) return null;
 		const columns = new Set(
-			selectedTasks.map((t) => getVisualColumn(t.status)),
+			selectedTasks.map((t) => getBoardColumn(t)),
 		);
 		return columns.size === 1 ? [...columns][0] : null;
 	}, [selectedTasks, selectedTaskIds.size]);
@@ -1170,8 +1149,8 @@ export function KanbanBoard({
 					.getState()
 					.tasks.find((t) => t.id === overId);
 				if (overTask) {
-					setOverColumnId(overTask.status);
-					announceColumn = getVisualColumn(overTask.status);
+					announceColumn = getBoardColumn(overTask);
+					setOverColumnId(announceColumn);
 				}
 			}
 
@@ -1551,7 +1530,7 @@ export function KanbanBoard({
 							setImportConfirmDialog({
 								open: true,
 								workItems: parsed.workItems,
-								targetColumn: columnStatus,
+								targetColumn: columnStatus as TaskStatus, // IMPORT_ALLOWED_COLUMNS: statuses only
 								isImporting: false,
 								source: isJira ? "jira" : "azure-devops",
 							});
@@ -1996,9 +1975,10 @@ export function KanbanBoard({
 				.tasks.find((t) => t.id === activeTaskId);
 			if (!task) return;
 			oldStatus = task.status;
+			if (await outcomeDrop(task, overId)) return;
 
 			// Check if dropped on a column
-			if (isValidDropColumn(overId)) {
+			if (isValidDropColumn(overId) && !isOutcomeColumn(overId)) {
 				newStatus = overId;
 			} else {
 				// Check if dropped on another task - move to that task's column
@@ -2012,8 +1992,8 @@ export function KanbanBoard({
 					if (!task) return;
 
 					// Compare visual columns
-					const taskVisualColumn = getVisualColumn(task.status);
-					const overTaskVisualColumn = getVisualColumn(overTask.status);
+					const taskVisualColumn = getBoardColumn(task);
+					const overTaskVisualColumn = getBoardColumn(overTask);
 
 					// Same visual column: reorder within column
 					if (taskVisualColumn === overTaskVisualColumn) {
@@ -2154,7 +2134,7 @@ export function KanbanBoard({
 			}
 
 			// Update task order for the new column - add task to top of new column
-			const oldVisualColumn = getVisualColumn(oldStatus);
+			const oldVisualColumn = getBoardColumn(task);
 			const newVisualColumn = getVisualColumn(newStatus);
 
 			if (oldVisualColumn !== newVisualColumn) {
@@ -2195,7 +2175,7 @@ export function KanbanBoard({
 			setColumnOrder,
 			announce,
 			getColumnLabel,
-			kanbanSort,
+			kanbanSort, outcomeDrop,
 		],
 	);
 
@@ -2310,7 +2290,7 @@ export function KanbanBoard({
 													<span className="block text-xs text-muted-foreground">
 														{t("kanban.stale.rowMeta", {
 															column:
-																getColumnLabel(getVisualColumn(task.status)) ??
+																getColumnLabel(getBoardColumn(task)) ??
 																"",
 															duration: formatAgingDuration(hours, t),
 														})}
@@ -2322,29 +2302,6 @@ export function KanbanBoard({
 								</ScrollArea>
 							</PopoverContent>
 						</Popover>
-					)}
-					{/* Abandoned filter: shown greyed on the board by default; this chip
-					    toggles hiding them. Only appears when there are abandoned tasks. */}
-					{abandonedCount > 0 && (
-						<button
-							type="button"
-							onClick={toggleHideAbandoned}
-							aria-pressed={hideAbandoned}
-							className={cn(
-								"flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
-								hideAbandoned
-									? "border-warning/50 bg-warning/20 text-warning hover:bg-warning/25"
-									: "border-border/60 bg-muted/30 text-muted-foreground hover:bg-muted/50",
-							)}
-							title={
-								hideAbandoned
-									? t("kanban.abandoned.showChip")
-									: t("kanban.abandoned.hideChip")
-							}
-						>
-							<Ban className="h-3.5 w-3.5" />
-							{t("kanban.abandoned.chip", { count: abandonedCount })}
-						</button>
 					)}
 					{/* Cost forecast: sum of applied Formula Lab estimates */}
 					{costForecast.totalUsd > 0 && (
@@ -2577,6 +2534,7 @@ export function KanbanBoard({
 					onClear={deselectAllTasks}
 				/>
 			)}
+			<AbandonRequestDialog />
 
 			{/* Bulk "mark as done" confirmation dialog (human_review → done + PR creation) */}
 			<AlertDialog

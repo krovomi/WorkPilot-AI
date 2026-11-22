@@ -30,7 +30,9 @@ describe("normalizeColumnOrder", () => {
 			"in_progress",
 			"ai_review",
 			"human_review",
+			"failed",
 			"build_failed",
+			"abandoned",
 		]);
 	});
 

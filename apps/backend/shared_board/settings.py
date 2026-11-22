@@ -15,6 +15,11 @@ setup card the form created for a project with no phone app, see
 ``mobile.bootstrap``) are plain ``task_metadata.json`` fields, as on the
 desktop; the run reads the targets (``run_manager``), the board the rest.
 
+``abandoned`` and its companions (when, why, the resolution and the task it
+duplicates or that replaces it) set a card aside in the « Abandonnée » column
+of every member's board; nothing is deleted and resuming clears them
+(``shared/utils/task-lifecycle.ts`` on the desktop).
+
 The engine names a provider of the capability matrix
 (``capabilities/providers.yaml``); its credentials are the deployment's, as
 for every run on the server. The goal is validated by ``goal.spec`` and its
@@ -122,8 +127,27 @@ class CardEngine(BaseModel):
 MobileTarget = Literal["android", "ios"]
 #: A task id as the app names a card: ``server:<project>:<card>`` or a spec id.
 TaskRef = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9:._-]{0,199}$")]
+#: Why a card was set aside, as the desktop's ``ABANDON_RESOLUTIONS`` lists them.
+AbandonResolution = Literal[
+    "wont_do", "duplicate", "obsolete", "replaced", "pr_closed", "other"
+]
+#: An ISO 8601 instant as ``Date.toISOString`` writes it.
+INSTANT_PATTERN = (
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$"
+)
 #: Metadata keys this module writes as they are given (``None`` removes them).
-PLAIN_KEYS = ("priority", "category", "mobileTargets", "blockedBy", "mobileBootstrap")
+PLAIN_KEYS = (
+    "priority",
+    "category",
+    "mobileTargets",
+    "blockedBy",
+    "mobileBootstrap",
+    "abandoned",
+    "abandonedAt",
+    "abandonedReason",
+    "abandonedResolution",
+    "abandonedLink",
+)
 
 
 class MobileBootstrap(BaseModel):
@@ -153,6 +177,11 @@ class CardSettings(BaseModel):
     mobileTargets: list[MobileTarget] | None = Field(default=None, max_length=2)
     blockedBy: list[TaskRef] | None = Field(default=None, max_length=50)
     mobileBootstrap: MobileBootstrap | None = None
+    abandoned: bool | None = None
+    abandonedAt: str | None = Field(default=None, pattern=INSTANT_PATTERN)
+    abandonedReason: str | None = Field(default=None, max_length=2000)
+    abandonedResolution: AbandonResolution | None = None
+    abandonedLink: TaskRef | None = None
 
     def plain_value(self, key: str) -> Any:
         """The value written to ``task_metadata.json``; ``None`` removes the key."""
@@ -267,6 +296,7 @@ def read_settings(root: Path, directory: Path) -> dict[str, Any]:
         "mobileTargets": metadata.get("mobileTargets"),
         "blockedBy": metadata.get("blockedBy"),
         "mobileBootstrap": metadata.get("mobileBootstrap"),
+        **{key: metadata.get(key) for key in PLAIN_KEYS if key.startswith("abandoned")},
         "goal": None,
         "goalError": None,
     }

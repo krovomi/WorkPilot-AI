@@ -30,6 +30,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TASK_STATUS_LABELS } from "../../../shared/constants";
 import type { Task, TaskStatus } from "../../../shared/types";
+import type { TaskStatusColumn } from "../../../shared/constants/task";
 import { columnPulse } from "../../lib/column-pulse";
 import { isQuickAddColumn, type QuickAddColumn } from "../../lib/kanban-columns";
 import { QUICK_ADD_LABELS } from "../../lib/quick-add";
@@ -92,7 +93,8 @@ const COLUMN_MENU_IGNORED_TARGETS =
 	'.kanban-card, input, textarea, [contenteditable="true"], [data-quick-add]';
 
 export interface DroppableColumnProps {
-	status: TaskStatus;
+	/** The column: a status, or an outcome column (« Échec », « Abandonnée »). */
+	status: TaskStatusColumn;
 	tasks: Task[];
 	onTaskClick: (task: Task) => void;
 	onStatusChange: (taskId: string, newStatus: TaskStatus) => unknown;
@@ -648,6 +650,10 @@ export const DroppableColumn = memo(function DroppableColumn({
 				return "column-pr-open";
 			case "done":
 				return "column-done";
+			case "failed":
+				return "column-failed";
+			case "abandoned":
+				return "column-abandoned";
 			default:
 				return "border-t-muted-foreground/30";
 		}

@@ -35,6 +35,20 @@ function renderItems(props: ComponentProps<typeof TaskCardMenuItems>) {
 const separators = () => document.querySelectorAll('[role="separator"]').length;
 
 describe("TaskCardMenuItems", () => {
+	it("sets a task aside, or resumes it, from the work group", async () => {
+		const user = userEvent.setup();
+		const onAbandon = vi.fn();
+		const { unmount } = renderItems({ onAbandon, onDelete: vi.fn() });
+		expect(separators()).toBe(1);
+		await user.click(screen.getByRole("menuitem", { name: "Abandon…" }));
+		expect(onAbandon).toHaveBeenCalled();
+		unmount();
+		const onUnabandon = vi.fn();
+		renderItems({ onUnabandon });
+		await user.click(screen.getByRole("menuitem", { name: "Resume" }));
+		expect(onUnabandon).toHaveBeenCalled();
+	});
+
 	it("shows delete alone, without a separator", () => {
 		renderItems({ onDelete: vi.fn() });
 		expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Delete"]);

@@ -37,6 +37,8 @@ function createTestTaskOrder(
 		done: [],
 		pr_created: [],
 		error: [],
+		failed: [],
+		abandoned: [],
 		...overrides,
 	};
 }
@@ -318,6 +320,8 @@ describe("Task Order State Management", () => {
 				done: [],
 				pr_created: [],
 				error: [],
+				failed: [],
+				abandoned: [],
 			});
 		});
 
@@ -360,6 +364,8 @@ describe("Task Order State Management", () => {
 				done: [],
 				pr_created: [],
 				error: [],
+				failed: [],
+				abandoned: [],
 			});
 		});
 
@@ -383,6 +389,8 @@ describe("Task Order State Management", () => {
 				done: [],
 				pr_created: [],
 				error: [],
+				failed: [],
+				abandoned: [],
 			});
 
 			localStorage.getItem = originalGetItem;
@@ -618,6 +626,8 @@ describe("Task Order State Management", () => {
 				done: [],
 				pr_created: [],
 				error: [],
+				failed: [],
+				abandoned: [],
 			} as TaskOrderState;
 			useTaskStore.setState({ taskOrder: order });
 
@@ -732,6 +742,8 @@ describe("Task Order State Management", () => {
 				done: [],
 				pr_created: [],
 				error: [],
+				failed: [],
+				abandoned: [],
 			});
 
 			consoleSpy.mockRestore();

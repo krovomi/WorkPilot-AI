@@ -773,10 +773,10 @@ function TaskDetailModalContent({
 		}
 	};
 
-	const handleAbandon = async (reason?: string) => {
+	const handleAbandon = async (choice: Parameters<typeof abandonTask>[1]) => {
 		state.setIsAbandoning(true);
 		try {
-			const result = await abandonTask(task.id, reason);
+			const result = await abandonTask(task.id, choice);
 			if (result.success) {
 				state.setShowAbandonDialog(false);
 				toast({
@@ -1643,7 +1643,7 @@ function TaskDetailModalContent({
 			{/* Abandon Confirmation Dialog (optional reason) */}
 			<AbandonDialog
 				open={state.showAbandonDialog}
-				task={task}
+				tasks={[task]}
 				isAbandoning={state.isAbandoning}
 				onOpenChange={state.setShowAbandonDialog}
 				onAbandon={handleAbandon}

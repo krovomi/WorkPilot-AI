@@ -4,7 +4,7 @@
  */
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { TaskStatus } from "../../../shared/types";
+import type { TaskStatusColumn } from "../../../shared/constants/task";
 import { columnCapacity } from "../../lib/kanban-column-meta";
 import {
 	ColumnCount,
@@ -66,20 +66,22 @@ describe("ColumnIcon", () => {
 	});
 
 	it("falls back to the inbox for a status without a column", () => {
-		expect(columnIcon("error" as TaskStatus)).toBe(columnIcon("backlog"));
+		expect(columnIcon("error" as string as TaskStatusColumn)).toBe(columnIcon("backlog"));
 	});
 });
 
 describe("empty states", () => {
-	const statuses: TaskStatus[] = [
+	const statuses: TaskStatusColumn[] = [
 		"backlog",
 		"queue",
 		"in_progress",
 		"ai_review",
 		"human_review",
+		"failed",
 		"build_failed",
 		"pr_created",
 		"done",
+		"abandoned",
 	];
 
 	it.each(statuses)("%s has a message and a hint", (status) => {
@@ -89,7 +91,7 @@ describe("empty states", () => {
 	});
 
 	it("an unknown status has a message and no hint", () => {
-		const { container } = render(<ColumnEmptyState status={"error" as TaskStatus} isOver={false} />);
+		const { container } = render(<ColumnEmptyState status={"error" as string as TaskStatusColumn} isOver={false} />);
 		expect(container.querySelector(".kanban-col-empty-title")).toBeInTheDocument();
 		expect(container.querySelector(".kanban-col-empty-hint")).toBeNull();
 	});

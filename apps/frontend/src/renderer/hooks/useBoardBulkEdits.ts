@@ -5,14 +5,14 @@ import {
 	type CardType,
 	cardTypeChoiceMetadata,
 } from "../../shared/constants/card-types";
-import type { TaskStatusColumn } from "../../shared/constants/task";
+import { isOutcomeColumn, type TaskStatusColumn } from "../../shared/constants/task";
 import type { Task, TaskPriority } from "../../shared/types";
 import { deleteCardsLater } from "../components/kanban/deleteCardsLater";
 import { applyCardChoice, isLightCard, recordMoves } from "../lib/card-edits";
 import { countRunning, type GroupMovePlan, planGroupMove } from "../lib/group-move";
 import { getVisualColumn } from "../lib/kanban-columns";
 import { undoLast, useBoardUndoStore } from "../stores/board-undo-store";
-import { persistTaskStatus, useTaskStore } from "../stores/task-store";
+import { persistTaskStatus, resumeAbandonedTask, useTaskStore } from "../stores/task-store";
 import { toast } from "./use-toast";
 
 /** What a group move did besides moving: cards left waiting, cards left in place. */
@@ -110,6 +110,8 @@ export function useBoardBulkEdits({
 	// rest waits in the queue, held there until the queue has run once.
 	const moveSelection = useCallback(
 		async (target: TaskStatusColumn) => {
+			// « Échec » and « Abandonnée » are reached by the runs and the abandon dialog.
+			if (isOutcomeColumn(target)) return;
 			const running = countRunning(useTaskStore.getState().tasks);
 			const plan = planGroupMove(selectedTasks, target, maxParallelTasks - running);
 			if (plan.moves.length === 0) {
@@ -121,6 +123,9 @@ export function useBoardBulkEdits({
 			const moved = [];
 			for (const { task, to } of plan.moves) {
 				if (to === "queue" && task.status === "in_progress") heldInQueue.add(task.id);
+				// An abandoned card is resumed on its way (lib/kanban-columns.ts canMoveTaskTo).
+				if (task.metadata?.abandoned === true && !(await resumeAbandonedTask(task.id)).success) { failed++; continue; }
+				if (task.status === to) continue;
 				const result = await persistTaskStatus(task.id, to);
 				if (result.success) moved.push({ id: task.id, from: task.status, to });
 				// Held by the pre-analysis: its dialog asks what the card needs.

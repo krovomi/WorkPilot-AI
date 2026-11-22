@@ -1499,7 +1499,9 @@ export const TaskCard = memo(function TaskCard({
 					<div className="relative z-10 mb-2 flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1">
 						<Ban className="h-3.5 w-3.5 shrink-0 text-warning" />
 						<span className="text-2xs font-medium text-warning">
-							{t("tasks:abandon.badge")}
+							{task.metadata?.abandonedResolution
+								? t(`tasks:abandon.resolutions.${task.metadata.abandonedResolution}`)
+								: t("tasks:abandon.badge")}
 						</span>
 						<button
 							type="button"

@@ -33,7 +33,8 @@ export function availableActions(
 	details: CardDetails | null,
 	runs: readonly AgentRun[],
 ): CardAction[] {
-	if (!card.specId) return [];
+	// A card set aside is resumed from the desktop board.
+	if (!card.specId || card.outcome === "abandoned") return [];
 	if (activeRun(runs)) return ["stop"];
 	// The column says an agent works on it, but no run is queued or running:
 	// the build crashed, the server restarted, or sending it back could not

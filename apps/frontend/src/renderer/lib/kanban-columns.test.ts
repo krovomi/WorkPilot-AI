@@ -7,6 +7,7 @@ import { TASK_STATUS_COLUMNS } from "../../shared/constants";
 import {
 	canMoveTaskTo,
 	emptyColumnGroups,
+	getBoardColumn,
 	getVisualColumn,
 	manualMoveTargets,
 	VALID_BULK_TRANSITIONS,
@@ -22,8 +23,60 @@ describe("getVisualColumn", () => {
 		);
 	});
 
-	it("still draws an error under Human review", () => {
-		expect(getVisualColumn("error")).toBe("human_review");
+	it("draws an error in Failed", () => {
+		expect(getVisualColumn("error")).toBe("failed");
+	});
+});
+
+describe("getBoardColumn", () => {
+	it("puts an abandoned card in Abandoned whatever its status", () => {
+		expect(
+			getBoardColumn({ status: "in_progress", metadata: { abandoned: true } }),
+		).toBe("abandoned");
+	});
+
+	it("puts a review that ended on a failure in Failed", () => {
+		for (const reviewReason of ["errors", "prompt_too_long", "qa_rejected"] as const) {
+			expect(getBoardColumn({ status: "human_review", reviewReason })).toBe(
+				"failed",
+			);
+		}
+	});
+
+	it("keeps a finished review in Human review", () => {
+		expect(
+			getBoardColumn({ status: "human_review", reviewReason: "completed" }),
+		).toBe("human_review");
+	});
+});
+
+describe("outcome columns", () => {
+	const failed = { status: "error" as const };
+	const abandoned = { status: "queue" as const, metadata: { abandoned: true } };
+
+	it("never accepts a card dropped into Failed", () => {
+		expect(canMoveTaskTo({ status: "backlog" }, "failed")).toBe(false);
+	});
+
+	it("lets any card but a done one be abandoned", () => {
+		expect(canMoveTaskTo({ status: "in_progress" }, "abandoned")).toBe(true);
+		expect(canMoveTaskTo({ status: "done" }, "abandoned")).toBe(false);
+		expect(canMoveTaskTo(abandoned, "abandoned")).toBe(false);
+	});
+
+	it("sends a failed card back to work only", () => {
+		expect(canMoveTaskTo(failed, "queue")).toBe(true);
+		expect(canMoveTaskTo(failed, "backlog")).toBe(true);
+		expect(canMoveTaskTo(failed, "done")).toBe(false);
+		expect(manualMoveTargets(failed)).toEqual(["backlog", "queue", "in_progress"]);
+	});
+
+	it("lets an abandoned card go back to the column of its status", () => {
+		expect(canMoveTaskTo(abandoned, "queue")).toBe(true);
+	});
+
+	it("offers no Move to menu on an abandoned card", () => {
+		expect(manualMoveTargets(abandoned)).toEqual([]);
 	});
 });
 

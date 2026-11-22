@@ -5,7 +5,7 @@
  * by both the Kanban board and the task-detail modal.
  */
 
-import type { Task, TaskMetadata } from "../types/task";
+import type { AbandonResolution, Task, TaskMetadata } from "../types/task";
 
 /**
  * "Definition of Done" checklist surfaced before a task is closed from human
@@ -38,28 +38,52 @@ export function isTaskAbandoned(task: Pick<Task, "metadata">): boolean {
 	return task.metadata?.abandoned === true;
 }
 
+/** What a person says when they set a task aside. */
+export interface AbandonChoice {
+	reason?: string;
+	resolution?: AbandonResolution;
+	/** The task it duplicates or is replaced by; kept for those two resolutions only. */
+	link?: string;
+}
+
+const LINKED_RESOLUTIONS: ReadonlySet<AbandonResolution> = new Set([
+	"duplicate",
+	"replaced",
+]);
+
 /**
  * Metadata patch that marks a task abandoned. Merged onto the existing metadata
  * (see TASK_UPDATE), so only the abandon fields are set. An empty/whitespace
- * reason is omitted rather than stored as a blank string.
+ * reason is omitted rather than stored as a blank string; a link is kept only
+ * for a resolution that names another task.
  */
 export function buildAbandonMetadata(
-	reason?: string,
+	choice: AbandonChoice | string = {},
 	now: Date = new Date(),
 ): Partial<TaskMetadata> {
+	const { reason, resolution, link } =
+		typeof choice === "string" ? { reason: choice } : choice;
 	const trimmed = reason?.trim();
+	const linked = resolution && LINKED_RESOLUTIONS.has(resolution) ? link?.trim() : undefined;
 	return {
 		abandoned: true,
 		abandonedAt: now.toISOString(),
 		...(trimmed ? { abandonedReason: trimmed } : {}),
+		...(resolution ? { abandonedResolution: resolution } : {}),
+		...(linked ? { abandonedLink: linked } : {}),
 	};
 }
 
 /**
  * Metadata patch that reactivates an abandoned task. `abandoned: false` (not
  * deletion) is enough since {@link isTaskAbandoned} checks strict equality;
- * the reason is cleared so a resumed task reads clean.
+ * the reason, resolution and link are cleared so a resumed task reads clean.
  */
 export function buildResumeMetadata(): Partial<TaskMetadata> {
-	return { abandoned: false, abandonedReason: undefined };
+	return {
+		abandoned: false,
+		abandonedReason: undefined,
+		abandonedResolution: undefined,
+		abandonedLink: undefined,
+	};
 }
