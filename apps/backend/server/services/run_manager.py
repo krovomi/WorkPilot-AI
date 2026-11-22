@@ -454,9 +454,10 @@ class RunManager:
         longer exists, then record its end on a row that is gone. Returns how
         many runs were stopped; gives up waiting after ``timeout`` seconds.
         """
+        held = self.active_runs(project_id)
         runs = await self.stop_runs(project_id)
         await wait_until_ended(
-            lambda: any(run in self._tracked for run in runs), timeout
+            lambda: any(run in self._tracked for run in held), timeout
         )
         return len(runs)
 
@@ -473,8 +474,17 @@ class RunManager:
         self, project_id: str, started_by: str | None = None
     ) -> list[str]:
         """Stop the project's runs (only those ``started_by`` started, when
-        given) without waiting for them to end; the ids stopped."""
-        runs = self.active_runs(project_id, started_by)
+        given) without waiting for them to end; the ids stopped.
+
+        A run already stopped and still winding down is not stopped again,
+        nor counted: a second Stop right after the first one names only the
+        runs it stopped itself.
+        """
+        runs = [
+            run
+            for run in self.active_runs(project_id, started_by)
+            if run not in self._cancelled
+        ]
         for run_id in runs:
             await self.cancel_run(run_id)
         return runs
