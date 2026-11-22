@@ -108,7 +108,7 @@ def test_selenium_python() -> None:
     assert body == [
         '    driver.get("http://localhost:3000/login")',
         '    fill(locate(driver, By.CSS_SELECTOR, "#email"), TEST_DATA["email"])',
-        '    fill(locate(driver, By.CSS_SELECTOR, "#pw"), os.environ["E2E_PW"])',
+        '    fill(locate(driver, By.CSS_SELECTOR, "#pw"), os.environ[TEST_DATA["pw_env"]])',
         '    Select(locate(driver, By.CSS_SELECTOR, "[data-testid=\\"lang\\"]", '
         'frames=["#f"])).select_by_value("fr")',
         "    element = locate(driver, By.XPATH, " + json.dumps(ROLE_XPATH) + ")",
@@ -132,14 +132,33 @@ def test_selenium_java() -> None:
     assert test.code.startswith("package e2e;\n") and "class LogInTest {" in test.code
     assert "Thread.sleep" not in test.code and "implicitlyWait" not in test.code
     assert "private static String secret(String name)" in test.code
-    assert test.data_path is None and test.data_code is None
-    assert '\t\tstatic final String EMAIL = "ada@x.io";' in test.code.splitlines()
+    assert test.data_path == "src/test/resources/e2e/log-in.data.json"
+    assert json.loads(test.data_code or "") == {"email": "ada@x.io", "pw_env": "E2E_PW"}
     lines = test.code.splitlines()
+    assert lines[2:7] == [
+        "import java.io.IOException;",
+        "import java.io.InputStream;",
+        "import java.io.UncheckedIOException;",
+        "import java.nio.charset.StandardCharsets;",
+        "import java.time.Duration;",
+    ]
+    assert (
+        "import java.util.Map;" in lines
+        and "import org.openqa.selenium.json.Json;" in lines
+    )
+    assert (
+        '\tprivate static final Map<String, Object> TEST_DATA = readTestData("log-in.data.json");'
+        in lines
+    )
+    assert (
+        "\t\ttry (InputStream in = LogInTest.class.getResourceAsStream(file)) {"
+        in lines
+    )
     body = lines[lines.index("\tvoid replaysTheRecordedSteps() {") + 1 : -2]
     assert body == [
         '\t\tdriver.get("http://localhost:3000/login");',
-        '\t\tfill(locate(By.cssSelector("#email")), TestData.EMAIL);',
-        '\t\tfill(locate(By.cssSelector("#pw")), secret("E2E_PW"));',
+        '\t\tfill(locate(By.cssSelector("#email")), data("email"));',
+        '\t\tfill(locate(By.cssSelector("#pw")), secret(data("pw_env")));',
         '\t\tnew Select(locate(By.cssSelector("[data-testid=\\"lang\\"]"), '
         'new String[] {"#f"}, new String[] {}, false)).selectByValue("fr");',
         "\t\t{",
@@ -180,7 +199,7 @@ def test_webdriverio() -> None:
     assert body == [
         '\t\tawait browser.url("http://localhost:3000/login");',
         '\t\tawait (await locate("#email")).setValue(TEST_DATA["email"]);',
-        '\t\tawait (await locate("#pw")).setValue(secret("E2E_PW"));',
+        '\t\tawait (await locate("#pw")).setValue(secret(TEST_DATA["pw_env"]));',
         '\t\tawait (await locate("[data-testid=\\"lang\\"]", { frames: ["#f"] }))'
         '.selectByAttribute("value", "fr");',
         "\t\t{",
@@ -207,6 +226,7 @@ def test_no_secret_no_helper_and_empty_tests() -> None:
     assert py.splitlines()[-1] == "    pass" and "import os" not in py
     java = export_recording(empty, "selenium-java").code
     assert "secret(" not in java and "class RecordedFlowTest {" in java
+    assert "TEST_DATA" not in java and "import java.io" not in java
     assert "secret(" not in export_recording(empty, "webdriverio").code
 
 
