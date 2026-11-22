@@ -102,3 +102,17 @@ async def group_project_role(
         .where(Project.org_id == UserGroup.org_id)
     )
     return highest_role(*(await db.scalars(query)))
+
+
+async def project_group_names(
+    db: AsyncSession, user_id: str, project_id: str
+) -> list[str]:
+    """The names of this person's groups in the organization of one project:
+    the teams a run they start recalls ``team:`` memories for."""
+    query = (
+        select(UserGroup.name)
+        .join(Project, Project.org_id == UserGroup.org_id)
+        .where(Project.id == project_id)
+        .where(UserGroup.id.in_(_member_groups(user_id)))
+    )
+    return sorted(set(await db.scalars(query)))

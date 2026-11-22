@@ -8,7 +8,7 @@
 | `arbitration.py` | after a sync: safe rules settle a pair, the rest waits for a person |
 | `advisor.py` | a model's opinion on one queued pair, asked by a person |
 | `announce.py` | a queued pair told to the team, once, when the project asks (a port the notifications fill) |
-| `scopes.py` | where a memory applies: a module, ``team:<name>`` or ``branch:<ref>`` |
+| `scopes.py` | where a memory applies: a module, ``team:<name>`` or ``branch:<ref>``; what an agent recalls of it (`recalled`) |
 | `maintainers.py` | who settles an escalated pair, per scope |
 | `undo.py` | take a decision back: the last automatic one within the hour, or a merge |
 | `folds.py` | the pattern a learning-loop merge folded in, kept so that the merge can be separated |

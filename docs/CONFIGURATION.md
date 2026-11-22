@@ -908,6 +908,8 @@ Opt-in features. Those marked *API* are read by the local API: put them in
 | `WORKPILOT_AUTO_PROMOTE_THRESHOLD` | off | *API.* Integer from 0 to 100. Enables "Accept & skip human review" in the QA promotion dialog when the build's QA score reaches it; the score is 0 unless QA signed off. Nothing moves a card on its own. |
 | `AUTO_TEST_GENERATION` | on | `false`, and only `false`, removes the "automated tests" section from each subtask's coding prompt. That section tells the coder which kinds of tests to write, with the test libraries the project already has. |
 | `AUTO_FIX_MAX_ATTEMPTS` | 5 | CLI: attempts of `run.py --spec … --auto-fix` when `--auto-fix-max-attempts` is not given. |
+| `WORKPILOT_BRAIN_BRANCH` | unset | Set by WorkPilot, not by a person: the git branch of the build a `workpilot-brain` MCP server was started for (empty when it could not be read). Its `brain_recall` and `query_graph` leave out a memory scoped `branch:` to another branch, or to any branch when it is empty. Unset (a person's own agent), the server reads the branch of the folder it runs in. See [memory-lifecycle.md](architecture/memory-lifecycle.md). |
+| `WORKPILOT_RECALL_TEAMS` | unset | Set by the server for each run, never passed from its own environment: the groups of the person who started it in the project's organization, a JSON list of names (`[]` for none). A run's agents recall a memory scoped `team:<name>` only when one of those groups has that name. Unset (desktop, CLI), `team:` memories are recalled by every build. |
 
 ## Debug and console output
 
