@@ -620,7 +620,7 @@
 	},
 	"kanbanColumnSummary": {
 		"label": "Column summary",
-		"description": "Show a one-line summary under each Kanban column title (urgent cards, free slots, plans to approve…)."
+		"description": "Show a one-line summary under each Kanban column title (urgent tasks, agent phases, plans to approve…)."
 	},
 	"general": {
 		"providerSection": "Default provider",

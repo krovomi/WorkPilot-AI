@@ -1670,7 +1670,7 @@
 	},
 	"kanbanColumnSummary": {
 		"label": "Résumé des colonnes",
-		"description": "Affiche une ligne de résumé sous le titre de chaque colonne du Kanban (cartes urgentes, créneaux libres, plans à approuver…)."
+		"description": "Affiche une ligne de résumé sous le titre de chaque colonne du Kanban (tâches urgentes, phase des agents, plans à approuver…)."
 	},
 	"mcp": {
 		"addCustomServer": "Ajouter un serveur personnalisé",
