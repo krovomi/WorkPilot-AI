@@ -6,7 +6,7 @@ import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { errorLabel } from "./lifecycle-labels";
-import { MemoryTimeline } from "./MemoryTimeline";
+import { MemoryTimeline, UnverifiedBadge } from "./MemoryTimeline";
 
 interface MemoryActionsProps {
 	readonly projectId: string;
@@ -17,6 +17,8 @@ interface MemoryActionsProps {
 	readonly appliesTo?: string;
 	/** After a pin, a forget or a scope: the list is read again. */
 	readonly onChanged: () => void;
+	/** No trusted key signed its last change: readable, kept from agents. */
+	readonly unverified?: boolean;
 }
 
 /** The scope forms besides a module path (`brain/lifecycle/scopes.py`). */
@@ -29,6 +31,7 @@ export function MemoryActions({
 	pinned,
 	appliesTo = "",
 	onChanged,
+	unverified = false,
 }: MemoryActionsProps) {
 	const { t } = useTranslation(["context"]);
 	const [busy, setBusy] = useState(false);
@@ -86,6 +89,7 @@ export function MemoryActions({
 	return (
 		<div className="mt-3 space-y-2" data-testid="memory-actions">
 			<div className="flex flex-wrap items-center gap-2">
+				{unverified && <UnverifiedBadge />}
 				{pinned && (
 					<Badge variant="outline" className="text-xs">
 						<Pin className="h-3 w-3 mr-1" />
@@ -171,7 +175,9 @@ export function MemoryActions({
 					{error}
 				</p>
 			)}
-			{history && <MemoryTimeline entries={history} />}
+			{history && (
+				<MemoryTimeline entries={history} unverified={unverified ? new Set([memoryId]) : undefined} />
+			)}
 		</div>
 	);
 }

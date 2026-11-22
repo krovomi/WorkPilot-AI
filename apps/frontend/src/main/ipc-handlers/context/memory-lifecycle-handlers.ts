@@ -22,6 +22,7 @@ import type {
 	MemoryLifecycleView,
 	MemoryRestoreOutcome,
 	MemoryRevertOutcome,
+	TrustedSigner,
 } from "../../../shared/types";
 import { backendFetch } from "../_backend-fetch";
 import { localOnly, type MemoryTarget, memoryFetch, memoryTarget } from "./memory-lifecycle-target";
@@ -35,6 +36,7 @@ import {
 	maintainerNames,
 	memoryId,
 	scopeText,
+	signerLines,
 	trashId,
 } from "./memory-lifecycle-validation";
 
@@ -53,6 +55,11 @@ interface LifecycleResponse {
 	pinned?: number;
 	pin_limit?: number;
 	retention_days?: number;
+	signers?: TrustedSigner[];
+	signers_rejected?: number;
+	signing?: boolean;
+	can_edit_signers?: boolean;
+	unverified?: string[];
 }
 
 function post(body: Record<string, unknown>): RequestInit {
@@ -91,6 +98,12 @@ export async function loadMemoryLifecycle(
 			pinned: result.pinned ?? 0,
 			pinLimit: result.pin_limit ?? 50,
 			retentionDays: result.retention_days ?? 30,
+			// A server project's brain is never synced: no list, nothing unverified.
+			signers: result.signers ?? [],
+			signersRejected: result.signers_rejected ?? 0,
+			signing: result.signing === true,
+			canEditSigners: result.can_edit_signers !== false,
+			unverified: result.unverified ?? [],
 		},
 	};
 }
@@ -274,6 +287,23 @@ export function registerMemoryLifecycleHandlers(): void {
 			);
 			return result.success
 				? { success: true, data: result.maintainers ?? [] }
+				: failure(result);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.CONTEXT_MEMORY_SET_SIGNERS,
+		async (_, projectId: unknown, rawLines: unknown): Promise<IPCResult<TrustedSigner[]>> => {
+			const project = localOnly(projectId);
+			if ("error" in project) return { success: false, error: project.error };
+			const lines = signerLines(rawLines);
+			if (!lines) return INVALID;
+			const result = await backendFetch<{ signers?: TrustedSigner[] }>(
+				"/api/brain/memory/signers",
+				post({ project_dir: project.path, lines }),
+			);
+			return result.success
+				? { success: true, data: result.signers ?? [] }
 				: failure(result);
 		},
 	);

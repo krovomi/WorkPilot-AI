@@ -166,7 +166,10 @@ class PatternSource:
             from learning_loop.pattern_storage import PatternStorage
 
             self._cache = [
-                p.to_dict() for p in PatternStorage(self.project_dir).load_patterns()
+                p.to_dict()
+                for p in PatternStorage(self.project_dir).load_patterns(
+                    trusted_only=True
+                )
             ]
         except Exception as exc:  # noqa: BLE001 - no patterns is an empty source
             logger.debug("could not read the learning patterns: %s", exc)
@@ -275,7 +278,7 @@ class BrainSource:
                 brain._refresh()
             # The learning loop's patterns are `PatternSource`'s, with their
             # evidence; listing them here too would show each one twice.
-            self._nodes = [
+            nodes = [
                 node
                 for node in brain.graph().nodes.values()
                 if str(node.get("source_file") or "").startswith(self.prefix)
@@ -283,6 +286,14 @@ class BrainSource:
                 and "learning-loop"
                 not in ((node.get("metadata") or {}).get("tags") or [])
             ]
+            # What this source answers goes to an agent: not a note no
+            # trusted key signed (`brain.lifecycle.provenance`).
+            from brain.lifecycle.provenance import unverified_among
+
+            hidden = unverified_among(
+                brain.root, [str(n["source_file"]) for n in nodes]
+            )
+            self._nodes = [n for n in nodes if str(n["source_file"]) not in hidden]
         except Exception as exc:  # noqa: BLE001
             logger.debug("could not read the brain graph: %s", exc)
         return self._nodes

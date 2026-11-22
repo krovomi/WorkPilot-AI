@@ -606,7 +606,9 @@ def sync(request: SyncRequest) -> dict:
 def recall(request: RecallRequest) -> dict:
     if _refused():
         return _DESKTOP_ONLY
-    return {"success": True, **Brain().recall(request.query, limit=request.limit)}
+    # A person searching: the notes no trusted key signed are shown, marked.
+    found = Brain().recall(request.query, limit=request.limit, include_unverified=True)
+    return {"success": True, **found}
 
 
 @router.post("/learn")

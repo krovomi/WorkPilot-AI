@@ -26,6 +26,7 @@ import { Input } from "../ui/input";
 import { ScrollArea } from "../ui/scroll-area";
 import { memoryFilterCategories } from "./constants";
 import { InfoItem } from "./InfoItem";
+import { UnverifiedBadge } from "./lifecycle/MemoryTimeline";
 import { MemoryCard } from "./MemoryCard";
 
 type FilterCategory = keyof typeof memoryFilterCategories;
@@ -42,6 +43,7 @@ interface MemoriesTabProps {
 		type: string;
 		content: string;
 		score: number;
+		verified?: boolean;
 	}>;
 	readonly searchLoading: boolean;
 	readonly onSearch: (query: string) => void;
@@ -302,6 +304,7 @@ export function MemoriesTab({
 											<span className="text-xs text-muted-foreground">
 												{t("context:memories.score", { score: result.score.toFixed(2) })}
 											</span>
+											{result.verified === false && <UnverifiedBadge />}
 										</div>
 										<pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono max-h-40 overflow-auto">
 											{result.content}

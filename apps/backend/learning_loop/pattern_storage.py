@@ -201,13 +201,22 @@ class PatternStorage:
 
     # -- the API the learning loop has always had ---------------------------
 
-    def load_patterns(self) -> list[LearningPattern]:
-        """Load all patterns from the vault."""
+    def load_patterns(self, *, trusted_only: bool = False) -> list[LearningPattern]:
+        """Load all patterns from the vault.
+
+        ``trusted_only``: without the patterns whose note no trusted key
+        signed (`brain.lifecycle.provenance`), for what goes in a prompt. The
+        store itself reads them all: it rewrites what it read.
+        """
         memory = self._open()
         if memory is None:
             return []
         try:
-            return self._read(memory)
+            patterns = self._read(memory)
+            if trusted_only:
+                hidden = memory.unverified_pattern_ids()
+                patterns = [p for p in patterns if p.pattern_id not in hidden]
+            return patterns
         except Exception as e:  # noqa: BLE001 - patterns never fail a build
             logger.warning(f"Failed to load learning patterns: {e}")
             return []
@@ -283,8 +292,11 @@ class PatternStorage:
     def get_patterns_for_phase(
         self, phase: str, min_confidence: float = 0.5
     ) -> list[LearningPattern]:
-        """Get enabled patterns for a specific agent phase above confidence threshold."""
-        patterns = self.load_patterns()
+        """Get enabled patterns for a specific agent phase above confidence threshold.
+
+        For a prompt: a pattern no trusted key signed is not one of them.
+        """
+        patterns = self.load_patterns(trusted_only=True)
         return [
             p
             for p in patterns

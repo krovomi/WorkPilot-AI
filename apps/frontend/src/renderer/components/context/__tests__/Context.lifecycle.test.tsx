@@ -74,6 +74,11 @@ beforeEach(async () => {
 			pinned: 0,
 			pinLimit: 50,
 			retentionDays: 30,
+			signers: [],
+			signersRejected: 0,
+			signing: false,
+			canEditSigners: true,
+			unverified: [],
 		},
 	});
 	(globalThis as { electronAPI?: unknown }).electronAPI = api;

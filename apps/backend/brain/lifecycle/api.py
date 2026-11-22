@@ -12,6 +12,7 @@ running the backend.
 | ``POST /revert`` | undo an automatic decision of the last hour, or separate a merge (`undo.py`) |
 | ``POST /scope`` | where one memory applies (``applies_to``) |
 | ``POST /maintainers`` | who settles an escalated conflict, for the whole memory or one scope (`maintainers.py`) |
+| ``POST /signers`` | the keys whose signed notes reach agents (`signers.py`); by a maintainer when there are some |
 | ``POST /conflicts/resolve`` | keep A, keep B, write the canonical note, or "not a conflict" |
 | ``POST /conflicts/suggest`` | a model's opinion on one queued pair (`advisor.py`) |
 
@@ -42,6 +43,8 @@ from . import (
     journal,
     maintainers,
     metrics,
+    provenance,
+    signers,
     store,
     undo,
 )
@@ -100,6 +103,28 @@ def _answer(outcome: dict[str, Any]) -> dict[str, Any]:
     return {"success": False, "error": code, **outcome}
 
 
+def _trust(root: Path, base: Path) -> tuple[provenance.Trust, dict[str, Any]]:
+    """The list in effect and the notes' verdicts; nothing a failed git
+    command could not answer keeps the tab from opening."""
+    try:
+        return provenance.verdicts(root, base)
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        logger.warning("brain: note signatures not read: %s", exc)
+        return provenance.Trust(), {}
+
+
+def _unverified_memories(base: Path, judged: dict[str, Any]) -> list[str]:
+    """The memories (not the journal, not the project's hub) no trusted key signed."""
+    prefix = f"{base.as_posix()}/"
+    return sorted(
+        rel
+        for rel, verdict in judged.items()
+        if verdict.status == "unverified"
+        and rel.startswith(prefix)
+        and not any(part.startswith(".") for part in rel[len(prefix) :].split("/"))
+    )[:500]
+
+
 @router.get("/lifecycle")
 def lifecycle(project_dir: str = "", limit: int = 100) -> dict:
     scope = _scope(project_dir)
@@ -116,6 +141,8 @@ def lifecycle(project_dir: str = "", limit: int = 100) -> dict:
     entries = journal.read(brain.root, base, limit=5000)
     modes = undo.revertible(brain.root, base, entries)
     who = identity.person(brain.root)
+    lists = maintainers.read_all(brain.root, base)
+    trust, judged = _trust(brain.root, base)
     return {
         "success": True,
         "journal": [e.to_dict() for e in entries[:limit]],
@@ -126,12 +153,17 @@ def lifecycle(project_dir: str = "", limit: int = 100) -> dict:
         "conflicts": arbitration.with_maintainers(
             brain.root, arbitration.open_conflicts(brain.root, base.as_posix()), who
         ),
-        "maintainers": (lists := maintainers.read_all(brain.root, base)).get("", []),
+        "maintainers": lists.get("", []),
         "maintainer_scopes": {scope: names for scope, names in lists.items() if scope},
         "can_arbitrate": maintainers.allows(lists.get("", []), who),
         "pinned": store.pinned_count(brain.root, base),
         "pin_limit": store.PIN_LIMIT,
         "retention_days": store.retention_days(),
+        "signers": [s.to_dict() for s in trust.signers],
+        "signers_rejected": len(trust.rejected),
+        "signing": provenance.signing_enabled(brain.root),
+        "can_edit_signers": maintainers.allows(lists.get("", []), who),
+        "unverified": _unverified_memories(base, judged),
     }
 
 
@@ -148,7 +180,13 @@ def history(project_dir: str = "", id: str = "", limit: int = 100) -> dict:
     limit = max(1, min(int(limit or 100), 500))
     entries = journal.read(brain.root, base, note=rel, limit=limit)
     metrics.count_view(brain.root, base)
-    return {"success": True, "id": rel, "entries": [e.to_dict() for e in entries]}
+    verdict = _trust(brain.root, base)[1].get(rel)
+    return {
+        "success": True,
+        "id": rel,
+        "entries": [e.to_dict() for e in entries],
+        "verified": verdict.to_dict() if verdict else None,
+    }
 
 
 @router.post("/forget")
@@ -247,6 +285,29 @@ def set_maintainers(request: MaintainersRequest) -> dict:
         return {"success": False, "error": "invalid", "code": "invalid"}
     _sync(brain, "brain: designate the memory maintainers")
     return {"success": True, "maintainers": kept}
+
+
+class SignersRequest(BaseModel):
+    project_dir: str = ""
+    lines: list[str] = []
+    """One ``<name> <key>`` per line: an SSH public key or a GPG fingerprint."""
+
+
+@router.post("/signers")
+def set_signers(request: SignersRequest) -> dict:
+    scope = _scope(request.project_dir)
+    if isinstance(scope, dict):
+        return scope
+    brain, base = scope
+    # The maintainers' rule: with a list of them, only they change who is trusted.
+    top = maintainers.read_all(brain.root, base).get("", [])
+    if not maintainers.allows(top, identity.person(brain.root)):
+        return {"success": False, "error": "maintainer-only", "code": "maintainer-only"}
+    kept = signers.write(brain.root, base, request.lines[: signers.MAX_SIGNERS + 1])
+    if kept is None:
+        return {"success": False, "error": "invalid", "code": "invalid"}
+    _sync(brain, "brain: change the memory's trusted signers")
+    return {"success": True, "signers": [s.to_dict() for s in kept]}
 
 
 class RevertRequest(BaseModel):

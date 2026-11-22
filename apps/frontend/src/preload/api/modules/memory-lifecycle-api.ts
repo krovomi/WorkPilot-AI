@@ -15,6 +15,7 @@ import type {
 	MemoryLifecycleView,
 	MemoryRestoreOutcome,
 	MemoryRevertOutcome,
+	TrustedSigner,
 } from "../../../shared/types";
 import { invokeIpc } from "./ipc-utils";
 
@@ -63,6 +64,12 @@ export interface MemoryLifecycleAPI {
 		names: string[],
 		scope?: string,
 	) => Promise<IPCResult<string[]>>;
+	/** The keys whose signed notes reach agents: one `<name> <key>` per line
+	 * (an SSH public key or a GPG fingerprint); none: every note is trusted. */
+	setMemorySigners: (
+		projectId: string,
+		lines: string[],
+	) => Promise<IPCResult<TrustedSigner[]>>;
 	/** Undo an automatic decision of the last hour, or separate a merge. */
 	revertMemoryDecision: (
 		projectId: string,
@@ -96,6 +103,8 @@ export function createMemoryLifecycleAPI(): MemoryLifecycleAPI {
 			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, projectId, memoryId, appliesTo),
 		setMemoryMaintainers: (projectId, names, scope) =>
 			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, projectId, names, scope),
+		setMemorySigners: (projectId, lines) =>
+			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_SET_SIGNERS, projectId, lines),
 		revertMemoryDecision: (projectId, entryId) =>
 			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, projectId, entryId),
 	};

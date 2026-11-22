@@ -59,7 +59,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .lifecycle import announce
+from .lifecycle import announce, provenance
 from .lifecycle import journal as lifecycle_journal
 from .lifecycle import store as lifecycle_store
 from .memories import redact
@@ -237,8 +237,18 @@ class ProjectMemory:
         brain: Brain | None = None,
         project: str | None = None,
         actor: str = "agent",
+        show_unverified: bool = False,
+        signatures: bool = True,
     ) -> None:
         self.actor = actor
+        self.show_unverified = show_unverified
+        """A person reading: the notes no trusted key signed are kept, marked
+        (``verified: False``). Agents never get them (`lifecycle.provenance`)."""
+        self.signatures = signatures
+        """``False`` for a server project's brain, read by a route: no git
+        command runs in a brain that a project's runs write to, and it is
+        never synced, so nothing in it came from a teammate."""
+        self._unverified: frozenset[str] | None = None
         """Who the journal says acted (`lifecycle.journal.ACTORS`)."""
         self._explained: dict[str, tuple[str, str, str, list[str]]] = {}
         self.spec_dir = Path(spec_dir) if spec_dir else None
@@ -260,6 +270,23 @@ class ProjectMemory:
         self._pending = 0
         self._pulled = False
         self._imported = False
+
+    def unverified_notes(self) -> frozenset[str]:
+        """This project's notes whose last change no trusted key signed.
+
+        Empty when the project lists no trusted signer. Read once per
+        memory, after its pull, like the notes themselves.
+        """
+        if not self.signatures:
+            return frozenset()
+        if self._unverified is None:
+            brain = self._reader()
+            self._unverified = (
+                provenance.unverified(brain.root, self.base)
+                if brain is not None
+                else frozenset()
+            )
+        return self._unverified
 
     # -- plumbing -----------------------------------------------------------
 
@@ -483,21 +510,33 @@ class ProjectMemory:
             return False
 
     def _notes(
-        self, kind: str, *, learned: bool | None = None
+        self, kind: str, *, learned: bool | None = None, everything: bool = False
     ) -> list[tuple[str, dict[str, Any], str]]:
         """The notes of *kind*. ``learned`` keeps only the learning loop's
-        patterns (``True``) or only the others (``False``); ``None`` keeps all."""
+        patterns (``True``) or only the others (``False``); ``None`` keeps all.
+
+        A note no trusted key signed is left out unless a person reads
+        (``show_unverified``) or the caller keeps the store whole
+        (``everything``: the learning loop rewrites what it read).
+        """
         brain = self._reader()
         if brain is None:
             return []
         folder = inside(brain.root, self.base / KINDS[kind])
         if not folder.is_dir():
             return []
+        hidden = (
+            frozenset()
+            if everything or self.show_unverified
+            else self.unverified_notes()
+        )
         out = []
         for path in sorted(folder.rglob("*.md")):
             if path.name.startswith(".") or ".conflict-" in path.name:
                 continue
             rel = path.relative_to(brain.root).as_posix()
+            if rel in hidden:
+                continue
             try:
                 note = read_note(brain.root, rel)
             except (OSError, ValueError):
@@ -574,8 +613,22 @@ class ProjectMemory:
         """The learning loop's patterns, oldest first, as their dicts."""
         return [
             dict(meta[LEARNED])
-            for _, meta, _ in self._by_date(self._notes("pattern", learned=True))
+            for _, meta, _ in self._by_date(
+                self._notes("pattern", learned=True, everything=True)
+            )
         ]
+
+    def unverified_pattern_ids(self) -> set[str]:
+        """The learning loop's patterns whose note no trusted key signed: kept
+        by its store, never put in a prompt."""
+        hidden = self.unverified_notes()
+        if not hidden:
+            return set()
+        return {
+            str(meta[LEARNED].get("pattern_id") or "")
+            for rel, meta, _ in self._notes("pattern", learned=True, everything=True)
+            if rel in hidden
+        }
 
     def forget(
         self, kind: str, slug: str, *, reason_code: str = "", reason: str = ""
@@ -827,6 +880,7 @@ class ProjectMemory:
     ) -> list[dict[str, Any]]:
         """Notes of this project's memory ranked by overlap with *query*."""
         terms = _terms(query)
+        marked = self.unverified_notes() if self.show_unverified else frozenset()
         hits = []
         for kind in kinds:
             for rel, meta, body in self._notes(kind, learned=learned):
@@ -846,6 +900,7 @@ class ProjectMemory:
                         "updated": str(
                             meta.get("updated") or meta.get("created") or ""
                         ),
+                        "verified": rel not in marked,
                     }
                 )
         # Newest first, then (stable) best score first: equal scores keep recency.
@@ -856,7 +911,11 @@ class ProjectMemory:
 
     def status(self) -> dict[str, Any]:
         brain = self._get_brain(create=False)
-        counts = {kind: len(self._notes(kind)) for kind in KINDS} if brain else {}
+        counts = (
+            {kind: len(self._notes(kind, everything=True)) for kind in KINDS}
+            if brain
+            else {}
+        )
         return {
             "enabled": self.is_enabled,
             "initialized": brain is not None,
@@ -1089,16 +1148,24 @@ def list_memories(
     From ``brain`` when given (a server project's own, read by
     ``shared_features.context``), else the person's brain.
     """
-    memory = ProjectMemory(project=project, brain=brain)
+    memory = _for_person(project, brain)
     return (
         [_episode(h) for h in memory.search("", limit=limit)] if memory.project else []
+    )
+
+
+def _for_person(project: str, brain: Brain | None) -> ProjectMemory:
+    """The memory a person reads: every note, the unverified ones marked —
+    except in a server project's brain (``brain`` given), never synced."""
+    return ProjectMemory(
+        project=project, brain=brain, show_unverified=True, signatures=brain is None
     )
 
 
 def search_memories(
     project: str, query: str, *, limit: int = 20, brain: Brain | None = None
 ) -> list[dict[str, Any]]:
-    memory = ProjectMemory(project=project, brain=brain)
+    memory = _for_person(project, brain)
     if not memory.project:
         return []
     return [
@@ -1107,6 +1174,7 @@ def search_memories(
             "score": h["score"],
             "type": h["type"],
             "path": h["path"],
+            "verified": h["verified"],
         }
         for h in memory.search(query, limit=limit)
     ]
@@ -1132,6 +1200,7 @@ def _episode(hit: dict[str, Any]) -> dict[str, Any]:
         "path": hit["path"],
         "pinned": meta.get("pinned") is True,
         "applies_to": str(meta.get("applies_to") or ""),
+        "verified": hit.get("verified", True),
     }
 
 

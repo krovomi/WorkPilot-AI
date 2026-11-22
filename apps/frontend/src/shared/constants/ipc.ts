@@ -309,6 +309,7 @@ export const IPC_CHANNELS = {
 	CONTEXT_MEMORY_REVERT: "context:memoryRevert",
 	CONTEXT_MEMORY_SET_SCOPE: "context:memorySetScope",
 	CONTEXT_MEMORY_SET_MAINTAINERS: "context:memorySetMaintainers",
+	CONTEXT_MEMORY_SET_SIGNERS: "context:memorySetSigners",
 
 	// Environment configuration
 	ENV_GET: "env:get",
