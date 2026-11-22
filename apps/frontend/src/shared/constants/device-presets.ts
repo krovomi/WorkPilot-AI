@@ -42,6 +42,9 @@ export const DEFAULT_MATRIX_DEVICE_IDS: readonly string[] = [
 	"desktop-1080p",
 ];
 
+/** Les vues vivantes affichées au plus : au-delà, la machine rend trop de pages à la fois. */
+export const MAX_LIVE_VIEWS = 6;
+
 /** Le preset d'un identifiant reçu, ou `undefined` : un id inconnu n'est jamais émulé. */
 export function findDevicePreset(id: unknown): DevicePreset | undefined {
 	if (typeof id !== "string") return undefined;

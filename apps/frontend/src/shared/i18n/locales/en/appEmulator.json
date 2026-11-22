@@ -308,6 +308,24 @@
 			"clean": "None",
 			"partial": "Partial reading",
 			"nearBreakpoint": "Next to a breakpoint"
+		},
+		"mode": {
+			"captures": "Captures",
+			"live": "Live views"
+		},
+		"live": {
+			"sync": "Navigate and scroll together",
+			"hint": "Each checked device shows the live page. Moving in one moves the others; the dev server reloads them all when the code changes.",
+			"capped": "{{count}} live views at most: the first {{count}} checked devices are shown.",
+			"empty": "Check devices to see them live, side by side.",
+			"errors": {
+				"invalid-request": "The request was refused.",
+				"unknown-device": "This device is not in the catalogue.",
+				"unknown-view": "This view is not part of the matrix.",
+				"not-running": "The emulator's server is not running: start it, then come back.",
+				"elsewhere": "This view left the emulator's server: it is not emulated.",
+				"emulation-failed": "The device could not be emulated in this view."
+			}
 		}
 	}
 }

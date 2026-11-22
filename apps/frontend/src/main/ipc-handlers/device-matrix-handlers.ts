@@ -60,6 +60,7 @@ import { gridCaption } from "../device-matrix/grid-labels";
 import { PersonaFailure, personaCookies } from "../device-matrix/personas";
 import { showSaveDialog } from "../electron-utils";
 import { registerDeviceLibraryHandlers } from "./device-library-handlers";
+import { registerLiveViewHandlers } from "./live-view-handlers";
 
 const MAX_PATH = 2048;
 export const GRID_EXPORT_FORMATS: readonly DeviceGridExportFormat[] = ["png", "pdf"];
@@ -175,8 +176,9 @@ interface KeptCapture extends Throttling {
 }
 
 export function registerDeviceMatrixHandlers(): void {
-	// Les appareils personnalisés et les personas que les captures nomment.
+	// Les appareils personnalisés et les personas que les captures nomment, et les vues vivantes.
 	registerDeviceLibraryHandlers();
+	registerLiveViewHandlers();
 	let busy = false;
 	/** La dernière capture de chaque appareil (au plus une par appareil du catalogue). */
 	const kept = new Map<string, KeptCapture>();

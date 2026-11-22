@@ -5,6 +5,10 @@ import type {
 	BreakpointScanResult,
 	CustomDeviceDraft,
 	CustomDeviceResult,
+	LiveScrollRequest,
+	LiveScrollResult,
+	LiveViewRequest,
+	LiveViewResult,
 	PersonaResult,
 } from "../../../shared/types/device-library";
 import type {
@@ -44,6 +48,12 @@ export interface DeviceMatrixAPI {
 	/** Enregistre sous `name` les cookies que l'aperçu envoie au serveur de l'émulateur, chiffrés par le main. */
 	saveEmulatorPersona: (name: string) => Promise<PersonaResult>;
 	deleteEmulatorPersona: (id: string) => Promise<PersonaResult>;
+	/** Pose l'appareil nommé dans un `<webview>` de la matrice ; le main vérifie ce que l'id nomme. */
+	emulateEmulatorLiveView: (request: LiveViewRequest) => Promise<LiveViewResult>;
+	/** La part défilée d'une vue vivante. */
+	readEmulatorLiveScroll: (webContentsId: number) => Promise<LiveScrollResult>;
+	/** Défile ces vues vivantes à la même part. */
+	setEmulatorLiveScroll: (request: LiveScrollRequest) => Promise<LiveScrollResult>;
 }
 
 export function createDeviceMatrixAPI(): DeviceMatrixAPI {
@@ -86,5 +96,19 @@ export function createDeviceMatrixAPI(): DeviceMatrixAPI {
 		listEmulatorPersonas: () => ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_LIST_PERSONAS),
 		saveEmulatorPersona: (name) => ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_SAVE_PERSONA, { name }),
 		deleteEmulatorPersona: (id) => ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_DELETE_PERSONA, { id }),
+		emulateEmulatorLiveView: (request) =>
+			ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_EMULATE_LIVE_VIEW, {
+				webContentsId: request.webContentsId,
+				deviceId: request.deviceId,
+				orientation: request.orientation,
+			}),
+		readEmulatorLiveScroll: (webContentsId) =>
+			ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_READ_LIVE_SCROLL, { webContentsId }),
+		setEmulatorLiveScroll: (request) =>
+			ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_SET_LIVE_SCROLL, {
+				webContentsIds: request.webContentsIds,
+				x: request.x,
+				y: request.y,
+			}),
 	};
 }

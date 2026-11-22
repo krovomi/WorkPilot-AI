@@ -1,5 +1,5 @@
 import { Camera, CheckCircle2, Download, Loader2, Square } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { DEVICE_ORIENTATIONS, DEVICE_PRESETS, orientationOf } from "../../../shared/constants/device-presets";
@@ -19,6 +19,7 @@ import { type DeviceCaptureEntry, useDeviceMatrixStore } from "../../stores/devi
 import { Button } from "../ui/button";
 import { BreakpointScanPanel } from "./BreakpointScanPanel";
 import { CustomDevices } from "./CustomDevices";
+import { LiveMatrix } from "./LiveMatrix";
 import { ISSUE_KEYS, MarkedCapture } from "./MarkedCapture";
 import { SessionChoice } from "./SessionChoice";
 
@@ -57,11 +58,14 @@ interface DeviceMatrixProps {
 	onCapture?: (image: string, url: string) => void;
 	/** La matrice a été ouverte d'office pour la revue d'une tâche : elle le dit. */
 	auto?: boolean;
+	/** Change quand l'aperçu est rechargé : les vues vivantes se rechargent avec lui. */
+	refreshKey?: number;
 }
 
 /** Plusieurs appareils, capturés par le main et lus pour les bugs responsive, côte à côte. */
-export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }: DeviceMatrixProps) {
+export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false, refreshKey = 0 }: DeviceMatrixProps) {
 	const { t } = useTranslation("appEmulator");
+	const [live, setLive] = useState(false);
 	const {
 		selected,
 		entries,
@@ -256,7 +260,29 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 				/>
 			</div>
 			<div className="min-h-0 flex-1 overflow-auto p-3">
-				{tiles.length === 0 ? (
+				<div className="mb-3 flex gap-1">
+					{[false, true].map((mode) => (
+						<Button
+							key={String(mode)}
+							size="sm"
+							variant={live === mode ? "default" : "outline"}
+							aria-pressed={live === mode}
+							onClick={() => setLive(mode)}
+						>
+							{t(mode ? "matrix.mode.live" : "matrix.mode.captures")}
+						</Button>
+					))}
+				</div>
+				{live ? (
+					<LiveMatrix
+						serverUrl={serverUrl}
+						path={path}
+						devices={devices.filter((device) => selected.includes(device.id))}
+						orientation={orientation}
+						refreshKey={refreshKey}
+						deviceName={(device) => deviceName(t, device)}
+					/>
+				) : tiles.length === 0 ? (
 					<p className="text-sm text-muted-foreground">{t("matrix.empty")}</p>
 				) : (
 					<div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] items-start gap-3">

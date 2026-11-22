@@ -308,6 +308,24 @@
 			"clean": "Aucun",
 			"partial": "Lecture partielle",
 			"nearBreakpoint": "À côté d'un point de rupture"
+		},
+		"mode": {
+			"captures": "Captures",
+			"live": "Vues vivantes"
+		},
+		"live": {
+			"sync": "Naviguer et défiler ensemble",
+			"hint": "Chaque appareil coché montre la page vivante. Bouger dans l'une fait bouger les autres ; le serveur de dev les recharge toutes quand le code change.",
+			"capped": "{{count}} vues vivantes au plus : les {{count}} premiers appareils cochés sont montrés.",
+			"empty": "Cochez des appareils pour les voir vivants, côte à côte.",
+			"errors": {
+				"invalid-request": "La demande a été refusée.",
+				"unknown-device": "Cet appareil n'est pas dans le catalogue.",
+				"unknown-view": "Cette vue n'appartient pas à la matrice.",
+				"not-running": "Le serveur de l'émulateur ne tourne pas : lancez-le, puis revenez.",
+				"elsewhere": "Cette vue a quitté le serveur de l'émulateur : elle n'est pas émulée.",
+				"emulation-failed": "L'appareil n'a pas pu être émulé dans cette vue."
+			}
 		}
 	}
 }

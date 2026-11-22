@@ -90,4 +90,22 @@ describe("createDeviceMatrixAPI", () => {
 		await api.deleteEmulatorPersona("persona-x");
 		expect(invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.APP_EMULATOR_DELETE_PERSONA, { id: "persona-x" });
 	});
+
+	it("names live views by id, with a device, an orientation or a scroll share only", async () => {
+		const api = createDeviceMatrixAPI();
+		await api.emulateEmulatorLiveView({ webContentsId: 7, deviceId: "pixel-8", orientation: "portrait", src: "x" } as never);
+		expect(invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.APP_EMULATOR_EMULATE_LIVE_VIEW, {
+			webContentsId: 7,
+			deviceId: "pixel-8",
+			orientation: "portrait",
+		});
+		await api.readEmulatorLiveScroll(7);
+		expect(invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.APP_EMULATOR_READ_LIVE_SCROLL, { webContentsId: 7 });
+		await api.setEmulatorLiveScroll({ webContentsIds: [8], x: 0, y: 0.5, code: "alert(1)" } as never);
+		expect(invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.APP_EMULATOR_SET_LIVE_SCROLL, {
+			webContentsIds: [8],
+			x: 0,
+			y: 0.5,
+		});
+	});
 });

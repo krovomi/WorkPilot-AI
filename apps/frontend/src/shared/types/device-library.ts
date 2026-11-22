@@ -86,3 +86,38 @@ export interface BreakpointScan {
 export type BreakpointScanResult =
 	| { readonly success: true; readonly data: BreakpointScan }
 	| { readonly success: false; readonly error: DeviceCaptureError };
+
+/** Une vue vivante : un `<webview>` de la matrice, nommé par l'id de son contenu, et l'appareil qu'il émule. */
+export interface LiveViewRequest {
+	readonly webContentsId: number;
+	readonly deviceId: string;
+	/** Un sens de `DEVICE_ORIENTATIONS`. */
+	readonly orientation: string;
+}
+
+export type LiveViewError =
+	| "invalid-request"
+	| "unknown-device"
+	| "unknown-view"
+	| "not-running"
+	| "elsewhere"
+	| "emulation-failed";
+
+export type LiveViewResult =
+	| { readonly success: true; readonly data: { readonly reloaded: boolean } }
+	| { readonly success: false; readonly error: LiveViewError };
+
+/** La part défilée d'une page, de 0 à 1 sur chaque axe. */
+export interface LiveScroll {
+	readonly x: number;
+	readonly y: number;
+}
+
+export type LiveScrollResult =
+	| { readonly success: true; readonly data: LiveScroll }
+	| { readonly success: false; readonly error: LiveViewError };
+
+/** Défiler ces vues à la même part. */
+export interface LiveScrollRequest extends LiveScroll {
+	readonly webContentsIds: readonly number[];
+}
