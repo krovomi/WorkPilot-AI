@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..notes import Note
+from . import scopes
 from .store import iter_live, own_text
 
 __all__ = [
@@ -226,7 +227,7 @@ def _overlap(a: set[str], b: set[str]) -> tuple[int, float]:
 
 
 def _scope(note: Note) -> str:
-    return str(note.meta.get("applies_to") or "").strip().lower()
+    return scopes.key(str(note.meta.get("applies_to") or ""))
 
 
 def compare(a: Note | str, b: Note | str) -> Contradiction | None:

@@ -48,6 +48,8 @@ import { loadBackendEnv } from "../source-env";
 import type { AgentEvents } from "./agent-events";
 import type { AgentState } from "./agent-state";
 import { crossReviewEnv, getOAuthModeClearVars, specByExampleEnv } from "./env-utils";
+import { suitePlacementEnv } from "../suite-placement/build-env";
+import { ciRouteAvailable } from "../suite-placement/ci-route";
 import { forwardTaskEventToHooks } from "./hook-bridge";
 import { PERMISSION_CHANNEL_ENV } from "../task-permissions";
 import { parseTaskEvent } from "./task-event-parser";
@@ -747,6 +749,15 @@ export class AgentProcessManager {
 
 			// The ceilings a task's plan is split against (on when absent).
 			Object.assign(env, autoSplitEnv(project.settings.autoSplit));
+		}
+
+		// Where the full suite of a QA review runs, and whether the app follows
+		// the project's CI after the build (`suite-placement/`).
+		if (project) {
+			Object.assign(
+				env,
+				suitePlacementEnv(project.settings, ciRouteAvailable(project.id)),
+			);
 		}
 
 		return env;

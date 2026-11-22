@@ -59,6 +59,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .lifecycle import announce
 from .lifecycle import journal as lifecycle_journal
 from .lifecycle import store as lifecycle_store
 from .memories import redact
@@ -299,6 +300,10 @@ class ProjectMemory:
             return None
         if not self._pulled:
             self._pulled = True
+            if self.project_dir is not None:
+                # Which folder this memory is for: a sync of the whole vault
+                # finds the project's channels by it (`lifecycle.announce`).
+                announce.register_project(brain.root, self.project_dir)
             try:
                 brain.before_read()
             except Exception as exc:  # noqa: BLE001 - a failed pull still reads the disk

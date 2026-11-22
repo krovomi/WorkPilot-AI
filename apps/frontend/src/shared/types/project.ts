@@ -4,6 +4,7 @@
 
 import type { EngineTrio, TaskKind } from "./task";
 import type { RemoteProvider } from "../utils/git-remote-provider";
+import type { TestPlacementMode } from "./suite-placement";
 
 export interface Project {
 	id: string;
@@ -76,6 +77,17 @@ export interface ProjectSettings {
 	specByExample?: boolean;
 	/** Maximum parallel tasks allowed (default: 3) */
 	maxParallelTasks?: number;
+	/**
+	 * Where the long suites of this project's tasks run (`test_placement/`):
+	 * `auto` (default) computes from the machine, `machine` or `ci` decide.
+	 * A card's own `testPlacement` wins.
+	 */
+	testPlacement?: TestPlacementMode;
+	/**
+	 * Auto may push a task's branch without a pull request to run the forge's
+	 * CI. Default: on when the project has a CI; `false` turns it off.
+	 */
+	testPlacementBranchPush?: boolean;
 	/**
 	 * Split a task whose plan is too big for one small pull request into
 	 * several tasks (`apps/backend/task_split/`). On by default; the ceilings
@@ -440,6 +452,8 @@ export interface ProjectEnvConfig {
 	// Generic webhook (flat JSON POST)
 	notifyWebhookEnabled?: boolean;
 	notifyWebhookUrl?: string;
+	/** Also announce a memory conflict a teammate's sync queued (`WORKPILOT_MEMORY_CONFLICT_NOTIFY`). */
+	memoryConflictNotify?: boolean;
 
 	// Per-agent MCP overrides (add/remove MCPs from specific agents)
 	agentMcpOverrides?: AgentMcpOverrides;

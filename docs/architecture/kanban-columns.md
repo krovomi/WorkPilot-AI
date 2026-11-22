@@ -21,7 +21,7 @@ Halo de [kanban-card-colors.md](kanban-card-colors.md).
 | Icône | `ColumnIcon` (`kanban/ColumnBand.tsx`) | la même que l'état vide, sur une tuile pleine de l'accent ; tourne dans « En cours » tant qu'une carte y est (sauf `prefers-reduced-motion`) |
 | Compteur | `ColumnCount` | gros chiffre à droite ; `n/limite` quand la colonne a une limite, phrase complète pour les lecteurs d'écran |
 | Jauge | `ColumnGauge` | « En cours » : un segment par tâche parallèle (`maxParallelTasks`, au-delà de 8 une barre) ; autre colonne : barre vers sa limite WIP |
-| État vide | `ColumnEmptyState` | icône dans un halo de l'accent, message et indication, cadre pointillé ; « Build rouge » vide montre une coche |
+| État vide | `ColumnEmptyState` | icône dans un halo de l'accent, message et indication sur toute la largeur, cadre pointillé de hauteur fixe (11rem) pour que les « Ajouter une tâche » des colonnes vides s'alignent ; « Build rouge » vide montre une coche |
 | Cible de dépôt | `.kanban-column.drop-zone-highlight` | bordure, halo et lueur de l'accent de la colonne visée (l'ancienne couleur jaune fixe ignorait le thème) |
 | Colonne repliée | `.kanban-col-collapsed` | toute la bande teintée : icône, compteur, nom vertical ; pas de message d'état vide (trop étroit) |
 
@@ -74,3 +74,10 @@ La ligne partage sa rangée avec la jauge (résumé à gauche, jauge à droite) 
 vide, dans une colonne sans résumé : les bandeaux ont tous la même hauteur et les premières cartes
 s'alignent d'une colonne à l'autre.
 Le réglage `kanbanColumnSummary` (Paramètres › Affichage, activé par défaut) la masque.
+
+## Vocabulaire
+
+Dans l'interface, une carte du Kanban s'appelle une **tâche** (« Ajouter une tâche », « Titre de la
+tâche », « Menu de la tâche »), en `en` *task*. Le code garde ses noms (`TaskCard`, `cardMenu`,
+`.kanban-card`). Le menu du clic droit s'appelle « Menu de la tâche » pour ne pas porter le même nom
+accessible que le bouton ⋮ « Actions de la tâche ».

@@ -847,6 +847,14 @@ one interval after the build started, so a short task sends none, and a build
 resumed after a restart waits for the rest of the interval
 ([task-digest.md](architecture/task-digest.md)).
 
+`WORKPILOT_MEMORY_CONFLICT_NOTIFY` (off by default; `true` turns it on) also
+announces on the same channels a memory conflict that a teammate's brain sync
+queued for a person: the project, the kind of note, the two titles, a short
+cleaned preview and the authors' git names (never an e-mail). Each pair is
+announced once for the team; nothing is sent under the strict offline policy
+([memory-lifecycle.md](architecture/memory-lifecycle.md)). The switch is in
+Project settings > Notifications.
+
 ### Third-party MCP servers
 
 These credentials go only to an MCP server an agent may be given. A server starts

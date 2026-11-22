@@ -230,6 +230,7 @@ function ChannelRow({
  * Announces on the configured channels when:
  * - A Kanban task is completed (moved to done)
  * - A PR is automatically created for human review
+ * - A teammate's sync queues a memory conflict, when the project asks
  */
 export function ChannelNotificationsIntegration({
 	projectId,
@@ -289,6 +290,22 @@ export function ChannelNotificationsIntegration({
 						{t("settings:channelNotifications.triggerPrCreated")}
 					</li>
 				</ul>
+				{/* Opt-in: a memory conflict says what teammates wrote, so it is asked for. */}
+				<div className="flex items-start justify-between gap-3 pt-2" data-testid="memory-conflict-notify">
+					<div>
+						<Label htmlFor="memory-conflict-notify" className="text-sm text-foreground">
+							{t("settings:channelNotifications.triggerMemoryConflict")}
+						</Label>
+						<p className="text-xs text-muted-foreground mt-0.5">
+							{t("settings:channelNotifications.triggerMemoryConflictHint")}
+						</p>
+					</div>
+					<Switch
+						id="memory-conflict-notify"
+						checked={Boolean(envConfig.memoryConflictNotify)}
+						onCheckedChange={(checked) => updateEnvConfig({ memoryConflictNotify: checked })}
+					/>
+				</div>
 			</div>
 		</div>
 	);

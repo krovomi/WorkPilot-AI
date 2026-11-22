@@ -7,7 +7,7 @@ interface LifecycleMetricsProps {
 	readonly metrics: MemoryLifecycleMetrics;
 }
 
-/** How the lifecycle behaves: restores, automatic removals, pins, conflicts. */
+/** How the lifecycle behaves: restores, automatic removals, pins, conflicts, consensus notes. */
 export function LifecycleMetrics({ metrics }: LifecycleMetricsProps) {
 	const { t } = useTranslation(["context"]);
 	const lines = [
@@ -27,6 +27,10 @@ export function LifecycleMetrics({ metrics }: LifecycleMetricsProps) {
 			? null
 			: t("context:lifecycle.metrics.resolution", { hours: metrics.mean_resolution_hours }),
 		t("context:lifecycle.metrics.views", { count: metrics.history_views }),
+		t("context:lifecycle.metrics.consensus", {
+			count: metrics.consensus_month ?? 0,
+			live: metrics.consensus_live ?? 0,
+		}),
 	].filter((line): line is string => line !== null);
 	return (
 		<Card data-testid="memory-lifecycle-metrics">

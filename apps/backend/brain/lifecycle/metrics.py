@@ -12,6 +12,12 @@ helps from one that gets in the way:
 | ``conflicts_month``, ``auto_settled_month``, ``resolved_month`` | ``conflict``, ``archive`` by ``sync``, ``resolve`` | conflicts found per sync, and who settled them |
 | ``mean_resolution_hours`` | a ``conflict`` and the ``resolve`` of the same notes | how long a pair waits for a person |
 | ``history_views`` | this machine's count of "why?" opened | whether the explanations are read |
+| ``consensus_month`` | ``create`` of a canonical note a person wrote (``person-wrote``), last 30 days | the canonical memories a team writes per month |
+| ``consensus_live`` | the live notes whose ``source`` is ``team-consensus-…`` | how many of them are still in use: neither forgotten nor replaced |
+
+The issue's adoption rate was "via the reviewer's analytics", which do not
+read the memory; the two consensus figures are what this machine can count
+on its own: what a team settled, and what of it still stands.
 
 Nothing here is sent anywhere. The view count is this machine's
 (``.workpilot-brain/lifecycle-views.json``, ignored by git): counting it in
@@ -104,6 +110,11 @@ def compute(
     this_month = [(m, e) for m, e in dated if m >= month]
     live = list(iter_live(root, base))
     pinned = sum(1 for _, note in live if note.meta.get("pinned") is True)
+    consensus = sum(
+        1
+        for _, note in live
+        if str(note.meta.get("source") or "").startswith("team-consensus-")
+    )
     restores = sum(1 for e in this_week if e.action == "restore")
     undone = sum(1 for e in this_week if e.undoes)
     return {
@@ -122,5 +133,11 @@ def compute(
         "resolved_month": sum(1 for _, e in this_month if e.action == "resolve"),
         "mean_resolution_hours": _resolution_hours(this_month),
         "history_views": views(root, base),
+        "consensus_month": sum(
+            1
+            for _, e in this_month
+            if e.action == "create" and e.reason_code == "person-wrote"
+        ),
+        "consensus_live": consensus,
         "too_aggressive": restores >= AGGRESSIVE_RESTORES,
     }

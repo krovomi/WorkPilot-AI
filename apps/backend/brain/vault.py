@@ -253,14 +253,19 @@ class Brain:
     def _review_pull(self, result: SyncResult) -> None:
         """Contradictions the pull brought into a project memory: settled by
         the safe rules or queued for a person (`lifecycle.arbitration`). What
-        an automatic rule archived is committed by the next sync."""
+        an automatic rule archived is committed by the next sync; a pair
+        queued is announced to the team when the project opted in."""
         if not (result.pulled and (result.received or result.conflicts)):
             return
+        from .lifecycle import announce
         from .lifecycle.arbitration import review_pull
 
         result.memory_conflicts = review_pull(
             self.root, result.received, result.conflicts
         )
+        # What is queued here, said on the project's channels when it asked
+        # (`lifecycle.announce`), off the caller's thread.
+        announce.start(self.root)
 
     # -- write -------------------------------------------------------------
 
