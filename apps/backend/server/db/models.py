@@ -13,11 +13,12 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -1132,5 +1133,38 @@ class UsageRecord(Base):
     #: True when the provider reported no count and it was estimated.
     estimated: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class PresenceDay(Base):
+    """One person's presence in one organization on one day.
+
+    Written by the server only, from the requests it authenticates
+    (``services/presence.py``): the day, and the last moment that day the
+    person made a request. That is all presence keeps: which pages, cards or
+    texts never come into it. It answers who is active (per day, week, month),
+    who is signed in now, and which accounts lie dormant. A deleted account
+    keeps its days with ``user_id`` emptied, so the counts of past days stay
+    right without naming anyone. Rows older than the retention are erased
+    (``services/usage_retention.py``).
+    """
+
+    __tablename__ = "presence_days"
+    __table_args__ = (
+        UniqueConstraint("user_id", "org_id", "day", name="uq_presence_user_org_day"),
+        Index("ix_presence_org_day", "org_id", "day"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    #: None for a platform administrator acting in no organization.
+    org_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True
+    )
+    day: Mapped[date] = mapped_column(Date)
+    last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

@@ -43,6 +43,10 @@ WORKPILOT_PASSWORD_HIBP_CHECK=false
 # How long a forgotten-password link stays usable, in minutes (5 to 1440).
 WORKPILOT_PASSWORD_RESET_TTL_MINUTES=60
 
+# How many days token use and presence days are kept before they are erased
+# (30 to 3650). What is recorded: docs/server-usage-data.md.
+WORKPILOT_USAGE_RETENTION_DAYS=365
+
 # SMTP for invitation and forgotten-password emails (leave WORKPILOT_SMTP_HOST
 # empty to disable; the admin UI then shows a copyable link instead).
 WORKPILOT_SMTP_HOST=
