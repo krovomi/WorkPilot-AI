@@ -27,15 +27,12 @@ import {
 	isGitIdentityComplete,
 } from "../git-identity/GitIdentityFields";
 import { useProviderContext } from "../ProviderContext";
-import { AutoSplitSettings } from "./AutoSplitSettings";
-import { CrossReviewSettings } from "./CrossReviewSettings";
-import { ProjectTestPlacementSettings } from "../suite-placement/ProjectTestPlacementSettings";
 import { RepositorySection } from "./RepositorySection";
+import { SettingsGroup, SwitchRow } from "./SettingsGroup";
+import { WorkflowSettings } from "./WorkflowSettings";
 import { WorktreeRecipeSection } from "./WorktreeRecipeSection";
 import { Button } from "../ui/button";
-import { Label } from "../ui/label";
 import { Separator } from "../ui/separator";
-import { Switch } from "../ui/switch";
 
 interface GeneralSettingsProps {
 	readonly project: Project;
@@ -300,11 +297,10 @@ export function GeneralSettings({
 				<>
 					<Separator />
 
-					{/* Agent Settings */}
-					<section className="space-y-4">
-						<h3 className="text-sm font-semibold text-foreground">
-							{t("projectSections.agentConfiguration.title")}
-						</h3>
+					<SettingsGroup
+						title={t("projectSections.agentConfiguration.title")}
+						description={t("projectSections.general.groups.agent.description")}
+					>
 						<button
 							type="button"
 							onClick={handleOpenAgentSettings}
@@ -328,70 +324,18 @@ export function GeneralSettings({
 							</div>
 							<ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
 						</button>
-						<div className="flex items-center justify-between pt-2">
-							<div className="space-y-0.5">
-								<Label htmlFor="use-claude-md" className="font-normal text-foreground">
-									{t("projectSections.general.useClaudeMd")}
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									{t("projectSections.general.useClaudeMdDescription")}
-								</p>
-							</div>
-							<Switch
-								id="use-claude-md"
-								checked={settings.useClaudeMd ?? true}
-								onCheckedChange={(checked) => setProject({ useClaudeMd: checked })}
-							/>
-						</div>
-						<div className="flex items-center justify-between pt-2">
-							<div className="space-y-0.5">
-								<Label htmlFor="tdd-mode" className="font-normal text-foreground">
-									{t("projectSections.general.tddMode")}
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									{t("projectSections.general.tddModeDescription")}
-								</p>
-							</div>
-							<Switch
-								id="tdd-mode"
-								checked={settings.tddMode ?? false}
-								onCheckedChange={(checked) => setProject({ tddMode: checked })}
-							/>
-						</div>
-						<div className="flex items-center justify-between pt-2">
-							<div className="space-y-0.5">
-								<Label htmlFor="verify-loop" className="font-normal text-foreground">
-									{t("projectSections.general.verifyLoop")}
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									{t("projectSections.general.verifyLoopDescription")}
-								</p>
-							</div>
-							<Switch
-								id="verify-loop"
-								checked={settings.verifyLoop ?? true}
-								onCheckedChange={(checked) => setProject({ verifyLoop: checked })}
-							/>
-						</div>
-						<div className="flex items-center justify-between pt-2">
-							<div className="space-y-0.5">
-								<Label htmlFor="spec-by-example" className="font-normal text-foreground">
-									{t("projectSections.general.specByExample")}
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									{t("projectSections.general.specByExampleDescription")}
-								</p>
-							</div>
-							<Switch
-								id="spec-by-example"
-								checked={settings.specByExample ?? false}
-								onCheckedChange={(checked) => setProject({ specByExample: checked })}
-							/>
-						</div>
-						<AutoSplitSettings settings={settings} setSettings={setSettings} />
-						<CrossReviewSettings settings={settings} setSettings={setSettings} />
-						<ProjectTestPlacementSettings settings={settings} onChange={setProject} />
-					</section>
+						<SwitchRow
+							id="use-claude-md"
+							label={t("projectSections.general.useClaudeMd")}
+							description={t("projectSections.general.useClaudeMdDescription")}
+							checked={settings.useClaudeMd ?? true}
+							onCheckedChange={(checked) => setProject({ useClaudeMd: checked })}
+						/>
+					</SettingsGroup>
+
+					<Separator />
+
+					<WorkflowSettings settings={settings} setSettings={setSettings} />
 
 					<Separator />
 
@@ -399,54 +343,32 @@ export function GeneralSettings({
 
 					<Separator />
 
-					{/* Notifications */}
-					<section className="space-y-4">
-						<h3 className="text-sm font-semibold text-foreground">
-							{t("notifications.title")}
-						</h3>
-						<div className="space-y-4">
-							<div className="flex items-center justify-between">
-								<Label htmlFor="notify-task-complete" className="font-normal text-foreground">
-									{t("notifications.onTaskComplete")}
-								</Label>
-								<Switch
-									id="notify-task-complete"
-									checked={settings.notifications.onTaskComplete}
-									onCheckedChange={(checked) => setNotification({ onTaskComplete: checked })}
-								/>
-							</div>
-							<div className="flex items-center justify-between">
-								<Label htmlFor="notify-task-failed" className="font-normal text-foreground">
-									{t("notifications.onTaskFailed")}
-								</Label>
-								<Switch
-									id="notify-task-failed"
-									checked={settings.notifications.onTaskFailed}
-									onCheckedChange={(checked) => setNotification({ onTaskFailed: checked })}
-								/>
-							</div>
-							<div className="flex items-center justify-between">
-								<Label htmlFor="notify-review-needed" className="font-normal text-foreground">
-									{t("notifications.onReviewNeeded")}
-								</Label>
-								<Switch
-									id="notify-review-needed"
-									checked={settings.notifications.onReviewNeeded}
-									onCheckedChange={(checked) => setNotification({ onReviewNeeded: checked })}
-								/>
-							</div>
-							<div className="flex items-center justify-between">
-								<Label htmlFor="notify-sound" className="font-normal text-foreground">
-									{t("notifications.sound")}
-								</Label>
-								<Switch
-									id="notify-sound"
-									checked={settings.notifications.sound}
-									onCheckedChange={(checked) => setNotification({ sound: checked })}
-								/>
-							</div>
-						</div>
-					</section>
+					<SettingsGroup title={t("notifications.title")}>
+						<SwitchRow
+							id="notify-task-complete"
+							label={t("notifications.onTaskComplete")}
+							checked={settings.notifications.onTaskComplete}
+							onCheckedChange={(checked) => setNotification({ onTaskComplete: checked })}
+						/>
+						<SwitchRow
+							id="notify-task-failed"
+							label={t("notifications.onTaskFailed")}
+							checked={settings.notifications.onTaskFailed}
+							onCheckedChange={(checked) => setNotification({ onTaskFailed: checked })}
+						/>
+						<SwitchRow
+							id="notify-review-needed"
+							label={t("notifications.onReviewNeeded")}
+							checked={settings.notifications.onReviewNeeded}
+							onCheckedChange={(checked) => setNotification({ onReviewNeeded: checked })}
+						/>
+						<SwitchRow
+							id="notify-sound"
+							label={t("notifications.sound")}
+							checked={settings.notifications.sound}
+							onCheckedChange={(checked) => setNotification({ sound: checked })}
+						/>
+					</SettingsGroup>
 				</>
 			)}
 		</>
