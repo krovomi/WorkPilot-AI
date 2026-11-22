@@ -1,48 +1,31 @@
+/**
+ * Microsoft Entra ID as a configuration of the OpenID Connect sign-in: the
+ * ids the server gives are checked before they become Microsoft URLs, and the
+ * browser flow is the generic one (`oidc-pkce.ts`), run here on a real
+ * loopback port against the tenant's endpoints.
+ */
 import * as http from "node:http";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("./open-external", () => ({ openExternalUrl: vi.fn() }));
 
-import { openExternalUrl } from "./open-external";
 import {
-	acquireEntraIdToken,
-	authorizeUrl,
 	checkEntraConfig,
-	type EntraDeps,
-	idTokenNonce,
+	ENTRA_SCOPES,
+	entraProvider,
+	entraProviderFromConfig,
 } from "./entra-sign-in";
+import { acquireIdToken, nonceOf } from "./oidc-pkce";
 
 const TENANT = "11111111-2222-4333-8444-555555555555";
 const CLIENT = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 const CONFIG = { entra_tenant_id: TENANT, entra_client_id: CLIENT };
+const AUTHORITY = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0`;
 
 function idToken(claims: Record<string, unknown>): string {
 	const part = (value: unknown) =>
 		Buffer.from(JSON.stringify(value)).toString("base64url");
 	return `${part({ alg: "none" })}.${part(claims)}.sig`;
-}
-
-function jsonResponse(body: unknown, ok = true): Response {
-	return { ok, json: async () => body } as Response;
-}
-
-/** A browser that follows the authorize URL straight back to the loopback. */
-function browser(
-	answer: (url: URL) => Record<string, string> | null,
-	seen: URL[] = [],
-): EntraDeps["openBrowser"] {
-	return async (raw) => {
-		const url = new URL(raw);
-		seen.push(url);
-		const query = answer(url);
-		if (query === null) return;
-		const back = new URL(url.searchParams.get("redirect_uri") as string);
-		back.hostname = "127.0.0.1";
-		for (const [key, value] of Object.entries(query)) {
-			back.searchParams.set(key, value);
-		}
-		await get(back);
-	};
 }
 
 /** A GET on the loopback that does not go through the global fetch. */
@@ -56,11 +39,6 @@ function get(url: URL): Promise<number> {
 			.on("error", reject);
 	});
 }
-
-const signedIn = (url: URL) => ({
-	code: "the-code",
-	state: url.searchParams.get("state") as string,
-});
 
 describe("checkEntraConfig", () => {
 	it.each([
@@ -117,195 +95,94 @@ describe("checkEntraConfig", () => {
 	});
 });
 
-describe("idTokenNonce", () => {
-	it("reads the nonce claim", () => {
-		expect(idTokenNonce(idToken({ nonce: "n1" }))).toBe("n1");
-	});
-
-	it("answers null for a token without a usable nonce", () => {
-		expect(idTokenNonce("only-one-part")).toBeNull();
-		expect(idTokenNonce("a.!!!.c")).toBeNull();
-		expect(idTokenNonce(idToken({ nonce: 3 }))).toBeNull();
-		expect(idTokenNonce(idToken({}))).toBeNull();
-	});
-});
-
-describe("authorizeUrl", () => {
-	it("writes every parameter encoded, on the Microsoft authority", () => {
-		const url = new URL(
-			authorizeUrl(CONFIG, {
-				redirectUri: "http://localhost:1/callback",
-				state: "s&x=1",
-				nonce: "n",
-				challenge: "c",
-			}),
-		);
-		expect(url.origin).toBe("https://login.microsoftonline.com");
-		expect(url.pathname).toBe(`/${TENANT}/oauth2/v2.0/authorize`);
-		expect(url.searchParams.get("state")).toBe("s&x=1");
-		expect(url.searchParams.get("x")).toBeNull();
-		expect(url.searchParams.get("nonce")).toBe("n");
-		expect(url.searchParams.get("code_challenge_method")).toBe("S256");
-		expect(url.searchParams.get("client_id")).toBe(CLIENT);
-	});
-});
-
-describe("acquireEntraIdToken", () => {
-	afterEach(() => {
-		vi.unstubAllGlobals();
-	});
-
-	it("exchanges the code with the global fetch by default", async () => {
-		const seen: URL[] = [];
-		vi.stubGlobal(
-			"fetch",
-			vi.fn(async () =>
-				jsonResponse({
-					id_token: idToken({ nonce: seen[0].searchParams.get("nonce") }),
-				}),
-			),
-		);
-		const token = await acquireEntraIdToken(CONFIG, {
-			openBrowser: browser(signedIn, seen),
+describe("entraProvider", () => {
+	it("points the generic flow at the tenant's endpoints", () => {
+		expect(entraProvider({ entra_tenant_id: ` ${TENANT} `, entra_client_id: CLIENT })).toEqual({
+			authorizationEndpoint: `${AUTHORITY}/authorize`,
+			tokenEndpoint: `${AUTHORITY}/token`,
+			clientId: CLIENT,
+			scopes: ENTRA_SCOPES,
 		});
-		expect(idTokenNonce(token)).toBe(seen[0].searchParams.get("nonce"));
 	});
 
-	it("signs in and returns the id_token that echoes the nonce", async () => {
+	it("refuses ids without a valid shape before writing any URL", () => {
+		expect(() =>
+			entraProvider({ entra_tenant_id: "evil.example/x", entra_client_id: CLIENT }),
+		).toThrow("tenant");
+	});
+});
+
+describe("entraProviderFromConfig", () => {
+	it("reads the provider the server describes", () => {
+		expect(
+			entraProviderFromConfig({ entra_enabled: true, ...CONFIG })?.tokenEndpoint,
+		).toBe(`${AUTHORITY}/token`);
+	});
+
+	it("is null when the server offers no Entra sign-in", () => {
+		for (const config of [null, "config", {}, { ...CONFIG, entra_enabled: false }]) {
+			expect(entraProviderFromConfig(config)).toBeNull();
+		}
+	});
+
+	it("throws when the server's ids have no valid shape", () => {
+		expect(() =>
+			entraProviderFromConfig({
+				entra_enabled: true,
+				entra_tenant_id: TENANT,
+				entra_client_id: null,
+			}),
+		).toThrow("not a valid client id");
+	});
+});
+
+describe("the Entra sign-in through the generic flow", () => {
+	it("authorizes on the tenant, trades the code there, and keeps the nonce", async () => {
 		const seen: URL[] = [];
-		const fakeFetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
-			const body = new URLSearchParams(String(init?.body));
-			expect(body.get("code")).toBe("the-code");
-			expect(body.get("redirect_uri")).toBe(
-				seen[0].searchParams.get("redirect_uri"),
+		const fetchToken = vi.fn(async (_url: unknown, init?: RequestInit) => {
+			const form = new URLSearchParams(String(init?.body));
+			expect(form.get("client_id")).toBe(CLIENT);
+			expect(form.get("code")).toBe("the-code");
+			expect(form.get("redirect_uri")).toBe(seen[0].searchParams.get("redirect_uri"));
+			expect(form.get("code_verifier")).toBeTruthy();
+			return new Response(
+				JSON.stringify({ id_token: idToken({ nonce: seen[0].searchParams.get("nonce") }) }),
 			);
-			return jsonResponse({
-				id_token: idToken({ nonce: seen[0].searchParams.get("nonce") }),
-			});
-		});
-		const token = await acquireEntraIdToken(CONFIG, {
-			openBrowser: browser(signedIn, seen),
-			fetch: fakeFetch as unknown as typeof fetch,
-		});
-		expect(idTokenNonce(token)).toBe(seen[0].searchParams.get("nonce"));
-		expect(String(fakeFetch.mock.calls[0][0])).toBe(
-			`https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`,
-		);
-	});
-
-	it("refuses an id_token issued for another request", async () => {
-		await expect(
-			acquireEntraIdToken(CONFIG, {
-				openBrowser: browser(signedIn),
-				fetch: (async () =>
-					jsonResponse({ id_token: idToken({ nonce: "other" }) })) as typeof fetch,
-			}),
-		).rejects.toThrow("does not match this request");
-	});
-
-	it("refuses a server configuration before opening anything", async () => {
-		const openBrowser = vi.fn();
-		await expect(
-			acquireEntraIdToken(
-				{ entra_tenant_id: "evil.example/x", entra_client_id: CLIENT },
-				{ openBrowser },
-			),
-		).rejects.toThrow("tenant");
-		expect(openBrowser).not.toHaveBeenCalled();
-	});
-
-	it("refuses a redirect carrying another state", async () => {
-		await expect(
-			acquireEntraIdToken(CONFIG, {
-				openBrowser: browser(() => ({ code: "c", state: "forged" })),
-				fetch: vi.fn() as unknown as typeof fetch,
-			}),
-		).rejects.toThrow("State mismatch");
-	});
-
-	it("reports the provider's error, and a missing code", async () => {
-		await expect(
-			acquireEntraIdToken(CONFIG, {
-				openBrowser: browser((url) => ({
-					state: url.searchParams.get("state") as string,
-					error_description: "Denied",
-				})),
-			}),
-		).rejects.toThrow("Denied");
-		await expect(
-			acquireEntraIdToken(CONFIG, {
-				openBrowser: browser((url) => ({
-					state: url.searchParams.get("state") as string,
-				})),
-			}),
-		).rejects.toThrow("No authorization code returned");
-	});
-
-	it("answers 404 to anything but GET /callback", async () => {
-		let statuses: number[] = [];
-		await acquireEntraIdToken(CONFIG, {
+		}) as unknown as typeof fetch;
+		const token = await acquireIdToken(entraProvider(CONFIG), {
 			openBrowser: async (raw) => {
 				const url = new URL(raw);
+				seen.push(url);
 				const back = new URL(url.searchParams.get("redirect_uri") as string);
-				back.hostname = "127.0.0.1";
-				const other = new URL("/elsewhere", back);
-				statuses = [
-					(await fetch(other)).status,
-					(await fetch(back, { method: "POST" })).status,
-				];
-				back.searchParams.set("code", "c");
+				back.searchParams.set("code", "the-code");
 				back.searchParams.set("state", url.searchParams.get("state") as string);
-				await fetch(back);
+				await get(back);
 			},
-			fetch: (async () => jsonResponse({}, false)) as unknown as typeof fetch,
-		}).catch(() => undefined);
-		expect(statuses).toEqual([404, 404]);
+			fetchToken,
+		});
+		expect(nonceOf(token)).toBe(seen[0].searchParams.get("nonce"));
+		const authorize = seen[0];
+		expect(authorize.origin + authorize.pathname).toBe(`${AUTHORITY}/authorize`);
+		expect(authorize.searchParams.get("client_id")).toBe(CLIENT);
+		expect(authorize.searchParams.get("scope")).toBe(ENTRA_SCOPES);
+		expect(authorize.searchParams.get("code_challenge_method")).toBe("S256");
+		expect(authorize.searchParams.get("state")).toBeTruthy();
+		expect(vi.mocked(fetchToken).mock.calls[0][0]).toBe(`${AUTHORITY}/token`);
 	});
 
-	it("reports a failed token exchange", async () => {
+	it("refuses an id_token issued for another sign-in", async () => {
 		await expect(
-			acquireEntraIdToken(CONFIG, {
-				openBrowser: browser(signedIn),
-				fetch: (async () =>
-					jsonResponse({ error_description: "Bad code" }, false)) as typeof fetch,
-			}),
-		).rejects.toThrow("Bad code");
-		await expect(
-			acquireEntraIdToken(CONFIG, {
-				openBrowser: browser(signedIn),
-				fetch: (async () => jsonResponse({})) as typeof fetch,
-			}),
-		).rejects.toThrow("Token exchange failed");
-	});
-
-	it("gives up when the browser cannot be opened", async () => {
-		await expect(
-			acquireEntraIdToken(CONFIG, {
-				openBrowser: async () => {
-					throw new Error("no browser");
+			acquireIdToken(entraProvider(CONFIG), {
+				openBrowser: async (raw) => {
+					const url = new URL(raw);
+					const back = new URL(url.searchParams.get("redirect_uri") as string);
+					back.searchParams.set("code", "c");
+					back.searchParams.set("state", url.searchParams.get("state") as string);
+					await get(back);
 				},
+				fetchToken: (async () =>
+					new Response(JSON.stringify({ id_token: idToken({ nonce: "other" }) }))) as typeof fetch,
 			}),
-		).rejects.toThrow("no browser");
-		await expect(
-			acquireEntraIdToken(CONFIG, {
-				openBrowser: () => Promise.reject("plain"),
-			}),
-		).rejects.toThrow("plain");
-	});
-
-	it("times out when nobody comes back", async () => {
-		await expect(
-			acquireEntraIdToken(CONFIG, {
-				openBrowser: browser(() => null),
-				timeoutMs: 20,
-			}),
-		).rejects.toThrow("Login timed out");
-	});
-
-	it("opens the browser through openExternalUrl by default", async () => {
-		vi.mocked(openExternalUrl).mockRejectedValueOnce(new Error("blocked"));
-		await expect(acquireEntraIdToken(CONFIG)).rejects.toThrow("blocked");
-		const opened = new URL(vi.mocked(openExternalUrl).mock.calls[0][0]);
-		expect(opened.hostname).toBe("login.microsoftonline.com");
+		).rejects.toThrow("was not issued for this sign-in");
 	});
 });

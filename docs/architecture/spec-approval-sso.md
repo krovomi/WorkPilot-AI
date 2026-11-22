@@ -4,7 +4,7 @@ summary: >-
   Connexion par tout fournisseur OpenID Connect, à côté d'Entra, sur le bureau et le téléphone ;
   une spec s'approuve avec `review.approve`, par autant de personnes que sa criticité en demande,
   l'auteur selon `WORKPILOT_SELF_APPROVAL` ; délégations, escalade d'un plan qui attend trop, et
-  connexion nommée dans le journal.
+  connexion nommée dans le journal et montrée sur le bureau, où Entra suit le flux générique.
 ---
 
 # Approbation de spec et connexion SSO en mode serveur
@@ -14,7 +14,8 @@ qu'il soit, et rendre l'approbation d'une spec réelle côté serveur, y compris
 de la carte qui voudrait l'approuver. Lot 3 : plusieurs approbateurs selon la criticité d'une
 carte, et la délégation d'une approbation. Lot 4 : l'escalade d'un plan qui attend trop, les écrans
 de l'app de bureau et de l'app mobile, la connexion SSO sur le téléphone, la connexion nommée dans
-le journal, et les délégations d'une personne qui part.
+le journal, et les délégations d'une personne qui part. Lot 5 : le bouton Entra du bureau passe par
+le flux du fournisseur générique, et le bureau montre comment la session ouverte l'a été.
 
 ## Un fournisseur OpenID Connect quelconque
 
@@ -28,7 +29,7 @@ seule change la source des adresses.
 | Réglages | `server/config.py` | `WORKPILOT_OIDC_ISSUER`, `WORKPILOT_OIDC_CLIENT_ID` (les deux allument la connexion), `WORKPILOT_OIDC_NAME` (le nom du bouton), `WORKPILOT_OIDC_SCOPES` |
 | Découverte et validation | `server/auth/oidc_generic.py` | lit `<issuer>/.well-known/openid-configuration`, vérifie l'`id_token`, trouve ou crée la personne |
 | Routes | `server/routers/auth.py` | `/auth/config` décrit le fournisseur, `POST /auth/sso/exchange` échange l'`id_token` (publique, 10 par minute, auditée `auth.login.oidc`) |
-| App de bureau | `src/main/oidc-pkce.ts`, `src/main/ipc-handlers/server-sso-handlers.ts` | le flux du navigateur, dans le main ; le bouton « Se connecter avec {nom} » de `ServerLoginScreen` |
+| App de bureau | `src/main/oidc-pkce.ts`, `src/main/entra-sign-in.ts`, `src/main/ipc-handlers/server-sso-handlers.ts` | le flux du navigateur, dans le main, pour les deux fournisseurs ; les boutons « Se connecter avec {nom} » et Entra de `ServerLoginScreen` |
 
 **Pourquoi la découverte et pas des adresses configurées.** Okta, Google, Keycloak et Auth0 publient
 tous ce document ; un opérateur ne donne que l'émetteur et l'identifiant du client, comme pour
@@ -58,6 +59,43 @@ et un `nonce` lient la réponse à cette tentative ; le main refuse un `id_token
 
 Un fournisseur injoignable ou un document refusé n'éteint que le bouton : `/auth/config` répond
 `sso_enabled: false` et le journalise, les comptes locaux et Entra restent offerts.
+
+## Entra, une configuration du flux générique sur le bureau (lot 5)
+
+Le bureau ne mène plus qu'un flux de navigateur (`acquireIdToken` de `src/main/oidc-pkce.ts`) :
+Authorization Code + PKCE `S256`, `state` et `nonce`, redirection sur la boucle locale qui ne
+répond qu'à un `GET /callback` (404 à toute autre méthode ou chemin), navigateur ouvert par
+`openExternalUrl`. Ce qui distingue les fournisseurs tient dans une table fermée de
+`server-sso-handlers.ts`, choisie par le canal IPC et jamais par une donnée du renderer :
+
+| Canal | Fournisseur lu dans `/auth/config` | `id_token` remis à |
+|---|---|---|
+| `SERVER_AUTH_LOGIN_SSO` | `providerFromConfig` : adresses de la découverte, revérifiées (https, http sur la boucle locale seulement, sans identifiants ni fragment), client et scopes bornés | `POST /auth/sso/exchange` |
+| `SERVER_AUTH_LOGIN_ENTRA` | `entraProviderFromConfig` : tenant et client vérifiés dans leurs formes documentées (`checkEntraConfig`), puis les adresses fixes du tenant sur `login.microsoftonline.com` | `POST /auth/oidc/exchange` |
+
+Les deux canaux revalident l'URL du serveur reçue du renderer (`serverUrlFrom`) et ne passent en
+mode serveur qu'une fois le fournisseur accepté. Un fournisseur ajouté au serveur (Okta, Google
+Workspace, Keycloak, Auth0…) marche donc du bureau sans code de plus ; Entra garde son échange côté
+serveur (voir plus bas pourquoi). Le flux générique ne cite jamais le texte d'erreur du
+fournisseur, seulement son code borné, et la requête de jeton n'envoie plus `scope`, facultatif
+pour Entra comme pour OAuth 2.0.
+
+## La connexion de la session ouverte (lot 5)
+
+`GET /auth/me/session` (toute personne connectée, ses propres données) dit qui est connecté et
+comment la session a été ouverte : la personne, l'identifiant de la connexion et sa méthode (lus
+dans le jeton signé, `sid` et `amr`), le nom du fournisseur et l'hôte de son émetteur, et l'heure
+de la connexion, lue sur la ligne `auth.login.*` du journal (`session_of` de
+`server/auth/sign_in.py`). Cette ligne garde désormais le fournisseur tel qu'il était configuré à
+la connexion (`payload` : nom et émetteur) : renommer le fournisseur ensuite ne renomme pas une
+connexion passée. Une ligne d'avant, sans fournisseur, prend celui configuré aujourd'hui pour sa
+méthode ; un jeton d'avant les identifiants de connexion ne nomme rien.
+
+Sur le bureau, la page « Ma session sur le serveur » des réglages (mode serveur,
+`components/settings/ServerSessionSettings.tsx`) l'affiche, avec un bouton de déconnexion. Le main
+lit la route (`src/main/server-session-info.ts`) et ne garde pour le renderer que des champs bornés
+de forme connue : méthode en liste fermée, hôte en caractères de nom d'hôte, date lisible ; aucun
+jeton ne quitte le main.
 
 ## L'approbation d'une spec
 
@@ -261,6 +299,4 @@ Reste de l'issue #363 :
 - le SCIM 2.0 (comptes et groupes poussés par le fournisseur vers les rôles) : un protocole de
   provisionnement entier (ressources `Users` et `Groups`, filtres, `PATCH`), avec son propre jeton
   par fournisseur, une surface publique nouvelle à concevoir et sécuriser à part ;
-- le bouton Entra de l'app de bureau mène encore son propre flux : le faire passer par celui du
-  fournisseur générique (`src/main/oidc-pkce.ts`, `state` et `nonce` partagés), comme le téléphone ;
-- l'app de bureau ne montre pas encore la connexion d'une session ouverte (l'API la donne).
+- l'app mobile ne montre pas encore la connexion de sa session (`GET /auth/me/session` la donne).
