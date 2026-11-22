@@ -208,6 +208,7 @@ PHASE_ALIASES: dict[str, str] = {
     "git_command": "solo",
     "code_playground": "solo",
     "replay_summary": "solo",
+    "recorder_assist": "solo",
     "linear_updater": "solo",
     "pr_followup_reviewer": "solo",
     # Writes one archify model from evidence already in its prompt; Python

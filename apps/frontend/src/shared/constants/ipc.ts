@@ -790,6 +790,11 @@ export const IPC_CHANNELS = {
 	BROWSER_AGENT_RUN_TESTS: "browserAgent:runTests",
 	BROWSER_AGENT_RECORD_START: "browserAgent:recordStart", // A session in a browser window the person drives (#387)
 	BROWSER_AGENT_RECORD_STOP: "browserAgent:recordStop",
+	BROWSER_AGENT_RECORD_DIALOG: "browserAgent:recordDialog", // The person's answer to a dialog the recorded page opened
+	BROWSER_AGENT_RECORD_RUN: "browserAgent:recordRun", // Run the test proposed on a review card, in its worktree
+	BROWSER_AGENT_RECORD_RESHOOT: "browserAgent:recordReshoot", // Replay the stopped recording headless: which selectors still work
+	BROWSER_AGENT_RECORD_RESHOOT_APPLY: "browserAgent:recordReshootApply", // Give steps the selectors the reshoot proposed
+	BROWSER_AGENT_RECORD_ASSIST: "browserAgent:recordAssist", // A light model (or rules) names the test, ranks the checks
 	BROWSER_AGENT_RECORD_EXPORT: "browserAgent:recordExport", // Steps → Playwright / Cypress test: preview, review card or file
 	BROWSER_AGENT_RECORD_EVENT: "browserAgent:recordEvent", // main → renderer: step, started, stopped, error
 

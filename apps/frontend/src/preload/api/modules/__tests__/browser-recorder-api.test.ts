@@ -23,9 +23,23 @@ describe("createBrowserRecorderAPI", () => {
 		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_START, "/p", "http://a.test");
 		await api.stopBrowserRecording();
 		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_STOP);
+		await api.answerBrowserRecorderDialog({ id: 1, accept: false, text: "" });
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_DIALOG, {
+			id: 1,
+			accept: false,
+			text: "",
+		});
 		const request = { format: "cypress", destination: "preview", name: "", stepIds: ["s1"] } as const;
 		await api.exportBrowserRecording("/p", request);
 		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_EXPORT, "/p", request);
+		await api.runBrowserRecordedTest("/p");
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_RUN, "/p");
+		await api.assistBrowserRecording("/p");
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_ASSIST, "/p");
+		await api.reshootBrowserRecording("/p");
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT, "/p");
+		await api.applyBrowserReshoot("/p", ["s1"]);
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.BROWSER_AGENT_RECORD_RESHOOT_APPLY, "/p", ["s1"]);
 	});
 
 	it("hears the record events", () => {

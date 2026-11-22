@@ -16,7 +16,7 @@ from browser_agent.recorder import (
     record_session,
     shadow_hosts,
 )
-from browser_agent.recording import MAX_FRAMES, MAX_STEPS, RequestWait
+from browser_agent.recording import MAX_FRAMES, MAX_SHADOW, MAX_STEPS, RequestWait
 from playwright.async_api import Error as BrowserError
 
 PAGE = "http://localhost:3000/shop"
@@ -96,7 +96,7 @@ def test_an_element_whose_place_cannot_be_named_is_not_recorded() -> None:
     unnamed = {"tag": "x-card", "role": "tab", "name": "Card"}
     for target in (
         {**SAVE, "shadow": "x-card"},
-        {**SAVE, "shadow": [HOST] * 5},
+        {**SAVE, "shadow": [HOST] * (MAX_SHADOW + 1)},
         {**SAVE, "shadow": [unnamed]},
     ):
         assert rec.on_page_event({"kind": "click", "target": target}) is None
@@ -203,10 +203,13 @@ async def test_a_session_records_inside_frames_and_waits_for_requests() -> None:
     driver = asyncio.ensure_future(drive())
     recording, _reason = await record_session(page, PAGE, stop, emitted.append)
     await asyncio.wait_for(driver, timeout=5)
-    first, second = recording.steps[1:]
+    first, second, shadowed = recording.steps[1:]
     assert first.frames == ['iframe[name="pay"]', 'iframe[name="inner"]']
     assert first.wait_request == RequestWait("POST", "/api/pay")
-    assert second.frames == first.frames and len(recording.steps) == 3
+    assert second.frames == first.frames and first.frame_shadow == []
+    # An iframe inside a shadow root names its host too.
+    assert shadowed.frames == ['iframe[name="s"]']
+    assert shadowed.frame_shadow == [["x-card"]]
     # Each frame is described once, then remembered until it is detached.
     assert inner.asked == 1 and pay.asked == 1
     assert emitted[2] is first

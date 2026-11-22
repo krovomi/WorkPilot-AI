@@ -38,14 +38,18 @@ vi.mock("../../utils/python-runner-env", () => ({
 }));
 
 import {
+	answerDialog,
 	backendPath,
 	readLines,
 	readRecordUrl,
 	recordedSteps,
 	resetRecorderSessionForTests,
+	sessionSteps,
+	sessionSuggestions,
 	spawnRecorderRunner,
 	startRecording,
 	stopRecording,
+	updateStepSelectors,
 } from "../recorder-session";
 
 function fakeChild() {
@@ -212,6 +216,58 @@ describe("stopRecording", () => {
 		expect(child.written).toEqual(["stop\n"]);
 		child.stdin.destroy();
 		expect(stopRecording()).toEqual({ success: false });
+	});
+});
+
+describe("the stopped recording's steps", () => {
+	it("are given out, and take new selectors, only once it has stopped", async () => {
+		expect(sessionSteps("/p")).toEqual([]);
+		expect(sessionSuggestions("/p")).toEqual([]);
+		expect(updateStepSelectors("/p", "s2", [])).toBeNull();
+		const child = fakeChild();
+		await startRecording("/p", "http://a.test", deps(child).deps);
+		child.stdout.write(`RECORDER_STEP:${JSON.stringify({ id: "s2", kind: "click", selectors: [button] })}\n`);
+		await tick();
+		expect(sessionSteps("/p")).toEqual([]);
+		expect(sessionSuggestions("/p")).toEqual([]);
+		expect(updateStepSelectors("/p", "s2", [])).toBeNull();
+		child.emit("close", 0);
+		expect(sessionSteps("/p").map((s) => s.id)).toEqual(["s2"]);
+		expect(sessionSuggestions("/p")).toEqual([]);
+		expect(sessionSuggestions("/other")).toEqual([]);
+		expect(sessionSteps("/other")).toEqual([]);
+		const css = [{ strategy: "css", value: "#go" }] as const;
+		expect(updateStepSelectors("/p", "s2", css)).toEqual({ id: "s2", kind: "click", selectors: css });
+		expect(recordedSteps("/p", ["s2"])[0].selectors).toEqual(css);
+		expect(updateStepSelectors("/p", "s7", css)).toBeNull();
+		expect(updateStepSelectors("/other", "s2", css)).toBeNull();
+	});
+});
+
+describe("answerDialog", () => {
+	it("passes the answer to the dialog waiting, and to no other", async () => {
+		expect(answerDialog({ id: 1, accept: true })).toEqual({ success: false });
+		const child = fakeChild();
+		const { deps: d, events } = deps(child);
+		await startRecording("/p", "http://a.test", d);
+		expect(answerDialog({ id: 1, accept: true })).toEqual({ success: false });
+		child.stdout.write('RECORDER_DIALOG:{"id":1,"type":"evil"}\nRECORDER_DIALOG:not json\n');
+		child.stdout.write('RECORDER_DIALOG:{"id":2,"type":"prompt","message":"Name?","defaultValue":"x"}\n');
+		await tick();
+		expect(events.filter((e) => e.type === "dialog")).toEqual([
+			{ type: "dialog", dialog: { id: 2, type: "prompt", message: "Name?", defaultValue: "x" } },
+		]);
+		expect(answerDialog({ id: 1, accept: true })).toEqual({ success: false });
+		expect(answerDialog({ id: 2, accept: "yes" })).toEqual({ success: false });
+		expect(answerDialog({ id: 2, accept: true, text: "Neo" })).toEqual({ success: true });
+		// Answered once: a second answer has no dialog to go to.
+		expect(answerDialog({ id: 2, accept: false })).toEqual({ success: false });
+		await tick();
+		expect(child.written).toEqual(['dialog {"id":2,"accept":true,"text":"Neo"}\n']);
+		child.stdout.write('RECORDER_DIALOG:{"id":3,"type":"alert"}\n');
+		await tick();
+		child.stdin.destroy();
+		expect(answerDialog({ id: 3, accept: true })).toEqual({ success: false });
 	});
 });
 

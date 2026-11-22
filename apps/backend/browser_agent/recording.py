@@ -22,6 +22,16 @@ previous action; ``wait_hidden``: a loading indicator it showed went away,
 named by a CSS selector this package builds from a closed set of patterns).
 An export turns those into explicit waits, never a pause.
 
+Beyond clicks, typing and lists, a step may hover an element (when that showed
+something), scroll the page or an element to a position (``scroll_x``,
+``scroll_y``; no selector means the window), drag an element onto another
+(``drop``, with how the page listened: ``html5`` drag events or ``pointer``
+events), pick several options of a list (``values``), and carry the answer
+the person gave, from the desktop app, to the dialog the action opened
+(``dialog``: ``alert``, ``confirm``, ``prompt`` or ``beforeunload``, accepted
+or dismissed, with the text typed into a prompt). An ``<iframe>`` inside open
+shadow roots names those hosts too (``frame_shadow``, one list per frame).
+
 A selector that matches several elements on the page carries the element's
 place among them (``nth``, counted by the page in document order); a unique
 one never does. A check the recorder proposes after an action (a status, an
@@ -46,20 +56,37 @@ MAX_URL = 2048
 MAX_SELECTORS = 6
 MAX_SELECTOR_VALUE = 300
 #: Nested iframes, nested shadow roots: deeper than this is not recorded.
-MAX_FRAMES = 4
-MAX_SHADOW = 4
+MAX_FRAMES = 8
+MAX_SHADOW = 8
+#: Options picked in one multiple-choice list.
+MAX_VALUES = 20
+#: A scroll position, in CSS pixels, on either axis.
+MAX_SCROLL = 10_000_000
 MAX_PATH = 300
 #: A selector matching more elements than this is not kept, even with ``nth``.
 MAX_MATCHES = 20
 
-STEP_KINDS = ("navigate", "click", "fill", "select", "press", "assert_text")
+STEP_KINDS = (
+    "navigate",
+    "click",
+    "fill",
+    "select",
+    "press",
+    "assert_text",
+    "hover",
+    "scroll",
+    "drag",
+)
 STRATEGIES = ("testid", "role", "label", "placeholder", "text", "css")
 #: Keys whose press is recorded: they submit, close or confirm.
 KEYS = ("Enter", "Escape")
 #: The HTTP methods a request wait may name.
 HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE")
-#: The kinds of step that cause a transition (navigation, request).
-ACTION_KINDS = ("click", "fill", "select", "press")
+#: The kinds of step that cause a transition (navigation, request, dialog).
+ACTION_KINDS = ("click", "fill", "select", "press", "hover", "scroll", "drag")
+#: How the page listened to a drag: drag events, or pointer and mouse events.
+DRAG_MODES = ("html5", "pointer")
+DIALOG_TYPES = ("alert", "confirm", "prompt", "beforeunload")
 #: ARIA roles a selector may name; ``getByRole`` takes nothing else.
 ROLES = frozenset(
     {
@@ -189,6 +216,64 @@ def page_url(raw: object) -> str:
     return url if is_web_url(url) else ""
 
 
+@dataclass(frozen=True)
+class DialogAnswer:
+    """What the person answered to the dialog an action opened."""
+
+    type: str
+    accept: bool
+    #: The text typed into a ``prompt`` (accepted only).
+    text: str = ""
+    #: The dialog's message, page text: shown in the app, never exported.
+    message: str = ""
+
+    def to_dict(self) -> dict[str, object]:
+        data: dict[str, object] = {"type": self.type, "accept": self.accept}
+        if self.text:
+            data["text"] = self.text
+        if self.message:
+            data["message"] = self.message
+        return data
+
+    @classmethod
+    def from_dict(cls, raw: object) -> DialogAnswer | None:
+        if not isinstance(raw, dict) or raw.get("type") not in DIALOG_TYPES:
+            return None
+        accept = raw.get("accept")
+        if not isinstance(accept, bool):
+            return None
+        kind = str(raw.get("type"))
+        text = clean_value(raw.get("text")) if accept and kind == "prompt" else ""
+        return cls(kind, accept, text, clean_line(raw.get("message")))
+
+
+def is_scroll(raw: object) -> bool:
+    """A scroll position: a whole number of pixels, from 0 to :data:`MAX_SCROLL`."""
+    return type(raw) is int and 0 <= raw <= MAX_SCROLL
+
+
+def _selectors(raw: object) -> list[Selector]:
+    return [
+        s
+        for s in (
+            Selector.from_dict(item) for item in (raw if isinstance(raw, list) else [])
+        )
+        if s is not None
+    ][:MAX_SELECTORS]
+
+
+def _frame_shadow(raw: object, frames: int) -> list[list[str]] | None:
+    """The shadow hosts above each iframe: one list per frame, or None."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) != frames:
+        return None
+    chains = [_css_chain(item, MAX_SHADOW) for item in raw]
+    if any(c is None for c in chains):
+        return None
+    return [c for c in chains if c is not None] if any(chains) else []
+
+
 def _css_chain(raw: object, limit: int) -> list[str] | None:
     """A list of CSS selectors (frames, shadow hosts), or None when malformed."""
     if raw is None:
@@ -227,6 +312,17 @@ class RecordedStep:
     wait_hidden: str = ""
     #: A proposed check: the id of the action it follows (``assert_text`` only).
     after: str = ""
+    #: The options picked in a multiple-choice list (``select``).
+    values: list[str] = field(default_factory=list)
+    #: Where a ``scroll`` step scrolls to; without a selector, the window.
+    scroll_x: int = 0
+    scroll_y: int = 0
+    #: The element a ``drag`` step drops onto, in the same frame and shadow roots.
+    drop: list[Selector] = field(default_factory=list)
+    drag_mode: str = ""
+    dialog: DialogAnswer | None = None
+    #: The shadow hosts above each of ``frames``: empty, or one list per frame.
+    frame_shadow: list[list[str]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -246,11 +342,20 @@ class RecordedStep:
             ("waitUrl", self.wait_url),
             ("waitHidden", self.wait_hidden),
             ("after", self.after),
+            ("values", self.values),
+            ("dragMode", self.drag_mode),
+            ("frameShadow", self.frame_shadow),
         ):
             if value:
                 data[name] = value
         if self.wait_request:
             data["waitRequest"] = self.wait_request.to_dict()
+        if self.kind == "scroll":
+            data["scrollX"], data["scrollY"] = self.scroll_x, self.scroll_y
+        if self.drop:
+            data["drop"] = [s.to_dict() for s in self.drop]
+        if self.dialog:
+            data["dialog"] = self.dialog.to_dict()
         return data
 
     @classmethod
@@ -263,31 +368,42 @@ class RecordedStep:
             return None
         if kind not in STEP_KINDS:
             return None
-        raw_selectors = raw.get("selectors")
-        selectors = [
-            s
-            for s in (
-                Selector.from_dict(item)
-                for item in (raw_selectors if isinstance(raw_selectors, list) else [])
-            )
-            if s is not None
-        ][:MAX_SELECTORS]
+        selectors = _selectors(raw.get("selectors"))
         step = cls(id=step_id, kind=kind, selectors=selectors)
         if kind == "navigate":
             step.url = clean_line(raw.get("url"), MAX_URL)
             return step if is_web_url(step.url) else None
-        if not selectors:
-            return None
         frames = _css_chain(raw.get("frames"), MAX_FRAMES)
         shadow = _css_chain(raw.get("shadow"), MAX_SHADOW)
-        if frames is None or shadow is None:
+        frame_shadow = _frame_shadow(raw.get("frameShadow"), len(frames or []))
+        if frames is None or shadow is None or frame_shadow is None:
             return None
-        step.frames, step.shadow = frames, shadow
+        # Only a scroll of the top window has no element to name.
+        if not selectors and (kind != "scroll" or frames or shadow):
+            return None
+        step.frames, step.shadow, step.frame_shadow = frames, shadow, frame_shadow
         step.wait_visible = raw.get("waitVisible") is True
         if kind in ACTION_KINDS:
             step.wait_url = page_url(raw.get("waitUrl"))
             step.wait_request = RequestWait.from_dict(raw.get("waitRequest"))
             step.wait_hidden = loader_selector(raw.get("waitHidden"))
+            step.dialog = DialogAnswer.from_dict(raw.get("dialog"))
+        if kind == "scroll":
+            x, y = raw.get("scrollX"), raw.get("scrollY")
+            if not (isinstance(x, int) and isinstance(y, int)):
+                return None
+            if not (is_scroll(x) and is_scroll(y)):
+                return None
+            step.scroll_x, step.scroll_y = x, y
+        elif kind == "drag":
+            step.drop = _selectors(raw.get("drop"))
+            if not step.drop or raw.get("dragMode") not in DRAG_MODES:
+                return None
+            step.drag_mode = str(raw.get("dragMode"))
+        if kind == "select":
+            values = raw.get("values")
+            if isinstance(values, list) and 1 < len(values) <= MAX_VALUES:
+                step.values = [clean_value(v, MAX_TEXT) for v in values]
         if kind in ("fill", "select"):
             secret = raw.get("secretEnv", "")
             if isinstance(secret, str) and ENV_NAME.match(secret):
