@@ -59,6 +59,9 @@ KEEP_LINES_ON_COMPACT = 2_000
 _CATEGORY = re.compile(r"^[a-z_]{1,32}$")
 _FINDING_ID = re.compile(FINDING_ID)
 _SPACES = re.compile(r"\s+")
+_REVIEW_FILE = re.compile(r"^review_([1-9][0-9]{0,8})\.json$")
+#: Saved reviews counted for the monthly figures, the newest first.
+MAX_COUNTED_REVIEWS = 200
 
 router = APIRouter(prefix="/api/features/forge/github/reviews", tags=["features"])
 
@@ -271,6 +274,34 @@ def feedback_view(scope: ProjectScope, number: int) -> dict[str, Any]:
     return {"feedback": feedback, "held": [item["finding_id"] for item in held]}
 
 
+def review_counts(scope: ProjectScope) -> list[dict[str, Any]]:
+    """How many findings each saved review holds, and when it ran, for the
+    panel's monthly figures; the newest ``MAX_COUNTED_REVIEWS`` reviews."""
+    directory = GITHUB._review_dir(scope)
+    if not directory.is_dir():
+        return []
+    numbers = sorted(
+        (
+            int(match.group(1))
+            for entry in directory.iterdir()
+            if (match := _REVIEW_FILE.match(entry.name))
+        ),
+        reverse=True,
+    )[:MAX_COUNTED_REVIEWS]
+    counts: list[dict[str, Any]] = []
+    for number in numbers:
+        text = read_file(directory, f"review_{number}.json", MAX_REVIEW)
+        try:
+            data = json.loads(text) if text is not None else None
+        except ValueError:
+            data = None
+        findings = data.get("findings") if isinstance(data, dict) else None
+        at = data.get("reviewed_at") if isinstance(data, dict) else None
+        if isinstance(findings, list) and isinstance(at, str):
+            counts.append({"pr": number, "at": at[:40], "findings": len(findings)})
+    return counts
+
+
 @router.get("/{number}/feedback")
 async def get_feedback(
     number: int, scope: ProjectScope = Depends(resolve_project_scope)
@@ -325,7 +356,8 @@ async def feedback_overview(
 ) -> dict[str, Any]:
     """What the app needs for the project-wide view: the dataset as the
     reviewer reads it (its newest part), the threshold the review jobs run
-    with, the held rejections, and whether the caller may act on them."""
+    with, the held rejections, whether the caller may act on them, and the
+    findings count of the saved reviews (computed here, sent nowhere else)."""
     path = _dataset(scope)
     dataset = ""
     if path.is_file():
@@ -338,6 +370,7 @@ async def feedback_overview(
         "threshold": rf.resolve_threshold(),
         "held": read_held(scope),
         "maintainer": is_maintainer(scope, get_principal(request)),
+        "reviews": review_counts(scope),
     }
 
 

@@ -106,10 +106,25 @@ export interface ReviewFeedbackServerStats {
 	held: HeldRejection[];
 }
 
+/**
+ * One month of the project's reviews (lot 4), computed on the machine or on
+ * the team's server: the PRs whose saved review ran that month, their
+ * findings in total, and the kinds of remark the reviewer learned then.
+ */
+export interface ReviewFeedbackMonth {
+	/** `YYYY-MM`. */
+	month: string;
+	reviews: number;
+	findings: number;
+	rulesLearned: number;
+}
+
 export interface ReviewFeedbackStats {
 	threshold: number;
 	categories: ReviewFeedbackCategoryStats[];
 	rules: ReviewFeedbackRuleStats[];
+	/** The newest months first, six at most. */
+	months: ReviewFeedbackMonth[];
 	/** Set for a server project, whose feedback the server keeps. */
 	server?: ReviewFeedbackServerStats;
 }

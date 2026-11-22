@@ -39,6 +39,7 @@ import {
 	resolveThreshold,
 	validRecord,
 } from "./review-feedback-dataset";
+import { serverReviewCounts } from "./review-feedback-metrics";
 import { computeStats } from "./review-feedback-stats";
 import type { ValidFeedback } from "./review-feedback-store";
 
@@ -178,7 +179,7 @@ export async function serverFeedbackStats(
 	return {
 		success: true,
 		stats: {
-			...computeStats(records, threshold),
+			...computeStats(records, threshold, serverReviewCounts(body?.reviews)),
 			server: { maintainer: body?.maintainer === true, held },
 		},
 	};

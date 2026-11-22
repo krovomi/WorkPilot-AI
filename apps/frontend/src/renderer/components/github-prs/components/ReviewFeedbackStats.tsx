@@ -4,7 +4,8 @@
  * downgrades or hides, a reset for each, and the conventions file. On a
  * server project (lot 3), the rejections held for a maintainer; a reset is a
  * maintainer's, and the conventions file is saved where the person chooses
- * (lot 4), since the server's clone is nobody's working copy. Folded by
+ * (lot 4), since the server's clone is nobody's working copy; the figures by
+ * month (lot 4) follow the rules. Folded by
  * default and loaded when opened: a PR view does not read the dataset for it.
  */
 
@@ -22,6 +23,7 @@ import {
 	useReviewFeedbackStats,
 } from "../hooks/useReviewFeedbackStats";
 import { ReviewFeedbackHeld } from "./ReviewFeedbackHeld";
+import { ReviewFeedbackMonths } from "./ReviewFeedbackMonths";
 
 function rated(row: ReviewFeedbackCategoryStats): number {
 	return row.accepted + row.rejected + row.notApplicable;
@@ -224,6 +226,10 @@ export function ReviewFeedbackStats({ projectId }: { projectId: string }) {
 						</p>
 					)}
 					<StatsBody state={state} />
+					{state.stats && (
+						// An answer of an app older than lot 4 has no months.
+						<ReviewFeedbackMonths rows={state.stats.months ?? []} />
+					)}
 					<ReviewFeedbackHeld state={state} />
 					<div className="space-y-1 border-t border-border/50 pt-2">
 						<Button

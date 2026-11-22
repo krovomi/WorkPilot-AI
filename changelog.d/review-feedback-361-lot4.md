@@ -10,4 +10,6 @@ section: ✨ Nouveautés
   prévenus sur leurs canaux « Besoin de toi » (ntfy, Telegram, Teams), un moment qu'on coupe dans
   ses préférences ; le message ne donne que le projet et le numéro de la PR. Le fichier
   `review-conventions.md` d'un projet serveur se construit depuis les retours du serveur et
-  s'enregistre où l'on veut, dans sa copie de travail.
+  s'enregistre où l'on veut, dans sa copie de travail. Le panneau donne aussi, par mois, les PR
+  revues, les résultats par PR et les règles apprises, calculés sur la machine ou sur le serveur
+  de l'équipe.

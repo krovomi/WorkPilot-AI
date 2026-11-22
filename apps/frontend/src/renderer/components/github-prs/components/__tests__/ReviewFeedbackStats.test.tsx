@@ -157,6 +157,38 @@ describe("ReviewFeedbackStats", () => {
 		);
 	});
 
+	it("shows the figures by month, even before any feedback, in English and French", async () => {
+		const months = [
+			{ month: "2026-11", reviews: 2, findings: 5, rulesLearned: 1 },
+			{ month: "2026-10", reviews: 0, findings: 0, rulesLearned: 2 },
+		];
+		api.getReviewFeedbackStats.mockResolvedValue({
+			success: true,
+			stats: { threshold: 3, categories: [], rules: [], months },
+		});
+		await openPanel();
+
+		const table = await screen.findByRole("table", { name: t("months.title") });
+		expect(table).toHaveTextContent("2026-11");
+		expect(table).toHaveTextContent("2.5");
+		expect(table).toHaveTextContent("—");
+		expect(screen.getByText(t("months.hint"))).toBeVisible();
+		expect(screen.getByText(t("empty"))).toBeVisible();
+
+		await act(() => i18n.changeLanguage("fr"));
+		expect(screen.getByRole("table", { name: "Par mois" })).toHaveTextContent("2,5");
+	});
+
+	it("shows no monthly table when there is nothing to count", async () => {
+		api.getReviewFeedbackStats.mockResolvedValue({
+			success: true,
+			stats: { ...STATS, months: [] },
+		});
+		await openPanel();
+		await screen.findByText(t("overall", { rate: 30, total: 10 }));
+		expect(screen.queryByText(t("months.title"))).toBeNull();
+	});
+
 	it("folds again", async () => {
 		api.getReviewFeedbackStats.mockResolvedValue({ success: true, stats: STATS });
 		await openPanel();

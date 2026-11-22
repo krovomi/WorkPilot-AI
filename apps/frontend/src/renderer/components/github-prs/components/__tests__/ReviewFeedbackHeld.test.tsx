@@ -69,6 +69,7 @@ function stats(maintainer: boolean, held = HELD): Stats {
 				topReason: null,
 			},
 		],
+		months: [],
 		server: { maintainer, held },
 	};
 }

@@ -27,6 +27,7 @@ import {
 	saveServerConventions,
 	serverFeedbackStats,
 } from "./review-feedback-server";
+import { readReviewCounts } from "./review-feedback-metrics";
 import { computeStats, configuredThreshold } from "./review-feedback-stats";
 import { isPrNumber, readRecords, recordReset } from "./review-feedback-store";
 import { withProjectOrNull } from "./utils/project-middleware";
@@ -44,7 +45,11 @@ const INVALID = { success: false, error: "invalid" } as const;
 function statsOf(projectPath: string): ReviewFeedbackStatsResult {
 	return {
 		success: true,
-		stats: computeStats(readRecords(projectPath), configuredThreshold()),
+		stats: computeStats(
+			readRecords(projectPath),
+			configuredThreshold(),
+			readReviewCounts(projectPath),
+		),
 	};
 }
 

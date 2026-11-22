@@ -36,6 +36,7 @@ optional reason, from a closed list (`too_pedantic`, `project_convention`,
 | Server projects (lot 3) | routes `apps/backend/shared_features/forge_review_feedback.py`; app side `main/ipc-handlers/github/review-feedback-server.ts`; held list `renderer/components/github-prs/components/ReviewFeedbackHeld.tsx`, channel `GITHUB_PR_REVIEW_FEEDBACK_HELD_DECIDE` |
 | Self-check before posting (lot 3) | `apps/backend/runners/github/services/self_critique.py`, called by `orchestrator.review_pr` and `followup_review_pr` |
 | Contradictions (lot 4) | `apps/backend/runners/github/services/contradiction_check.py`, after the self-check, same callers |
+| Figures by month (lot 4) | `main/ipc-handlers/github/review-feedback-metrics.ts`, shown by `ReviewFeedbackMonths.tsx`; server counts `forge_review_feedback.review_counts` |
 | Maintainers told of a held rejection (lot 4) | `apps/backend/shared_features/forge_review_feedback_notify.py`, moment `review_feedback_held` of `server/services/needs_you.py` |
 
 ## The dataset
@@ -264,12 +265,25 @@ dialog (`saveConventionsAs`), usually their own checkout, to commit it there.
 The path comes from the dialog, never from the renderer; a link there is
 refused, and the file goes through a fresh temporary name renamed over it.
 
+## The figures by month (lot 4)
+
+Under the rules, a table gives the newest six months that have something to
+count: the PRs whose saved review ran that month, their findings per PR, and
+the rules learned. A PR counts once, with its latest saved review
+(`.workpilot/github/pr/review_<n>.json`), in the month that review ran; the
+newest 200 reviews are read, each a regular file inside the project, at most
+2 MB. A rule counts in the month of the verdict that brought it to the
+threshold, if it is still learned (the dataset is append-only, so its order
+is the verdicts'; a rule that fell under and came back counts when it came
+back; one reset, accepted again or on an undated line, does not). The main
+process computes both (`review-feedback-metrics.ts`) from the project's
+folder, or for a server project from the dataset and the review counts the
+server's `GET /feedback` answers (`review_counts`, the same bounds). Nothing
+is sent anywhere else: no telemetry.
+
 ## Left for later
 
-Nothing of what lots 1 to 3 left remains. Two ideas of the issue took another
-shape: the learned rules live in the dataset, not in the brain (see "The
-dataset" above), and a finding's confidence is shown as its severity, by
-which the PR view groups the findings, most severe first (`SEVERITY_ORDER`).
-Of the issue's metrics, the acceptance rate is in the panel; the findings per
-PR and the rules learned per month are not shown yet. Every figure is
-computed on the machine or on the team's server: nothing is sent elsewhere.
+Nothing of the issue remains. Two of its ideas took another shape: the
+learned rules live in the dataset, not in the brain (see "The dataset"
+above), and a finding's confidence is shown as its severity, by which the PR
+view groups the findings, most severe first (`SEVERITY_ORDER`).
