@@ -1,4 +1,22 @@
 {
+	"readiness": {
+		"checking": "Pré-analyse de « {{title}} »…",
+		"title": "Avant de démarrer « {{title}} »",
+		"questionsIntro": "La carte est courte : l'agent devrait deviner. Répondez en une ligne, la réponse s'ajoute à la description.",
+		"problemIntro": "Le démarrage échouerait :",
+		"problems": {
+			"no_git": "Le projet n'est pas un dépôt git. WorkPilot construit chaque tâche dans un worktree : lancez « git init » dans le dossier du projet.",
+			"no_commit": "Le dépôt git n'a encore aucun commit. Faites un premier commit, puis redémarrez la carte.",
+			"no_auth": "Le compte Claude n'est pas connecté. Connectez-le dans Paramètres, Profils Claude, puis redémarrez la carte."
+		},
+		"answerLabel": "Réponse",
+		"sectionTitle": "Précisions avant le démarrage",
+		"later": "Plus tard",
+		"close": "Fermer",
+		"startAnyway": "Démarrer quand même",
+		"saveAndStart": "Enregistrer et démarrer",
+		"saveFailed": "Les réponses n'ont pas pu être enregistrées. La carte n'a pas démarré."
+	},
 	"dictation": {
 		"pending": "Ajoutez ou annulez le brouillon vocal avant de continuer.",
 		"start": "Dicter",
@@ -265,6 +283,8 @@
 			"queued_other": "{{count}} cartes attendent dans File d'attente : En cours est plein ({{slots}} à la fois).",
 			"skipped_one": "{{count}} carte reste en place (déjà dans cette colonne, ou PR ouverte sans PR).",
 			"skipped_other": "{{count}} cartes restent en place (déjà dans cette colonne, ou PR ouverte sans PR).",
+			"held_one": "{{count}} carte attend vos réponses avant de démarrer.",
+			"held_other": "{{count}} cartes attendent vos réponses avant de démarrer.",
 			"nothing": "Aucune carte à déplacer vers cette colonne"
 		},
 		"dragColumn": "Glisser pour réordonner la colonne",

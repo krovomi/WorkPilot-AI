@@ -1,4 +1,22 @@
 {
+	"readiness": {
+		"checking": "Checking “{{title}}” before it starts…",
+		"title": "Before “{{title}}” starts",
+		"questionsIntro": "The card is short: the agent would have to guess. Answer in one line; the answer is added to the description.",
+		"problemIntro": "The start would fail:",
+		"problems": {
+			"no_git": "The project is not a git repository. WorkPilot builds each task in a worktree: run “git init” in the project folder.",
+			"no_commit": "The git repository has no commit yet. Make a first commit, then start the card again.",
+			"no_auth": "The Claude account is not signed in. Sign in under Settings, Claude Profiles, then start the card again."
+		},
+		"answerLabel": "Answer",
+		"sectionTitle": "Clarifications before the start",
+		"later": "Later",
+		"close": "Close",
+		"startAnyway": "Start anyway",
+		"saveAndStart": "Save and start",
+		"saveFailed": "The answers could not be saved. The card did not start."
+	},
 	"dictation": {
 		"pending": "Add or discard the voice draft before continuing.",
 		"start": "Dictate",
@@ -265,6 +283,8 @@
 			"queued_other": "{{count}} cards wait in Queue: In Progress is full ({{slots}} at a time).",
 			"skipped_one": "{{count}} card stays put (already in that column, or PR Open without a PR).",
 			"skipped_other": "{{count}} cards stay put (already in that column, or PR Open without a PR).",
+			"held_one": "{{count}} card waits for your answers before it starts.",
+			"held_other": "{{count}} cards wait for your answers before they start.",
 			"nothing": "No card to move to this column"
 		},
 		"dragColumn": "Drag to reorder column",

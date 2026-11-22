@@ -25,6 +25,7 @@ import {
 import { extractSubtaskFiles } from "../../shared/utils/subtask-files";
 import { subtaskBlockFields } from "../../shared/utils/subtask-unblock";
 import { isMeaningfulFeatureTitle } from "../../shared/utils/task-title";
+import { readyToStart } from "../lib/start-readiness";
 
 interface TaskState {
 	tasks: Task[];
@@ -1136,6 +1137,8 @@ export async function submitReview(
  */
 export interface PersistStatusResult {
 	success: boolean;
+	/** The pre-analysis held the card back: its dialog says why, no error to show. */
+	held?: boolean;
 	worktreeExists?: boolean;
 	worktreePath?: string;
 	error?: string;
@@ -1148,16 +1151,20 @@ export interface PersistStatusResult {
 export async function persistTaskStatus(
 	taskId: string,
 	status: TaskStatus,
-	options?: { forceCleanup?: boolean; skipPrCreation?: boolean },
+	options?: { forceCleanup?: boolean; skipPrCreation?: boolean; skipReadiness?: boolean },
 ): Promise<PersistStatusResult> {
 	const store = useTaskStore.getState();
+	const { skipReadiness, ...forwarded } = options ?? {};
 
 	try {
+		// A first start goes through the pre-analysis (lib/start-readiness.ts).
+		const task = status === "in_progress" && !skipReadiness ? store.tasks.find((t) => t.id === taskId) : undefined;
+		if (task && !(await readyToStart(task))) return { success: false, held: true };
 		// Persist to file first (don't optimistically update for 'done' status)
 		const result = await globalThis.electronAPI.updateTaskStatus(
 			taskId,
 			status,
-			options,
+			options && skipReadiness !== undefined ? forwarded : options,
 		);
 
 		if (!result.success) {

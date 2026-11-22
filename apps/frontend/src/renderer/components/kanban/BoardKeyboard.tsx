@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { TASK_STATUS_LABELS, type TaskStatusColumn } from "../../../shared/constants/task";
 import { useBoardShortcuts } from "../../hooks/useBoardShortcuts";
 import { useShortcutsHelpStore } from "../../stores/shortcuts-help-store";
+import { ReadinessDialog } from "../task-readiness/ReadinessDialog";
 import { ShortcutsHelpDialog } from "./ShortcutsHelpDialog";
 
 interface BoardKeyboardProps {
@@ -15,7 +16,8 @@ interface BoardKeyboardProps {
 }
 
 /**
- * The board's keys (useBoardShortcuts) and their help dialog. An arrow
+ * The board's keys (useBoardShortcuts), their help dialog, and the dialog of
+ * the cards the pre-analysis held before they start. An arrow
  * that moves the focus says where it landed: "2 of 5, Queue".
  */
 export function BoardKeyboard({ announce, ...shortcuts }: BoardKeyboardProps) {
@@ -33,5 +35,11 @@ export function BoardKeyboard({ announce, ...shortcuts }: BoardKeyboardProps) {
 				}),
 			),
 	});
-	return <ShortcutsHelpDialog />;
+	return (
+		<>
+			<ShortcutsHelpDialog />
+			{/* Cards the pre-analysis held back before « En cours ». */}
+			<ReadinessDialog />
+		</>
+	);
 }

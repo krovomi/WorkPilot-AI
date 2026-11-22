@@ -16,6 +16,7 @@ import {
 } from "../../../__tests__/helpers/renderer-api";
 import type { Task, TaskStatus } from "../../../shared/types";
 import { useProjectStore } from "../../stores/project-store";
+import { useTaskReadinessStore } from "../../stores/task-readiness-store";
 import { loadDraft, onQueueKick, useTaskStore } from "../../stores/task-store";
 import { Toaster } from "../ui/toaster";
 import { TooltipProvider } from "../ui/tooltip";
@@ -85,6 +86,7 @@ beforeEach(() => {
 	localStorage.clear();
 	useProjectStore.setState({ selectedProjectId: projectId, activeProjectId: null });
 	useTaskStore.setState({ tasks: [] });
+	useTaskReadinessStore.setState({ held: [], accepted: new Set() });
 	api = installRendererApi({
 		createTask: vi.fn(async (_projectId: string, title: string) => {
 			created++;
@@ -265,6 +267,18 @@ describe("quick add in a column", () => {
 		expect(
 			await screen.findByText("1 card waits in Queue: In Progress is full (1 at a time)."),
 		).toBeInTheDocument();
+	});
+
+	it("leaves in Planification a card the pre-analysis holds, and says so", async () => {
+		api.fn("checkTaskReadiness").mockResolvedValue({
+			success: true,
+			data: { ready: false, questions: [{ id: "q1", question: "Which page?" }] },
+		});
+		renderColumn({ status: "in_progress" });
+		await userEvent.click(screen.getAllByRole("button", { name: "Add and start" })[0]);
+		await userEvent.type(box(), "Fix it{Enter}");
+		expect(await screen.findByText("1 card waits for your answers before it starts.")).toBeInTheDocument();
+		expect(api.fn("updateTaskStatus")).not.toHaveBeenCalled();
 	});
 
 	it("names the start of several pasted lines", async () => {

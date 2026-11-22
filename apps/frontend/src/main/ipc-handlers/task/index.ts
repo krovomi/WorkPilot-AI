@@ -24,6 +24,7 @@ import { registerGoalHandlers } from "./goal-handlers";
 import { registerTaskLogsHandlers } from "./logs-handlers";
 import { registerMcpAppHandlers } from "./mcp-app-handlers";
 import { registerPrFollowupHandlers } from "./pr-followup-handlers";
+import { registerReadinessHandlers } from "./readiness-handlers";
 import { registerSnapshotHandlers } from "./snapshot-handlers";
 import { registerStopAllHandlers } from "./stop-all-handlers";
 import { registerWorktreeHandlers } from "./worktree-handlers";
@@ -47,6 +48,9 @@ export function registerTaskHandlers(
 
 	// Register context-window handlers (manual compact/clear, live policy edit)
 	registerTaskContextHandlers(agentManager);
+
+	// The pre-analysis of a card about to start (machine checks, AI review of a short card)
+	registerReadinessHandlers();
 
 	// Register goal handlers (goal mode: the command that says "done")
 	registerGoalHandlers();

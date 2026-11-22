@@ -153,6 +153,7 @@ export function QuickAddComposer({
 		const metadata = quickAddMetadata({ engine, type, priority });
 		let created = 0;
 		let waiting = 0;
+		let held = 0;
 		try {
 			for (const item of items) {
 				const task = await createTask(projectId, item.title, item.description, {
@@ -167,7 +168,8 @@ export function QuickAddComposer({
 					column = "queue";
 					waiting++;
 				}
-				if (column) await persistTaskStatus(task.id, column);
+				// Held by the pre-analysis, it stays in Planification: its dialog says why.
+				if (column && (await persistTaskStatus(task.id, column)).held) held++;
 			}
 		} finally {
 			setBusy(false);
@@ -181,9 +183,12 @@ export function QuickAddComposer({
 					column: t(`tasks:columns.${status}`),
 				}),
 				description:
-					waiting > 0
-						? t("tasks:kanban.groupMove.queued", { count: waiting, slots: maxParallelTasks })
-						: undefined,
+					[
+						waiting > 0 ? t("tasks:kanban.groupMove.queued", { count: waiting, slots: maxParallelTasks }) : "",
+						held > 0 ? t("tasks:kanban.groupMove.held", { count: held }) : "",
+					]
+						.filter(Boolean)
+						.join(" ") || undefined,
 			});
 		} else {
 			// Keep the lines that were not created, so a retry does not duplicate.

@@ -9,6 +9,7 @@ import { mobileService } from "./mobile-service";
 import { naturalLanguageGitService } from "./natural-language-git-service";
 import { performanceProfilerService } from "./performance-profiler-service";
 import { pipelineGeneratorService } from "./pipeline-generator-service";
+import { readinessReviewService } from "./readiness-review-service";
 import { specInterviewService } from "./spec-interview-service";
 import { visualProgrammingService } from "./visual-programming-service";
 
@@ -40,6 +41,7 @@ export function configurePythonFeatureServices(
 		naturalLanguageGitService,
 		performanceProfilerService,
 		pipelineGeneratorService,
+		readinessReviewService,
 		specInterviewService,
 		visualProgrammingService,
 	]) {
