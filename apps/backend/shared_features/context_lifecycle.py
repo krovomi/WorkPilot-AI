@@ -124,13 +124,14 @@ def _answer(outcome: dict[str, Any]) -> dict[str, Any]:
 
 def read_lifecycle(scope: ProjectScope, limit: int) -> dict[str, Any]:
     """The journal, what can be taken back, the figures, the trash and the pins."""
-    from brain.lifecycle import journal, metrics, store, undo
+    from brain.lifecycle import folds, journal, metrics, store, undo
 
     root = brain_root(scope)
     if root is None:
         return dict(_NO_BRAIN)
     base = _base(scope)
     store.purge_expired(root, base)
+    folds.purge_expired(root, base)
     entries = journal.read(root, base, limit=5000)
     modes = undo.revertible(root, base, entries)
     return {
