@@ -71,8 +71,9 @@
 	"projects": {
 		"title": "Projets",
 		"empty": "Aucun projet pour l'instant. Ajoutez-en un depuis l'app de bureau.",
-		"role": "Rôle : {{role}}",
-		"settings": "Réglages"
+		"settings": "Réglages",
+		"count_one": "{{count}} projet",
+		"count_other": "{{count}} projets"
 	},
 	"board": {
 		"live": "En direct",
@@ -84,7 +85,9 @@
 		"groupMark": "Partie {{index}}/{{total}} · {{title}}",
 		"groupHint": "N'affiche que les cartes de ce groupe",
 		"groupFilter": "Groupe {{group}} · tout afficher",
-		"showAll": "Afficher toutes les cartes"
+		"showAll": "Afficher toutes les cartes",
+		"sync": "Synchro",
+		"emptyHint": "Les cartes arrivent ici en avançant sur le tableau."
 	},
 	"columns": {
 		"backlog": "Planification",
@@ -196,7 +199,8 @@
 		"steeringLabel": "Message pour la prochaine session",
 		"steeringSend": "Envoyer",
 		"steeringQueued": "En attente de la prochaine session",
-		"steeringDelivered": "Remis à la session {{session}} ({{date}})"
+		"steeringDelivered": "Remis à la session {{session}} ({{date}})",
+		"working": "Agent au travail"
 	},
 	"actions": {
 		"start": "Démarrer",
@@ -366,7 +370,12 @@
 		"trend": "Par rapport à la période d'avant",
 		"tokens": "Tokens",
 		"allTime": "Depuis le début",
-		"noSessions": "Pas encore de session."
+		"noSessions": "Pas encore de session.",
+		"tiles": {
+			"qa": "QA réussies du premier coup",
+			"spent": "dépensés en {{days}} jours",
+			"done": "cartes terminées"
+		}
 	},
 	"governance": {
 		"intro": "Ce que le workpilot.policy.yaml du projet demande à ses agents sur le serveur. Le serveur revérifie chaque action.",
@@ -499,7 +508,6 @@
 	"tokens": {
 		"title": "Mes jetons sur le serveur",
 		"summary": "Vos jetons GitHub, GitLab, Azure DevOps, Jira et Linear, utilisés pour vos propres appels.",
-		"manage": "Gérer mes jetons",
 		"intro": "Le serveur garde ces jetons chiffrés et s'en sert pour vos propres appels aux forges et aux outils de suivi. Une fois enregistré, un jeton n'est plus jamais affiché, ni sur le téléphone ni ailleurs.",
 		"kinds": {
 			"github_token": "GitHub",
@@ -522,7 +530,6 @@
 	"admin": {
 		"title": "Administration",
 		"summary": "Membres, invitations, groupes et rôles de cette organisation.",
-		"open": "Ouvrir l'administration",
 		"of": "Organisation : {{org}}",
 		"remove": "Retirer",
 		"projectRole": {
@@ -741,5 +748,54 @@
 		},
 		"issuer": "Fournisseur d'identité",
 		"signedInAt": "Connecté le"
+	},
+	"nav": {
+		"projects": "Projets",
+		"board": "Tableau",
+		"more": "Plus",
+		"moreEmpty": "Votre rôle n'ouvre aucune autre page de ce projet.",
+		"pages": {
+			"roadmap": {
+				"title": "Roadmap",
+				"hint": "Les fonctionnalités prévues pour le projet, par phase et priorité"
+			},
+			"ideas": {
+				"title": "Idées",
+				"hint": "Les améliorations qu'un agent a trouvées dans le code, à changer en cartes"
+			},
+			"context": {
+				"title": "Contexte",
+				"hint": "Ce que les agents savent du projet : stack, services, mémoires"
+			},
+			"sessions": {
+				"title": "Sessions",
+				"hint": "Chaque session d'agent du projet, avec ses jetons et son coût"
+			},
+			"analyses": {
+				"title": "Analyses",
+				"hint": "Sécurité, performance, qualité : des rapports lancés sur le serveur"
+			},
+			"delegations": {
+				"title": "Approbations prêtées",
+				"hint": "Qui peut approuver en votre nom pendant votre absence"
+			},
+			"governance": {
+				"title": "Gouvernance",
+				"hint": "La politique des agents du projet et les appels en attente d'approbation"
+			},
+			"waves": {
+				"title": "Vagues",
+				"hint": "Le backlog planifié en vagues de cartes qui peuvent tourner côte à côte"
+			}
+		}
+	},
+	"time": {
+		"now": "à l'instant",
+		"minutes_one": "il y a {{count}} min",
+		"minutes_other": "il y a {{count}} min",
+		"hours_one": "il y a {{count}} h",
+		"hours_other": "il y a {{count}} h",
+		"days_one": "il y a {{count}} j",
+		"days_other": "il y a {{count}} j"
 	}
 }

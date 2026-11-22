@@ -4,6 +4,7 @@
 	"main": "expo-router/entry",
 	"dependencies": {
 		"@expo/metro-runtime": "~58.0.16",
+		"@expo/vector-icons": "^15.1.1",
 		"expo": "~58.0.22",
 		"expo-auth-session": "~58.0.16",
 		"expo-constants": "~58.0.14",
