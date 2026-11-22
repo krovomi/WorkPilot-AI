@@ -1606,7 +1606,9 @@
 		"expires": "expire le",
 		"revoke": "Révoquer",
 		"copyLink": "Copier le lien",
-		"copyFailed": "Le lien n'a pas pu être copié"
+		"copyFailed": "Le lien n'a pas pu être copié",
+		"orgRole": "Rôle dans l'organisation",
+		"orgRoleDefault": "Par défaut pour cet accès"
 	},
 	"jiraImport": {
 		"cancel": "Annuler",

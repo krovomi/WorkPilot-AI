@@ -136,6 +136,7 @@ const bridge = {
 	updateRole: vi.fn(),
 	deleteRole: vi.fn(),
 	updateMemberRole: vi.fn(),
+	addMember: vi.fn(),
 	removeMember: vi.fn(),
 	activateUser: vi.fn(),
 	deactivateUser: vi.fn(),
@@ -464,6 +465,47 @@ describe("MembersTab", () => {
 		expect(bridge.deactivateUser).toHaveBeenCalledWith("ana");
 		expect(bridge.activateUser).toHaveBeenCalledWith("bo");
 		expect(bridge.removeMember).toHaveBeenCalledWith("bo");
+	});
+});
+
+describe("MembersTab, adding an account that already exists", () => {
+	it("is offered to a platform administrator only", async () => {
+		grant(["org.member.write"]);
+		render(<MembersTab />);
+		await waitFor(() => expect(bridge.listMembers).toHaveBeenCalled());
+		expect(screen.queryByLabelText("Add an account that already exists")).toBeNull();
+	});
+
+	it("adds the account by its email with the chosen role, even to an empty organization", async () => {
+		grant(["org.member.write"], { isPlatformAdmin: true });
+		bridge.addMember.mockImplementation(() => ok(member("cy")));
+		render(<MembersTab />);
+		const email = await screen.findByLabelText("Add an account that already exists");
+		expect(screen.getByText("No members yet.")).toBeInTheDocument();
+		await waitFor(() =>
+			expect(screen.getByRole("option", { name: "Lead" })).toBeInTheDocument(),
+		);
+		fireEvent.change(email, { target: { value: " cy@example.test " } });
+		fireEvent.change(screen.getByLabelText("Role"), { target: { value: "lead" } });
+		bridge.listMembers.mockImplementation(() => ok([member("cy")]));
+		fireEvent.click(screen.getByRole("button", { name: "Add to the organization" }));
+		await waitFor(() =>
+			expect(bridge.addMember).toHaveBeenCalledWith({ email: "cy@example.test", role_slug: "lead" }),
+		);
+		expect(await screen.findByText("cy@example.test")).toBeInTheDocument();
+		await waitFor(() => expect(email).toHaveValue(""));
+	});
+
+	it("keeps the address when the server refuses it", async () => {
+		grant(["org.member.write"], { isPlatformAdmin: true });
+		bridge.listMembers.mockImplementation(() => ok([member("ana")]));
+		bridge.addMember.mockImplementation(() => refused("User not found"));
+		render(<MembersTab />);
+		const email = await screen.findByLabelText("Add an account that already exists");
+		fireEvent.change(email, { target: { value: "who@example.test" } });
+		fireEvent.click(screen.getByRole("button", { name: "Add to the organization" }));
+		await waitFor(() => expect(useAdminStore.getState().error).toBe("User not found"));
+		expect(email).toHaveValue("who@example.test");
 	});
 });
 

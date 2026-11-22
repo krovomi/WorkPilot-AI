@@ -101,6 +101,7 @@ class TestIssuing:
                 {"project_role": "boss", "project_id": "<a>"},
                 "Invalid project role: boss",
             ),
+            ({"org_role": "boss"}, "Invalid organization role: boss"),
             ({"project_id": "<b>"}, "Unknown project"),
             ({"project_id": "no-such-project"}, "Unknown project"),
         ],
@@ -180,6 +181,16 @@ class TestJoining:
             "/auth/login", json={"email": "newcomer@example.com", "password": PASSWORD}
         )
         assert login.status_code == 200
+
+    async def test_an_invitation_names_the_role_in_the_organization(self, world):
+        made = await invite(world, org_role="reviewer")
+        joined = (await accept(world, token_of(made["invite_link"]))).json()
+        me = await world.client.get(
+            "/auth/me/permissions",
+            headers={"Authorization": f"Bearer {joined['access_token']}"},
+        )
+        assert me.json()["org_role"] == "reviewer"
+        assert me.json()["platform_role"] == "member"
 
     async def test_an_invitation_to_a_project_brings_the_project(self, world):
         a = world.projects["a"]

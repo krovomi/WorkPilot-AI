@@ -17,6 +17,26 @@ import {
 import { groupsApi } from "../server-admin-groups";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
+/** Only the fields the server reads, as bounded strings: an id or an email, and a role. */
+export function memberToAdd(
+	body: unknown,
+): { user_id: string; role_slug: string } | { email: string; role_slug: string } | null {
+	if (typeof body !== "object" || body === null) return null;
+	const { user_id, email, role_slug } = body as Record<string, unknown>;
+	const role = typeof role_slug === "string" && role_slug.length > 0 ? role_slug : "contributor";
+	if (role.length > 60) return null;
+	if (typeof user_id === "string" && email === undefined) {
+		return user_id.length > 0 && user_id.length <= 64 ? { user_id, role_slug: role } : null;
+	}
+	if (typeof email === "string" && user_id === undefined) {
+		const trimmed = email.trim();
+		return trimmed.includes("@") && trimmed.length <= 320
+			? { email: trimmed, role_slug: role }
+			: null;
+	}
+	return null;
+}
+
 export function registerServerAdminHandlers(): void {
 	// --- Effective permissions of the signed-in user ------------------------
 	ipcMain.handle(IPC_CHANNELS.SERVER_ADMIN_MY_PERMISSIONS, async () => fetchMyPermissions());
@@ -62,11 +82,11 @@ export function registerServerAdminHandlers(): void {
 
 	// --- Members -------------------------------------------------------------
 	ipcMain.handle(IPC_CHANNELS.SERVER_ADMIN_LIST_MEMBERS, async () => adminApi.listMembers());
-	ipcMain.handle(
-		IPC_CHANNELS.SERVER_ADMIN_ADD_MEMBER,
-		async (_e, body: { user_id: string; role_slug: string }) =>
-			adminApi.addMember(body),
-	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_ADMIN_ADD_MEMBER, async (_e, body: unknown) => {
+		const account = memberToAdd(body);
+		if (!account) return { ok: false as const, error: "Invalid member" };
+		return adminApi.addMember(account);
+	});
 	ipcMain.handle(
 		IPC_CHANNELS.SERVER_ADMIN_UPDATE_MEMBER_ROLE,
 		async (_e, userId: string, roleSlug: string) =>

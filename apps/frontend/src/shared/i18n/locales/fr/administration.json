@@ -53,6 +53,11 @@
 			"status": "Statut",
 			"sessions": "Sessions",
 			"actions": "Actions"
+		},
+		"addExisting": {
+			"email": "Ajouter un compte qui existe déjà",
+			"help": "Pour une personne qui a déjà un compte sur ce serveur, dans une autre organisation : une invitation refuse son adresse.",
+			"submit": "Ajouter à l'organisation"
 		}
 	},
 	"groups": {

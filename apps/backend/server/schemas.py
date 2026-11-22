@@ -90,6 +90,9 @@ class ChangePasswordRequest(BaseModel):
 class CreateInvitationRequest(BaseModel):
     email: EmailStr
     role: str = "member"
+    # The role in the organization (a built-in or the organization's own
+    # slug); without it, the one the platform ``role`` maps onto.
+    org_role: str | None = Field(default=None, max_length=60)
     project_id: str | None = None
     project_role: str | None = None
 
@@ -225,8 +228,18 @@ class OrgMemberPublic(BaseModel):
 
 
 class AddOrgMemberRequest(BaseModel):
-    user_id: str
+    """An existing account, named by its id or, for a platform administrator
+    (who sees every account), by its email address."""
+
+    user_id: str | None = Field(default=None, max_length=64)
+    email: EmailStr | None = None
     role_slug: str = "contributor"
+
+    @model_validator(mode="after")
+    def _one_account(self) -> AddOrgMemberRequest:
+        if (self.user_id is None) == (self.email is None):
+            raise ValueError("give either user_id or email")
+        return self
 
 
 class UpdateOrgMemberRequest(BaseModel):

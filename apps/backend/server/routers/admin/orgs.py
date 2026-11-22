@@ -210,13 +210,26 @@ async def add_member(
     actor: CurrentUser = Depends(require_permission("org.member.write")),
     db: AsyncSession = Depends(get_db),
 ) -> OrgMemberPublic:
-    user = await db.get(User, body.user_id)
+    if body.email is not None:
+        # An address names any account of the server: only who already sees
+        # every account may look one up by it, so that an organization's
+        # administrator cannot probe other tenants' people.
+        if not actor.is_platform_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Only a platform administrator can add an account by email",
+            )
+        user = await db.scalar(
+            select(User).where(User.email == str(body.email).strip().lower())
+        )
+    else:
+        user = await db.get(User, body.user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
     existing = await db.scalar(
         select(OrgMember.id).where(
-            OrgMember.org_id == org_id, OrgMember.user_id == body.user_id
+            OrgMember.org_id == org_id, OrgMember.user_id == user.id
         )
     )
     if existing:
@@ -268,10 +281,14 @@ async def update_member_role(
 
     role = await _role_in_scope(db, org_id, body.role_slug)
     previous = member.role_id
-    if ADMIN_PERMISSION not in (role.permissions or ()):
+    current = await db.get(Role, member.role_id)
+    was_admin = current is not None and ADMIN_PERMISSION in (current.permissions or ())
+    if was_admin and ADMIN_PERMISSION not in (role.permissions or ()):
         # Same reason as removing yourself (below): demoting yourself, or the
         # last member who can manage members, leaves the tenant with no
-        # administrator at all.
+        # administrator at all. A member who could not manage members loses
+        # nothing of the kind: an organization a platform administrator just
+        # created has no administrator yet, and its roles must still change.
         if member_user_id == actor.id:
             raise HTTPException(
                 status_code=400,
