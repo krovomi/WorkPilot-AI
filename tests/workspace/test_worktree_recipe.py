@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 from core.workspace import ports as ports_mod
 from core.workspace import recipe as recipe_mod
+from core.workspace import recipe_detect
 from core.workspace.ports import release_ports, reserve_ports, reserved_port
 from core.workspace.recipe import detect_recipe, load_recipe, parse_recipe, recipe_for
 from core.workspace.recipe_api import render_toml
@@ -92,13 +93,15 @@ def test_detect_recipe_names_the_stack_package_manager(tmp_path, files, expected
     assert list(recipe.setup) == expected
 
 
-def test_detect_recipe_dotnet_nested_solution_and_tools(tmp_path):
+def test_detect_recipe_dotnet_nested_project_and_tools(tmp_path):
+    # `dotnet restore` alone, at a root with no project file, stops on MSB1003:
+    # the nested project is named.
     (tmp_path / "src" / "Api").mkdir(parents=True)
     (tmp_path / "src" / "Api" / "Api.csproj").write_text("<Project/>", encoding="utf-8")
     (tmp_path / ".config").mkdir()
     (tmp_path / ".config" / "dotnet-tools.json").write_text("{}", encoding="utf-8")
     assert list(detect_recipe(tmp_path).setup) == [
-        ("dotnet", "restore"),
+        ("dotnet", "restore", "src/Api/Api.csproj"),
         ("dotnet", "tool", "restore"),
     ]
 
@@ -123,9 +126,9 @@ def test_detect_recipe_polyglot_gets_one_step_per_manager(tmp_path):
 def test_detect_recipe_gradle_wrapper_follows_the_platform(tmp_path, monkeypatch):
     (tmp_path / "gradlew").write_text("", encoding="utf-8")
     (tmp_path / "gradlew.bat").write_text("", encoding="utf-8")
-    monkeypatch.setattr(recipe_mod, "is_windows", lambda: True)
+    monkeypatch.setattr(recipe_detect, "is_windows", lambda: True)
     assert detect_recipe(tmp_path).setup[0][0] == "gradlew.bat"
-    monkeypatch.setattr(recipe_mod, "is_windows", lambda: False)
+    monkeypatch.setattr(recipe_detect, "is_windows", lambda: False)
     assert detect_recipe(tmp_path).setup[0][0] == "./gradlew"
 
 
