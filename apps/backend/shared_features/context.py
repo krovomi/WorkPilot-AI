@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query
 from server.authz.scope import ProjectScope, resolve_project_scope
 from server.config import get_settings
-from server.services.run_isolation import project_brain
+from server.services.run_isolation import served_project_brain
 
 router = APIRouter(prefix="/api/features/context", tags=["features"])
 
@@ -43,9 +43,10 @@ def read_memories(scope: ProjectScope, query: str, limit: int) -> dict[str, Any]
     from brain.tasks import project_name_from
     from brain.vault import Brain
 
-    brain = Brain(project_brain(get_settings().repos_root, scope.project_id))
     key = "results" if query else "memories"
-    if not brain.exists:
+    root = served_project_brain(get_settings().repos_root, scope.project_id)
+    brain = Brain(root) if root is not None else None
+    if brain is None or not brain.exists:
         return {"available": False, key: []}
     # The name a build of this clone files its notes under
     # (``brain.tasks.project_name``), read from the server's own path.

@@ -112,6 +112,9 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("GET", "/api/features/governance/audit"): "audit.export",
     ("POST", "/api/features/governance/approvals/{request_id}"): "review.approve",
     ("POST", "/api/features/governance/stop"): "agent.cancel",
+    # "Execute in optimal order" starts the cards of a wave as the caller.
+    ("POST", "/api/features/execution-waves/run"): "agent.execute",
+    ("POST", "/api/features/execution-waves/run/step"): "agent.execute",
     # Audit trail is append-only and its exports carry personal data.
     ("GET", "/api/audit-trail/export/soc2"): "audit.export",
     ("GET", "/api/audit-trail/export/gdpr"): "audit.export",

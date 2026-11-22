@@ -67,7 +67,10 @@ describe("server project context", () => {
 						timestamp: "2026-10-31T10:00:00+00:00",
 						content: "x".repeat(5_000),
 						path: "knowledge/projects/p/memory/gotchas/a.md",
+						pinned: true,
+						applies_to: "apps/web/",
 					},
+					{ id: "knowledge/projects/p/memory/gotchas/b.md", content: "no path" },
 					{ id: "", content: "no id" },
 					"not a row",
 				],
@@ -87,8 +90,16 @@ describe("server project context", () => {
 			onServer: true,
 		});
 		expect(read.data?.status.dbPath).toBeUndefined();
-		expect(read.data?.memories).toHaveLength(1);
+		expect(read.data?.memories).toHaveLength(2);
 		expect(read.data?.memories[0].content).toHaveLength(2_000);
+		// What the lifecycle actions need: the vault path, the pin, the scope.
+		expect(read.data?.memories[0]).toMatchObject({
+			path: "knowledge/projects/p/memory/gotchas/a.md",
+			pinned: true,
+			applies_to: "apps/web/",
+		});
+		expect(read.data?.memories[1]).toMatchObject({ pinned: false, applies_to: "" });
+		expect(read.data?.memories[1].path).toBeUndefined();
 	});
 
 	it("searches with the query, and says when the project has no memory yet", async () => {

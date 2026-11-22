@@ -32,10 +32,12 @@ from offline_policy import airgap_status
 
 from .alerts import SmtpFactory, send_alerts
 from .collectors import Fetch, default_fetch, health_check
-from .config import WatchSettings, is_local_host, load_settings
-from .evaluate import HealthResult, Level, compare, sample_level, verdict
+from .config import WatchSettings, load_settings
+from .evaluate import Level, MetricCheck, compare, sample_level, verdict
+from .flags import RollbackFlag, flag_from_env, turn_off
 from .incident import Ask, explain, markdown, summarize
 from .migrations import changed_paths, migration_files
+from .net import HealthResult, is_local_host
 from .revert import OpenRevertPR, open_revert
 from .rollback import RollbackPlan, execute_rollback, plan_rollback
 
@@ -53,18 +55,25 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def load_runs(project_dir: Path) -> list[dict]:
+    """The runs WorkPilot recorded in `.workpilot/cicd_runs.json`, newest first."""
+    path = Path(project_dir) / RUNS_FILE
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_RUNS_BYTES:
+        return []
+    try:
+        runs = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return []
+    return (
+        [run for run in runs if isinstance(run, dict)] if isinstance(runs, list) else []
+    )
+
+
 def find_run(project_dir: Path, run_id: str) -> dict:
     if not RUN_ID.match(run_id):
         raise WatchError("invalid run id")
-    path = Path(project_dir) / RUNS_FILE
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_RUNS_BYTES:
-        raise WatchError("unknown run")
-    try:
-        runs = json.loads(path.read_text(encoding="utf-8"))
-    except (ValueError, UnicodeDecodeError) as error:
-        raise WatchError("unknown run") from error
-    for run in runs if isinstance(runs, list) else []:
-        if isinstance(run, dict) and run.get("id") == run_id:
+    for run in load_runs(project_dir):
+        if run.get("id") == run_id:
             return run
     raise WatchError("unknown run")
 
@@ -127,18 +136,35 @@ def _measure(
     }
 
 
+def _checks(
+    settings: WatchSettings,
+    baseline: dict[str, float | None],
+    fetch: Fetch,
+    now: datetime,
+) -> list[MetricCheck]:
+    source = settings.source
+    if source is None:
+        return []
+    values = _measure(settings, fetch, now)
+    checks = []
+    for rule in settings.metrics:
+        if rule.canary_query:
+            # Canary analysis: the canary against the stable fleet, now.
+            canary = source.value(rule.canary_query, fetch, now)
+            checks.append(compare(rule, values.get(rule.name), canary))
+        else:
+            checks.append(compare(rule, baseline.get(rule.name), values.get(rule.name)))
+    return checks
+
+
 def _sample(
     settings: WatchSettings,
     baseline: dict[str, float | None],
     fetch: Fetch,
     now: datetime,
 ) -> dict:
-    values = _measure(settings, fetch, now)
-    checks = [
-        compare(rule, baseline.get(rule.name), values.get(rule.name))
-        for rule in settings.metrics
-        if settings.source
-    ]
+    checks = _checks(settings, baseline, fetch, now)
+    canaries = {rule.name for rule in settings.metrics if rule.canary_query}
     health: HealthResult | None = (
         health_check(settings.health_url, fetch) if settings.health_url else None
     )
@@ -146,7 +172,10 @@ def _sample(
         "at": now.isoformat(),
         "level": sample_level(checks, health).value,
         "health": health.to_dict() if health else None,
-        "metrics": [c.to_dict() for c in checks],
+        "metrics": [
+            {**c.to_dict(), **({"against": "stable"} if c.name in canaries else {})}
+            for c in checks
+        ],
     }
 
 
@@ -195,6 +224,38 @@ def _report(
     }
 
 
+def _flag_off(
+    state: dict,
+    flag: RollbackFlag,
+    fetch: Fetch,
+    offline: bool,
+    now: Callable[[], datetime],
+) -> bool:
+    """Turn the release's flag off; True when it is, and the rollback is that."""
+    state["flag"] = turn_off(flag, fetch, offline=offline)
+    if state["flag"]["status"] != "done":
+        return False
+    state.update(rollback="started", strategy="flag", rollback_at=now().isoformat())
+    return True
+
+
+def _redeploy(
+    state: dict,
+    env: dict,
+    run: dict,
+    plan: RollbackPlan,
+    fetch: Fetch,
+    now: Callable[[], datetime],
+) -> None:
+    """Run the last good deployment again."""
+    if execute_rollback(env, run, plan, fetch):
+        state.update(
+            rollback="started", strategy="deployment", rollback_at=now().isoformat()
+        )
+    else:
+        state["rollback"] = "failed"
+
+
 def run_watch(
     project_dir: Path,
     run_id: str,
@@ -216,6 +277,7 @@ def run_watch(
     loaded = load_settings(project_dir, env)
     problems.extend(loaded.problems)
     settings = _confine(loaded, offline, problems)
+    flag = flag_from_env(env, problems)
     started = now()
     state: dict = {
         "run_id": run_id,
@@ -231,6 +293,8 @@ def run_watch(
             )
         ).isoformat(),
         "auto_rollback": settings.auto_rollback,
+        # A feature flag the rollback turns off before redeploying anything.
+        "flag_configured": flag is not None,
         "problems": problems,
         "samples": [],
         "verdict": Level.UNKNOWN.value,
@@ -255,6 +319,9 @@ def run_watch(
         sample = _sample(settings, baseline, fetch, now())
         state["samples"].append(sample)
         levels.append(Level(sample["level"]))
+        if levels[-1] == Level.CRITICAL and levels[-2:-1] != [Level.CRITICAL]:
+            # Where the run of critical samples that ends the window began.
+            state["degraded_at"] = sample["at"]
         state["verdict"] = verdict(levels).value
         _save(project_dir, state, now())
         if state["verdict"] == Level.CRITICAL.value:
@@ -266,13 +333,20 @@ def run_watch(
         migrations = _migrations(project_dir, plan)
         state["plan"] = plan.to_dict()
         state["migrations"] = migrations
-        if not plan.automatic:
+        if (
+            flag
+            and settings.auto_rollback
+            and _flag_off(state, flag, fetch, offline, now)
+        ):
+            pass  # The flag is off: nothing is redeployed.
+        elif flag and not settings.auto_rollback:
+            state["rollback"] = "proposed"
+        elif not plan.automatic:
             state["rollback"] = "manual"
         elif migrations:
             state["rollback"] = "blocked_migrations"
         elif settings.auto_rollback:
-            started_ok = execute_rollback(env, run, plan, fetch)
-            state["rollback"] = "started" if started_ok else "failed"
+            _redeploy(state, env, run, plan, fetch, now)
         else:
             state["rollback"] = "proposed"
     if state["verdict"] in (Level.WARNING.value, Level.CRITICAL.value):
@@ -308,15 +382,17 @@ def run_rollback(
     state = read_state(project_dir, run_id)
     if state is None:
         raise WatchError("run not watched")
-    plan = _plan(project_dir, env, run, _offline(project_dir), fetch)
+    offline = _offline(project_dir)
+    plan = _plan(project_dir, env, run, offline, fetch)
     state["plan"] = plan.to_dict()
     state["migrations"] = _migrations(project_dir, plan)
-    if not plan.automatic:
+    flag = flag_from_env(env, [])
+    if flag and _flag_off(state, flag, fetch, offline, now):
+        pass  # The flag is off: nothing is redeployed.
+    elif not plan.automatic:
         state["rollback"] = "manual"
     else:
-        state["rollback"] = (
-            "started" if execute_rollback(env, run, plan, fetch) else "failed"
-        )
+        _redeploy(state, env, run, plan, fetch, now)
     state["rollback_by"] = "person"
     _save(project_dir, state, now())
     return state

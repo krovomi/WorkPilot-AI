@@ -107,7 +107,7 @@ def test_selenium_python() -> None:
     body = lines[lines.index("def test_log_in(driver) -> None:") + 1 :]
     assert body == [
         '    driver.get("http://localhost:3000/login")',
-        '    fill(locate(driver, By.CSS_SELECTOR, "#email"), "ada@x.io")',
+        '    fill(locate(driver, By.CSS_SELECTOR, "#email"), TEST_DATA["email"])',
         '    fill(locate(driver, By.CSS_SELECTOR, "#pw"), os.environ["E2E_PW"])',
         '    Select(locate(driver, By.CSS_SELECTOR, "[data-testid=\\"lang\\"]", '
         'frames=["#f"])).select_by_value("fr")',
@@ -132,11 +132,13 @@ def test_selenium_java() -> None:
     assert test.code.startswith("package e2e;\n") and "class LogInTest {" in test.code
     assert "Thread.sleep" not in test.code and "implicitlyWait" not in test.code
     assert "private static String secret(String name)" in test.code
+    assert test.data_path is None and test.data_code is None
+    assert '\t\tstatic final String EMAIL = "ada@x.io";' in test.code.splitlines()
     lines = test.code.splitlines()
     body = lines[lines.index("\tvoid replaysTheRecordedSteps() {") + 1 : -2]
     assert body == [
         '\t\tdriver.get("http://localhost:3000/login");',
-        '\t\tfill(locate(By.cssSelector("#email")), "ada@x.io");',
+        '\t\tfill(locate(By.cssSelector("#email")), TestData.EMAIL);',
         '\t\tfill(locate(By.cssSelector("#pw")), secret("E2E_PW"));',
         '\t\tnew Select(locate(By.cssSelector("[data-testid=\\"lang\\"]"), '
         'new String[] {"#f"}, new String[] {}, false)).selectByValue("fr");',
@@ -162,7 +164,13 @@ def test_webdriverio() -> None:
     test = export_recording(_recording(), "webdriverio", "Log in")
     assert test.path == "test/specs/log-in.e2e.js" and test.skipped == 1
     assert test.code.startswith(
+        'import { readFileSync } from "node:fs";\n'
         'import { $, $$, browser, expect } from "@wdio/globals";'
+    )
+    assert test.data_path == "test/specs/log-in.data.json"
+    assert (
+        '\treadFileSync(new URL("log-in.data.json", import.meta.url), "utf-8"),'
+        in test.code.splitlines()
     )
     assert "browser.pause" not in test.code
     lines = test.code.splitlines()
@@ -171,7 +179,7 @@ def test_webdriverio() -> None:
     ]
     assert body == [
         '\t\tawait browser.url("http://localhost:3000/login");',
-        '\t\tawait (await locate("#email")).setValue("ada@x.io");',
+        '\t\tawait (await locate("#email")).setValue(TEST_DATA["email"]);',
         '\t\tawait (await locate("#pw")).setValue(secret("E2E_PW"));',
         '\t\tawait (await locate("[data-testid=\\"lang\\"]", { frames: ["#f"] }))'
         '.selectByAttribute("value", "fr");',

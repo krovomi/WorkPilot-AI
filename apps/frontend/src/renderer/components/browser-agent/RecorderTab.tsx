@@ -28,6 +28,7 @@ import { RecorderDialog } from "./RecorderDialog";
 import { RecorderRun } from "./RecorderRun";
 import { selectorSummary, stepDetail } from "./recorder-steps";
 import { RecorderSuggestions } from "./RecorderSuggestions";
+import { RecorderTestData } from "./RecorderTestData";
 
 export { selectorSummary, stepDetail };
 
@@ -290,6 +291,7 @@ export function RecorderTab({ projectPath }: RecorderTabProps) {
 							{t("browserAgent:recorder.skipped", { count: outcome.skipped })}
 						</Notice>
 					)}
+					<RecorderTestData outcome={outcome} />
 					{outcome.code && (
 						<pre className="max-h-96 overflow-auto rounded-md bg-[var(--wp-code-bg)] p-3 font-mono text-xs">
 							{outcome.code}

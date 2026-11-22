@@ -1,7 +1,7 @@
 """Leaderboard consents: who agreed to show by name on Pixel Office's board.
 
 Revision ID: 0023_leaderboard_consents
-Revises: 0019_login_sessions
+Revises: 0020_replay_share_bookmarks
 Create Date: 2026-11-22
 
 One new table, nothing changed in the existing ones. Like ``0015``, the step
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0023_leaderboard_consents"
-down_revision = "0019_login_sessions"
+down_revision = "0020_replay_share_bookmarks"
 branch_labels = None
 depends_on = None
 

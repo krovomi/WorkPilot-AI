@@ -6,6 +6,7 @@ import {
 	type DesignStackDetection,
 	type DesignStyle,
 	type DesignLoopProgress,
+	type DesignLoopStats,
 	type DesignToCodeProgress,
 	type DesignToCodeResult,
 	type DesignWriteOutcome,
@@ -130,6 +131,8 @@ interface DesignToCodeState {
 	notes: Record<number, string>;
 	writing: boolean;
 	writeOutcome: DesignWriteOutcome | null;
+	/** The render loop's figures on the selected project (null: not read yet). */
+	loopStats: DesignLoopStats | null;
 }
 
 interface DesignToCodeActions {
@@ -207,6 +210,7 @@ const initialState: DesignToCodeState = {
 	notes: {},
 	writing: false,
 	writeOutcome: null,
+	loopStats: null,
 };
 
 export const useDesignToCodeStore = create<
@@ -376,6 +380,23 @@ export async function detectDesignStack(projectId: string | null): Promise<void>
 	}
 }
 
+/** Read the render loop's figures on the project (kept on this computer). */
+export async function loadDesignLoopStats(projectId: string | null): Promise<void> {
+	if (!projectId) {
+		useDesignToCodeStore.setState({ loopStats: null });
+		return;
+	}
+	try {
+		const loopStats = await globalThis.electronAPI.getDesignLoopStats(projectId);
+		// A late answer for a project the page has left is dropped.
+		if (useProjectStore.getState().selectedProjectId === projectId) {
+			useDesignToCodeStore.setState({ loopStats: loopStats ?? null });
+		}
+	} catch {
+		/* no figures: the page shows none */
+	}
+}
+
 /**
  * Run the design-to-code pipeline via IPC
  */
@@ -406,6 +427,9 @@ export async function runDesignToCodePipeline(): Promise<void> {
 		});
 
 		useDesignToCodeStore.getState().setPipelineResult(result);
+		if (result.render_loop) {
+			void loadDesignLoopStats(useProjectStore.getState().selectedProjectId);
+		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		useDesignToCodeStore.getState().setPipelineError(message);
@@ -428,6 +452,7 @@ export async function writeDesignFilesToProject(): Promise<void> {
 		const outcome = await globalThis.electronAPI.writeDesignFiles(projectId, files);
 		useDesignToCodeStore.getState().setWriteOutcome(outcome);
 		useDesignToCodeStore.getState().selectStep("project");
+		if (outcome.review) void loadDesignLoopStats(projectId);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		useDesignToCodeStore.setState({ error: message });

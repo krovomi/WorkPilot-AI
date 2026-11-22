@@ -38,6 +38,10 @@ vi.mock("../../conflict-waves/run-history", async (importOriginal) => ({
 	appendRunRecord: (...args: unknown[]) => runHistory.appendRunRecord(...args),
 	readRunHistory: (...args: unknown[]) => runHistory.readRunHistory(...args),
 }));
+const conflictTimes = { readConflictTimes: vi.fn() };
+vi.mock("../../conflict-waves/conflict-times", () => ({
+	readConflictTimes: (...args: unknown[]) => conflictTimes.readConflictTimes(...args),
+}));
 vi.mock("../../conflict-waves/run-store", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../../conflict-waves/run-store")>()),
 	readSavedRun: (...args: unknown[]) => runStore.readSavedRun(...args),
@@ -283,13 +287,19 @@ describe("the saved run channels", () => {
 		expect(Date.parse(runHistory.appendRunRecord.mock.calls[0][1].finishedAt)).not.toBeNaN();
 	});
 
-	it("reads the history of the project's own path", async () => {
+	it("reads the history and the merge conflict times of the project's own path", async () => {
 		runHistory.readRunHistory.mockReturnValue({ records: [], ignored: false });
+		const conflicts = {
+			entries: [{ taskId: "001-a", detectedAt: "2026-11-20T09:00:00.000Z", resolvedAt: null }],
+			ignored: false,
+		};
+		conflictTimes.readConflictTimes.mockReturnValue(conflicts);
 		expect(await invoke("p1", IPC_CHANNELS.CONFLICT_WAVES_HISTORY)).toEqual({
 			success: true,
-			data: { records: [], ignored: false },
+			data: { records: [], ignored: false, conflicts },
 		});
 		expect(runHistory.readRunHistory).toHaveBeenCalledWith("/projects/p1");
+		expect(conflictTimes.readConflictTimes).toHaveBeenCalledWith("/projects/p1");
 	});
 
 	it("answers an ignored history when reading it fails", async () => {

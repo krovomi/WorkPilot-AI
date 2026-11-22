@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import type { DeployWatch } from "../../shared/types/deploy-watch";
+import type {
+	DeployLinksView,
+	DeployVerdictReview,
+	DeployWatch,
+	DeployWatchFigures,
+} from "../../shared/types/deploy-watch";
 
 export type CICDProvider = "github" | "gitlab" | "azure" | "jenkins" | "";
 export type PipelineRunStatus =
@@ -34,7 +39,7 @@ export interface CICDConfig {
 	monitor_window_minutes: string;
 	monitor_deploy_wait_minutes: string;
 	auto_rollback: boolean;
-	/** prometheus (default) | datadog | newrelic | cloudwatch, and their settings. */
+	/** prometheus (default) | datadog | newrelic | cloudwatch | grafana, and their settings. */
 	monitor_source: string;
 	monitor_datadog_site: string;
 	monitor_datadog_api_key: string;
@@ -46,6 +51,9 @@ export interface CICDConfig {
 	monitor_aws_access_key_id: string;
 	monitor_aws_secret_access_key: string;
 	monitor_aws_session_token: string;
+	monitor_grafana_url: string;
+	monitor_grafana_token: string;
+	monitor_grafana_datasource_uid: string;
 	/** Where the alert of a bad verdict goes. Secrets come back masked. */
 	alert_slack_webhook_url: string;
 	alert_pagerduty_routing_key: string;
@@ -56,6 +64,14 @@ export interface CICDConfig {
 	alert_smtp_port: string;
 	alert_smtp_user: string;
 	alert_smtp_password: string;
+	/** The feature flag a critical verdict turns off (unleash | launchdarkly | configcat). */
+	rollback_flag_provider: string;
+	rollback_flag_url: string;
+	rollback_flag_key: string;
+	rollback_flag_project: string;
+	rollback_flag_environment: string;
+	rollback_flag_user: string;
+	rollback_flag_token: string;
 }
 
 export interface PipelineRun {
@@ -98,6 +114,15 @@ interface CICDTriggersState {
 	/** Rolls a watched run back; the person asked for it on the page. */
 	rollback: (projectDir: string, runId: string) => Promise<boolean>;
 	rollingBack: string | null;
+	/** The projects rolled back with this one (#366, lot 4). */
+	links: DeployLinksView | null;
+	loadLinks: (projectDir: string) => Promise<void>;
+	saveLinks: (projectDir: string, projectIds: string[]) => Promise<void>;
+	/** The watch figures, computed on this machine. */
+	figures: DeployWatchFigures | null;
+	loadFigures: (projectDir: string) => Promise<void>;
+	/** A person's word on a bad verdict; null takes it back. */
+	reviewVerdict: (projectDir: string, runId: string, review: DeployVerdictReview | null) => Promise<void>;
 	clearError: () => void;
 }
 
@@ -112,7 +137,7 @@ const isShown = (projectDir: string) => projectDir === shownProject;
 /** The dashboard opened on a project: the last project's data is not its. */
 function show(projectDir: string): void {
 	if (!isShown(projectDir)) {
-		useCICDTriggersStore.setState({ config: null, runs: [] });
+		useCICDTriggersStore.setState({ config: null, runs: [], links: null, figures: null });
 	}
 	shownProject = projectDir;
 }
@@ -143,6 +168,8 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set) => ({
 	isTriggering: false,
 	error: null,
 	rollingBack: null,
+	links: null,
+	figures: null,
 
 	loadConfig: async (projectDir) => {
 		show(projectDir);
@@ -239,6 +266,7 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set) => ({
 				return false;
 			}
 			await readRuns(projectDir);
+			await readFigures(projectDir);
 			return true;
 		} catch (err) {
 			if (isShown(projectDir)) set({ error: String(err) });
@@ -248,5 +276,50 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set) => ({
 		}
 	},
 
+	loadLinks: async (projectDir) => {
+		show(projectDir);
+		await answer(projectDir, () => globalThis.electronAPI.getDeployLinks(projectDir), (links) => set({ links }));
+	},
+
+	saveLinks: async (projectDir, projectIds) => {
+		await answer(projectDir, () => globalThis.electronAPI.setDeployLinks(projectDir, projectIds), (links) =>
+			set({ links }),
+		);
+	},
+
+	loadFigures: async (projectDir) => {
+		show(projectDir);
+		await readFigures(projectDir);
+	},
+
+	reviewVerdict: async (projectDir, runId, review) => {
+		await answer(projectDir, () => globalThis.electronAPI.reviewDeployVerdict(projectDir, runId, review), () => undefined);
+		if (!isShown(projectDir)) return;
+		await readRuns(projectDir);
+		await readFigures(projectDir);
+	},
+
 	clearError: () => set({ error: null }),
 }));
+
+/** Applies a typed call's answer for the project on screen, or shows its error. */
+async function answer<T>(
+	projectDir: string,
+	call: () => Promise<{ success: boolean; data?: T; error?: string }>,
+	apply: (data: T) => void,
+): Promise<void> {
+	try {
+		const result = await call();
+		if (!isShown(projectDir)) return;
+		if (result.success) apply(result.data as T);
+		else useCICDTriggersStore.setState({ error: result.error ?? "Request failed" });
+	} catch (err) {
+		if (isShown(projectDir)) useCICDTriggersStore.setState({ error: String(err) });
+	}
+}
+
+async function readFigures(projectDir: string): Promise<void> {
+	await answer(projectDir, () => globalThis.electronAPI.getDeployFigures(projectDir), (figures) =>
+		useCICDTriggersStore.setState({ figures }),
+	);
+}

@@ -1484,15 +1484,15 @@ def _session_hooks(
                 matcher=CLAUDE_TOOLS_MATCHER,
                 hooks=[make_claude_hook(spec_dir, project_dir)],
             ),
-            # MCP Apps (IA4): Claude Code calls the tool and shows no view;
-            # this keeps it for the task panel, as the WorkPilot loop does.
-            # Only when a custom server is started; the hook never changes
-            # the result.
+            # MCP Apps (IA4): keeps a custom server's view for the task panel
+            # (Claude Code shows none); it never changes the result.
             *(
                 [
                     HookMatcher(
                         matcher="mcp__.*",
-                        hooks=[make_app_view_hook(spec_dir, app_view_servers)],
+                        hooks=[
+                            make_app_view_hook(spec_dir, app_view_servers, project_dir)
+                        ],
                     )
                 ]
                 if app_view_servers

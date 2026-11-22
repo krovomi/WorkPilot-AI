@@ -157,6 +157,9 @@ _IGNORED = (
     # flagging the same pair would conflict on the queue itself. The decision
     # (canonical note, archived variants, journal) is in the vault.
     ".workpilot-brain/conflicts.json",
+    # How often this machine opened a memory's history (``lifecycle.metrics``):
+    # a per-machine count, rewritten at every reading.
+    ".workpilot-brain/lifecycle-views.json",
 )
 
 _ATTRIBUTES = "knowledge/projects/*/memory/.lifecycle/journal/*.md merge=union"

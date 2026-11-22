@@ -20,14 +20,27 @@ const previewSession = () => session.defaultSession;
 /** Une copie refusée par le serveur de cookies : la capture continue sans ce cookie. */
 const ignore = () => undefined;
 
+/** Ce qu'une copie garde d'un cookie : de quoi le reposer tel quel, rien d'autre. */
+export type CookieCopy = Pick<
+	Electron.Cookie,
+	"name" | "value" | "domain" | "hostOnly" | "path" | "secure" | "httpOnly" | "session" | "expirationDate" | "sameSite"
+>;
+
 /**
- * Copie dans `target` les cookies de l'aperçu pour `origin`. Lire les
- * cookies de l'aperçu peut échouer : l'appelant en fait un échec nommé,
- * plutôt que de montrer comme « connectée » une page qui ne l'est pas.
+ * Les cookies que l'aperçu enverrait à `origin`, `MAX_SHARED_COOKIES` au plus.
+ * Lire la session de l'aperçu peut échouer : l'appelant en fait un échec nommé.
  */
-export async function sharePreviewCookies(target: Electron.Session, origin: string): Promise<number> {
-	const cookies = (await previewSession().cookies.get({ url: origin })).slice(0, MAX_SHARED_COOKIES);
-	const copies = cookies.map((cookie) =>
+export async function readPreviewCookies(origin: string): Promise<CookieCopy[]> {
+	return (await previewSession().cookies.get({ url: origin })).slice(0, MAX_SHARED_COOKIES);
+}
+
+/** Pose `cookies` dans `target` pour `origin` ; rend combien la session a acceptés. */
+export async function copyCookies(
+	target: Electron.Session,
+	origin: string,
+	cookies: readonly CookieCopy[],
+): Promise<number> {
+	const copies = cookies.slice(0, MAX_SHARED_COOKIES).map((cookie) =>
 		target.cookies
 			.set({
 				url: origin,
@@ -44,4 +57,13 @@ export async function sharePreviewCookies(target: Electron.Session, origin: stri
 			.then(() => true, ignore),
 	);
 	return (await Promise.all(copies)).filter(Boolean).length;
+}
+
+/**
+ * Copie dans `target` les cookies de l'aperçu pour `origin`. Lire les
+ * cookies de l'aperçu peut échouer : l'appelant en fait un échec nommé,
+ * plutôt que de montrer comme « connectée » une page qui ne l'est pas.
+ */
+export async function sharePreviewCookies(target: Electron.Session, origin: string): Promise<number> {
+	return copyCookies(target, origin, await readPreviewCookies(origin));
 }

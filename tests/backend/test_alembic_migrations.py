@@ -161,7 +161,7 @@ def test_the_leaderboard_consents_table_comes_and_goes_with_its_revision(
     config, db = alembic_config
     command.upgrade(config, "head")
     assert "leaderboard_consents" in _tables(db)
-    command.downgrade(config, "0019_login_sessions")
+    command.downgrade(config, "0020_replay_share_bookmarks")
     assert "leaderboard_consents" not in _tables(db)
     # A table already there (``create_all`` of a newer build) is kept.
     engine = sa.create_engine(f"sqlite:///{db}")
@@ -181,7 +181,7 @@ def test_the_leaderboard_consents_table_comes_and_goes_with_its_revision(
             connection.execute(sa.text("DROP TABLE leaderboard_consents"))
     finally:
         engine.dispose()
-    command.downgrade(config, "0019_login_sessions")
+    command.downgrade(config, "0020_replay_share_bookmarks")
     assert "leaderboard_consents" not in _tables(db)
 
 
@@ -225,3 +225,24 @@ def test_the_sign_in_columns_come_and_go_with_their_revision(alembic_config):
         engine.dispose()
     command.downgrade(config, "0018_approval_escalations")
     assert not login & _columns(db, "auth_sessions")
+
+
+def test_the_bookmark_count_of_a_replay_share_comes_and_goes(alembic_config):
+    config, db = alembic_config
+    command.upgrade(config, "head")
+    assert "bookmarks" in _columns(db, "replay_shares")
+    command.downgrade(config, "0019_login_sessions")
+    assert "bookmarks" not in _columns(db, "replay_shares")
+    command.upgrade(config, "head")
+    assert "bookmarks" in _columns(db, "replay_shares")
+    # A column already gone (dropped by hand) does not stop the downgrade.
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text("ALTER TABLE replay_shares DROP COLUMN bookmarks")
+            )
+    finally:
+        engine.dispose()
+    command.downgrade(config, "0019_login_sessions")
+    assert "bookmarks" not in _columns(db, "replay_shares")

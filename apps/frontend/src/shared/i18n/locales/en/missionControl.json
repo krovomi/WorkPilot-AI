@@ -107,7 +107,7 @@
 		"agent_failed": "Agent failed",
 		"agent_rebalanced": "Agent rebalanced",
 		"agent_rebalance_skipped": "Agent not rebalanced",
-		"agent_loop_detected": "Answer is looping"
+		"agent_loop_detected": "Agent is looping"
 	},
 	"compose": {
 		"tabManual": "Manual",
@@ -208,7 +208,10 @@
 	"rebalance": {
 		"badge_one": "Rebalanced once",
 		"badge_other": "Rebalanced {{count}} times",
-		"loopBadge": "Answer looped",
+		"loopBadge": "Looping",
+		"helperBadge": "Helping {{name}}",
+		"helpedBadge": "Helper started",
+		"helperTask": "Works out why {{name}} got stuck, then does its task",
 		"moved": "{{reason}}: {{action}}, {{from}} → {{to}}",
 		"notMoved": "{{reason}}: {{skipped}}",
 		"reasons": {
@@ -220,13 +223,18 @@
 		"actions": {
 			"retry_profile": "retried on another Claude profile",
 			"reroute": "moved to another provider",
-			"escalate": "moved to a bigger model"
+			"escalate": "moved to a bigger model",
+			"helper": "handed to a helper agent"
 		},
 		"skipped": {
 			"limit": "already rebalanced as many times as allowed for this task",
 			"over_budget": "the session is over its budget",
 			"no_alternative": "no other provider or bigger model can take the role",
 			"disabled": "automatic rebalancing is off"
+		},
+		"loopSources": {
+			"answer": "Read in the answer",
+			"steps": "Read in the decision tree: the same steps over and over"
 		}
 	},
 	"health": {

@@ -123,6 +123,7 @@ vi.mock("@/components/GitHubIssues", () => stubModule("GitHubIssues"));
 vi.mock("../components/GitLabIssues", () => stubModule("GitLabIssues"));
 vi.mock("../components/github-prs", () => stubModule("GitHubPRs"));
 vi.mock("../components/gitlab-merge-requests", () => stubModule("GitLabMergeRequests"));
+vi.mock("../components/bitbucket/BitbucketViews", () => stubModule("BitbucketViews"));
 vi.mock("../components/Changelog", () => stubModule("Changelog"));
 vi.mock("../components/AgentTools", () => stubModule("AgentTools"));
 vi.mock("../components/Worktrees", () => stubModule("Worktrees"));
@@ -791,6 +792,8 @@ describe("the page on screen", () => {
 			["gitlab-issues", "GitLabIssues", "gitlab"],
 			["github-prs", "GitHubPRs", "github"],
 			["gitlab-merge-requests", "GitLabMergeRequests", "gitlab"],
+			["bitbucket-issues", "BitbucketViews", "bitbucket"],
+			["bitbucket-pull-requests", "BitbucketViews", "bitbucket"],
 		];
 		for (const [view, page, section] of cases) {
 			await go(view, true);
@@ -803,6 +806,21 @@ describe("the page on screen", () => {
 			await call("AppSettingsDialog", "onOpenChange", false);
 		}
 		expect(stubProps("GitHubPRs").isActive).toBe(false);
+	});
+
+	it("the Bitbucket pages show the project on screen, and none without one", async () => {
+		await renderApp();
+		await go("bitbucket-pull-requests", true);
+		await screen.findByTestId("stub-BitbucketViews");
+		expect(stubProps("BitbucketViews")).toMatchObject({ view: "bitbucket-pull-requests", projectId: "p1" });
+		await act(async () => {
+			useProjectStore.setState({ activeProjectId: null, selectedProjectId: "p1" });
+		});
+		expect(stubProps("BitbucketViews").projectId).toBe("p1");
+		await act(async () => {
+			useProjectStore.setState({ activeProjectId: null, selectedProjectId: null });
+		});
+		expect(screen.queryByTestId("stub-BitbucketViews")).toBeNull();
 	});
 
 	it("the issue pages link to their task on the Kanban", async () => {

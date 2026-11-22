@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from .config import MetricRule, Worse
+from .net import HealthResult
 
 CRITICAL_IN_A_ROW = 2
 
@@ -48,16 +49,6 @@ class MetricCheck:
             "change_pct": self.change_pct,
             "level": self.level.value,
         }
-
-
-@dataclass(frozen=True)
-class HealthResult:
-    ok: bool
-    status: int | None = None
-    error: str = ""
-
-    def to_dict(self) -> dict:
-        return {"ok": self.ok, "status": self.status, "error": self.error}
 
 
 def compare(

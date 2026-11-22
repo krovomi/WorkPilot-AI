@@ -15,6 +15,8 @@ imported on first use and moved aside, never deleted — into
 the learning loop keeps under ``.workpilot/`` (`foundation.workpilot_layout`).
 
 Handles deduplication by merging similar patterns and increasing confidence.
+The pattern folded into another is kept beside the memory's archive with what
+it brought (`brain.lifecycle.folds`), so that a person can separate them.
 When memory is off (``BRAIN_ENABLED=false``) there is nowhere to remember:
 reads are empty and writes are dropped, like every other memory.
 """
@@ -28,6 +30,9 @@ from typing import Any
 from .models import LearningPattern
 
 logger = logging.getLogger(__name__)
+
+MERGE_BOOST = 0.15
+"""How far a merge moves a pattern's confidence towards 1: ``c + (1 - c) * boost``."""
 
 LEGACY_PATTERNS = Path(".workpilot") / "learning_loop" / "patterns.json"
 """The store the patterns had before the vault, relative to the project."""
@@ -106,11 +111,14 @@ class PatternStorage:
         *,
         sync: bool = True,
         merged: dict[str, str] | None = None,
+        folded: dict[str, list[tuple[LearningPattern, dict[str, Any]]]] | None = None,
     ) -> bool:
         """Write the patterns that changed, forget the ones that are gone.
 
         *merged* names the patterns a similar one was folded into, with the
-        folded instruction: the memory journal explains the merge.
+        folded instruction: the memory journal explains the merge. *folded*
+        gives, for each, the patterns folded in and what each brought: they
+        are kept, and the merge names them, so that a person can separate it.
         """
         current = {p.pattern_id: _evidence(p) for p in self._read(memory)}
         ok = True
@@ -122,12 +130,28 @@ class PatternStorage:
                 continue
             title = pattern.description.strip() or pattern.actionable_instruction
             if merged and pattern.pattern_id in merged:
+                kept = [
+                    rel
+                    for fold, share in (folded or {}).get(pattern.pattern_id, [])
+                    if (
+                        rel := memory.keep_folded(
+                            pattern.pattern_id,
+                            _evidence(fold),
+                            title=(
+                                fold.description.strip() or fold.actionable_instruction
+                            )[:80],
+                            body=_note_body(fold),
+                            share=share,
+                        )
+                    )
+                ]
                 memory.explain_next(
                     "pattern",
                     pattern.pattern_id,
                     action="merge",
                     reason_code="similar-merged",
                     reason=merged[pattern.pattern_id],
+                    related=kept,
                 )
             written = memory.record_learned_pattern(
                 evidence, title=title[:80], body=_note_body(pattern)
@@ -194,6 +218,7 @@ class PatternStorage:
         *,
         sync: bool = True,
         merged: dict[str, str] | None = None,
+        folded: dict[str, list[tuple[LearningPattern, dict[str, Any]]]] | None = None,
         actor: str | None = None,
     ) -> None:
         """Save all patterns to the vault (one sync unless ``sync=False``).
@@ -206,25 +231,30 @@ class PatternStorage:
             return
         if actor:
             memory.actor = actor
-        self._write(memory, patterns, sync=sync, merged=merged)
+        self._write(memory, patterns, sync=sync, merged=merged, folded=folded)
 
     def add_patterns(
         self, new_patterns: list[LearningPattern]
     ) -> list[LearningPattern]:
         """Add new patterns, merging duplicates. Returns the updated list."""
         existing = self.load_patterns()
-        folded: dict[str, str] = {}
+        instructions: dict[str, str] = {}
+        folded: dict[str, list[tuple[LearningPattern, dict[str, Any]]]] = {}
         for new_p in new_patterns:
             merged = False
             for i, existing_p in enumerate(existing):
                 if self._are_similar(existing_p, new_p):
+                    share = self._share(existing_p, new_p)
                     existing[i] = self._merge_pattern(existing_p, new_p)
-                    folded[existing_p.pattern_id] = new_p.actionable_instruction[:200]
+                    instructions[existing_p.pattern_id] = new_p.actionable_instruction[
+                        :200
+                    ]
+                    folded.setdefault(existing_p.pattern_id, []).append((new_p, share))
                     merged = True
                     break
             if not merged:
                 existing.append(new_p)
-        self.save_patterns(existing, merged=folded)
+        self.save_patterns(existing, merged=instructions, folded=folded)
         return existing
 
     def delete_pattern(self, pattern_id: str, *, actor: str = "user") -> bool:
@@ -307,6 +337,18 @@ class PatternStorage:
         ).ratio()
         return ratio >= self.SIMILARITY_THRESHOLD
 
+    @staticmethod
+    def _share(existing: LearningPattern, new: LearningPattern) -> dict[str, Any]:
+        """What merging *new* adds to *existing*: what separating takes back."""
+        return {
+            "occurrences": new.occurrence_count,
+            "builds": [
+                b for b in new.source_build_ids if b not in existing.source_build_ids
+            ],
+            "tags": [t for t in new.context_tags if t not in existing.context_tags],
+            "boost": MERGE_BOOST,
+        }
+
     def _merge_pattern(
         self, existing: LearningPattern, new: LearningPattern
     ) -> LearningPattern:
@@ -314,7 +356,7 @@ class PatternStorage:
         existing.occurrence_count += new.occurrence_count
         # Boost confidence, capped at 0.99
         existing.confidence = min(
-            0.99, existing.confidence + (1 - existing.confidence) * 0.15
+            0.99, existing.confidence + (1 - existing.confidence) * MERGE_BOOST
         )
         existing.last_seen = new.last_seen
         # Merge source build IDs (dedup)

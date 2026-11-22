@@ -3,12 +3,15 @@
  * request: the render loop is asked for only by a strict `true`.
  */
 import { EventEmitter } from "node:events";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }));
+const { spawn, state } = vi.hoisted(() => ({
+	spawn: vi.fn(),
+	state: { project: "", result: '{"success":true}' },
+}));
 
 vi.mock("node:child_process", async (importOriginal) => ({
 	...(await importOriginal<typeof import("node:child_process")>()),
@@ -18,7 +21,11 @@ vi.mock("electron", () => ({
 	app: { getPath: () => tmpdir(), getAppPath: () => tmpdir(), isPackaged: false },
 }));
 vi.mock("../project-store", () => ({
-	projectStore: { getProject: () => undefined, getProjects: () => [] },
+	projectStore: {
+		getProject: (id: string) =>
+			id === "p1" && state.project ? { id: "p1", path: state.project } : undefined,
+		getProjects: () => (state.project ? [{ id: "p1", path: state.project }] : []),
+	},
 }));
 vi.mock("../python-env-manager", () => ({ pythonEnvManager: { getPythonPath: () => null } }));
 vi.mock("../updater/path-resolver", () => ({ getEffectiveSourcePath: () => tmpdir() }));
@@ -31,6 +38,7 @@ vi.mock("../generated-review/review-run", () => ({
 }));
 
 import { RENDER_LOOP_MAX_MASKS } from "../../shared/constants/design-render-loop";
+import { LOOP_HISTORY } from "../design-loop-history";
 import { renderLoopArgs } from "../design-render-loop-args";
 import { DesignToCodeService } from "../design-to-code-service";
 
@@ -43,7 +51,7 @@ function fakeRunner() {
 		stderr: new EventEmitter(),
 	});
 	queueMicrotask(() => {
-		proc.stdout.emit("data", Buffer.from('__DESIGN_TO_CODE_RESULT__:{"success":true}\n'));
+		proc.stdout.emit("data", Buffer.from(`__DESIGN_TO_CODE_RESULT__:${state.result}\n`));
 		proc.emit("close", 0);
 	});
 	return proc;
@@ -66,6 +74,9 @@ beforeEach(() => {
 
 afterEach(() => {
 	rmSync(source, { recursive: true, force: true });
+	if (state.project) rmSync(state.project, { recursive: true, force: true });
+	state.project = "";
+	state.result = '{"success":true}';
 });
 
 describe("DesignToCodeService.run", () => {
@@ -101,6 +112,27 @@ describe("DesignToCodeService.run", () => {
 			]),
 		);
 		expect(await argsFor({ renderLoopOptions: options })).not.toContain("--loop-states");
+	});
+});
+
+describe("the loop's figures", () => {
+	it("are kept in the selected project for a loop that ran, and only then", async () => {
+		state.project = mkdtempSync(path.join(tmpdir(), "dtc-run-project-"));
+		await argsFor({ projectId: "p1" });
+		expect(existsSync(path.join(state.project, LOOP_HISTORY))).toBe(false);
+		state.result = JSON.stringify({
+			success: true,
+			generated_files: [],
+			render_loop: {
+				status: "converged",
+				best_iteration: 1,
+				iterations: [{ score: 0.8 }, { score: 0.97 }],
+				route: "google",
+			},
+		});
+		await argsFor({ projectId: "p1" });
+		const line = JSON.parse(readFileSync(path.join(state.project, LOOP_HISTORY), "utf-8"));
+		expect(line).toMatchObject({ status: "converged", best_score: 0.97, iterations: 1, route: "google" });
 	});
 });
 

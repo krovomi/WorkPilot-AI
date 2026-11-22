@@ -19,6 +19,7 @@ export type ProjectSettingsSection =
 	| "linear"
 	| "github"
 	| "gitlab"
+	| "bitbucket"
 	| "azure-devops"
 	| "jira"
 	| "figma"
