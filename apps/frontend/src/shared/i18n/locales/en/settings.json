@@ -1516,7 +1516,14 @@
 		"healthCheckFailed": "Health check failed",
 		"connectionTestFailed": "Connection test failed",
 		"errorNameNoId": "The name needs at least one letter or digit",
-		"removeHeader": "Remove header {{name}}"
+		"removeHeader": "Remove header {{name}}",
+		"confine": {
+			"label": "Run confined (OS sandbox)",
+			"hint": "The server starts only in the OS sandbox: it writes only in the project and reaches only the hosts below and the registry its launcher installs from. Where there is no sandbox (Windows), it does not start.",
+			"hosts": "Hosts it may reach",
+			"hostsHint": "Separated by spaces or commas: api.example.com, *.example.com, or a local 127.0.0.1:5432."
+		},
+		"confinedNotTested": "Not tested: this server runs confined, and only an agent starts it, in the OS sandbox."
 	},
 	"terminalFonts": {
 		"title": "Terminal Fonts",

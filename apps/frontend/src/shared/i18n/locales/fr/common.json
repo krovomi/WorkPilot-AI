@@ -1220,6 +1220,7 @@
 			"allowed": "Serveurs du catalogue autorisés : {{ids}}.",
 			"allowedNone": "Aucun serveur du catalogue n'est autorisé.",
 			"minScore": "Score de sécurité minimum : {{min}}.",
+			"confineBelow": "Les serveurs dont le score de sécurité est sous {{min}}, et ceux hors catalogue, tournent confinés (bac à sable de l'OS, réseau limité aux hôtes qu'ils listent).",
 			"customBlocked": "Les serveurs hors catalogue sont refusés.",
 			"invalidTitle": "La politique MCP du projet (.workpilot/mcp-policy.json) est invalide : aucun serveur ne peut être installé tant qu'elle n'est pas corrigée.",
 			"invalid": {

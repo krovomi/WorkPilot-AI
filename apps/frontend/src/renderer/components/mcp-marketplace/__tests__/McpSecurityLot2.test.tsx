@@ -142,9 +142,15 @@ describe("the install policy", () => {
 	it("says what an active policy allows", () => {
 		withPolicy({
 			state: "active",
-			policy: { allowedServers: ["github", "sentry"], minScore: 60, blockCustomServers: true },
+			policy: {
+				allowedServers: ["github", "sentry"],
+				minScore: 60,
+				confineBelow: 75,
+				blockCustomServers: true,
+			},
 		});
 		render(<McpPolicyBanner projectId="p1" />);
+		expect(screen.getByText(/^Servers with a security score under 75/)).toBeInTheDocument();
 		expect(screen.getByText(/^This project has an MCP policy/)).toBeInTheDocument();
 		expect(screen.getByText("Allowed catalog servers: github, sentry.")).toBeInTheDocument();
 		expect(screen.getByText("Lowest security score: 60.")).toBeInTheDocument();
@@ -160,6 +166,7 @@ describe("the install policy", () => {
 		render(<McpPolicyBanner projectId="p1" />);
 		expect(screen.queryByText(/^Allowed catalog servers/)).toBeNull();
 		expect(screen.queryByText(/^Lowest security score/)).toBeNull();
+		expect(screen.queryByText(/^Servers with a security score under/)).toBeNull();
 		expect(screen.queryByText("Servers outside the catalog are refused.")).toBeNull();
 	});
 

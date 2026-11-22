@@ -20,6 +20,12 @@ export interface McpInstallPolicy {
 	blockCustomServers: boolean;
 	/** Findings of the code scan the team has reviewed, each with its reason (lot 3). */
 	acceptedFindings?: McpAcceptedFinding[];
+	/**
+	 * A command server whose security score is under this (0-100), or that is
+	 * not a catalog server, runs confined: the main writes `confine` on it
+	 * (lot 5, `main/mcp-security/confine-guard.ts`).
+	 */
+	confineBelow?: number;
 }
 
 /** Why the file is not a policy; i18n key under `mcpMarketplace.policy.invalid`. */
