@@ -19,7 +19,7 @@ import os
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from foundation.platform import find_executable, is_linux, is_macos, is_windows
@@ -46,12 +46,22 @@ _ENGINE_SOCKETS = (
 ISOLATED = "isolated"
 UNAVAILABLE = "unavailable"
 
+#: Why the sandbox is unavailable, for an interface that names it in its own
+#: language (`reason` stays the stable English detail): the platform has no
+#: sandbox, its program is not installed, or it is there and refused to run.
+UNSUPPORTED = "unsupported"
+MISSING = "missing"
+REFUSED = "refused"
+
 
 @dataclass(frozen=True)
 class SandboxStatus:
     state: str
     backend: str | None
     reason: str | None = None
+    #: `UNSUPPORTED`, `MISSING` or `REFUSED` when unavailable. Not compared:
+    #: it classifies `reason`, it does not change the status.
+    kind: str | None = field(default=None, compare=False)
 
     @property
     def available(self) -> bool:
@@ -87,6 +97,7 @@ def _probe_linux() -> SandboxStatus:
             UNAVAILABLE,
             "bubblewrap",
             f"bubblewrap (bwrap) is not installed: {install_hint('bubblewrap')}",
+            MISSING,
         )
     command = [
         bwrap,
@@ -108,7 +119,9 @@ def _probe_linux() -> SandboxStatus:
             command, capture_output=True, text=True, timeout=_PROBE_TIMEOUT, check=False
         )
     except (OSError, subprocess.TimeoutExpired) as error:
-        return SandboxStatus(UNAVAILABLE, "bubblewrap", f"bwrap did not run: {error}")
+        return SandboxStatus(
+            UNAVAILABLE, "bubblewrap", f"bwrap did not run: {error}", REFUSED
+        )
     if result.returncode != 0:
         detail = (result.stderr or "").strip().splitlines()[-1:] or ["no detail"]
         return SandboxStatus(
@@ -116,13 +129,16 @@ def _probe_linux() -> SandboxStatus:
             "bubblewrap",
             "bwrap is installed but the kernel refused it "
             f"(user namespaces disabled or restricted): {detail[0][:200]}",
+            REFUSED,
         )
     return SandboxStatus(ISOLATED, "bubblewrap")
 
 
 def _probe_macos() -> SandboxStatus:
     if not Path(_SANDBOX_EXEC).exists():
-        return SandboxStatus(UNAVAILABLE, "seatbelt", "sandbox-exec is missing")
+        return SandboxStatus(
+            UNAVAILABLE, "seatbelt", "sandbox-exec is missing", MISSING
+        )
     try:
         result = subprocess.run(
             [_SANDBOX_EXEC, "-p", "(version 1)(allow default)", "/usr/bin/true"],
@@ -133,13 +149,14 @@ def _probe_macos() -> SandboxStatus:
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         return SandboxStatus(
-            UNAVAILABLE, "seatbelt", f"sandbox-exec did not run: {error}"
+            UNAVAILABLE, "seatbelt", f"sandbox-exec did not run: {error}", REFUSED
         )
     if result.returncode != 0:
         return SandboxStatus(
             UNAVAILABLE,
             "seatbelt",
             f"sandbox-exec refused: {(result.stderr or '').strip()[:200]}",
+            REFUSED,
         )
     return SandboxStatus(ISOLATED, "seatbelt")
 
@@ -156,8 +173,11 @@ def probe() -> SandboxStatus:
             UNAVAILABLE,
             None,
             "WorkPilot has no OS sandbox on Windows yet (AppContainer is planned)",
+            UNSUPPORTED,
         )
-    return SandboxStatus(UNAVAILABLE, None, "no OS sandbox for this platform")
+    return SandboxStatus(
+        UNAVAILABLE, None, "no OS sandbox for this platform", UNSUPPORTED
+    )
 
 
 def _proxy_dir() -> Path:

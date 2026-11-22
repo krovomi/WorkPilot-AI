@@ -14,10 +14,12 @@ import type {
 import type { McpPolicyState } from "../../../shared/types/mcp-policy";
 import type {
 	McpReviewDeleteRequest,
+	McpReviewList,
 	McpReviewListRequest,
 	McpReviewRequest,
 	McpServerReview,
 } from "../../../shared/types/mcp-reviews";
+import type { McpSandboxRequest, McpSandboxStatus } from "../../../shared/types/mcp-sandbox";
 import type {
 	McpInstalledWatchView,
 	McpSecurityRequest,
@@ -61,12 +63,17 @@ export interface McpAPI {
 	}) => Promise<IPCResult<McpInstalledWatchView>>;
 	/** Acknowledges every alert of a catalog server; false when it had none */
 	acknowledgeMcpAlerts: (request: { serverId: string }) => Promise<IPCResult<boolean>>;
-	/** The team's reviews of a catalog server, for a server project, the latest first */
-	listMcpReviews: (request: McpReviewListRequest) => Promise<IPCResult<McpServerReview[]>>;
+	/**
+	 * The organization's reviews of a catalog server, from a server project,
+	 * the latest first, and whether the caller may write one
+	 */
+	listMcpReviews: (request: McpReviewListRequest) => Promise<IPCResult<McpReviewList>>;
 	/** Writes the caller's review of a catalog server, replacing the one they left */
 	putMcpReview: (request: McpReviewRequest) => Promise<IPCResult<McpServerReview>>;
-	/** Deletes a review: its author's or the project owner's to do */
+	/** Deletes a review: its author's or an organization administrator's to do */
 	deleteMcpReview: (request: McpReviewDeleteRequest) => Promise<IPCResult<boolean>>;
+	/** Whether this machine starts a server that must run confined, and why not */
+	getMcpSandboxStatus: (request?: McpSandboxRequest) => Promise<IPCResult<McpSandboxStatus>>;
 }
 
 export function createMcpAPI(): McpAPI {
@@ -100,5 +107,8 @@ export function createMcpAPI(): McpAPI {
 
 		deleteMcpReview: (request: McpReviewDeleteRequest) =>
 			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_DELETE_REVIEW, request),
+
+		getMcpSandboxStatus: (request?: McpSandboxRequest) =>
+			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_GET_SANDBOX, request),
 	};
 }

@@ -30,6 +30,9 @@ PUBLIC_PATHS = {
     "/auth/config",
     "/auth/invitations/lookup",
     "/auth/invitations/accept",
+    "/auth/password-reset/request",
+    "/auth/password-reset/lookup",
+    "/auth/password-reset/confirm",
     "/health",
     "/docs",
     "/openapi.json",
@@ -147,6 +150,13 @@ async def _attach_principal(request: Request, claims: dict) -> bool:
         delegations=delegations,
     )
     return True
+
+
+async def _note_presence(request: Request) -> None:
+    """The caller used the server today, in the organization they act in."""
+    from server.services import presence
+
+    await presence.touch(request.state.user_id, getattr(request.state, "org_id", None))
 
 
 async def _attach_token_principal(request: Request, raw: str) -> JSONResponse | None:
@@ -292,21 +302,24 @@ async def _ensure_db_ready() -> None:
 def _run_periodic_jobs(app: FastAPI) -> None:
     """Run the server's periodic jobs for the app's lifetime, inside its lifespan.
 
-    One today: escalating a plan that waited too long for its approvals
-    (``services/approval_escalation.py``), started only when it is on.
+    Escalating a plan that waited too long for its approvals
+    (``services/approval_escalation.py``), started only when it is on; and
+    erasing usage data past its retention (``services/usage_retention.py``).
     """
     inner = app.router.lifespan_context
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[object]:
-        from server.services import approval_escalation
+        from server.services import approval_escalation, usage_retention
 
         async with inner(application) as state:
             approval_escalation.start(ready=_ensure_db_ready)
+            usage_retention.start(ready=_ensure_db_ready)
             try:
                 yield state
             finally:
                 await approval_escalation.stop()
+                await usage_retention.stop()
 
     app.router.lifespan_context = lifespan
 
@@ -346,6 +359,7 @@ def mount_server_mode(app: FastAPI) -> bool:
             )
             if failure is not None:
                 return failure
+            await _note_presence(request)
             return await call_next(request)
         try:
             claims = decode_access_token(auth[len("Bearer ") :].strip())
@@ -383,6 +397,7 @@ def mount_server_mode(app: FastAPI) -> bool:
             return JSONResponse(
                 status_code=401, content={"detail": "Invalid or expired token"}
             )
+        await _note_presence(request)
 
         forbidden = await _reject_client_supplied_paths(request)
         if forbidden is not None:
@@ -396,6 +411,7 @@ def mount_server_mode(app: FastAPI) -> bool:
 
     for module_path, label in (
         ("server.routers.invitations", "invitations"),
+        ("server.routers.password_reset", "password-reset"),
         ("server.routers.projects", "projects"),
         ("server.routers.specs", "specs"),
         ("server.routers.users", "users"),

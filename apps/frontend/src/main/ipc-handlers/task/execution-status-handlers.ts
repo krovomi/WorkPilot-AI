@@ -391,6 +391,7 @@ print(json.dumps(result))
 						planPath,
 						status,
 						project.id,
+						"user",
 					);
 
 					if (!persisted) {

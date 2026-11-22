@@ -172,8 +172,9 @@ _ALL: tuple[Permission, ...] = (
     _p("settings", "provider.write", privileged=True),
     # -- marketplace -------------------------------------------------------
     _p("marketplace", "read"),
-    # A review of a catalogue server left with a project's team (#369 lot 5):
-    # text, never code, so not privileged.
+    # A review of a catalogue server shared within the organization (#369
+    # lots 5 and 6): text, never code, so not privileged; maintainers and
+    # administrators hold it.
     _p("marketplace", "write"),
     _p("marketplace", "install", privileged=True),
     # -- lab ---------------------------------------------------------------

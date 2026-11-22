@@ -201,20 +201,33 @@ class PatternStorage:
 
     # -- the API the learning loop has always had ---------------------------
 
-    def load_patterns(self, *, trusted_only: bool = False) -> list[LearningPattern]:
-        """Load all patterns from the vault.
+    def load_patterns(self) -> list[LearningPattern]:
+        """Load all patterns from the vault: the store's own read.
 
-        ``trusted_only``: without the patterns whose note no trusted key
-        signed (`brain.lifecycle.provenance`), for what goes in a prompt. The
-        store itself reads them all: it rewrites what it read.
+        Every pattern, whatever its scope or signature: what the store writes
+        back is what it read, and a pattern it did not see would be forgotten.
+        What goes to an agent is `recall_patterns`.
         """
+        return self._load(recall=False)
+
+    def recall_patterns(self) -> list[LearningPattern]:
+        """The patterns an agent of this build may get (a prompt, ``mem_search``).
+
+        Without those whose note no trusted key signed
+        (`brain.lifecycle.provenance`) and those scoped to another branch or,
+        on a server, another team (`brain.lifecycle.scopes.recalled`, for the
+        branch of ``project_dir``). Never written back.
+        """
+        return self._load(recall=True)
+
+    def _load(self, *, recall: bool) -> list[LearningPattern]:
         memory = self._open()
         if memory is None:
             return []
         try:
             patterns = self._read(memory)
-            if trusted_only:
-                hidden = memory.unverified_pattern_ids()
+            if recall:
+                hidden = memory.unrecalled_pattern_ids()
                 patterns = [p for p in patterns if p.pattern_id not in hidden]
             return patterns
         except Exception as e:  # noqa: BLE001 - patterns never fail a build
@@ -294,9 +307,10 @@ class PatternStorage:
     ) -> list[LearningPattern]:
         """Get enabled patterns for a specific agent phase above confidence threshold.
 
-        For a prompt: a pattern no trusted key signed is not one of them.
+        For a prompt (`recall_patterns`): a pattern no trusted key signed, or
+        scoped to another branch or team, is not one of them.
         """
-        patterns = self.load_patterns(trusted_only=True)
+        patterns = self.recall_patterns()
         return [
             p
             for p in patterns

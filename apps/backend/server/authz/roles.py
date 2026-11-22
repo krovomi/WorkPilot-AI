@@ -65,7 +65,6 @@ _REVIEWER = _VIEWER | {
     "review.approve",
     "qa.write",
     "qa.promote",
-    "marketplace.write",
 }
 
 _CONTRIBUTOR = _VIEWER | {
@@ -81,7 +80,6 @@ _CONTRIBUTOR = _VIEWER | {
     "agent.write",
     "agent.execute",
     "agent.cancel",
-    "marketplace.write",
 }
 
 _OPERATOR = _VIEWER | {
@@ -104,6 +102,9 @@ _MAINTAINER = _CONTRIBUTOR | {
     "project.member.read",
     "ops.write",
     "settings.write",
+    # The organization's team reviews of catalogue MCP servers (#369): read
+    # by every member, written by maintainers and administrators.
+    "marketplace.write",
 }
 
 # Org admin: everything inside the tenant, nothing across tenants.

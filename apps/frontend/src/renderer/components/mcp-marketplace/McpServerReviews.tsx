@@ -1,10 +1,12 @@
 /**
- * The team's security reviews of a catalog server (issue #369, lot 5), in a
- * server project only: what the members saw using it, next to the score the
- * app computes. One review per member, which a second write replaces; its
- * author or the project owner deletes it. The server checks every right and
- * the main every argument; this view only hides what the caller cannot do.
- * A comment is shown as text.
+ * The organization's security reviews of a catalog server (issue #369, lots
+ * 5 and 6), in a server project only: what its members saw using it, next to
+ * the score the app computes. They are the organization's, read from any of
+ * its projects. One review per member, which a second write replaces; its
+ * author or an organization administrator deletes it. Only those the server
+ * lets write (maintainers, administrators) see the form. The server checks
+ * every right and the main every argument; this view only hides what the
+ * caller cannot do. A comment is shown as text.
  */
 
 import { Loader2, Trash2 } from "lucide-react";
@@ -13,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import {
 	MCP_REVIEW_MAX_COMMENT,
 	MCP_REVIEW_VERDICTS,
+	type McpReviewList,
 	type McpReviewVerdict,
 	type McpServerReview,
 } from "../../../shared/types/mcp-reviews";
@@ -42,31 +45,26 @@ export function McpServerReviews({ serverId }: McpServerReviewsProps) {
 		s.projects.find((p) => p.id === s.selectedProjectId),
 	);
 	if (!project?.remote) return null;
-	return (
-		<ReviewsPanel
-			projectId={project.id}
-			serverId={serverId}
-			canWrite={project.remote.role !== "viewer"}
-		/>
-	);
+	return <ReviewsPanel projectId={project.id} serverId={serverId} />;
 }
 
 interface ReviewsPanelProps {
 	readonly projectId: string;
 	readonly serverId: string;
-	readonly canWrite: boolean;
 }
 
-function ReviewsPanel({ projectId, serverId, canWrite }: ReviewsPanelProps) {
+function ReviewsPanel({ projectId, serverId }: ReviewsPanelProps) {
 	const { t } = useTranslation(["common"]);
 	const [reviews, setReviews] = useState<McpServerReview[] | null>(null);
+	const [canWrite, setCanWrite] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [verdict, setVerdict] = useState<McpReviewVerdict>("caution");
 	const [comment, setComment] = useState("");
 	const [busy, setBusy] = useState(false);
 
-	const fill = useCallback((rows: McpServerReview[]) => {
+	const fill = useCallback(({ reviews: rows, canWrite: writes }: McpReviewList) => {
 		setReviews(rows);
+		setCanWrite(writes);
 		const mine = rows.find((review) => review.mine);
 		if (mine) {
 			setVerdict(mine.verdict);

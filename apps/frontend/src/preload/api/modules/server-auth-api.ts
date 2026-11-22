@@ -56,6 +56,8 @@ export interface ServerAuthConfig {
 	sso_enabled?: boolean;
 	/** The provider's name, for the button. */
 	sso_name?: string;
+	/** "Forgot password?" emails a link; otherwise an administrator issues it. */
+	password_reset_by_email?: boolean;
 }
 
 export type ServerAuthResult =
@@ -84,6 +86,15 @@ export interface CreateInvitationResult extends InvitationPublic {
 
 export type DataResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
+/** A link a platform admin issued for an account to set a new password. */
+export interface PasswordResetIssued {
+	email: string;
+	expires_at: string;
+	email_sent: boolean;
+	/** Only when no email went: the admin hands the link over. */
+	reset_link: string | null;
+}
+
 export interface ServerAuthAPI {
 	getState: () => Promise<ServerAuthState>;
 	getConfig: (
@@ -110,6 +121,20 @@ export interface ServerAuthAPI {
 		displayName: string,
 		password: string,
 	) => Promise<ServerAuthResult>;
+	requestPasswordReset: (
+		serverUrl: string,
+		email: string,
+	) => Promise<DataResult<{ requested: boolean }>>;
+	lookupPasswordReset: (
+		serverUrl: string,
+		link: string,
+	) => Promise<DataResult<{ email: string }>>;
+	confirmPasswordReset: (
+		serverUrl: string,
+		link: string,
+		password: string,
+	) => Promise<DataResult<{ reset: boolean }>>;
+	issuePasswordReset: (userId: string) => Promise<DataResult<PasswordResetIssued>>;
 	createInvite: (payload: {
 		email: string;
 		role?: string;
@@ -192,6 +217,30 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 			token,
 			displayName,
 			password,
+		),
+	requestPasswordReset: (serverUrl, email) =>
+		invokeIpc<DataResult<{ requested: boolean }>>(
+			IPC_CHANNELS.SERVER_AUTH_REQUEST_PASSWORD_RESET,
+			serverUrl,
+			email,
+		),
+	lookupPasswordReset: (serverUrl, link) =>
+		invokeIpc<DataResult<{ email: string }>>(
+			IPC_CHANNELS.SERVER_AUTH_LOOKUP_PASSWORD_RESET,
+			serverUrl,
+			link,
+		),
+	confirmPasswordReset: (serverUrl, link, password) =>
+		invokeIpc<DataResult<{ reset: boolean }>>(
+			IPC_CHANNELS.SERVER_AUTH_CONFIRM_PASSWORD_RESET,
+			serverUrl,
+			link,
+			password,
+		),
+	issuePasswordReset: (userId) =>
+		invokeIpc<DataResult<PasswordResetIssued>>(
+			IPC_CHANNELS.SERVER_AUTH_ISSUE_PASSWORD_RESET,
+			userId,
 		),
 	createInvite: (payload) =>
 		invokeIpc<DataResult<CreateInvitationResult>>(

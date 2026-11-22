@@ -10,7 +10,7 @@ summary: >-
 # Enregistreur du Browser Agent : une session devient un test
 
 > Pourquoi l'onglet « Enregistreur » du Browser Agent enregistre ce que fait une personne sur une
-> page et l'exporte en test E2E, et comment. Issue : #387 (lots 1 à 5). Règles :
+> page et l'exporte en test E2E, et comment. Issue : #387 (lots 1 à 6). Règles :
 > [`security.md`](../rules/security.md) (S1, S2, S4, S6, S7) ; écriture dans un projet :
 > [generated-review.md](generated-review.md).
 
@@ -107,8 +107,12 @@ l'enregistreur est posé, avec une fenêtre cette fois.
 5. **Les secrets.** Une valeur saisie dans un champ `password`, un champ dont le nom, l'id, le
    label ou l'autocomplete nomme un secret, ou une valeur qui a la forme d'une clé
    (`foundation/log_redaction.redact_text`) n'est jamais gardée : l'étape porte le nom d'une
-   variable (`E2E_PASSWORD`, `[A-Z0-9_]` seulement) que le test lit. Un texte à vérifier qui
-   contient une clé n'est pas enregistré, une URL qui en porte une perd sa query.
+   variable (`E2E_PASSWORD`, `[A-Z0-9_]` seulement). À l'export, ce nom (jamais une valeur) va
+   dans le fichier de données sous une clé en `_env` (`"password_env": "E2E_PASSWORD"`), et le
+   test lit la variable qu'il nomme au moment de tourner (`process.env`, `os.environ`,
+   `Cypress.env`, `System.getenv`, `Environment.GetEnvironmentVariable`, `ENV.fetch`) ; le haut
+   du test liste les variables à définir. Un texte à vérifier qui contient une clé n'est pas
+   enregistré, une URL qui en porte une perd sa query.
 6. **Le main garde les étapes** (`main/browser-recorder/recorder-session.ts`), relues par
    `parseRecordedStep`. Le renderer les affiche, en retire, et n'envoie à l'export que des ids :
    il ne fournit jamais le contenu d'une étape.
@@ -150,14 +154,19 @@ l'enregistreur est posé, avec une fenêtre cette fois.
      40 caractères), sinon le genre de la valeur ; le même champ retapé avec la même valeur
      garde sa clé, sinon `_2`, `_3`… Genre (`email`, `date`, `number`, `phone`, `url`, `name`,
      `text`) par règles seulement, forme de la valeur puis mots du champ : aucun modèle ne voit
-     une valeur saisie. Où vivent les données, dans l'idiome de chaque framework : un JSON à côté
-     du test (`<test>.data.json`) que Playwright TS lit par `testInfo.file`, Python par
-     `Path(__file__)`, Selenium JS par `__dirname` (`.cjs`), WebdriverIO par `import.meta.url`
-     (ESM), Ruby par `__dir__` dans un `let(:test_data)` ; Cypress : une fixture
-     `cypress/fixtures/recorded/<test>.json`, `cy.fixture(…).as("data")` ; Java et C# : un bloc de
-     constantes `TestData` en tête de classe (lire un JSON y demanderait une bibliothèque ou une
-     règle de build). Chaque clé et valeur entre par le littéral de la langue (JSON pour le
-     fichier). Le main relit la réponse (`browser-recorder-data.ts` : clés `[a-z0-9_]`, genres en
+     une valeur saisie. Le secret d'une étape y entre par le nom de sa variable (point 5), sous
+     la clé `<champ>_env` (`secret_env` sans mot), une par variable. Où vivent les données, dans
+     l'idiome de chaque framework : un JSON à côté du test (`<test>.data.json`) que Playwright TS
+     lit par `testInfo.file`, Python par `Path(__file__)`, Selenium JS par `__dirname` (`.cjs`),
+     WebdriverIO par `import.meta.url` (ESM), Ruby par `__dir__` dans un `let(:test_data)`, C# par
+     `System.Text.Json` à côté de sa source (`[CallerFilePath]`, sinon le dossier de sortie du
+     build, `AppContext.BaseDirectory`) ; Java : le même fichier dans les ressources de test du
+     paquet (`src/test/resources/e2e/<test>.data.json`, que Maven et Gradle mettent sur le
+     classpath), lu par `getResourceAsStream` et le lecteur JSON de Selenium
+     (`org.openqa.selenium.json.Json`, déjà dans `selenium-java`) : ni bibliothèque ni règle de
+     build en plus ; Cypress : une fixture `cypress/fixtures/recorded/<test>.json`,
+     `cy.fixture(…).as("data")`. Chaque clé et valeur entre dans le fichier par son littéral
+     JSON. Le main relit la réponse (`browser-recorder-data.ts` : clés `[a-z0-9_]`, genres en
      liste fermée, fichier en `.json`) ; la carte de revue écrit le fichier dans son worktree, à
      côté du test, chemin relu dans le worktree ; « Enregistrer dans un fichier… » le pose à côté
      du fichier choisi, sous son propre nom. L'onglet montre les clés, leur genre et le fichier
@@ -235,6 +244,12 @@ l'enregistreur est posé, avec une fenêtre cette fois.
   (`fixturesFolder` d'un projet n'est pas lu) ; WebdriverIO lit son JSON par `import.meta.url`,
   donc un projet ESM (le défaut de WebdriverIO, et le test généré importe déjà en ESM). Une
   réponse tapée dans un `prompt()` et l'option choisie dans une liste restent dans le test.
+  C# : un build qui réécrit les chemins de source (`PathMap`, `ContinuousIntegrationBuild`)
+  rend `[CallerFilePath]` inutile ; le test lit alors le fichier dans le dossier de sortie, que
+  le projet doit y copier (`CopyToOutputDirectory`). Un test Java ou Cypress « Enregistré dans
+  un fichier… » a son fichier de données posé à côté de lui, hors de son classpath ou de ses
+  fixtures : à déplacer. Le C# généré n'est pas compilé par les tests (pas de `dotnet` sur la
+  machine où ce lot a été écrit) : il est vérifié par son texte.
 - Lancer un test qui lit des secrets : l'app lance sans identifiants, la personne le lance avec
   ses variables. Un test proposé dans un fichier (hors projet) n'est pas lancé non plus : seul
   le worktree d'une carte a la recette du projet.
@@ -247,7 +262,10 @@ l'enregistreur est posé, avec une fenêtre cette fois.
 
 Vérification : `pytest tests/browser_agent -q` (dont `test_codegen_text.py` : un littéral par
 langage relu par sa langue, Java selon JLS 3.3, et une valeur saisie relue depuis les données de
-chaque format ; `test_codegen_data.py` : clés, genres, secrets jamais en données ; `test_recorder_checks.py` : places, attentes
+chaque format ; `test_codegen_data.py` : clés, genres, secrets jamais en données (aucune valeur
+d'un secret dans le test, le fichier de données ni la réponse à l'app, pour chaque format) ;
+`test_codegen_compiled_data.py` : JSON lu en Java et en C#, et le test Java compilé par `javac`
+(s'il est là) contre des bouchons de Selenium et JUnit ; `test_recorder_checks.py` : places, attentes
 d'indicateur, vérifications proposées ; `test_recorder_actions.py`, `test_codegen_actions.py` :
 survols, défilements, glisser, dialogues, nouvelles langues ; `test_recorder_run.py`,
 `test_recorder_replay.py`, `test_recorder_assist.py`) ;

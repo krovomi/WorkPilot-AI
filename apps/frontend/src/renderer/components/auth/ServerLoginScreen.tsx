@@ -21,6 +21,7 @@ import {
 } from "@/components/ui";
 import { useServerSessionStore } from "../../stores/server-session-store";
 import { AcceptInviteForm } from "./AcceptInviteForm";
+import { ForgotPasswordForm } from "./ForgotPasswordForm";
 
 const LAST_SERVER_URL_KEY = "workpilot-last-server-url";
 
@@ -32,7 +33,9 @@ export function ServerLoginScreen() {
 	const loginSso = useServerSessionStore((s) => s.loginSso);
 	const switchToLocalMode = useServerSessionStore((s) => s.switchToLocalMode);
 
-	const [view, setView] = useState<"login" | "invite">("login");
+	const [view, setView] = useState<"login" | "invite" | "reset">("login");
+	// Set once a new password was saved: the sign-in screen says so.
+	const [passwordWasReset, setPasswordWasReset] = useState(false);
 
 	const [url, setUrl] = useState(
 		serverUrl || localStorage.getItem(LAST_SERVER_URL_KEY) || "",
@@ -139,6 +142,20 @@ export function ServerLoginScreen() {
 		return <AcceptInviteForm onBack={() => setView("login")} />;
 	}
 
+	if (view === "reset") {
+		return (
+			<ForgotPasswordForm
+				serverUrl={url.trim()}
+				onBack={() => setView("login")}
+				onDone={() => {
+					setPasswordWasReset(true);
+					setPassword("");
+					setView("login");
+				}}
+			/>
+		);
+	}
+
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
 			<Card className="w-full max-w-md">
@@ -220,6 +237,12 @@ export function ServerLoginScreen() {
 						/>
 					</div>
 
+					{passwordWasReset && !error && (
+						<p className="text-sm text-muted-foreground" role="status">
+							{t("passwordReset.done")}
+						</p>
+					)}
+
 					{error && (
 						<p className="text-sm text-destructive" role="alert">
 							{error}
@@ -259,6 +282,18 @@ export function ServerLoginScreen() {
 						}}
 					>
 						{t("serverLogin.haveInvite")}
+					</button>
+
+					<button
+						type="button"
+						className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+						disabled={busy !== null}
+						onClick={() => {
+							setError(null);
+							setView("reset");
+						}}
+					>
+						{t("serverLogin.forgotPassword")}
 					</button>
 				</CardContent>
 			</Card>

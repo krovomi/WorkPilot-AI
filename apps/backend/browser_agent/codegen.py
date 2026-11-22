@@ -11,10 +11,11 @@ key sequence (Cypress ``type`` is told not to parse ``{…}``). Page text never
 goes into a comment.
 
 A secret field reads its value from an environment variable whose name the
-recorder built from ``[A-Z0-9_]`` only (``recording.ENV_NAME``); the generated
-file names the variables it needs at its top. Any other value typed into a
-field is the test's data (``codegen_data``): a JSON file next to the test, a
-Cypress fixture, or a block of constants in Java and C#, read by a key.
+recorder built from ``[A-Z0-9_]`` only (``recording.ENV_NAME``): the test's
+data holds that name (never a value), and the generated file names the
+variables it needs at its top. Any other value typed into a field is the
+test's data too (``codegen_data``): a JSON file next to the test (in Java, in
+the test resources of its package) or a Cypress fixture, read by a key.
 
 Each framework takes the first selector of a step it can express: Cypress has
 no role or label query without an extra library, so it falls through to the
@@ -246,7 +247,7 @@ def _pw_ts_action(step: RecordedStep, loc: str) -> str:
     if step.kind in ("fill", "select"):
         method = "fill" if step.kind == "fill" else "selectOption"
         value = (
-            f"secret({literal(step.secret_env)})"
+            f"secret(data[{literal(step.data_key)}])"
             if step.secret_env
             else f"data[{literal(step.data_key)}]"
             if step.data_key
@@ -393,7 +394,7 @@ def _pw_py_action(step: RecordedStep, loc: str) -> str:
     if step.kind in ("fill", "select"):
         method = "fill" if step.kind == "fill" else "select_option"
         value = (
-            f"os.environ[{py_literal(step.secret_env)}]"
+            f"os.environ[TEST_DATA[{py_literal(step.data_key)}]]"
             if step.secret_env
             else f"TEST_DATA[{py_literal(step.data_key)}]"
             if step.data_key
@@ -548,7 +549,7 @@ def _cy_action(step: RecordedStep, query: str) -> str | None:
     if step.kind == "fill":
         if step.secret_env:
             return (
-                f"{query}.clear().type(Cypress.env({literal(step.secret_env)}), "
+                f"{query}.clear().type(Cypress.env(data[{literal(step.data_key)}]), "
                 "{ log: false });"
             )
         if step.data_key:
@@ -564,7 +565,7 @@ def _cy_action(step: RecordedStep, query: str) -> str | None:
         )
     if step.kind == "select":
         if step.secret_env:
-            return f"{query}.select(Cypress.env({literal(step.secret_env)}));"
+            return f"{query}.select(Cypress.env(data[{literal(step.data_key)}]));"
         return f"{query}.select({literal(step.value)});"
     if step.kind == "press":
         return f"{query}.type({literal(_CYPRESS_KEYS[step.key])});"

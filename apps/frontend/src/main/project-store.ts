@@ -41,6 +41,7 @@ import { stripHtml } from "./ipc-handlers/shared/sanitize";
 import { getAutoBuildPath, isInitialized } from "./project-initializer";
 import { readCiSuite } from "./suite-placement/ci-suite";
 import { readSuitePlacement } from "./suite-placement/placement-file";
+import { readStatusHistory } from "./task-status-history";
 import { updateExistingFile } from "./utils/existing-file";
 import { ensureAbsolutePath } from "./utils/path-helpers";
 import { findAllSpecPaths } from "./utils/spec-path-helpers";
@@ -795,6 +796,7 @@ export class ProjectStore {
 			const qaSignoff = qaSignoffOf(plan);
 			const ciSuite = readCiSuite(plan as unknown as Record<string, unknown> | null);
 			const suitePlacement = readSuitePlacement(specPath);
+			const statusHistory = readStatusHistory(specPath);
 
 			return {
 				id: dir.name,
@@ -838,6 +840,7 @@ export class ProjectStore {
 				...(suitePlacement && { suitePlacement }),
 				...(ciSuite && { ciSuite }),
 				...(executionProgress && { executionProgress }),
+				...(statusHistory.length > 0 && { statusHistory }),
 				stagedInMainProject,
 				stagedAt,
 				location,

@@ -152,10 +152,12 @@ Les plus utilisées :
 
 | Variable | Défaut | À régler quand |
 |---|---|---|
-| `WORKPILOT_PUBLIC_BASE_URL` | — | toujours (`configure.py` l'écrit) : base des liens d'invitation |
+| `WORKPILOT_PUBLIC_BASE_URL` | — | toujours (`configure.py` l'écrit) : base des liens d'invitation et de réinitialisation |
 | `WORKPILOT_PUBLIC_STREAM_URL` | hôte de l'API, port 8765 | toujours derrière le proxy : `wss://<même hôte>` (ou `ws://` en `lan`) |
 | `WORKPILOT_MAX_CONCURRENT_RUNS` | `3` | la machine a plus de cœurs et de mémoire : runs et jobs simultanés, tout le serveur |
 | `WORKPILOT_INVITATION_TTL_HOURS` | `72` | un lien d'invitation doit durer plus ou moins longtemps |
+| `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | `60` | un lien de mot de passe oublié doit durer plus ou moins longtemps (de 5 à 1440 minutes) |
+| `WORKPILOT_USAGE_RETENTION_DAYS` | `365` | votre registre RGPD fixe une autre durée pour la consommation et la présence (de 30 à 3650 jours) ; ce qui est gardé : [server-usage-data.md](server-usage-data.md) |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | `12` | une politique de mot de passe plus stricte (jamais moins de 12) |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | refuser les mots de passe connus des fuites |
 | `WORKPILOT_ACCESS_TOKEN_TTL_MINUTES` | `15` | rarement |
@@ -333,6 +335,27 @@ le rôle dans l'organisation (sinon Contributor pour un membre, Viewer pour un l
 Avec Microsoft Entra ou un fournisseur OpenID Connect, la première connexion crée ou relie le
 compte d'une adresse dont le fournisseur se porte garant.
 
+### Un mot de passe oublié
+
+Seul un compte à mot de passe local en a un à oublier : un compte Microsoft ou SSO se réinitialise
+chez son fournisseur.
+
+- **Avec SMTP réglé**, la personne clique **Mot de passe oublié ?** sur l'écran de connexion (app de
+  bureau ou téléphone), saisit son adresse, et reçoit un lien. Le serveur répond la même chose que
+  l'adresse ait un compte ou non, et n'envoie pas plus d'un lien par minute pour une même adresse.
+- **Sans SMTP**, l'écran le dit et renvoie vers un administrateur de la plateforme. Celui-ci ouvre
+  **Administration → Membres**, clique l'icône de clé sur la ligne de la personne (compte actif),
+  et l'app affiche le lien à copier et à transmettre. Avec SMTP réglé, ce même bouton envoie le lien
+  par e-mail à la personne.
+- Format du lien : `<WORKPILOT_PUBLIC_BASE_URL>/reset-password?token=<jeton>`. Comme une invitation,
+  ce n'est pas une page web : la personne le colle dans l'app (**J'ai un lien**), avec ou sans
+  l'adresse devant, puis choisit son nouveau mot de passe (mêmes règles qu'à la création).
+- Il sert une fois, pendant 60 minutes par défaut (`WORKPILOT_PASSWORD_RESET_TTL_MINUTES`, de 5 à
+  1440) ; un nouveau lien annule le précédent. Le mot de passe changé, **toutes les sessions** du
+  compte sont fermées : il faut se reconnecter partout.
+- L'audit garde chaque étape : `auth.password_reset.requested`, `auth.password_reset.issued` (par un
+  administrateur) et `auth.password_reset.completed`. Le serveur ne garde que l'empreinte du jeton.
+
 ### Les projets
 
 Un projet est un dépôt git que le serveur clone. Dans l'app : **Ajouter un projet** →
@@ -374,7 +397,8 @@ sessions, jetons…), avec un export JSON.
 
 1. Au premier lancement, l'écran **Connexion au serveur WorkPilot** demande l'URL du serveur,
    puis l'e-mail et le mot de passe, ou le bouton Microsoft ou de votre SSO. **J'ai une
-   invitation** crée le compte à partir du lien reçu.
+   invitation** crée le compte à partir du lien reçu ; **Mot de passe oublié ?** en choisit un
+   nouveau ([Un mot de passe oublié](#un-mot-de-passe-oublié)).
 2. Vous avez choisi **Mode local** ? **Réglages → Serveur d'équipe → Se connecter à un serveur**
    ramène à cet écran.
 3. Ouvrez un projet de l'équipe (**Ajouter un projet** liste ceux du serveur) : son tableau est
@@ -402,6 +426,7 @@ L'app mobile se connecte au même serveur. Les adresses acceptées :
 | `http://localhost` | oui | cette machine (émulateur) |
 | `http://workpilot.example.com` | non | HTTP vers Internet : mot de passe en clair |
 
+**Mot de passe oublié ?**, sous les boutons de connexion, suit le même chemin que sur le bureau.
 Le téléphone doit être sur le même réseau (ou VPN) qu'un serveur `lan`. Avec
 `WORKPILOT_PUSH_ENABLED=true`, il reçoit une notification quand un run que vous avez lancé
 réussit ou échoue.
@@ -480,6 +505,25 @@ curl -sS $WP/auth/me -H "Authorization: Bearer $TOKEN"
 curl -sS $WP/auth/me/permissions -H "Authorization: Bearer $TOKEN"
 ```
 
+**Mot de passe oublié** (routes publiques, 5 demandes par minute au plus) :
+
+```bash
+# Demander un lien : la réponse est la même que l'adresse ait un compte ou non
+curl -sS -X POST $WP/auth/password-reset/request -H 'Content-Type: application/json' \
+  -d '{"email": "alice@example.com"}'
+# → 202 { "requested": true }
+
+# Pour quel compte est ce lien (404 s'il est invalide ou expiré)
+curl -sS -X POST $WP/auth/password-reset/lookup -H 'Content-Type: application/json' \
+  -d '{"token": "<jeton>"}'
+# → { "email": "alice@example.com" }
+
+# Choisir le nouveau mot de passe ; toutes les sessions du compte sont fermées
+curl -sS -X POST $WP/auth/password-reset/confirm -H 'Content-Type: application/json' \
+  -d '{"token": "<jeton>", "new_password": "<nouveau mot de passe>"}'
+# → { "reset": true }
+```
+
 **Plusieurs organisations** : ajoutez `-H "X-WorkPilot-Org: <org_id>"` à chaque requête, ou
 `POST /auth/switch-org` avec `{"org_id": "<org_id>"}`, qui rend un jeton lié à cette
 organisation. Avec une seule organisation, rien à faire.
@@ -550,6 +594,12 @@ curl -sS $WP/admin/quotas -H "Authorization: Bearer $TOKEN"
 curl -sS -X PUT $WP/admin/quotas -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"max_users": 25, "max_projects": 10, "max_concurrent_runs": 4, "monthly_token_budget": 50000000, "enforce_hard_stop": true}'
 
+# Émettre un lien de mot de passe oublié pour un compte (administrateur de la plateforme) ;
+# reset_link est null quand le lien est parti par e-mail
+curl -sS -X POST $WP/admin/users/<user_id>/password-reset -H "Authorization: Bearer $TOKEN"
+# → { "email": "bob@example.com", "expires_at": "…", "email_sent": false,
+#     "reset_link": "https://workpilot.example.com/reset-password?token=…" }
+
 # L'audit, 500 lignes au plus par appel
 curl -sS "$WP/admin/audit?limit=100&offset=0" -H "Authorization: Bearer $TOKEN"
 
@@ -587,11 +637,11 @@ curl -sS -X PUT $WP/users/me/secrets -H "Authorization: Bearer $TOKEN" -H 'Conte
 | Lancer répond 402 | budget mensuel de tokens atteint | relever le budget dans Quotas, ou décocher Blocage |
 | Les vues GitHub répondent 503 | jeton personnel absent, ou clé maître changée | **Mes jetons sur le serveur** : enregistrer à nouveau |
 | L'invitation n'arrive pas | SMTP non réglé ou en échec | copier le lien affiché par l'app et le transmettre |
+| Le lien de mot de passe oublié n'arrive pas | SMTP non réglé, adresse sans compte local, compte désactivé, ou demande répétée dans la minute | un administrateur de la plateforme émet le lien depuis **Membres** (icône de clé) |
+| « Ce lien est invalide ou a expiré » | lien déjà servi, remplacé par un plus récent, ou plus vieux que `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | en demander un nouveau |
 
 ## 10. Limites actuelles
 
-- Pas encore de réinitialisation d'un mot de passe oublié : un compte local qui l'a perdu ne
-  peut pas se reconnecter seul.
 - Pas encore de vue de la consommation de tokens par personne ou par modèle (elle est
   enregistrée par run et par job) ni de rapport quotidien.
 - Aucune image du serveur n'est publiée : elle se construit depuis le dépôt.

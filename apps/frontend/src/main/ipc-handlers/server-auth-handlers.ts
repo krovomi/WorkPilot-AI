@@ -36,6 +36,12 @@ import {
 	setServerSecret,
 } from "../server-user-secrets";
 import { pullServerInterface } from "../server-menu-layout";
+import {
+	confirmPasswordReset,
+	issuePasswordReset,
+	lookupPasswordReset,
+	requestPasswordReset,
+} from "../server-password-reset";
 import { getServerSession } from "../server-session-info";
 import {
 	deleteServerNeedsYouChannel,
@@ -103,6 +109,25 @@ export function registerServerAuthHandlers(
 			notifyRenderer();
 			return result;
 		},
+	);
+
+	// --- Forgotten password: every argument is checked in server-password-reset.ts ---
+
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_AUTH_REQUEST_PASSWORD_RESET,
+		(_e, serverUrl: unknown, email: unknown) => requestPasswordReset(serverUrl, email),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_AUTH_LOOKUP_PASSWORD_RESET,
+		(_e, serverUrl: unknown, link: unknown) => lookupPasswordReset(serverUrl, link),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_AUTH_CONFIRM_PASSWORD_RESET,
+		(_e, serverUrl: unknown, link: unknown, password: unknown) =>
+			confirmPasswordReset(serverUrl, link, password),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_ISSUE_PASSWORD_RESET, (_e, userId: unknown) =>
+		issuePasswordReset(userId),
 	);
 
 	ipcMain.handle(

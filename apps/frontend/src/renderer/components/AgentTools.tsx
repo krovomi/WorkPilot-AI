@@ -60,6 +60,7 @@ import { useSettingsStore } from "../stores/settings-store";
 import type { McpPolicyRefusal, McpPolicyRefusalData } from "../../shared/types/mcp-policy";
 import { CustomMcpDialog } from "./CustomMcpDialog";
 import { McpPolicyRefusalNotice } from "./mcp-marketplace/McpPolicyNotice";
+import { McpConfinedRefusal } from "./mcp-marketplace/McpSandboxRefusal";
 import { McpServerSettingsDialog } from "./McpServerSettingsDialog";
 import { TokenSavingsSettings } from "./settings/TokenSavingsSettings";
 import { UiUxSettings } from "./settings/UiUxSettings";
@@ -1538,6 +1539,7 @@ export function AgentTools() {
 																			? `${server.command} ${server.args?.join(" ") || ""}`
 																			: server.url)}
 																</p>
+																<McpConfinedRefusal server={server} className="mt-1" />
 															</div>
 														</div>
 														<div className="flex items-center gap-1">

@@ -1,9 +1,10 @@
 /**
- * The team's security reviews of a catalogue MCP server, for a server
- * project (#369, lot 5): read them, write one's own, delete one.
+ * The organization's security reviews of a catalogue MCP server, from a
+ * server project (#369, lots 5 and 6): read them, write one's own, delete one.
  *
- * The server keeps them (`apps/backend/shared_features/mcp_reviews.py`) and
- * checks every permission; main only talks to it for a project the app
+ * The server keeps them with the project's organization
+ * (`apps/backend/shared_features/mcp_reviews.py`) and checks every
+ * permission; main only talks to it for a project the app
  * listed from that server (`getServerProject`). The renderer gives a project
  * id, a catalogue id, a verdict from a closed list and a comment, or a
  * review id: each is checked here before a request is made, and what the
@@ -14,6 +15,7 @@ import type { IPCResult } from "../shared/types/common";
 import {
 	MCP_REVIEW_MAX_COMMENT,
 	MCP_REVIEW_VERDICTS,
+	type McpReviewList,
 	type McpReviewVerdict,
 	type McpServerReview,
 } from "../shared/types/mcp-reviews";
@@ -62,10 +64,11 @@ export function toReview(raw: unknown): McpServerReview | null {
 	};
 }
 
-/** The reviews of `serverId` in the server project `projectId`, the latest first. */
-export async function listMcpReviews(
-	request: unknown,
-): Promise<IPCResult<McpServerReview[]>> {
+/**
+ * The reviews of `serverId` in the organization of the server project
+ * `projectId`, the latest first, and whether the server lets the caller write.
+ */
+export async function listMcpReviews(request: unknown): Promise<IPCResult<McpReviewList>> {
 	if (!isRecord(request)) return fail("Invalid request");
 	const projectId = serverProjectId(request.projectId);
 	if (!projectId) return fail("not_a_server_project");
@@ -75,14 +78,17 @@ export async function listMcpReviews(
 	}
 	const answer = await authedFetch<unknown>(route(projectId, "", serverId), "GET");
 	if (!answer.ok) return fail(answer.error);
-	const rows = isRecord(answer.data) ? answer.data.reviews : null;
-	if (!Array.isArray(rows)) return fail("bad_reviews");
+	const body = isRecord(answer.data) ? answer.data : null;
+	if (!body || !Array.isArray(body.reviews)) return fail("bad_reviews");
 	return {
 		success: true,
-		data: rows
-			.slice(0, MAX_REVIEWS)
-			.map(toReview)
-			.filter((review): review is McpServerReview => review !== null),
+		data: {
+			reviews: body.reviews
+				.slice(0, MAX_REVIEWS)
+				.map(toReview)
+				.filter((review): review is McpServerReview => review !== null),
+			canWrite: body.can_write === true,
+		},
 	};
 }
 
@@ -109,7 +115,7 @@ export async function putMcpReview(request: unknown): Promise<IPCResult<McpServe
 	return review ? { success: true, data: review } : fail("bad_reviews");
 }
 
-/** Delete a review: the server lets its author or the project owner do it. */
+/** Delete a review: the server lets its author or an organization administrator do it. */
 export async function deleteMcpReview(request: unknown): Promise<IPCResult<boolean>> {
 	if (!isRecord(request)) return fail("Invalid request");
 	const projectId = serverProjectId(request.projectId);

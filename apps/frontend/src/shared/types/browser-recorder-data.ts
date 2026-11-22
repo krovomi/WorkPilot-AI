@@ -3,10 +3,10 @@
  *
  * The exporter (`apps/backend/browser_agent/codegen_data.py`) takes each value
  * typed into a field out of the test: the test reads it by a key from a data
- * file next to it (a JSON file, or a Cypress fixture) or, in Java and C#,
- * from a block of constants. It also says what each key holds (`kind`), by
- * rules, never by a model. A secret is never data: it stays an environment
- * variable.
+ * file next to it (a JSON file, in Java a test resource of its package, or a
+ * Cypress fixture). It also says what each key holds (`kind`), by rules, never
+ * by a model. A secret's value is never data: the file holds only the name of
+ * its environment variable, read by the test at run time.
  *
  * The runner's answer is read again here: a key in `[a-z0-9_]`, a kind in the
  * closed list, a data file whose path and JSON are strings. Where the file may

@@ -34,6 +34,7 @@ from pathlib import Path
 
 from server.db.engine import get_session_factory
 from server.db.models import ProjectJob
+from server.services import audit
 from server.services.events import emit_board_event
 from server.services.run_manager import (
     BACKEND_DIR,
@@ -46,6 +47,8 @@ from server.services.run_manager import (
 from server.services.usage_records import finish_collecting, usage_channel
 from sqlalchemy import select
 
+#: A job started, in the audit log: its feature and its id.
+JOB_STARTED = "project.job.started"
 FEATURE_KEY = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
 #: A file of ``runners/``, or of one of its packages (``github/runner.py``):
 #: never a ``..`` or an absolute path.
@@ -178,6 +181,15 @@ class ProjectJobs:
                     status="queued",
                 )
                 db.add(job)
+                # In the organization's history with the job it names.
+                await audit.record(
+                    db,
+                    action=JOB_STARTED,
+                    actor_id=user_id,
+                    org_id=org_id,
+                    project_id=project_id,
+                    payload={"feature": feature, "job_id": job_id},
+                )
                 await db.commit()
                 await db.refresh(job)
             recorded = True

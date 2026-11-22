@@ -42,6 +42,27 @@
 		"sso": "Se connecter par authentification unique (SSO)",
 		"ssoRefused": "Le serveur a refusé ce compte."
 	},
+	"forgotPassword": {
+		"open": "Mot de passe oublié ?",
+		"title": "Mot de passe oublié",
+		"askDescription": "Saisissez l'adresse de votre compte : le serveur vous envoie un lien pour choisir un nouveau mot de passe.",
+		"setDescription": "Collez le lien reçu (ou son code), puis choisissez votre nouveau mot de passe.",
+		"noEmail": "Ce serveur n'envoie pas d'e-mail. Demandez un lien de réinitialisation à un administrateur du serveur, puis revenez ici avec.",
+		"send": "Envoyer le lien",
+		"sent": "Si un compte utilise cette adresse, un lien est en route. Il ne sert qu'une fois, pour une durée limitée.",
+		"haveLink": "J'ai un lien",
+		"needLink": "Il me faut un lien",
+		"link": "Lien ou code de réinitialisation",
+		"newPassword": "Nouveau mot de passe",
+		"confirm": "Confirmer le mot de passe",
+		"minLength": "Au moins {{count}} caractères.",
+		"mismatch": "Les mots de passe ne correspondent pas.",
+		"save": "Enregistrer mon mot de passe",
+		"invalidLink": "Ce lien de réinitialisation est invalide ou a expiré. Demandez-en un nouveau.",
+		"failed": "Le mot de passe n'a pas pu être réinitialisé : {{message}}",
+		"done": "Votre mot de passe a été changé. Connectez-vous avec le nouveau.",
+		"back": "Retour à la connexion"
+	},
 	"unreachable": {
 		"title": "Serveur injoignable",
 		"body": "Votre session est conservée. Vérifiez votre connexion puis réessayez.",
@@ -198,7 +219,6 @@
 	},
 	"settings": {
 		"title": "Réglages",
-		"account": "Compte",
 		"server": "Serveur",
 		"organization": "Organisation",
 		"signOut": "Se déconnecter",
@@ -708,5 +728,20 @@
 		"conflictsIgnored": "Les temps des conflits de fusion étaient illisibles.",
 		"minutes": "{{count}} min",
 		"hours": "{{hours}} h {{minutes}} min"
+	},
+	"mySession": {
+		"title": "Ma session",
+		"loading": "Lecture de la session",
+		"unavailable": "La session ne peut pas être lue sur le serveur",
+		"method": "Ouverte avec",
+		"methods": {
+			"local": "Mot de passe",
+			"entra": "Microsoft Entra ID",
+			"oidc": "Connexion unique : {{name}}",
+			"invite": "Invitation acceptée",
+			"unknown": "Non enregistrée (session ouverte avant que le serveur ne nomme les connexions)"
+		},
+		"issuer": "Fournisseur d'identité",
+		"signedInAt": "Connecté le"
 	}
 }

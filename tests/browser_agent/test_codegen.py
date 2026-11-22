@@ -53,7 +53,10 @@ def test_playwright_typescript() -> None:
     test = export_recording(_recording(), "playwright-ts", "Log in")
     assert test.path == "e2e/log-in.spec.ts" and test.env_vars == ["E2E_PASSWORD"]
     assert test.data_path == "e2e/log-in.data.json"
-    assert json.loads(test.data_code or "") == {"email": "ada@x.io"}
+    assert json.loads(test.data_code or "") == {
+        "email": "ada@x.io",
+        "password_env": "E2E_PASSWORD",
+    }
     assert test.code.splitlines() == [
         'import { readFileSync } from "node:fs";',
         'import { dirname, join } from "node:path";',
@@ -73,7 +76,7 @@ def test_playwright_typescript() -> None:
         "\t);",
         '\tawait page.goto("http://localhost:3000/login");',
         '\tawait page.getByLabel("Email", { exact: true }).fill(data["email"]);',
-        '\tawait page.getByLabel("Password", { exact: true }).fill(secret("E2E_PASSWORD"));',
+        '\tawait page.getByLabel("Password", { exact: true }).fill(secret(data["password_env"]));',
         '\tawait page.getByTestId("lang").selectOption("fr");',
         '\tawait page.getByRole("button", { name: "Sign in", exact: true }).click();',
         '\tawait page.getByPlaceholder("Search", { exact: true }).press("Enter");',
@@ -96,7 +99,8 @@ def test_playwright_python_is_valid_python() -> None:
     assert lines[lines.index("def test_log_in(page: Page) -> None:") + 1 :] == [
         '    page.goto("http://localhost:3000/login")',
         '    page.get_by_label("Email", exact=True).fill(TEST_DATA["email"])',
-        '    page.get_by_label("Password", exact=True).fill(os.environ["E2E_PASSWORD"])',
+        '    page.get_by_label("Password", exact=True)'
+        '.fill(os.environ[TEST_DATA["password_env"]])',
         '    page.get_by_test_id("lang").select_option("fr")',
         '    page.get_by_role("button", name="Sign in", exact=True).click()',
         '    page.get_by_placeholder("Search", exact=True).press("Enter")',
@@ -142,13 +146,18 @@ def test_cypress_secrets_empty_values_and_unknown_roles() -> None:
             RecordedStep("s5", "press", [field], key="Escape"),
         ]
     )
-    lines = export_recording(recording, "cypress").code.splitlines()
+    test = export_recording(recording, "cypress")
+    lines = test.code.splitlines()
+    assert json.loads(test.data_code or "") == {
+        "pw_env": "E2E_PW",
+        "pw_env_2": "E2E_PLAN",
+    }
     assert (
-        '\t\tcy.get("#pw").clear().type(Cypress.env("E2E_PW"), { log: false });'
+        '\t\tcy.get("#pw").clear().type(Cypress.env(data["pw_env"]), { log: false });'
         in lines
     )
     assert '\t\tcy.get("#pw").clear();' in lines
-    assert '\t\tcy.get("#pw").select(Cypress.env("E2E_PLAN"));' in lines
+    assert '\t\tcy.get("#pw").select(Cypress.env(data["pw_env_2"]));' in lines
     assert "\t\t// step skipped: no selector Cypress can express" in lines
     assert '\t\tcy.get("#pw").type("{esc}");' in lines
 
