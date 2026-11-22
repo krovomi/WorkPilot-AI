@@ -21,7 +21,9 @@ or an organization administrator) is held in
 reads; a maintainer approves it, and it joins the dataset, or discards it.
 An acceptance counts at once: it only makes the reviewer keep a remark.
 Resetting a learned rule changes the reviews of everyone, so it is a
-maintainer's too. The held file names no one.
+maintainer's too. The held file names no one. When a rejection starts the
+wait, the maintainers hear of it on their "needs you" channels
+(``forge_review_feedback_notify``).
 """
 
 from __future__ import annotations
@@ -41,6 +43,7 @@ from server.authz.principal import Principal, get_principal
 from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.models import ProjectRole
 from shared_board.cards import _require_writer
+from shared_features import forge_review_feedback_notify as notify
 from shared_features.api import read_file
 from shared_features.forge_review import GITHUB, MAX_REVIEW, NUMBER_MAX
 
@@ -305,6 +308,9 @@ async def set_feedback(
     others = _without(held, number, body.finding_id)
     if rejecting and not is_maintainer(scope, principal):
         _write_held(scope, [*others, record])
+        if not held:
+            # The wait starts: its maintainers hear of it, once.
+            notify.schedule(scope.project_id, number, principal.id)
     else:
         # What a maintainer says, or an acceptance, settles the finding.
         _append(scope, record)

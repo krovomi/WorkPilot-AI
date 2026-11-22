@@ -52,6 +52,7 @@ EVENTS: tuple[str, ...] = (
     "review_ready",
     "failed",
     "approval_escalated",
+    "review_feedback_held",
 )
 LOCALES = frozenset({"en", "fr"})
 #: What a route shows in place of a stored secret: that it is set, nothing of it.
@@ -85,6 +86,11 @@ _STRINGS: dict[str, dict[str, tuple[str, str]]] = {
             "{project}, card {card}: its plan has waited for approval longer "
             "than your team allows.",
         ),
+        "review_feedback_held": (
+            "A rejection waits for you",
+            "{project}: a member rejected a review finding on pull request "
+            "#{card}. It counts once a maintainer approves it.",
+        ),
         "test": ("WorkPilot test", "Notifications from the server reach you here."),
     },
     "fr": {
@@ -104,6 +110,11 @@ _STRINGS: dict[str, dict[str, tuple[str, str]]] = {
             "Un plan attend un approbateur",
             "{project}, carte {card} : son plan attend une approbation depuis "
             "plus longtemps que ton équipe ne le permet.",
+        ),
+        "review_feedback_held": (
+            "Un rejet t'attend",
+            "{project} : un membre a rejeté une remarque de revue sur la pull "
+            "request #{card}. Il compte dès qu'un mainteneur l'approuve.",
         ),
         "test": ("Test WorkPilot", "Les notifications du serveur t'arrivent bien ici."),
     },

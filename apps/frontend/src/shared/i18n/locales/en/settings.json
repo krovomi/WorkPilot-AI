@@ -2105,7 +2105,8 @@
 			"plan_review": "A plan waits for approval",
 			"review_ready": "Work is ready for my review",
 			"failed": "A run stopped on an error",
-			"approval_escalated": "A plan waited too long for its approvers"
+			"approval_escalated": "A plan waited too long for its approvers",
+			"review_feedback_held": "A member's rejection of a review finding waits for a maintainer"
 		},
 		"language": "Language of the messages",
 		"enabled": "{{channel}} on",
