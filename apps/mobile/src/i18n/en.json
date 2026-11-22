@@ -196,7 +196,6 @@
 	},
 	"settings": {
 		"title": "Settings",
-		"account": "Account",
 		"server": "Server",
 		"organization": "Organization",
 		"signOut": "Sign out",
@@ -706,5 +705,20 @@
 		"conflictsIgnored": "The merge conflict times could not be read.",
 		"minutes": "{{count}} min",
 		"hours": "{{hours}} h {{minutes}} min"
+	},
+	"mySession": {
+		"title": "My session",
+		"loading": "Loading the session",
+		"unavailable": "The session cannot be read from the server",
+		"method": "Opened with",
+		"methods": {
+			"local": "Password",
+			"entra": "Microsoft Entra ID",
+			"oidc": "Single sign-on: {{name}}",
+			"invite": "Accepted invitation",
+			"unknown": "Not recorded (session opened before the server named sign-ins)"
+		},
+		"issuer": "Identity provider",
+		"signedInAt": "Signed in at"
 	}
 }
