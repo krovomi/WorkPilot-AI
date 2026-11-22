@@ -71,8 +71,9 @@
 	"projects": {
 		"title": "Projects",
 		"empty": "No project yet. Add one from the desktop app.",
-		"role": "Role: {{role}}",
-		"settings": "Settings"
+		"settings": "Settings",
+		"count_one": "{{count}} project",
+		"count_other": "{{count}} projects"
 	},
 	"board": {
 		"live": "Live",
@@ -84,7 +85,9 @@
 		"groupMark": "Part {{index}}/{{total}} · {{title}}",
 		"groupHint": "Shows only this group's cards",
 		"groupFilter": "Group {{group}} · show all",
-		"showAll": "Show every card"
+		"showAll": "Show every card",
+		"sync": "Sync",
+		"emptyHint": "Cards land here as they move along the board."
 	},
 	"columns": {
 		"backlog": "Planning",
@@ -198,7 +201,8 @@
 		"steeringLabel": "Message for the next session",
 		"steeringSend": "Send",
 		"steeringQueued": "Waiting for the next session",
-		"steeringDelivered": "Delivered to session {{session}} ({{date}})"
+		"steeringDelivered": "Delivered to session {{session}} ({{date}})",
+		"working": "Agent working"
 	},
 	"actions": {
 		"start": "Start",
@@ -368,7 +372,12 @@
 		"trend": "Against the period before",
 		"tokens": "Tokens",
 		"allTime": "Since the start",
-		"noSessions": "No session yet."
+		"noSessions": "No session yet.",
+		"tiles": {
+			"qa": "first-time QA passes",
+			"spent": "spent in {{days}} days",
+			"done": "cards done"
+		}
 	},
 	"governance": {
 		"intro": "What the project's workpilot.policy.yaml asks of its agents on the server. The server checks every action again.",
@@ -501,7 +510,6 @@
 	"tokens": {
 		"title": "My tokens on the server",
 		"summary": "Your GitHub, GitLab, Azure DevOps, Jira and Linear tokens, used for your own calls.",
-		"manage": "Manage my tokens",
 		"intro": "The server keeps these tokens encrypted and uses them for your own forge and tracker calls. Once saved, a token is never shown again, on the phone or anywhere else.",
 		"kinds": {
 			"github_token": "GitHub",
@@ -524,7 +532,6 @@
 	"admin": {
 		"title": "Administration",
 		"summary": "Members, invitations, groups and roles of this organization.",
-		"open": "Open the administration",
 		"of": "Organization: {{org}}",
 		"remove": "Remove",
 		"projectRole": {
@@ -743,5 +750,54 @@
 		},
 		"issuer": "Identity provider",
 		"signedInAt": "Signed in at"
+	},
+	"nav": {
+		"projects": "Projects",
+		"board": "Board",
+		"more": "More",
+		"moreEmpty": "Your role opens no other page of this project.",
+		"pages": {
+			"roadmap": {
+				"title": "Roadmap",
+				"hint": "The features planned for the project, by phase and priority"
+			},
+			"ideas": {
+				"title": "Ideas",
+				"hint": "Improvements an agent found in the code, to turn into cards"
+			},
+			"context": {
+				"title": "Context",
+				"hint": "What the agents know of the project: stack, services, memories"
+			},
+			"sessions": {
+				"title": "Sessions",
+				"hint": "Every agent session of the project, with its tokens and cost"
+			},
+			"analyses": {
+				"title": "Analyses",
+				"hint": "Security, performance, quality: reports run on the server"
+			},
+			"delegations": {
+				"title": "Lent approvals",
+				"hint": "Who may approve in your name while you are away"
+			},
+			"governance": {
+				"title": "Governance",
+				"hint": "The project's agent policy and the calls waiting for an approval"
+			},
+			"waves": {
+				"title": "Waves",
+				"hint": "The backlog planned in waves of cards that can run side by side"
+			}
+		}
+	},
+	"time": {
+		"now": "just now",
+		"minutes_one": "{{count}} min ago",
+		"minutes_other": "{{count}} min ago",
+		"hours_one": "{{count}} h ago",
+		"hours_other": "{{count}} h ago",
+		"days_one": "{{count}} d ago",
+		"days_other": "{{count}} d ago"
 	}
 }

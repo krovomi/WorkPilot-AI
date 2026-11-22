@@ -102,7 +102,7 @@ describe("card screen", () => {
 		expect(screen.getByText("Full-text search on products")).toBeTruthy();
 		expect(screen.getByText("No spec yet. Start the card to write it.")).toBeTruthy();
 		expect(screen.getByText("No run yet.")).toBeTruthy();
-		expect(screen.getByText("· Feature")).toBeTruthy();
+		expect(screen.getByText("Feature")).toBeTruthy();
 		await fireEvent.press(screen.getByRole("button", { name: "Start" }));
 		expect(await screen.findByRole("button", { name: "Stop" })).toBeTruthy();
 		expect(started(server)).toEqual(["spec"]);
@@ -272,6 +272,14 @@ describe("card screen", () => {
 		expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
 		expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
 		expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+	});
+
+	it("says who claimed the card and how long ago it moved", async () => {
+		const moved = new Date(Date.now() - 2 * 3_600_000).toISOString();
+		const state = { card: card({ claimedByName: "Bob", updatedAt: moved }), details: details(), runs: [] as AgentRun[] };
+		serveCard(state, {}, ["board.read"]);
+		await openApp("/projects/p1/cards/007-search");
+		expect(await screen.findByText("Claimed by Bob · 2 h ago")).toBeTruthy();
 	});
 
 	it("hides the steering of a finished card and shows a card the server cannot find", async () => {

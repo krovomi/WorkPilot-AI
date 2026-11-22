@@ -380,7 +380,8 @@ describe("dashboard and sessions", () => {
 		);
 		const app = await openApp("/projects/p1/dashboard");
 		expect(await screen.findByText("Spending, last 30 days")).toBeTruthy();
-		expect(screen.getByText("67 %")).toBeTruthy();
+		// In the tile at the top and in the Quality figures.
+		expect(screen.getAllByText("67 %")).toHaveLength(2);
 		expect(screen.getByText("8.3")).toBeTruthy();
 		expect(screen.getByText("+12 %")).toBeTruthy();
 		expect(screen.getByText("claude-sonnet")).toBeTruthy();

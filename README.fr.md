@@ -215,9 +215,9 @@ Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ress
 </tr>
 </table>
 
-**App mobile (iOS et Android)** : avec un serveur d'équipe, le tableau partagé dans votre poche : ouvrir une carte, approuver un plan, régler sa criticité ou prêter son approbation, lancer ou arrêter les agents, lire le tableau de bord, les Insights, la feuille de route et les idées ; se connecter par mot de passe, Microsoft Entra ou l'authentification unique du serveur.
+**App mobile (iOS et Android)** : avec un serveur d'équipe, le tableau partagé dans votre poche : ouvrir une carte, approuver un plan, régler sa criticité ou prêter son approbation, lancer ou arrêter les agents, lire le tableau de bord, les Insights, la feuille de route et les idées ; se connecter par mot de passe, Microsoft Entra ou l'authentification unique du serveur. Chaque projet s'ouvre sur des onglets (tableau, Insights, forge, tableau de bord, plus), et les sept thèmes de couleur du bureau, en clair ou en sombre, suivent votre compte d'un appareil à l'autre.
 
-![App mobile : tableau, carte et tableau de bord](.github/assets/screenshots/mobile.png)
+![App mobile : le tableau en Default clair, une carte en Default sombre, le tableau de bord en Ocean clair et les réglages d'apparence en Forest sombre](.github/assets/screenshots/mobile.png)
 
 ---
 
