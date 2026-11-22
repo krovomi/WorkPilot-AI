@@ -14,6 +14,8 @@ Everything is read, nothing is written here:
 * the capabilities are detected, never guessed from a name: the context window
   WorkPilot plans for (``context_mgmt.windows``) and, when models.dev recorded
   it, whether the model calls tools (``public_model_registry``, cache only);
+  for a local Ollama model models.dev does not know, the running server says
+  (its ``capabilities``, ``offline_policy.local_model_catalog``);
 * a provider is offered only when it drives an agent itself
   (``capabilities/providers.yaml`` names an adapter): Mission Control runs
   each agent on its own provider and refuses a substitute.
@@ -27,6 +29,7 @@ from functools import lru_cache
 from context_mgmt.windows import effective_window, resolve_context_window
 from cost_intelligence.catalog import FLAT_RATE_PROVIDERS, PricingCatalog
 from models_registry import list_provider, tier_pick
+from offline_policy.local_model_catalog import ollama_tool_use
 from phase_config import is_local_provider, local_default_model
 from public_model_registry import cached_tool_call
 from skills_registry.providers import get_provider_capabilities
@@ -35,6 +38,8 @@ from skills_registry.providers import get_provider_capabilities
 _ALIASES = {"claude": "anthropic", "gemini": "google"}
 # Local runtimes `phase_config.is_local_provider` does not name.
 _LOCAL_EXTRA = frozenset({"lm-studio", "llama-cpp"})
+# The local runtimes that answer Ollama's API.
+_OLLAMA = frozenset({"ollama", "local"})
 
 # The tier asked for first, then the closest: up before down, so a role keeps
 # its quality when a provider has no model of its tier.
@@ -100,6 +105,13 @@ def _price(provider: str, model: str) -> tuple[float | None, float | None, bool]
     return pricing.input, pricing.output, False
 
 
+def _tool_use(provider: str, model: str) -> bool | None:
+    known = cached_tool_call(model)
+    if known is None and provider in _OLLAMA:
+        return ollama_tool_use(model)
+    return known
+
+
 def _build(provider: str, model: str, label: str, tier: str) -> ModelPick:
     input_price, output_price, flat = _price(provider, model)
     return ModelPick(
@@ -110,7 +122,7 @@ def _build(provider: str, model: str, label: str, tier: str) -> ModelPick:
         input_price=input_price,
         output_price=output_price,
         flat_rate=flat,
-        tool_use=cached_tool_call(model),
+        tool_use=_tool_use(provider, model),
         context_window=effective_window(model, resolve_context_window(model)),
     )
 
