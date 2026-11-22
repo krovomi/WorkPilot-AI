@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
@@ -133,6 +134,11 @@ export default function SignIn() {
 						busy={busy === "sso"}
 						disabled={!server.trim() || !!busy}
 						onPress={() => void attempt("sso")}
+					/>
+					<Button
+						label={t("forgotPassword.open")}
+						variant="secondary"
+						onPress={() => router.push({ pathname: "/forgot-password", params: { server: server.trim() } })}
 					/>
 				</ScrollView>
 			</KeyboardAvoiding>

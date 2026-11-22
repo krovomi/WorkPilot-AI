@@ -149,11 +149,11 @@ describe("ForgotPasswordForm", () => {
 	});
 
 	it("drops an answer about an address or a link that has since changed", async () => {
-		let answerConfig: (value: unknown) => void = () => {};
+		let answerConfig: (value: unknown) => void = () => undefined;
 		getConfig
 			.mockImplementationOnce(() => new Promise((resolve) => (answerConfig = resolve)))
 			.mockResolvedValue(config(false));
-		let answerLookup: (value: unknown) => void = () => {};
+		let answerLookup: (value: unknown) => void = () => undefined;
 		lookupPasswordReset
 			.mockImplementationOnce(() => new Promise((resolve) => (answerLookup = resolve)))
 			.mockResolvedValue({ ok: false, error: "nope" });
