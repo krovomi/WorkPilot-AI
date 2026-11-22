@@ -66,6 +66,8 @@ SERVER_ONLY_ENV: frozenset[str] = frozenset(
         "WORKPILOT_SMTP_USE_SSL",
         "WORKPILOT_ADMIN_PASSWORD",
         "WORKPILOT_WS_ALLOWED_ORIGINS",
+        # Where the server is hosted (deploy/configure.py): the deploy's.
+        "WORKPILOT_HOSTING",
         # The PostgreSQL password of deploy/docker-compose.yml, which reaches
         # the API through the same env file.
         "POSTGRES_PASSWORD",
@@ -85,6 +87,9 @@ RUN_ENV: frozenset[str] = frozenset(
         # The card's phone targets (``run_manager.card_environment``): the
         # server's own value would choose for every card.
         "WORKPILOT_MOBILE_TARGETS",
+        # The run's usage pipe (``usage_records.UsageChannel``): a value the
+        # server had would point the run at a descriptor that is not its own.
+        "WORKPILOT_USAGE_FD",
     }
 )
 

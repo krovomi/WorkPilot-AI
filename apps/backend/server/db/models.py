@@ -1049,3 +1049,55 @@ class LeaderboardConsent(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
     )
+
+
+class UsageRecord(Base):
+    """The tokens one agent session of a server run or job used.
+
+    Written by the server only, from the run's usage channel
+    (``services/usage_records.py``): the run reports each session it ends,
+    the server checks the values and stores them against the person who
+    started it, its organization, its project and its run or job. Totals,
+    never content: no prompt, no answer, no file name. A deleted account
+    keeps its rows with ``user_id`` emptied, so the organization's totals stay
+    right without naming anyone.
+    """
+
+    __tablename__ = "usage_records"
+    __table_args__ = (
+        Index("ix_usage_org_time", "org_id", "created_at"),
+        Index("ix_usage_user_time", "user_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    job_id: Mapped[str | None] = mapped_column(
+        ForeignKey("project_jobs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    #: The run's phase (spec, planning, coding, qa...) or the job's feature.
+    phase: Mapped[str] = mapped_column(String(40))
+    agent_type: Mapped[str] = mapped_column(String(40), default="")
+    provider: Mapped[str] = mapped_column(String(40), default="")
+    model: Mapped[str] = mapped_column(String(120), default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cache_write_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cache_read_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    #: Millionths of a US dollar: the provider's price, or the catalog's.
+    cost_micro_usd: Mapped[int] = mapped_column(Integer, default=0)
+    #: True when the provider reported no count and it was estimated.
+    estimated: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )

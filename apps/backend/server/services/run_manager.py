@@ -41,6 +41,7 @@ from server.services.run_isolation import (
     project_brain_env,
 )
 from server.services.secrets import get_user_secret
+from server.services.usage_records import finish_collecting, usage_channel
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
@@ -624,21 +625,34 @@ class RunManager:
                     # environment must not choose for a card.
                     env.update(card_environment(server_path, spec_name))
                     cmd = confine(cmd, project_id, server_path, Path(scratch), env)
+                    channel = await usage_channel(project_id, user_id, run_id=run_id)
+                    env.update(channel.env)
                     logger.info("Run %s starting: %s", run_id, " ".join(cmd[:6]))
-                    proc = await asyncio.create_subprocess_exec(
-                        *cmd,
-                        cwd=str(BACKEND_DIR),
-                        env=env,
-                        # Never interactive: a prompt would wait forever.
-                        stdin=asyncio.subprocess.DEVNULL,
-                        stdout=asyncio.subprocess.DEVNULL,  # agents log to task_logs/WS
-                        stderr=asyncio.subprocess.PIPE,
-                    )
+                    spawned = False
+                    try:
+                        proc = await asyncio.create_subprocess_exec(
+                            *cmd,
+                            cwd=str(BACKEND_DIR),
+                            env=env,
+                            # Never interactive: a prompt would wait forever.
+                            stdin=asyncio.subprocess.DEVNULL,
+                            stdout=asyncio.subprocess.DEVNULL,  # agents log to task_logs/WS
+                            stderr=asyncio.subprocess.PIPE,
+                            pass_fds=channel.pass_fds,
+                        )
+                        spawned = True
+                    finally:
+                        if not spawned:
+                            # No process holds the pipe: release both ends.
+                            channel.close()
+                    channel.started()
+                    counting = asyncio.create_task(channel.collect())
                     self._active[run_id] = proc
                     if run_id in self._cancelled:
                         # Stop arrived while the environment was being built.
                         proc.terminate()
                     _, stderr = await proc.communicate()
+                    await finish_collecting(counting)
                 if approved:
                     _keep_approval(spec_dir)
 
