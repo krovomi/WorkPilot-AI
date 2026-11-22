@@ -26,6 +26,7 @@ import { CollaborationSettings } from "../collaboration/CollaborationSettings";
 import { ServerMcpSettings } from "./ServerMcpSettings";
 import { ServerNeedsYouSettings } from "./ServerNeedsYouSettings";
 import { ServerReplayLinksSettings } from "./ServerReplayLinksSettings";
+import { ServerSessionSettings } from "./ServerSessionSettings";
 import { ServerTokensSettings } from "./ServerTokensSettings";
 import { ModuleStage, Notice, toneClass } from "../charter";
 import { Button } from "../ui/button";
@@ -97,6 +98,7 @@ export type AppSection =
 	| "anomaly-detection"
 	// Multi-utilisateurs (serveur ; les invitations pour les admins seulement)
 	| "team-invitations"
+	| "server-session"
 	| "server-tokens"
 	| "server-mcp"
 	| "server-needs-you"
@@ -174,6 +176,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	const hidden = new Set([
 		...(isServerAdmin ? [] : ["team-invitations"]),
 		...(serverMode === "server" ? [] : [
+					"server-session",
 					"server-tokens",
 					"server-mcp",
 					"server-needs-you",
@@ -452,6 +455,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return <SwarmModeSettings />;
 			case "team-invitations":
 				return isServerAdmin ? <InvitationsAdmin /> : null;
+			case "server-session":
+				return serverMode === "server" ? <ServerSessionSettings /> : null;
 			case "server-tokens":
 				return serverMode === "server" ? <ServerTokensSettings /> : null;
 			case "server-mcp":

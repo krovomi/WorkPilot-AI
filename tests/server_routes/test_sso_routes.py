@@ -127,6 +127,25 @@ async def test_a_new_person_is_provisioned_once_and_audited(world, provider):
     assert actions.count("auth.login.oidc") == 2
 
 
+async def test_the_session_names_the_provider_it_was_opened_with(
+    world, provider, monkeypatch
+):
+    from server import config as server_config
+
+    signed = await exchange(world, id_token(provider))
+    assert signed.status_code == 200, signed.text
+    headers = {"Authorization": f"Bearer {signed.json()['access_token']}"}
+    # Renaming the provider later does not rename this sign-in.
+    monkeypatch.setenv("WORKPILOT_OIDC_NAME", "Keycloak")
+    server_config.reset_settings_cache()
+    session = (await world.client.get("/auth/me/session", headers=headers)).json()
+    assert session["method"] == "oidc"
+    assert session["provider_name"] == "Okta"
+    assert session["issuer_host"] == "login.example.test"
+    assert session["user"]["email"] == "ada@example.com"
+    assert session["signed_in_at"]
+
+
 async def test_a_verified_email_links_the_existing_account(world, provider):
     token = id_token(provider, sub="00u-viewer", email="viewer_a@example.com")
     answer = await exchange(world, token)

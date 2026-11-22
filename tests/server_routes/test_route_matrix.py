@@ -89,6 +89,7 @@ RULES: dict[tuple[str, str], Rule] = {
     ("POST", "/auth/invitations/accept"): public(),
     ("GET", "/auth/me"): signed_in(),
     ("GET", "/auth/me/permissions"): signed_in(),
+    ("GET", "/auth/me/session"): signed_in(),
     ("POST", "/auth/switch-org"): signed_in(),
     ("POST", "/auth/password"): signed_in(),
     ("POST", "/auth/users"): Rule("admin_role"),

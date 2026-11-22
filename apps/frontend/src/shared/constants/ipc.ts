@@ -1459,6 +1459,8 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_DELETE_SECRET: "server-auth:delete-secret",
 	// The person's theme on the server, read at connection (main/server-ui-preferences.ts).
 	SERVER_AUTH_PULL_UI_PREFERENCES: "server-auth:pull-ui-preferences",
+	// How the current session was opened and who it is (main/server-session-info.ts).
+	SERVER_AUTH_GET_SESSION: "server-auth:get-session",
 	// The person's own "needs you" channels on the server (ntfy, Telegram,
 	// Teams): secrets set, masked, never read back (main/server-needs-you.ts).
 	SERVER_NEEDS_YOU_GET: "server-needs-you:get",

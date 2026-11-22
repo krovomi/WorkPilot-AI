@@ -417,6 +417,19 @@ class TestEntraSignIn:
         assert config["entra_enabled"] is True
         assert config["entra_tenant_id"] == self.TENANT
 
+    async def test_the_session_names_entra_and_its_tenant_host(self, world, entra):
+        signed = await self.exchange(world, self.id_token(entra))
+        assert signed.status_code == 200, signed.text
+        answer = await world.client.get(
+            "/auth/me/session", headers=bearer(signed.json()["access_token"])
+        )
+        assert answer.status_code == 200, answer.text
+        session = answer.json()
+        assert session["method"] == "entra"
+        assert session["provider_name"] == "Microsoft Entra ID"
+        assert session["issuer_host"] == "login.microsoftonline.com"
+        assert session["user"]["email"] == "grace@example.com"
+
     async def test_a_new_person_is_provisioned_once(self, world, entra):
         first = await self.exchange(world, self.id_token(entra))
         assert first.status_code == 200, first.text
