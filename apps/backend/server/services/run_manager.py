@@ -436,7 +436,12 @@ class RunManager:
         self._cancelled.add(run_id)
         proc = self._active.get(run_id)
         if proc is not None:
-            proc.terminate()
+            try:
+                proc.terminate()
+            except ProcessLookupError:
+                # It ended on its own and is not reaped yet: nothing to stop.
+                # Windows reports it here; elsewhere asyncio ignores it.
+                pass
         return True
 
     async def stop_project(

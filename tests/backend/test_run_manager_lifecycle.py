@@ -160,3 +160,21 @@ async def test_cancel_answers_false_for_a_run_it_does_not_hold():
     from server.services.run_manager import RunManager
 
     assert await RunManager().cancel_run("unknown-run") is False
+
+
+@pytest.mark.asyncio
+async def test_a_run_whose_process_already_ended_is_stopped_without_an_error():
+    """Windows raises ProcessLookupError on terminate() for a process that has
+    exited but is not reaped yet; Stop must still answer that it stopped."""
+    from server.services.run_manager import RunManager
+
+    class _Ended:
+        def terminate(self):
+            raise ProcessLookupError()
+
+    manager = RunManager()
+    manager._tracked.add("run-1")
+    manager._active["run-1"] = _Ended()
+
+    assert await manager.cancel_run("run-1") is True
+    assert "run-1" in manager._cancelled
