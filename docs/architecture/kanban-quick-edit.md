@@ -1,7 +1,7 @@
 ---
 feature: Ajout et édition rapides des cartes Kanban
 summary: >-
-  Ajout rapide depuis Planification et File d'attente (une carte par ligne collée) ; clic droit
+  Ajout rapide depuis Planification, File d'attente et En cours (une carte par ligne collée) ; clic droit
   sur carte et colonne, liste d'actions partagée avec « ⋮ », Type ▸, Priorité ▸, Modifier… ;
   sélection Ctrl/Maj et Ctrl+A, actions en masse, suppression différée, Ctrl+Z ; renommage en
   place (F2), flèches entre cartes, aide des touches (Ctrl+/).
@@ -20,10 +20,18 @@ travail est découpé en quatre lots, un par PR, dans cet ordre :
 
 ## Où l'on crée une carte
 
-Seulement dans **Planification** (`backlog`) et **File d'attente** (`queue`),
-`QUICK_ADD_COLUMNS` de `renderer/lib/kanban-columns.ts`. Les autres colonnes sont tenues par le
-pipeline (En cours, Révision IA, Révision humaine), la CI (Build rouge) ou le suivi des PR (PR
-ouverte, Terminé) : une carte créée là ne décrirait rien de réel.
+Seulement dans **Planification** (`backlog`), **File d'attente** (`queue`) et **En cours**
+(`in_progress`), `QUICK_ADD_COLUMNS` de `renderer/lib/kanban-columns.ts`. Les autres colonnes
+sont tenues par le pipeline (Révision IA, Révision humaine), la CI (Build rouge) ou le suivi des
+PR (PR ouverte, Terminé) : une carte créée là ne décrirait rien de réel. Les mots de la boîte
+dans chaque colonne (« Ajouter et démarrer », « Démarrer ») sont dans `QUICK_ADD_LABELS` de
+`renderer/lib/quick-add.ts`.
+
+Une carte créée dans En cours démarre aussitôt (`persistTaskStatus(…, "in_progress")`, que le
+main traduit en lancement), comme une carte glissée là, tant qu'En cours a une place libre
+(`maxParallelTasks` du projet, compté par `countRunning` de `lib/group-move.ts`). Sinon elle
+attend dans File d'attente, et le toast le dit. Avant le 22 novembre, la boîte n'existait pas
+dans En cours : il fallait créer la carte ailleurs puis la glisser.
 
 Une carte créée dans File d'attente y est placée (`persistTaskStatus(…, "queue")`) et y attend,
 comme une carte glissée là : la file la démarre quand un emplacement se libère (une tâche quitte
@@ -89,7 +97,7 @@ Reprendre ou Pause, Synchroniser depuis la branche, puis Supprimer, à part.
   l'agent lit ne change pas sous lui.
 
 Une **colonne** a de même une liste (`kanban/ColumnMenuItems.tsx`) pour son menu « ⋯ » et son
-clic droit : Ajouter une carte (clic droit, Planification et File d'attente), Tout sélectionner,
+clic droit : Ajouter une carte (clic droit, Planification, File d'attente et En cours), Tout sélectionner,
 Tout mettre en file (Planification), Archiver les terminées et Afficher les archivées (Terminé),
 Paramètres de la file (File d'attente), verrou de largeur, repli. Une action qui ne s'applique pas
 (colonne vide, autre colonne) n'est pas montrée ; une colonne sans action n'a pas de menu.
@@ -135,6 +143,24 @@ colonne de la sélection et ajoute **Type** et **Priorité**. Le clic droit sur 
 partie d'une sélection de plusieurs agit sur toute la sélection (`SelectionMenuItems`, via
 `kanban/board-selection-context.ts`) : Type ▸, Priorité ▸, Effacer la sélection, Supprimer ; le
 menu « ⋮ » reste celui de la carte. `hooks/useBoardBulkEdits.ts` porte ces actions.
+
+### Glisser la sélection
+
+Glisser une carte qui fait partie d'une sélection de plusieurs déplace toute la sélection, même
+si elle vient de plusieurs colonnes. Chaque carte suit les règles d'un glisser seul
+(`lib/group-move.ts`, `planGroupMove`) : une carte déjà dans la colonne reste où elle est,
+« PR ouverte » ne prend que les cartes qui ont une PR, et « En cours » ne prend que ce que ses
+places libres permettent ; le reste attend dans File d'attente (une carte qui y était déjà n'est
+pas réécrite). Une carte d'En cours renvoyée dans la file y est tenue le temps que la file tourne
+une fois, comme pour un glisser seul. Les cartes déplacées arrivent en haut de leur colonne, dans
+l'ordre de la sélection, et un seul Ctrl+Z les ramène. La barre d'actions passe par la même
+fonction (`moveSelection`), donc elle respecte aussi la limite d'En cours.
+
+Pendant le glisser, la carte sous le pointeur s'affiche en pile avec le nombre de cartes
+(`kanban/DragOverlayCard.tsx`) et les cartes sélectionnées s'estompent à leur place
+(`[data-board-group-drag]` dans `globals.css`). Une colonne qui ne prend aucune carte de la
+sélection (`groupMoveTargets`) s'affiche comme refusée. Révision humaine vers Terminé garde sa
+confirmation, puis le flux de création des PR.
 
 ### Supprimer sans confirmer une carte neuve
 
@@ -204,6 +230,7 @@ dans `stores/shortcuts-help-store.ts`, que la barre d'outils et le tableau parta
 | `renderer/components/kanban/CardChoiceMenuItems.tsx` | types et priorités en éléments de menu |
 | `renderer/components/kanban/PointerMenu.tsx` | menu au pointeur, `isFromPortal`, `withoutPortalEvents` |
 | `renderer/hooks/useBoardSelection.ts`, `useBoardShortcuts.ts`, `useBoardBulkEdits.ts` | sélection, touches, actions sur la sélection |
+| `renderer/lib/group-move.ts`, `components/kanban/DragOverlayCard.tsx` | où va chaque carte d'une sélection déplacée, pile sous le pointeur |
 | `renderer/components/kanban/BulkActionBar.tsx`, `board-selection-context.ts` | barre d'actions, sélection pour le clic droit |
 | `renderer/lib/card-edits.ts`, `stores/board-undo-store.ts` | carte neuve, type et priorité en masse, Ctrl+Z |
 | `renderer/stores/pending-delete-store.ts`, `components/kanban/deleteCardsLater.tsx` | suppression différée |
@@ -220,5 +247,6 @@ Tests : `kanban/QuickAddComposer.test.tsx`, `lib/__tests__/quick-add.test.ts`,
 `lib/__tests__/card-edits.test.ts`, `stores/__tests__/board-undo-store.test.ts`,
 `stores/__tests__/pending-delete-store.test.ts`, `hooks/__tests__/useBoardSelection.test.tsx`,
 `hooks/__tests__/useBoardShortcuts.test.tsx`, `lib/__tests__/card-focus.test.tsx`,
-`kanban/BoardKeyboard.test.tsx`, `__tests__/TaskCard.test.tsx` (« renaming in place ») ; un sous-menu se choisit au clavier dans jsdom
+`kanban/BoardKeyboard.test.tsx`, `__tests__/TaskCard.test.tsx` (« renaming in place »),
+`lib/__tests__/group-move.test.ts`, `kanban/DragOverlayCard.test.tsx` ; un sous-menu se choisit au clavier dans jsdom
 (`src/__tests__/helpers/menus.ts`).

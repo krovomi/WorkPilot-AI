@@ -15,7 +15,7 @@ import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .graph import BrainGraph, rebuild
 from .home import KINDS, MARKER, brain_dir, graph_path, is_brain, kind_dir
@@ -41,6 +41,9 @@ from .sync import (
     sync,
 )
 from .tasks import build_note_id
+
+if TYPE_CHECKING:
+    from .lifecycle.scopes import Audience
 
 __all__ = ["Brain", "SEED_DIR"]
 
@@ -414,34 +417,42 @@ class Brain:
         return BrainGraph.load(self.root)
 
     def recall(
-        self, query: str, limit: int = 5, *, include_unverified: bool = False
+        self,
+        query: str,
+        limit: int = 5,
+        *,
+        audience: Audience | None = None,
+        include_unverified: bool = False,
     ) -> dict[str, Any]:
         """Levels 1 and 2 of graph-first recall: graph hits, then their frontmatter.
 
         Level 3 — the body — is `read`, a separate call, because deciding which
-        file deserves opening is the whole point of the first two.
+        file deserves opening is the whole point of the first two. With an
+        *audience* (`lifecycle.scopes.Audience`, an agent's build), a note
+        scoped elsewhere is left out (`lifecycle.scopes.recalled`).
 
         A project note no trusted key signed (`lifecycle.provenance`) is left
         out — what recall answers goes to agents — unless a person asks
         (``include_unverified``): it is then marked ``verified: False``.
         """
         self.before_read()
-        hits = self.graph().query(query, limit=limit)
+        # Asked for more when some may be left out, so that the limit still fills.
+        wanted = limit if audience is None else max(limit * 4, 20)
+        hits = self.graph().query(query, limit=wanted)
         level = "graph"
         if not hits:
-            hits = self._index_search(query, limit)
+            hits = self._index_search(query, wanted)
             level = "index"
         hits = self._signed_only(hits, include_unverified)
+        kept: list[dict[str, Any]] = []
         for hit in hits:
-            source = hit.get("source_file")
-            # An image hit carries its text in ``match``; its bytes have no
-            # frontmatter to read.
-            if (
-                source
-                and str(source).endswith(".md")
-                and inside(self.root, source).is_file()
-            ):
-                meta = read_note(self.root, source).meta
+            if len(kept) >= limit:
+                break
+            meta = self._meta_of(hit.get("source_file"))
+            if not _recalled(meta, audience):
+                continue
+            kept.append(hit)
+            if meta is not None:
                 hit["frontmatter"] = {
                     k: meta[k]
                     for k in (
@@ -452,13 +463,14 @@ class Brain:
                         "agents",
                         "updated",
                         "description",
+                        "applies_to",
                     )
                     if k in meta
                 }
         return {
             "query": query,
             "level": level,
-            "hits": hits,
+            "hits": kept,
             "next": "brain_read_note(path) sur le source_file utile — seulement si ceci ne suffit pas",
         }
 
@@ -477,6 +489,30 @@ class Brain:
             if str(hit.get("source_file") or "") in hidden:
                 hit["verified"] = False
         return hits
+
+    def _meta_of(self, source: Any) -> dict[str, Any] | None:
+        """The frontmatter of a note hit; ``None`` for anything else. An image
+        hit carries its text in ``match``; its bytes have no frontmatter."""
+        if not (
+            source
+            and str(source).endswith(".md")
+            and inside(self.root, source).is_file()
+        ):
+            return None
+        return read_note(self.root, source).meta
+
+    def recalled(
+        self, hits: list[dict[str, Any]], audience: Audience | None, limit: int
+    ) -> list[dict[str, Any]]:
+        """The first *limit* graph *hits* an agent recalling for *audience*
+        gets (`lifecycle.scopes.recalled`), each note's scope read from its file."""
+        kept: list[dict[str, Any]] = []
+        for hit in hits:
+            if len(kept) >= limit:
+                break
+            if _recalled(self._meta_of(hit.get("source_file")), audience):
+                kept.append(hit)
+        return kept
 
     def _index_search(self, query: str, limit: int) -> list[dict[str, Any]]:
         """Fallback: words anywhere in the body, reported as path + matching line only."""
@@ -552,3 +588,12 @@ class Brain:
             "autoPull": _auto("BRAIN_AUTO_PULL"),
             "autoPush": _auto("BRAIN_AUTO_PUSH"),
         }
+
+
+def _recalled(meta: dict[str, Any] | None, audience: Audience | None) -> bool:
+    """Whether a hit with this frontmatter is recalled for *audience*."""
+    if audience is None or meta is None:
+        return True
+    from .lifecycle import scopes
+
+    return scopes.recalled(meta.get("applies_to"), audience)

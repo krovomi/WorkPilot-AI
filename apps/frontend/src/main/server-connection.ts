@@ -385,6 +385,7 @@ export async function acceptInvite(
 export async function createInvite(payload: {
 	email: string;
 	role?: string;
+	org_role?: string | null;
 	project_id?: string | null;
 	project_role?: string | null;
 }): Promise<
@@ -679,8 +680,9 @@ export const adminApi = {
 		authedFetch<{ deleted: boolean }>(`/admin/roles/${roleId}`, "DELETE"),
 
 	listMembers: () => authedFetch<OrgMemberSummary[]>("/admin/members", "GET"),
-	addMember: (body: { user_id: string; role_slug: string }) =>
-		authedFetch<OrgMemberSummary>("/admin/members", "POST", body),
+	addMember: (
+		body: { user_id: string; role_slug: string } | { email: string; role_slug: string },
+	) => authedFetch<OrgMemberSummary>("/admin/members", "POST", body),
 	updateMemberRole: (userId: string, roleSlug: string) =>
 		authedFetch<OrgMemberSummary>(`/admin/members/${userId}`, "PATCH", {
 			role_slug: roleSlug,

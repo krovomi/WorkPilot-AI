@@ -85,6 +85,7 @@ async def create_invitation_endpoint(
             org_id=org_id,
             role=body.role,
             invited_by=admin.id,
+            org_role=body.org_role,
             project_id=body.project_id,
             project_role=body.project_role,
         )

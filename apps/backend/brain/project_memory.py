@@ -59,7 +59,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .lifecycle import announce, provenance
+from .lifecycle import announce, provenance, scopes
 from .lifecycle import journal as lifecycle_journal
 from .lifecycle import store as lifecycle_store
 from .memories import redact
@@ -80,6 +80,7 @@ __all__ = [
     "get_graph_hints",
     "import_legacy_spec_memory",
     "is_memory_enabled",
+    "agent_memory",
     "list_memories",
     "open_project_memory",
     "search_memories",
@@ -237,10 +238,15 @@ class ProjectMemory:
         brain: Brain | None = None,
         project: str | None = None,
         actor: str = "agent",
+        audience: scopes.Audience | None = None,
         show_unverified: bool = False,
         signatures: bool = True,
     ) -> None:
         self.actor = actor
+        """Who the journal says acted (`lifecycle.journal.ACTORS`)."""
+        self.audience = audience
+        """Whom the reads recall for (`lifecycle.scopes.recalled`): an agent's
+        build. ``None`` for a person's surfaces, which show every note."""
         self.show_unverified = show_unverified
         """A person reading: the notes no trusted key signed are kept, marked
         (``verified: False``). Agents never get them (`lifecycle.provenance`)."""
@@ -249,7 +255,6 @@ class ProjectMemory:
         command runs in a brain that a project's runs write to, and it is
         never synced, so nothing in it came from a teammate."""
         self._unverified: frozenset[str] | None = None
-        """Who the journal says acted (`lifecycle.journal.ACTORS`)."""
         self._explained: dict[str, tuple[str, str, str, list[str]]] = {}
         self.spec_dir = Path(spec_dir) if spec_dir else None
         self.project_dir = Path(project_dir) if project_dir else None
@@ -547,6 +552,18 @@ class ProjectMemory:
             out.append((rel, meta, _own_text(note.body)))
         return out
 
+    def _recall(
+        self, kind: str, *, learned: bool | None = None
+    ) -> list[tuple[str, dict[str, Any], str]]:
+        """`_notes`, less what `audience` does not recall. The reads go
+        through it; a write reads every note (`_notes`), recalled or not."""
+        notes = self._notes(kind, learned=learned)
+        if self.audience is None:
+            return notes
+        return [
+            n for n in notes if scopes.recalled(n[1].get("applies_to"), self.audience)
+        ]
+
     # -- write (synchronous core) -------------------------------------------
 
     def record_gotcha(
@@ -822,17 +839,17 @@ class ProjectMemory:
     # -- read (synchronous core) --------------------------------------------
 
     def load_gotchas(self) -> list[str]:
-        return [body.strip() for _, _, body in self._by_date(self._notes("gotcha"))]
+        return [body.strip() for _, _, body in self._by_date(self._recall("gotcha"))]
 
     def load_patterns(self) -> list[str]:
         return [
             body.strip()
-            for _, _, body in self._by_date(self._notes("pattern", learned=False))
+            for _, _, body in self._by_date(self._recall("pattern", learned=False))
         ]
 
     def load_codebase_map(self) -> dict[str, str]:
         out: dict[str, str] = {}
-        for _, meta, body in self._notes("codebase"):
+        for _, meta, body in self._recall("codebase"):
             path = str(meta.get("file") or "")
             if path:
                 first = body.strip().splitlines()[0] if body.strip() else ""
@@ -841,7 +858,7 @@ class ProjectMemory:
 
     def load_sessions(self, *, spec_only: bool = True) -> list[dict[str, Any]]:
         sessions = []
-        for rel, meta, _ in self._notes("session"):
+        for rel, meta, _ in self._recall("session"):
             if spec_only and self.spec_id and meta.get("spec") != self.spec_id:
                 continue
             item = {
@@ -883,7 +900,7 @@ class ProjectMemory:
         marked = self.unverified_notes() if self.show_unverified else frozenset()
         hits = []
         for kind in kinds:
-            for rel, meta, body in self._notes(kind, learned=learned):
+            for rel, meta, body in self._recall(kind, learned=learned):
                 title = str(meta.get("title") or "")
                 score = _score(terms, f"{title}\n{body}")
                 if terms and score <= 0:
@@ -1057,9 +1074,17 @@ def _body_text(hit: dict[str, Any]) -> str:
 def open_project_memory(
     spec_dir: Path | str | None = None, project_dir: Path | str | None = None
 ) -> ProjectMemory | None:
-    """The memory of *spec_dir*'s project, or ``None`` when memory is off."""
+    """The memory of *spec_dir*'s project as a build's agents recall it
+    (`agent_memory`), or ``None`` when memory is off."""
     memory = ProjectMemory(spec_dir, project_dir)
-    return memory if memory.is_enabled else None
+    return agent_memory(memory, project_dir or spec_dir) if memory.is_enabled else None
+
+
+def agent_memory(memory: ProjectMemory, workdir: Path | str | None) -> ProjectMemory:
+    """*memory*, recalling for the build working in *workdir* (its worktree):
+    its branch, and on a server the groups of the run's starter."""
+    memory.audience = scopes.audience(workdir)
+    return memory
 
 
 # ---------------------------------------------------------------------------
@@ -1095,7 +1120,7 @@ def _graph_hints(
     if not is_memory_enabled() or not Brain().exists:
         return []
     project_dir = Path(project_id) if project_id else None
-    memory = ProjectMemory(spec_dir, project_dir)
+    memory = agent_memory(ProjectMemory(spec_dir, project_dir), project_dir or spec_dir)
     hints = (
         [
             {
@@ -1114,7 +1139,9 @@ def _graph_hints(
     brain = memory._brain or Brain()
     seen = {h["path"] for h in hints}
     try:
-        recalled = brain.recall(query, limit=max_results)["hits"]
+        recalled = brain.recall(query, limit=max_results, audience=memory.audience)[
+            "hits"
+        ]
     except Exception:  # noqa: BLE001 - a recall that fails leaves the memory hits
         recalled = []
     for hit in recalled:

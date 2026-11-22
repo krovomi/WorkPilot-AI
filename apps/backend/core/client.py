@@ -1293,10 +1293,10 @@ def _workpilot_servers(
     if "brain" in required_servers:
         from brain.runtime import SERVER_KEY, mcp_server_config, task_ref
 
-        # The task, when there is one, so what the agent learns shows up on
-        # its Kanban card.
+        # The task, so what the agent learns shows up on its Kanban card; the
+        # folder, so it recalls for its branch (`brain.lifecycle.scopes`).
         mcp_servers[SERVER_KEY] = mcp_server_config(
-            task=task_ref(project_dir, spec_dir)
+            task=task_ref(project_dir, spec_dir), project_dir=project_dir
         )
 
     # ui-ux-pro-max (`uiux/integration.py`): offered only on a task whose

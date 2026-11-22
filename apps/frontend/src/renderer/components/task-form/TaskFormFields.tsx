@@ -33,6 +33,7 @@ import type {
 	TaskImpact,
 	TaskKind,
 	TaskPriority,
+	TestPlacementMode,
 	ThinkingLevel,
 } from "../../../shared/types";
 import type {
@@ -60,6 +61,7 @@ import { Textarea } from "../ui/textarea";
 import { ClassificationFields } from "./ClassificationFields";
 import { ContextPolicyFields } from "./ContextPolicyFields";
 import { VerifyLoopFields } from "./VerifyLoopFields";
+import { TestPlacementFields } from "../suite-placement/TestPlacementFields";
 import { ImagePreviewModal } from "./ImagePreviewModal";
 import { MobileTargetsFields } from "./MobileTargetsFields";
 import type { MobileSetupState } from "./useMobileSetup";
@@ -150,6 +152,9 @@ interface TaskFormFieldsProps {
 	autoSplitKind?: TaskKind;
 	/** The project turned the split off. */
 	autoSplitProjectDisabled?: boolean;
+	/** Where this task's long suites run (undefined: the project's); without a handler, not shown. */
+	testPlacement?: TestPlacementMode;
+	onTestPlacementChange?: (value: TestPlacementMode | undefined) => void;
 	/** The verification loop for this task; omitted, the field is not shown. */
 	verifyLoop?: boolean;
 	onVerifyLoopChange?: (enabled: boolean) => void;
@@ -247,6 +252,8 @@ export function TaskFormFields({
 	autoSplitProjectDisabled,
 	verifyLoop,
 	onVerifyLoopChange,
+	testPlacement,
+	onTestPlacementChange,
 	verifyWindow,
 	onVerifyWindowChange,
 	verifyScenario,
@@ -875,6 +882,15 @@ export function TaskFormFields({
 							onVerifyWindowChange={onVerifyWindowChange}
 							verifyScenario={verifyScenario}
 							onVerifyScenarioChange={onVerifyScenarioChange}
+							disabled={disabled}
+							idPrefix={idPrefix}
+						/>
+					)}
+
+					{onTestPlacementChange && (
+						<TestPlacementFields
+							value={testPlacement}
+							onChange={onTestPlacementChange}
 							disabled={disabled}
 							idPrefix={idPrefix}
 						/>

@@ -38,6 +38,7 @@ import {
 	getUtilitySettings,
 	isGitWorkTree,
 } from "./worktree-handler-utils";
+import { ciPipelineService } from "../../ci-pipeline-service";
 
 export function registerWorktreeMergeHandlers(
 	pythonEnvManager: PythonEnvManager,
@@ -741,6 +742,12 @@ export function registerWorktreeMergeHandlers(
 								task,
 								project,
 							);
+							// The base moved: the other green cards take it and run their suite again.
+							if (!staged) {
+								ciPipelineService.refreshAfterMerge(project, task.id).catch((error: unknown) => {
+									console.warn("[MERGE] Green cards not refreshed:", error);
+								});
+							}
 
 							resolve({
 								success: true,

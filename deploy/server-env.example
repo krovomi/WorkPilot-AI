@@ -21,6 +21,11 @@ WORKPILOT_ENTRA_CLIENT_ID=
 # Server-level LLM credentials (shared pool for all agent runs)
 CLAUDE_CODE_OAUTH_TOKEN=
 
+# Where this server runs, written by `python3 configure.py` with the two
+# addresses below: public (a VPS or a server with a DNS name, HTTPS),
+# lan (a machine of the local network, HTTP) or local (this computer only).
+WORKPILOT_HOSTING=
+
 # Public base URL of this server (used to build invitation links)
 WORKPILOT_PUBLIC_BASE_URL=https://workpilot.example.com
 

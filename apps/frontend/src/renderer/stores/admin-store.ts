@@ -65,6 +65,8 @@ interface AdminState {
 
 	setMemberRole: (userId: string, roleSlug: string) => Promise<boolean>;
 	removeMember: (userId: string) => Promise<boolean>;
+	/** Adds an account the server already has, by its email (platform administrators). */
+	addMemberByEmail: (email: string, roleSlug: string) => Promise<boolean>;
 	setUserActive: (userId: string, active: boolean) => Promise<boolean>;
 	revokeSessions: (userId: string) => Promise<boolean>;
 
@@ -240,6 +242,15 @@ export const useAdminStore = create<AdminState>((set, get) => {
 			const ok = await withLoading(
 				"setMemberRole",
 				(a) => a.updateMemberRole(userId, roleSlug),
+				() => undefined,
+			);
+			if (ok) await get().loadMembers();
+			return ok;
+		},
+		addMemberByEmail: async (email, roleSlug) => {
+			const ok = await withLoading(
+				"addMember",
+				(a) => a.addMember({ email, role_slug: roleSlug }),
 				() => undefined,
 			);
 			if (ok) await get().loadMembers();

@@ -39,6 +39,7 @@ import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 import { MergeProgressOverlay } from "./MergeProgressOverlay";
+import { SuiteHoldNotice } from "./SuiteHoldNotice";
 
 // Maximum log entries to keep to prevent memory issues during long merges
 const MAX_LOG_ENTRIES = 500;
@@ -77,6 +78,8 @@ interface WorkspaceStatusProps {
 	readonly isCompleting?: boolean;
 	/** Open the Definition-of-Done confirmation to close the task. */
 	readonly onRequestComplete?: () => void;
+	/** The full suite runs on the CI: the merge waits for it (`webUrl`: the run). */
+	readonly suiteHold?: { readonly webUrl?: string } | null;
 }
 
 /**
@@ -137,6 +140,7 @@ export function WorkspaceStatus({
 	onShowPRDialog,
 	isCompleting,
 	onRequestComplete,
+	suiteHold = null,
 }: WorkspaceStatusProps) {
 	const { t } = useTranslation(["taskReview", "common", "tasks"]);
 	const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
@@ -866,6 +870,8 @@ export function WorkspaceStatus({
 					</label>
 				)}
 
+				{suiteHold && <SuiteHoldNotice webUrl={suiteHold.webUrl} />}
+
 				{/* Primary Actions */}
 				<div className="flex gap-2">
 					{/* State 1: No merge preview yet - show "Check for Conflicts" */}
@@ -976,7 +982,7 @@ export function WorkspaceStatus({
 												: "success"
 										}
 										onClick={onMerge}
-										disabled={isMerging || isDiscarding}
+										disabled={isMerging || isDiscarding || Boolean(suiteHold)}
 										className="flex-1"
 									>
 										{isMerging ? (

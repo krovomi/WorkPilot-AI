@@ -56,7 +56,10 @@ import { withForgeAccounts } from "./forge/forge-credentials";
 import { readProjectEnvFile } from "./project-env-file";
 import { projectStore } from "./project-store";
 import { taskStateManager } from "./task-state-manager";
-import { setCiFollowed } from "./suite-placement/ci-route";
+import { ciRouteAvailable, setCiFollowed } from "./suite-placement/ci-route";
+import { refreshGreenCards, type RefreshOutcome } from "./suite-placement/base-refresh";
+import { rerunQaReview } from "./suite-placement/qa-rerun";
+import { getEffectiveBaseBranch } from "./ipc-handlers/task/worktree-git-refs";
 import { commitRun } from "./suite-placement/ci-suite";
 import {
 	advanceCiSuite,
@@ -228,6 +231,35 @@ class CiPipelineService {
 		if (record?.state !== "pending") return;
 		await this.getProvider(project, { forceRefresh: true });
 		setTimeout(() => void this.refreshTask(task.id), 30_000);
+	}
+
+	/**
+	 * After a merge into a project's base: every other green card takes the
+	 * new base, then its suite runs again on the CI when this loop follows the
+	 * project's CI, else its QA review runs again here (`base-refresh.ts`).
+	 */
+	async refreshAfterMerge(
+		project: Project,
+		mergedTaskId: string | null,
+	): Promise<Record<string, RefreshOutcome>> {
+		const cached = await this.getProvider(project, { forceRefresh: true });
+		const followed = cached.adapter !== null && ciRouteAvailable(project.id);
+		const agentManager = this.agentManager;
+		const outcomes = await refreshGreenCards(project, projectStore.getTasks(project.id), mergedTaskId, {
+			ciFollowed: () => followed,
+			rerunQa: (task, owner) =>
+				agentManager
+					? rerunQaReview(task, owner, agentManager, () => this.getMainWindow?.() ?? null)
+					: Promise.resolve(false),
+			baseOf: (owner, task) =>
+				getEffectiveBaseBranch(owner.path, task.specId, owner.settings?.mainBranch),
+		});
+		projectStore.invalidateTasksCache(project.id);
+		const sent = Object.entries(outcomes).filter(([, outcome]) => outcome !== "up_to_date");
+		if (sent.length > 0) {
+			console.warn(`[BaseRefresh] ${project.name}: ${sent.map(([spec, o]) => `${spec}=${o}`).join(", ")}`);
+		}
+		return outcomes;
 	}
 
 	getStatus(taskId: string): TaskPipelineStatus | null {

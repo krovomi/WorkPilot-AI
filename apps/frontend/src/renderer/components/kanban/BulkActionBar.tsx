@@ -14,7 +14,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { CardType } from "../../../shared/constants/card-types";
 import type { TaskStatusColumn } from "../../../shared/constants/task";
-import type { TaskPriority, TaskStatus } from "../../../shared/types";
+import type { TaskPriority } from "../../../shared/types";
 import { Button } from "../ui/button";
 import {
 	DropdownMenu,
@@ -24,17 +24,17 @@ import {
 import { CardTypeMenuItems, PriorityMenuItems } from "./CardChoiceMenuItems";
 
 type BulkStep =
-	| { kind: "move"; to: TaskStatus; icon: LucideIcon; primary: boolean }
+	| { kind: "move"; to: TaskStatusColumn; icon: LucideIcon; primary: boolean }
 	| { kind: "markDone" }
 	| { kind: "createPRs" };
 
-const back = (to: TaskStatus): BulkStep => ({
+const back = (to: TaskStatusColumn): BulkStep => ({
 	kind: "move",
 	to,
 	icon: ChevronLeft,
 	primary: false,
 });
-const forward = (to: TaskStatus): BulkStep => ({
+const forward = (to: TaskStatusColumn): BulkStep => ({
 	kind: "move",
 	to,
 	icon: ChevronsRight,
@@ -61,7 +61,7 @@ interface BulkActionBarProps {
 	count: number;
 	/** The column every selected card is in; null for a mixed selection. */
 	column: TaskStatusColumn | null;
-	onMove: (status: TaskStatus) => void;
+	onMove: (status: TaskStatusColumn) => void;
 	onMarkDone: () => void;
 	onCreatePRs: () => void;
 	onSetType: (type: CardType) => void;

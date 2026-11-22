@@ -187,6 +187,9 @@ _IGNORED = (
     # one machine's folders and claims. The vault's journal says the rest.
     ".workpilot-brain/projects.json*",
     ".workpilot-brain/announced.json*",
+    # The vectors a local embeddings model gave this machine's notes
+    # (`lifecycle.embeddings`): a cache, rebuilt by any machine that has one.
+    ".workpilot-brain/embeddings.json",
     # What git said of each commit's signature (`lifecycle.provenance`), and
     # the trusted signers in git's ``allowed_signers`` form: derived on each
     # machine from the vault's list and its history.

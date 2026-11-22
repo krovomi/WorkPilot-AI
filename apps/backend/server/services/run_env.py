@@ -85,6 +85,9 @@ RUN_ENV: frozenset[str] = frozenset(
         # The card's phone targets (``run_manager.card_environment``): the
         # server's own value would choose for every card.
         "WORKPILOT_MOBILE_TARGETS",
+        # The groups of the run's starter, whose ``team:`` memories it
+        # recalls (``brain.lifecycle.scopes.TEAMS_ENV``).
+        "WORKPILOT_RECALL_TEAMS",
     }
 )
 

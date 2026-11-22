@@ -1961,6 +1961,12 @@ body {
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
 }
 
+/* A selection dragged as one: its cards fade where they were */
+[data-board-group-drag] [data-task-id]:has(.kanban-card[aria-selected="true"]) {
+  opacity: 0.35;
+  transition: opacity 120ms ease;
+}
+
 /* Dragging source placeholder effect */
 .dragging-placeholder {
   opacity: 0.4;

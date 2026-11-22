@@ -417,6 +417,7 @@ class ToolExecutor:
                     arguments,
                     task=task_ref(self.project_dir, self.spec_dir),
                     max_chars=self._page_chars(),
+                    project_dir=self.project_dir,
                 )
             )
         elif _is_code_search_tool(tool_name):

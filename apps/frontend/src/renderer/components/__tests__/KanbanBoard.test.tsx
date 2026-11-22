@@ -699,26 +699,61 @@ describe("KanbanBoard — selection and bulk actions", () => {
 		expect(
 			screen.getAllByText("Different columns — move unavailable").length,
 		).toBeGreaterThan(0);
-		await drag.start("a");
+		// Dragged, the same selection moves: each card by the single-drop rules.
+		drag.start("a");
 		await drag.end("a", "in_progress");
-		expect(api.fn("updateTaskStatus")).not.toHaveBeenCalled();
+		// One slot (the project's limit): A starts, B keeps waiting in the queue.
+		expect(await screen.findAllByText("1 card waits in Queue: In Progress is full (1 at a time).")).not.toHaveLength(0);
+		expect(api.fn("updateTaskStatus").mock.calls.map((call) => call[0])).toEqual(["a"]);
 	});
 
-	it("drags a selection to a valid column, refuses an invalid one", async () => {
+	it("drags a selection as a stack, and refuses a column none of it may enter", async () => {
 		const user = userEvent.setup();
 		renderBoard([makeTask({ id: "a", title: "A" }), makeTask({ id: "b", title: "B" })]);
 		await select(user, "A");
 		await select(user, "B");
 		drag.start("a");
-		drag.over("a", "done");
-		await drag.end("a", "done");
+		expect(document.querySelector("[data-board-group-drag]")).not.toBeNull();
+		drag.over("a", "pr_created");
+		await drag.end("a", "pr_created");
 		expect(
-			(await screen.findAllByText("Cannot move selected tasks to this column")).length,
+			(await screen.findAllByText("No card to move to this column")).length,
 		).toBeGreaterThan(0);
+		expect(screen.getAllByText(/2 cards stay put/).length).toBeGreaterThan(0);
+		expect(document.querySelector("[data-board-group-drag]")).toBeNull();
 		await drag.end("a", "queue");
 		await waitFor(() =>
 			expect(api.fn("updateTaskStatus")).toHaveBeenCalledTimes(2),
 		);
+	});
+
+	it("starts what the free slots allow and queues the rest of a dragged selection", async () => {
+		const user = userEvent.setup();
+		// The project runs one card at a time.
+		renderBoard([
+			makeTask({ id: "a", title: "A" }),
+			makeTask({ id: "b", title: "B" }),
+			makeTask({ id: "c", title: "C", status: "queue" }),
+			makeTask({ id: "d", title: "D" }),
+		]);
+		for (const title of ["A", "B", "C", "D"]) await select(user, title);
+		drag.start("a");
+		await drag.end("a", "in_progress");
+		await waitFor(() => expect(screen.getAllByText(/3 task\(s\) moved successfully/).length).toBeGreaterThan(0));
+		expect(screen.getAllByText("3 cards wait in Queue: In Progress is full (1 at a time).").length).toBeGreaterThan(0);
+		const moves = api.fn("updateTaskStatus").mock.calls.map((call) => [call[0], call[1]]);
+		// C already waits in the queue: it stays there, nothing to save.
+		expect(moves).toEqual([["a", "in_progress"], ["b", "queue"], ["d", "queue"]]);
+	});
+
+	it("keeps running cards a person sends back to the queue waiting there", async () => {
+		const user = userEvent.setup();
+		renderBoard([makeTask({ id: "a", title: "A", status: "in_progress" })]);
+		await select(user, "A");
+		await user.click(screen.getByRole("button", { name: /^Queue$/ }));
+		await waitFor(() => expect(screen.getAllByText(/1 task\(s\) moved successfully/).length).toBeGreaterThan(0));
+		// The slot it freed does not start it again at once.
+		expect(api.fn("updateTaskStatus").mock.calls.map((call) => [call[0], call[1]])).toEqual([["a", "queue"]]);
 	});
 
 	it("asks before completing reviewed cards, then opens the PR flow", async () => {
