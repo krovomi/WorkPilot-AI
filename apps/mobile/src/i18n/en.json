@@ -241,7 +241,8 @@
 		"toCard": "Turn into a card",
 		"openCard": "Open its card",
 		"context": "Context",
-		"governance": "Governance"
+		"governance": "Governance",
+		"waves": "Waves"
 	},
 	"roadmap": {
 		"empty": "No roadmap yet. Generate one: an agent studies the project and proposes phases and features.",
@@ -657,5 +658,48 @@
 		"noColleague": "No colleague can approve on this project.",
 		"days": "For how many days (1 to 90)",
 		"lend": "Lend"
+	},
+	"waves": {
+		"intro": "The server plans the backlog from its copy of the code: cards that share no file run side by side, wave after wave, in the order that merges best. Opening this page takes the run's next step.",
+		"execute": "Execute in optimal order",
+		"finished": "The last run went through all its waves.",
+		"ignored": "The saved run could not be read, so it was set aside.",
+		"advance": {
+			"merged": "Next wave once merged",
+			"review": "Next wave once in review"
+		},
+		"start": "Start the first wave",
+		"noRight": "You don't have the rights to start agents on this project.",
+		"empty": "Nothing in Planning or Queue to plan.",
+		"step": "Check now",
+		"stop": "Stop the run",
+		"stopTitle": "Stop the run?",
+		"stopBody": "The cards it started keep running; no further wave starts.",
+		"running": "Wave {{wave}} of {{total}}",
+		"wave": "Wave {{index}}",
+		"failure": {
+			"needs_approval": "waits for its spec to be approved",
+			"claimed": "claimed by someone else",
+			"already_running": "already running",
+			"quota": "over the agent quota",
+			"refused": "the server refused to start it",
+			"missing": "no longer on the board"
+		},
+		"blocked": "waits for a card it depends on",
+		"gone": "no longer on the board",
+		"agentRunning": "agent running",
+		"plan_one": "Plan: {{count}} wave, up to {{parallel}} at a time",
+		"plan_other": "Plan: {{count}} waves, up to {{parallel}} at a time",
+		"risk": "Conflict risk avoided: {{avoided}} of {{total}}",
+		"mergeChecks": "Trial merges: {{checked}} checked, {{conflicts}} in conflict",
+		"cycles": "Some cards depend on each other in a loop and are left out:",
+		"excluded": {
+			"cycle": "in a dependency loop",
+			"blocked_by_cycle": "depends on a card in a loop"
+		},
+		"history": "Last {{days}} days",
+		"historyIgnored": "The run history could not be read.",
+		"historyLine": "Runs: {{runs}} (stopped: {{stopped}}) · conflicts avoided: {{conflicts}} · risk avoided: {{risk}} · cards started: {{started}}",
+		"lastRun": "Last run finished {{at}}"
 	}
 }

@@ -241,7 +241,8 @@
 		"toCard": "En faire une carte",
 		"openCard": "Ouvrir sa carte",
 		"context": "Contexte",
-		"governance": "Gouvernance"
+		"governance": "Gouvernance",
+		"waves": "Vagues"
 	},
 	"roadmap": {
 		"empty": "Pas encore de roadmap. Générez-en une : un agent étudie le projet et propose des phases et des fonctionnalités.",
@@ -657,5 +658,48 @@
 		"noColleague": "Aucun collègue ne peut approuver sur ce projet.",
 		"days": "Pour combien de jours (1 à 90)",
 		"lend": "Prêter"
+	},
+	"waves": {
+		"intro": "Le serveur planifie le backlog depuis sa copie du code : les cartes qui ne partagent aucun fichier tournent côte à côte, vague après vague, dans l'ordre qui fusionne le mieux. Ouvrir cette page fait avancer l'exécution.",
+		"execute": "Exécuter dans l'ordre optimal",
+		"finished": "La dernière exécution a passé toutes ses vagues.",
+		"ignored": "L'exécution enregistrée était illisible ; elle a été écartée.",
+		"advance": {
+			"merged": "Vague suivante une fois fusionnée",
+			"review": "Vague suivante une fois en revue"
+		},
+		"start": "Lancer la première vague",
+		"noRight": "Vous n'avez pas le droit de lancer des agents sur ce projet.",
+		"empty": "Rien à planifier en Planification ni en File.",
+		"step": "Vérifier maintenant",
+		"stop": "Arrêter l'exécution",
+		"stopTitle": "Arrêter l'exécution ?",
+		"stopBody": "Les cartes lancées continuent ; aucune autre vague ne démarre.",
+		"running": "Vague {{wave}} sur {{total}}",
+		"wave": "Vague {{index}}",
+		"failure": {
+			"needs_approval": "attend l'approbation de sa spec",
+			"claimed": "prise par quelqu'un d'autre",
+			"already_running": "déjà en cours",
+			"quota": "au-delà du quota d'agents",
+			"refused": "le serveur a refusé de la lancer",
+			"missing": "n'est plus sur le tableau"
+		},
+		"blocked": "attend une carte dont elle dépend",
+		"gone": "n'est plus sur le tableau",
+		"agentRunning": "agent en cours",
+		"plan_one": "Plan : {{count}} vague, jusqu'à {{parallel}} à la fois",
+		"plan_other": "Plan : {{count}} vagues, jusqu'à {{parallel}} à la fois",
+		"risk": "Risque de conflit évité : {{avoided}} sur {{total}}",
+		"mergeChecks": "Fusions d'essai : {{checked}} vérifiées, {{conflicts}} en conflit",
+		"cycles": "Des cartes dépendent les unes des autres en boucle et sont écartées :",
+		"excluded": {
+			"cycle": "dans une boucle de dépendances",
+			"blocked_by_cycle": "dépend d'une carte prise dans une boucle"
+		},
+		"history": "{{days}} derniers jours",
+		"historyIgnored": "L'historique des exécutions était illisible.",
+		"historyLine": "Exécutions : {{runs}} (arrêtées : {{stopped}}) · conflits évités : {{conflicts}} · risque évité : {{risk}} · cartes lancées : {{started}}",
+		"lastRun": "Dernière exécution terminée le {{at}}"
 	}
 }
