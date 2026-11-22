@@ -357,7 +357,10 @@ class MCPToolManager:
         else:  # command / stdio
             from core.mcp_confinement import confined_launch  # noqa: PLC0415
             from mcp import StdioServerParameters  # noqa: PLC0415
-            from mcp.client.stdio import stdio_client  # noqa: PLC0415
+            from mcp.client.stdio import (  # noqa: PLC0415
+                get_default_environment,
+                stdio_client,
+            )
 
             # A confined server starts under the OS sandbox, or not at all.
             launch = confined_launch(
@@ -365,10 +368,13 @@ class MCPToolManager:
             )
             if launch is None:
                 raise RuntimeError("it must run confined and cannot be")
+            # The server's environment is built, not inherited: the MCP SDK's
+            # short default list (PATH, HOME, user, terminal; the system
+            # folders on Windows) plus the entry's own `env`.
             params = StdioServerParameters(
                 command=launch[0],
                 args=launch[1],
-                env={**os.environ, **(cfg.get("env") or {})},
+                env={**get_default_environment(), **(cfg.get("env") or {})},
             )
             read, write = await self._stack.enter_async_context(stdio_client(params))
 
