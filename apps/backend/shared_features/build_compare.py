@@ -16,7 +16,10 @@ Per spec (a ``spec_id`` with at least one recorded agent session):
 - **QA iterations**: the QA sessions its plan's sign-off counts
   (``qa_signoff.qa_session``), when it has one;
 - **agents**: the distinct agents (planner, coder, QA reviewer…) that worked
-  on it, when the ledger names them.
+  on it, when the ledger names them;
+- **mutation score** and **first-run CI**, when its QA and the follow-through
+  of its PR recorded them (``build_compare_quality``): the two figures for
+  which more is better.
 
 A project's figure for a window is the median over the specs that started in
 it: the last thirty days, and the thirty before for the trend, and each of
@@ -29,26 +32,37 @@ of them have it; below that only its size is, so a median never stands for
 one identifiable project. Its top tenth (the figure the best
 tenth of its projects reach) needs ``min_top`` projects with that figure.
 Specs are also compared kind by kind (bug fix, feature, refactoring…), as
-their card recorded it, against the same kind in the other projects.
+their card recorded it, against the same kind in the other projects. Each
+group also gives its trend, from the window before to the last, so the
+project's own trend can be read against it; a project whose segment changed
+during the last window is set against its old and new peers alike.
 """
 
 from __future__ import annotations
 
 import statistics
 from collections.abc import Callable, Iterable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from foundation.git_executable import run_git
+from shared_features import build_compare_quality as quality
 from shared_features import build_compare_segments as segments
 from shared_features import usage_ledger
 
 WINDOW = timedelta(days=30)
 #: The weeks of a project's own sparkline, the oldest first.
 WEEKS = 8
-METRICS = ("minutes", "cost", "qa_iterations", "agents")
+METRICS = (
+    "minutes",
+    "cost",
+    "qa_iterations",
+    "agents",
+    "mutation_score",
+    "ci_first_pass",
+)
 #: Spec plans read per project, the most read of one and of all, in bytes.
 MAX_PLANS = 500
 PLAN_LIMIT = 2_000_000
@@ -57,6 +71,10 @@ PLANS_TOTAL = 32_000_000
 METADATA_FILE = "task_metadata.json"
 METADATA_LIMIT = 200_000
 METADATA_TOTAL = 8_000_000
+#: A spec's mutation record (it lists every mutant) and follow-through state,
+#: the most read of one and of all, in bytes.
+RECORD_LIMIT = 2_000_000
+RECORDS_TOTAL = 16_000_000
 #: Tracked files counted, and the seconds `git ls-files` may take.
 GIT_TIMEOUT = 20
 #: Upper bounds of the size buckets, in tracked files.
@@ -76,6 +94,8 @@ class SpecFacts:
     qa_iterations: int | None
     agents: int | None
     kind: str | None = None
+    mutation_score: int | None = None
+    ci_first_pass: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +106,9 @@ class ProjectFacts:
     size: str
     specs: tuple[SpecFacts, ...]
     team: str = "unknown"
+    #: The size and team one window ago, read for the compared project only.
+    size_before: str | None = None
+    team_before: str | None = None
 
 
 def _qa_session(plan: object) -> int | None:
@@ -153,10 +176,28 @@ def spec_kinds(project_dir: Path) -> dict[str, str]:
     return found
 
 
+def mutation_scores(project_dir: Path) -> dict[str, int]:
+    """Each spec's mutation score, from its last mutation gate."""
+    records = _spec_files(
+        project_dir, quality.MUTATION_FILE, RECORD_LIMIT, RECORDS_TOTAL
+    )
+    return quality.by_spec(records, quality.mutation_score)
+
+
+def first_ci_results(project_dir: Path) -> dict[str, bool]:
+    """Whether the CI passed on each spec's PR as it was opened."""
+    records = _spec_files(
+        project_dir, quality.FOLLOWUP_FILE, METADATA_LIMIT, METADATA_TOTAL
+    )
+    return quality.by_spec(records, quality.first_ci)
+
+
 def spec_facts(
     usages: Iterable[usage_ledger.Usage],
     qa: dict[str, int],
     kinds: dict[str, str] | None = None,
+    mutation: dict[str, int] | None = None,
+    ci: dict[str, bool] | None = None,
 ) -> tuple[SpecFacts, ...]:
     """One line per spec that recorded an agent session."""
     facts = []
@@ -171,6 +212,8 @@ def spec_facts(
                 qa_iterations=qa.get(spec_id),
                 agents=len(agents) or None,
                 kind=(kinds or {}).get(spec_id),
+                mutation_score=(mutation or {}).get(spec_id),
+                ci_first_pass=(ci or {}).get(spec_id),
             )
         )
     return tuple(facts)
@@ -183,11 +226,24 @@ def size_bucket(project_dir: Path) -> str:
     result = run_git(["ls-files", "-z"], cwd=project_dir, timeout=GIT_TIMEOUT)
     if result.returncode != 0:
         return "unknown"
-    files = result.stdout.count("\0")
+    return _size_name(result.stdout.count("\0"))
+
+
+def _size_name(files: int) -> str:
     for limit, name in SIZE_BUCKETS:
         if files < limit:
             return name
     return "monorepo"
+
+
+def with_history(facts: ProjectFacts, project_dir: Path, now: datetime) -> ProjectFacts:
+    """`facts` with the size and team the project had one window ago."""
+    files = segments.tracked_files_at(project_dir, now - WINDOW)
+    return replace(
+        facts,
+        size_before="unknown" if files is None else _size_name(files),
+        team_before=segments.team_bucket(project_dir, days_ago=WINDOW.days),
+    )
 
 
 def main_stack(project_dir: Path) -> str:
@@ -206,7 +262,11 @@ def project_facts(project_dir: Path) -> ProjectFacts:
         stack=main_stack(project_dir),
         size=size_bucket(project_dir),
         specs=spec_facts(
-            ledgers.usages, qa_iterations(project_dir), spec_kinds(project_dir)
+            ledgers.usages,
+            qa_iterations(project_dir),
+            spec_kinds(project_dir),
+            mutation_scores(project_dir),
+            first_ci_results(project_dir),
         ),
         team=segments.team_bucket(project_dir),
     )
@@ -223,13 +283,17 @@ def _group_median(values: Iterable[float | int | None], min_group: int) -> float
     return _median(present) if len(present) >= min_group else None
 
 
-def _top(values: Iterable[float | None], min_top: int | None) -> float | None:
-    """The figure the best tenth reach (lower is better), from `min_top`
-    values up; None below, or when no `min_top` is set."""
+def _top(
+    values: Iterable[float | None], min_top: int | None, higher: bool = False
+) -> float | None:
+    """The figure the best tenth reach (the first decile, or the last when
+    `higher` is better), from `min_top` values up; None below, or when no
+    `min_top` is set."""
     present = sorted(v for v in values if v is not None)
     if min_top is None or len(present) < max(min_top, 2):
         return None
-    return float(statistics.quantiles(present, n=10, method="inclusive")[0])
+    deciles = statistics.quantiles(present, n=10, method="inclusive")
+    return float(deciles[-1] if higher else deciles[0])
 
 
 def window(
@@ -248,6 +312,8 @@ def window(
         "cost": _median(s.cost for s in inside),
         "qa_iterations": _median(s.qa_iterations for s in inside),
         "agents": _median(s.agents for s in inside),
+        "mutation_score": _median(s.mutation_score for s in inside),
+        "ci_first_pass": quality.pass_rate(s.ci_first_pass for s in inside),
     }
 
 
@@ -258,18 +324,38 @@ def _trend(recent: float | None, previous: float | None) -> float | None:
     return (recent - previous) / previous * 100
 
 
+def _medians(members: list[dict[str, Any]], min_group: int) -> dict[str, Any]:
+    return {m: _group_median((p[m] for p in members), min_group) for m in METRICS}
+
+
 def _group(
-    members: list[dict[str, Any]], min_group: int, min_top: int | None = None
+    members: list[dict[str, Any]],
+    min_group: int,
+    min_top: int | None = None,
+    before: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    """A group's size, medians and top tenth; its trend too when the
+    figures of its projects in the window `before` are given."""
     if len(members) < min_group:
-        return {"projects": len(members), "medians": None, "top": None}
-    top = {m: _top((p[m] for p in members), min_top) for m in METRICS}
-    return {
+        empty = {"projects": len(members), "medians": None, "top": None}
+        return empty if before is None else {**empty, "trend": None}
+    medians = _medians(members, min_group)
+    top = {
+        m: _top((p[m] for p in members), min_top, m in quality.HIGHER_IS_BETTER)
+        for m in METRICS
+    }
+    group = {
         "projects": len(members),
-        "medians": {
-            m: _group_median((p[m] for p in members), min_group) for m in METRICS
-        },
+        "medians": medians,
         "top": top if any(v is not None for v in top.values()) else None,
+    }
+    if before is None:
+        return group
+    previous = _medians(before, min_group) if len(before) >= min_group else {}
+    trend = {m: _trend(medians[m], previous.get(m)) for m in METRICS}
+    return {
+        **group,
+        "trend": trend if any(v is not None for v in trend.values()) else None,
     }
 
 
@@ -315,13 +401,19 @@ def compare(
     """
     recent = window(current, now - WINDOW, now)
     previous = window(current, now - 2 * WINDOW, now - WINDOW)
-    active = [(peer, window(peer, now - WINDOW, now)) for peer in peers]
-    active = [(peer, figures) for peer, figures in active if figures["specs"]]
-    same_stack = [f for p, f in active if p.stack == current.stack]
-    same_segment = [
-        f for p, f in active if p.stack == current.stack and p.size == current.size
-    ]
-    same_team = [f for p, f in active if p.team == current.team]
+    sizes, size_from = segments.moved(current.size, current.size_before)
+    teams, team_from = segments.moved(current.team, current.team_before)
+    tests: dict[str, Callable[[ProjectFacts], bool]] = {
+        "segment": lambda p: p.stack == current.stack and p.size in sizes,
+        "stack": lambda p: p.stack == current.stack,
+        "team": lambda p: p.team in teams,
+        "all": lambda _p: True,
+    }
+
+    def members(start: datetime, end: datetime, test) -> list[dict[str, Any]]:
+        figures = [window(peer, start, end) for peer in peers if test(peer)]
+        return [f for f in figures if f["specs"]]
+
     week = timedelta(days=7)
     return {
         "window_days": WINDOW.days,
@@ -331,6 +423,8 @@ def compare(
             "stack": current.stack,
             "size": current.size,
             "team": current.team,
+            "size_from": size_from,
+            "team_from": team_from,
         },
         "recent": recent,
         "previous": previous,
@@ -340,12 +434,21 @@ def compare(
             for i in reversed(range(WEEKS))
         ],
         "groups": {
-            "segment": _group(same_segment, min_group, min_top),
-            "stack": _group(same_stack, min_group, min_top),
-            "team": _group(same_team, min_group, min_top),
-            "all": _group([f for _p, f in active], min_group, min_top),
+            name: _group(
+                members(now - WINDOW, now, test),
+                min_group,
+                min_top,
+                members(now - 2 * WINDOW, now - WINDOW, test),
+            )
+            for name, test in tests.items()
         },
-        "kinds": _kinds(current, [p for p, _f in active], now - WINDOW, now, min_group),
+        "kinds": _kinds(
+            current,
+            [p for p in peers if window(p, now - WINDOW, now)["specs"]],
+            now - WINDOW,
+            now,
+            min_group,
+        ),
     }
 
 
@@ -358,9 +461,10 @@ def compare_paths(
     min_top: int | None = None,
     read: Callable[[Path], ProjectFacts] = project_facts,
 ) -> dict[str, Any]:
-    """`compare` over project folders, each read with `read`."""
+    """`compare` over project folders, each read with `read`, the compared
+    one with its segment of one window ago."""
     return compare(
-        read(current),
+        with_history(read(current), current, now),
         [read(p) for p in peers],
         now,
         min_group=min_group,
