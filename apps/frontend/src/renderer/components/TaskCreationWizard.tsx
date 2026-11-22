@@ -45,6 +45,7 @@ import type {
 	ContextPolicy,
 	TaskMetadata,
 	TaskPriority,
+	TestPlacementMode,
 	ThinkingLevel,
 } from "../../shared/types";
 import type { MobilePlatform } from "../../shared/types/mobile";
@@ -96,6 +97,7 @@ import {
 	autoSplitCeilingFor,
 	kindFromCategory,
 } from "../../shared/utils/task-split";
+import { placementModeOf } from "./suite-placement/suite-hold";
 
 interface TaskCreationWizardProps {
 	projectId: string;
@@ -222,6 +224,8 @@ export function TaskCreationWizard({
 	// TDD override (per-task) - default false (inherit project setting)
 	const [tddMode, setTddMode] = useState(false);
 	const [verifyLoop, setVerifyLoop] = useState(true);
+	// Where the long suites run; undefined keeps the project's choice.
+	const [testPlacement, setTestPlacement] = useState<TestPlacementMode | undefined>();
 	// The automatic split: on, at the project's ceiling, unless the task says.
 	const [autoSplit, setAutoSplit] = useState<AutoSplitValue>(
 		DEFAULT_AUTO_SPLIT_VALUE,
@@ -297,6 +301,7 @@ export function TaskCreationWizard({
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
 				setTddMode(draft.tddMode ?? false);
 				setVerifyLoop(draft.verifyLoop ?? true);
+				setTestPlacement(placementModeOf(draft.testPlacement));
 				setAutoSplit(draft.autoSplit ?? DEFAULT_AUTO_SPLIT_VALUE);
 				setVerifyWindow(draft.verifyWindow ?? "");
 				setVerifyScenario(draft.verifyScenario ?? "");
@@ -436,6 +441,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			testPlacement,
 			autoSplit,
 			verifyWindow,
 			verifyScenario,
@@ -464,6 +470,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			testPlacement,
 			autoSplit,
 			verifyWindow,
 			verifyScenario,
@@ -669,6 +676,7 @@ export function TaskCreationWizard({
 			if (tddMode) metadata.tddMode = true;
 			// Only an explicit "off" is stored: absent means the project default.
 			if (!verifyLoop) metadata.verifyLoop = false;
+			if (testPlacement) metadata.testPlacement = testPlacement;
 			const split = autoSplitMetadata(autoSplit);
 			if (split.noSplit) metadata.noSplit = true;
 			if (split.splitMaxLines !== undefined) metadata.splitMaxLines = split.splitMaxLines;
@@ -756,6 +764,7 @@ export function TaskCreationWizard({
 		setReferencedFiles([]);
 		setRequireReviewBeforeCoding(false);
 		setAutoSplit(DEFAULT_AUTO_SPLIT_VALUE);
+		setTestPlacement(undefined);
 		setContextPolicy({ ...DEFAULT_CONTEXT_POLICY });
 		setAcceptanceCriteria(ensureAtLeastOne([]));
 		setExtraNote("");
@@ -982,6 +991,8 @@ export function TaskCreationWizard({
 					autoSplitProjectDisabled={projectAutoSplit?.enabled === false}
 					verifyLoop={verifyLoop}
 					onVerifyLoopChange={setVerifyLoop}
+					testPlacement={testPlacement}
+					onTestPlacementChange={setTestPlacement}
 					verifyWindow={verifyWindow}
 					onVerifyWindowChange={setVerifyWindow}
 					verifyScenario={verifyScenario}

@@ -1,18 +1,36 @@
 import { useCallback, useEffect, useMemo } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
 	type CardType,
 	cardTypeChoiceMetadata,
 } from "../../shared/constants/card-types";
-import type { Task, TaskPriority, TaskStatus } from "../../shared/types";
+import type { TaskStatusColumn } from "../../shared/constants/task";
+import type { Task, TaskPriority } from "../../shared/types";
 import { deleteCardsLater } from "../components/kanban/deleteCardsLater";
 import { applyCardChoice, isLightCard, recordMoves } from "../lib/card-edits";
+import { countRunning, type GroupMovePlan, planGroupMove } from "../lib/group-move";
+import { getVisualColumn } from "../lib/kanban-columns";
 import { undoLast, useBoardUndoStore } from "../stores/board-undo-store";
-import { persistTaskStatus } from "../stores/task-store";
+import { persistTaskStatus, useTaskStore } from "../stores/task-store";
 import { toast } from "./use-toast";
+
+/** What a group move did besides moving: cards left waiting, cards left in place. */
+function groupMoveDetails(plan: GroupMovePlan, slots: number, t: TFunction): string | undefined {
+	const lines = [];
+	if (plan.queued > 0) lines.push(t("tasks:kanban.groupMove.queued", { count: plan.queued, slots }));
+	if (plan.skipped > 0) lines.push(t("tasks:kanban.groupMove.skipped", { count: plan.skipped }));
+	return lines.length > 0 ? lines.join(" ") : undefined;
+}
 
 interface BulkEditsOptions {
 	projectId: string | null;
+	/** The slots of « En cours » (project setting). */
+	maxParallelTasks: number;
+	/** Cards a person sent back to the queue: the queue does not start them again at once. */
+	heldInQueue: Set<string>;
+	/** Starts queued cards while « En cours » has free slots. */
+	processQueue: () => Promise<void>;
 	selectedTasks: readonly Task[];
 	deselectAllTasks: () => void;
 	/** The confirmation for a selection that holds work (a plan, a worktree). */
@@ -26,6 +44,9 @@ interface BulkEditsOptions {
  */
 export function useBoardBulkEdits({
 	projectId,
+	maxParallelTasks,
+	heldInQueue,
+	processQueue,
 	selectedTasks,
 	deselectAllTasks,
 	openDeleteConfirm,
@@ -83,32 +104,48 @@ export function useBoardBulkEdits({
 		deselectAllTasks();
 	}, [selectedTasks, openDeleteConfirm, deselectAllTasks, t]);
 
+	// Each card follows the rules of a single drop (lib/group-move.ts): a card
+	// already there stays, « En cours » takes what its free slots allow and the
+	// rest waits in the queue, held there until the queue has run once.
 	const moveSelection = useCallback(
-		async (targetStatus: TaskStatus) => {
+		async (target: TaskStatusColumn) => {
+			const running = countRunning(useTaskStore.getState().tasks);
+			const plan = planGroupMove(selectedTasks, target, maxParallelTasks - running);
+			if (plan.moves.length === 0) {
+				toast({ title: t("tasks:kanban.groupMove.nothing"), description: groupMoveDetails(plan, maxParallelTasks, t) });
+				return;
+			}
 			let failed = 0;
 			const moved = [];
-			for (const task of selectedTasks) {
-				if ((await persistTaskStatus(task.id, targetStatus)).success) {
-					moved.push({ id: task.id, from: task.status, to: targetStatus });
+			for (const { task, to } of plan.moves) {
+				if (to === "queue" && task.status === "in_progress") heldInQueue.add(task.id);
+				if ((await persistTaskStatus(task.id, to)).success) {
+					moved.push({ id: task.id, from: task.status, to });
 				} else {
 					failed++;
 				}
 			}
+			// On top of their new column, in the selection's order.
+			const store = useTaskStore.getState();
+			for (const m of [...moved].reverse()) store.moveTaskToColumnTop(m.id, m.to, getVisualColumn(m.from));
+			if (projectId && moved.length > 0) store.saveTaskOrder(projectId);
 			recordMoves(moved, t("tasks:kanban.undoLabels.move", { count: moved.length }));
-			if (failed === 0) {
-				toast({ title: t("tasks:kanban.bulkMoveSuccess", { count: moved.length }) });
-				deselectAllTasks();
-			} else {
+			if (moved.some((m) => m.from === "in_progress")) await processQueue();
+			for (const { task, to } of plan.moves) if (to === "queue") heldInQueue.delete(task.id);
+			if (failed > 0) {
 				toast({
-					title: t("tasks:kanban.bulkMoveError", {
-						failed,
-						total: selectedTasks.length,
-					}),
+					title: t("tasks:kanban.bulkMoveError", { failed, total: plan.moves.length }),
 					variant: "destructive",
 				});
+				return;
 			}
+			toast({
+				title: t("tasks:kanban.bulkMoveSuccess", { count: moved.length }),
+				description: groupMoveDetails(plan, maxParallelTasks, t),
+			});
+			deselectAllTasks();
 		},
-		[selectedTasks, deselectAllTasks, t],
+		[selectedTasks, deselectAllTasks, projectId, maxParallelTasks, heldInQueue, processQueue, t],
 	);
 
 	const undo = useCallback(async () => {

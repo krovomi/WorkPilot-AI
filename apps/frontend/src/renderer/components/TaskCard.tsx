@@ -30,6 +30,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AutomationBadge } from "./kanban/AutomationBadge";
 import { ReviewLoadBadge, SplitPartBadge } from "./kanban/SplitPartBadge";
+import { SuitePlacementBadge, shownSuiteState } from "./suite-placement/SuitePlacementBadge";
 import { TaskLockBadge } from "./collaboration/TaskLockBadge";
 import { useFormatRelativeTime } from "@/hooks/useFormatRelativeTime";
 import { toast } from "../hooks/use-toast";
@@ -330,7 +331,8 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 	const hasVerdict =
 		task.verification?.status === "pass" ||
 		task.verification?.status === "fail" ||
-		!!task.crossReview;
+		!!task.crossReview ||
+		shownSuiteState(task) !== null;
 	const hasBlockers =
 		!!blockers && (blockers.pending.length > 0 || blockers.missing.length > 0);
 	if (
@@ -638,6 +640,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					{t(`tasks:crossReview.cardBadge.${task.crossReview.verdict}`)}
 				</Badge>
 			) : null}
+
+			{/* Where the full suite runs when not simply here, then the CI's verdict */}
+			<SuitePlacementBadge task={task} />
 
 			{/* Part of a split task (or the task that was split) */}
 			<SplitPartBadge task={task} />

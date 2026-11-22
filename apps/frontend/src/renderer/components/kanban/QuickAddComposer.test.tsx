@@ -1,8 +1,9 @@
 /**
  * Quick add from a column: the box opens from "+", the row under the cards,
- * a double-click on the empty space or N, and only in Planification and
- * File d'attente. Enter creates and keeps the box open; a pasted list makes
- * one card per line; File d'attente queues what it creates.
+ * a double-click on the empty space or N, and only in Planification,
+ * File d'attente and En cours. Enter creates and keeps the box open; a pasted
+ * list makes one card per line; File d'attente queues what it creates and
+ * En cours starts it while a slot is free.
  */
 
 import { DndContext } from "@dnd-kit/core";
@@ -16,6 +17,7 @@ import {
 import type { Task, TaskStatus } from "../../../shared/types";
 import { useProjectStore } from "../../stores/project-store";
 import { loadDraft, onQueueKick, useTaskStore } from "../../stores/task-store";
+import { Toaster } from "../ui/toaster";
 import { TooltipProvider } from "../ui/tooltip";
 import { DroppableColumn, type DroppableColumnProps } from "./KanbanColumn";
 
@@ -48,6 +50,7 @@ function renderColumn(overrides: Partial<DroppableColumnProps> = {}) {
 		<DndContext>
 			<TooltipProvider>
 				<DroppableColumn {...props} />
+				<Toaster />
 			</TooltipProvider>
 		</DndContext>,
 	);
@@ -243,6 +246,35 @@ describe("quick add in a column", () => {
 		unregister();
 	});
 
+	it("starts what it creates in En cours while a slot is free, then queues it", async () => {
+		useProjectStore.setState({
+			projects: [{ id: projectId, settings: { maxParallelTasks: 1 } } as never],
+		});
+		renderColumn({ status: "in_progress" });
+		const [headerPlus] = screen.getAllByRole("button", { name: "Add and start" });
+		await userEvent.click(headerPlus);
+		expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+		await userEvent.type(box(), "Ship it{Enter}");
+		await waitFor(() =>
+			expect(api.fn("updateTaskStatus")).toHaveBeenCalledWith("new-1", "in_progress", undefined),
+		);
+		await userEvent.type(box(), "Next one{Enter}");
+		await waitFor(() =>
+			expect(api.fn("updateTaskStatus")).toHaveBeenCalledWith("new-2", "queue", undefined),
+		);
+		expect(
+			await screen.findByText("1 card waits in Queue: In Progress is full (1 at a time)."),
+		).toBeInTheDocument();
+	});
+
+	it("names the start of several pasted lines", async () => {
+		renderColumn({ status: "in_progress" });
+		await userEvent.click(screen.getAllByRole("button", { name: "Add and start" })[0]);
+		await userEvent.click(box());
+		await userEvent.paste("Fix the login\nFix the logout");
+		expect(screen.getByRole("button", { name: "Start 2 tasks" })).toBeInTheDocument();
+	});
+
 	it("keeps the text and says so when creating fails", async () => {
 		api.restore();
 		api = installRendererApi({
@@ -300,7 +332,7 @@ describe("quick add in a column", () => {
 	});
 
 	it("is not offered in agent columns nor without a way to add", () => {
-		for (const status of ["in_progress", "ai_review", "human_review", "done"] as const) {
+		for (const status of ["ai_review", "human_review", "done"] as const) {
 			const { unmount } = renderColumn({ status });
 			expect(screen.queryByRole("button", { name: "Add a task" })).toBeNull();
 			unmount();

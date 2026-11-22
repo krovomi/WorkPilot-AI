@@ -796,6 +796,8 @@ uses no network.
 | `UTILITY_THINKING_BUDGET` | off | Thinking budget, in tokens, of the same calls; empty or `0` turns it off. |
 | `INSIGHT_EXTRACTION_ENABLED` | `true` | After each coder session, an LLM pass extracts insights into the project memory. Only `true`, `1` or `yes` keep it on (`on` turns it off). It also needs a Claude token. |
 | `INSIGHT_EXTRACTOR_MODEL` | `DEFAULT_EXTRACTION_MODEL` ([analysis/insight_extractor.py](../apps/backend/analysis/insight_extractor.py)) | Model of that pass. It always runs on Claude: give a Claude model id. |
+| `BRAIN_CONFLICT_EMBEDDINGS` | on | After a brain sync, an embeddings model that the local Ollama already has also reads the received gotchas and patterns, to flag two notes that disagree in different words ([memory-lifecycle.md](architecture/memory-lifecycle.md)). `0`, `false`, `no` or `off` turns it off; unset, the switch in Settings > Brain decides (`brain.json`). Nothing is pulled and nothing leaves the machine: only `OLLAMA_BASE_URL` on a loopback address is asked, with a timeout, so strict offline mode allows it. Without Ollama or an embeddings model, only shared words count, as before. At most 200 notes are sent per sync; vectors are cached in `.workpilot-brain/embeddings.json` (ignored by git). |
+| `BRAIN_CONFLICT_EMBEDDINGS_MODEL` | first pulled | The Ollama model of that pass (`nomic-embed-text`, `bge-m3`…; `x` also matches `x:latest`). Unset, the model named in Settings > Brain, else the first embeddings model Ollama lists, multilingual ones first. A model Ollama does not have turns the pass off: it is never pulled. |
 
 ## Forges, notifications and MCP servers
 

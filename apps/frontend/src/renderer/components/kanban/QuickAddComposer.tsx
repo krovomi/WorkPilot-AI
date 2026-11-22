@@ -12,15 +12,17 @@ import {
 	CARD_TYPES,
 	type CardType,
 } from "../../../shared/constants/card-types";
-import type { TaskPriority } from "../../../shared/types";
+import type { TaskPriority, TaskStatus } from "../../../shared/types";
 import {
 	defaultEngineProvider,
 	seedEngine,
 } from "../../../shared/utils/task-engine";
 import { useToast } from "../../hooks/use-toast";
 import type { QuickAddColumn } from "../../lib/kanban-columns";
+import { countRunning } from "../../lib/group-move";
 import {
 	buildQuickAddItems,
+	QUICK_ADD_LABELS,
 	quickAddLines,
 	quickAddMetadata,
 	splitsByDefault,
@@ -33,6 +35,7 @@ import {
 	loadDraft,
 	persistTaskStatus,
 	saveDraft,
+	useTaskStore,
 } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import {
@@ -69,8 +72,8 @@ interface QuickAddComposerProps {
 }
 
 /**
- * The quick-add box at the top of the Planification and File d'attente
- * columns. Enter creates and keeps the box open for the next card; a pasted
+ * The quick-add box at the top of the Planification, File d'attente and
+ * En cours columns. Enter creates and keeps the box open for the next card; a pasted
  * list makes one card per line. Design: docs/architecture/kanban-quick-edit.md.
  */
 export function QuickAddComposer({
@@ -88,6 +91,12 @@ export function QuickAddComposer({
 			s.projects.find(
 				(p) => p.id === (s.activeProjectId || s.selectedProjectId),
 			)?.settings?.provider,
+	);
+	// The slots of « En cours », as the board counts them.
+	const maxParallelTasks = useProjectStore(
+		(s) =>
+			s.projects.find((p) => p.id === (s.activeProjectId || s.selectedProjectId))?.settings
+				?.maxParallelTasks ?? 3,
 	);
 	const { settings } = useSettingsStore(
 		useShallow((s) => ({ settings: s.settings })),
@@ -143,6 +152,7 @@ export function QuickAddComposer({
 		);
 		const metadata = quickAddMetadata({ engine, type, priority });
 		let created = 0;
+		let waiting = 0;
 		try {
 			for (const item of items) {
 				const task = await createTask(projectId, item.title, item.description, {
@@ -150,8 +160,14 @@ export function QuickAddComposer({
 				});
 				if (!task) break;
 				created++;
-				// Queued, it waits for a free slot like a card dropped there.
-				if (status === "queue") await persistTaskStatus(task.id, "queue");
+				// Queued, it waits for a free slot like a card dropped there. Started,
+				// it takes a free slot of « En cours », or waits in the queue too.
+				let column: TaskStatus | null = status === "backlog" ? null : status;
+				if (column === "in_progress" && countRunning(useTaskStore.getState().tasks) >= maxParallelTasks) {
+					column = "queue";
+					waiting++;
+				}
+				if (column) await persistTaskStatus(task.id, column);
 			}
 		} finally {
 			setBusy(false);
@@ -164,6 +180,10 @@ export function QuickAddComposer({
 					count: created,
 					column: t(`tasks:columns.${status}`),
 				}),
+				description:
+					waiting > 0
+						? t("tasks:kanban.groupMove.queued", { count: waiting, slots: maxParallelTasks })
+						: undefined,
 			});
 		} else {
 			// Keep the lines that were not created, so a retry does not duplicate.
@@ -181,6 +201,7 @@ export function QuickAddComposer({
 		type,
 		priority,
 		status,
+		maxParallelTasks,
 		toast,
 		t,
 	]);
@@ -224,12 +245,9 @@ export function QuickAddComposer({
 	};
 
 	const TypeIcon = type ? CARD_TYPE_ICONS[type] : null;
-	let createLabel = t("tasks:kanban.quickAdd.create");
-	if (cardCount > 1) {
-		createLabel = t("tasks:kanban.quickAdd.createMany", { count: cardCount });
-	} else if (status === "queue") {
-		createLabel = t("tasks:kanban.quickAdd.queue");
-	}
+	const labels = QUICK_ADD_LABELS[status];
+	const createLabel =
+		cardCount > 1 ? t(`tasks:${labels.createMany}`, { count: cardCount }) : t(`tasks:${labels.create}`);
 
 	return (
 		<div

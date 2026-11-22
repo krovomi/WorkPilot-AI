@@ -20,11 +20,11 @@ const engine: TaskEngine = {
 } as TaskEngine;
 
 describe("quick add", () => {
-	it("is offered in the planning and queue columns only", () => {
+	it("is offered in the planning, queue and in-progress columns only", () => {
 		expect(isQuickAddColumn("backlog")).toBe(true);
 		expect(isQuickAddColumn("queue")).toBe(true);
+		expect(isQuickAddColumn("in_progress")).toBe(true);
 		for (const status of [
-			"in_progress",
 			"ai_review",
 			"human_review",
 			"build_failed",

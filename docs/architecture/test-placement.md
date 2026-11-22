@@ -75,10 +75,16 @@ Une revue légère ou ciblée ne lance que ses quelques tests : elle n'est pas p
 
 ## Ce qui n'est pas encore fait
 
-- L'app : pousser la branche sans PR, déclencher et suivre le pipeline de chaque forge
-  (`ci-pipeline-providers.ts`), ne mettre la carte en revue humaine qu'une fois la suite verte ;
-  l'interrupteur Automatique / Manuel du projet et de la carte, la raison sur la carte. Tant que
-  l'app ne pose pas `WORKPILOT_TEST_PLACEMENT_ROUTES`, chaque suite reste sur la machine.
 - La suite remise au serveur WorkPilot.
-- L'échec rapide en deux temps (tests touchés puis suite complète) et la relance de la suite des
-  cartes vertes quand leur base avance.
+- La relance de la suite des cartes vertes quand leur base avance.
+
+Faits depuis : l'app pousse la branche et suit la CI ([test-placement-ci.md](test-placement-ci.md)),
+avec l'interrupteur du projet et de la carte.
+
+## Échec rapide
+
+Une revue complète lance d'abord les tests des fichiers changés et de ce qui les importe (phase
+3.0 de `prompts/qa_reviewer.md`, avec la sélection propre à chaque pile : `vitest related`,
+`jest --findRelatedTests`, `pytest <chemins>`, `go test <paquets>`, `cargo test -p`,
+`dotnet test --filter`, `mvn -Dtest=`). Un rouge rejette tout de suite, sans lancer les longues
+suites : le fixer reçoit l'échec sans attendre la suite complète, et la revue suivante lance tout.
