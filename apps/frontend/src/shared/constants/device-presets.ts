@@ -42,6 +42,9 @@ export const DEFAULT_MATRIX_DEVICE_IDS: readonly string[] = [
 	"desktop-1080p",
 ];
 
+/** Les vues vivantes affichées au plus : au-delà, la machine rend trop de pages à la fois. */
+export const MAX_LIVE_VIEWS = 6;
+
 /** Le preset d'un identifiant reçu, ou `undefined` : un id inconnu n'est jamais émulé. */
 export function findDevicePreset(id: unknown): DevicePreset | undefined {
 	if (typeof id !== "string") return undefined;
@@ -67,11 +70,16 @@ export function orientationOf(device: Pick<DevicePreset, "width" | "height">): D
  */
 export function orientDevice(device: DevicePreset, orientation: DeviceOrientation): DevicePreset {
 	if (!device.mobile || orientationOf(device) === orientation) return device;
-	return { ...device, width: device.height, height: device.width };
+	return { ...device, width: device.height, height: device.width, rotated: true };
 }
 
-/** L'appareil n'est pas dans le sens de son preset : il a été tourné. */
+/**
+ * L'appareil n'est pas dans le sens de son preset : il a été tourné. Un
+ * appareil passé par `orientDevice` le dit (`rotated`) ; un appareil du
+ * catalogue se compare aussi à son preset.
+ */
 export function isRotated(device: DevicePreset): boolean {
+	if (device.rotated) return true;
 	const preset = findDevicePreset(device.id) ?? device;
 	return orientationOf(preset) !== orientationOf(device);
 }

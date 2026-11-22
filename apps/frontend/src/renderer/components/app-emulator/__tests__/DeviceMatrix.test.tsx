@@ -5,7 +5,7 @@
  * The device matrix (#383): pick devices, capture them through the main,
  * see them side by side with what the reading found, and keep one for the
  * visual review. Throttling and orientation are picked from closed lists, the
- * preview's session is a yes or no; faulty elements are boxed on the capture;
+ * session is blank, the preview's or a persona; faulty elements are boxed on the capture;
  * the grid exports through the main as a PNG or a PDF. The preview keeps its
  * `<webview>` mounted behind it.
  */
@@ -14,14 +14,17 @@ import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../../../../shared/i18n";
 import type { DeviceCapture, ResponsiveReport } from "../../../../shared/types/device-matrix";
+import { useDeviceLibraryStore } from "../../../stores/device-library-store";
 import { useDeviceMatrixStore } from "../../../stores/device-matrix-store";
 import { DeviceMatrix, matrixPath } from "../DeviceMatrix";
 import { ResponsivePreview } from "../ResponsivePreview";
 
 const captureEmulatorDevice = vi.fn();
 const exportEmulatorDeviceGrid = vi.fn();
+const listEmulatorCustomDevices = vi.fn(async (): Promise<unknown> => ({ success: true, data: [] }));
+const listEmulatorPersonas = vi.fn(async (): Promise<unknown> => ({ success: true, data: [] }));
 Object.defineProperty(window, "electronAPI", {
-	value: { captureEmulatorDevice, exportEmulatorDeviceGrid },
+	value: { captureEmulatorDevice, exportEmulatorDeviceGrid, listEmulatorCustomDevices, listEmulatorPersonas },
 	writable: true,
 });
 
@@ -39,6 +42,7 @@ const done = (deviceId: string, report: ResponsiveReport | null, conditions: Par
 		width: 393,
 		height: 852,
 		previewSession: false,
+		persona: null,
 		...conditions,
 	},
 });
@@ -53,6 +57,7 @@ const report = (overrides: Partial<ResponsiveReport>): ResponsiveReport => ({
 });
 
 function reset(entries = {}) {
+	useDeviceLibraryStore.setState({ customDevices: [], personas: [], loaded: false, problem: null });
 	useDeviceMatrixStore.setState({
 		selected: ["iphone-15"],
 		entries,
@@ -62,6 +67,8 @@ function reset(entries = {}) {
 		cpu: "1x",
 		orientation: "portrait",
 		previewSession: false,
+		persona: null,
+		scan: null,
 		showMarkers: true,
 		autoCaptured: [],
 		exporting: false,
@@ -99,7 +106,7 @@ describe("DeviceMatrix", () => {
 		await waitFor(() =>
 			expect(screen.getAllByText("The emulator's server is not running: start it, then capture again.")).toHaveLength(2),
 		);
-		const plain = { network: "none", cpu: "1x", orientation: "portrait", previewSession: false };
+		const plain = { network: "none", cpu: "1x", orientation: "portrait", previewSession: false, persona: null };
 		expect(captureEmulatorDevice).toHaveBeenCalledWith({ deviceId: "iphone-15", path: "/cart", ...plain });
 		expect(captureEmulatorDevice).toHaveBeenCalledWith({ deviceId: "pixel-8", path: "/cart", ...plain });
 	});
@@ -127,6 +134,7 @@ describe("DeviceMatrix", () => {
 			cpu: "6x",
 			orientation: "portrait",
 			previewSession: false,
+			persona: null,
 		});
 	});
 
@@ -139,7 +147,7 @@ describe("DeviceMatrix", () => {
 			"Landscape",
 		]);
 		fireEvent.change(orientation, { target: { value: "landscape" } });
-		fireEvent.click(screen.getByLabelText(/Use the preview's session/));
+		fireEvent.change(screen.getByLabelText("Session"), { target: { value: "preview" } });
 		fireEvent.click(screen.getByRole("button", { name: "Capture 1 device" }));
 		await waitFor(() =>
 			expect(screen.getByText("The preview's session could not be read: capture again without it.")).toBeInTheDocument(),
@@ -329,6 +337,47 @@ describe("DeviceMatrix", () => {
 		expect(onCapture).toHaveBeenCalledWith("data:image/png;base64,AA==", "http://localhost:5173/cart#iphone-15");
 		fireEvent.click(screen.getByRole("button", { name: "Clear the captures" }));
 		expect(document.querySelectorAll("figure[data-device]")).toHaveLength(0);
+	});
+
+	it("loads the custom devices and personas once, and shows them like catalogue devices", async () => {
+		const custom = {
+			id: "custom-11111111-2222-4333-8444-555555555555",
+			name: "Flip 6",
+			category: "phone" as const,
+			width: 360,
+			height: 748,
+			deviceScaleFactor: 3,
+			mobile: true,
+			touch: true,
+			userAgent: "UA",
+		};
+		const persona = {
+			id: "persona-11111111-2222-4333-8444-555555555555",
+			name: "Admin",
+			host: "http://localhost",
+			cookieCount: 2,
+			savedAt: 0,
+		};
+		listEmulatorCustomDevices.mockResolvedValueOnce({ success: true, data: [custom] });
+		listEmulatorPersonas.mockResolvedValueOnce({ success: true, data: [persona] });
+		reset({ [custom.id]: done(custom.id, report({}), { width: 748, height: 360, orientation: "landscape", persona: persona.id }) });
+		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
+		const tile = await screen.findByAltText("The page rendered on Flip 6");
+		const figure = within(tile.closest("figure") as HTMLElement);
+		expect(figure.getByText("Landscape · Persona Admin · Loaded in 1.2 s")).toBeInTheDocument();
+		expect(screen.getByRole("option", { name: "Persona: Admin" })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "All" }));
+		expect(screen.getByRole("button", { name: "Capture 11 devices" })).toBeEnabled();
+		expect(listEmulatorCustomDevices).toHaveBeenCalledTimes(1);
+	});
+
+	it("names a persona that is gone by its id, and stays quiet when the lists cannot be read", async () => {
+		listEmulatorCustomDevices.mockRejectedValueOnce(new Error("bridge gone"));
+		listEmulatorPersonas.mockResolvedValueOnce({ success: false, error: "write-failed" });
+		reset({ "pixel-8": done("pixel-8", report({}), { persona: "persona-gone" }) });
+		render(<DeviceMatrix serverUrl="http://localhost:5173" currentUrl="http://localhost:5173/" />);
+		expect(await screen.findByText("Persona persona-gone · Loaded in 1.2 s")).toBeInTheDocument();
+		expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 	});
 
 	it("offers no keep button without a review to keep it for", () => {

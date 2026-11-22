@@ -58,6 +58,9 @@ describe("createReplayAPI sharing", () => {
 			["p1", "x"],
 		],
 		[() => api.openReplayTeamShare("link"), IPC_CHANNELS.REPLAY_OPEN_TEAM_SHARE, ["link"]],
+		[() => api.listMyReplayTeamShares(), IPC_CHANNELS.REPLAY_LIST_MY_TEAM_SHARES, []],
+		[() => api.getReplayUsage(), IPC_CHANNELS.REPLAY_GET_USAGE, []],
+		[() => api.getReplayTeamUsage("p1"), IPC_CHANNELS.REPLAY_GET_TEAM_USAGE, ["p1"]],
 	])("%#: forwards on its channel", async (run, channel, args) => {
 		invokeIpc.mockClear();
 		await run();

@@ -3,6 +3,10 @@
 Kept in `<spec_dir>/pr_followup.json`, next to the task's other records, so
 that a restart of the app picks the loop up where it was: how many fix rounds
 were spent, which head was pushed last, which review threads were answered.
+
+`first_ci` is what the CI said of the PR before the follow-through pushed any
+fix ("passed" or "failed"), written once: "How you compare" reads it as the
+spec's first-run CI result (`shared_features/build_compare_quality.py`).
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ from typing import Any
 
 STATE_FILENAME = "pr_followup.json"
 _HISTORY_CAP = 50
+FIRST_CI_VERDICTS = ("passed", "failed")
 
 
 @dataclass
@@ -29,6 +34,9 @@ class FollowupState:
     """Heads on which a fix round produced no commit: retrying the same head
     would spend a round to produce nothing again."""
     no_checks_polls: int = 0
+    first_ci: str = ""
+    """passed or failed: the CI's verdict on the first head it judged; ""
+    until then."""
     history: list[dict[str, Any]] = field(default_factory=list)
 
     def record(self, kind: str, head_sha: str, detail: str = "") -> None:
@@ -63,6 +71,8 @@ def load_state(spec_dir: Path) -> FollowupState:
     if isinstance(heads, list):
         state.no_progress_heads = [str(h) for h in heads]
     state.no_checks_polls = _int(raw.get("no_checks_polls"))
+    first_ci = raw.get("first_ci")
+    state.first_ci = first_ci if first_ci in FIRST_CI_VERDICTS else ""
     history = raw.get("history")
     if isinstance(history, list):
         state.history = [h for h in history if isinstance(h, dict)][-_HISTORY_CAP:]

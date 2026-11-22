@@ -14,10 +14,12 @@
  *  - GitHub Actions: GITHUB_TOKEN (or gh CLI) + GITHUB_REPO (or CICD_GITHUB_TOKEN)
  *  - GitLab CI:      GITLAB_TOKEN (or glab CLI) + GITLAB_PROJECT [+ GITLAB_INSTANCE_URL]
  *                    (or CICD_GITLAB_TOKEN / CICD_GITLAB_PROJECT_ID)
+ *  - Bitbucket:      BITBUCKET_ENABLED + BITBUCKET_WORKSPACE + BITBUCKET_REPO + BITBUCKET_TOKEN
+ *                    [+ BITBUCKET_USERNAME] (ipc-handlers/bitbucket/pipelines-adapter.ts)
  *  - Jenkins:        CICD_JENKINS_URL + CICD_JENKINS_JOB + CICD_JENKINS_TOKEN
  *                    [+ CICD_JENKINS_USER] — multibranch job layout
  *
- * Provider selection: explicit CICD_PROVIDER=azure|github|gitlab|jenkins,
+ * Provider selection: explicit CICD_PROVIDER=azure|github|gitlab|bitbucket|jenkins,
  * otherwise auto-detected in that order from available credentials.
  */
 
@@ -34,6 +36,7 @@ import {
 	getGitLabConfig,
 	normalizeProjectReference,
 } from "./ipc-handlers/gitlab/utils";
+import { bitbucketPipelinesAdapter } from "./ipc-handlers/bitbucket/pipelines-adapter";
 
 const MAX_ERROR_LINES = 40;
 
@@ -557,7 +560,7 @@ function resolveJenkinsConfig(env: MergedEnv): JenkinsProviderConfig | null {
  * Resolve the CI provider adapter for a project.
  *
  * Explicit CICD_PROVIDER wins; otherwise the first provider with complete
- * credentials is used (Azure → GitHub → GitLab → Jenkins). Returns null when
+ * credentials is used (Azure → GitHub → GitLab → Bitbucket → Jenkins). Returns null when
  * no provider is configured — the polling service then skips the project.
  */
 export async function resolvePipelineProvider(
@@ -594,6 +597,9 @@ export async function resolvePipelineProvider(
 		case "gitlab":
 		case "gitlab-ci":
 			return buildGitLab();
+		case "bitbucket":
+		case "bitbucket-pipelines":
+			return bitbucketPipelinesAdapter(env);
 		case "jenkins":
 			return buildJenkins();
 		case "none":
@@ -604,6 +610,10 @@ export async function resolvePipelineProvider(
 	}
 
 	return (
-		buildAzure() ?? buildGitHub() ?? (await buildGitLab()) ?? buildJenkins()
+		buildAzure() ??
+		buildGitHub() ??
+		(await buildGitLab()) ??
+		bitbucketPipelinesAdapter(env) ??
+		buildJenkins()
 	);
 }

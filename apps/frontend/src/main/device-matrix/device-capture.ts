@@ -33,7 +33,7 @@ import type {
 	NetworkProfile,
 	ResponsiveReport,
 } from "../../shared/types/device-matrix";
-import { sharePreviewCookies } from "./preview-session";
+import { type CookieCopy, copyCookies, sharePreviewCookies } from "./preview-session";
 import { buildProbe, sanitizeReport } from "./responsive-probe";
 
 /** Le temps laissé à une application monopage pour se dessiner après `load`, multiplié par le ralentissement du processeur. */
@@ -65,16 +65,27 @@ export interface Throttling {
 	readonly cpu: CpuProfile;
 }
 
-/** Ce que la capture emprunte à l'aperçu. */
+/** Ce que la capture emprunte à l'aperçu, ou à un persona. */
 export interface CaptureOptions {
 	/** Copier les cookies de l'aperçu pour l'origine rendue. */
 	readonly previewSession: boolean;
+	/** Les cookies déchiffrés d'un persona, posés avant le chargement (`personas.ts`). */
+	readonly persona?: readonly CookieCopy[];
+}
+
+/** La page chargée sur l'appareil, prête à être lue ou photographiée. */
+export interface DevicePage {
+	readonly wc: Electron.WebContents;
+	readonly send: Send;
+	/** Durée du chargement jusqu'à `load`, en millisecondes. */
+	readonly loadMs: number;
+	readonly origin: string;
 }
 
 /** Sans bridage : ni le réseau ni le processeur ne sont touchés. */
 export const NO_THROTTLING: Throttling = { network: NETWORK_PROFILES[0], cpu: CPU_PROFILES[0] };
 
-type Send = (method: string, params?: Record<string, unknown>) => Promise<unknown>;
+export type Send = (method: string, params?: Record<string, unknown>) => Promise<unknown>;
 
 const guardedPartitions = new Set<string>();
 
@@ -103,10 +114,10 @@ export function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
 	]).finally(() => clearTimeout(timer));
 }
 
-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+export const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** L'appareil, posé avant le chargement. */
-async function emulate(send: Send, device: DevicePreset): Promise<void> {
+/** L'appareil, posé avant le chargement (et à chaque largeur d'une relecture). */
+export async function emulate(send: Send, device: DevicePreset): Promise<void> {
 	await send("Emulation.setDeviceMetricsOverride", {
 		width: device.width,
 		height: device.height,
@@ -150,15 +161,18 @@ async function throttle(send: Send, { network, cpu }: Throttling): Promise<void>
 }
 
 /**
- * Rend `url` sur `device`. `url` est déjà résolue par le handler sur l'origine
- * du serveur lancé par l'émulateur ; la fenêtre n'en sort pas.
+ * Charge `url` sur `device` dans la fenêtre cachée, puis passe la page à
+ * `work`. `url` est déjà résolue par le handler sur l'origine du serveur lancé
+ * par l'émulateur ; la fenêtre n'en sort pas. Fenêtre détruite et session
+ * vidée quoi qu'il arrive.
  */
-export async function captureDevice(
+export async function withDevicePage<T>(
 	device: DevicePreset,
 	url: string,
-	throttling: Throttling = NO_THROTTLING,
-	options: CaptureOptions = { previewSession: false },
-): Promise<DeviceShot> {
+	throttling: Throttling,
+	options: CaptureOptions,
+	work: (page: DevicePage) => Promise<T>,
+): Promise<T> {
 	const origin = new URL(url).origin;
 	const win = new BrowserWindow({
 		show: false,
@@ -188,9 +202,10 @@ export async function captureDevice(
 		wc.setUserAgent(device.userAgent);
 		await emulate(send, device);
 		await throttle(send, throttling);
-		if (options.previewSession) {
+		if (options.previewSession || options.persona) {
 			try {
-				await sharePreviewCookies(captureSession(), origin);
+				if (options.persona) await copyCookies(captureSession(), origin, options.persona);
+				else await sharePreviewCookies(captureSession(), origin);
 			} catch {
 				throw new DeviceCaptureFailure("session-failed");
 			}
@@ -203,9 +218,34 @@ export async function captureDevice(
 		}
 		const loadMs = Date.now() - started;
 		await wait(SETTLE_MS * throttling.cpu.rate);
-		const raw = await wc
-			.executeJavaScriptInIsolatedWorld(PROBE_WORLD_ID, [{ code: buildProbe(device) }])
-			.catch(() => null);
+		return await work({ wc, send, loadMs, origin });
+	} finally {
+		try {
+			if (wc.debugger.isAttached()) wc.debugger.detach();
+		} catch {
+			// parti avec la fenêtre
+		}
+		win.destroy();
+		await captureSession()
+			.clearStorageData()
+			.catch(() => undefined);
+	}
+}
+
+/** Le script de lecture dans son monde isolé ; `null` quand la page ne répond pas. */
+export function runProbe(wc: Electron.WebContents, code: string): Promise<unknown> {
+	return wc.executeJavaScriptInIsolatedWorld(PROBE_WORLD_ID, [{ code }]).catch(() => null);
+}
+
+/** Rend `url` sur `device`, le photographie et le lit. */
+export function captureDevice(
+	device: DevicePreset,
+	url: string,
+	throttling: Throttling = NO_THROTTLING,
+	options: CaptureOptions = { previewSession: false },
+): Promise<DeviceShot> {
+	return withDevicePage(device, url, throttling, options, async ({ wc, send, loadMs, origin }) => {
+		const raw = await runProbe(wc, buildProbe(device));
 		const shot = (await send("Page.captureScreenshot", {
 			format: "png",
 			captureBeyondViewport: false,
@@ -221,20 +261,10 @@ export async function captureDevice(
 			report: sanitizeReport(raw),
 			loadMs,
 		};
-	} finally {
-		try {
-			if (wc.debugger.isAttached()) wc.debugger.detach();
-		} catch {
-			// parti avec la fenêtre
-		}
-		win.destroy();
-		await captureSession()
-			.clearStorageData()
-			.catch(() => undefined);
-	}
+	});
 }
 
-function sameOrigin(target: string, origin: string): boolean {
+export function sameOrigin(target: string, origin: string): boolean {
 	try {
 		return new URL(target).origin === origin;
 	} catch {

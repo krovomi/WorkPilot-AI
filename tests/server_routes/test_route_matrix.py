@@ -299,6 +299,8 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/api/features/replay-shares"): scoped("lab.read"),
     ("POST", "/api/features/replay-shares/{share_id}/open"): scoped("lab.read"),
     ("DELETE", "/api/features/replay-shares/{share_id}"): scoped("lab.write"),
+    ("GET", "/api/features/replay-shares/mine"): needs("lab.read"),
+    ("GET", "/api/features/replay-shares/usage"): scoped("lab.read"),
     # Governance of a server project: reading is the audit domain, the rest
     # carries the permission of the act (approving, stopping, exporting).
     ("GET", "/api/features/governance"): scoped("audit.read"),

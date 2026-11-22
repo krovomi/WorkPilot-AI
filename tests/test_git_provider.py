@@ -223,10 +223,10 @@ class TestDetectGitProviderEdgeCases:
         assert provider == "unknown"
 
     def test_unknown_provider(self, temp_repo_dir):
-        """Test unknown provider (Bitbucket)."""
+        """Test unknown provider (Codeberg)."""
         mock_result = MagicMock(
             returncode=0,
-            stdout="git@bitbucket.org:user/repo.git\n",
+            stdout="git@codeberg.org:user/repo.git\n",
         )
 
         with patch("foundation.git_provider.run_git", return_value=mock_result):
@@ -345,8 +345,10 @@ class TestClassifyHostname:
         assert _classify_hostname("code-gitlab.enterprise") == "unknown"
 
     def test_bitbucket(self):
-        """Test classification of Bitbucket (unknown)."""
-        assert _classify_hostname("bitbucket.org") == "unknown"
+        """Bitbucket Cloud and its subdomains, never a look-alike host."""
+        assert _classify_hostname("bitbucket.org") == "bitbucket"
+        assert _classify_hostname("altssh.bitbucket.org") == "bitbucket"
+        assert _classify_hostname("bitbucket.org.evil.example") == "unknown"
 
     def test_custom_domain(self):
         """Test classification of custom domain without keywords."""
