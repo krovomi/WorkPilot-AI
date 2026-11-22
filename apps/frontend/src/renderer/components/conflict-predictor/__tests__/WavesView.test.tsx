@@ -509,8 +509,15 @@ describe("WavesView, sprint metrics", () => {
 		expect(screen.queryByTestId("wave-run-history")).toBeNull();
 		unmount();
 		useExecutionWavesStore.setState({ history: { ...history, projectId: PROJECT } });
-		render(<WavesView />);
+		const again = render(<WavesView />);
 		expect(screen.getByTestId("wave-run-history")).toBeInTheDocument();
+		expect(screen.queryByTestId("merge-conflict-times")).toBeNull();
+		again.unmount();
+		// The merge conflict times come with the history.
+		const conflicts = { entries: [{ taskId: "a", detectedAt: new Date().toISOString(), resolvedAt: null }], ignored: false };
+		useExecutionWavesStore.setState({ history: { ...history, conflicts, projectId: PROJECT } });
+		render(<WavesView />);
+		expect(screen.getByTestId("merge-conflict-times")).toHaveTextContent("1 conflict still open.");
 	});
 });
 

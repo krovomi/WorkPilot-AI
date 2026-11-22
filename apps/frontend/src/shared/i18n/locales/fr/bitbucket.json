@@ -1,0 +1,117 @@
+{
+	"checking": "Vérification de la connexion à Bitbucket…",
+	"refresh": "Actualiser",
+	"openInBitbucket": "Ouvrir dans Bitbucket",
+	"notConnected": {
+		"title": "Bitbucket n'est pas connecté",
+		"description": "Activez Bitbucket dans les réglages du projet et donnez-lui un jeton et un dépôt.",
+		"openSettings": "Ouvrir les réglages Bitbucket"
+	},
+	"tabs": {
+		"pullRequests": "Pull requests",
+		"pipelines": "Pipelines"
+	},
+	"issues": {
+		"filter": "État des issues",
+		"filters": {
+			"open": "Ouvertes",
+			"closed": "Fermées",
+			"all": "Toutes"
+		},
+		"search": "Rechercher une issue",
+		"check": "Sélectionner l'issue n° {{id}}",
+		"importChecked_one": "Importer {{count}} en tâche",
+		"importChecked_other": "Importer {{count}} en tâches",
+		"importOne": "Importer en tâche",
+		"importResult": "{{imported}} importée(s), {{failed}} en échec.",
+		"none": "Aucune issue dans cet état.",
+		"noMatch": "Aucune issue ne correspond à la recherche.",
+		"select": "Sélectionnez une issue pour l'afficher ici.",
+		"noDescription": "Aucune description.",
+		"trackerOff": "Le suivi des issues est désactivé",
+		"trackerOffDescription": "Ce dépôt Bitbucket n'a pas de suivi des issues. Activez-le dans les réglages du dépôt sur bitbucket.org.",
+		"states": {
+			"new": "Nouvelle",
+			"open": "Ouverte",
+			"resolved": "Résolue",
+			"on hold": "En attente",
+			"invalid": "Invalide",
+			"duplicate": "Doublon",
+			"wontfix": "Ne sera pas corrigée",
+			"closed": "Fermée"
+		},
+		"kinds": {
+			"bug": "Bug",
+			"enhancement": "Amélioration",
+			"proposal": "Proposition",
+			"task": "Tâche"
+		}
+	},
+	"comments": {
+		"title": "Commentaires",
+		"loading": "Chargement des commentaires…",
+		"none": "Aucun commentaire."
+	},
+	"pullRequests": {
+		"filter": "État des pull requests",
+		"states": {
+			"OPEN": "Ouverte",
+			"MERGED": "Fusionnée",
+			"DECLINED": "Refusée",
+			"SUPERSEDED": "Remplacée"
+		},
+		"draft": "brouillon",
+		"none": "Aucune pull request dans cet état.",
+		"select": "Sélectionnez une pull request pour l'afficher ici.",
+		"noDescription": "Aucune description.",
+		"branches": "{{source}} vers {{destination}}",
+		"files": "Fichiers modifiés",
+		"loadingDiff": "Chargement des modifications…",
+		"diffTruncated": "Le diff est trop long : seul son début est affiché."
+	},
+	"pipelines": {
+		"build": "Build n° {{number}}",
+		"none": "Aucun pipeline pour l'instant.",
+		"states": {
+			"SUCCESSFUL": "Réussi",
+			"FAILED": "Échoué",
+			"ERROR": "Erreur",
+			"STOPPED": "Arrêté",
+			"IN_PROGRESS": "En cours",
+			"PENDING": "En attente",
+			"PAUSED": "En pause",
+			"EXPIRED": "Expiré",
+			"NOT_RUN": "Non lancé"
+		}
+	},
+	"errors": {
+		"checkConnection": "Impossible de vérifier la connexion à Bitbucket.",
+		"loadIssues": "Impossible de charger les issues Bitbucket.",
+		"import": "Impossible d'importer les issues.",
+		"loadPullRequests": "Impossible de charger les pull requests.",
+		"loadDetail": "Impossible de charger toute cette pull request.",
+		"loadPipelines": "Impossible de charger les pipelines."
+	},
+	"settings": {
+		"title": "Intégration Bitbucket",
+		"description": "Connecter un dépôt Bitbucket Cloud pour ses issues, ses pull requests et ses pipelines",
+		"enable": "Activer Bitbucket",
+		"enableDescription": "Afficher les issues et les pull requests de ce dépôt, et ouvrir la pull request d'une tâche sur Bitbucket.",
+		"username": "Nom d'utilisateur ou e-mail",
+		"usernameDescription": "Avec un jeton d'API ou un mot de passe d'application, l'e-mail ou le nom d'utilisateur du compte. Laissez vide pour un jeton d'accès de dépôt ou d'espace de travail.",
+		"token": "Jeton",
+		"tokenDescription": "Un jeton d'API, un mot de passe d'application ou un jeton d'accès qui lit les issues, les pull requests et les pipelines, et écrit les pull requests pour en ouvrir. Il est stocké chiffré.",
+		"workspace": "Espace de travail",
+		"repo": "Dépôt",
+		"repoDescription": "Rempli depuis le remote bitbucket.org du projet s'il est vide. Vous pouvez aussi coller espace/dépôt ou une URL de clone.",
+		"connectionStatus": "État de la connexion",
+		"checkConnection": "Tester",
+		"checkUsesSaved": "Le test utilise les réglages enregistrés.",
+		"notChecked": "Pas encore testé",
+		"checking": "Vérification…",
+		"connectedTo": "Connecté à {{repo}}",
+		"notConnected": "Non connecté",
+		"autoSync": "Charger les issues à l'ouverture du projet",
+		"autoSyncDescription": "Récupérer les issues Bitbucket dès l'ouverture du projet."
+	}
+}

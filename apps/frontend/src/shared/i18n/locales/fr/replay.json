@@ -239,7 +239,8 @@
 			"share_revoked": "Ce lien a été révoqué. Demandez-en un nouveau.",
 			"too_many_shares": "Ce projet a déjà autant de liens ouverts qu'il peut en garder. Révoquez-en un d'abord.",
 			"empty_reply": "Écrivez quelque chose avant d'envoyer une réponse.",
-			"too_many_replies": "Ce signet a déjà autant de réponses qu'il peut en garder."
+			"too_many_replies": "Ce signet a déjà autant de réponses qu'il peut en garder.",
+			"bad_usage": "Les chiffres d'usage sont revenus sous une forme inattendue."
 		},
 		"video": {
 			"export": "Exporter une vidéo (WebM)",
@@ -321,5 +322,35 @@
 		"writtenBy": "Écrit par un modèle ({{model}}) à partir des étapes enregistrées, masquées comme pour un export.",
 		"recording": "Un résumé se demande une fois l'enregistrement de la session terminé.",
 		"noProvider": "Choisissez un provider par défaut dans les Réglages pour résumer les étapes."
+	},
+	"usage": {
+		"kicker": "Usage",
+		"title": "Comment vos rejeux sont partagés",
+		"none": "—",
+		"percent": "{{value}} %",
+		"weekOf": "Semaine du {{date}}",
+		"local": {
+			"perWeek": "Exports par semaine",
+			"exports": "Exports, {{weeks}} dernières semaines",
+			"annotated": "Sessions avec un signet",
+			"discussed": "Signets discutés",
+			"summarized": "Résumées par un modèle",
+			"imported": "Importées",
+			"weekCount_one": "{{count}} export",
+			"weekCount_other": "{{count}} exports",
+			"where": "Compté sur cet ordinateur, à partir de ses sessions et des fichiers, pages, vidéos et liens qu'il a produits. Rien n'est envoyé nulle part."
+		},
+		"team": {
+			"title": "Liens d'équipe de {{project}}",
+			"links": "Liens créés, {{days}} derniers jours",
+			"openRate": "Liens ouverts",
+			"opens": "Ouvertures",
+			"active": "Ouverts en ce moment",
+			"annotated": "Partagés avec un signet",
+			"sharers": "Personnes qui partagent",
+			"weekCount_one": "{{count}} lien",
+			"weekCount_other": "{{count}} liens",
+			"where": "Calculé par votre serveur WorkPilot pour ce projet seulement, en totaux : aucun titre, aucune personne, aucun lien. Rien n'est envoyé ailleurs."
+		}
 	}
 }

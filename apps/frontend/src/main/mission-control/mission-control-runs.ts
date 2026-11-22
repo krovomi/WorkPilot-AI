@@ -21,7 +21,10 @@
  * looping (it says so in the reply to an update, and the run is stopped), is
  * handed to `/rebalance` before its failure is recorded. The backend decides
  * (another Claude profile, another provider, a bigger model, or nothing) and
- * moves the agent; the same task then starts again on its new model.
+ * moves the agent; the same task then starts again on its new model. When
+ * nothing is left to try, the backend may start a helper beside it instead: the
+ * stuck agent records its failure, and the helper (an agent card of its own,
+ * whose task the backend wrote) runs in the same project.
  */
 
 import { mkdtempSync, rmSync } from "node:fs";
@@ -105,15 +108,20 @@ function post(deps: MissionControlDeps, agentId: string, body: unknown) {
 	});
 }
 
-type RebalanceReply = { rebalance?: { action: string }; agent?: AgentConfig };
+type RebalanceReply = {
+	rebalance?: { action: string; helper_id?: string };
+	agent?: AgentConfig;
+};
 
-/** The agent's new configuration when the backend rebalanced it, else null. */
+/** What the backend did: moved the agent, started a helper beside it, or nothing. */
+type Rebalanced = { moved: AgentConfig } | { helper: string } | null;
+
 async function rebalance(
 	deps: MissionControlDeps,
 	agentId: string,
 	error: string,
 	rateLimit: SDKRateLimitInfo | null,
-): Promise<AgentConfig | null> {
+): Promise<Rebalanced> {
 	const reply = await deps.backendFetch<RebalanceReply>(
 		`/api/mission-control/agents/${agentId}/rebalance`,
 		{
@@ -126,7 +134,9 @@ async function rebalance(
 		},
 	);
 	if (!reply.success || !reply.agent || !reply.rebalance) return null;
-	return reply.rebalance.action === "none" ? null : reply.agent;
+	const { action, helper_id: helper } = reply.rebalance;
+	if (action === "helper") return isAgentId(helper) ? { helper } : null;
+	return action === "none" ? null : { moved: reply.agent };
 }
 
 /** Is a run of this agent in progress in this process? */
@@ -269,12 +279,16 @@ async function runAgent(
 		const reason = looped
 			? "The answer kept repeating itself"
 			: failure || "No response from the provider";
-		const moved = await rebalance(deps, agentId, reason, rateLimit);
-		if (moved && !stopped()) {
-			await restart(deps, agentId, moved, prompt, projectDir);
+		const done = await rebalance(deps, agentId, reason, rateLimit);
+		if (done && "moved" in done && !stopped()) {
+			await restart(deps, agentId, done.moved, prompt, projectDir);
 			return;
 		}
 		await post(deps, agentId, { status: "error", error: reason.slice(0, MAX_ERROR_CHARS) });
+		if (done && "helper" in done && !stopped()) {
+			const helped = await startMissionControlAgent(deps, done.helper, "", projectDir);
+			if (!helped.success) logger.warn("[MissionControl] Helper did not start:", helped.error);
+		}
 	} catch (error) {
 		logger.warn("[MissionControl] Run failed:", error);
 		if (!stopped()) {

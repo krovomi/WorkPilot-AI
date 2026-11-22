@@ -9,6 +9,8 @@ const authedFetch = vi.hoisted(() => vi.fn());
 vi.mock("../../../server-connection", () => ({ authedFetch }));
 vi.mock("../utils/subprocess-runner", () => ({ getBackendPath: () => null }));
 vi.mock("../../../source-env", () => ({ loadBackendEnv: () => ({}) }));
+const saveConventionsAs = vi.hoisted(() => vi.fn());
+vi.mock("../review-conventions", () => ({ saveConventionsAs }));
 
 import type { Project } from "../../../../shared/types";
 import { signature } from "../review-feedback-dataset";
@@ -16,6 +18,7 @@ import {
 	decideServerHeld,
 	recordServerFeedback,
 	resetServerRule,
+	saveServerConventions,
 	serverFeedback,
 	serverFeedbackStats,
 } from "../review-feedback-server";
@@ -42,6 +45,7 @@ function record(i: number, extra: Record<string, unknown> = {}) {
 
 beforeEach(() => {
 	authedFetch.mockReset();
+	saveConventionsAs.mockReset();
 });
 
 describe("one PR", () => {
@@ -148,6 +152,27 @@ describe("the project-wide view", () => {
 		]);
 	});
 
+	it("counts the server's saved reviews by month", async () => {
+		authedFetch.mockResolvedValueOnce({
+			ok: true,
+			data: {
+				...overview,
+				reviews: [
+					{ pr: 3, at: "2026-11-02T10:00:00", findings: 4 },
+					{ pr: 2, at: "2026-11-01T10:00:00", findings: 1 },
+					{ pr: 1, at: "not a date", findings: 9 },
+				],
+			},
+		});
+
+		const result = await serverFeedbackStats(PROJECT);
+
+		if (!result.success) throw new Error("expected the stats");
+		expect(result.stats.months).toEqual([
+			{ month: "2026-11", reviews: 2, findings: 5, rulesLearned: 1 },
+		]);
+	});
+
 	it("bounds a long note, and reads an answer of the wrong shape as an empty view", async () => {
 		authedFetch.mockResolvedValueOnce({
 			ok: true,
@@ -159,7 +184,13 @@ describe("the project-wide view", () => {
 
 		authedFetch.mockResolvedValueOnce({
 			ok: true,
-			data: { dataset: 7, threshold: "9; rm -rf /", maintainer: "yes", held: {} },
+			data: {
+				dataset: 7,
+				threshold: "9; rm -rf /",
+				maintainer: "yes",
+				held: {},
+				reviews: "many",
+			},
 		});
 		await expect(serverFeedbackStats(PROJECT)).resolves.toEqual({
 			success: true,
@@ -167,6 +198,7 @@ describe("the project-wide view", () => {
 				threshold: 3,
 				categories: [],
 				rules: [],
+				months: [],
 				server: { maintainer: false, held: [] },
 			},
 		});
@@ -215,5 +247,33 @@ describe("the project-wide view", () => {
 			success: false,
 			error: "write_failed",
 		});
+	});
+});
+
+describe("the conventions file (lot 4)", () => {
+	it("is built from the server's dataset and threshold, then saved here", async () => {
+		const saved = { success: true, path: "/home/me/repo/review-conventions.md", rules: 1 };
+		saveConventionsAs.mockResolvedValue(saved);
+		authedFetch.mockResolvedValueOnce({
+			ok: true,
+			data: { dataset: `${JSON.stringify(record(0))}\n`, threshold: 4 },
+		});
+
+		await expect(saveServerConventions(PROJECT)).resolves.toEqual(saved);
+
+		expect(authedFetch).toHaveBeenCalledWith(`${ROUTE}/feedback?${Q}`, "GET");
+		const [records, threshold] = saveConventionsAs.mock.calls[0] ?? [];
+		expect(records).toEqual([expect.objectContaining({ findingId: "f0" })]);
+		expect(threshold).toBe(4);
+	});
+
+	it("saves nothing when the server does not answer", async () => {
+		authedFetch.mockResolvedValueOnce({ ok: false, error: "HTTP 403" });
+
+		await expect(saveServerConventions(PROJECT)).resolves.toEqual({
+			success: false,
+			error: "not_found",
+		});
+		expect(saveConventionsAs).not.toHaveBeenCalled();
 	});
 });

@@ -188,6 +188,9 @@ describe("export", () => {
 			"/out/r.wpreplay",
 			Buffer.from([0x1f, 0x8b, 0]),
 		);
+		// Counted on this machine once written, by its kind only.
+		expect(fetchMock.mock.calls[1][0]).toBe("http://127.0.0.1:9000/replay/usage/exports");
+		expect(sent(1)).toEqual({ kind: "wpreplay" });
 	});
 
 	it("writes nothing the backend did not build as asked", async () => {
@@ -212,6 +215,8 @@ describe("export", () => {
 
 		expect(result).toEqual({ success: true, canceled: true });
 		expect(files.writeFile).not.toHaveBeenCalled();
+		// A closed dialog is not an export.
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 
 	it("passes the backend's refusal on and asks for no file", async () => {

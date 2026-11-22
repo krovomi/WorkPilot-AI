@@ -62,6 +62,7 @@ describe("server needs-you channels", () => {
 			review_ready: true,
 			failed: true,
 			approval_escalated: true,
+			review_feedback_held: true,
 		});
 		expect(result.data?.locale).toBe("fr");
 	});
@@ -131,6 +132,7 @@ describe("server needs-you channels", () => {
 				review_ready: true,
 				failed: false,
 				approval_escalated: true,
+				review_feedback_held: true,
 			},
 			locale: "en",
 		});
