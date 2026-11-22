@@ -13,6 +13,7 @@ A spec directory in a task worktree (``<root>/.workpilot/worktrees/tasks/<t>/
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -62,6 +63,10 @@ def _number(value: Any) -> float:
 
 
 _cache: dict[str, tuple[tuple[int, int], list[Usage]]] = {}
+# A rewrite of the same size inside one tick of a coarse clock (Windows,
+# FAT: up to 2 s) keeps the modification time. A ledger read that soon after
+# its last write is not kept, like git's "racy" index entries.
+RACY_NS = 2_000_000_000
 
 
 def usages(root: Path) -> list[Usage]:
@@ -74,7 +79,6 @@ def usages(root: Path) -> list[Usage]:
         info = path.stat()
     except OSError:
         return []
-    # Modification time and size: two writes in one clock tick still differ.
     stamp = (info.st_mtime_ns, info.st_size)
     cached = _cache.get(str(path))
     if cached and cached[0] == stamp:
@@ -101,7 +105,10 @@ def usages(root: Path) -> list[Usage]:
                 at=_when(row.get("timestamp")),
             )
         )
-    _cache[str(path)] = (stamp, found)
+    if time.time_ns() - info.st_mtime_ns > RACY_NS:
+        _cache[str(path)] = (stamp, found)
+    else:
+        _cache.pop(str(path), None)
     return found
 
 

@@ -341,11 +341,15 @@ def test_the_review_is_posted_with_its_verdict_and_the_ai_comments_answered(revi
         "review",
         "5",
         "--request-changes",
-        "--body",
-        result.summary,
+        "--body-file",
+        "-",
         "-R",
         "own/repo",
     ]
+    # The multi-line summary goes on stdin: a newline does not survive a
+    # command line on Windows (cmd.exe ends it there).
+    read = zip(review.gh.calls(), review.gh.stdins(), strict=True)
+    assert [s for c, s in read if c[:2] == ["pr", "review"]] == [result.summary]
     # Replies go to the comment's thread, as a literal field; trivial verdicts
     # and triages without a reply are left alone, a refused reply is skipped.
     assert calls[1:] == [
