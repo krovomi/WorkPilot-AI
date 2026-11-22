@@ -1448,6 +1448,12 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_LOGIN_SSO: "server-auth:login-sso",
 	SERVER_AUTH_LOGOUT: "server-auth:logout",
 	SERVER_AUTH_LOOKUP_INVITE: "server-auth:lookup-invite",
+	// A forgotten password (main/server-password-reset.ts): ask for a link,
+	// read it, set the new password; a platform admin issues a link.
+	SERVER_AUTH_REQUEST_PASSWORD_RESET: "server-auth:request-password-reset",
+	SERVER_AUTH_LOOKUP_PASSWORD_RESET: "server-auth:lookup-password-reset",
+	SERVER_AUTH_CONFIRM_PASSWORD_RESET: "server-auth:confirm-password-reset",
+	SERVER_AUTH_ISSUE_PASSWORD_RESET: "server-auth:issue-password-reset",
 	SERVER_AUTH_RESTORE: "server-auth:restore",
 	SERVER_AUTH_REVOKE_INVITE: "server-auth:revoke-invite",
 	SERVER_AUTH_SET_MODE: "server-auth:set-mode",

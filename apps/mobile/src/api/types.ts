@@ -33,6 +33,8 @@ export interface AuthConfig {
 	sso_scopes?: unknown;
 	sso_authorization_endpoint?: unknown;
 	sso_token_endpoint?: unknown;
+	/** The server emails a reset link to a forgotten password; otherwise an administrator issues it. */
+	password_reset_by_email?: boolean;
 }
 
 export interface Organization {

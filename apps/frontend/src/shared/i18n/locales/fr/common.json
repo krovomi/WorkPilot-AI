@@ -1598,7 +1598,25 @@
 		"localAccountButton": "Connexion",
 		"localModeButton": "Mode local",
 		"haveInvite": "J'ai une invitation",
+		"forgotPassword": "Mot de passe oublié ?",
 		"failed": "Connexion impossible"
+	},
+	"passwordReset": {
+		"title": "Réinitialiser votre mot de passe",
+		"askDescription": "Saisissez l'e-mail de votre compte : si le serveur le connaît, il vous envoie un lien pour choisir un nouveau mot de passe.",
+		"setDescription": "Collez le lien reçu, puis choisissez votre nouveau mot de passe. Vos autres sessions seront fermées.",
+		"noEmail": "Ce serveur ne peut pas envoyer d'e-mail. Demandez un lien de réinitialisation à un administrateur du serveur (Administration, Membres), puis choisissez « J'ai un lien ».",
+		"send": "Envoyer le lien",
+		"sent": "Si un compte utilise cette adresse, un lien est en route. Il sert une fois et expire bientôt.",
+		"haveLink": "J'ai un lien",
+		"needLink": "Il me faut un lien",
+		"link": "Lien ou code de réinitialisation",
+		"forAccount": "Pour le compte {{email}}",
+		"newPassword": "Nouveau mot de passe",
+		"save": "Enregistrer mon mot de passe",
+		"invalidLink": "Ce lien de réinitialisation est invalide ou a expiré",
+		"failed": "Le mot de passe n'a pas pu être réinitialisé",
+		"done": "Votre mot de passe a été changé. Connectez-vous avec le nouveau."
 	},
 	"acceptInvite": {
 		"title": "Créer votre compte",

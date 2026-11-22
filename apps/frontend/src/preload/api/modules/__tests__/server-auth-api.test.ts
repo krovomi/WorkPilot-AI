@@ -26,4 +26,17 @@ describe("createServerAuthAPI", () => {
 		await createServerAuthAPI().getSession();
 		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_AUTH_GET_SESSION);
 	});
+
+	it("forwards the forgotten-password calls on their own channels", async () => {
+		const api = createServerAuthAPI();
+		const url = "https://wp.example.test";
+		await api.requestPasswordReset(url, "a@x.test");
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_AUTH_REQUEST_PASSWORD_RESET, url, "a@x.test");
+		await api.lookupPasswordReset(url, "link");
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_AUTH_LOOKUP_PASSWORD_RESET, url, "link");
+		await api.confirmPasswordReset(url, "link", "pw");
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_AUTH_CONFIRM_PASSWORD_RESET, url, "link", "pw");
+		await api.issuePasswordReset("u1");
+		expect(invokeIpc).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_AUTH_ISSUE_PASSWORD_RESET, "u1");
+	});
 });

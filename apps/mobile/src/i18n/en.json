@@ -42,6 +42,27 @@
 		"sso": "Sign in with single sign-on",
 		"ssoRefused": "The server refused this account."
 	},
+	"forgotPassword": {
+		"open": "Forgot password?",
+		"title": "Forgotten password",
+		"askDescription": "Enter your account's email: the server sends you a link to choose a new password.",
+		"setDescription": "Paste the link you received (or its code), then choose your new password.",
+		"noEmail": "This server can't send email. Ask a server administrator for a reset link, then come back here with it.",
+		"send": "Send the link",
+		"sent": "If an account uses this address, a link is on its way. It works once, for a limited time.",
+		"haveLink": "I have a link",
+		"needLink": "I need a link",
+		"link": "Reset link or code",
+		"newPassword": "New password",
+		"confirm": "Confirm password",
+		"minLength": "At least {{count}} characters.",
+		"mismatch": "The passwords do not match.",
+		"save": "Set my password",
+		"invalidLink": "This reset link is invalid or has expired. Ask for a new one.",
+		"failed": "The password could not be reset: {{message}}",
+		"done": "Your password was changed. Sign in with the new one.",
+		"back": "Back to sign-in"
+	},
 	"unreachable": {
 		"title": "Server unreachable",
 		"body": "Your session is kept. Check your connection, then try again.",

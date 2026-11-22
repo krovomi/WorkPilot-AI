@@ -334,6 +334,8 @@ class ServerSettings:
     # Optional Have I Been Pwned k-anonymity check on new passwords.
     # Off by default so the server stays fully offline-capable.
     password_hibp_check: bool
+    # How long a password reset link stays usable.
+    password_reset_ttl_minutes: int
 
     # SMTP for transactional email (invitation links). All empty => email
     # disabled and the API returns the invite link for manual delivery.
@@ -428,6 +430,9 @@ class ServerSettings:
             invitation_ttl_hours=_env_int("WORKPILOT_INVITATION_TTL_HOURS", 72),
             password_min_length=_env_int("WORKPILOT_PASSWORD_MIN_LENGTH", 12),
             password_hibp_check=_env_bool("WORKPILOT_PASSWORD_HIBP_CHECK", False),
+            password_reset_ttl_minutes=_env_int(
+                "WORKPILOT_PASSWORD_RESET_TTL_MINUTES", 60
+            ),
             smtp_host=os.environ.get("WORKPILOT_SMTP_HOST", ""),
             smtp_port=_env_int("WORKPILOT_SMTP_PORT", 587),
             smtp_user=os.environ.get("WORKPILOT_SMTP_USER", ""),

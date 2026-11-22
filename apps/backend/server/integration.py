@@ -30,6 +30,9 @@ PUBLIC_PATHS = {
     "/auth/config",
     "/auth/invitations/lookup",
     "/auth/invitations/accept",
+    "/auth/password-reset/request",
+    "/auth/password-reset/lookup",
+    "/auth/password-reset/confirm",
     "/health",
     "/docs",
     "/openapi.json",
@@ -396,6 +399,7 @@ def mount_server_mode(app: FastAPI) -> bool:
 
     for module_path, label in (
         ("server.routers.invitations", "invitations"),
+        ("server.routers.password_reset", "password-reset"),
         ("server.routers.projects", "projects"),
         ("server.routers.specs", "specs"),
         ("server.routers.users", "users"),

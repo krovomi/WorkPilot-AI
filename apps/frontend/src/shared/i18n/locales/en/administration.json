@@ -40,6 +40,15 @@
 		"recentFailures": "Recent failures"
 	},
 	"members": {
+		"passwordReset": {
+			"action": "Reset password",
+			"actionNamed": "Reset the password of {{name}}",
+			"sent": "A reset link was emailed to {{email}}.",
+			"copyLink": "No email went: send this link to {{email}} yourself. It works once, until {{expires}}.",
+			"copy": "Copy the link",
+			"copied": "Copied",
+			"failed": "The reset link could not be issued"
+		},
 		"empty": "No members yet.",
 		"active": "Active",
 		"inactive": "Disabled",

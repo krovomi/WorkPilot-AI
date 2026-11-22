@@ -85,6 +85,9 @@ async def auth_config() -> dict:
         "entra_enabled": settings.entra_enabled,
         "entra_tenant_id": settings.entra_tenant_id or None,
         "entra_client_id": settings.entra_client_id or None,
+        # "Forgot password?" sends a link by email; without SMTP, an
+        # administrator issues it.
+        "password_reset_by_email": settings.email_enabled,
         **await _sso_config(),
     }
 
