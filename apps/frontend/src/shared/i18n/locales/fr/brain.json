@@ -102,17 +102,26 @@
 			"identity": "git ne sait pas qui committe : lancez « git config --global user.name \"Votre nom\" » et « git config --global user.email vous@exemple.com ».",
 			"rejected": "GitHub a refusé l'envoi (branche protégée, ou dépôt modifié ailleurs entre-temps). Resynchronisez ; si ça persiste, voyez le détail ci-dessous.",
 			"pathTooLong": "Un chemin du vault est trop long pour Windows : lancez « git config --global core.longpaths true ».",
-			"invalidModel": "Ce n'est pas un nom de modèle Ollama."
+			"invalidModel": "Ce n'est pas un nom de modèle local.",
+			"invalidProvider": "Ce n'est pas un serveur local que cette vérification sait interroger (Ollama ou LM Studio)."
 		},
 		"gitSaid": "git a répondu :",
 		"embeddings": {
 			"title": "Trouver les conflits de mémoire formulés autrement",
-			"hint": "Quand Ollama a déjà un modèle d'embeddings, une synchronisation lui demande aussi quelles notes veulent dire la même chose, pour signaler deux notes qui se contredisent sans mots en commun. Rien n'est téléchargé et rien ne quitte cette machine ; sans modèle, seuls les mots en commun comptent.",
+			"hint": "Quand Ollama ou LM Studio a déjà un modèle d'embeddings, une synchronisation lui demande aussi quelles notes veulent dire la même chose, pour signaler deux notes qui se contredisent sans mots en commun. Rien n'est téléchargé et rien ne quitte cette machine ; sans modèle, seuls les mots en commun comptent.",
 			"model": "Modèle d'embeddings",
-			"modelPlaceholder": "Automatique : le premier modèle d'embeddings d'Ollama",
-			"modelHint": "Un modèle déjà téléchargé dans Ollama (par exemple nomic-embed-text ou bge-m3). Si Ollama ne l'a pas, la vérification est sautée : il n'est jamais téléchargé.",
+			"modelPlaceholder": "Automatique : le premier modèle d'embeddings du serveur",
+			"modelHint": "Un modèle que le serveur a déjà (par exemple nomic-embed-text ou bge-m3 dans Ollama, text-embedding-nomic-embed-text-v1.5 dans LM Studio). Si aucun serveur ne l'a, la vérification est sautée : il n'est jamais téléchargé.",
 			"save": "Enregistrer le modèle",
-			"locked": "Imposé par la variable d'environnement {{variable}}."
+			"locked": "Imposé par la variable d'environnement {{variable}}.",
+			"provider": "Serveur local",
+			"providerAuto": "Automatique : Ollama, sinon LM Studio",
+			"providerOllama": "Ollama",
+			"providerLmStudio": "LM Studio",
+			"providerHint": "Un serveur choisi ici est le seul interrogé.",
+			"searching": "Recherche d'un modèle d'embeddings local…",
+			"found": "Trouvé : {{model}} dans {{provider}}.",
+			"notFound": "Aucun modèle d'embeddings local trouvé : seuls les mots en commun comptent."
 		}
 	}
 }

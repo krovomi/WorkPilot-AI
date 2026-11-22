@@ -113,8 +113,11 @@ class FakeOllama:
 def ollama(monkeypatch):
     fake = FakeOllama()
     monkeypatch.setenv("OLLAMA_BASE_URL", fake.url)
+    # No LM Studio: a real one on this machine is never asked by a test.
+    monkeypatch.setenv("LMSTUDIO_BASE_URL", "http://127.0.0.1:9")
     monkeypatch.delenv(embeddings.SWITCH_ENV, raising=False)
     monkeypatch.delenv(embeddings.MODEL_ENV, raising=False)
+    monkeypatch.delenv(embeddings.PROVIDER_ENV, raising=False)
     monkeypatch.delenv("BRAIN_CONFLICT_STALE_DAYS", raising=False)
     yield fake
     fake.close()
@@ -463,6 +466,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("WORKPILOT_BRAIN_CONFIG", str(tmp_path / "brain.json"))
     monkeypatch.delenv(embeddings.SWITCH_ENV, raising=False)
     monkeypatch.delenv(embeddings.MODEL_ENV, raising=False)
+    monkeypatch.delenv(embeddings.PROVIDER_ENV, raising=False)
     app = FastAPI()
     app.include_router(brain_api.router)
     return TestClient(app)
@@ -482,8 +486,10 @@ class TestSettingsRoute:
         assert reply["settings"]["conflictEmbeddings"] == {
             "enabled": False,
             "model": "bge-m3",
+            "provider": "",
             "enabledLocked": False,
             "modelLocked": False,
+            "providerLocked": False,
         }
         reply = post(client, {"conflict_embeddings_model": ""})
         assert reply["settings"]["conflictEmbeddings"]["model"] == ""

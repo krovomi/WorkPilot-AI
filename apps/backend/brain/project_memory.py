@@ -635,16 +635,23 @@ class ProjectMemory:
             )
         ]
 
-    def unverified_pattern_ids(self) -> set[str]:
-        """The learning loop's patterns whose note no trusted key signed: kept
-        by its store, never put in a prompt."""
+    def unrecalled_pattern_ids(self) -> set[str]:
+        """The learning loop's patterns this memory's agents do not get: the
+        notes no trusted key signed (`lifecycle.provenance`) and those its
+        `audience` does not recall (another branch, another team:
+        `lifecycle.scopes.recalled`). Kept by the store, which rewrites them
+        all; never put in a prompt nor answered by ``mem_search``."""
         hidden = self.unverified_notes()
-        if not hidden:
+        if not hidden and self.audience is None:
             return set()
         return {
             str(meta[LEARNED].get("pattern_id") or "")
             for rel, meta, _ in self._notes("pattern", learned=True, everything=True)
             if rel in hidden
+            or (
+                self.audience is not None
+                and not scopes.recalled(meta.get("applies_to"), self.audience)
+            )
         }
 
     def forget(

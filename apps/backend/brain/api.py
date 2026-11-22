@@ -92,7 +92,10 @@ class SettingsRequest(BaseModel):
     conflict_embeddings: bool | None = None
     """Let a local embeddings model find memory conflicts in other words."""
     conflict_embeddings_model: str | None = None
-    """The Ollama model it uses; ``""`` for the first one Ollama has."""
+    """The local model it uses; ``""`` for the first one the server has."""
+    conflict_embeddings_provider: str | None = None
+    """The local server it asks (``ollama``, ``lm-studio``); ``""`` for Ollama,
+    else LM Studio."""
 
 
 class InstructionRequest(BaseModel):
@@ -304,8 +307,10 @@ def _embeddings_view() -> dict:
     return {
         "enabled": embeddings.enabled(),
         "model": embeddings.configured_model(),
+        "provider": embeddings.configured_provider(),
         "enabledLocked": bool(os.environ.get(embeddings.SWITCH_ENV, "").strip()),
         "modelLocked": bool(os.environ.get(embeddings.MODEL_ENV, "").strip()),
+        "providerLocked": bool(os.environ.get(embeddings.PROVIDER_ENV, "").strip()),
     }
 
 
@@ -321,8 +326,17 @@ def _save_embeddings(request: SettingsRequest) -> str | None:
             return "env-locked"
         if not embeddings.valid_model(model):
             return "invalid-model"
+    provider = request.conflict_embeddings_provider
+    if provider is not None:
+        if view["providerLocked"]:
+            return "env-locked"
+        provider = embeddings.valid_provider(provider)
+        if provider is None:
+            return "invalid-provider"
     if request.conflict_embeddings is not None and view["enabledLocked"]:
         return "env-locked"
+    if provider is not None:
+        write_config(**{embeddings.CONFIG_PROVIDER: provider or None})
     if model is not None:
         write_config(**{embeddings.CONFIG_MODEL: model or None})
     if request.conflict_embeddings is not None:
@@ -335,6 +349,27 @@ def get_settings() -> dict:
     if _refused():
         return _DESKTOP_ONLY
     return {"success": True, "settings": settings_view()}
+
+
+@router.get("/settings/embeddings")
+def get_embeddings_found() -> dict:
+    """Which local server and model a sync's review would ask now, if any.
+
+    Its own route: asking the servers waits on them (a timeout each), and the
+    settings page should not. ``found`` is ``None`` when the check is off or
+    no local server has an embedding model.
+    """
+    if _refused():
+        return _DESKTOP_ONLY
+    from .lifecycle import embeddings
+
+    found = embeddings.find() if embeddings.enabled() else None
+    return {
+        "success": True,
+        "found": (
+            {"provider": found.provider, "model": found.model} if found else None
+        ),
+    }
 
 
 def _unexpected(what: str) -> dict:

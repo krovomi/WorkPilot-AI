@@ -52,6 +52,7 @@ const ERROR_KEYS: Record<string, string> = {
 	rejected: "brain:settings.errors.rejected",
 	"path-too-long": "brain:settings.errors.pathTooLong",
 	"invalid-model": "brain:settings.errors.invalidModel",
+	"invalid-provider": "brain:settings.errors.invalidProvider",
 };
 
 export function BrainSettings() {

@@ -102,17 +102,26 @@
 			"identity": "git does not know who is committing: run “git config --global user.name \"Your name\"” and “git config --global user.email you@example.com”.",
 			"rejected": "GitHub refused the push (protected branch, or the repository changed elsewhere meanwhile). Sync again; if it persists, see the detail below.",
 			"pathTooLong": "A path in the vault is too long for Windows: run “git config --global core.longpaths true”.",
-			"invalidModel": "That is not an Ollama model name."
+			"invalidModel": "That is not a local model name.",
+			"invalidProvider": "That is not a local server this check can ask (Ollama or LM Studio)."
 		},
 		"gitSaid": "git said:",
 		"embeddings": {
 			"title": "Find memory conflicts in other words",
-			"hint": "When Ollama already has an embeddings model, a sync also asks it which notes mean the same thing, to flag two that disagree without sharing words. Nothing is downloaded and nothing leaves this machine; without a model, only shared words count.",
+			"hint": "When Ollama or LM Studio already has an embeddings model, a sync also asks it which notes mean the same thing, to flag two that disagree without sharing words. Nothing is downloaded and nothing leaves this machine; without a model, only shared words count.",
 			"model": "Embeddings model",
-			"modelPlaceholder": "Automatic: the first embeddings model Ollama has",
-			"modelHint": "A model already pulled in Ollama (for example nomic-embed-text or bge-m3). If Ollama does not have it, the check is skipped: it is never pulled.",
+			"modelPlaceholder": "Automatic: the first embeddings model the server has",
+			"modelHint": "A model the server already has (for example nomic-embed-text or bge-m3 in Ollama, text-embedding-nomic-embed-text-v1.5 in LM Studio). If no server has it, the check is skipped: it is never downloaded.",
 			"save": "Save the model",
-			"locked": "Set by the environment variable {{variable}}."
+			"locked": "Set by the environment variable {{variable}}.",
+			"provider": "Local server",
+			"providerAuto": "Automatic: Ollama, else LM Studio",
+			"providerOllama": "Ollama",
+			"providerLmStudio": "LM Studio",
+			"providerHint": "A server chosen here is the only one asked.",
+			"searching": "Looking for a local embeddings model…",
+			"found": "Found: {{model}} in {{provider}}.",
+			"notFound": "No local embeddings model found: only shared words count."
 		}
 	}
 }

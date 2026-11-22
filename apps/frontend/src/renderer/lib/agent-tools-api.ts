@@ -1415,12 +1415,23 @@ export interface BrainSettings {
 
 export interface BrainConflictEmbeddings {
 	readonly enabled: boolean;
-	/** The Ollama model; "" for the first embeddings model Ollama has. */
+	/** The local model; "" for the first embeddings model the server has. */
 	readonly model: string;
 	/** Set by `BRAIN_CONFLICT_EMBEDDINGS`: the switch does not win. */
 	readonly enabledLocked: boolean;
 	/** Set by `BRAIN_CONFLICT_EMBEDDINGS_MODEL`. */
 	readonly modelLocked: boolean;
+	/** The local server asked; "" for Ollama, else LM Studio. Absent from an older backend. */
+	readonly provider?: BrainEmbeddingsProvider | "";
+	/** Set by `BRAIN_CONFLICT_EMBEDDINGS_PROVIDER`. */
+	readonly providerLocked?: boolean;
+}
+
+export type BrainEmbeddingsProvider = "ollama" | "lm-studio";
+
+/** The local server and model a sync would ask now; null when none has one. */
+export interface BrainEmbeddingsFound {
+	readonly found: { readonly provider: BrainEmbeddingsProvider; readonly model: string } | null;
 }
 
 export interface BrainSettingsUpdate {
@@ -1432,8 +1443,10 @@ export interface BrainSettingsUpdate {
 	/** Create, clone or adopt the brain now. */
 	connect?: boolean;
 	conflict_embeddings?: boolean;
-	/** "" goes back to the first embeddings model Ollama has. */
+	/** "" goes back to the first embeddings model the server has. */
 	conflict_embeddings_model?: string;
+	/** "" goes back to Ollama, else LM Studio. */
+	conflict_embeddings_provider?: BrainEmbeddingsProvider | "";
 }
 
 export interface BrainNoteSummary {
@@ -1479,6 +1492,13 @@ export async function fetchBrainSettings(
 	signal?: AbortSignal,
 ): Promise<ApiResult<{ settings: BrainSettings }>> {
 	return _get<{ settings: BrainSettings }>("/api/brain/settings", {}, signal);
+}
+
+/** Asks the local servers, so it is its own call: the settings do not wait on it. */
+export async function fetchBrainEmbeddingsFound(
+	signal?: AbortSignal,
+): Promise<ApiResult<BrainEmbeddingsFound>> {
+	return _get<BrainEmbeddingsFound>("/api/brain/settings/embeddings", {}, signal);
 }
 
 export async function saveBrainSettings(
