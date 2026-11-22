@@ -3,8 +3,8 @@ feature: Retours sur la revue de PR
 summary: >-
   Chaque résultat d'une revue de PR s'accepte, se rejette ou se marque non applicable. Un type de
   remarque souvent rejeté est rétrogradé puis retiré, sur tous les providers ; sécurité et
-  critique jamais. Taux d'acceptation, réinitialisation, conventions ; sur un serveur, le rejet
-  d'un membre attend un propriétaire ; une remarque répétée au même endroit est fondue.
+  critique jamais. Taux d'acceptation, conventions ; sur un serveur, le rejet d'un membre attend
+  un propriétaire, prévenu ; remarques répétées fondues, remarques contraires tranchées.
 ---
 
 # Feedback on PR review findings (#361)
@@ -35,6 +35,8 @@ optional reason, from a closed list (`too_pedantic`, `project_convention`,
 | The dataset read as the backend reads it | `main/ipc-handlers/github/review-feedback-dataset.ts`, rules in `review-feedback-stats.ts`, file in `review-conventions.ts` |
 | Server projects (lot 3) | routes `apps/backend/shared_features/forge_review_feedback.py`; app side `main/ipc-handlers/github/review-feedback-server.ts`; held list `renderer/components/github-prs/components/ReviewFeedbackHeld.tsx`, channel `GITHUB_PR_REVIEW_FEEDBACK_HELD_DECIDE` |
 | Self-check before posting (lot 3) | `apps/backend/runners/github/services/self_critique.py`, called by `orchestrator.review_pr` and `followup_review_pr` |
+| Contradictions (lot 4) | `apps/backend/runners/github/services/contradiction_check.py`, after the self-check, same callers |
+| Maintainers told of a held rejection (lot 4) | `apps/backend/shared_features/forge_review_feedback_notify.py`, moment `review_feedback_held` of `server/services/needs_you.py` |
 
 ## The dataset
 
@@ -179,8 +181,8 @@ closed shapes; the dataset, the held file and `.workpilot` are refused when a
 link leads them out of the clone. In the app, the handlers check every
 argument as for a local project, then send the call to the server; the stats
 are computed from the server's dataset with the same code
-(`computeStats`). The conventions file stays a local project's: a server's
-clone is nobody's working copy.
+(`computeStats`). A server's clone is nobody's working copy, so its
+conventions file is saved where the person chooses (lot 4, below).
 
 ### A newcomer's rejection waits for a maintainer
 
@@ -211,14 +213,63 @@ of all. The summary lists what was merged ("Self-check before posting"). It
 runs without a model, on every provider, in the initial review and in the
 follow-up, whose unresolved and new id lists lose the merged ids.
 
+## Contradictions (lot 4)
+
+Two specialists can ask for opposite changes at one place: add a check and
+remove it, inline a helper and extract it. Telling them apart needs to read
+them, so after the self-check the findings of one file at most ten lines apart
+whose wording differs are paired (twenty pairs at most), and one completion
+answers which pairs contradict each other. It goes through `agent_runtime`'s
+`oneshot_completion`: the provider the process runs on, its default model, no
+tool and no project, so it holds on Claude, Codex, Copilot, Ollama and every
+other provider. A review with no such pair asks nothing.
+
+Of a contradicting pair, the more severe finding stays, then a security one,
+then the more confident; the other leaves the review and the summary lists it
+("Contradictions removed before posting"). The follow-up review runs the same
+check; the dropped finding leaves its unresolved and new id lists, and the
+verdict stands, since the finding kept is at least as severe.
+
+The findings are model output written while reading the pull request (S2):
+title, detail and suggested fix go to the prompt as one bounded line each,
+cleaned and fenced (`quote_untrusted`). The answer is read through the pair
+ids sent: the model can only point at a pair it was shown, so it can make the
+review drop a finding, never add or change one. A security finding or a
+critical one never leaves this way, as with the learned suppressions. A
+failure, a timeout (two minutes) or an answer that does not parse leaves the
+review as it was. `WORKPILOT_REVIEW_CONTRADICTION_CHECK=0` turns it off.
+
+## Telling the maintainers (lot 4)
+
+When a member's rejection starts a project's wait (the held list was empty),
+the project's maintainers hear of it on their own "needs you" channels (ntfy,
+Telegram, Teams), each in their language, unless they muted the moment
+"A member's rejection of a review finding waits for a maintainer" in
+Settings. One message per wait: the next comes once the list was cleared.
+The maintainers are those `is_maintainer` accepts (an owner of the project,
+by their own role or a group's; with no role on it, an organization
+administrator), active, twenty at most, never the person who rejected. The
+message carries the project's name and the PR number, never the finding,
+its note or who rejected it. Sending is off unless the operator turned it on
+(`WORKPILOT_NEEDS_YOU_ENABLED`), runs in the background and never fails the
+verdict. No route is added: the verdict's route schedules it.
+
+## The conventions file of a server project (lot 4)
+
+A server's clone is nobody's working copy, so the file is not written there.
+On a server project, the same button reads the server's dataset and its
+threshold (the route of the stats), builds the same file
+(`buildConventions`), and saves it where the person chooses in a native save
+dialog (`saveConventionsAs`), usually their own checkout, to commit it there.
+The path comes from the dialog, never from the renderer; a link there is
+refused, and the file goes through a fresh temporary name renamed over it.
+
 ## Left for later
 
-- Telling a maintainer that rejections wait, on their own channels: the
-  server's "needs you" notifications (ntfy, Telegram, Teams) are built around
-  a card's run; a new kind of event needs its own preferences and texts. The
-  held list is in the PR view's panel meanwhile.
-- Catching two remarks that ask for opposite changes: that needs a model call
-  per review. The parallel reviewer's finding-validator already re-reads each
-  finding against the code; the self-check stays deterministic.
-- The conventions file of a server project, which would need a place people
-  read and commit from.
+Nothing of what lots 1 to 3 left remains. Two ideas of the issue took another
+shape: the learned rules live in the dataset, not in the brain (see "The
+dataset" above), and a finding's confidence is shown as its severity, by
+which the PR view groups the findings, most severe first (`SEVERITY_ORDER`).
+Of the issue's metrics, the acceptance rate is in the panel; the findings per
+PR and the rules learned per month are not shown yet. Every figure is
+computed on the machine or on the team's server: nothing is sent elsewhere.

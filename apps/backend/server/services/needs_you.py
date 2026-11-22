@@ -20,6 +20,12 @@ key (``secrets.py``), never returned by a route (only that they are set),
 never logged. Sending runs in the background, is off unless the operator
 turns it on (``WORKPILOT_NEEDS_YOU_ENABLED``), and never fails a run.
 
+Two moments come from elsewhere, through :func:`notify_people`: a plan
+that waited too long (``approval_escalated``, ``approval_escalation.py``) and
+a member's rejection of a review finding waiting for a maintainer
+(``review_feedback_held``, ``shared_features/forge_review_feedback_notify.py``),
+which names the pull request's number in place of a card.
+
 Whether a plan still waits for approval is the board's answer
 (``review.state``): the server imports no feature unit, so the board installs
 it with :func:`set_approval_check`, as it does for push.
