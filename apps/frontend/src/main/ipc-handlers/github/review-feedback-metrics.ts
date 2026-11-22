@@ -13,7 +13,7 @@
  *   (the dataset is append-only, so its order is the verdicts' order).
  */
 
-import { lstatSync, readdirSync, readFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readdirSync, readSync } from "node:fs";
 import path from "node:path";
 import type { ReviewFeedbackMonth } from "../../../shared/types/review-feedback";
 import { resolveUnder } from "../../security/renderer-path";
@@ -61,14 +61,30 @@ export function reviewCount(
 	return count === null ? null : { pr, month, findings: count };
 }
 
+/**
+ * One saved review, read through the descriptor its type and size were
+ * checked on, so nothing can swap the file between the check and the read.
+ * O_NOFOLLOW refuses a link where it exists; Windows has none, so the name
+ * must still be the regular file that was opened. A file that grew since the
+ * check is read up to its checked size, and then is not JSON.
+ */
 function readReview(directory: string, name: string): unknown {
 	const file = path.join(directory, name);
+	let fd: number | null = null;
 	try {
-		const stat = lstatSync(file);
-		if (!stat.isFile() || stat.size > MAX_REVIEW_BYTES) return null;
-		return JSON.parse(readFileSync(file, "utf-8"));
+		// O_NOFOLLOW is undefined on Windows, and `| undefined` adds nothing.
+		fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+		const info = fstatSync(fd);
+		const named = lstatSync(file);
+		const same = named.isFile() && named.ino === info.ino && named.dev === info.dev;
+		if (!same || info.size > MAX_REVIEW_BYTES) return null;
+		const buffer = Buffer.alloc(info.size);
+		const read = readSync(fd, buffer, 0, info.size, 0);
+		return JSON.parse(buffer.subarray(0, read).toString("utf-8"));
 	} catch {
 		return null;
+	} finally {
+		if (fd !== null) closeSync(fd);
 	}
 }
 

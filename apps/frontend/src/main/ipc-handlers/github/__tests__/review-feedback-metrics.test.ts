@@ -122,12 +122,13 @@ describe("readReviewCounts", () => {
 		]);
 	});
 
-	it("skips a review too large to read and a link", () => {
+	it("skips a review too large to read, a link and a folder", () => {
 		save("review_1.json", "x".repeat(2_000_001));
 		const outside = path.join(root, "outside.json");
 		writeFileSync(outside, JSON.stringify({ reviewed_at: "2026-11-01T00:00:00", findings: [1] }));
 		symlinkSync(outside, path.join(reviews, "review_2.json"));
 		save("review_3.json", { reviewed_at: "2026-11-01T00:00:00", findings: [] });
+		mkdirSync(path.join(reviews, "review_4.json"));
 
 		expect(readReviewCounts(project).map((c) => c.pr)).toEqual([3]);
 	});
