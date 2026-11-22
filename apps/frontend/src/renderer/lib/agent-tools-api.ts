@@ -1409,6 +1409,18 @@ export interface BrainSettings {
 	readonly homeRoots?: readonly string[];
 	/** Where the folder picker opens under WSL: the Windows profile, else drive C. */
 	readonly browseRoot?: string | null;
+	/** A local embeddings model finding memory conflicts in other words. */
+	readonly conflictEmbeddings?: BrainConflictEmbeddings;
+}
+
+export interface BrainConflictEmbeddings {
+	readonly enabled: boolean;
+	/** The Ollama model; "" for the first embeddings model Ollama has. */
+	readonly model: string;
+	/** Set by `BRAIN_CONFLICT_EMBEDDINGS`: the switch does not win. */
+	readonly enabledLocked: boolean;
+	/** Set by `BRAIN_CONFLICT_EMBEDDINGS_MODEL`. */
+	readonly modelLocked: boolean;
 }
 
 export interface BrainSettingsUpdate {
@@ -1419,6 +1431,9 @@ export interface BrainSettingsUpdate {
 	enabled?: boolean;
 	/** Create, clone or adopt the brain now. */
 	connect?: boolean;
+	conflict_embeddings?: boolean;
+	/** "" goes back to the first embeddings model Ollama has. */
+	conflict_embeddings_model?: string;
 }
 
 export interface BrainNoteSummary {

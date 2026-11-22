@@ -184,7 +184,10 @@
 				"none": "no preference"
 			},
 			"escalated": "Decided {{date}} {{actor}}, and contradicted again: a maintainer settles it.",
-			"waitingMaintainer": "Waiting for a maintainer: {{names}}."
+			"waitingMaintainer": "Waiting for a maintainer: {{names}}.",
+			"foundBy": {
+				"embeddings": "Found by meaning (local model)"
+			}
 		},
 		"trash": {
 			"title": "Recently forgotten",
