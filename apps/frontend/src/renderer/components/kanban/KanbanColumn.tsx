@@ -1000,8 +1000,12 @@ export const DroppableColumn = memo(function DroppableColumn({
 						)}
 					</div>
 				</div>
-				{capacity && <ColumnGauge count={tasks.length} capacity={capacity} />}
-				{showPulse && <ColumnPulse items={pulse} />}
+				{(capacity || showPulse) && (
+					<div className="kanban-col-meta">
+						{showPulse && <ColumnPulse items={pulse} />}
+						{capacity && <ColumnGauge count={tasks.length} capacity={capacity} />}
+					</div>
+				)}
 				</div>
 
 				{/* Task list */}
