@@ -86,7 +86,17 @@ function metric(raw: unknown): DeployMetricCheck {
 		current: num(m.current),
 		changePct: num(m.change_pct),
 		level: oneOf(m.level, LEVELS, "unknown"),
+		canary: m.against === "stable",
 	};
+}
+
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+
+/** An ISO 8601 moment with its offset, as the runner writes them; "" otherwise. */
+export function isoTime(value: unknown): string {
+	return typeof value === "string" && ISO_TIME.test(value) && !Number.isNaN(Date.parse(value))
+		? value
+		: "";
 }
 
 function plan(raw: unknown): DeployRollbackPlan | undefined {
@@ -101,6 +111,7 @@ function plan(raw: unknown): DeployRollbackPlan | undefined {
 		targetSha: text(p.target_sha, 40),
 		targetUrl: url.startsWith("https://") ? url : "",
 		currentSha: text(p.current_sha, 40),
+		targetAt: isoTime(p.target_at),
 	};
 }
 
@@ -185,6 +196,10 @@ export function parseDeployWatch(raw: unknown, live: boolean): DeployWatch | und
 			? { rollback: s.rollback as DeployRollbackState }
 			: {}),
 		rollbackByPerson: s.rollback_by === "person",
+		linkedCause: s.rollback_by === "linked" ? text(s.linked_cause, 100) : "",
+		linkedOnly: s.reason === "linked_rollback",
+		...(isoTime(s.degraded_at) ? { degradedAt: isoTime(s.degraded_at) } : {}),
+		...(isoTime(s.rollback_at) ? { rollbackAt: isoTime(s.rollback_at) } : {}),
 		...(revertPr(s.revert_pr) ? { revertPr: revertPr(s.revert_pr) } : {}),
 		...(incident(s.incident) ? { incident: incident(s.incident) } : {}),
 		...(alerts(s.alerts) ? { alerts: alerts(s.alerts) } : {}),
@@ -262,7 +277,15 @@ export function readDeployWatch(
 	live: boolean,
 ): DeployWatch | undefined {
 	if (!RUN_ID.test(runId)) return undefined;
-	const file = deployWatchPath(projectPath, runId);
+	const raw = readJsonFile(deployWatchPath(projectPath, runId), MAX_STATE_BYTES);
+	return raw === undefined ? undefined : parseDeployWatch(raw, live);
+}
+
+/**
+ * The JSON of a regular file of at most `maxBytes`, or undefined: a link, a
+ * larger file or bad JSON is not read. Never throws.
+ */
+export function readJsonFile(file: string, maxBytes: number): unknown {
 	let fd: number | undefined;
 	try {
 		// One descriptor, opened without following a link: the file checked
@@ -275,13 +298,13 @@ export function readDeployWatch(
 			!named.isFile() ||
 			named.ino !== stat.ino ||
 			named.dev !== stat.dev ||
-			stat.size > MAX_STATE_BYTES
+			stat.size > maxBytes
 		) {
 			return undefined;
 		}
 		const buffer = Buffer.alloc(stat.size);
 		const read = fs.readSync(fd, buffer, 0, stat.size, 0);
-		return parseDeployWatch(JSON.parse(buffer.toString("utf-8", 0, read)), live);
+		return JSON.parse(buffer.toString("utf-8", 0, read)) as unknown;
 	} catch {
 		return undefined;
 	} finally {

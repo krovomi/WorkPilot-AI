@@ -1,6 +1,7 @@
 /**
  * The settings of the watch after a deployment that lot 3 of #366 added: the
- * metric source other than Prometheus (Datadog, New Relic, CloudWatch) and
+ * metric source other than Prometheus (Datadog, New Relic, CloudWatch, and
+ * Grafana since lot 4) and
  * the alert channels (Slack, PagerDuty, e-mail).
  *
  * Renderer field → `.workpilot/.env` key, like the rest of the CI/CD
@@ -27,6 +28,10 @@ export const WATCH_SOURCE_KEYS: Readonly<Record<string, string>> = {
 	monitor_aws_access_key_id: "CICD_MONITOR_AWS_ACCESS_KEY_ID",
 	monitor_aws_secret_access_key: "CICD_MONITOR_AWS_SECRET_ACCESS_KEY",
 	monitor_aws_session_token: "CICD_MONITOR_AWS_SESSION_TOKEN",
+	// Grafana (#366, lot 4): its URL, a service account token, a data source.
+	monitor_grafana_url: "CICD_MONITOR_GRAFANA_URL",
+	monitor_grafana_token: "CICD_MONITOR_GRAFANA_TOKEN",
+	monitor_grafana_datasource_uid: "CICD_MONITOR_GRAFANA_DATASOURCE_UID",
 };
 
 export const WATCH_ALERT_KEYS: Readonly<Record<string, string>> = {
@@ -64,6 +69,7 @@ const SOURCE_KEY: Readonly<Record<string, string>> = {
 	datadog: "CICD_MONITOR_DATADOG_API_KEY",
 	newrelic: "CICD_MONITOR_NEWRELIC_API_KEY",
 	cloudwatch: "CICD_MONITOR_AWS_SECRET_ACCESS_KEY",
+	grafana: "CICD_MONITOR_GRAFANA_URL",
 };
 
 /** The CI/CD settings name something to watch after a deployment. */

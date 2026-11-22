@@ -62,13 +62,14 @@
 		"monitor_deploy_wait_minutes": "Wait for the deployment to land (minutes)",
 		"auto_rollback": "Roll back by itself on a critical verdict",
 		"autoRollbackHint": "Off: the rollback is offered here. On: GitHub Actions and Azure Pipelines go back to the last run that succeeded, unless the change holds a database migration.",
-		"fileHint": "Metrics and thresholds: .workpilot/deploy-monitors.yaml (query in the source's language, kind error_rate, latency, throughput or custom, warning and critical in percent). revert_pr: true opens a PR that reverts the deployed commit after a critical verdict; explain_incident: false keeps the model out of the incident report.",
+		"fileHint": "Metrics and thresholds: .workpilot/deploy-monitors.yaml (query in the source's language, kind error_rate, latency, throughput or custom, warning and critical in percent; canary_query compares the canary with the stable fleet at each sample). revert_pr: true opens a PR that reverts the deployed commit after a critical verdict; explain_incident: false keeps the model out of the incident report.",
 		"monitor_source": "Metric source",
 		"sources": {
 			"prometheus": "Prometheus",
 			"datadog": "Datadog",
 			"newrelic": "New Relic",
-			"cloudwatch": "Amazon CloudWatch"
+			"cloudwatch": "Amazon CloudWatch",
+			"grafana": "Grafana"
 		},
 		"monitor_datadog_site": "Datadog site",
 		"monitor_datadog_api_key": "Datadog API key",
@@ -84,8 +85,12 @@
 			"prometheus": "Each metric's query is PromQL; a vector is summed.",
 			"datadog": "Each metric's query is a Datadog metric query; the newest point of each series over the last five minutes is summed.",
 			"newrelic": "Each metric's query is NRQL with its SINCE clause; the numbers of the result are summed.",
-			"cloudwatch": "Each metric's query is a Metrics Insights query or metric math; the newest value of each result over the last five minutes is summed."
-		}
+			"cloudwatch": "Each metric's query is a Metrics Insights query or metric math; the newest value of each result over the last five minutes is summed.",
+			"grafana": "Each metric's query is the data source's expression (PromQL for Prometheus or Mimir, LogQL for Loki); the newest value of each frame over the last five minutes is summed."
+		},
+		"monitor_grafana_url": "Grafana URL",
+		"monitor_grafana_token": "Grafana service account token",
+		"monitor_grafana_datasource_uid": "Grafana data source uid"
 	},
 	"watch": {
 		"notConfigured": "Not watched: no health check or metric is configured.",
@@ -161,6 +166,30 @@
 				"pagerduty": "PagerDuty",
 				"email": "e-mail"
 			}
+		},
+		"metricCanary": "{{name}} (canary): stable {{baseline}} → canary {{current}} ({{change}} %, {{level}})",
+		"withProject": "(with {{project}})",
+		"linkedByHand": "Roll back the linked services by hand too: {{projects}}.",
+		"confirmLinked": "Run the last good deployment again? These go back with it: {{projects}}.",
+		"linked": {
+			"started": "{{project}}: rollback started.",
+			"failed": "{{project}}: the rollback could not start.",
+			"blocked_migrations": "{{project}}: rollback blocked by a database migration.",
+			"manual": "{{project}}: roll back by hand.",
+			"not_deployed_since": "{{project}}: not deployed since the good version, nothing to roll back.",
+			"missing": "{{project}}: the project is no longer in the app.",
+			"error": "{{project}}: no answer from its rollback.",
+			"migrations": "Migrations: {{files}}.",
+			"openTarget": "last good run"
+		},
+		"review": {
+			"question": "Was this verdict right?",
+			"false_positive": "False alarm",
+			"confirmed": "Real problem"
+		},
+		"investigate": {
+			"selfHealing": "Investigate in Self-Healing",
+			"task": "Open the task"
 		}
 	},
 	"alerts": {
@@ -176,5 +205,30 @@
 		"alert_smtp_user": "SMTP user (optional)",
 		"alert_smtp_password": "SMTP password (optional)",
 		"offlineHint": "Strict offline mode: only a webhook or an SMTP server on this machine or a private address is used; PagerDuty is not called."
+	},
+	"links": {
+		"heading": "Services rolled back with this one",
+		"description": "When a rollback of this project starts, the projects switched on here go back too, each with its own CI/CD settings, to where they were at this project's last good run. A project not deployed since then is left as it is.",
+		"none": "No other project in the app."
+	},
+	"figures": {
+		"heading": "Watch figures",
+		"watches": "Watched deployments",
+		"verdicts": "Bad verdicts",
+		"verdictsValue": "{{critical}} critical, {{warning}} degraded",
+		"rollbacks": "Rollbacks",
+		"rollbacksValue": "{{automatic}} automatic, {{person}} asked by a person",
+		"incidentsAvoided": "Incidents avoided",
+		"timeToRollback": "Degradation to rollback",
+		"timeValue": "mean {{mean}}, median {{median}} ({{count}} timed)",
+		"falseAlarms": "False alarms",
+		"falseAlarmsValue": "{{rate}} % ({{count}} of {{reviewed}} reviewed verdicts; {{rollbacks}} needless rollback(s))",
+		"noReview": "no verdict reviewed yet",
+		"slow": "The median is above the three-minute goal: shorten the wait or the interval in .workpilot/deploy-monitors.yaml, or turn the automatic rollback on.",
+		"month": "Month",
+		"automatic": "Automatic",
+		"person": "By a person",
+		"critical": "Critical",
+		"local": "Computed on this machine from this project's watches; nothing is sent anywhere."
 	}
 }

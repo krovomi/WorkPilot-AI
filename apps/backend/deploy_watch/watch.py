@@ -53,18 +53,25 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def load_runs(project_dir: Path) -> list[dict]:
+    """The runs WorkPilot recorded in `.workpilot/cicd_runs.json`, newest first."""
+    path = Path(project_dir) / RUNS_FILE
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_RUNS_BYTES:
+        return []
+    try:
+        runs = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return []
+    return (
+        [run for run in runs if isinstance(run, dict)] if isinstance(runs, list) else []
+    )
+
+
 def find_run(project_dir: Path, run_id: str) -> dict:
     if not RUN_ID.match(run_id):
         raise WatchError("invalid run id")
-    path = Path(project_dir) / RUNS_FILE
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_RUNS_BYTES:
-        raise WatchError("unknown run")
-    try:
-        runs = json.loads(path.read_text(encoding="utf-8"))
-    except (ValueError, UnicodeDecodeError) as error:
-        raise WatchError("unknown run") from error
-    for run in runs if isinstance(runs, list) else []:
-        if isinstance(run, dict) and run.get("id") == run_id:
+    for run in load_runs(project_dir):
+        if run.get("id") == run_id:
             return run
     raise WatchError("unknown run")
 
@@ -134,11 +141,16 @@ def _sample(
     now: datetime,
 ) -> dict:
     values = _measure(settings, fetch, now)
-    checks = [
-        compare(rule, baseline.get(rule.name), values.get(rule.name))
-        for rule in settings.metrics
-        if settings.source
-    ]
+    checks = []
+    source = settings.source
+    for rule in settings.metrics if source is not None else ():
+        if rule.canary_query:
+            # Canary analysis: the canary against the stable fleet, now.
+            canary = source.value(rule.canary_query, fetch, now)
+            checks.append(compare(rule, values.get(rule.name), canary))
+        else:
+            checks.append(compare(rule, baseline.get(rule.name), values.get(rule.name)))
+    canaries = {rule.name for rule in settings.metrics if rule.canary_query}
     health: HealthResult | None = (
         health_check(settings.health_url, fetch) if settings.health_url else None
     )
@@ -146,7 +158,10 @@ def _sample(
         "at": now.isoformat(),
         "level": sample_level(checks, health).value,
         "health": health.to_dict() if health else None,
-        "metrics": [c.to_dict() for c in checks],
+        "metrics": [
+            {**c.to_dict(), **({"against": "stable"} if c.name in canaries else {})}
+            for c in checks
+        ],
     }
 
 
@@ -255,6 +270,9 @@ def run_watch(
         sample = _sample(settings, baseline, fetch, now())
         state["samples"].append(sample)
         levels.append(Level(sample["level"]))
+        if levels[-1] == Level.CRITICAL and levels[-2:-1] != [Level.CRITICAL]:
+            # Where the run of critical samples that ends the window began.
+            state["degraded_at"] = sample["at"]
         state["verdict"] = verdict(levels).value
         _save(project_dir, state, now())
         if state["verdict"] == Level.CRITICAL.value:
@@ -273,6 +291,8 @@ def run_watch(
         elif settings.auto_rollback:
             started_ok = execute_rollback(env, run, plan, fetch)
             state["rollback"] = "started" if started_ok else "failed"
+            if started_ok:
+                state["rollback_at"] = now().isoformat()
         else:
             state["rollback"] = "proposed"
     if state["verdict"] in (Level.WARNING.value, Level.CRITICAL.value):
@@ -317,6 +337,8 @@ def run_rollback(
         state["rollback"] = (
             "started" if execute_rollback(env, run, plan, fetch) else "failed"
         )
+        if state["rollback"] == "started":
+            state["rollback_at"] = now().isoformat()
     state["rollback_by"] = "person"
     _save(project_dir, state, now())
     return state

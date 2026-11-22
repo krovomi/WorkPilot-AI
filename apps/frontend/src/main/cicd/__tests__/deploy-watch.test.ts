@@ -33,6 +33,7 @@ const STATE = {
 			health: { ok: false, status: 503 },
 			metrics: [
 				{ name: "errors", kind: "error_rate", baseline: 0.01, current: 0.05, change_pct: 400, level: "critical" },
+				{ name: "canary", kind: "custom", baseline: 1, current: 2, change_pct: 100, level: "critical", against: "stable" },
 				{ name: "odd", kind: 3, baseline: "x", current: Number.NaN, level: "nope" },
 				"junk",
 			],
@@ -46,7 +47,10 @@ const STATE = {
 		target_sha: "a".repeat(40),
 		target_url: "https://github.com/acme/shop/actions/runs/10",
 		current_sha: "b".repeat(40),
+		target_at: "2026-11-15T08:00:00+00:00",
 	},
+	degraded_at: "2026-11-15T10:10:00.123456+00:00",
+	rollback_at: "yesterday",
 	migrations: ["db/migrate/1_add.rb"],
 	rollback: "blocked_migrations",
 	rollback_by: "person",
@@ -73,6 +77,9 @@ describe("watchConfigured", () => {
 		expect(
 			watchConfigured({ CICD_MONITOR_SOURCE: "cloudwatch", CICD_MONITOR_AWS_SECRET_ACCESS_KEY: "aws-0000" }),
 		).toBe(true);
+		expect(watchConfigured({ CICD_MONITOR_SOURCE: "grafana", CICD_MONITOR_GRAFANA_URL: "https://grafana.example" })).toBe(
+			true,
+		);
 		expect(watchConfigured({ CICD_MONITOR_SOURCE: "prometheus", CICD_MONITOR_PROMETHEUS_URL: "http://x" })).toBe(
 			true,
 		);
@@ -109,10 +116,16 @@ describe("parseDeployWatch", () => {
 			rollbackByPerson: true,
 		});
 		expect(watch?.lastMetrics).toEqual([
-			{ name: "errors", kind: "error_rate", baseline: 0.01, current: 0.05, changePct: 400, level: "critical" },
-			{ name: "odd", kind: "", baseline: null, current: null, changePct: null, level: "unknown" },
-			{ name: "", kind: "", baseline: null, current: null, changePct: null, level: "unknown" },
+			{ name: "errors", kind: "error_rate", baseline: 0.01, current: 0.05, changePct: 400, level: "critical", canary: false },
+			{ name: "canary", kind: "custom", baseline: 1, current: 2, changePct: 100, level: "critical", canary: true },
+			{ name: "odd", kind: "", baseline: null, current: null, changePct: null, level: "unknown", canary: false },
+			{ name: "", kind: "", baseline: null, current: null, changePct: null, level: "unknown", canary: false },
 		]);
+		// Times are kept only as the runner writes them.
+		expect(watch?.degradedAt).toBe("2026-11-15T10:10:00.123456+00:00");
+		expect(watch?.rollbackAt).toBeUndefined();
+		expect(watch?.linkedCause).toBe("");
+		expect(watch?.linkedOnly).toBe(false);
 		expect(watch?.plan).toEqual({
 			provider: "github",
 			reason: "rerun",
@@ -121,7 +134,22 @@ describe("parseDeployWatch", () => {
 			targetSha: "a".repeat(40),
 			targetUrl: "https://github.com/acme/shop/actions/runs/10",
 			currentSha: "b".repeat(40),
+			targetAt: "2026-11-15T08:00:00+00:00",
 		});
+	});
+
+	it("names the project a run went back with", () => {
+		const linked = parseDeployWatch(
+			{ ...STATE, rollback: "started", rollback_by: "linked", linked_cause: "API".repeat(50), reason: "linked_rollback" },
+			false,
+		);
+		expect(linked?.linkedCause).toBe("API".repeat(50).slice(0, 100));
+		expect(linked?.linkedOnly).toBe(true);
+		expect(parseDeployWatch({ ...STATE, linked_cause: "API" }, false)?.linkedCause).toBe("");
+		expect(parseDeployWatch({ ...STATE, rollback_at: "2026-11-15T10:12:00Z" }, false)?.rollbackAt).toBe(
+			"2026-11-15T10:12:00Z",
+		);
+		expect(parseDeployWatch({ ...STATE, rollback_at: "2026-13-01T10:00:00Z" }, false)?.rollbackAt).toBeUndefined();
 	});
 
 	it("refuses a link that is not https and a bad run id", () => {
