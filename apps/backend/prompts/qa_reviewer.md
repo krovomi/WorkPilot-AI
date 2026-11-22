@@ -85,6 +85,19 @@ Wait for all services to be healthy before proceeding.
 
 ## PHASE 3: RUN AUTOMATED TESTS
 
+### 3.0: Touched Tests First (fail fast)
+
+Before any long suite, run only the tests of the changed files and of the code
+that imports them, with each stack's own selection: the test files themselves,
+`vitest related <files>`, `jest --findRelatedTests <files>`, `pytest <test
+paths>`, `go test <changed packages>`, `cargo test -p <crate>`, `dotnet test
+<test project> --filter <class>`, `mvn -Dtest=<classes> test`.
+
+If one fails, **stop here**: skip 3.1 to 3.4 and Phase 7.1, REJECT with the
+failing tests in `issues_found`, and write `"full_suite": "not run: touched
+tests failed"` in `tests_passed`. The fixer gets the failure without waiting
+for the whole suite; the next review runs everything.
+
 ### 3.1: Unit Tests
 
 Run all unit tests for affected services:
