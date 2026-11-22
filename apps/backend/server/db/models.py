@@ -992,6 +992,41 @@ class ReplayShare(Base):
     bookmarks: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
+class McpServerReview(Base):
+    """A member's security review of a catalogue MCP server, kept with a
+    server project (#369, lot 5).
+
+    One review per person, project and server (``server_id`` is the id of the
+    app's MCP catalogue): writing again replaces it. ``verdict`` is one of a
+    closed list (``mcp_reviews.VERDICTS``); ``comment`` is plain text, shown
+    as text, never fed to a model. Reviews stay inside their project.
+    """
+
+    __tablename__ = "mcp_server_reviews"
+    __table_args__ = (
+        UniqueConstraint("project_id", "server_id", "author_id", name="uq_mcp_review"),
+        Index("ix_mcp_server_reviews_project", "project_id", "server_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    server_id: Mapped[str] = mapped_column(String(100))
+    author_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    author_name: Mapped[str] = mapped_column(String(200), default="")
+    verdict: Mapped[str] = mapped_column(String(16))
+    comment: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class LeaderboardConsent(Base):
     """Whether a person agreed to show by name on their organization's
     Pixel Office leaderboards (#350).

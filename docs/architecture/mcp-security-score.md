@@ -207,16 +207,40 @@ venue du renderer ne fait pas revenir en arrière le main.
 - **Tests** : `tests/core/test_mcp_confinement.py` (refus du champ, refus de lancement, chaque
   chemin), `confine-guard.test.ts`, `mcp-handlers-confined.test.ts`.
 
+## Avis de l'équipe (mode serveur, lot 5)
+
+Le score dit ce qui se lit de l'extérieur (registre, OSV, code publié) ; un avis dit ce qu'une
+équipe a vu en utilisant le serveur : « marche, mais appelle un hôte que la doc ne cite pas ». Dans
+un projet du serveur, la carte d'un serveur du catalogue montre, sous son score, les avis des
+membres du projet (`renderer/components/mcp-marketplace/McpServerReviews.tsx`) ; hors mode serveur
+elle n'en montre aucun.
+
+- **Ce qui est gardé** (`apps/backend/shared_features/mcp_reviews.py`, table `mcp_server_reviews`) :
+  l'id du catalogue (vérifié sur le motif des ids, le catalogue étant livré avec l'app et non avec
+  le serveur), un verdict d'une liste fermée (`safe`, `caution`, `unsafe`) et un commentaire de
+  texte brut, caractères de contrôle retirés, espaces repliés, 1 000 caractères au plus. Il est
+  affiché comme texte et n'est jamais donné à un modèle. Un membre a un avis par serveur : en
+  écrire un second remplace le premier. 2 000 avis par projet au plus ; une liste en rend 500.
+- **Qui y touche** : un avis ne quitte jamais son projet (`project_id` résolu par
+  `resolve_project_scope`, un projet d'un autre tenant répond 404). Lire est `marketplace.read` ;
+  écrire ou supprimer le sien est `marketplace.write`, accordé aux rôles contributeur et relecteur
+  (et donc mainteneur et administrateur), pas aux rôles lecteur, analyste et opérateur. Supprimer
+  l'avis d'un autre revient au propriétaire du projet ou à un administrateur de l'organisation.
+- **Côté app** : le renderer ne donne qu'un id de projet, un id du catalogue, un verdict et un
+  commentaire, ou un id d'avis ; `main/mcp-reviews.ts` les revérifie, ne parle qu'au serveur d'un
+  projet qu'il a listé (`getServerProject`) et relit la réponse champ par champ. Un lecteur du
+  projet lit les avis sans formulaire ; l'interface ne fait que masquer, le serveur refuse.
+
 ## Pas encore fait (suite de #369)
 
-- **Avis de sécurité de l'équipe en mode serveur** (table `mcp_server_reviews`, feature
-  `mcp_reviews`, permission `marketplace.write`, canaux IPC et vue dans le Marketplace) : PR
-  séparée de ce lot. Partager des avis entre organisations demande une décision : rien ne sort
-  d'une organisation aujourd'hui.
 - **Confinement sous `confineBelow`** : la politique s'applique quand l'app écrit la liste des
   serveurs ; un serveur écrit dans le `.env` hors de l'app n'est confiné qu'au prochain
   enregistrement de la liste. Le backend ne recalcule pas le score (il vit dans le main). Pas de
   bac à sable sous Windows (AppContainer prévu par `os_sandbox/`) : un serveur confiné n'y tourne pas.
+- **Avis au-delà du projet** : les avis de l'équipe restent dans leur projet. Les partager entre
+  les projets d'une organisation, ou entre organisations (avis communautaires), est une décision à
+  prendre (Leub) : rien ne quitte une organisation aujourd'hui, et un avis public demande un
+  service hébergé que l'app n'a pas. Les avis ne changent pas non plus le score.
 - **Signature cryptographique de l'éditeur** (provenance npm, sigstore) : vérifier une
   attestation demande une bibliothèque sigstore, nouvelle dépendance à justifier ; l'éditeur reste
   noté par `official`.

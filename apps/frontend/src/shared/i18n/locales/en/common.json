@@ -1263,6 +1263,31 @@
 				"newCodeFinding": "Version {{version}} brings code that the previous one did not have: {{rule}} ({{file}}).",
 				"sourceUnavailable": "The code of version {{version}} can no longer be read: it cannot be audited."
 			}
+		},
+		"reviews": {
+			"title": "Team reviews",
+			"hint": "What your team saw using this server. Only members of this server project read them.",
+			"loading": "Loading the reviews",
+			"none": "No one on the team has reviewed this server yet.",
+			"by": "by {{author}}",
+			"unknownAuthor": "a former member",
+			"delete": "Delete this review",
+			"write": "Your review",
+			"yours": "Your review (saving replaces it)",
+			"comment": "Comment",
+			"commentPlaceholder": "What did you see? Hosts it calls, files it reads, anything the docs do not say.",
+			"save": "Post the review",
+			"update": "Update the review",
+			"verdicts": {
+				"safe": "Safe",
+				"caution": "Use with caution",
+				"unsafe": "Unsafe"
+			},
+			"errors": {
+				"too_many_reviews": "This project holds as many reviews as it can.",
+				"review_not_found": "This review no longer exists.",
+				"failed": "The server refused or could not be reached."
+			}
 		}
 	},
 	"terminalGrid": {
