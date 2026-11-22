@@ -17,6 +17,7 @@ fichiers y renvoient.
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | vue d'ensemble : agents, sous-agents, workflows, état, couches de sécurité | référence |
 | [`CONFIGURATION.md`](CONFIGURATION.md) | providers, résolution des identifiants, variables d'environnement | référence |
 | [`CLI-USAGE.md`](CLI-USAGE.md) | utilisation en terminal et en CI | guide |
+| [`server-guide.md`](server-guide.md) | paramétrer, configurer et utiliser le serveur d'équipe, avec exemples et formats : `.env.server`, rôles, projets, quotas, app, téléphone, MCP, API | guide |
 | [`server-operations.md`](server-operations.md) | exploiter le serveur multi-utilisateurs d'une équipe : déploiement, TLS, sauvegarde, mise à jour, quotas, audit | guide |
 | [`MODEL_CATALOG.md`](MODEL_CATALOG.md) | mettre à jour le catalogue de modèles livré | guide |
 | [`RELEASE.md`](RELEASE.md) | publier une version | mainteneurs |
