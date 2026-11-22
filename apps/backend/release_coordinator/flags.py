@@ -126,13 +126,25 @@ def build_request(
     )
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A provider answers in place: a redirect is its answer, never followed."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect())
+
+
 def send(request: FlagRequest) -> int:
     """The status the provider answered; 0 when nothing answered."""
     prepared = urllib.request.Request(
         request.url, data=request.body, headers=request.headers, method=request.method
     )
     try:
-        with urllib.request.urlopen(prepared, timeout=TIMEOUT_S) as response:  # noqa: S310 - http(s) only, checked by the train file
+        with _OPENER.open(
+            prepared, timeout=TIMEOUT_S
+        ) as response:  # http(s) only, checked by the train file
             return int(response.status)
     except urllib.error.HTTPError as exc:
         return int(exc.code)
