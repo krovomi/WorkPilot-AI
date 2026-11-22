@@ -272,7 +272,11 @@ class GHClient:
                 # Unexpected error
                 logger.error(f"Unexpected error in gh command: {e}")
                 if attempt == self.max_retries:
-                    raise GHCommandError(f"gh {args[0]} failed: {str(e)}")
+                    # Name the folder: on Windows a deleted cwd only says
+                    # "The directory name is invalid", without the path.
+                    raise GHCommandError(
+                        f"gh {args[0]} failed in {self.project_dir}: {str(e)}"
+                    )
                 else:
                     # Retry on unexpected errors too
                     backoff_delay = 2 ** (attempt - 1)
