@@ -124,7 +124,7 @@ describe("empty columns", () => {
 		expect(screen.getByText("Drop here")).toBeInTheDocument();
 	});
 
-	it("a collapsed empty column shows its count, its empty state and expands on click", async () => {
+	it("a collapsed empty column shows its count, no message, and expands on click", async () => {
 		const onToggleCollapsed = vi.fn();
 		const { container } = renderColumn({
 			status: "queue",
@@ -132,8 +132,8 @@ describe("empty columns", () => {
 			isImportForbidden: true,
 			onToggleCollapsed,
 		});
-		expect(screen.getByText("Queue is empty")).toBeInTheDocument();
-		expect(container.querySelector(".column-count-badge")).toHaveTextContent("0");
+		expect(screen.queryByText("Queue is empty")).toBeNull();
+		expect(container.querySelector(".kanban-col-count")).toHaveTextContent("0");
 		await userEvent.click(screen.getByRole("button", { name: "Expand column" }));
 		expect(onToggleCollapsed).toHaveBeenCalledOnce();
 	});
@@ -173,7 +173,7 @@ describe("render cap", () => {
 			isCollapsed: true,
 		});
 		expect(screen.getByText("Task solo")).toBeInTheDocument();
-		expect(container.querySelector(".column-count-badge")).toHaveTextContent("1");
+		expect(container.querySelector(".kanban-col-count")).toHaveTextContent("1");
 	});
 });
 
@@ -232,8 +232,34 @@ describe("WIP limit", () => {
 			wipLimit: 2,
 			onSetWipLimit: vi.fn(),
 		});
-		const badge = within(container).getByText("3/2");
-		expect(badge).toHaveClass("text-warning");
+		const count = container.querySelector(".kanban-col-count");
+		expect(count).toHaveTextContent("3/2");
+		expect(count).toHaveAttribute("data-warn");
+		expect(within(container).getByText("3 cards, limit 2")).toBeInTheDocument();
+		expect(container.querySelector(".kanban-col-gauge-bar > span")).toHaveStyle({ width: "100%" });
+	});
+
+	it("a WIP limit not yet exceeded shows the count calmly", () => {
+		const { container } = renderColumn({
+			tasks: [makeTask("a")],
+			wipLimit: 2,
+			onSetWipLimit: vi.fn(),
+		});
+		const count = container.querySelector(".kanban-col-count");
+		expect(count).toHaveTextContent("1/2");
+		expect(count).not.toHaveAttribute("data-warn");
+	});
+
+	it("« En cours » shows its parallel slots and turns its icon while agents work", () => {
+		const { container } = renderColumn({
+			status: "in_progress",
+			tasks: [makeTask("a", { status: "in_progress" }), makeTask("b", { status: "in_progress" })],
+			maxParallelTasks: 2,
+		});
+		expect(container.querySelector(".kanban-col-count")).toHaveAttribute("data-warn");
+		expect(container.querySelectorAll(".kanban-col-gauge-seg[data-on]")).toHaveLength(2);
+		expect(within(container).getByText("2 of 2 parallel slots in use")).toBeInTheDocument();
+		expect(container.querySelector(".kanban-col-icon-busy")).not.toBeNull();
 	});
 });
 

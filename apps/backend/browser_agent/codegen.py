@@ -12,7 +12,9 @@ goes into a comment.
 
 A secret field reads its value from an environment variable whose name the
 recorder built from ``[A-Z0-9_]`` only (``recording.ENV_NAME``); the generated
-file names the variables it needs at its top.
+file names the variables it needs at its top. Any other value typed into a
+field is the test's data (``codegen_data``): a JSON file next to the test, a
+Cypress fixture, or a block of constants in Java and C#, read by a key.
 
 Each framework takes the first selector of a step it can express: Cypress has
 no role or label query without an extra library, so it falls through to the
@@ -43,9 +45,18 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from .codegen_data import (
+    TestData,
+    cypress_fixture,
+    data_path,
+    extract,
+    file_name,
+    json_file,
+    py_data_lines,
+)
 from .codegen_text import css_string, literal, pascal, py_literal, slug
 from .codegen_webdriver import selenium_java, selenium_python, webdriverio
 from .codegen_webdriver_langs import (
@@ -124,15 +135,24 @@ class GeneratedTest:
     path: str
     env_vars: list[str] = field(default_factory=list)
     skipped: int = 0
+    #: The typed values the test reads by key (``codegen_data``).
+    data: TestData = field(default_factory=TestData)
+    #: The data file to write next to the test, relative to the project root.
+    data_path: str | None = None
+    data_code: str | None = None
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        out: dict[str, object] = {
             "format": self.format,
             "code": self.code,
             "path": self.path,
             "envVars": self.env_vars,
             "skipped": self.skipped,
+            "dataValues": [v.to_dict() for v in self.data.values],
         }
+        if self.data_path and self.data_code is not None:
+            out["fixture"] = {"path": self.data_path, "code": self.data_code}
+        return out
 
 
 def file_path(fmt: str, name: str, root: Path | None = None) -> str:
@@ -228,6 +248,8 @@ def _pw_ts_action(step: RecordedStep, loc: str) -> str:
         value = (
             f"secret({literal(step.secret_env)})"
             if step.secret_env
+            else f"data[{literal(step.data_key)}]"
+            if step.data_key
             else literal(step.value)
         )
         return f"await {loc}.{method}({value});"
@@ -284,8 +306,18 @@ def _pw_ts_step(step: RecordedStep) -> list[str]:
     return lines
 
 
-def _playwright_ts(name: str, steps: list[RecordedStep], env: list[str]) -> str:
-    lines = ['import { expect, test } from "@playwright/test";', ""]
+def _playwright_ts(
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData
+) -> str:
+    lines = (
+        [
+            'import { readFileSync } from "node:fs";',
+            'import { dirname, join } from "node:path";',
+        ]
+        if data
+        else []
+    )
+    lines += ['import { expect, test } from "@playwright/test";', ""]
     if env:
         lines += [
             "// Secrets are read from the environment: " + ", ".join(env) + ".",
@@ -296,7 +328,16 @@ def _playwright_ts(name: str, steps: list[RecordedStep], env: list[str]) -> str:
             "}",
             "",
         ]
-    lines.append(f"test({literal(name)}, async ({{ page }}) => {{")
+    if not data:
+        lines.append(f"test({literal(name)}, async ({{ page }}) => {{")
+    else:
+        lines += [
+            f"// The values typed while recording are read from {file_name(name)}, next to this file.",
+            f"test({literal(name)}, async ({{ page }}, testInfo) => {{",
+            "\tconst data: Record<string, string> = JSON.parse(",
+            f'\t\treadFileSync(join(dirname(testInfo.file), {literal(file_name(name))}), "utf-8"),',
+            "\t);",
+        ]
     lines += [f"\t{line}" for s in steps for line in _pw_ts_step(s)]
     lines.append("});")
     return "\n".join(lines) + "\n"
@@ -354,6 +395,8 @@ def _pw_py_action(step: RecordedStep, loc: str) -> str:
         value = (
             f"os.environ[{py_literal(step.secret_env)}]"
             if step.secret_env
+            else f"TEST_DATA[{py_literal(step.data_key)}]"
+            if step.data_key
             else py_literal(step.value)
         )
         return f"{loc}.{method}({value})"
@@ -401,17 +444,25 @@ def _pw_py_step(step: RecordedStep) -> list[str]:
     return lines
 
 
-def _playwright_python(name: str, steps: list[RecordedStep], env: list[str]) -> str:
+def _playwright_python(
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData
+) -> str:
     lines = [f'"""Recorded with the WorkPilot Browser Agent: {slug(name, " ")}."""']
     lines.append("")
-    imports = (["import os"] if env else []) + (
-        ["from urllib.parse import urlsplit"]
-        if any(s.wait_request for s in steps)
-        else []
+    imports = (
+        (["import json"] if data else [])
+        + (["import os"] if env else [])
+        + (["from pathlib import Path"] if data else [])
+        + (
+            ["from urllib.parse import urlsplit"]
+            if any(s.wait_request for s in steps)
+            else []
+        )
     )
     if imports:
         lines += [*imports, ""]
     lines += ["from playwright.sync_api import Page, expect", "", ""]
+    lines += py_data_lines(name, data)
     if env:
         lines.append("# Secrets are read from the environment: " + ", ".join(env) + ".")
     lines.append(f"def test_{slug(name, '_')}(page: Page) -> None:")
@@ -500,6 +551,11 @@ def _cy_action(step: RecordedStep, query: str) -> str | None:
                 f"{query}.clear().type(Cypress.env({literal(step.secret_env)}), "
                 "{ log: false });"
             )
+        if step.data_key:
+            return (
+                f"{query}.clear().type(data[{literal(step.data_key)}], "
+                "{ parseSpecialCharSequences: false });"
+            )
         if not step.value:
             return f"{query}.clear();"
         return (
@@ -571,7 +627,9 @@ def _cy_step(step: RecordedStep) -> list[str] | None:
     return lines
 
 
-def _cypress(name: str, steps: list[RecordedStep], env: list[str]) -> tuple[str, int]:
+def _cypress(
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData
+) -> tuple[str, int]:
     lines: list[str] = []
     if env:
         lines += [
@@ -580,10 +638,19 @@ def _cypress(name: str, steps: list[RecordedStep], env: list[str]) -> tuple[str,
             + ".",
             "",
         ]
-    lines += [
-        f"describe({literal(name)}, () => {{",
-        f"\tit({literal('replays the recorded steps')}, () => {{",
-    ]
+    lines.append(f"describe({literal(name)}, () => {{")
+    if data:
+        lines += [
+            "\t// The values typed while recording: a fixture in cypress/fixtures.",
+            "\tbeforeEach(() => {",
+            f'\t\tcy.fixture({literal(cypress_fixture(name))}).as("data");',
+            "\t});",
+            "",
+            f"\tit({literal('replays the recorded steps')}, function () {{",
+            "\t\tconst data = this.data;",
+        ]
+    else:
+        lines.append(f"\tit({literal('replays the recorded steps')}, () => {{")
     skipped = 0
     for step in steps:
         code = _cy_step(step)
@@ -596,11 +663,11 @@ def _cypress(name: str, steps: list[RecordedStep], env: list[str]) -> tuple[str,
     return "\n".join(lines) + "\n", skipped
 
 
-Generator = Callable[[str, list[RecordedStep], list[str]], tuple[str, int]]
+Generator = Callable[[str, list[RecordedStep], list[str], TestData], tuple[str, int]]
 
 _GENERATORS: dict[str, Generator] = {
-    "playwright-ts": lambda n, s, e: (_playwright_ts(n, s, e), 0),
-    "playwright-python": lambda n, s, e: (_playwright_python(n, s, e), 0),
+    "playwright-ts": lambda n, s, e, d: (_playwright_ts(n, s, e, d), 0),
+    "playwright-python": lambda n, s, e, d: (_playwright_python(n, s, e, d), 0),
     "cypress": _cypress,
     "selenium-python": selenium_python,
     "selenium-java": selenium_java,
@@ -625,11 +692,20 @@ def export_recording(
         if s.kind == "navigate" or s.selectors or (s.kind == "scroll" and not s.frames)
     ]
     env = sorted({s.secret_env for s in steps if ENV_NAME.match(s.secret_env)})
-    code, skipped = _GENERATORS[fmt](title, steps, env)
+    data = extract(steps)
+    steps = [
+        replace(s, data_key=data.keys[s.id]) if s.id in data.keys else s for s in steps
+    ]
+    code, skipped = _GENERATORS[fmt](title, steps, env, data)
+    path = file_path(fmt, title, root)
+    where = data_path(fmt, title, path) if data else None
     return GeneratedTest(
         format=fmt,
         code=code,
-        path=file_path(fmt, title, root),
+        path=path,
         env_vars=env,
         skipped=skipped,
+        data=data,
+        data_path=where,
+        data_code=json_file(data) if where else None,
     )

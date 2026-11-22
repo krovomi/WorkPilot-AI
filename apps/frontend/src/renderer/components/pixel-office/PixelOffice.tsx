@@ -18,12 +18,18 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FAMILY_SHIRTS } from "../../lib/pixel-office-providers";
+import {
+	type AgentSkin,
+	agentShirt,
+	shownDecor,
+	wornSkin,
+} from "../../lib/pixel-office-skins";
 import {
 	onOfficeSignal,
 	type PixelAgent,
 	usePixelOfficeStore,
 } from "../../stores/pixel-office-store";
+import { useProjectStore } from "../../stores/project-store";
 import { useSwarmStore } from "../../stores/swarm-store";
 import { loadTasks, useTaskStore } from "../../stores/task-store";
 import { useTerminalStore } from "../../stores/terminal-store";
@@ -38,7 +44,9 @@ import { KioskOverlay } from "./KioskOverlay";
 import { NarrativeFeed } from "./NarrativeFeed";
 import { OfficeScenesMenu } from "./OfficeScenesMenu";
 import { ProviderLegend } from "./ProviderLegend";
+import { CosmeticsPanel } from "./CosmeticsPanel";
 import { SeasonPanel } from "./SeasonPanel";
+import { TeamBoardPanel } from "./TeamBoardPanel";
 import { closeChimes, playChime } from "./office-sounds";
 import { shippedToday } from "./office-stats";
 import { PixelOfficeCanvas } from "./PixelOfficeCanvas";
@@ -113,9 +121,10 @@ interface WaitingQueueProps {
 	readonly agents: PixelAgent[];
 	readonly onAgentClick: (agentId: string, x: number) => void;
 	readonly calm: boolean;
+	readonly skin: AgentSkin;
 }
 
-function WaitingQueue({ agents, onAgentClick, calm }: WaitingQueueProps) {
+function WaitingQueue({ agents, onAgentClick, calm, skin }: WaitingQueueProps) {
 	const { t } = useTranslation(["pixelOffice"]);
 	const stripRef = useRef<HTMLDivElement>(null);
 
@@ -210,7 +219,7 @@ function WaitingQueue({ agents, onAgentClick, calm }: WaitingQueueProps) {
 								<MiniPixelChar
 									characterIndex={agent.characterIndex}
 									calm={calm}
-									shirt={agent.providerFamily && FAMILY_SHIRTS[agent.providerFamily]}
+									shirt={agentShirt(agent.providerFamily, skin)}
 								/>
 							</div>
 							{/* Violet glow dot */}
@@ -282,6 +291,11 @@ export function PixelOffice({
 	const addTerminal = useTerminalStore((s) => s.addTerminal);
 	const removeTerminal = useTerminalStore((s) => s.removeTerminal);
 	const canAddTerminal = useTerminalStore((s) => s.canAddTerminal);
+	// A server project: its cards come from the server, its folder here is
+	// the app's mirror, so no terminal opens on it.
+	const remote = useProjectStore((s) =>
+		s.projects.some((p) => p.id === projectId && !!p.remote),
+	);
 
 	const tasks = useTaskStore((s) => s.tasks);
 	const tasksLoading = useTaskStore((s) => s.isLoading);
@@ -344,6 +358,7 @@ export function PixelOffice({
 		projectPath,
 		tasks,
 		ready: !tasksLoading,
+		remote,
 	});
 	const refreshAchievements = achievements.refresh;
 	const kioskRefresh = useCallback(() => {
@@ -355,6 +370,12 @@ export function PixelOffice({
 		achievements.projectTasks,
 		achievements.incidents,
 		achievements.now,
+	);
+	// The cosmetics chosen: a locked skin is not worn, hidden decor not drawn.
+	const skin = wornSkin(settings.agentSkin, season.decorIds);
+	const decorShown = useMemo(
+		() => shownDecor(season.decorIds, settings.hiddenDecor),
+		[season.decorIds, settings.hiddenDecor],
 	);
 	const scenes = useOfficeNarratives({
 		projectId,
@@ -638,14 +659,21 @@ export function PixelOffice({
 				<div className="flex items-center gap-1">
 					<AddAgentButton
 						onClick={handleAddAgent}
-						disabled={!canAddTerminal(projectPath)}
+						disabled={remote || !canAddTerminal(projectPath)}
 					/>
 					<div className="w-px h-5 bg-border mx-1" />
+					{remote && <TeamBoardPanel projectId={projectId} />}
 					<AchievementsPanel unlocked={achievements.unlocked} />
 					<SeasonPanel
 						season={season.season}
 						progress={season.progress}
 						decor={season.decor}
+					/>
+					<CosmeticsPanel
+						earned={season.decorIds}
+						hidden={settings.hiddenDecor}
+						skin={settings.agentSkin}
+						onChange={updateSettings}
 					/>
 					<OfficeScenesMenu
 						enabled={settings.narratives}
@@ -780,7 +808,7 @@ export function PixelOffice({
 						</p>
 						<AddAgentButton
 							onClick={handleAddAgent}
-							disabled={!canAddTerminal(projectPath)}
+							disabled={remote || !canAddTerminal(projectPath)}
 						/>
 					</div>
 				) : (
@@ -791,7 +819,8 @@ export function PixelOffice({
 								height={dimensions.height}
 								emptyDeskLabel={t("pixelOffice:canvas.emptyDesk")}
 								calm={calm}
-								decor={season.decorIds}
+								decor={decorShown}
+								skin={skin}
 								onAgentClick={handleAgentClick}
 							/>
 						)}
@@ -811,6 +840,7 @@ export function PixelOffice({
 							agents={pendingAgents}
 							onAgentClick={handlePendingAgentClick}
 							calm={calm}
+							skin={skin}
 						/>
 
 						{/* Backdrop */}

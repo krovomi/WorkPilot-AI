@@ -1849,7 +1849,14 @@
 		"healthCheckFailed": "La vérification de l'état a échoué",
 		"connectionTestFailed": "Le test de connexion a échoué",
 		"errorNameNoId": "Le nom doit contenir au moins une lettre ou un chiffre",
-		"removeHeader": "Retirer l'en-tête {{name}}"
+		"removeHeader": "Retirer l'en-tête {{name}}",
+		"confine": {
+			"label": "Exécuter confiné (bac à sable de l'OS)",
+			"hint": "Le serveur ne démarre que dans le bac à sable de l'OS : il n'écrit que dans le projet et ne joint que les hôtes ci-dessous et le registre d'où son lanceur s'installe. Sans bac à sable (Windows), il ne démarre pas.",
+			"hosts": "Hôtes qu'il peut joindre",
+			"hostsHint": "Séparés par des espaces ou des virgules : api.example.com, *.example.com, ou un local 127.0.0.1:5432."
+		},
+		"confinedNotTested": "Non testé : ce serveur tourne confiné, et seul un agent le démarre, dans le bac à sable de l'OS."
 	},
 	"modelSelect": {
 		"discoveryNotAvailable": "Découverte de modèles non disponible. Saisissez le nom du modèle manuellement.",

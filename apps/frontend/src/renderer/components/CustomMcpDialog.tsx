@@ -9,6 +9,7 @@ import { ExternalLink, Globe, Terminal, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CustomMcpServer } from "../../shared/types";
+import { confinementToSave, McpConfineFields } from "./McpConfineFields";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -58,6 +59,8 @@ export function CustomMcpDialog({
 	const [headerValue, setHeaderValue] = useState("");
 	const [bearerToken, setBearerToken] = useState("");
 	const [showAdvancedHeaders, setShowAdvancedHeaders] = useState(false);
+	const [confined, setConfined] = useState(false);
+	const [confineHosts, setConfineHosts] = useState("");
 	const [error, setError] = useState<string | null>(null);
 
 	// Known provider patterns for helpful hints
@@ -107,6 +110,8 @@ export function CustomMcpDialog({
 		if (open && server) {
 			setFormData(server);
 			setArgsInput(server.args?.join(" ") || "");
+			setConfined(server.confine !== undefined);
+			setConfineHosts(server.confine?.hosts.join(" ") ?? "");
 			// Extract bearer token from existing Authorization header
 			const authHeader =
 				server.headers?.Authorization || server.headers?.authorization || "";
@@ -133,6 +138,8 @@ export function CustomMcpDialog({
 				description: "",
 			});
 			setArgsInput("");
+			setConfined(false);
+			setConfineHosts("");
 			setBearerToken("");
 			setShowAdvancedHeaders(false);
 			setError(null);
@@ -203,6 +210,7 @@ export function CustomMcpDialog({
 						args: argsInput.split(" ").filter(Boolean),
 						// The dialog has no field for it: keep what the catalog set.
 						...(formData.env ? { env: formData.env } : {}),
+						...confinementToSave(confined, confineHosts),
 					}
 				: {
 						url: formData.url,
@@ -372,6 +380,12 @@ export function CustomMcpDialog({
 									{t("mcp.argsHint")}
 								</p>
 							</div>
+							<McpConfineFields
+								confined={confined}
+								hostsInput={confineHosts}
+								onConfinedChange={setConfined}
+								onHostsChange={setConfineHosts}
+							/>
 						</>
 					)}
 

@@ -61,6 +61,7 @@ function episode(value: unknown): MemoryEpisode | null {
 	if (!isRecord(value)) return null;
 	const id = text(value.id, 300);
 	const content = text(value.content, MAX_CONTENT);
+	const where = text(value.path, 300);
 	if (!id || !content) return null;
 	return {
 		id,
@@ -70,6 +71,10 @@ function episode(value: unknown): MemoryEpisode | null {
 		...(typeof value.session_number === "number"
 			? { session_number: value.session_number }
 			: {}),
+		// How the lifecycle actions name the memory, checked again by them.
+		...(where ? { path: where } : {}),
+		pinned: value.pinned === true,
+		applies_to: text(value.applies_to, 200),
 	};
 }
 

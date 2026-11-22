@@ -203,6 +203,43 @@ describe("RecorderTab", () => {
 		await waitFor(() => expect(screen.queryByText(/Enregistré dans/)).not.toBeInTheDocument());
 	});
 
+	it("shows the typed values the test reads, with their data file or their block", async () => {
+		useBrowserRecorderStore.setState({ steps: STEPS });
+		render(<RecorderTab projectPath="/projects/app" />);
+		api.exportBrowserRecording.mockResolvedValueOnce({
+			success: true,
+			code: "test()",
+			dataValues: [
+				{ name: "e_mail", kind: "email" },
+				{ name: "birth_date", kind: "date" },
+			],
+			fixture: { path: "cypress/fixtures/recorded/connexion.json", code: '{\n  "e_mail": "<b>ada</b>"\n}\n' },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Aperçu" }));
+		expect(
+			await screen.findByText(/sont lues dans cypress\/fixtures\/recorded\/connexion\.json, écrit à côté du test/),
+		).toBeInTheDocument();
+		const keys = screen.getByRole("list", { name: "Valeurs saisies" });
+		expect(keys).toHaveTextContent("e_maile-mail");
+		expect(keys).toHaveTextContent("birth_datedate");
+		// The data file is text: a value never becomes markup.
+		expect(screen.getByTestId("recorder-fixture").textContent).toContain('"e_mail": "<b>ada</b>"');
+		expect(screen.getByTestId("recorder-fixture").querySelector("b")).toBeNull();
+
+		api.exportBrowserRecording.mockResolvedValueOnce({
+			success: true,
+			code: "class T {}",
+			dataValues: [{ name: "e_mail", kind: "email" }],
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Aperçu" }));
+		expect(await screen.findByText(/dans le bloc TestData en haut du test/)).toBeInTheDocument();
+		expect(screen.queryByTestId("recorder-fixture")).not.toBeInTheDocument();
+
+		api.exportBrowserRecording.mockResolvedValueOnce({ success: true, code: "test()" });
+		fireEvent.click(screen.getByRole("button", { name: "Aperçu" }));
+		await waitFor(() => expect(screen.queryByTestId("recorder-test-data")).not.toBeInTheDocument());
+	});
+
 	it("is a tab of the Browser Agent", async () => {
 		project.id = null;
 		useBrowserAgentStore.setState({ activeTab: "recorder" });

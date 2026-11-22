@@ -25,6 +25,7 @@ import {
 	parseBuilderProject,
 	validBuilderProjects,
 } from "./mcp-builder-args";
+import { registerMcpReviewHandlers } from "./mcp-reviews-handlers";
 import {
 	installedWatchView,
 	McpWatchRequestError,
@@ -215,6 +216,9 @@ export function registerMcpMarketplaceHandlers(): void {
 			}
 		},
 	);
+
+	// The team's reviews of a catalog server, for a server project (#369).
+	registerMcpReviewHandlers();
 
 	startMcpInstalledWatch();
 

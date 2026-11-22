@@ -61,6 +61,21 @@ describe("useOfficeAchievements", () => {
 		expect(result.current.toast).toBeUndefined();
 	});
 
+	it("reads no incident on a server project's mirror", async () => {
+		const { result } = renderHook(() =>
+			useOfficeAchievements({
+				projectId: "p",
+				projectPath: "/mirror",
+				tasks: [task({ status: "done" })],
+				ready: true,
+				remote: true,
+			}),
+		);
+		await waitFor(() => expect(Object.keys(result.current.unlocked)).toEqual(["first-ship"]));
+		expect(result.current.incidents).toEqual([]);
+		expect(getIncidents).not.toHaveBeenCalled();
+	});
+
 	it("waits for the task list before recording anything", async () => {
 		getIncidents.mockResolvedValue({ success: true, data: [] });
 		const { result, rerender } = renderHook((props) => useOfficeAchievements(props), {
