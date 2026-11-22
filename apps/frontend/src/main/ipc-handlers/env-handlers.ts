@@ -33,6 +33,7 @@ import {
 } from "../project-env-file";
 import { ensureProjectEnvIgnored } from "../project-initializer";
 import { installGuardDeps } from "../mcp-security/runtime";
+import { withMcpConfinement } from "../mcp-security/confine-guard";
 import { mcpInstallRefusal, refusalMessage } from "../mcp-security/install-guard";
 import { withGhCliToken } from "./github/oauth-token";
 import { withGlabCliToken } from "./gitlab/oauth-token";
@@ -1221,6 +1222,14 @@ ${otherLines.join("\n")}
 						error: refusalMessage(refusal),
 						data: { mcpPolicyRefusal: refusal },
 					};
+				}
+				// A low-score server is written confined (`confineBelow`, #369 lot 5).
+				if (unmasked.customMcpServers) {
+					unmasked.customMcpServers = await withMcpConfinement(
+						project.path,
+						unmasked.customMcpServers,
+						installGuardDeps(),
+					);
 				}
 				const newContent = generateEnvContent(
 					await withGlabCliToken(config, await withGhCliToken(config, unmasked)),

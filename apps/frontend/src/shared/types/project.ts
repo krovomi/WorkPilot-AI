@@ -483,6 +483,19 @@ export interface CustomMcpServer {
 	headers?: Record<string, string>;
 	/** Optional description shown in UI */
 	description?: string;
+	/**
+	 * Run in the OS sandbox with only these hosts on the network, plus the
+	 * registry its launcher installs from (type 'command' only). The main
+	 * writes it when the project's MCP policy has `confineBelow`; the backend
+	 * never starts the server another way (`core/mcp_confinement.py`).
+	 */
+	confine?: McpServerConfinement;
+}
+
+/** The network a confined custom MCP server may reach. */
+export interface McpServerConfinement {
+	/** `api.example.com`, `*.example.com`, or a local `127.0.0.1:5432`; 32 at most. */
+	hosts: string[];
 }
 
 /**
@@ -529,6 +542,8 @@ export interface McpTestConnectionResult {
 	tools?: string[];
 	/** Response time in milliseconds */
 	responseTime?: number;
+	/** Not tested: the server runs confined, started only by an agent (#369 lot 5). */
+	confined?: boolean;
 }
 
 // WorkPilot AI Initialization Types

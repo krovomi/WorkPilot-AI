@@ -1152,7 +1152,9 @@ export function AgentTools() {
 				[server.id]: {
 					serverId: server.id,
 					status: test?.success ? "healthy" : "unhealthy",
-					message: test?.message ?? t("settings:mcp.connectionTestFailed"),
+					message: test?.confined
+						? t("settings:mcp.confinedNotTested")
+						: (test?.message ?? t("settings:mcp.connectionTestFailed")),
 					responseTime: test?.responseTime,
 					checkedAt: new Date().toISOString(),
 				},
