@@ -70,4 +70,7 @@ par `lib/column-pulse.ts` depuis les cartes que la colonne a déjà, sans appel 
 | Terminé | terminées depuis lundi 00:00, heure locale |
 
 Les autres colonnes n'en ont pas. Le texte est coupé par une ellipse et entier dans l'infobulle.
+La ligne partage sa rangée avec la jauge (résumé à gauche, jauge à droite) et la rangée reste là,
+vide, dans une colonne sans résumé : les bandeaux ont tous la même hauteur et les premières cartes
+s'alignent d'une colonne à l'autre.
 Le réglage `kanbanColumnSummary` (Paramètres › Affichage, activé par défaut) la masque.

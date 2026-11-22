@@ -1223,6 +1223,18 @@ def _isolated_brain(tmp_path_factory, monkeypatch):
 # own tests (`tests/os_sandbox/`), which turn it back on.
 
 
+# Where a full QA review's suite runs is ambient too: the machine's load, the
+# queue in the home folder. A reviewer test runs it here, with the queue in a
+# temporary folder; `tests/suite_placement/` turns the decision back on.
+
+
+@pytest.fixture(autouse=True)
+def _suite_placement_here(tmp_path_factory, monkeypatch):
+    monkeypatch.setenv("WORKPILOT_TEST_PLACEMENT", "machine")
+    queue = tmp_path_factory.mktemp("suite-queue")
+    monkeypatch.setenv("WORKPILOT_SUITE_QUEUE_DIR", str(queue))
+
+
 @pytest.fixture(autouse=True)
 def _os_sandbox_off_by_default(monkeypatch):
     monkeypatch.setenv("WORKPILOT_SANDBOX", "off")
