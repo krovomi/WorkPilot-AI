@@ -31,6 +31,8 @@ knowledge/projects/<projet>/memory/
   .lifecycle/archived/<dossier>/<slug>--<date>.md     les variantes écartées, liées à la canonique
   .lifecycle/folded/patterns/<id>--<date>.md          les patterns qu'une fusion du learning loop a pliés (30 jours)
 <cerveau>/.workpilot-brain/conflicts.json             la file « à trancher » de cette machine (ignorée par git)
+<cerveau>/.workpilot-brain/projects.json              où vit chaque projet de cette machine (ignoré par git)
+<cerveau>/.workpilot-brain/announced.json             les paires annoncées d'ici à l'équipe (ignoré par git)
 ```
 
 **Dans le vault, donc synchronisé.** Le journal, la corbeille et l'archive voyagent avec les notes :
@@ -183,7 +185,11 @@ Lus dans le journal, rien n'est envoyé : restaurations et annulations de la sem
 veut dire que les automatisations retirent trop, et l'onglet le dit à partir de
 `AGGRESSIVE_RESTORES`, 5), retraits automatiques, taux d'épingles, conflits des 30 derniers jours
 réglés par les règles ou par une personne, temps moyen avant qu'une personne tranche, et le
-nombre d'historiques ouverts (« pourquoi ? »). Ce dernier est compté par machine
+nombre d'historiques ouverts (« pourquoi ? »), les notes de consensus écrites en 30 jours
+(`create` / `person-wrote`) et celles encore en usage (notes vivantes dont la `source` est
+`team-consensus-…` : ni oubliées ni remplacées), les deux chiffres de l'issue qu'une machine
+peut compter seule (son « taux d'adoption » passait par les analytics du reviewer, qui ne
+lisent pas la mémoire). Le nombre d'historiques est compté par machine
 (`.workpilot-brain/lifecycle-views.json`, ignoré par git) : le compter dans le vault ferait de
 chaque lecture un commit.
 
@@ -259,9 +265,81 @@ arrivent chez le coéquipier au prochain pull, et une paire réglée ailleurs so
   (`maintainer-only` sinon, et l'UI désactive ses boutons) ; sans liste, par n'importe qui.
   C'est une règle d'équipe, pas un contrôle d'accès : quiconque écrit dans le vault peut changer
   la liste ou son nom git, et le journal le montre.
-- **La portée d'une mémoire** (`store.scope`) : **Portée** sur chaque mémoire écrit son
-  `applies_to` (une ligne, 200 caractères au plus ; vide = partout), que le détecteur respecte
-  déjà. C'est la « branche de mémoire » par module de l'issue.
+- **Des mainteneurs par portée**, pour une équipe trop grande pour une liste : un titre
+  `## <portée>` du même fichier ouvre la liste d'un module, d'une équipe ou d'une branche (50
+  au plus), et la section la plus précise qui couvre la portée de la paire l'emporte
+  (`apps/` couvre `apps/billing/`, `branch:release/` couvre `branch:release/2.0`, `team:pay` ne
+  couvre pas `team:payments`) ; une paire qu'aucune section ne couvre revient à la liste du
+  haut. La portée d'une paire est lue dans ses notes au moment de trancher (celle qu'elles
+  partagent, sinon celle qui est posée) ; chaque paire escaladée de la vue porte ses
+  mainteneurs et si la personne ici en est (`arbitration.with_maintainers`). `POST
+  …/maintainers` prend une `scope` facultative ; une liste de portée vide disparaît. Un titre
+  qui ne nomme pas une portée lisible est ignoré avec ses noms : une liste ne s'applique jamais
+  là où personne ne l'a voulue.
+- **La portée d'une mémoire** (`store.scope`, `scopes.py`) : **Portée** sur chaque mémoire
+  écrit son `applies_to` (une ligne, 200 caractères au plus ; vide = partout), que le détecteur
+  respecte. Trois formes, que le champ suggère :
+
+  | Forme | Exemple | Pour |
+  |---|---|---|
+  | un module | `apps/billing/` | une partie du code (tout texte, comme avant) |
+  | `team:<nom>` | `team:paiements` | la façon de faire d'une équipe |
+  | `branch:<nom>` | `branch:release/2.0` | une branche git, une ligne de version |
+
+  Le préfixe s'écrit en minuscules sans espace après les deux-points (`Team: Paiements` et
+  `team:paiements` sont une seule portée, comparée sans casse) ; un nom de branche suit les
+  règles d'une ref git (ni espace, ni `..`, ni `~^:?*[\`), pour qu'une faute de frappe soit
+  refusée plutôt que de ne rien couvrir. C'est la « branche de mémoire » de l'issue, par
+  module, par équipe ou par branche : deux notes de portées différentes ne se contredisent
+  jamais. La portée ne filtre pas encore ce qu'un agent rappelle : elle sépare les conflits et
+  désigne les mainteneurs.
+
+## Le dire à l'équipe (`announce.py`), sur demande
+
+Quand une synchronisation met une paire en file, les auteurs des deux notes l'apprennent là où
+l'équipe parle déjà : les canaux du projet pour « PR prête » (Teams, Slack, Discord, Google
+Chat, webhook, `services/notifications/`). Rien sans `WORKPILOT_MEMORY_CONFLICT_NOTIFY=true`
+(l'environnement du processus, sinon le `.workpilot/.env` du projet ; l'interrupteur est dans
+Réglages du projet → Notifications) ni sous la politique hors ligne stricte (une politique
+illisible compte comme stricte) : les notes sont le savoir du projet, un webhook est un nuage.
+
+- **Un port, pas un import.** Les canaux et leur garde SSRF (`channels.post_json` : adresse
+  publique `http`/`https` résolue, pas de redirection) vivent dans `services`, qui est dans le
+  cycle d'imports des agents ; `brain` n'y entre pas. `services/notifications/__init__.py`
+  installe donc l'expéditeur (`memory_conflicts.ChannelAnnouncer`) dans chaque processus qui
+  charge les notifications (l'API, un build ; le runner du cerveau les charge pour cela). Un
+  processus sans expéditeur n'annonce rien, et le suivant qui en a un le fait : ce qu'il
+  annonce est « ce qui est en file ici et n'a pas été annoncé ».
+- **Quel projet.** Le vault est commun à tous les projets de la machine et la file nomme une
+  mémoire (`knowledge/projects/<slug>/memory`), pas un dossier ; les webhooks sont ceux d'un
+  projet. Chaque `ProjectMemory` qui lit le vault écrit où vit son projet
+  (`.workpilot-brain/projects.json`, le worktree d'une tâche ramené à son projet) ; une entrée
+  n'est crue que si le dossier existe encore, est absolu, et est bien le projet que la mémoire
+  nomme.
+- **Ce qui part.** Le nom du dossier du projet, le genre de note et le signal (listes fermées),
+  et pour chaque note son titre, un aperçu de 200 caractères et ses auteurs. Les auteurs sont
+  les noms git des commits qui ont touché la note (au plus trois, sans l'identité de repli
+  « WorkPilot Brain », sans un nom qui contient un `@` : jamais une adresse) ; pour une copie de
+  conflit, celui de la version distante. Le texte est celui d'un coéquipier (règle S2) : passé
+  par `clean_untrusted`, expurgé, sur une ligne, avec `<`, `>` et `@` remplacés pour qu'il ne
+  mentionne personne (`@here`, `<!channel>`) ; Discord reçoit en plus `allowed_mentions` vide.
+  Un texte que le scanner d'injection signale est retenu (« texte retenu »), pas envoyé.
+- **Jamais deux fois.** Une paire est réservée dans `.workpilot-brain/announced.json` (verrou
+  par fichier, `foundation.json_ledger`) avant l'envoi et libérée si aucun canal ne l'a prise :
+  elle sera retentée au prochain pull. Une réservation qui ne peut pas s'écrire n'envoie rien.
+  Dès qu'un canal l'a prise, une ligne `notify` (`conflict-announced`) va au journal du vault :
+  le coéquipier dont la synchronisation met la même paire en file la voit après son prochain
+  pull et ne l'annonce pas. Deux machines qui annoncent dans la même minute, avant tout pull,
+  peuvent encore le dire chacune une fois.
+- **Hors du fil de l'appelant.** `Brain._review_pull` lance le balayage dans un fil à lui
+  (pas un démon : le processus attend la fin, chaque canal est borné par son délai) ; un
+  balayage à la fois par processus. Un message liste au plus trois paires, puis « et N de
+  plus », dans la langue de l'app ; le webhook générique reçoit aussi les paires en JSON
+  (`event: memory_conflict`).
+
+Vérifié contre un serveur HTTP local (`tests/services/test_memory_conflict_notices.py`), pas
+contre un vrai compte Slack ou Teams : les formats de message sont ceux que les canaux
+reçoivent déjà pour « PR prête » et le test de webhook.
 
 ## L'avis d'un modèle (`advisor.py`), demandé par une personne
 
@@ -294,15 +372,15 @@ change pas.
 
 ## Ce qui reste (lots suivants)
 
-Rien pour #348. Pour #352 :
+Rien pour #348. Pour #352, ce qui attend une décision du mainteneur du projet :
 
-- Notifications d'équipe (Slack, Teams, e-mail) quand un conflit est détecté : les canaux
-  existent (`services/notifications/`), mais la configuration d'un webhook est celle d'un projet
-  et le vault est commun à tous ; à brancher et à vérifier avec un compte Slack ou Teams réel,
-  qu'on n'a pas ici.
-- Mainteneurs par module (une liste par `applies_to`) pour une grande équipe ; portées par équipe
-  ou par branche git, que les notes ne portent pas encore.
 - Embeddings locaux pour rapprocher deux formulations équivalentes : une dépendance lourde
-  (modèle de phrases à télécharger) à justifier ; signature des instantanés et liste blanche des
-  sources : demande une clé par coéquipier et sa distribution (aujourd'hui, la confiance est
-  celle du distant git choisi).
+  (modèle de phrases à télécharger) à justifier.
+- Signature des instantanés et liste blanche des sources : que devient une note non signée, et
+  comment la clé de chaque coéquipier lui parvient (aujourd'hui, la confiance est celle du
+  distant git choisi).
+- Les projets du serveur n'ont pas de file de conflits (leur cerveau n'est jamais
+  synchronisé), donc pas d'annonce ni de mainteneurs par portée.
+- Une portée qui filtrerait aussi ce qu'un agent rappelle (une note `branch:release/2.0` servie
+  seulement à une tâche de cette branche) : aujourd'hui elle sépare les conflits et désigne les
+  mainteneurs.

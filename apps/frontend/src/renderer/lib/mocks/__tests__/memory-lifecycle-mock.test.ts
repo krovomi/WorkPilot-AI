@@ -15,6 +15,7 @@ describe("the memory lifecycle browser mock", () => {
 				lastUndo: null,
 				metrics: null,
 				maintainers: [],
+				maintainerScopes: {},
 				canArbitrate: true,
 				trash: [],
 				conflicts: [],

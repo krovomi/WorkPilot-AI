@@ -46,6 +46,7 @@ interface LifecycleResponse {
 	last_undo?: string | null;
 	metrics?: MemoryLifecycleMetrics;
 	maintainers?: string[];
+	maintainer_scopes?: Record<string, string[]>;
 	can_arbitrate?: boolean;
 	trash?: MemoryLifecycleView["trash"];
 	conflicts?: MemoryLifecycleView["conflicts"];
@@ -83,6 +84,7 @@ export async function loadMemoryLifecycle(
 			lastUndo: result.last_undo ?? null,
 			metrics: result.metrics ?? null,
 			maintainers: result.maintainers ?? [],
+			maintainerScopes: result.maintainer_scopes ?? {},
 			canArbitrate: result.can_arbitrate !== false,
 			trash: result.trash ?? [],
 			conflicts: result.conflicts ?? [],
@@ -254,14 +256,21 @@ export function registerMemoryLifecycleHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS,
-		async (_, projectId: unknown, rawNames: unknown): Promise<IPCResult<string[]>> => {
+		async (
+			_,
+			projectId: unknown,
+			rawNames: unknown,
+			rawScope: unknown,
+		): Promise<IPCResult<string[]>> => {
 			const project = localOnly(projectId);
 			if ("error" in project) return { success: false, error: project.error };
 			const names = maintainerNames(rawNames);
-			if (!names) return INVALID;
+			// The list of one module, team or branch; none: the list at the top.
+			const scope = scopeText(rawScope);
+			if (!names || scope === null) return INVALID;
 			const result = await backendFetch<{ maintainers?: string[] }>(
 				"/api/brain/memory/maintainers",
-				post({ project_dir: project.path, names }),
+				post({ project_dir: project.path, names, ...(scope ? { scope } : {}) }),
 			);
 			return result.success
 				? { success: true, data: result.maintainers ?? [] }

@@ -18,7 +18,9 @@ export type MemoryLifecycleAction =
 	| "archive"
 	| "resolve"
 	| "conflict"
-	| "designate";
+	| "designate"
+	/** A queued conflict announced on the team's channels (opt-in). */
+	| "notify";
 
 export interface MemoryJournalEntry {
 	id: string;
@@ -67,6 +69,8 @@ export interface MemoryConflictSide {
 	confidence: number | null;
 	agents: string[];
 	tasks: string[];
+	/** Where the note applies: a module, `team:<name>`, `branch:<name>`; empty: everywhere. */
+	applies_to?: string;
 }
 
 export type MemoryConflictSignal =
@@ -83,6 +87,11 @@ export interface MemoryConflictEscalation {
 	by: string;
 	actor: string;
 	reason_code: string;
+	/** The pair's scope, whose maintainers settle it (the most specific list). */
+	scope?: string;
+	maintainers?: string[];
+	/** Whether the person at this machine is one of them. */
+	can_arbitrate?: boolean;
 }
 
 export interface MemoryConflict {
@@ -114,6 +123,10 @@ export interface MemoryLifecycleMetrics {
 	resolved_month: number;
 	mean_resolution_hours: number | null;
 	history_views: number;
+	/** Canonical notes a person wrote in the last 30 days. */
+	consensus_month?: number;
+	/** Consensus notes still in the memory: neither forgotten nor replaced. */
+	consensus_live?: number;
 	/** Many restores this week: the automations remove too much. */
 	too_aggressive: boolean;
 }
@@ -127,6 +140,8 @@ export interface MemoryLifecycleView {
 	metrics: MemoryLifecycleMetrics | null;
 	/** Who settles an escalated pair; empty: anyone. */
 	maintainers: string[];
+	/** The lists of a module, a team or a branch: the most specific one covering a pair wins. */
+	maintainerScopes: Record<string, string[]>;
 	/** Whether the person at this machine may settle an escalated pair. */
 	canArbitrate: boolean;
 	trash: TrashedMemory[];

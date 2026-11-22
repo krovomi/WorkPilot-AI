@@ -116,6 +116,9 @@ const NOTIFY_WEBHOOK_ENV_KEYS = {
 	WEBHOOK_URL: "NOTIFY_WEBHOOK_URL",
 } as const;
 
+/** A memory conflict a teammate's sync queued, on the same channels (opt-in, #352). */
+const MEMORY_CONFLICT_NOTIFY_KEY = "WORKPILOT_MEMORY_CONFLICT_NOTIFY";
+
 // CI/CD pipeline loop environment variable keys (« Build rouge »)
 // Read by ci-pipeline-service.ts / ci-pipeline-providers.ts. Azure DevOps,
 // GitHub and GitLab credentials are reused from their own sections above.
@@ -558,6 +561,11 @@ export function registerEnvHandlers(
 		) {
 			existingVars[NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL] = config.notifyWebhookUrl;
 		}
+		if (config.memoryConflictNotify !== undefined) {
+			existingVars[MEMORY_CONFLICT_NOTIFY_KEY] = config.memoryConflictNotify
+				? "true"
+				: "false";
+		}
 		// Git/Worktree Settings
 		if (config.defaultBranch !== undefined) {
 			existingVars.DEFAULT_BRANCH = config.defaultBranch;
@@ -759,6 +767,8 @@ ${envLine(existingVars, GOOGLE_CHAT_ENV_KEYS.WEBHOOK_URL, "https://chat.googleap
 # Generic webhook (flat JSON POST)
 ${existingVars[NOTIFY_WEBHOOK_ENV_KEYS.ENABLED] ? `${NOTIFY_WEBHOOK_ENV_KEYS.ENABLED}=${existingVars[NOTIFY_WEBHOOK_ENV_KEYS.ENABLED]}` : `# ${NOTIFY_WEBHOOK_ENV_KEYS.ENABLED}=false`}
 ${envLine(existingVars, NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL, "https://example.com/webhook")}
+# Also announce a memory conflict a teammate's sync brought (titles, a short preview, authors' names)
+${existingVars[MEMORY_CONFLICT_NOTIFY_KEY] ? `${MEMORY_CONFLICT_NOTIFY_KEY}=${existingVars[MEMORY_CONFLICT_NOTIFY_KEY]}` : `# ${MEMORY_CONFLICT_NOTIFY_KEY}=false`}
 
 # =============================================================================
 # GIT/WORKTREE SETTINGS (OPTIONAL)
@@ -1081,6 +1091,9 @@ ${otherLines.join("\n")}
 			}
 			if (vars[NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL]) {
 				config.notifyWebhookUrl = vars[NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL];
+			}
+			if (vars[MEMORY_CONFLICT_NOTIFY_KEY]?.toLowerCase() === "true") {
+				config.memoryConflictNotify = true;
 			}
 
 			// Git/Worktree config

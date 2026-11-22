@@ -56,10 +56,12 @@ export interface MemoryLifecycleAPI {
 		memoryId: string,
 		appliesTo: string,
 	) => Promise<IPCResult<{ appliesTo: string }>>;
-	/** Who settles a conflict that flip-flops; an empty list: anyone. */
+	/** Who settles a conflict that flip-flops; an empty list: anyone. With a
+	 * scope (a module, `team:x`, `branch:y`), the list of that scope only. */
 	setMemoryMaintainers: (
 		projectId: string,
 		names: string[],
+		scope?: string,
 	) => Promise<IPCResult<string[]>>;
 	/** Undo an automatic decision of the last hour, or separate a merge. */
 	revertMemoryDecision: (
@@ -92,8 +94,8 @@ export function createMemoryLifecycleAPI(): MemoryLifecycleAPI {
 			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_SUGGEST_RESOLUTION, projectId, conflictId),
 		setMemoryScope: (projectId, memoryId, appliesTo) =>
 			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, projectId, memoryId, appliesTo),
-		setMemoryMaintainers: (projectId, names) =>
-			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, projectId, names),
+		setMemoryMaintainers: (projectId, names, scope) =>
+			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, projectId, names, scope),
 		revertMemoryDecision: (projectId, entryId) =>
 			invokeIpc(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, projectId, entryId),
 	};

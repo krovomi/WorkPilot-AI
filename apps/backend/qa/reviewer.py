@@ -13,6 +13,7 @@ Memory Integration:
 import json
 import re
 import time
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -43,6 +44,7 @@ from .criteria import (
 )
 from .report import render_qa_report
 from .session_stream import stream_session
+from .suite_placement import place_full_suite
 
 # How a failed pass reads. The loop classifies the message (`classify_qa_error`)
 # to tell the next pass what actually went wrong: every error used to be
@@ -440,21 +442,28 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
     # What the plan held before the reviewer touched it, so an edit that
     # breaks its JSON can be undone instead of failing every following pass.
     plan_before = _read_plan_text(spec_dir)
+
+    # Where the full suite runs (`test_placement`): may wait in the machine's
+    # queue, and moves the suite to the CI or the server when this one is busy.
+    placement = await place_full_suite(project_dir, spec_dir, review_scope)
+    if placement is not None:
+        prompt += placement.prompt_addendum()
     session_started_at = time.time()
 
     try:
-        outcome = await stream_session(
-            client,
-            prompt,
-            agent_type="qa_reviewer",
-            agent_name="QA Reviewer",
-            tool_label="QA Tool",
-            spec_dir=spec_dir,
-            project_dir=project_dir,
-            task_logger=task_logger,
-            verbose=verbose,
-            commands_seen=commands_seen,
-        )
+        with placement.measure() if placement is not None else nullcontext():
+            outcome = await stream_session(
+                client,
+                prompt,
+                agent_type="qa_reviewer",
+                agent_name="QA Reviewer",
+                tool_label="QA Tool",
+                spec_dir=spec_dir,
+                project_dir=project_dir,
+                task_logger=task_logger,
+                verbose=verbose,
+                commands_seen=commands_seen,
+            )
     except Exception as e:
         debug_error(
             "qa_reviewer",
@@ -465,6 +474,9 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
         if task_logger:
             task_logger.log_error(f"QA session error: {e}", LogPhase.VALIDATION)
         return "error", str(e)
+    finally:
+        if placement is not None:
+            placement.close()
 
     return await _process_qa_result(
         spec_dir,
