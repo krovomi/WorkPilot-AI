@@ -4,6 +4,7 @@ import asyncio
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import mcp.client.stdio as stdio_module
+import pytest
 from core.mcp_tools import MCPToolManager
 
 
@@ -22,9 +23,8 @@ def _started_env(monkeypatch, cfg: dict) -> dict:
     async def open_once() -> None:
         manager._stack = AsyncExitStack()
         try:
-            await manager._open_session(cfg)
-        except RuntimeError:
-            pass
+            with pytest.raises(RuntimeError, match="stop after the launch parameters"):
+                await manager._open_session(cfg)
         finally:
             await manager._stack.aclose()
 
