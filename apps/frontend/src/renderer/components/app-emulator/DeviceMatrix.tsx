@@ -1,8 +1,8 @@
 import { Camera, CheckCircle2, Download, Loader2, Square } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
-import { DEVICE_ORIENTATIONS, DEVICE_PRESETS, isRotated } from "../../../shared/constants/device-presets";
+import { DEVICE_ORIENTATIONS, DEVICE_PRESETS, orientationOf } from "../../../shared/constants/device-presets";
 import { CPU_PROFILES, NETWORK_PROFILES, findCpuProfile } from "../../../shared/constants/emulation-throttling";
 import type {
 	CpuProfileId,
@@ -14,9 +14,13 @@ import type {
 	NetworkProfileId,
 	ResponsiveReport,
 } from "../../../shared/types/device-matrix";
+import { useDeviceLibraryStore } from "../../stores/device-library-store";
 import { type DeviceCaptureEntry, useDeviceMatrixStore } from "../../stores/device-matrix-store";
 import { Button } from "../ui/button";
+import { BreakpointScanPanel } from "./BreakpointScanPanel";
+import { CustomDevices } from "./CustomDevices";
 import { ISSUE_KEYS, MarkedCapture } from "./MarkedCapture";
+import { SessionChoice } from "./SessionChoice";
 
 const CATEGORIES: readonly DeviceCategory[] = ["phone", "tablet", "desktop", "tv"];
 
@@ -66,10 +70,10 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 		network,
 		cpu,
 		orientation,
-		previewSession,
 		showMarkers,
 		exporting,
 		exportStatus,
+		scanning,
 	} = useDeviceMatrixStore(
 		useShallow((state) => ({
 			selected: state.selected,
@@ -79,10 +83,10 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 			network: state.network,
 			cpu: state.cpu,
 			orientation: state.orientation,
-			previewSession: state.previewSession,
 			showMarkers: state.showMarkers,
 			exporting: state.exporting,
 			exportStatus: state.exportStatus,
+			scanning: state.scan?.status === "running",
 		})),
 	);
 	const toggleDevice = useDeviceMatrixStore((state) => state.toggleDevice);
@@ -93,11 +97,17 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 	const setNetwork = useDeviceMatrixStore((state) => state.setNetwork);
 	const setCpu = useDeviceMatrixStore((state) => state.setCpu);
 	const setOrientation = useDeviceMatrixStore((state) => state.setOrientation);
-	const setPreviewSession = useDeviceMatrixStore((state) => state.setPreviewSession);
 	const setShowMarkers = useDeviceMatrixStore((state) => state.setShowMarkers);
 	const exportGrid = useDeviceMatrixStore((state) => state.exportGrid);
+	const customDevices = useDeviceLibraryStore((state) => state.customDevices);
+	const loadLibrary = useDeviceLibraryStore((state) => state.load);
+	useEffect(() => {
+		void loadLibrary();
+	}, [loadLibrary]);
+	const devices: readonly DevicePreset[] = [...DEVICE_PRESETS, ...customDevices];
+	const busy = running || scanning;
 	const { path, sameServer } = matrixPath(serverUrl, currentUrl);
-	const tiles = DEVICE_PRESETS.filter((device) => entries[device.id]);
+	const tiles = devices.filter((device) => entries[device.id]);
 	const exportable = tiles.some((device) => entries[device.id].status === "done");
 
 	return (
@@ -113,7 +123,7 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 				</p>
 				<div className="flex flex-wrap gap-4">
 					{CATEGORIES.map((category) => (
-						<fieldset key={category} className="space-y-1" disabled={running}>
+						<fieldset key={category} className="space-y-1" disabled={busy}>
 							<legend className="text-xs font-medium">{t(`matrix.category.${category}`)}</legend>
 							{DEVICE_PRESETS.filter((device) => device.category === category).map((device) => (
 								<label key={device.id} className="flex items-center gap-2 text-sm">
@@ -128,6 +138,12 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 							))}
 						</fieldset>
 					))}
+					<CustomDevices
+						selected={selected}
+						disabled={busy}
+						onToggle={toggleDevice}
+						dimensions={(device) => dimensions(t, device)}
+					/>
 				</div>
 				<div className="flex flex-wrap items-end gap-3">
 					<Choice
@@ -169,19 +185,7 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 					<p className="max-w-xs text-xs text-muted-foreground">{t("matrix.throttling.hint")}</p>
 				</div>
 				<div className="flex flex-wrap items-start gap-4 text-sm">
-					<label className="flex max-w-md items-start gap-2">
-						<input
-							type="checkbox"
-							className="mt-1"
-							checked={previewSession}
-							disabled={running}
-							onChange={(event) => setPreviewSession(event.target.checked)}
-						/>
-						<span>
-							{t("matrix.previewSession")}
-							<span className="block text-xs text-muted-foreground">{t("matrix.previewSessionHint")}</span>
-						</span>
-					</label>
+					<SessionChoice disabled={busy} />
 					<label className="flex items-center gap-2">
 						<input
 							type="checkbox"
@@ -198,7 +202,7 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 							{t("matrix.stop")}
 						</Button>
 					) : (
-						<Button size="sm" disabled={selected.length === 0} onClick={() => void captureSelected(path)}>
+						<Button size="sm" disabled={selected.length === 0 || scanning} onClick={() => void captureSelected(path)}>
 							<Camera className="mr-1 h-3.5 w-3.5" />
 							{t("matrix.capture", { count: selected.length })}
 						</Button>
@@ -207,7 +211,7 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 						size="sm"
 						variant="ghost"
 						disabled={running}
-						onClick={() => setSelection(DEVICE_PRESETS.map((device) => device.id))}
+						onClick={() => setSelection(devices.map((device) => device.id))}
 					>
 						{t("matrix.selectAll")}
 					</Button>
@@ -222,7 +226,7 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 							key={format}
 							size="sm"
 							variant="outline"
-							disabled={running || exporting || !exportable}
+							disabled={busy || exporting || !exportable}
 							onClick={() => void exportGrid(format)}
 						>
 							{exporting ? (
@@ -244,6 +248,12 @@ export function DeviceMatrix({ serverUrl, currentUrl, onCapture, auto = false }:
 						{t(`matrix.exportErrors.${exportStatus.error}`)}
 					</p>
 				)}
+				<BreakpointScanPanel
+					path={path}
+					devices={devices}
+					disabled={running || exporting}
+					deviceName={(device) => deviceName(t, device)}
+				/>
 			</div>
 			<div className="min-h-0 flex-1 overflow-auto p-3">
 				{tiles.length === 0 ? (
@@ -297,6 +307,11 @@ function Choice({
 	);
 }
 
+/** Le nom d'un appareil : celui que la personne a donné, ou celui du catalogue. */
+export function deviceName(t: Translate, device: DevicePreset): string {
+	return device.name ?? t(`devices.${device.id}`);
+}
+
 function dimensions(t: Translate, device: Pick<DevicePreset, "width" | "height" | "deviceScaleFactor">): string {
 	return t("matrix.dimensions", {
 		width: device.width,
@@ -309,12 +324,18 @@ function dimensions(t: Translate, device: Pick<DevicePreset, "width" | "height" 
  * Le sens si l'appareil a été tourné, la session prêtée, le bridage s'il y en
  * a eu un, puis le temps de chargement.
  */
-function conditions(t: Translate, language: string, device: DevicePreset, capture: DeviceCapture): string {
+function conditions(
+	t: Translate,
+	language: string,
+	device: DevicePreset,
+	capture: DeviceCapture,
+	personaName: string | undefined,
+): string {
 	const parts: string[] = [];
-	if (isRotated({ ...device, width: capture.width, height: capture.height })) {
-		parts.push(t(`matrix.orientation.${capture.orientation}`));
-	}
+	// Rendu dans l'autre sens que celui de l'appareil : il a été tourné.
+	if (orientationOf(device) !== capture.orientation) parts.push(t(`matrix.orientation.${capture.orientation}`));
 	if (capture.previewSession) parts.push(t("matrix.withPreviewSession"));
+	if (capture.persona) parts.push(t("matrix.withPersona", { name: personaName ?? capture.persona }));
 	if (capture.network !== "none") parts.push(t(`matrix.network.${capture.network}`));
 	const rate = findCpuProfile(capture.cpu)?.rate ?? 1;
 	if (rate > 1) parts.push(t("matrix.cpuSlowdown", { rate }));
@@ -337,7 +358,10 @@ function DeviceTile({
 	onCapture?: (image: string, url: string) => void;
 }) {
 	const { t, i18n } = useTranslation("appEmulator");
-	const name = t(`devices.${device.id}`);
+	const name = deviceName(t, device);
+	const personas = useDeviceLibraryStore((state) => state.personas);
+	const personaName =
+		entry.status === "done" ? personas.find((persona) => persona.id === entry.capture.persona)?.name : undefined;
 	// Une capture faite donne la fenêtre rendue (tournée ou non).
 	const shown = entry.status === "done" ? { ...device, width: entry.capture.width, height: entry.capture.height } : device;
 	return (
@@ -360,7 +384,7 @@ function DeviceTile({
 			)}
 			{entry.status === "done" && (
 				<>
-					<p className="text-xs text-muted-foreground">{conditions(t, i18n.language, device, entry.capture)}</p>
+					<p className="text-xs text-muted-foreground">{conditions(t, i18n.language, device, entry.capture, personaName)}</p>
 					<MarkedCapture capture={entry.capture} name={name} markers={markers} />
 					<ReportSummary report={entry.capture.report} />
 					{onCapture && (

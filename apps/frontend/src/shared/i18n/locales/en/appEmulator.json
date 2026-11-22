@@ -179,7 +179,10 @@
 			"capture-failed": "The page could not be captured on this device.",
 			"unknown-throttling": "This throttling profile is not in the list.",
 			"throttling-failed": "The network or CPU throttling could not be applied on this device.",
-			"session-failed": "The preview's session could not be read: capture again without it."
+			"session-failed": "The preview's session could not be read: capture again without it.",
+			"unknown-persona": "This persona no longer exists: choose another session.",
+			"persona-locked": "The persona's cookies could not be decrypted (system keyring locked or changed): save it again.",
+			"persona-elsewhere": "This persona was saved for another server: it is only replayed on that host."
 		},
 		"report": {
 			"unavailable": "The page could not be read for responsive bugs.",
@@ -236,12 +239,75 @@
 			"portrait": "Portrait",
 			"landscape": "Landscape"
 		},
-		"previewSession": "Use the preview's session (cookies)",
 		"previewSessionHint": "The cookies the preview sends to this server are lent to each capture, so a page behind a sign-in shows as you see it. Local storage is not shared.",
 		"withPreviewSession": "Preview's session",
 		"markers": "Box the faulty elements",
 		"exportPng": "Export PNG",
 		"exportPdf": "Export PDF",
-		"auto": "Shown for the review of this task: its changes touch the interface."
+		"auto": "Shown for the review of this task: its changes touch the interface.",
+		"withPersona": "Persona {{name}}",
+		"custom": {
+			"legend": "My devices",
+			"add": "Add a device",
+			"hint": "Kept on this computer. The width and height are in CSS pixels; the app checks every field before emulating it.",
+			"name": "Name",
+			"width": "Width (CSS px)",
+			"height": "Height (CSS px)",
+			"scale": "Pixel ratio",
+			"mobile": "Mobile browser (applies the viewport meta tag)",
+			"touch": "Touch screen",
+			"userAgent": "User agent",
+			"userAgentFrom": "Start from the browser of",
+			"save": "Add this device",
+			"remove": "Remove {{name}}",
+			"invalid": "Check the fields: width and height from 240 to 3840 px, pixel ratio from 1 to 4, a name of 1 to 40 characters, a user agent in plain ASCII (512 characters at most).",
+			"errors": {
+				"invalid-request": "The request was refused.",
+				"invalid-device": "This device is out of bounds: check its fields.",
+				"too-many": "20 devices at most: remove one first.",
+				"unknown-device": "This device no longer exists.",
+				"write-failed": "The device list could not be saved."
+			}
+		},
+		"session": {
+			"label": "Session",
+			"blank": "Blank session",
+			"preview": "The preview's session (cookies)",
+			"persona": "Persona: {{name}}",
+			"personaHint_one": "{{count}} cookie saved for {{host}} on {{date}}, encrypted by the system keyring; replayed only on that host.",
+			"personaHint_other": "{{count}} cookies saved for {{host}} on {{date}}, encrypted by the system keyring; replayed only on that host.",
+			"saveTitle": "Save the preview's session as a persona",
+			"saveHint": "Sign in as someone in the preview, then save: the cookies the preview sends to this server are encrypted and kept on this computer. They are never shown.",
+			"personaName": "Persona name",
+			"save": "Save the persona",
+			"delete": "Delete this persona",
+			"errors": {
+				"invalid-request": "Give the persona a name of 1 to 40 characters.",
+				"not-running": "The emulator's server is not running: start it, sign in in the preview, then save.",
+				"encryption-unavailable": "No system keyring can encrypt the cookies: the persona was not saved.",
+				"session-failed": "The preview's session could not be read.",
+				"no-cookies": "The preview sends no cookie to this server: sign in in the preview first.",
+				"too-many": "10 personas at most: delete one first.",
+				"unknown-persona": "This persona no longer exists.",
+				"write-failed": "The personas could not be saved."
+			}
+		},
+		"scan": {
+			"title": "Breakpoints",
+			"intro": "Reads the page, on the chosen device, at common widths and one pixel on each side of every width breakpoint its style sheets declare.",
+			"device": "Device",
+			"run": "Read the breakpoints",
+			"running": "Reading the page at each width…",
+			"breakpoints": "Breakpoints declared: {{list}}",
+			"none": "No width breakpoint in the style sheets the page can read.",
+			"width": "Width",
+			"overflow": "Sideways scroll",
+			"issues": "Responsive bugs",
+			"widthPx": "{{width}} px",
+			"overflowPx": "{{px}} px",
+			"clean": "None",
+			"partial": "Partial reading",
+			"nearBreakpoint": "Next to a breakpoint"
+		}
 	}
 }

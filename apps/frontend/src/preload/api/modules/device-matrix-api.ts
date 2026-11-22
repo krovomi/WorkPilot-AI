@@ -1,6 +1,13 @@
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import type {
+	BreakpointScanRequest,
+	BreakpointScanResult,
+	CustomDeviceDraft,
+	CustomDeviceResult,
+	PersonaResult,
+} from "../../../shared/types/device-library";
+import type {
 	DeviceCaptureRequest,
 	DeviceCaptureResult,
 	DeviceGridExportRequest,
@@ -22,6 +29,21 @@ export interface DeviceMatrixAPI {
 	 * l'écrire dans une boîte native.
 	 */
 	exportEmulatorDeviceGrid: (request: DeviceGridExportRequest) => Promise<DeviceGridExportResult>;
+	/**
+	 * Relit la page aux largeurs courantes et autour de ses points de rupture,
+	 * sur l'appareil nommé ; le main rend des comptes par largeur.
+	 */
+	scanEmulatorBreakpoints: (request: BreakpointScanRequest) => Promise<BreakpointScanResult>;
+	/** Les appareils personnalisés gardés par le main. */
+	listEmulatorCustomDevices: () => Promise<CustomDeviceResult>;
+	/** Ajoute un appareil décrit ; le main relit chaque champ dans ses bornes et lui donne son id. */
+	saveEmulatorCustomDevice: (draft: CustomDeviceDraft) => Promise<CustomDeviceResult>;
+	deleteEmulatorCustomDevice: (id: string) => Promise<CustomDeviceResult>;
+	/** Les personas : leur nom, leur hôte, leur nombre de cookies, jamais un cookie. */
+	listEmulatorPersonas: () => Promise<PersonaResult>;
+	/** Enregistre sous `name` les cookies que l'aperçu envoie au serveur de l'émulateur, chiffrés par le main. */
+	saveEmulatorPersona: (name: string) => Promise<PersonaResult>;
+	deleteEmulatorPersona: (id: string) => Promise<PersonaResult>;
 }
 
 export function createDeviceMatrixAPI(): DeviceMatrixAPI {
@@ -34,6 +56,7 @@ export function createDeviceMatrixAPI(): DeviceMatrixAPI {
 				cpu: request.cpu,
 				orientation: request.orientation,
 				previewSession: request.previewSession,
+				persona: request.persona,
 			}),
 		exportEmulatorDeviceGrid: (request) =>
 			ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_EXPORT_DEVICE_GRID, {
@@ -41,5 +64,27 @@ export function createDeviceMatrixAPI(): DeviceMatrixAPI {
 				format: request.format,
 				markers: request.markers,
 			}),
+		scanEmulatorBreakpoints: (request) =>
+			ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_SCAN_BREAKPOINTS, {
+				deviceId: request.deviceId,
+				path: request.path,
+				previewSession: request.previewSession,
+				persona: request.persona,
+			}),
+		listEmulatorCustomDevices: () => ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_LIST_CUSTOM_DEVICES),
+		saveEmulatorCustomDevice: (draft) =>
+			ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_SAVE_CUSTOM_DEVICE, {
+				name: draft.name,
+				width: draft.width,
+				height: draft.height,
+				deviceScaleFactor: draft.deviceScaleFactor,
+				mobile: draft.mobile,
+				touch: draft.touch,
+				userAgent: draft.userAgent,
+			}),
+		deleteEmulatorCustomDevice: (id) => ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_DELETE_CUSTOM_DEVICE, { id }),
+		listEmulatorPersonas: () => ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_LIST_PERSONAS),
+		saveEmulatorPersona: (name) => ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_SAVE_PERSONA, { name }),
+		deleteEmulatorPersona: (id) => ipcRenderer.invoke(IPC_CHANNELS.APP_EMULATOR_DELETE_PERSONA, { id }),
 	};
 }

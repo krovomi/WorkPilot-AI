@@ -179,7 +179,10 @@
 			"capture-failed": "La page n’a pas pu être capturée sur cet appareil.",
 			"unknown-throttling": "Ce profil de bridage n'est pas dans la liste.",
 			"throttling-failed": "Le bridage réseau ou processeur n'a pas pu être appliqué sur cet appareil.",
-			"session-failed": "La session de l’aperçu n’a pas pu être lue : capturez de nouveau sans elle."
+			"session-failed": "La session de l’aperçu n’a pas pu être lue : capturez de nouveau sans elle.",
+			"unknown-persona": "Ce persona n'existe plus : choisissez une autre session.",
+			"persona-locked": "Les cookies du persona n'ont pas pu être déchiffrés (trousseau du système verrouillé ou changé) : enregistrez-le à nouveau.",
+			"persona-elsewhere": "Ce persona a été enregistré pour un autre serveur : il n'est rejoué que sur cet hôte."
 		},
 		"report": {
 			"unavailable": "La page n’a pas pu être lue pour y chercher les bugs responsive.",
@@ -236,12 +239,75 @@
 			"portrait": "Portrait",
 			"landscape": "Paysage"
 		},
-		"previewSession": "Utiliser la session de l’aperçu (cookies)",
 		"previewSessionHint": "Les cookies que l’aperçu envoie à ce serveur sont prêtés à chaque capture : une page derrière une connexion s’affiche comme vous la voyez. Le stockage local n’est pas partagé.",
 		"withPreviewSession": "Session de l’aperçu",
 		"markers": "Encadrer les éléments fautifs",
 		"exportPng": "Exporter en PNG",
 		"exportPdf": "Exporter en PDF",
-		"auto": "Affichée pour la revue de cette tâche : ses changements touchent l’interface."
+		"auto": "Affichée pour la revue de cette tâche : ses changements touchent l’interface.",
+		"withPersona": "Persona {{name}}",
+		"custom": {
+			"legend": "Mes appareils",
+			"add": "Ajouter un appareil",
+			"hint": "Gardés sur cet ordinateur. Largeur et hauteur en pixels CSS ; l'app vérifie chaque champ avant de l'émuler.",
+			"name": "Nom",
+			"width": "Largeur (px CSS)",
+			"height": "Hauteur (px CSS)",
+			"scale": "Densité de pixels",
+			"mobile": "Navigateur mobile (applique la balise viewport)",
+			"touch": "Écran tactile",
+			"userAgent": "User agent",
+			"userAgentFrom": "Partir du navigateur de",
+			"save": "Ajouter cet appareil",
+			"remove": "Retirer {{name}}",
+			"invalid": "Vérifiez les champs : largeur et hauteur de 240 à 3 840 px, densité de 1 à 4, un nom de 1 à 40 caractères, un user agent en ASCII simple (512 caractères au plus).",
+			"errors": {
+				"invalid-request": "La demande a été refusée.",
+				"invalid-device": "Cet appareil sort des bornes : vérifiez ses champs.",
+				"too-many": "20 appareils au plus : retirez-en un d'abord.",
+				"unknown-device": "Cet appareil n'existe plus.",
+				"write-failed": "La liste des appareils n'a pas pu être enregistrée."
+			}
+		},
+		"session": {
+			"label": "Session",
+			"blank": "Session vierge",
+			"preview": "La session de l'aperçu (cookies)",
+			"persona": "Persona : {{name}}",
+			"personaHint_one": "{{count}} cookie enregistré pour {{host}} le {{date}}, chiffré par le trousseau du système ; rejoué sur cet hôte seulement.",
+			"personaHint_other": "{{count}} cookies enregistrés pour {{host}} le {{date}}, chiffrés par le trousseau du système ; rejoués sur cet hôte seulement.",
+			"saveTitle": "Enregistrer la session de l'aperçu comme persona",
+			"saveHint": "Connectez-vous dans l'aperçu sous l'identité voulue, puis enregistrez : les cookies que l'aperçu envoie à ce serveur sont chiffrés et gardés sur cet ordinateur. Ils ne sont jamais affichés.",
+			"personaName": "Nom du persona",
+			"save": "Enregistrer le persona",
+			"delete": "Supprimer ce persona",
+			"errors": {
+				"invalid-request": "Donnez au persona un nom de 1 à 40 caractères.",
+				"not-running": "Le serveur de l'émulateur ne tourne pas : lancez-le, connectez-vous dans l'aperçu, puis enregistrez.",
+				"encryption-unavailable": "Aucun trousseau du système ne peut chiffrer les cookies : le persona n'a pas été enregistré.",
+				"session-failed": "La session de l'aperçu n'a pas pu être lue.",
+				"no-cookies": "L'aperçu n'envoie aucun cookie à ce serveur : connectez-vous d'abord dans l'aperçu.",
+				"too-many": "10 personas au plus : supprimez-en un d'abord.",
+				"unknown-persona": "Ce persona n'existe plus.",
+				"write-failed": "Les personas n'ont pas pu être enregistrés."
+			}
+		},
+		"scan": {
+			"title": "Points de rupture",
+			"intro": "Lit la page, sur l'appareil choisi, aux largeurs courantes et à un pixel de part et d'autre de chaque point de rupture de largeur que déclarent ses feuilles de style.",
+			"device": "Appareil",
+			"run": "Lire les points de rupture",
+			"running": "Lecture de la page à chaque largeur…",
+			"breakpoints": "Points de rupture déclarés : {{list}}",
+			"none": "Aucun point de rupture de largeur dans les feuilles de style que la page peut lire.",
+			"width": "Largeur",
+			"overflow": "Défilement de côté",
+			"issues": "Bugs responsive",
+			"widthPx": "{{width}} px",
+			"overflowPx": "{{px}} px",
+			"clean": "Aucun",
+			"partial": "Lecture partielle",
+			"nearBreakpoint": "À côté d'un point de rupture"
+		}
 	}
 }

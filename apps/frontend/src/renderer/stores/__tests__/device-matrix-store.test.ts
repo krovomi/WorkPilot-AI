@@ -3,16 +3,20 @@
  * catalogue order under the chosen throttling, a stop keeps what was
  * rendered, a failure is named, and the export names the rendered devices.
  * A task under review gets its default devices captured once, unasked.
+ * Custom devices follow the catalogue, a persona replaces the preview's
+ * session, and the breakpoint scan runs here too.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_MATRIX_DEVICE_IDS } from "../../../shared/constants/device-presets";
 import type { DeviceCapture } from "../../../shared/types/device-matrix";
+import { useDeviceLibraryStore } from "../device-library-store";
 import { useDeviceMatrixStore } from "../device-matrix-store";
 
 const captureEmulatorDevice = vi.fn();
 const exportEmulatorDeviceGrid = vi.fn();
+const scanEmulatorBreakpoints = vi.fn();
 Object.defineProperty(globalThis, "electronAPI", {
-	value: { captureEmulatorDevice, exportEmulatorDeviceGrid },
+	value: { captureEmulatorDevice, exportEmulatorDeviceGrid, scanEmulatorBreakpoints },
 	writable: true,
 });
 
@@ -30,13 +34,30 @@ const capture = (deviceId: string): { success: true; data: DeviceCapture } => ({
 		width: 393,
 		height: 852,
 		previewSession: false,
+		persona: null,
 	},
 });
+
+const CUSTOM = "custom-11111111-2222-4333-8444-555555555555";
+const PERSONA = "persona-11111111-2222-4333-8444-555555555555";
+const foldable = {
+	id: CUSTOM,
+	name: "Flip 6",
+	category: "phone" as const,
+	width: 360,
+	height: 748,
+	deviceScaleFactor: 3,
+	mobile: true,
+	touch: true,
+	userAgent: "UA",
+};
 
 describe("useDeviceMatrixStore", () => {
 	beforeEach(() => {
 		captureEmulatorDevice.mockReset();
 		exportEmulatorDeviceGrid.mockReset();
+		scanEmulatorBreakpoints.mockReset();
+		useDeviceLibraryStore.setState({ customDevices: [] });
 		useDeviceMatrixStore.setState({
 			selected: [...DEFAULT_MATRIX_DEVICE_IDS],
 			entries: {},
@@ -46,6 +67,8 @@ describe("useDeviceMatrixStore", () => {
 			cpu: "1x",
 			orientation: "portrait",
 			previewSession: false,
+			persona: null,
+			scan: null,
 			showMarkers: true,
 			autoCaptured: [],
 			exporting: false,
@@ -79,7 +102,7 @@ describe("useDeviceMatrixStore", () => {
 		useDeviceMatrixStore.getState().setOrientation("landscape");
 		useDeviceMatrixStore.getState().setPreviewSession(true);
 		await useDeviceMatrixStore.getState().captureSelected("/cart");
-		const throttled = { network: "fast-3g", cpu: "4x", orientation: "landscape", previewSession: true };
+		const throttled = { network: "fast-3g", cpu: "4x", orientation: "landscape", previewSession: true, persona: null };
 		expect(captureEmulatorDevice.mock.calls.map(([request]) => request)).toEqual([
 			{ deviceId: "iphone-15", path: "/cart", ...throttled },
 			{ deviceId: "pixel-8", path: "/cart", ...throttled },
@@ -206,5 +229,70 @@ describe("useDeviceMatrixStore", () => {
 		useDeviceMatrixStore.setState({ running: false, exporting: true });
 		expect(useDeviceMatrixStore.getState().autoCapture("task-2", "/")).toBe(false);
 		expect(captureEmulatorDevice).toHaveBeenCalledTimes(DEFAULT_MATRIX_DEVICE_IDS.length);
+	});
+
+	it("puts custom devices after the catalogue, and exports them by id", async () => {
+		useDeviceLibraryStore.setState({ customDevices: [foldable] });
+		useDeviceMatrixStore.getState().setSelection([CUSTOM, "tv-1080p", "custom-gone"]);
+		expect(useDeviceMatrixStore.getState().selected).toEqual(["tv-1080p", CUSTOM]);
+		useDeviceMatrixStore.setState({
+			entries: {
+				[CUSTOM]: { status: "done", capture: capture(CUSTOM).data },
+				"tv-1080p": { status: "done", capture: capture("tv-1080p").data },
+			},
+		});
+		exportEmulatorDeviceGrid.mockResolvedValueOnce({ success: true, data: { saved: false } });
+		await useDeviceMatrixStore.getState().exportGrid("png");
+		expect(exportEmulatorDeviceGrid.mock.calls[0][0].deviceIds).toEqual(["tv-1080p", CUSTOM]);
+	});
+
+	it("chooses a persona or the preview's session, never both", async () => {
+		const store = useDeviceMatrixStore.getState();
+		store.setPreviewSession(true);
+		store.setPersona(PERSONA);
+		expect(useDeviceMatrixStore.getState()).toMatchObject({ previewSession: false, persona: PERSONA });
+		captureEmulatorDevice.mockImplementation(async ({ deviceId }) => capture(deviceId));
+		await useDeviceMatrixStore.getState().captureSelected("/", ["pixel-8"]);
+		expect(captureEmulatorDevice.mock.calls[0][0]).toMatchObject({ previewSession: false, persona: PERSONA });
+		store.setPreviewSession(true);
+		expect(useDeviceMatrixStore.getState()).toMatchObject({ previewSession: true, persona: null });
+		store.setPersona(null);
+		store.setPreviewSession(false);
+		expect(useDeviceMatrixStore.getState()).toMatchObject({ previewSession: false, persona: null });
+	});
+
+	it("scans the breakpoints with the session chosen, and names a failure", async () => {
+		const scan = { deviceId: "desktop-1080p", url: "http://localhost:5173/", breakpoints: [768], steps: [] };
+		scanEmulatorBreakpoints.mockImplementationOnce(async () => {
+			expect(useDeviceMatrixStore.getState().scan).toEqual({ status: "running", deviceId: "desktop-1080p" });
+			return { success: true, data: scan };
+		});
+		useDeviceMatrixStore.getState().setPersona(PERSONA);
+		await useDeviceMatrixStore.getState().scanBreakpoints("desktop-1080p", "/pricing");
+		expect(scanEmulatorBreakpoints).toHaveBeenCalledWith({
+			deviceId: "desktop-1080p",
+			path: "/pricing",
+			previewSession: false,
+			persona: PERSONA,
+		});
+		expect(useDeviceMatrixStore.getState().scan).toEqual({ status: "done", scan });
+		scanEmulatorBreakpoints.mockResolvedValueOnce({ success: false, error: "not-running" });
+		await useDeviceMatrixStore.getState().scanBreakpoints("desktop-1080p", "/");
+		expect(useDeviceMatrixStore.getState().scan).toEqual({ status: "failed", error: "not-running" });
+		scanEmulatorBreakpoints.mockRejectedValueOnce(new Error("bridge gone"));
+		await useDeviceMatrixStore.getState().scanBreakpoints("desktop-1080p", "/");
+		expect(useDeviceMatrixStore.getState().scan).toEqual({ status: "failed", error: "capture-failed" });
+	});
+
+	it("never scans beside a capture, an export or another scan, nor captures beside a scan", async () => {
+		useDeviceMatrixStore.setState({ running: true });
+		await useDeviceMatrixStore.getState().scanBreakpoints("desktop-1080p", "/");
+		useDeviceMatrixStore.setState({ running: false, exporting: true });
+		await useDeviceMatrixStore.getState().scanBreakpoints("desktop-1080p", "/");
+		useDeviceMatrixStore.setState({ exporting: false, scan: { status: "running", deviceId: "ipad-mini" } });
+		await useDeviceMatrixStore.getState().scanBreakpoints("desktop-1080p", "/");
+		await useDeviceMatrixStore.getState().captureSelected("/");
+		expect(scanEmulatorBreakpoints).not.toHaveBeenCalled();
+		expect(captureEmulatorDevice).not.toHaveBeenCalled();
 	});
 });
