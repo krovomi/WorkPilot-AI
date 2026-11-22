@@ -132,7 +132,9 @@
 			"minutes": "Durée du build",
 			"cost": "Coût (USD)",
 			"qaIterations": "Itérations de QA",
-			"agents": "Agents"
+			"agents": "Agents",
+			"mutationScore": "Score de mutation",
+			"firstCi": "CI verte du premier coup"
 		},
 		"sizes": {
 			"small": "Petit dépôt",
@@ -144,7 +146,7 @@
 		"otherStack": "Autre pile",
 		"smallGroup_one": "La médiane d'un groupe s'affiche à partir de {{count}} projet actif.",
 		"smallGroup_other": "La médiane d'un groupe s'affiche à partir de {{count}} projets actifs : en dessous, seul leur nombre.",
-		"lowerIsBetter": "Plus bas, c'est mieux, pour chaque chiffre. La durée d'un build va de la première session d'agent de la spec à la dernière.",
+		"lowerIsBetter": "Plus bas est mieux, sauf pour le score de mutation et le taux de CI verte du premier coup, où plus haut est mieux. La durée de build d'une spec va de sa première session d'agent à sa dernière.",
 		"yourProjects": "Vos autres projets",
 		"noOtherProjects": "Aucun de vos autres projets n'a construit de spec sur cette période.",
 		"teams": {
@@ -174,6 +176,15 @@
 			"note_one": "Chaque case : ce projet, puis la médiane des autres projets pour le même type, à partir de {{count}} projet.",
 			"note_other": "Chaque case : ce projet, puis la médiane des autres projets pour le même type, à partir de {{count}} projets."
 		},
-		"ciPending": "Le taux de CI vert du premier coup n'est pas encore enregistré : il n'est pas comparé."
+		"qualitySources": "Le score de mutation vient de la porte de mutation de la spec en QA, la CI verte du premier coup du suivi de sa pull request : la CI est-elle passée sur la pull request telle qu'elle a été ouverte, avant tout correctif. Une spec qui ne les a pas n'est pas comptée pour eux.",
+		"groupTrend": "tendance : {{value}}",
+		"movedChip": "{{from}} → {{to}}",
+		"moving": "Ce projet est passé de {{from}} à {{to}} ces {{days}} derniers jours : tant que ce changement a moins de {{days}} jours, il est comparé aux projets des deux.",
+		"pace": {
+			"title": "Votre rythme face à vos pairs",
+			"faster": "{{metric}} : {{own}} pour ce projet, {{group}} pour la médiane de « {{groupName}} ». Vous progressez plus vite.",
+			"slower": "{{metric}} : {{own}} pour ce projet, {{group}} pour la médiane de « {{groupName}} ». Vos pairs progressent plus vite.",
+			"same": "{{metric}} : {{own}} pour ce projet, {{group}} pour la médiane de « {{groupName}} ». À peu près au même rythme."
+		}
 	}
 }

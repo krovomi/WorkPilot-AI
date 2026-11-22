@@ -4,13 +4,13 @@ summary: >-
   Une session pilotée à la main (survols, défilements, glisser-déposer, dialogues répondus dans
   l'app) devient un test Playwright, Cypress, Selenium (Python, Java, C#, Ruby, JS) ou
   WebdriverIO : étapes bornées, sélecteurs robustes, attentes déduites, secrets en variables,
-  texte de page en littéral, test sur une carte de revue, lancé là, rejoué sans fenêtre.
+  valeurs saisies en données, texte de page en littéral, test sur une carte de revue, lancé là.
 ---
 
 # Enregistreur du Browser Agent : une session devient un test
 
 > Pourquoi l'onglet « Enregistreur » du Browser Agent enregistre ce que fait une personne sur une
-> page et l'exporte en test E2E, et comment. Issue : #387 (lots 1 à 3). Règles :
+> page et l'exporte en test E2E, et comment. Issue : #387 (lots 1 à 5). Règles :
 > [`security.md`](../rules/security.md) (S1, S2, S4, S6, S7) ; écriture dans un projet :
 > [generated-review.md](generated-review.md).
 
@@ -144,6 +144,24 @@ l'enregistreur est posé, avec une fenêtre cette fois.
      rend toutes les correspondances : `cy.contains` n'en rend qu'une, un rôle ou un texte placé
      passe donc au sélecteur suivant) ; WebDriver la garde pour un placeholder ou un texte, qu'il
      trouve dans le même ordre que la page (`locate(…, nth)`), et passe au suivant pour le reste.
+   - **Données saisies** (`codegen_data.py`) : une valeur tapée dans un champ (ni secret, ni
+     vide) sort des étapes ; le test la lit par une clé. Clé : mots ASCII du label, du
+     placeholder, du test id, du nom accessible ou du `name`/id du champ (`[a-z][a-z0-9_]*`,
+     40 caractères), sinon le genre de la valeur ; le même champ retapé avec la même valeur
+     garde sa clé, sinon `_2`, `_3`… Genre (`email`, `date`, `number`, `phone`, `url`, `name`,
+     `text`) par règles seulement, forme de la valeur puis mots du champ : aucun modèle ne voit
+     une valeur saisie. Où vivent les données, dans l'idiome de chaque framework : un JSON à côté
+     du test (`<test>.data.json`) que Playwright TS lit par `testInfo.file`, Python par
+     `Path(__file__)`, Selenium JS par `__dirname` (`.cjs`), WebdriverIO par `import.meta.url`
+     (ESM), Ruby par `__dir__` dans un `let(:test_data)` ; Cypress : une fixture
+     `cypress/fixtures/recorded/<test>.json`, `cy.fixture(…).as("data")` ; Java et C# : un bloc de
+     constantes `TestData` en tête de classe (lire un JSON y demanderait une bibliothèque ou une
+     règle de build). Chaque clé et valeur entre par le littéral de la langue (JSON pour le
+     fichier). Le main relit la réponse (`browser-recorder-data.ts` : clés `[a-z0-9_]`, genres en
+     liste fermée, fichier en `.json`) ; la carte de revue écrit le fichier dans son worktree, à
+     côté du test, chemin relu dans le worktree ; « Enregistrer dans un fichier… » le pose à côté
+     du fichier choisi, sous son propre nom. L'onglet montre les clés, leur genre et le fichier
+     en texte.
    - **Cadres et shadow roots** : `frameLocator` / `frame_locator` puis `locator(hôte)`
      (Playwright perce les shadow roots ouverts) ; `its("0.contentDocument.body")` puis
      `.shadow()` (Cypress, iframe de même origine seulement) ; `switch_to.frame` puis
@@ -213,8 +231,10 @@ l'enregistreur est posé, avec une fenêtre cette fois.
 
 ## Pas encore fait
 
-- Extraire en fixtures les données paramétrables (emails, dates) : l'assistant nomme et classe,
-  mais les valeurs saisies restent dans le test, et ne sont pas envoyées au modèle.
+- Données saisies : une fixture Cypress suppose le dossier `cypress/fixtures` par défaut
+  (`fixturesFolder` d'un projet n'est pas lu) ; WebdriverIO lit son JSON par `import.meta.url`,
+  donc un projet ESM (le défaut de WebdriverIO, et le test généré importe déjà en ESM). Une
+  réponse tapée dans un `prompt()` et l'option choisie dans une liste restent dans le test.
 - Lancer un test qui lit des secrets : l'app lance sans identifiants, la personne le lance avec
   ses variables. Un test proposé dans un fichier (hors projet) n'est pas lancé non plus : seul
   le worktree d'une carte a la recette du projet.
@@ -226,7 +246,8 @@ l'enregistreur est posé, avec une fenêtre cette fois.
   serveur), car la fenêtre du navigateur s'ouvre sur cet ordinateur.
 
 Vérification : `pytest tests/browser_agent -q` (dont `test_codegen_text.py` : un littéral par
-langage relu par sa langue, Java selon JLS 3.3 ; `test_recorder_checks.py` : places, attentes
+langage relu par sa langue, Java selon JLS 3.3, et une valeur saisie relue depuis les données de
+chaque format ; `test_codegen_data.py` : clés, genres, secrets jamais en données ; `test_recorder_checks.py` : places, attentes
 d'indicateur, vérifications proposées ; `test_recorder_actions.py`, `test_codegen_actions.py` :
 survols, défilements, glisser, dialogues, nouvelles langues ; `test_recorder_run.py`,
 `test_recorder_replay.py`, `test_recorder_assist.py`) ;

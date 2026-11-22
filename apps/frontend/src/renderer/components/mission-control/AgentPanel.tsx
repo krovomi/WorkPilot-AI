@@ -13,6 +13,7 @@ import {
 	DollarSign,
 	FileCode,
 	GitBranch,
+	LifeBuoy,
 	MessageSquareText,
 	MoreVertical,
 	Play,
@@ -156,8 +157,8 @@ export function AgentPanel({
 					</span>
 				</div>
 
-				{/* Live rebalancing (#344): the agent was moved, or its answer looped */}
-				{(Boolean(agent.rebalances) || agent.loop_detected) && (
+				{/* Live rebalancing (#344): the agent was moved, its answer looped, or a helper is beside it */}
+				{(Boolean(agent.rebalances) || agent.loop_detected || agent.helper_of || agent.helper_id) && (
 					<div className="flex flex-wrap gap-1.5" data-testid="mission-control-agent-rebalanced">
 						{Boolean(agent.rebalances) && (
 							<Badge variant="outline" className="text-3xs px-1.5 py-0 text-warning border-warning/30">
@@ -171,12 +172,29 @@ export function AgentPanel({
 								{t("missionControl:rebalance.loopBadge")}
 							</Badge>
 						)}
+						{agent.helper_of && (
+							<Badge variant="outline" className="text-3xs px-1.5 py-0 text-info border-info/30">
+								<LifeBuoy className="h-3 w-3 mr-1" />
+								{t("missionControl:rebalance.helperBadge", { name: agent.helper_of_name })}
+							</Badge>
+						)}
+						{agent.helper_id && (
+							<Badge variant="outline" className="text-3xs px-1.5 py-0 text-info border-info/30">
+								<LifeBuoy className="h-3 w-3 mr-1" />
+								{t("missionControl:rebalance.helpedBadge")}
+							</Badge>
+						)}
 					</div>
 				)}
 
 				{/* Task + what the run is waiting on: one model call has no percentage */}
+				{/* A helper's task is the prompt the backend wrote for its model: say what it does. */}
 				{agent.current_task && (
-					<p className="text-xs text-foreground/80 line-clamp-2">{agent.current_task}</p>
+					<p className="text-xs text-foreground/80 line-clamp-2">
+						{agent.helper_of
+							? t("missionControl:rebalance.helperTask", { name: agent.helper_of_name })
+							: agent.current_task}
+					</p>
 				)}
 				{agent.status === "running" && (
 					<div className="space-y-1" data-testid="mission-control-agent-running">

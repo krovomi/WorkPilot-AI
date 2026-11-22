@@ -125,6 +125,23 @@ describe("ENV_UPDATE and the MCP install policy", () => {
 		expect(readFileSync(envPath(), "utf-8")).not.toContain('"id":"mine"');
 	});
 
+	it("writes a server outside the catalog confined under confineBelow (#369 lot 5)", async () => {
+		policy({ confineBelow: 50 });
+		const REMOTE = { id: "remote", name: "Remote", type: "http", url: "https://mcp.example.com/mcp" };
+		const OWN = { ...MINE, id: "own", confine: { hosts: ["api.example.com"] } };
+		await expect(update({ customMcpServers: [MINE, OWN, REMOTE] })).resolves.toEqual({
+			success: true,
+		});
+		const line = readFileSync(envPath(), "utf-8")
+			.split("\n")
+			.find((l) => l.startsWith("CUSTOM_MCP_SERVERS="));
+		expect(JSON.parse(line?.slice("CUSTOM_MCP_SERVERS=".length) ?? "[]")).toEqual([
+			{ ...MINE, confine: { hosts: [] } },
+			OWN,
+			REMOTE,
+		]);
+	});
+
 	it("checks nothing for an update without servers", async () => {
 		policy("{ not json");
 		await expect(update({ githubRepo: "o/r" })).resolves.toEqual({ success: true });

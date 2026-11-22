@@ -2,12 +2,12 @@
 feature: "Marketplace MCP : score, alertes et politique"
 summary: >-
   Score 0-100 d'un serveur du catalogue sur sept dimensions ; faits npm, PyPI et OSV lus par le
-  main, jamais en hors-ligne strict ; analyse en mémoire de l'archive publiée, vérifiée par
-  empreinte ; revérification quotidienne avec alertes à acquitter ; liste blanche
-  (.workpilot/mcp-policy.json) appliquée par le main à l'écriture du .env.
+  main, jamais en hors-ligne strict ; analyse de l'archive publiée ; alertes quotidiennes ; liste
+  blanche (.workpilot/mcp-policy.json) appliquée par le main ; sous confineBelow, serveur lancé
+  confiné (os_sandbox, hôtes listés) par tous les providers, ou pas lancé.
 ---
 
-# Score de sécurité du Marketplace MCP (issue #369, lots 1 à 3)
+# Score de sécurité du Marketplace MCP (issue #369, lots 1 à 3 et 5)
 
 Chaque carte du Marketplace MCP montre un badge « Sécurité N/100 ». Le score vient d'abord du
 catalogue seul, calculé dans le renderer, sans réseau ; ouvrir les détails de la carte demande au
@@ -140,6 +140,7 @@ venue du renderer ne fait pas revenir en arrière le main.
 
 ```json
 { "version": 1, "allowedServers": ["github", "sentry"], "minScore": 60, "blockCustomServers": true,
+  "confineBelow": 75,
   "acceptedFindings": [{ "server": "github", "rule": "dynamicCode", "reason": "charge ses greffons" }] }
 ```
 
@@ -169,13 +170,53 @@ venue du renderer ne fait pas revenir en arrière le main.
   n'en dépendent pas. Dans Agent Tools, un enregistrement refusé remet la liste d'avant et dit
   pourquoi (`McpPolicyRefusalNotice`), jusqu'au prochain enregistrement accepté.
 
+## Exécution confinée d'un serveur à score faible (lot 5)
+
+- **Le champ** : une entrée `command` de `CUSTOM_MCP_SERVERS` peut porter
+  `"confine": { "hosts": ["api.example.com", "*.example.com", "127.0.0.1:5432"] }`. Schéma fermé,
+  revalidé par `validate_custom_mcp_server` (`core/mcp_confinement.py`, `valid_confine`) : une
+  seule clé, 32 hôtes au plus, chacun lu par `os_sandbox.hosts.parse_rule` (pas de `*.com`, pas
+  de boucle locale sans port, pas de port distant) ; un serveur `http` ne se confine pas. Une
+  entrée mal formée est refusée entière. Le champ ne change ni la liste des lanceurs ni les
+  options refusées : `bash` ou `-e` restent refusés, confinés ou non.
+- **Qui l'écrit** : la personne (case « Exécuter confiné » et hôtes dans la fenêtre d'un serveur
+  personnalisé, `McpConfineFields.tsx`) ou le main : sous `confineBelow` (`.workpilot/mcp-policy.json`,
+  entier 0-100), `env:update` écrit `confine: { hosts: [] }` sur chaque serveur `command` de la
+  liste sans `confine` qui est hors catalogue (pas de score) ou dont le score du main est sous le
+  seuil (`main/mcp-security/confine-guard.ts`, `policyConfines`). Toute la liste est regardée,
+  serveurs gardés compris : confiner ne fait que restreindre. Un `confine` déjà écrit est gardé,
+  hôtes compris. Le bandeau de la politique le dit.
+- **Qui le lance** : tous les chemins qui démarrent un serveur personnalisé enveloppent sa
+  commande (`confined_launch`) : le SDK Claude (`mcp_pinning.pinned_servers`), la boucle WorkPilot
+  (`MCPToolManager._open_session`), la sonde des épingles (`_list`, lancée dans le projet), la
+  session des vues MCP Apps (`make_app_view_hook`, qui garde `confine`), Codex, OpenCode et les
+  agents ACP (`cli_mcp_servers`, `confined_server`). La commande lancée est
+  `/usr/bin/env <variables du proxy> <bwrap ou sandbox-exec> … <lanceur> <arguments>` : les
+  variables du serveur (sa clé d'API) voyagent comme avant, jamais sur la ligne de commande. Codex
+  reçoit ce lanceur cité en entier en TOML (`_toml_quoted`) : il n'y a pas de bac à sable, donc
+  pas de `cmd.exe`, sous Windows, où un serveur marqué est refusé quand même.
+- **Ce que le bac à sable permet** : celui de `os_sandbox/` (bubblewrap, Seatbelt), avec sa propre
+  liste d'hôtes : ceux de l'entrée et le registre de son lanceur (`npx`, `npm` : npm ; `uvx`,
+  `uv` : PyPI ; `node`, `python` : aucun). `WORKPILOT_SANDBOX_HOSTS` n'y est pas ajouté. Écritures
+  dans le projet (le worktree), `<tmp>/workpilot` et les caches de paquets ; identifiants cachés.
+- **Échec fermé** : sans bac à sable (Windows, bwrap absent ou refusé), avec
+  `WORKPILOT_SANDBOX=off`, sans projet, ou si la politique ne peut se préparer, le serveur n'est
+  pas lancé, et le log dit pourquoi. Le test de connexion d'Agent Tools ne lance jamais un serveur
+  confiné, même envoyé sans son `confine` (le main relit celui du projet, `mustRunConfined`) : il
+  dit qu'il ne l'a pas testé.
+- **Tests** : `tests/core/test_mcp_confinement.py` (refus du champ, refus de lancement, chaque
+  chemin), `confine-guard.test.ts`, `mcp-handlers-confined.test.ts`.
+
 ## Pas encore fait (suite de #369)
 
-- **Exécution confinée d'un serveur à score faible** : chaque provider lance lui-même ses serveurs
-  MCP (le SDK Claude démarre un serveur stdio sans passer par WorkPilot) et le bac à sable de
-  l'OS (`os_sandbox/`) ne sait pas encore donner à un serveur ses propres hôtes réseau ; à faire
-  dans le backend, provider par provider.
-- **Avis communautaires** : il faut un service partagé hébergé, que l'app n'a pas.
+- **Avis de sécurité de l'équipe en mode serveur** (table `mcp_server_reviews`, feature
+  `mcp_reviews`, permission `marketplace.write`, canaux IPC et vue dans le Marketplace) : PR
+  séparée de ce lot. Partager des avis entre organisations demande une décision : rien ne sort
+  d'une organisation aujourd'hui.
+- **Confinement sous `confineBelow`** : la politique s'applique quand l'app écrit la liste des
+  serveurs ; un serveur écrit dans le `.env` hors de l'app n'est confiné qu'au prochain
+  enregistrement de la liste. Le backend ne recalcule pas le score (il vit dans le main). Pas de
+  bac à sable sous Windows (AppContainer prévu par `os_sandbox/`) : un serveur confiné n'y tourne pas.
 - **Signature cryptographique de l'éditeur** (provenance npm, sigstore) : vérifier une
   attestation demande une bibliothèque sigstore, nouvelle dépendance à justifier ; l'éditeur reste
   noté par `official`.

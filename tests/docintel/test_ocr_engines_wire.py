@@ -541,3 +541,16 @@ class TestDoctrShapes:
         boxes = python_ocr.parse_doctr(export)
 
         assert [(b.text, b.line, b.left, b.top) for b in boxes] == [("kept", 0, 20, 20)]
+
+
+def test_a_schema_is_sent_as_ollama_s_format(ollama, image) -> None:
+    ollama.answer = (200, {"response": '{"edits": []}'})
+    schema = {"type": "object", "properties": {"edits": {"type": "array"}}}
+
+    assert ollama_vision.ask(image, "fix it", {}, schema=schema) == (
+        '{"edits": []}',
+        "",
+    )
+    assert ollama.bodies[-1]["format"] == schema
+    ollama_vision.ask(image, "read it", {})
+    assert "format" not in ollama.bodies[-1]

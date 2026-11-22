@@ -5,6 +5,7 @@
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import type {
 	DesignFileToWrite,
+	DesignLoopStats,
 	DesignStackDetection,
 	DesignToCodeProgress,
 	DesignToCodeRequest,
@@ -23,6 +24,8 @@ export interface DesignToCodeAPI {
 		request: DesignToCodeRequest,
 	) => Promise<DesignToCodeResult>;
 	detectDesignStack: (projectId: string) => Promise<DesignStackDetection>;
+	/** The render loop's figures on the project, read on this computer. */
+	getDesignLoopStats: (projectId: string) => Promise<DesignLoopStats>;
 	writeDesignFiles: (
 		projectId: string,
 		files: DesignFileToWrite[],
@@ -38,6 +41,8 @@ export function createDesignToCodeAPI(): DesignToCodeAPI {
 			invokeIpc(IPC_CHANNELS.DESIGN_TO_CODE_RUN, request),
 		detectDesignStack: (projectId) =>
 			invokeIpc(IPC_CHANNELS.DESIGN_TO_CODE_DETECT_STACK, projectId),
+		getDesignLoopStats: (projectId) =>
+			invokeIpc(IPC_CHANNELS.DESIGN_TO_CODE_LOOP_STATS, projectId),
 		writeDesignFiles: (projectId, files) =>
 			invokeIpc(IPC_CHANNELS.DESIGN_TO_CODE_WRITE_FILES, projectId, files),
 		onDesignToCodeProgress: (callback) =>

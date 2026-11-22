@@ -323,7 +323,7 @@ function createProviderResult(
 	remoteUrl?: string,
 ): RepoProviderDetectionResult {
 	return {
-		provider: provider as RepoProviderDetectionResult["provider"],
+		provider: provider as RemoteProvider,
 		remoteName,
 		remoteUrl,
 	};

@@ -84,3 +84,111 @@ def test_without_a_structured_output_the_text_is_the_answer(
 ) -> None:
     answer, _ = _ask(monkeypatch, tmp_path, structured)
     assert (answer.text, answer.structured) == ("thinking", False)
+
+
+def test_every_route_is_answered_in_the_schema() -> None:
+    from design_to_code.vision import _CATALOGUE
+
+    assert calls.SCHEMA_ROUTES == frozenset(_CATALOGUE)
+
+
+@pytest.mark.parametrize(
+    ("data", "text"),
+    [
+        ({"content": [{"type": "tool_use", "input": EDITS}]}, json.dumps(EDITS)),
+        (
+            {
+                "content": [
+                    {"type": "tool_use", "input": None},
+                    {"type": "text", "text": " in text "},
+                    "odd",
+                ]
+            },
+            "in text",
+        ),
+        ({"content": "not a list"}, ""),
+        ({}, ""),
+    ],
+)
+def test_claude_s_tool_input_else_its_text(data, text) -> None:
+    assert calls.anthropic_answer(data) == text
+
+
+@pytest.mark.parametrize(
+    ("data", "text"),
+    [
+        (
+            {
+                "choices": [
+                    {"message": {"tool_calls": [{"function": {"arguments": EDITS}}]}}
+                ]
+            },
+            json.dumps(EDITS),
+        ),
+        (
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "tool_calls": [
+                                {"function": "odd"},
+                                {"function": {"arguments": "  "}},
+                            ],
+                            "content": " plain ",
+                        }
+                    }
+                ]
+            },
+            "plain",
+        ),
+        ({"choices": [{"message": {"content": None}}]}, ""),
+        ({"choices": [{"message": "odd"}]}, ""),
+        ({"choices": []}, ""),
+    ],
+)
+def test_openai_s_function_arguments_else_its_text(data, text) -> None:
+    assert calls.openai_answer(data) == text
+
+
+@pytest.mark.parametrize(
+    ("data", "text"),
+    [
+        (
+            {
+                "candidates": [
+                    {"content": {"parts": [{"functionCall": {"args": EDITS}}]}}
+                ]
+            },
+            json.dumps(EDITS),
+        ),
+        (
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{"functionCall": {"args": 3}}, {"text": "words"}]
+                        }
+                    }
+                ]
+            },
+            "words",
+        ),
+        ({"candidates": [{"content": "odd"}]}, ""),
+        ({"candidates": None}, ""),
+    ],
+)
+def test_gemini_s_function_args_else_its_text(data, text) -> None:
+    assert calls.gemini_answer(data) == text
+
+
+def test_gemini_s_schema_keeps_its_shape_with_upper_case_types() -> None:
+    parameters = calls.gemini_fields()["tools"][0]["functionDeclarations"][0][
+        "parameters"
+    ]
+    assert parameters["properties"]["edits"]["type"] == "ARRAY"
+    assert parameters["properties"]["notes"]["items"] == {"type": "STRING"}
+    assert parameters["properties"]["edits"]["items"]["required"] == [
+        "path",
+        "find",
+        "replace",
+    ]

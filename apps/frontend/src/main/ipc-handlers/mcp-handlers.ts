@@ -665,6 +665,21 @@ export function withStoredSecrets(
 	return unmaskCustomMcpServers([server as CustomMcpServer], stored)[0];
 }
 
+/**
+ * Whether `server` must run confined (#369 lot 5): it says so, or the project
+ * holds a server of that id that does. The main has no OS sandbox: a confined
+ * server is started only by the backend, never by a connection test here.
+ */
+export function mustRunConfined(server: CustomMcpServer, projectId: unknown): boolean {
+	if (server.confine !== undefined) return true;
+	const project =
+		typeof projectId === "string" ? projectStore.getProject(projectId) : undefined;
+	if (!project) return false;
+	return parseCustomMcpServers(readProjectEnv(project).CUSTOM_MCP_SERVERS).some(
+		(stored) => stored.id === server.id && stored.confine !== undefined,
+	);
+}
+
 export function registerMcpHandlers(): void {
 	// Quick health check
 	ipcMain.handle(
@@ -691,6 +706,15 @@ export function registerMcpHandlers(): void {
 		async (_event, sent: unknown, projectId?: unknown) => {
 			const server = withStoredSecrets(sent, projectId);
 			if (!server) return { success: false, error: "Invalid server" };
+			if (mustRunConfined(server, projectId)) {
+				const data: McpTestConnectionResult = {
+					serverId: server.id,
+					success: false,
+					message: "This server runs confined: only an agent starts it, in the OS sandbox",
+					confined: true,
+				};
+				return { success: true, data };
+			}
 			try {
 				const result = await testMcpConnection(server);
 				return { success: true, data: result };

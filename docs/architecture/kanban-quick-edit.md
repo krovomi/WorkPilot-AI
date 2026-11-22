@@ -25,9 +25,10 @@ Seulement dans **Planification** (`backlog`) et **File d'attente** (`queue`),
 pipeline (En cours, Révision IA, Révision humaine), la CI (Build rouge) ou le suivi des PR (PR
 ouverte, Terminé) : une carte créée là ne décrirait rien de réel.
 
-Une carte créée dans File d'attente y est placée (`persistTaskStatus(…, "queue")`), puis
-`kickQueue()` demande au tableau de démarrer ce qu'il a la place de démarrer : elle part dès qu'un
-emplacement est libre, comme « Tout mettre en file ».
+Une carte créée dans File d'attente y est placée (`persistTaskStatus(…, "queue")`) et y attend,
+comme une carte glissée là : la file la démarre quand un emplacement se libère (une tâche quitte
+En cours). Le 21 novembre, la boîte appelait aussi `kickQueue()`, qui la démarrait tout de suite
+quand rien ne tournait ; « Mettre en file » envoyait donc la carte dans En cours.
 
 ## Les gestes
 
@@ -38,7 +39,7 @@ emplacement est libre, comme « Tout mettre en file ».
 | touche N (Planification) | idem, hors saisie, hors Ctrl/Cmd/Alt, sans dialogue ni menu ouvert (`hooks/useQuickAddShortcut.ts`) ; une colonne repliée se déplie |
 | Entrée | crée et garde la boîte ouverte, vide, pour la carte suivante |
 | Maj+Entrée | nouvelle ligne |
-| Échap ou ✕ | ferme ; le texte non créé est rendu à la prochaine ouverture (par projet et colonne, pour la vie de la fenêtre) |
+| Échap, ✕ (dans le coin, loin du bouton de création) ou un clic ailleurs | ferme ; le texte, le type et la priorité non créés sont rendus à la prochaine ouverture (par projet et colonne, pour la vie de la fenêtre). Un clic dans les menus de la boîte, qui vivent dans des portails, ne la ferme pas |
 | « Plus d'options… » | écrit le texte (et la priorité) dans le brouillon de l'assistant (`saveDraft`) puis ouvre l'assistant complet |
 
 Un simple clic dans le vide n'ouvre rien : il sert déjà à désélectionner, et le relâché d'un

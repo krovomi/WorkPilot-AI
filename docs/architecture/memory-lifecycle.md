@@ -29,6 +29,7 @@ knowledge/projects/<projet>/memory/
   .lifecycle/journal/<AAAA-MM>.md                     le journal, un fichier par mois
   .lifecycle/forgotten/<dossier>/<slug>.md            la corbeille (frontmatter `lifecycle:`)
   .lifecycle/archived/<dossier>/<slug>--<date>.md     les variantes écartées, liées à la canonique
+  .lifecycle/folded/patterns/<id>--<date>.md          les patterns qu'une fusion du learning loop a pliés (30 jours)
 <cerveau>/.workpilot-brain/conflicts.json             la file « à trancher » de cette machine (ignorée par git)
 ```
 
@@ -104,6 +105,7 @@ Le journal dit pourquoi une mémoire est partie ; la personne peut répondre « 
 | `forget` par une automatisation (un agent, le learning loop) | la note revient de la corbeille | dans l'heure (`UNDO_WINDOW`) : **Annuler** |
 | `archive` par une automatisation (un arbitrage de synchronisation) | la variante revient et la paire attend une personne | dans l'heure : **Annuler** |
 | `archive`, quel que soit l'auteur | la même chose, sans limite | tant que la variante est à l'archive : **Séparer** |
+| `merge` de deux patterns par le learning loop | le pattern plié redevient le sien, sa part retirée de l'autre (`folds.py`) | dans l'heure : **Annuler** ; puis tant que le pli est gardé (30 jours) : **Séparer** |
 
 - **Annuler la dernière décision automatique** est un bandeau en tête de l'onglet (l'entrée la
   plus récente de l'heure encore annulable) ; chaque entrée reprenable du journal a son bouton.
@@ -116,10 +118,64 @@ Le journal dit pourquoi une mémoire est partie ; la personne peut répondre « 
   version a pris le nom de la note) fait revenir la variante en copie de conflit à côté.
 - **Une entrée se reprend une fois** : la reprise est un `restore` (raison `undone` ou
   `unmerged`) qui porte l'id de l'entrée reprise (`undoes`). Un oubli par la personne se restaure
-  depuis la corbeille, pas ici ; une purge a supprimé la note ; une fusion du learning loop a plié
-  un pattern qui n'a jamais été une note à lui, donc rien à séparer. L'id reçu est vérifié deux
+  depuis la corbeille, pas ici ; une purge a supprimé la note. L'id reçu est vérifié deux
   fois (12 caractères hexadécimaux dans le main, entrée du journal de *ce* projet dans le backend),
   et le chemin que l'entrée nomme passe par `memory_rel` comme tout id.
+
+## Séparer une fusion du learning loop (`folds.py`)
+
+Le learning loop plie un nouveau pattern dans un pattern semblable qu'il connaît
+(`PatternStorage.add_patterns`) : occurrences ajoutées, confiance relevée, builds et étiquettes
+ajoutés. Le pattern plié n'était jamais écrit : le journal expliquait la fusion, rien ne la
+reprenait. Il est maintenant gardé, tel que la note qu'il aurait été, dans
+`.lifecycle/folded/patterns/`, avec ce qu'il a apporté (`lifecycle.share` : occurrences, les
+builds et étiquettes que lui seul a apportés, le pas de confiance `MERGE_BOOST`), et l'entrée
+`merge` du journal le nomme (`related`).
+
+- **Séparer** le remet à sa place comme pattern à lui et retire sa part du pattern canonique.
+  Le relèvement de confiance est le même pas affine `c ↦ c + (1 − c)·b` à chaque fusion : ces pas
+  commutent, donc en retirer un donne la confiance qu'aurait le pattern sans *cette* fusion, même
+  après d'autres. Le pied du pattern (« confiance 0,66, vu 5× ») est réécrit avec.
+- **Annuler** dans l'heure, comme toute décision automatique : la fusion est alors la dernière
+  décision du bandeau.
+- **Gardé 30 jours** (`BRAIN_MEMORY_RETENTION_DAYS`) : le learning loop fusionne à chaque build,
+  et une fusion que personne n'a contestée en un mois est l'histoire du pattern, pas une décision
+  à reprendre. Ensuite le pli est supprimé sans ligne de journal (l'entrée `merge` reste ; le pli
+  n'a jamais été une mémoire), à la lecture du cycle de vie.
+- Un pattern revenu depuis sous le même id n'est pas écrasé (`exists`) ; un pattern plié dans
+  lui-même (le même id revu) n'est pas un pli.
+
+## Un projet du serveur (`shared_features/context_lifecycle.py`)
+
+La mémoire d'un projet du serveur est son propre cerveau, sur le serveur
+(`run_isolation.project_brain`), que chaque run du projet alimente et que chaque membre lit. Les
+mêmes décisions y sont servies sous `/api/features/context/memory/*`, avec les permissions du
+serveur :
+
+| Route | Permission |
+|---|---|
+| `GET …/lifecycle`, `GET …/history` | `insight.read` : chaque membre lit pourquoi une mémoire est partie |
+| `POST …/forget`, `…/restore`, `…/pin`, `…/scope`, `…/revert` | `insight.write` |
+
+**Qui décide pour l'équipe.** La mémoire est celle de l'équipe, une décision sur elle aussi :
+quiconque peut écrire les insights du projet (contributeur, analyste, mainteneur, administrateur)
+oublie, épingle, restaure ou reprend une décision automatique, et le journal le nomme (`by`, son
+nom d'affichage ; l'e-mail n'est jamais écrit, `identity.acting_as`). Un lecteur lit et ne décide
+rien. Il n'y a pas de permission à part : forget, pin et undo sont réversibles et journalisés, et
+les insights sont déjà le domaine où l'on écrit ce que l'équipe sait.
+
+- **Aucune commande git** dans un cerveau que les runs du projet écrivent : la personne vient de
+  la session, pas de `git config`, et rien n'est commité par la route.
+- **Le cerveau reste dans le home du projet** : un cerveau qu'un run aurait remplacé par un lien
+  vers un autre dossier n'est pas servi (`no-brain`).
+- **Expurgé à la lecture** : journal et corbeille passent par `redact_text`, comme les mémoires.
+- **Pas de file de conflits** : elle suit une synchronisation git entre les vaults de coéquipiers,
+  et le cerveau d'un projet du serveur n'est jamais synchronisé. L'onglet le dit à la place de la
+  section ; conflits, mainteneurs et avis du modèle répondent `server-project`.
+
+Côté desktop, `memory-lifecycle-target.ts` envoie l'appel au backend de la machine (projet local,
+nommé par son chemin) ou au serveur (projet du serveur, nommé par son id, avec le jeton de la
+session) ; les deux répondent la même forme.
 
 ## Les chiffres (`metrics.py`)
 
@@ -229,17 +285,17 @@ change pas.
   `GET …/history`, `POST …/forget`, `…/restore`, `…/pin`, `…/revert`, `…/scope`, `…/maintainers`,
   `…/conflicts/resolve`, `…/conflicts/suggest` (`brain/lifecycle/api.py`, inclus dans le routeur
   du cerveau : refusé en mode serveur comme lui, le projet est un nom lu dans `project_dir`).
+- Serveur : `/api/features/context/memory/{lifecycle,history,forget,restore,pin,scope,revert}`
+  (`shared_features/context_lifecycle.py`, ci-dessus).
 - Desktop : canaux `CONTEXT_MEMORY_*` (`main/ipc-handlers/context/memory-lifecycle-handlers.ts`,
   chaque argument revalidé), onglet **Cycle de vie** de la vue Contexte
   (`components/context/lifecycle/`), et Épingler / Oublier / Historique sur chaque mémoire de
-  l'onglet Mémoires. Un projet du serveur n'a pas encore ces actions.
+  l'onglet Mémoires, pour un projet local comme pour un projet du serveur.
 
 ## Ce qui reste (lots suivants)
 
-- Projets du serveur : servir le cycle de vie par `/api/features/context/…` avec ses permissions.
-- Dé-fusion d'un pattern que le learning loop a plié dans un autre : le pattern plié n'est pas
-  gardé à part (seule son instruction est dans le journal) ; il faudrait que le learning loop le
-  conserve avant de le fusionner.
+Rien pour #348. Pour #352 :
+
 - Notifications d'équipe (Slack, Teams, e-mail) quand un conflit est détecté : les canaux
   existent (`services/notifications/`), mais la configuration d'un webhook est celle d'un projet
   et le vault est commun à tous ; à brancher et à vérifier avec un compte Slack ou Teams réel,

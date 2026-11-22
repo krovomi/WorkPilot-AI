@@ -75,6 +75,14 @@ describe("orientation", () => {
 		expect(tablet && orientDevice(tablet, "landscape").width).toBe(1024);
 	});
 
+	it("marks a custom device it turns, which has no preset to compare with", () => {
+		const custom = { ...iphone, id: "custom-x", width: 360, height: 748 };
+		const turned = orientDevice(custom, "landscape");
+		expect(turned).toMatchObject({ width: 748, height: 360, rotated: true });
+		expect(isRotated(turned)).toBe(true);
+		expect(isRotated(custom)).toBe(false);
+	});
+
 	it("never turns a desktop or a TV", () => {
 		expect(orientDevice(desktop, "portrait")).toBe(desktop);
 		expect(orientDevice(desktop, "landscape")).toBe(desktop);

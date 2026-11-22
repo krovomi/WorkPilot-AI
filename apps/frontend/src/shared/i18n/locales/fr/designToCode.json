@@ -380,5 +380,20 @@
 		"count_other": "{{count}} zones masquées (au plus {{max}})",
 		"clear": "Effacer les zones",
 		"remove": "Retirer la zone {{index}}"
+	},
+	"figures": {
+		"kicker": "Boucle de rendu sur ce projet",
+		"loops_one": "{{count}} boucle, {{converged}} convergée",
+		"loops_other": "{{count}} boucles, {{converged}} convergées",
+		"averageScore": "Score moyen retenu : {{score}} %",
+		"averageIterations": "Corrections moyennes pour converger : {{value}}",
+		"noConvergence": "Aucune boucle n'a encore convergé.",
+		"accepted_one": "Écrit sans retouche : {{kept}} sur {{count}} écriture",
+		"accepted_other": "Écrit sans retouche : {{kept}} sur {{count}} écritures",
+		"noneDecided": "Aucune écriture n'a encore atteint le projet.",
+		"pending_one": "{{count}} encore sur sa branche de revue",
+		"pending_other": "{{count}} encore sur leur branche de revue",
+		"approximation": "Approximatif : chaque fichier est comparé à son empreinte au moment de l'écriture ; une modification faite plus tard pour une autre raison compte comme une retouche, une carte abandonnée aussi.",
+		"local": "Gardé dans le dossier .workpilot de ce projet, sur cet ordinateur seulement."
 	}
 }

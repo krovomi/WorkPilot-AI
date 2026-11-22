@@ -5,10 +5,15 @@ Usage:
     python deploy_watch_runner.py --action watch --project /path --run-id <id> \
         [--project-name <name>] [--language en|fr]
     python deploy_watch_runner.py --action rollback --project /path --run-id <id>
+    python deploy_watch_runner.py --action rollback-linked --project /path \
+        --since <ISO 8601> [--cause <project name>]
 
 The run id names a record of `.workpilot/cicd_runs.json`; the endpoints and
 tokens come from the environment the app builds from the project's CI/CD
 settings. Prints the watch state as JSON.
+
+`rollback-linked` takes a service the person linked, in the app, to one that
+was rolled back, back to where it was at `--since` (`deploy_watch.linked`).
 
 A critical verdict may open a revert PR (`core.deploy_revert`, the forge the
 project pushes to) and every bad verdict asks the project's model for a short
@@ -27,12 +32,18 @@ from pathlib import Path
 
 def main(argv: list[str] | None = None) -> int:
     from core.deploy_revert import open_revert_pr
+    from deploy_watch.linked import run_linked_rollback
     from deploy_watch.watch import WatchError, run_rollback, run_watch
 
     parser = argparse.ArgumentParser(description="Deployment watch runner")
-    parser.add_argument("--action", choices=["watch", "rollback"], required=True)
+    parser.add_argument(
+        "--action", choices=["watch", "rollback", "rollback-linked"], required=True
+    )
     parser.add_argument("--project", required=True)
-    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--run-id", default="")
+    # rollback-linked: the moment to go back to, and the service that failed.
+    parser.add_argument("--since", default="")
+    parser.add_argument("--cause", default="")
     # For the alerts sent to Slack, PagerDuty and e-mail.
     parser.add_argument("--project-name", default="")
     parser.add_argument("--language", choices=["en", "fr"], default="en")
@@ -53,8 +64,10 @@ def main(argv: list[str] | None = None) -> int:
                 project_name=args.project_name[:100],
                 language=args.language,
             )
-        else:
+        elif args.action == "rollback":
             state = run_rollback(project, args.run_id, env)
+        else:
+            state = run_linked_rollback(project, args.since, env, cause=args.cause)
     except WatchError as error:
         print(json.dumps({"error": str(error)}), file=sys.stderr)
         return 1

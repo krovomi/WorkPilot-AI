@@ -37,6 +37,7 @@ export const TERMS: ReadonlySet<string> = new Set([
 	"Anthropic",
 	"AWS",
 	"Azure",
+	"Bitbucket",
 	"Canny",
 	"Claude",
 	"Codex",
@@ -114,6 +115,7 @@ export const TERMS: ReadonlySet<string> = new Set([
  */
 export const NAMES: ReadonlySet<string> = new Set([
 	"Azure DevOps Pipelines",
+	"Bitbucket Pipelines",
 	"Claude Code",
 	"Claude Code CLI",
 	"Cursor",
