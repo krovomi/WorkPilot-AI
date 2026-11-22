@@ -184,37 +184,45 @@ class ContentSanitizer:
         warnings = []
         was_modified = False
 
-        # Step 1: Remove HTML comments (common vector for hidden instructions)
-        html_comments = self.HTML_COMMENT_PATTERN.findall(content)
-        if html_comments:
-            content = self.HTML_COMMENT_PATTERN.sub("", content)
-            removed_items.extend(
-                [f"HTML comment ({len(c)} chars)" for c in html_comments]
-            )
-            was_modified = True
-            if self.log_truncation:
-                logger.info(
-                    f"Removed {len(html_comments)} HTML comments from {content_type}"
+        # Steps 1-2: remove what a reader does not see (HTML comments,
+        # invisible characters, script and style blocks). The removals repeat
+        # until nothing changes: taking one block out can join the text
+        # around it into another.
+        counts = {"comments": 0, "invisible": 0, "script": 0, "style": 0}
+        previous = None
+        while content != previous:
+            previous = content
+            invisible = self.INVISIBLE_PATTERN.findall(content)
+            if invisible:
+                content = self.INVISIBLE_PATTERN.sub("", content)
+                counts["invisible"] += len(invisible)
+            html_comments = self.HTML_COMMENT_PATTERN.findall(content)
+            if html_comments:
+                content = self.HTML_COMMENT_PATTERN.sub("", content)
+                removed_items.extend(
+                    [f"HTML comment ({len(c)} chars)" for c in html_comments]
                 )
+                counts["comments"] += len(html_comments)
+            script_tags = self.SCRIPT_TAG_PATTERN.findall(content)
+            if script_tags:
+                content = self.SCRIPT_TAG_PATTERN.sub("", content)
+                counts["script"] += len(script_tags)
+            style_tags = self.STYLE_TAG_PATTERN.findall(content)
+            if style_tags:
+                content = self.STYLE_TAG_PATTERN.sub("", content)
+                counts["style"] += len(style_tags)
 
-        # Step 1b: Remove characters a reader does not see
-        invisible = self.INVISIBLE_PATTERN.findall(content)
-        if invisible:
-            content = self.INVISIBLE_PATTERN.sub("", content)
-            removed_items.append(f"{len(invisible)} invisible characters")
-            was_modified = True
-
-        # Step 2: Remove script/style tags
-        script_tags = self.SCRIPT_TAG_PATTERN.findall(content)
-        if script_tags:
-            content = self.SCRIPT_TAG_PATTERN.sub("", content)
-            removed_items.append(f"{len(script_tags)} script tags")
-            was_modified = True
-
-        style_tags = self.STYLE_TAG_PATTERN.findall(content)
-        if style_tags:
-            content = self.STYLE_TAG_PATTERN.sub("", content)
-            removed_items.append(f"{len(style_tags)} style tags")
+        if counts["comments"] and self.log_truncation:
+            logger.info(
+                f"Removed {counts['comments']} HTML comments from {content_type}"
+            )
+        if counts["invisible"]:
+            removed_items.append(f"{counts['invisible']} invisible characters")
+        if counts["script"]:
+            removed_items.append(f"{counts['script']} script tags")
+        if counts["style"]:
+            removed_items.append(f"{counts['style']} style tags")
+        if any(counts.values()):
             was_modified = True
 
         # Step 3: Detect potential injection patterns (warn only, don't remove)

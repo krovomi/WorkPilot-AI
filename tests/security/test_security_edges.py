@@ -43,6 +43,23 @@ def test_sanitizer_empty_and_truncated():
     assert result.warnings == ["Content truncated from 25 to 10 chars"]
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("a<scr<script>x</script>ipt>run()</script>b", "ab"),
+        ("a<sty<style></style>le>p{}</style>b", "ab"),
+        ("a<!<!-- x -->-- hidden -->b", "ab"),
+        ("a<!\u200b-- hidden -->b<scr\u200bipt>x()</script>c", "abc"),
+    ],
+)
+def test_sanitizer_removes_a_block_that_appears_once_another_is_gone(text, expected):
+    result = ContentSanitizer(log_truncation=False).sanitize(text)
+    assert result.content == expected
+    assert result.was_modified
+    again = ContentSanitizer().sanitize(result.content)
+    assert (again.content, again.was_modified) == (expected, False)
+
+
 def test_wrap_sanitizes_first_unless_told_not_to():
     sanitizer = ContentSanitizer()
     wrapped = sanitizer.wrap_user_content("<!-- hidden -->hello", max_length=3)
