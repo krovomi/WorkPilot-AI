@@ -6,8 +6,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FAMILY_SHIRTS } from "../../lib/pixel-office-providers";
 import type { DecorId } from "../../lib/pixel-office-seasons";
+import { type AgentSkin, agentShirt } from "../../lib/pixel-office-skins";
 import {
 	type AgentActivity,
 	type PixelAgent,
@@ -271,6 +271,7 @@ interface DrawAgentOpts {
 	selected: string | null;
 	animFrame: number;
 	frame: number;
+	skin: AgentSkin;
 }
 
 function drawAgent({
@@ -282,6 +283,7 @@ function drawAgent({
 	selected,
 	animFrame,
 	frame,
+	skin,
 }: DrawAgentOpts) {
 	const visual = getAgentVisual(agent.activity, frame, z);
 	const { color, isActive, isWaiting, isIdle, isGhost, bounceY } = visual;
@@ -301,7 +303,7 @@ function drawAgent({
 		agent.characterIndex,
 		activityToDirection(agent.activity),
 		animFrame,
-		agent.providerFamily && FAMILY_SHIRTS[agent.providerFamily],
+		agentShirt(agent.providerFamily, skin),
 	);
 
 	// Selection ring
@@ -458,6 +460,8 @@ interface PixelOfficeCanvasProps {
 	readonly calm?: boolean;
 	/** The decor the project's seasons earned. */
 	readonly decor?: readonly DecorId[];
+	/** How the characters are dressed. */
+	readonly skin?: AgentSkin;
 	readonly onAgentClick?: (
 		agentId: string,
 		screenX: number,
@@ -471,6 +475,7 @@ export function PixelOfficeCanvas({
 	emptyDeskLabel,
 	calm = false,
 	decor = NO_DECOR,
+	skin = "provider",
 	onAgentClick,
 }: PixelOfficeCanvasProps) {
 	// State rather than a ref: the effects below run again once the element
@@ -516,6 +521,8 @@ export function PixelOfficeCanvas({
 	calmRef.current = calm;
 	const decorRef = useRef(decor);
 	decorRef.current = decor;
+	const skinRef = useRef(skin);
+	skinRef.current = skin;
 
 	// ── Render loop ────────────────────────────────────────
 
@@ -596,6 +603,7 @@ export function PixelOfficeCanvas({
 					selected,
 					animFrame,
 					frame,
+					skin: skinRef.current,
 				});
 			}
 

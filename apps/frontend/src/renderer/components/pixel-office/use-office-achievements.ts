@@ -15,6 +15,11 @@ interface Options {
 	readonly tasks: readonly Task[];
 	/** False while the task list is loading: nothing is recorded from a half list. */
 	readonly ready: boolean;
+	/**
+	 * A server project: its folder here is the app's mirror, so no local
+	 * runner reads it and it counts no incident.
+	 */
+	readonly remote?: boolean;
 }
 
 /**
@@ -31,6 +36,7 @@ export function useOfficeAchievements({
 	projectPath,
 	tasks,
 	ready,
+	remote = false,
 }: Options) {
 	const [incidents, setIncidents] = useState<IncidentFact[] | null>(null);
 	const [now, setNow] = useState(() => Date.now());
@@ -47,7 +53,7 @@ export function useOfficeAchievements({
 			if (pathRef.current === projectPath) setIncidents(facts);
 		};
 		const read = globalThis.electronAPI?.selfHealing?.getIncidents;
-		if (!read) {
+		if (!read || remote) {
 			done([]);
 			return;
 		}
@@ -55,7 +61,7 @@ export function useOfficeAchievements({
 			(result) => done(result?.success ? incidentFactsOf(result.data) : []),
 			() => done([]),
 		);
-	}, [projectPath]);
+	}, [projectPath, remote]);
 
 	useEffect(() => {
 		setIncidents(null);

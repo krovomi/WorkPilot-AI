@@ -17,6 +17,10 @@ const getPageFeatureSettings = vi.hoisted(() =>
 	vi.fn(() => ({ provider: "ollama", model: "llama4", thinkingLevel: "low" })),
 );
 vi.mock("../../services/page-llm-config", () => ({ getPageFeatureSettings }));
+vi.mock("../../server-pixel-office", () => ({
+	getTeamBoard: vi.fn(),
+	setTeamConsent: vi.fn(),
+}));
 
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import {
