@@ -90,10 +90,57 @@ describe("InvitationsAdmin", () => {
 			expect(serverAuth.createInvite).toHaveBeenCalledWith({
 				email: "dana@example.test",
 				role: "viewer",
+				org_role: null,
 			}),
 		);
 		expect(await screen.findByText(/Share this single-use link/)).toBeInTheDocument();
 		expect(screen.getByDisplayValue("https://team.example/invite?token=t")).toBeInTheDocument();
+	});
+
+	it("names the role in the organization when the roles can be read", async () => {
+		signedInAs(false);
+		const listRoles = vi.fn().mockResolvedValue({
+			ok: true,
+			data: [
+				{ id: "r1", slug: "reviewer", name: "Reviewer", scope: "org" },
+				{ id: "r2", slug: "proj-only", name: "Project only", scope: "project" },
+			],
+		});
+		(window as unknown as { electronAPI: unknown }).electronAPI = {
+			serverAuth,
+			serverAdmin: { listRoles },
+		};
+		serverAuth.createInvite.mockResolvedValue({
+			ok: true,
+			data: { invite_link: LINK, email_sent: false },
+		});
+		render(<InvitationsAdmin />);
+		const select = (await screen.findByLabelText("Role in the organization")) as HTMLSelectElement;
+		// A project-scoped role is no role in the organization.
+		expect(Array.from(select.options).map((o) => o.value)).toEqual(["", "reviewer"]);
+		fireEvent.change(select, { target: { value: "reviewer" } });
+		fireEvent.change(screen.getByLabelText("New user's email"), {
+			target: { value: "rita@example.test" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Invite" }));
+		await waitFor(() =>
+			expect(serverAuth.createInvite).toHaveBeenCalledWith({
+				email: "rita@example.test",
+				role: "member",
+				org_role: "reviewer",
+			}),
+		);
+	});
+
+	it("offers no organization role when the roles cannot be read", async () => {
+		signedInAs(false);
+		(window as unknown as { electronAPI: unknown }).electronAPI = {
+			serverAuth,
+			serverAdmin: { listRoles: vi.fn().mockRejectedValue(new Error("403")) },
+		};
+		render(<InvitationsAdmin />);
+		await waitFor(() => expect(serverAuth.listInvites).toHaveBeenCalled());
+		expect(screen.queryByLabelText("Role in the organization")).not.toBeInTheDocument();
 	});
 
 	it("lists pending invitations with their role in the app's language", async () => {
