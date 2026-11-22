@@ -14,6 +14,7 @@ import type {
 } from "../../../shared/types";
 import { stripAnsiCodes } from "../../../shared/utils/ansi-sanitizer";
 import { getToolPath } from "../../cli-tool-manager";
+import { recordMergeOutcome } from "../../conflict-waves/conflict-times";
 import { killProcessGracefully } from "../../platform";
 import { parsePythonCommand } from "../../python-detector";
 import { findServerCard } from "../../server-board-actions";
@@ -560,6 +561,11 @@ export function registerWorktreeMergeHandlers(
 								// The worktree will be cleaned up when user moves task to "Done" status.
 							}
 
+							// A merge that went through resolves the task's open conflict, if any.
+							if (!isStageOnly || hasActualStagedChanges || mergeAlreadyCommitted) {
+								recordMergeOutcome(project.path, task.specId, "merged");
+							}
+
 							debug(
 								"Merge result. isStageOnly:",
 								isStageOnly,
@@ -761,6 +767,7 @@ export function registerWorktreeMergeHandlers(
 								pattern.test(combinedOutput),
 							);
 							debug("Merge failed. hasConflicts:", hasConflicts);
+							if (hasConflicts) recordMergeOutcome(project.path, task.specId, "conflict");
 
 							resolve({
 								success: true,
@@ -1026,6 +1033,9 @@ export function registerWorktreeMergeHandlers(
 								// response unchanged.
 								// biome-ignore lint/suspicious/noExplicitAny: dynamic JSON from Python CLI
 								const result = parsed as any;
+								if (result.gitConflicts?.hasConflicts === true) {
+									recordMergeOutcome(project.path, task.specId, "conflict");
+								}
 								console.warn(
 									"[IPC] merge-preview result:",
 									JSON.stringify(result, null, 2),
