@@ -1457,3 +1457,115 @@ describe("TaskCard — right-click menu and quick edits", () => {
 		expect(onClick).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe("TaskCard — renaming in place", () => {
+	const cardOf = (title = "Add login page") =>
+		screen.getByRole("option", { name: title });
+	const titleOf = () => screen.getByRole("heading", { name: "Add login page" });
+	const box = () => screen.getByRole("textbox", { name: "Card title" });
+
+	function saving() {
+		api.restore();
+		api = installRendererApi({
+			updateTask: vi.fn(async (_id: string, updates: { title?: string }) => ({
+				success: true,
+				data: { ...makeTask(), ...updates },
+			})),
+		});
+	}
+
+	afterEach(() => vi.useRealTimers());
+
+	it("renames on a double-click on the title, without opening the card", async () => {
+		saving();
+		vi.useFakeTimers();
+		const { onClick } = renderCard({ task: makeTask() });
+		fireEvent.click(titleOf(), { detail: 1 });
+		fireEvent.click(titleOf(), { detail: 2 });
+		act(() => vi.advanceTimersByTime(1000));
+		expect(onClick).not.toHaveBeenCalled();
+		expect(box()).toHaveValue("Add login page");
+		// Clicks and presses in the box stay in it.
+		fireEvent.click(box());
+		fireEvent.doubleClick(box());
+		fireEvent.pointerDown(box());
+		fireEvent.mouseDown(box());
+		expect(onClick).not.toHaveBeenCalled();
+		fireEvent.change(box(), { target: { value: "  Add the login page " } });
+		fireEvent.keyDown(box(), { key: "a" });
+		fireEvent.keyDown(box(), { key: "Enter" });
+		expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", {
+			title: "Add the login page",
+		});
+		expect(screen.queryByRole("textbox", { name: "Card title" })).toBeNull();
+		expect(document.activeElement).toBe(cardOf());
+	});
+
+	it("opens the card a moment after a single click on the title", () => {
+		vi.useFakeTimers();
+		const { onClick, unmount } = renderCard({ task: makeTask() });
+		fireEvent.click(titleOf(), { detail: 1 });
+		expect(onClick).not.toHaveBeenCalled();
+		act(() => vi.advanceTimersByTime(300));
+		expect(onClick).toHaveBeenCalledTimes(1);
+		// A click still waiting when the card goes away opens nothing.
+		fireEvent.click(titleOf(), { detail: 1 });
+		unmount();
+		act(() => vi.advanceTimersByTime(300));
+		expect(onClick).toHaveBeenCalledTimes(1);
+	});
+
+	it("renames with F2; Escape, an empty or the same title change nothing", () => {
+		saving();
+		renderCard({ task: makeTask() });
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.change(box(), { target: { value: "Something else" } });
+		fireEvent.keyDown(box(), { key: "Escape" });
+		expect(document.activeElement).toBe(cardOf());
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.change(box(), { target: { value: "   " } });
+		fireEvent.blur(box());
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.blur(box());
+		expect(api.fn("updateTask")).not.toHaveBeenCalled();
+	});
+
+	it("saves when the box is left", async () => {
+		saving();
+		renderCard({ task: makeTask() });
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.change(box(), { target: { value: "Login page" } });
+		fireEvent.blur(box());
+		expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", { title: "Login page" });
+	});
+
+	it("says so when the title is not saved", async () => {
+		render(
+			<TooltipProvider>
+				<TaskCard task={makeTask()} onClick={vi.fn()} />
+				<Toaster />
+			</TooltipProvider>,
+		);
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.change(box(), { target: { value: "Login page" } });
+		fireEvent.keyDown(box(), { key: "Enter" });
+		await waitFor(() => expect(api.fn("updateTask")).toHaveBeenCalled());
+		expect(
+			await screen.findByText("The change could not be saved"),
+		).toBeInTheDocument();
+	});
+
+	it("is not offered while an agent works on the card, nor on an error title", () => {
+		const { onClick, unmount } = renderCard({
+			task: makeTask({ status: "in_progress" }),
+		});
+		fireEvent.keyDown(cardOf(), { key: "F2" });
+		fireEvent.click(titleOf(), { detail: 1 });
+		expect(onClick).toHaveBeenCalledTimes(1);
+		expect(screen.queryByRole("textbox", { name: "Card title" })).toBeNull();
+		unmount();
+		renderCard({ task: makeTask({ title: `Broken${JSON_ERROR_TITLE_SUFFIX}` }) });
+		fireEvent.keyDown(screen.getByRole("option"), { key: "F2" });
+		expect(screen.queryByRole("textbox", { name: "Card title" })).toBeNull();
+	});
+});

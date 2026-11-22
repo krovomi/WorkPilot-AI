@@ -16,6 +16,11 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 const KEYBOARD_OWNERS =
 	'[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 
+/** True while a dialog or a menu is open: board shortcuts stay quiet. */
+export function keyboardIsOwned(): boolean {
+	return !!document.querySelector(KEYBOARD_OWNERS);
+}
+
 /**
  * The board's N key: opens the quick-add box of the Planification column.
  * Plain N only, never while typing or while a dialog or menu is open, so it
@@ -29,7 +34,7 @@ export function useQuickAddShortcut(enabled: boolean, open: () => void): void {
 			if (e.key !== "n" && e.key !== "N") return;
 			if (e.ctrlKey || e.metaKey || e.altKey) return;
 			if (isTypingTarget(e.target)) return;
-			if (document.querySelector(KEYBOARD_OWNERS)) return;
+			if (keyboardIsOwned()) return;
 			e.preventDefault();
 			open();
 		};

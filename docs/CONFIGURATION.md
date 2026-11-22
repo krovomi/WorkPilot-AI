@@ -351,6 +351,8 @@ the same way, next to Entra. The server reads the provider's discovery document
 | `WORKPILOT_SELF_APPROVAL` | `when-alone` | Whether the author of a card approves its own spec: `allow`, `deny`, or `when-alone` (only while the others who may approve on the project could not give the approvals the card needs). Any other value is logged and replaced by the default. |
 | `WORKPILOT_APPROVAL_QUORUM` | `low=1,medium=1,high=1` | How many people approve a card, by its criticality, e.g. `low=1,medium=2,high=3` (1 to 10; a level left out needs 1). A card is `medium` unless an approver sets it, or its spec's assessment says it is complex (`high`). |
 | `WORKPILOT_APPROVAL_ROLES` | — | The roles one of a card's approvers must hold, by criticality, as role slugs joined by `+`, e.g. `high=tech-lead+security` (5 per level at most). |
+| `WORKPILOT_APPROVAL_ESCALATION_HOURS` | — (never) | How long a card's plan waits for its approvals before a second group of approvers hears of it, in hours: `24` for every criticality, or `low=72,medium=24,high=4` (0 to 720; a level left out never escalates). The wait starts when the spec run ended; a card escalates once per spec run. |
+| `WORKPILOT_APPROVAL_ESCALATION_ROLES` | `owner+admin` | The second group: the organization's people who hold one of these roles (slugs joined by `+`, 5 at most) and may approve on the project, other than the card's author and those who approved it. They hear of it on their "Needs you" channels. |
 
 The provider sign-in is on only when both `WORKPILOT_OIDC_ISSUER` and
 `WORKPILOT_OIDC_CLIENT_ID` are set; neither is a secret.
@@ -455,9 +457,6 @@ is taken so the user knows the output is not live data:
 - **Bounty board** — contestants fall back to a `[stub:...]` output string
   when the `llm_client` module is not importable. Logs a warning per
   contestant.
-- **Analytics API** ([apps/backend/analytics/api_minimal.py](../apps/backend/analytics/api_minimal.py))
-  currently returns empty/mock payloads for every endpoint. Treat it as a
-  scaffold until a real database-backed implementation lands.
 
 ## QA validation loop
 
@@ -810,6 +809,8 @@ Project settings writes `GITHUB_REPO` and `GITLAB_PROJECT` into the project's
 | `GITLAB_PROJECT` | — | The project's `group/project`, for the same uses on GitLab. |
 | `AZURE_DEVOPS_EXT_PAT` | — | Read when `AZURE_DEVOPS_PAT` is unset (it is the Azure DevOps CLI's name for it): pushes a task branch and opens its pull request. Secret. |
 | `GITHUB_BOT_TOKEN` | — | Token of the GitHub automation runner's bot account (PR review, auto-fix, triage) when `--bot-token` is not given. It only identifies that account, so the runner skips what the bot wrote itself; nothing is posted with it. Secret. |
+| `ISSUE_EMBEDDINGS_PROVIDER` | first with a key | Which service compares issues by meaning for triage's possible duplicates: `huggingface`, `openai`, `voyage`, `local` (sentence-transformers), or `none` for shared title words. Unset, the first of Hugging Face, OpenAI and Voyage with a key; under strict offline mode only `local`, and only when named. A failing service falls back to shared words. |
+| `ISSUE_EMBEDDINGS_MODEL` | service default | Embedding model of that service (`thenlper/gte-large` on Hugging Face, `text-embedding-3-small`, `voyage-large-2`, `all-MiniLM-L6-v2`). Vectors are cached per service and model in `.workpilot/github/embeddings/`. |
 | `MAX_PR_WORKTREES` | 10 | PR-review worktrees kept in `.workpilot/github/pr/worktrees`; the oldest go beyond that. |
 | `PR_WORKTREE_MAX_AGE_DAYS` | 7 | Age, in days, past which a PR-review worktree is removed, checked before each new review. `0` removes them all. |
 

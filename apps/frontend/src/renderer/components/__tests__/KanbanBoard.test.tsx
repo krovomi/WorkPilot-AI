@@ -36,6 +36,8 @@ import { useKanbanSettingsStore } from "../../stores/kanban-settings-store";
 import { useProjectEnvStore } from "../../stores/project-env-store";
 import { useProjectStore } from "../../stores/project-store";
 import { kickQueue, useTaskStore } from "../../stores/task-store";
+import { useBoardUndoStore } from "../../stores/board-undo-store";
+import { usePendingDeleteStore } from "../../stores/pending-delete-store";
 import { KanbanBoard } from "../KanbanBoard";
 import { Toaster } from "../ui/toaster";
 import { TooltipProvider } from "../ui/tooltip";
@@ -191,6 +193,8 @@ beforeEach(() => {
 	// The filter store skips a reload for the project it already holds.
 	useKanbanFilterStore.setState({ projectId: null } as never);
 	useKanbanFilterStore.getState().loadForProject("p1");
+	usePendingDeleteStore.setState({ ids: new Set() });
+	useBoardUndoStore.getState().clear();
 });
 
 afterEach(() => {
@@ -752,7 +756,11 @@ describe("KanbanBoard — selection and bulk actions", () => {
 			deleteTask: vi.fn(async () => ({ success: true })),
 			createTask: vi.fn(async () => ({ success: true, data: makeTask({ id: "a2" }) })),
 		});
-		renderBoard([makeTask({ id: "a", title: "A" }), makeTask({ id: "b", title: "B" })]);
+		// Cards with a worktree hold work: their deletion is confirmed first.
+		renderBoard([
+			makeTask({ id: "a", title: "A", location: "worktree" }),
+			makeTask({ id: "b", title: "B" }),
+		]);
 		await select(user, "A");
 		await user.click(
 			within(bulkBar()).getByRole("button", { name: /^Delete$/ }),
@@ -768,7 +776,7 @@ describe("KanbanBoard — selection and bulk actions", () => {
 	it("keeps the cards a bulk delete failed on selected", async () => {
 		const user = userEvent.setup();
 		installApi({ deleteTask: vi.fn(async () => ({ success: false, error: "locked" })) });
-		renderBoard([makeTask({ id: "a", title: "A" })]);
+		renderBoard([makeTask({ id: "a", title: "A", location: "worktree" })]);
 		await select(user, "A");
 		await user.click(
 			within(bulkBar()).getByRole("button", { name: /^Delete$/ }),
@@ -800,7 +808,7 @@ describe("KanbanBoard — per-card actions", () => {
 			deleteTask: vi.fn(async () => ({ success: true })),
 			createTask: vi.fn(async () => ({ success: true, data: makeTask() })),
 		});
-		renderBoard([makeTask()]);
+		renderBoard([makeTask({ location: "worktree" })]);
 		await user.click(screen.getByTitle("Delete"));
 		expect(await screen.findByText(/Are you sure you want to delete the task "Task one"/)).toBeInTheDocument();
 		await user.click(screen.getByRole("button", { name: "Delete Permanently" }));
@@ -815,7 +823,7 @@ describe("KanbanBoard — per-card actions", () => {
 			deleteTask: vi.fn(async () => ({ success: true })),
 			createTask: vi.fn(async () => ({ success: false, error: "disk full" })),
 		});
-		renderBoard([makeTask()]);
+		renderBoard([makeTask({ location: "worktree" })]);
 		await user.click(screen.getByTitle("Delete"));
 		await user.click(await screen.findByRole("button", { name: "Delete Permanently" }));
 		await user.click(await screen.findByRole("button", { name: "Undo" }));
@@ -825,7 +833,7 @@ describe("KanbanBoard — per-card actions", () => {
 	it("reports a single delete that failed", async () => {
 		const user = userEvent.setup();
 		installApi({ deleteTask: vi.fn(async () => ({ success: false, error: "locked" })) });
-		renderBoard([makeTask()]);
+		renderBoard([makeTask({ location: "worktree" })]);
 		await user.click(screen.getByTitle("Delete"));
 		await user.click(await screen.findByRole("button", { name: "Delete Permanently" }));
 		expect(await screen.findByText("Failed to delete some tasks")).toBeInTheDocument();
@@ -1226,7 +1234,7 @@ describe("KanbanBoard — edge cases", () => {
 				throw new Error("ipc gone");
 			}),
 		});
-		renderBoard([makeTask()]);
+		renderBoard([makeTask({ location: "worktree" })]);
 		await user.click(screen.getByTitle("Delete"));
 		await user.click(await screen.findByRole("button", { name: "Delete Permanently" }));
 		await user.click(await screen.findByRole("button", { name: "Undo" }));
@@ -1420,5 +1428,184 @@ describe("KanbanBoard — edge cases", () => {
 		});
 		expect(column("backlog").className).not.toContain("drop-zone-highlight");
 		fake.remove();
+	});
+});
+
+describe("KanbanBoard — quick selection, deferred delete and undo", () => {
+	const cardsOf = (status: string) => within(column(status)).getAllByRole("option");
+	const three = () => [
+		makeTask({ id: "a", title: "A", createdAt: new Date("2026-11-10T12:00:00Z") }),
+		makeTask({ id: "b", title: "B", createdAt: new Date("2026-11-10T11:00:00Z") }),
+		makeTask({ id: "c", title: "C", createdAt: new Date("2026-11-10T10:00:00Z") }),
+	];
+	/** The main process merges metadata like TASK_UPDATE does. */
+	const updatesMerge = () =>
+		installApi({
+			updateTask: vi.fn(async (id: string, updates: { metadata?: object }) => {
+				const task = useTaskStore.getState().tasks.find((t) => t.id === id);
+				return {
+					success: true,
+					data: { ...task, metadata: { ...task?.metadata, ...updates.metadata } },
+				};
+			}),
+		});
+	const priorityOf = (id: string) =>
+		useTaskStore.getState().tasks.find((t) => t.id === id)?.metadata?.priority;
+
+	it("toggles with Ctrl+click, selects a range with Shift+click, clears on Escape", async () => {
+		const onTaskClick = vi.fn();
+		renderBoard(three(), { onTaskClick });
+		const [a, , c] = cardsOf("backlog");
+		fireEvent.click(a, { ctrlKey: true });
+		expect(screen.getByText("1 tasks selected")).toBeInTheDocument();
+		expect(fireEvent.mouseDown(c, { shiftKey: true })).toBe(false);
+		fireEvent.click(c, { shiftKey: true });
+		expect(screen.getByText("3 tasks selected")).toBeInTheDocument();
+		fireEvent.click(a, { metaKey: true });
+		expect(screen.getByText("2 tasks selected")).toBeInTheDocument();
+		// A modifier on a control, or no modifier, keeps its meaning.
+		const area = column("backlog").querySelector(".flex-1.min-h-0") as HTMLElement;
+		expect(fireEvent.mouseDown(area, { shiftKey: true })).toBe(true);
+		fireEvent.click(area, { ctrlKey: true });
+		fireEvent.click(within(a).getByRole("button", { name: "Task actions" }), {
+			ctrlKey: true,
+		});
+		expect(screen.getByText("2 tasks selected")).toBeInTheDocument();
+		expect(onTaskClick).not.toHaveBeenCalled();
+		// Away from the delete corner (jsdom cards measure 0 × 0).
+		fireEvent.click(a, { clientX: 50, clientY: 50 });
+		expect(onTaskClick).toHaveBeenCalledTimes(1);
+		fireEvent.keyDown(document.body, { key: "Escape" });
+		expect(screen.queryByText(/tasks selected/)).toBeNull();
+	});
+
+	it("selects a column with Ctrl+A and deletes fresh cards after a delay, with undo", async () => {
+		const user = userEvent.setup();
+		installApi({ deleteTask: vi.fn(async () => ({ success: true })) });
+		renderBoard(three());
+		fireEvent.pointerOver(column("backlog"));
+		fireEvent.keyDown(document.body, { key: "a", ctrlKey: true });
+		expect(screen.getByText("3 tasks selected")).toBeInTheDocument();
+		fireEvent.keyDown(document.body, { key: "Delete" });
+		// No confirmation: the cards go now and are deleted later.
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		expect(screen.queryByRole("option", { name: "A" })).toBeNull();
+		expect(await screen.findByText("Successfully deleted 3 task(s)")).toBeInTheDocument();
+		await user.click(screen.getByRole("button", { name: "Undo" }));
+		expect(screen.getByRole("option", { name: "A" })).toBeInTheDocument();
+		expect(api.fn("deleteTask")).not.toHaveBeenCalled();
+		// The undo stack's entry is spent: Ctrl+Z has nothing more to do.
+		fireEvent.keyDown(document.body, { key: "z", ctrlKey: true });
+		expect(await screen.findByText(/Could not fully undo/)).toBeInTheDocument();
+		fireEvent.keyDown(document.body, { key: "z", ctrlKey: true });
+		expect(await screen.findByText("Nothing to undo")).toBeInTheDocument();
+	});
+
+	it("deletes one fresh card for good once the delay is over, Ctrl+Z before that", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		installApi({ deleteTask: vi.fn(async () => ({ success: true })) });
+		renderBoard([makeTask(), makeTask({ id: "t2", title: "Task two" })]);
+		fireEvent.click(within(screen.getByRole("option", { name: "Task two" })).getByTitle("Delete"));
+		expect(screen.queryByRole("option", { name: "Task two" })).toBeNull();
+		fireEvent.keyDown(document.body, { key: "z", ctrlKey: true });
+		expect(await screen.findByText("Undone: deletion of 1 card")).toBeInTheDocument();
+		expect(screen.getByRole("option", { name: "Task two" })).toBeInTheDocument();
+
+		fireEvent.click(within(screen.getByRole("option", { name: "Task one" })).getByTitle("Delete"));
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(8000);
+		});
+		expect(api.fn("deleteTask")).toHaveBeenCalledWith("t1");
+	});
+
+	it("says so when a delayed deletion fails", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		installApi({ deleteTask: vi.fn(async () => ({ success: false, error: "locked" })) });
+		renderBoard([makeTask()]);
+		fireEvent.click(screen.getByTitle("Delete"));
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(8000);
+		});
+		expect(await screen.findByText("Failed to delete some tasks")).toBeInTheDocument();
+		expect(screen.getByRole("option", { name: "Task one" })).toBeInTheDocument();
+	});
+
+	it("sets the type and priority of a selection, and undoes it", async () => {
+		const user = userEvent.setup();
+		updatesMerge();
+		renderBoard(three());
+		const [a, b] = cardsOf("backlog");
+		fireEvent.click(a, { ctrlKey: true });
+		fireEvent.click(b, { ctrlKey: true });
+		await user.click(within(bulkBar()).getByRole("button", { name: "Priority" }));
+		await user.click(await screen.findByRole("menuitem", { name: "High" }));
+		await waitFor(() => expect(priorityOf("b")).toBe("high"));
+		expect(priorityOf("a")).toBe("high");
+		await user.click(within(bulkBar()).getByRole("button", { name: "Type" }));
+		await user.click(await screen.findByRole("menuitem", { name: "Bug" }));
+		await waitFor(() => expect(api.fn("updateTask")).toHaveBeenCalledTimes(4));
+
+		fireEvent.keyDown(document.body, { key: "z", ctrlKey: true });
+		expect(await screen.findByText("Undone: type change")).toBeInTheDocument();
+		fireEvent.keyDown(document.body, { key: "z", ctrlKey: true });
+		await waitFor(() => expect(priorityOf("a")).toBeUndefined());
+	});
+
+	it("says how many cards of a selection could not be changed", async () => {
+		const user = userEvent.setup();
+		renderBoard(three());
+		fireEvent.click(cardsOf("backlog")[0], { ctrlKey: true });
+		await user.click(within(bulkBar()).getByRole("button", { name: "Priority" }));
+		await user.click(await screen.findByRole("menuitem", { name: "Low" }));
+		expect(await screen.findByText("1 card could not be changed")).toBeInTheDocument();
+	});
+
+	it("acts on the whole selection from a selected card's right-click", async () => {
+		const user = userEvent.setup();
+		updatesMerge();
+		renderBoard(three());
+		const [a, b, c] = cardsOf("backlog");
+		fireEvent.click(a, { ctrlKey: true });
+		fireEvent.click(b, { ctrlKey: true });
+		// Not on a card outside the selection.
+		fireEvent.contextMenu(c, { clientX: 5, clientY: 5 });
+		expect(screen.getByRole("menuitem", { name: "Open" })).toBeInTheDocument();
+		await user.keyboard("{Escape}");
+
+		fireEvent.contextMenu(a, { clientX: 5, clientY: 5 });
+		expect(screen.getByRole("menu", { name: "Card actions" })).toHaveTextContent(
+			"2 tasks selected",
+		);
+		await pickSubmenuItem(user, "Priority", "Urgent");
+		await waitFor(() => expect(priorityOf("b")).toBe("urgent"));
+
+		fireEvent.contextMenu(a, { clientX: 5, clientY: 5 });
+		await pickSubmenuItem(user, "Type", "Docs");
+		await waitFor(() => expect(api.fn("updateTask")).toHaveBeenCalledTimes(4));
+
+		fireEvent.contextMenu(a, { clientX: 5, clientY: 5 });
+		await user.click(screen.getByRole("menuitem", { name: "Clear Selection" }));
+		expect(screen.queryByText(/tasks selected/)).toBeNull();
+
+		fireEvent.click(a, { ctrlKey: true });
+		fireEvent.click(b, { ctrlKey: true });
+		fireEvent.contextMenu(b, { clientX: 5, clientY: 5 });
+		await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+		expect(screen.queryByRole("option", { name: "A" })).toBeNull();
+		expect(screen.getByRole("option", { name: "C" })).toBeInTheDocument();
+	});
+
+	it("moves a card back on Ctrl+Z, unless it has moved on since", async () => {
+		const user = userEvent.setup();
+		renderBoard([makeTask()]);
+		await user.click(screen.getByRole("button", { name: "Task actions" }));
+		await pickSubmenuItem(user, "Move to", "Queue");
+		await waitFor(() => expect(api.fn("updateTaskStatus")).toHaveBeenCalledTimes(1));
+		useTaskStore.getState().updateTask("t1", { status: "queue" });
+		fireEvent.keyDown(document.body, { key: "z", ctrlKey: true });
+		await waitFor(() =>
+			expect(api.fn("updateTaskStatus")).toHaveBeenLastCalledWith("t1", "backlog", undefined),
+		);
+		expect(await screen.findByText("Undone: move of 1 card")).toBeInTheDocument();
 	});
 });

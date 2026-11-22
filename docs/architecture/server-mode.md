@@ -385,6 +385,13 @@ jamais lu pour un projet du serveur.
 | Reconstruire l'index | `POST /api/features/context/jobs` | `agent.execute`, rôle `member` ou plus |
 | Lire, chercher les mémoires | `GET /api/features/context/memories` | `insight.read` |
 
+**La gouvernance d'un projet se lit sur le serveur.** Son `workpilot.policy.yaml`, son journal
+d'audit, les appels qu'attendent ses agents et son arrêt d'urgence sont servis par
+`/api/features/governance` (`shared_features/governance.py`, domaine `audit`) : une approbation y
+est donnée au nom du compte et de ses rôles, et `files.reviewers` peut en exiger un ; « Arrêter
+tous les agents » de l'app y arrête les runs et les jobs de la personne. Routes, permissions et
+délai mesuré : [governance-policy.md](governance-policy.md#un-projet-du-mode-serveur-shared_featuresgovernancepy).
+
 **Les vues GitHub d'un projet serveur passent par le serveur, avec le jeton de la personne.** Un
 projet cloné depuis github.com montre ses issues et ses pull requests. L'app n'a ni clone ni
 `gh` pour lui : `getGitHubConfig` lui donne pour jeton une poignée qui nomme le projet, pas un

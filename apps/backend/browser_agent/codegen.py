@@ -1,6 +1,7 @@
 """
 A recording written out as a test: Playwright (TypeScript, Python), Cypress,
-Selenium (Python, Java) or WebdriverIO.
+Selenium (Python, Java, C#, Ruby, JavaScript) or WebdriverIO (JavaScript,
+TypeScript).
 
 Deterministic, no model. Every piece of page content (URL, label, text, typed
 value, CSS) enters the code only as a string literal of the target language
@@ -28,6 +29,14 @@ each framework goes down the step's iframes and shadow hosts, and waits for
 the element to show when it appeared after the previous action, for the
 response to the request the action started, for the loading indicator it
 showed to go, and for the page it led to. Nothing waits for a fixed time.
+
+A hover, a scroll (of the window or of an element, to the recorded
+position), a drag onto another element and the options of a multiple list
+are written with each framework's own call when it has one; a dialog the
+action opened is answered as the person answered it while recording: a
+handler set before the action (Playwright, Cypress) or the alert answered
+after it (WebDriver). Cypress has no real hover: it triggers ``mouseover``,
+which a menu opened by CSS ``:hover`` alone does not see.
 """
 
 from __future__ import annotations
@@ -39,6 +48,12 @@ from pathlib import Path
 
 from .codegen_text import css_string, literal, pascal, py_literal, slug
 from .codegen_webdriver import selenium_java, selenium_python, webdriverio
+from .codegen_webdriver_langs import (
+    selenium_csharp,
+    selenium_js,
+    selenium_ruby,
+    webdriverio_ts,
+)
 from .recording import ENV_NAME, RecordedStep, Recording, Selector
 
 FORMATS = (
@@ -47,7 +62,11 @@ FORMATS = (
     "cypress",
     "selenium-python",
     "selenium-java",
+    "selenium-csharp",
+    "selenium-ruby",
+    "selenium-js",
     "webdriverio",
+    "webdriverio-ts",
 )
 DEFAULT_NAME = "recorded flow"
 MAX_NAME = 80
@@ -60,7 +79,11 @@ TEST_DIRS: dict[str, tuple[str, ...]] = {
     "selenium-python": ("tests/e2e", "tests", "e2e"),
     # The folder is the package the class declares (`package e2e;`).
     "selenium-java": ("src/test/java/e2e",),
+    "selenium-csharp": ("tests/E2E", "E2E", "tests"),
+    "selenium-ruby": ("spec/e2e", "spec/features", "spec"),
+    "selenium-js": ("test/e2e", "e2e", "tests/e2e"),
     "webdriverio": ("test/specs", "e2e", "tests/e2e"),
+    "webdriverio-ts": ("test/specs", "e2e", "tests/e2e"),
 }
 
 #: Cypress has no role query: the CSS of the elements a role usually comes from.
@@ -124,18 +147,35 @@ def file_path(fmt: str, name: str, root: Path | None = None) -> str:
         return f"{folder}/{slug(name, '-')}.cy.js"
     if fmt == "selenium-java":
         return f"{folder}/{pascal(name)}Test.java"
+    if fmt == "selenium-csharp":
+        return f"{folder}/{pascal(name)}Tests.cs"
+    if fmt == "selenium-ruby":
+        return f"{folder}/{slug(name, '_')}_spec.rb"
+    if fmt == "selenium-js":
+        # CommonJS whatever the package's "type": mocha loads a .cjs file as is.
+        return f"{folder}/{slug(name, '-')}.e2e.cjs"
     if fmt == "webdriverio":
         return f"{folder}/{slug(name, '-')}.e2e.js"
+    if fmt == "webdriverio-ts":
+        return f"{folder}/{slug(name, '-')}.e2e.ts"
     return f"{folder}/{slug(name, '-')}.spec.ts"
 
 
 # --- Playwright, TypeScript ----------------------------------------------------
 
 
+def frame_hops(step: RecordedStep) -> list[tuple[list[str], str]]:
+    """Each iframe of the step, with the shadow hosts it sits in."""
+    hosts = step.frame_shadow or [[] for _ in step.frames]
+    return list(zip(hosts, step.frames, strict=True))
+
+
 def _pw_ts_scope(step: RecordedStep) -> str:
     """``page``, then down the step's frames and shadow hosts."""
     scope = "page"
-    for frame in step.frames:
+    for above, frame in frame_hops(step):
+        for host in above:
+            scope += f".locator({literal(host)})"
         scope += f".frameLocator({literal(frame)})"
     for host in step.shadow:
         scope += f".locator({literal(host)})"
@@ -171,6 +211,18 @@ def _pw_ts_query(scope: str, s: Selector) -> str:
 def _pw_ts_action(step: RecordedStep, loc: str) -> str:
     if step.kind == "click":
         return f"await {loc}.click();"
+    if step.kind == "hover":
+        return f"await {loc}.hover();"
+    if step.kind == "scroll":
+        return (
+            f"await {loc}.evaluate((el, [x, y]) => el.scrollTo(x, y), "
+            f"[{step.scroll_x}, {step.scroll_y}]);"
+        )
+    if step.kind == "drag":
+        target = _pw_ts_locator(_pw_ts_scope(step), step.drop[0])
+        return f"await {loc}.dragTo({target});"
+    if step.kind == "select" and step.values and not step.secret_env:
+        return f"await {loc}.selectOption([{', '.join(map(literal, step.values))}]);"
     if step.kind in ("fill", "select"):
         method = "fill" if step.kind == "fill" else "selectOption"
         value = (
@@ -184,11 +236,31 @@ def _pw_ts_action(step: RecordedStep, loc: str) -> str:
     return f"await expect({loc}).toContainText({literal(step.text)});"
 
 
+def _pw_dialog(step: RecordedStep, quote: Callable[[str], str], arrow: str) -> str:
+    """The handler that answers the dialog the step's action opens."""
+    answer = step.dialog
+    assert answer is not None
+    if not answer.accept:
+        return f"dialog{arrow}dialog.dismiss()"
+    text = quote(answer.text) if answer.type == "prompt" else ""
+    return f"dialog{arrow}dialog.accept({text})"
+
+
 def _pw_ts_step(step: RecordedStep) -> list[str]:
     if step.kind == "navigate":
         return [f"await page.goto({literal(step.url)});"]
-    loc = _pw_ts_locator(_pw_ts_scope(step), step.selectors[0])
-    lines = [f"await expect({loc}).toBeVisible();"] if step.wait_visible else []
+    if step.kind == "scroll" and not step.selectors:
+        loc = ""
+        action = (
+            "await page.evaluate(([x, y]) => window.scrollTo(x, y), "
+            f"[{step.scroll_x}, {step.scroll_y}]);"
+        )
+    else:
+        loc = _pw_ts_locator(_pw_ts_scope(step), step.selectors[0])
+        action = _pw_ts_action(step, loc)
+    lines = [f"await expect({loc}).toBeVisible();"] if step.wait_visible and loc else []
+    if step.dialog:
+        lines.append(f'page.once("dialog", ({_pw_dialog(step, literal, ") => ")});')
     response = f"response{step.id.upper()}"
     if step.wait_request:
         lines.append(
@@ -196,7 +268,7 @@ def _pw_ts_step(step: RecordedStep) -> list[str]:
             f"r.request().method() === {literal(step.wait_request.method)} && "
             f"new URL(r.url()).pathname === {literal(step.wait_request.path)});"
         )
-    lines.append(_pw_ts_action(step, loc))
+    lines.append(action)
     if step.wait_request:
         lines.append(f"await {response};")
     if step.wait_hidden:
@@ -235,7 +307,9 @@ def _playwright_ts(name: str, steps: list[RecordedStep], env: list[str]) -> str:
 
 def _pw_py_scope(step: RecordedStep) -> str:
     scope = "page"
-    for frame in step.frames:
+    for above, frame in frame_hops(step):
+        for host in above:
+            scope += f".locator({py_literal(host)})"
         scope += f".frame_locator({py_literal(frame)})"
     for host in step.shadow:
         scope += f".locator({py_literal(host)})"
@@ -264,6 +338,17 @@ def _pw_py_query(scope: str, s: Selector) -> str:
 def _pw_py_action(step: RecordedStep, loc: str) -> str:
     if step.kind == "click":
         return f"{loc}.click()"
+    if step.kind == "hover":
+        return f"{loc}.hover()"
+    if step.kind == "scroll":
+        return (
+            f'{loc}.evaluate("(el, [x, y]) => el.scrollTo(x, y)", '
+            f"[{step.scroll_x}, {step.scroll_y}])"
+        )
+    if step.kind == "drag":
+        return f"{loc}.drag_to({_pw_py_locator(_pw_py_scope(step), step.drop[0])})"
+    if step.kind == "select" and step.values and not step.secret_env:
+        return f"{loc}.select_option([{', '.join(map(py_literal, step.values))}])"
     if step.kind in ("fill", "select"):
         method = "fill" if step.kind == "fill" else "select_option"
         value = (
@@ -280,9 +365,20 @@ def _pw_py_action(step: RecordedStep, loc: str) -> str:
 def _pw_py_step(step: RecordedStep) -> list[str]:
     if step.kind == "navigate":
         return [f"page.goto({py_literal(step.url)})"]
-    loc = _pw_py_locator(_pw_py_scope(step), step.selectors[0])
-    lines = [f"expect({loc}).to_be_visible()"] if step.wait_visible else []
-    action = _pw_py_action(step, loc)
+    if step.kind == "scroll" and not step.selectors:
+        loc = ""
+        action = (
+            'page.evaluate("([x, y]) => window.scrollTo(x, y)", '
+            f"[{step.scroll_x}, {step.scroll_y}])"
+        )
+    else:
+        loc = _pw_py_locator(_pw_py_scope(step), step.selectors[0])
+        action = _pw_py_action(step, loc)
+    lines = [f"expect({loc}).to_be_visible()"] if step.wait_visible and loc else []
+    if step.dialog:
+        lines.append(
+            f'page.once("dialog", lambda {_pw_dialog(step, py_literal, ": ")})'
+        )
     if step.wait_request:
         lines += [
             "with page.expect_response(lambda r: "
@@ -329,7 +425,10 @@ def _playwright_python(name: str, steps: list[RecordedStep], env: list[str]) -> 
 def _cy_scope(step: RecordedStep) -> str:
     """``cy``, then down the step's frames (same origin only) and shadow hosts."""
     scope = "cy"
-    for frame in step.frames:
+    for above, frame in frame_hops(step):
+        for host in above:
+            get = "cy.get" if scope == "cy" else f"{scope}.find"
+            scope = f"{get}({literal(host)}).shadow()"
         get = "cy.get" if scope == "cy" else f"{scope}.find"
         scope = (
             f'{get}({literal(frame)}).its("0.contentDocument.body")'
@@ -367,9 +466,34 @@ def _cy_first(scope: str, s: Selector) -> str | None:
     return None  # label: no query without Testing Library
 
 
-def _cy_action(step: RecordedStep, query: str) -> str:
+def _cy_drag(step: RecordedStep, query: str, target: str) -> str:
+    if step.drag_mode == "html5":
+        return (
+            "{ const dataTransfer = new DataTransfer(); "
+            f'{query}.trigger("dragstart", {{ dataTransfer }}); '
+            f'{target}.trigger("dragenter", {{ dataTransfer }})'
+            '.trigger("dragover", { dataTransfer }).trigger("drop", { dataTransfer }); '
+            f'{query}.trigger("dragend", {{ dataTransfer }}); }}'
+        )
+    return (
+        f'{query}.trigger("pointerdown", {{ button: 0 }}).trigger("mousedown", {{ button: 0 }}); '
+        f'{target}.trigger("pointermove").trigger("mousemove")'
+        '.trigger("pointerup").trigger("mouseup");'
+    )
+
+
+def _cy_action(step: RecordedStep, query: str) -> str | None:
     if step.kind == "click":
         return f"{query}.click();"
+    if step.kind == "hover":
+        return f'{query}.trigger("mouseover");'
+    if step.kind == "scroll":
+        return f"{query}.scrollTo({step.scroll_x}, {step.scroll_y});"
+    if step.kind == "drag":
+        target = _cy_find(_cy_scope(step), step.drop)
+        return None if target is None else _cy_drag(step, query, target)
+    if step.kind == "select" and step.values and not step.secret_env:
+        return f"{query}.select([{', '.join(map(literal, step.values))}]);"
     if step.kind == "fill":
         if step.secret_env:
             return (
@@ -391,25 +515,47 @@ def _cy_action(step: RecordedStep, query: str) -> str:
     return f'{query}.should("contain.text", {literal(step.text)});'
 
 
+def _cy_find(scope: str, selectors: list[Selector]) -> str | None:
+    return next(
+        (q for q in (_cy_query(scope, s) for s in selectors) if q is not None),
+        None,
+    )
+
+
+def _cy_dialog(step: RecordedStep) -> list[str]:
+    """The handler set before the action, answering its dialog as recorded."""
+    answer = step.dialog
+    if answer is None or answer.type in ("alert", "beforeunload"):
+        return []  # Cypress accepts an alert itself
+    if answer.type == "confirm":
+        return [
+            f'cy.once("window:confirm", () => {"true" if answer.accept else "false"});'
+        ]
+    value = literal(answer.text) if answer.accept else "null"
+    return [f'cy.window().then((win) => cy.stub(win, "prompt").returns({value}));']
+
+
 def _cy_step(step: RecordedStep) -> list[str] | None:
     if step.kind == "navigate":
         return [f"cy.visit({literal(step.url)});"]
-    scope = _cy_scope(step)
-    query = next(
-        (q for q in (_cy_query(scope, s) for s in step.selectors) if q is not None),
-        None,
-    )
-    if query is None:
-        return None
-    if step.wait_visible:
+    if step.kind == "scroll" and not step.selectors:
+        query = "cy"
+    else:
+        query = _cy_find(_cy_scope(step), step.selectors)
+        if query is None:
+            return None
+    if step.wait_visible and query != "cy":
         query += '.should("be.visible")'
-    lines: list[str] = []
+    action = _cy_action(step, query)
+    if action is None:
+        return None
+    lines: list[str] = _cy_dialog(step)
     if step.wait_request:
         lines.append(
             f"cy.intercept({{ method: {literal(step.wait_request.method)}, "
             f"pathname: {literal(step.wait_request.path)} }}).as({literal(step.id)});"
         )
-    lines.append(_cy_action(step, query))
+    lines.append(action)
     if step.wait_request:
         lines.append(f"cy.wait({literal('@' + step.id)});")
     if step.wait_hidden:
@@ -458,7 +604,11 @@ _GENERATORS: dict[str, Generator] = {
     "cypress": _cypress,
     "selenium-python": selenium_python,
     "selenium-java": selenium_java,
+    "selenium-csharp": selenium_csharp,
+    "selenium-ruby": selenium_ruby,
+    "selenium-js": selenium_js,
     "webdriverio": webdriverio,
+    "webdriverio-ts": webdriverio_ts,
 }
 
 
@@ -469,7 +619,11 @@ def export_recording(
     if fmt not in FORMATS:
         raise ValueError(f"Unknown test format: {fmt}")
     title = clean_name(name)
-    steps = [s for s in recording.steps if s.kind == "navigate" or s.selectors]
+    steps = [
+        s
+        for s in recording.steps
+        if s.kind == "navigate" or s.selectors or (s.kind == "scroll" and not s.frames)
+    ]
     env = sorted({s.secret_env for s in steps if ENV_NAME.match(s.secret_env)})
     code, skipped = _GENERATORS[fmt](title, steps, env)
     return GeneratedTest(

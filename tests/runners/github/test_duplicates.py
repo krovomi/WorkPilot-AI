@@ -132,6 +132,7 @@ def test_shared_entities_are_scored_by_overlap():
     [
         ("openai", "text-embedding-3-small"),
         ("voyage", "voyage-large-2"),
+        ("huggingface", "thenlper/gte-large"),
         ("local", "all-MiniLM-L6-v2"),
         ("unknown", "text-embedding-3-small"),
     ],
@@ -210,6 +211,85 @@ def test_a_voyage_error_says_how_to_fix_it(monkeypatch):
 
     with pytest.raises(Exception, match="Configure VOYAGE_API_KEY or use 'local'"):
         asyncio.run(EmbeddingProvider("voyage").get_embedding("text"))
+
+
+def _hugging_face(monkeypatch, *replies):
+    """Hugging Face's router, answering with `replies` in turn."""
+    sent = []
+    queue = list(replies)
+
+    def handler(request):
+        sent.append(request)
+        status, body = queue.pop(0)
+        return httpx.Response(status, json=body)
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda **kw: real(transport=httpx.MockTransport(handler), **kw),
+    )
+    return sent
+
+
+def test_hugging_face_embeds_on_the_router_s_feature_extraction(monkeypatch):
+    sent = _hugging_face(monkeypatch, (200, [0.5, 0.25]))
+    provider = EmbeddingProvider(
+        "huggingface", api_key="hf_test_0000"
+    )  # pragma: allowlist secret
+
+    assert asyncio.run(provider.get_embedding("z" * 9000)) == [0.5, 0.25]
+    [request] = sent
+    assert str(request.url) == (
+        "https://router.huggingface.co/hf-inference/models/thenlper/gte-large"
+        "/pipeline/feature-extraction"
+    )
+    assert (
+        request.headers["Authorization"] == "Bearer hf_test_0000"
+    )  # pragma: allowlist secret
+    assert json.loads(request.content) == {
+        "inputs": "z" * 8000,
+        "normalize": True,
+        "truncate": True,
+    }
+
+
+def test_a_loading_hugging_face_model_is_asked_again_and_waited_for(monkeypatch):
+    sent = _hugging_face(monkeypatch, (503, {"error": "loading"}), (200, [[1, 0.5]]))
+
+    vector = asyncio.run(EmbeddingProvider("huggingface").get_embedding("text"))
+
+    assert vector == [1.0, 0.5]
+    assert [r.headers.get("x-wait-for-model") for r in sent] == [None, "true"]
+    assert "Authorization" not in sent[0].headers
+
+
+def test_a_hugging_face_refusal_is_an_http_error(monkeypatch):
+    _hugging_face(monkeypatch, (401, {"error": "bad token"}))
+
+    with pytest.raises(httpx.HTTPStatusError):
+        asyncio.run(EmbeddingProvider("huggingface").get_embedding("text"))
+
+
+@pytest.mark.parametrize(
+    "reply", [[], [[]], {"error": "x"}, ["a", "b"], [True, False], [[[0.1]]]]
+)
+def test_a_hugging_face_answer_without_a_vector_is_refused(monkeypatch, reply):
+    _hugging_face(monkeypatch, (200, reply))
+
+    with pytest.raises(ValueError, match="no embedding vector"):
+        asyncio.run(EmbeddingProvider("huggingface").get_embedding("text"))
+
+
+@pytest.mark.parametrize(
+    "model", ["gte-large", "../../api/whoami", "a/b/c", "a/b?x=1", "/b", "a/.."]
+)
+def test_only_a_hub_repo_id_reaches_the_hugging_face_url(monkeypatch, model):
+    sent = _hugging_face(monkeypatch, (200, [0.1]))
+
+    with pytest.raises(ValueError, match="Not a Hugging Face model id"):
+        asyncio.run(EmbeddingProvider("huggingface", model=model).get_embedding("x"))
+    assert sent == []
 
 
 def test_the_local_model_without_its_package_says_how_to_install_it(monkeypatch):

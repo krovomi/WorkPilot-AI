@@ -52,6 +52,7 @@ import { ProjectSettingsContent } from "./ProjectSettingsContent";
 import { GuardrailsSettings } from "./GuardrailsSettings";
 import { SandboxSettings } from "./SandboxSettings";
 import { SchedulerSettings } from "./SchedulerSettings";
+import { ForgeAccountsSettings } from "./ForgeAccountsSettings";
 import { SettingsPageContext } from "./SettingsSection";
 import { resolveSettingsLanding } from "./settings-landing";
 import { filterSettingsThemes } from "./settings-search";
@@ -79,6 +80,7 @@ export type AppSection =
 	// Intégrations & Connexions (priorité 2)
 	| "integrations"
 	| "accounts"
+	| "forge-accounts"
 	// Interface & Apparence
 	| "appearance"
 	| "display"
@@ -413,6 +415,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 						isOpen={open}
 					/>
 				);
+			case "forge-accounts":
+				return <ForgeAccountsSettings />;
 			case "updates":
 				return (
 					<AdvancedSettings

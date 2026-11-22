@@ -1401,6 +1401,19 @@ body {
 /* Quick add (Planification, File d'attente): the row under the cards and the
    pills of the box (type, priority, one card per line). Design:
    docs/architecture/kanban-quick-edit.md. */
+/* A card's selection checkbox: shown on hover, on focus, when checked or
+   while the board has a selection (kanban-quick-edit.md, lot 3). */
+.kanban-card-check {
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+.kanban-card:hover .kanban-card-check,
+.kanban-card:focus-within .kanban-card-check,
+.kanban-card-check[data-checked],
+[data-board-selecting] .kanban-card-check {
+	opacity: 1;
+}
+
 .kanban-quick-add-row {
   display: flex;
   width: 100%;

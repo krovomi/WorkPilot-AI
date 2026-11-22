@@ -3,7 +3,6 @@
   "apps/backend/agents/session.py": 2245,
   "apps/backend/core/client.py": 2973,
   "apps/backend/core/workspace.py": 2171,
-  "apps/backend/provider_api.py": 2003,
   "apps/frontend/src/main/app-emulator-service.ts": 3234,
   "apps/frontend/src/main/claude-profile/credential-utils.ts": 2998,
   "apps/frontend/src/main/claude-profile/usage-monitor.ts": 4408,
@@ -13,6 +12,6 @@
   "apps/frontend/src/main/terminal/claude-integration-handler.ts": 2079,
   "apps/frontend/src/main/visual-proof-service.ts": 2695,
   "apps/frontend/src/renderer/App.tsx": 2116,
-  "apps/frontend/src/renderer/components/KanbanBoard.tsx": 3120,
+  "apps/frontend/src/renderer/components/KanbanBoard.tsx": 2970,
   "apps/frontend/src/renderer/components/task-detail/TaskLogs.tsx": 2167
 }

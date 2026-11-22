@@ -1,7 +1,7 @@
 """Replay shares: how many bookmarks each shared session carries.
 
 Revision ID: 0020_replay_share_bookmarks
-Revises: 0017_replay_shares
+Revises: 0019_login_sessions
 Create Date: 2026-11-21
 
 One nullable column on ``replay_shares``, read by the project's usage figures
@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0020_replay_share_bookmarks"
-down_revision = "0017_replay_shares"
+down_revision = "0019_login_sessions"
 branch_labels = None
 depends_on = None
 

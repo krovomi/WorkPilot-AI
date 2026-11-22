@@ -1,11 +1,10 @@
 ---
 feature: Ajout et édition rapides des cartes Kanban
 summary: >-
-  Ajout d'une ou plusieurs cartes depuis Planification et File d'attente (bouton, ligne sous les
-  cartes, double-clic sur le vide, touche N, collage d'une liste) ; type et priorité choisis à la
-  création ; assistant complet prérempli. Clic droit sur une carte et une colonne, une liste
-  d'actions partagée avec « ⋮ », Type ▸ et Priorité ▸, Modifier… direct. Lots suivants :
-  sélection, annulation, clavier.
+  Ajout rapide depuis Planification et File d'attente (une carte par ligne collée) ; clic droit
+  sur carte et colonne, liste d'actions partagée avec « ⋮ », Type ▸, Priorité ▸, Modifier… ;
+  sélection Ctrl/Maj et Ctrl+A, actions en masse, suppression différée, Ctrl+Z ; renommage en
+  place (F2), flèches entre cartes, aide des touches (Ctrl+/).
 ---
 
 # Ajout et édition rapides des cartes Kanban
@@ -16,8 +15,8 @@ travail est découpé en quatre lots, un par PR, dans cet ordre :
 
 1. **Ajout rapide en colonne** (livré).
 2. **Clic droit sur carte et colonne**, une seule liste d'actions partagée avec le menu « ⋮ » (livré).
-3. Sélection Ctrl/Maj, barre d'actions groupées enrichie, suppression différée, Ctrl+Z.
-4. Renommage en ligne, navigation au clavier, aide des raccourcis.
+3. **Sélection Ctrl/Maj**, barre d'actions groupées enrichie, suppression différée, Ctrl+Z (livré).
+4. **Renommage en ligne**, navigation au clavier, aide des raccourcis (livré).
 
 ## Où l'on crée une carte
 
@@ -109,6 +108,87 @@ et `withoutPortalEvents` (`SortableTaskCard`) ne démarre pas de glisser depuis 
 d'une colonne est un écouteur natif, qu'un portail n'atteint pas ; il laisse le sien à une carte,
 à un champ de texte et à la boîte d'ajout (`COLUMN_MENU_IGNORED_TARGETS`).
 
+## Sélection, suppression différée, annulation
+
+### Sélectionner
+
+`hooks/useBoardSelection.ts` tient la sélection (sortie de `KanbanBoard.tsx`, qui était à son
+plafond de taille). Ctrl+clic ou Cmd+clic ajoute ou retire une carte ; Maj+clic sélectionne de
+la dernière carte cliquée à celle-ci, dans la même colonne (sans ancre dans la colonne, il se
+comporte comme Ctrl+clic). Ces clics sont pris par un écouteur natif en capture sur la liste de
+la colonne (`KanbanColumn`), avant le clic de la carte, qui ne s'ouvre donc pas ; un clic avec
+modificateur sur un bouton, un lien, un champ ou la case garde son sens
+(`SELECT_GESTURE_IGNORED_TARGETS`). La carte porte `data-task-id` (`SortableTaskCard`).
+
+La case à cocher d'une carte n'apparaît qu'au survol, au focus, cochée, ou dès que le tableau a
+une sélection (`.kanban-card-check`, `data-board-selecting` sur le tableau).
+
+Touches (`hooks/useBoardShortcuts.ts`, jamais pendant une saisie ni avec un dialogue ou un menu
+ouvert, Ctrl et Cmd valent pareil) : Ctrl+A sélectionne la colonne qui a le focus, sinon celle
+sous le pointeur ; Échap vide la sélection ; Suppr ou Retour arrière la supprime ; Ctrl+Z annule.
+
+### Agir sur la sélection
+
+La barre (`kanban/BulkActionBar.tsx`, sortie du tableau) garde les étapes du pipeline pour la
+colonne de la sélection et ajoute **Type** et **Priorité**. Le clic droit sur une carte qui fait
+partie d'une sélection de plusieurs agit sur toute la sélection (`SelectionMenuItems`, via
+`kanban/board-selection-context.ts`) : Type ▸, Priorité ▸, Effacer la sélection, Supprimer ; le
+menu « ⋮ » reste celui de la carte. `hooks/useBoardBulkEdits.ts` porte ces actions.
+
+### Supprimer sans confirmer une carte neuve
+
+Une carte sur laquelle rien n'a travaillé (`isLightCard` de `lib/card-edits.ts` : Planification
+ou File d'attente, pas de plan, pas de worktree, jamais lancée) n'a que son texte à perdre. Sa
+suppression, seule ou en sélection, ne demande rien : la carte disparaît tout de suite et n'est
+supprimée qu'après `DEFERRED_DELETE_MS` = 8 s (`stores/pending-delete-store.ts`, le tableau
+masque les cartes en attente), sauf si « Annuler » dans le toast ou Ctrl+Z la ramène avant.
+Rien n'est supprimé si la fenêtre se ferme avant. Une carte qui n'a pas pu être supprimée
+revient, et un toast le dit. Toute autre carte garde le dialogue de confirmation et l'annulation
+d'avant (`restoreTask`, qui recrée la carte).
+
+### Ctrl+Z
+
+`stores/board-undo-store.ts` garde les 20 dernières modifications du projet affiché (vidée au
+changement de projet) : type et priorité (carte ou sélection, `applyCardChoice`), déplacements
+entre Planification et File d'attente (menu, glisser-déposer, barre ; `recordMoves`), suppressions
+encore en attente. Un déplacement qui lance ou arrête un agent ne s'annule pas. Une annulation ne
+touche qu'une carte restée telle qu'on l'a laissée ; sinon le toast dit qu'elle n'a pas été
+complète.
+
+## Renommer, naviguer au clavier, aide des touches
+
+### Renommer en place
+
+Un double-clic sur le titre d'une carte, ou F2 quand la carte a le focus, remplace le titre par
+une zone de texte (`kanban/InlineTitleEditor.tsx`, `hooks/useInlineRename.ts`) : Entrée ou
+quitter la zone enregistre, Échap garde l'ancien titre, un titre vide ou identique n'écrit rien.
+Entrée et Échap rendent le focus à la carte. Le titre passe par `TASK_UPDATE` (`renameCard` de
+`lib/card-edits.ts`) et entre dans la pile de Ctrl+Z, annulé seulement si la carte porte encore
+ce titre. Pas de renommage pendant qu'un agent travaille sur la carte (comme Modifier…), ni sur
+un titre d'erreur de lecture.
+
+Un simple clic sur le titre d'une carte renommable ouvre la fiche après
+`TITLE_DOUBLE_CLICK_MS` = 250 ms : la fiche est une modale, et sans ce délai le second clic d'un
+double-clic tomberait sur elle. Un clic ailleurs sur la carte l'ouvre tout de suite.
+
+### Les flèches
+
+Les flèches sans modificateur, depuis une carte ou sa poignée de glisser, passent le focus à la
+carte voisine (`lib/card-focus.ts`) : haut et bas dans la colonne, gauche et droite vers la
+colonne voisine qui montre des cartes, à la même ligne ou sur sa dernière carte. Le focus va
+toujours sur la carte (Entrée l'ouvre, F2 la renomme). La région `aria-live` du tableau dit
+« 2 sur 5, File d'attente » ; le lecteur d'écran lit déjà le titre de la carte. Une carte
+soulevée au clavier (Espace sur sa poignée, `aria-pressed` posé par dnd-kit) garde les flèches
+pour son déplacement.
+
+### L'aide
+
+Ctrl+/ (Cmd+/), « ? » ou le bouton clavier de la barre d'outils ouvrent
+`kanban/ShortcutsHelpDialog.tsx`, qui liste les touches des cartes, de la sélection et du tableau,
+avec ⌘ sous macOS et les noms de touches traduits (Maj, Entrée, Échap, Suppr). L'état ouvert vit
+dans `stores/shortcuts-help-store.ts`, que la barre d'outils et le tableau partagent.
+`kanban/BoardKeyboard.tsx` branche `useBoardShortcuts` sur le tableau et rend l'aide.
+
 ## Fichiers
 
 | Fichier | Rôle |
@@ -122,10 +202,22 @@ d'une colonne est un écouteur natif, qu'un portail n'atteint pas ; il laisse le
 | `renderer/components/kanban/ColumnMenuItems.tsx` | actions d'une colonne |
 | `renderer/components/kanban/CardChoiceMenuItems.tsx` | types et priorités en éléments de menu |
 | `renderer/components/kanban/PointerMenu.tsx` | menu au pointeur, `isFromPortal`, `withoutPortalEvents` |
+| `renderer/hooks/useBoardSelection.ts`, `useBoardShortcuts.ts`, `useBoardBulkEdits.ts` | sélection, touches, actions sur la sélection |
+| `renderer/components/kanban/BulkActionBar.tsx`, `board-selection-context.ts` | barre d'actions, sélection pour le clic droit |
+| `renderer/lib/card-edits.ts`, `stores/board-undo-store.ts` | carte neuve, type et priorité en masse, Ctrl+Z |
+| `renderer/stores/pending-delete-store.ts`, `components/kanban/deleteCardsLater.tsx` | suppression différée |
+| `renderer/components/kanban/InlineTitleEditor.tsx`, `hooks/useInlineRename.ts` | renommage en place |
+| `renderer/lib/card-focus.ts`, `components/kanban/BoardKeyboard.tsx` | flèches entre cartes, touches du tableau |
+| `renderer/components/kanban/ShortcutsHelpDialog.tsx`, `stores/shortcuts-help-store.ts` | aide des touches |
 | `renderer/styles/globals.css` | `.kanban-quick-add-row`, `.kanban-quick-add-pill` |
 
 Tests : `kanban/QuickAddComposer.test.tsx`, `lib/__tests__/quick-add.test.ts`,
 `shared/constants/card-types.test.ts`, `kanban/PointerMenu.test.tsx`,
 `kanban/TaskCardMenuItems.test.tsx`, `kanban/ColumnMenu.test.tsx`, `__tests__/TaskCard.test.tsx`
-(« right-click menu and quick edits ») ; un sous-menu se choisit au clavier dans jsdom
+(« right-click menu and quick edits »), `kanban/BulkActionBar.test.tsx`,
+`__tests__/KanbanBoard.test.tsx` (« quick selection, deferred delete and undo »),
+`lib/__tests__/card-edits.test.ts`, `stores/__tests__/board-undo-store.test.ts`,
+`stores/__tests__/pending-delete-store.test.ts`, `hooks/__tests__/useBoardSelection.test.tsx`,
+`hooks/__tests__/useBoardShortcuts.test.tsx`, `lib/__tests__/card-focus.test.tsx`,
+`kanban/BoardKeyboard.test.tsx`, `__tests__/TaskCard.test.tsx` (« renaming in place ») ; un sous-menu se choisit au clavier dans jsdom
 (`src/__tests__/helpers/menus.ts`).

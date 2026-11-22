@@ -30,6 +30,7 @@ import {
 } from "../../ui/select";
 import { Separator } from "../../ui/separator";
 import { Switch } from "../../ui/switch";
+import { ForgeAccountPicker } from "./ForgeAccountPicker";
 import { ForgeBindingNotice } from "./ForgeBindingNotice";
 
 interface AzureDevOpsIntegrationProps {
@@ -181,6 +182,8 @@ export function AzureDevOpsIntegration({
 	const { t } = useTranslation("settings");
 
 	if (!envConfig) return null;
+	// A saved account lends its PAT and organization: those fields are not this project's.
+	const usesAccount = Boolean(envConfig.azureDevOpsAccountId);
 
 	// Helper function to extract organization from Azure DevOps URL
 	const getOrganizationFromUrl = (url: string): string | null => {
@@ -240,7 +243,15 @@ export function AzureDevOpsIntegration({
 
 			{envConfig.azureDevOpsEnabled && (
 				<>
+					{/* A saved account of the app, or this project's own PAT */}
+					<ForgeAccountPicker
+						forge="azure_devops"
+						value={envConfig.azureDevOpsAccountId}
+						onChange={(accountId) => updateEnvConfig({ azureDevOpsAccountId: accountId })}
+					/>
+
 					{/* Organization URL */}
+					{!usesAccount && (
 					<div className="space-y-2">
 						<Label htmlFor="azure-devops-org-url" className="text-sm font-medium text-foreground">
 							{t("azureDevOps.orgUrlLabel")}
@@ -259,8 +270,10 @@ export function AzureDevOpsIntegration({
 							}
 						/>
 					</div>
+					)}
 
 					{/* Personal Access Token */}
+					{!usesAccount && (
 					<div className="space-y-2">
 						<Label htmlFor="azure-devops-pat" className="text-sm font-medium text-foreground">
 							{t("azureDevOps.patLabel")}
@@ -320,6 +333,7 @@ export function AzureDevOpsIntegration({
 							</div>
 						</div>
 					</div>
+					)}
 
 					{/* Repository */}
 					<div
@@ -349,12 +363,13 @@ export function AzureDevOpsIntegration({
 							azureDevOpsOrgUrl: envConfig.azureDevOpsOrgUrl ?? "",
 							azureDevOpsProject: envConfig.azureDevOpsProject ?? "",
 							azureDevOpsRepository: envConfig.azureDevOpsRepository ?? "",
+							azureDevOpsAccountId: envConfig.azureDevOpsAccountId ?? "",
 						}}
 						onApply={updateEnvConfig}
 					/>
 
 					{/* Connection Status */}
-					{envConfig.azureDevOpsPat && envConfig.azureDevOpsOrgUrl && (
+					{((envConfig.azureDevOpsPat && envConfig.azureDevOpsOrgUrl) || usesAccount) && (
 						<ConnectionStatus
 							isChecking={isCheckingAzureDevOps}
 							connectionStatus={azureDevOpsConnectionStatus}

@@ -27,6 +27,13 @@ reports into typed, bounded steps:
   proposed check (an ``assert_text`` step whose ``after`` names the action):
   at most :data:`SUGGESTIONS_PER_ACTION` per action, never part of the
   recording until the person keeps it in the desktop app;
+- a hover is reported by the page only when it showed something (a menu, a
+  tooltip); successive scrolls of one target make one step, updated in
+  place; a drag names the element dropped onto, in the same root;
+- a dialog the action opened (``alert``, ``confirm``, ``prompt``) is answered
+  by the person in the desktop app (:func:`record_session` asks through
+  ``ask_dialog``), and that answer is kept on the action, for the replay to
+  give it again;
 - at :data:`~browser_agent.recording.MAX_STEPS` the recording stops growing
   and says it was truncated;
 - a secret is never kept (``selector_builder.is_secret_field``), and a URL
@@ -52,18 +59,24 @@ from playwright.async_api import Error as BrowserError
 from .codegen_text import css_string
 from .recording import (
     ACTION_KINDS,
+    DIALOG_TYPES,
+    DRAG_MODES,
     HTTP_METHODS,
     KEYS,
     MAX_FRAMES,
     MAX_SHADOW,
     MAX_STEPS,
+    MAX_TEXT,
     MAX_URL,
+    MAX_VALUES,
+    DialogAnswer,
     RecordedStep,
     Recording,
     RequestWait,
     clean_line,
     clean_request_path,
     clean_value,
+    is_scroll,
     is_web_url,
     loader_selector,
     page_url,
@@ -84,6 +97,8 @@ REQUEST_WINDOW_S = 1.0
 SETTLE_WINDOW_S = 15.0
 #: A check proposed this soon after an action follows that action.
 SUGGEST_WINDOW_S = 5.0
+#: A dialog this soon after an action was opened by that action.
+DIALOG_WINDOW_S = 5.0
 SUGGESTIONS_PER_ACTION = 3
 MAX_SUGGESTIONS = 100
 _LOADER_CLASS = re.compile(r"^[A-Za-z_-][A-Za-z0-9_-]{0,60}$", re.ASCII)
@@ -131,6 +146,13 @@ def loader_css(raw: object) -> str:
         if _LOADER_CLASS.match(name) and _LOADER_WORD.search(name):
             return f".{name}"
     return ""
+
+
+def picked(raw: object) -> list[str]:
+    """The options picked in a multiple-choice list, when more than one."""
+    if not isinstance(raw, list) or not 1 < len(raw) <= MAX_VALUES:
+        return []
+    return [clean_value(v, MAX_TEXT) for v in raw if isinstance(v, str)]
 
 
 def _origin(url: str) -> tuple[str, str]:
@@ -256,9 +278,24 @@ class Recorder:
         return step
 
     def on_page_event(
-        self, payload: object, frames: list[str] | None = None
+        self,
+        payload: object,
+        frames: list[str] | None = None,
+        frame_shadow: list[list[str]] | None = None,
     ) -> RecordedStep | None:
-        """A report from the page (inside ``frames``): the step it adds or updates."""
+        """A report from the page (inside ``frames``): the step it adds or updates.
+
+        ``frame_shadow`` names, for each of ``frames``, the open shadow hosts
+        its ``<iframe>`` sits in (empty when none does).
+        """
+        step = self._on_page_event(payload, frames)
+        if step is not None and step.frames and any(frame_shadow or []):
+            step.frame_shadow = [list(hosts) for hosts in frame_shadow or []]
+        return step
+
+    def _on_page_event(
+        self, payload: object, frames: list[str] | None
+    ) -> RecordedStep | None:
         if not isinstance(payload, dict):
             return None
         kind = payload.get("kind")
@@ -267,19 +304,33 @@ class Recorder:
         target = payload.get("target")
         if kind not in (*ACTION_KINDS, "assert_text", "suggest"):
             return None
+        frames = list(frames or [])
+        if kind == "scroll" and target is None and not frames:
+            return self._scrolled(payload, [], [])
         if not isinstance(target, dict):
             return None
         selectors = build_selectors(target)
         shadow = shadow_hosts(target.get("shadow"))
-        frames = list(frames or [])
         if not selectors or shadow is None or len(frames) > MAX_FRAMES:
             return None
+        if kind == "scroll":
+            # A scrolled box holds a list: its text is all of it, never a name.
+            boxed = [s for s in selectors if s.strategy != "text"]
+            return self._scrolled(payload, boxed, shadow, frames) if boxed else None
+        if kind == "drag":
+            return self._dragged(payload, selectors, shadow, frames)
         appeared = target.get("appeared") is True
 
         def located(step: RecordedStep) -> RecordedStep:
             step.selectors, step.frames, step.shadow = selectors, frames, shadow
             step.wait_visible = step.wait_visible or appeared
             return step
+
+        if kind == "hover":
+            last = self.steps[-1] if self.steps else None
+            if last and last.kind == "hover" and last.selectors == selectors:
+                return None  # the pointer came back to it: one hover
+            return self._acted(self._add(located(self._new(kind))))
 
         if kind in ("fill", "select"):
             value = "" if target.get("secret") is True else payload.get("value")
@@ -297,6 +348,7 @@ class Recorder:
                 step = located(self._new(kind))
             step.secret_env = secret_env_name(target) if secret else ""
             step.value = "" if secret else value
+            step.values = [] if secret else picked(payload.get("values"))
             return self._acted(step if step is last else self._add(step))
 
         step = located(self._new(kind))
@@ -314,6 +366,76 @@ class Recorder:
             return self._suggest(step) if kind == "suggest" else self._add(step)
         return self._acted(self._add(step))
 
+    def _scrolled(
+        self,
+        payload: dict[str, Any],
+        selectors: list[Any],
+        shadow: list[str],
+        frames: list[str] | None = None,
+    ) -> RecordedStep | None:
+        """A scroll: successive ones of the same target make one step."""
+        x, y = payload.get("x"), payload.get("y")
+        if not (isinstance(x, int) and isinstance(y, int)):
+            return None
+        if not (is_scroll(x) and is_scroll(y)):
+            return None
+        frames = frames or []
+        last = self.steps[-1] if self.steps else None
+        if (
+            last
+            and last.kind == "scroll"
+            and (
+                last.selectors,
+                last.frames,
+                last.shadow,
+            )
+            == (selectors, frames, shadow)
+        ):
+            last.scroll_x, last.scroll_y = x, y
+            return self._acted(last)
+        step = self._new("scroll")
+        step.selectors, step.frames, step.shadow = selectors, frames, shadow
+        step.scroll_x, step.scroll_y = x, y
+        return self._acted(self._add(step))
+
+    def _dragged(
+        self,
+        payload: dict[str, Any],
+        selectors: list[Any],
+        shadow: list[str],
+        frames: list[str],
+    ) -> RecordedStep | None:
+        """A drag onto another element, in the same frame and shadow roots."""
+        drop = payload.get("drop")
+        mode = payload.get("mode")
+        if not isinstance(drop, dict) or mode not in DRAG_MODES:
+            return None
+        if shadow_hosts(drop.get("shadow")) != shadow:
+            return None  # dropped into another root: not one place to replay
+        drop_selectors = build_selectors(drop)
+        if not drop_selectors or drop_selectors == selectors:
+            return None
+        step = self._new("drag")
+        step.selectors, step.frames, step.shadow = selectors, frames, shadow
+        step.drop, step.drag_mode = drop_selectors, str(mode)
+        return self._acted(self._add(step))
+
+    def on_dialog(
+        self, kind: object, message: object, accept: bool, text: object = ""
+    ) -> RecordedStep | None:
+        """The person answered a dialog: the action that opened it gives that answer."""
+        step = self._recent_action(DIALOG_WINDOW_S)
+        if step is None or step.dialog is not None or kind not in DIALOG_TYPES:
+            return None
+        shown = clean_line(message)
+        if redact_text(shown) != shown:
+            shown = ""  # a key in the message: not kept
+        typed = clean_value(text) if accept and kind == "prompt" else ""
+        if typed and redact_text(typed) != typed:
+            typed = ""
+        step.dialog = DialogAnswer(str(kind), accept, typed, shown)
+        return step
+
     def _acted(self, step: RecordedStep | None) -> RecordedStep | None:
         """An action happened: what follows soon after is its doing."""
         self._last_action_at = self._clock()
@@ -322,6 +444,9 @@ class Recorder:
 
 
 Emit = Callable[[RecordedStep], None]
+#: Shows a dialog to the person; resolves with (accept, text), or None.
+AskDialog = Callable[[dict[str, str]], Awaitable[tuple[bool, str] | None]]
+FramePath = tuple[list[str], list[list[str]]]
 
 
 async def record_session(
@@ -330,8 +455,13 @@ async def record_session(
     stop: Awaitable[object],
     emit: Emit,
     recorder: Recorder | None = None,
+    ask_dialog: AskDialog | None = None,
 ) -> tuple[Recording, str]:
     """Record on ``page`` from ``url`` until ``stop`` resolves or the page closes.
+
+    ``ask_dialog`` shows a dialog the page opened to the person and resolves
+    with their answer (accept, text), or None to dismiss it; without it every
+    dialog is dismissed and nothing is recorded of it.
 
     Returns the recording and why it ended: ``stopped`` or ``closed``.
     """
@@ -339,28 +469,33 @@ async def record_session(
     # Reports are handled one at a time, in the order they came: describing a
     # frame awaits the browser, and a later report must not overtake it.
     lock = asyncio.Lock()
-    paths: dict[Any, list[str] | None] = {}
+    paths: dict[Any, FramePath | None] = {}
 
     def report(step: RecordedStep | None) -> None:
         if step is not None:
             emit(step)
 
-    async def frame_path(frame: Any) -> list[str] | None:
-        """The CSS of each ``<iframe>`` from the top page down to ``frame``."""
+    async def frame_path(frame: Any) -> FramePath | None:
+        """The CSS of each ``<iframe>`` from the top page down to ``frame``,
+        and of the shadow hosts each of them sits in."""
         chain: list[str] = []
+        hosts: list[list[str]] = []
         while frame is not page.main_frame:
             parent = frame.parent_frame
             if parent is None or len(chain) == MAX_FRAMES:
                 return None
             element = await frame.frame_element()
             described = await element.evaluate(DESCRIBE_FRAME)
-            # An iframe inside a shadow root: WebDriver cannot name it by CSS.
             css = css_selector(described)
-            if not css or (isinstance(described, dict) and described.get("shadow")):
+            above = shadow_hosts(
+                described.get("shadow") if isinstance(described, dict) else None
+            )
+            if not css or above is None:
                 return None
             chain.insert(0, css)
+            hosts.insert(0, above)
             frame = parent
-        return chain
+        return chain, hosts
 
     async def on_binding(source: dict[str, Any], payload: object) -> None:
         frame = source.get("frame")
@@ -373,8 +508,35 @@ async def record_session(
                     paths[frame] = await frame_path(frame)
                 except BrowserError:
                     paths[frame] = None  # the frame went away meanwhile
-            if paths[frame] is not None:
-                report(recorder.on_page_event(payload, paths[frame]))
+            found = paths[frame]
+            if found is not None:
+                report(recorder.on_page_event(payload, found[0], found[1]))
+
+    async def on_dialog(dialog: Any) -> None:
+        """The page opened a dialog: the person answers it in the desktop app."""
+        kind, message = dialog.type, dialog.message
+        answer = None
+        if ask_dialog is not None:
+            answer = await ask_dialog(
+                {
+                    "type": kind if kind in DIALOG_TYPES else "alert",
+                    "message": clean_line(message),
+                    "defaultValue": clean_line(dialog.default_value),
+                }
+            )
+        try:
+            if answer is None:
+                await dialog.dismiss()
+                return
+            accept, text = answer
+            if accept:
+                await (dialog.accept(text) if kind == "prompt" else dialog.accept())
+            else:
+                await dialog.dismiss()
+        except BrowserError:
+            return  # the page went away meanwhile
+        async with lock:
+            report(recorder.on_dialog(kind, message, accept, text))
 
     def on_frame(frame: Any) -> None:
         if frame is page.main_frame:
@@ -390,6 +552,8 @@ async def record_session(
     await page.expose_binding(BINDING, on_binding)
     await page.add_init_script(script=SCRIPT.read_text(encoding="utf-8"))
     page.on("framenavigated", on_frame)
+    # A listener keeps Playwright from closing the dialog itself.
+    page.on("dialog", on_dialog)
     page.on("framedetached", lambda frame: paths.pop(frame, None))
     page.on("request", on_request)
     page.on("close", lambda *_: closed.set())

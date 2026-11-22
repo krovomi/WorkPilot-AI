@@ -104,6 +104,11 @@ export async function listServerProjects(): Promise<Project[]> {
 	return [...known.values()];
 }
 
+/** The server projects as last listed (none in local mode). */
+export function listedServerProjects(): Project[] {
+	return [...known.values()];
+}
+
 /** The server project with this id, as last listed; undefined otherwise. */
 export function getServerProject(projectId: unknown): Project | undefined {
 	return typeof projectId === "string" ? known.get(projectId) : undefined;

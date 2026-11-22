@@ -3,6 +3,7 @@
  * pauses it, with a reason the next launch does not resume; every other agent
  * process is stopped. The spec directories are real: the backend reads the file.
  */
+import { type ChildProcess, spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -34,11 +35,15 @@ vi.mock("../../../app-logger", () => ({
 	appLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+const stopServerAgents = vi.hoisted(() => vi.fn(async () => ({ stopped: 0, failed: 0 })));
+vi.mock("../../../server-governance", () => ({ stopServerAgents }));
+
 import { IPC_CHANNELS } from "../../../../shared/constants";
 import type { AgentManager } from "../../../agent";
 import { projectStore } from "../../../project-store";
 import { wasInterruptedByAppExit } from "../interrupted-runs";
-import { registerStopAllHandlers, stopAllAgents } from "../stop-all-handlers";
+import { killProcessGracefully } from "../../../platform";
+import { registerStopAllHandlers, stopAllAgents, stopAllAgentsEverywhere } from "../stop-all-handlers";
 
 let root: string;
 let project: Project;
@@ -62,7 +67,7 @@ function task(id: string, specId: string, withSpecDir = true): Task {
 function manager(running: string[]) {
 	return {
 		getRunningTasks: vi.fn(() => running),
-		haltTask: vi.fn(() => true),
+		haltTask: vi.fn((_id: string) => true),
 		isRunning: vi.fn(() => true),
 	};
 }
@@ -157,7 +162,59 @@ describe("AGENTS_STOP_ALL", () => {
 		const handler = handlers.get(IPC_CHANNELS.AGENTS_STOP_ALL);
 		expect(await handler?.()).toEqual({
 			success: true,
-			data: { pausedTasks: [], stoppedProcesses: 0, failedTasks: [] },
+			data: { pausedTasks: [], stoppedProcesses: 0, failedTasks: [], serverAgents: 0, serverFailed: 0 },
 		});
+	});
+
+	it("also stops the person's agents on the server projects", async () => {
+		stopServerAgents.mockResolvedValueOnce({ stopped: 3, failed: 1 });
+		const result = await stopAllAgentsEverywhere(manager([]) as unknown as AgentManager);
+		expect(result.serverAgents).toBe(3);
+		expect(result.serverFailed).toBe(1);
+	});
+});
+
+/**
+ * The issue asks for the agents to be stopped within two seconds of the
+ * switch. Measured here on real processes (one per task, as the agent
+ * manager spawns them) killed by the same platform helper `killProcess`
+ * uses: from the call to the last process gone.
+ */
+describe("kill switch latency", () => {
+	const children: ChildProcess[] = [];
+
+	afterEach(() => {
+		for (const child of children.splice(0)) if (child.exitCode === null) child.kill("SIGKILL");
+	});
+
+	function agentProcess(): ChildProcess {
+		const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+		children.push(child);
+		return child;
+	}
+
+	it("stops every running agent in under two seconds", async () => {
+		const ids = ["t1", "t2", "t3", "ideation:proj-1"];
+		mockTasksByProject.set(project.id, [task("t1", "001-a"), task("t2", "002-b"), task("t3", "003-c")]);
+		const running = new Map(ids.map((id) => [id, agentProcess()]));
+		await Promise.all([...running.values()].map((c) => new Promise((ok) => c.once("spawn", ok))));
+		const exited = [...running.values()].map((c) => new Promise<void>((ok) => c.once("exit", () => ok())));
+		const agents = manager(ids);
+		agents.haltTask.mockImplementation((id: string) => {
+			const child = running.get(id);
+			if (!child) return false;
+			killProcessGracefully(child);
+			return true;
+		});
+
+		const began = performance.now();
+		const result = await stopAllAgentsEverywhere(agents as unknown as AgentManager);
+		await Promise.all(exited);
+		const elapsed = performance.now() - began;
+
+		expect(result.pausedTasks).toEqual(["t1", "t2", "t3"]);
+		expect(result.stoppedProcesses).toBe(1);
+		expect(elapsed).toBeLessThan(2000);
+		for (const child of running.values()) expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
 	});
 });

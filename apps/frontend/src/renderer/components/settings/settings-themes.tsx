@@ -93,6 +93,7 @@ export function createSettingsThemes(t: Translate): Record<SettingsTheme, Settin
 			tone: "violet",
 			sections: [
 				{ id: "accounts", icon: Users, label: nav("accounts"), type: "app" },
+				{ id: "forge-accounts", icon: KeyRound, label: t("settings:forgeAccounts.navLabel"), type: "app" },
 				{ id: "github", icon: Globe, label: "GitHub", type: "project" },
 				{ id: "gitlab", icon: GitLabIcon, label: "GitLab", type: "project" },
 				{ id: "azure-devops", icon: Cloud, label: "Azure DevOps", type: "project" },

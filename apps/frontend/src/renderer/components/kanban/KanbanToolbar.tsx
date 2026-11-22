@@ -3,6 +3,7 @@ import {
 	ArrowUpNarrowWide,
 	Bookmark,
 	Check,
+	Keyboard,
 	Plus,
 	Scissors,
 	SlidersHorizontal,
@@ -28,6 +29,7 @@ import {
 } from "../../lib/kanban-filter";
 import { splitGroupTone } from "../../../shared/utils/task-split";
 import { cn } from "../../lib/utils";
+import { useShortcutsHelpStore } from "../../stores/shortcuts-help-store";
 import { toneClass } from "../charter";
 import { TeamRoomBar } from "../collaboration";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
@@ -131,6 +133,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 	const setSortField = useKanbanFilterStore((s) => s.setSortField);
 	const toggleSortDirection = useKanbanFilterStore((s) => s.toggleSortDirection);
 	const clearFilters = useKanbanFilterStore((s) => s.clearFilters);
+	const setShortcutsOpen = useShortcutsHelpStore((s) => s.setOpen);
 	const savedViews = useKanbanFilterStore((s) => s.savedViews);
 	const saveCurrentView = useKanbanFilterStore((s) => s.saveCurrentView);
 	const applyView = useKanbanFilterStore((s) => s.applyView);
@@ -446,6 +449,16 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 					<KanbanMoreMenu projectId={projectId} />
 				</>
 			)}
+			<Button
+				variant="ghost"
+				size="icon"
+				className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+				onClick={() => setShortcutsOpen(true)}
+				title={t("kanban.shortcuts.open")}
+				aria-label={t("kanban.shortcuts.open")}
+			>
+				<Keyboard className="h-4 w-4" />
+			</Button>
 		</div>
 	);
 }

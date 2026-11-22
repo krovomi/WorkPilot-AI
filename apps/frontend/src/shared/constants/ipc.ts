@@ -602,6 +602,11 @@ export const IPC_CHANNELS = {
 	GIT_CHECK_STATUS: "git:checkStatus",
 	GIT_DETECT_PROVIDER: "git:detectProvider",
 	GIT_FORGE_BINDINGS: "git:forgeBindings",
+	// Forge accounts saved for the whole app (main/forge/forge-accounts.ts)
+	FORGE_ACCOUNTS_LIST: "forgeAccounts:list",
+	FORGE_ACCOUNTS_SAVE: "forgeAccounts:save",
+	FORGE_ACCOUNTS_DELETE: "forgeAccounts:delete",
+	FORGE_ACCOUNTS_TEST: "forgeAccounts:test",
 	GIT_INITIALIZE: "git:initialize",
 	GIT_SET_REMOTE: "git:setRemote",
 	GIT_CHECKOUT_BRANCH: "git:checkoutBranch",
@@ -785,6 +790,11 @@ export const IPC_CHANNELS = {
 	BROWSER_AGENT_RUN_TESTS: "browserAgent:runTests",
 	BROWSER_AGENT_RECORD_START: "browserAgent:recordStart", // A session in a browser window the person drives (#387)
 	BROWSER_AGENT_RECORD_STOP: "browserAgent:recordStop",
+	BROWSER_AGENT_RECORD_DIALOG: "browserAgent:recordDialog", // The person's answer to a dialog the recorded page opened
+	BROWSER_AGENT_RECORD_RUN: "browserAgent:recordRun", // Run the test proposed on a review card, in its worktree
+	BROWSER_AGENT_RECORD_RESHOOT: "browserAgent:recordReshoot", // Replay the stopped recording headless: which selectors still work
+	BROWSER_AGENT_RECORD_RESHOOT_APPLY: "browserAgent:recordReshootApply", // Give steps the selectors the reshoot proposed
+	BROWSER_AGENT_RECORD_ASSIST: "browserAgent:recordAssist", // A light model (or rules) names the test, ranks the checks
 	BROWSER_AGENT_RECORD_EXPORT: "browserAgent:recordExport", // Steps → Playwright / Cypress test: preview, review card or file
 	BROWSER_AGENT_RECORD_EVENT: "browserAgent:recordEvent", // main → renderer: step, started, stopped, error
 
@@ -1270,6 +1280,10 @@ export const IPC_CHANNELS = {
 	GUARDRAILS_CHECK_DIFF: "guardrails:checkDiff",
 	GOVERNANCE_REPORT: "governance:report",
 	GOVERNANCE_EXPORT_AUDIT: "governance:exportAudit",
+	GOVERNANCE_SERVER_REPORT: "governance:serverReport",
+	GOVERNANCE_SERVER_EXPORT: "governance:serverExport",
+	GOVERNANCE_SERVER_ANSWER: "governance:serverAnswer",
+	GOVERNANCE_SERVER_STOP: "governance:serverStop",
 	I18N_AGENT_CANCEL: "i18nAgent:cancel",
 	I18N_AGENT_ERROR: "i18n-agent-error",
 	I18N_AGENT_EVENT: "i18n-agent-event",
@@ -1442,6 +1456,14 @@ export const IPC_CHANNELS = {
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",
 	SMART_ESTIMATION_RESET_CALIBRATION: "smartEstimation:resetCalibration",
 	SPEC_APPROVAL_GET_SPEC: "specApproval:getSpec",
+	// Server mode: a server card's approval (criticality, who approved) and the
+	// approvals lent on a server project (main/server-card-approvals.ts)
+	SPEC_APPROVAL_SERVER_GET: "specApproval:serverGet",
+	SPEC_APPROVAL_SERVER_SET_CRITICALITY: "specApproval:serverSetCriticality",
+	SPEC_APPROVAL_DELEGATIONS_LIST: "specApproval:delegationsList",
+	SPEC_APPROVAL_DELEGATION_CREATE: "specApproval:delegationCreate",
+	SPEC_APPROVAL_DELEGATION_REVOKE: "specApproval:delegationRevoke",
+	SPEC_APPROVAL_DELEGATES_LIST: "specApproval:delegatesList",
 	SWARM_ANALYZE: "swarm:analyze",
 	SWARM_CANCEL: "swarm:cancel",
 	SWARM_EVENT: "swarm:event",

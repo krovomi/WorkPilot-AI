@@ -74,10 +74,6 @@ def record(req: RecordRunRequest):
             )
         )
         return {"success": True}
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=safe_error(e, logger, "record")
-        ) from e
     except Exception as e:  # noqa: BLE001
         logger.exception("record failed")
         return {"success": False, "error": safe_error(e, logger, "record")}
@@ -98,10 +94,6 @@ def record_batch(req: RecordBatchRequest):
         ]
         _get_monitor().record_many(runs)
         return {"success": True, "recorded": len(runs)}
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=safe_error(e, logger, "record_batch")
-        ) from e
     except Exception as e:  # noqa: BLE001
         logger.exception("record-batch failed")
         return {"success": False, "error": safe_error(e, logger, "record_batch")}

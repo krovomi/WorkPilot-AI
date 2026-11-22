@@ -1,6 +1,15 @@
 import type { Api } from "../api/endpoints";
 import type { AgentRun, BoardCard, CardDetails } from "../api/types";
-import { allowedActions, availableActions, runPhase, sendBack, startCard, stopCard } from "../board/actions";
+import {
+	ApprovalWaiting,
+	allowedActions,
+	approveCard,
+	availableActions,
+	runPhase,
+	sendBack,
+	startCard,
+	stopCard,
+} from "../board/actions";
 import { groupByColumn } from "../board/columns";
 import { initialColumn } from "../board/pickColumn";
 import { BOARD_EVENTS, channelUrl, parseStreamEvent, reconnectDelay } from "../board/stream";
@@ -154,6 +163,24 @@ describe("card actions", () => {
 		await startCard(api as unknown as Api, "p1", card(), details({ spec: "# Spec" }));
 		expect(api.approve).toHaveBeenCalledWith("p1", "001-login");
 		expect(api.startRun).toHaveBeenCalledWith("p1", "spec-1", "build");
+	});
+
+	it("does not build while the card waits for more approvals", async () => {
+		const api = fakeApi();
+		api.approve.mockResolvedValueOnce({ approved: false, approvedBy: null, approval: { count: 1, needed: 2 } });
+		const started = startCard(api as unknown as Api, "p1", card(), details({ spec: "# Spec" }));
+		await expect(started).rejects.toBeInstanceOf(ApprovalWaiting);
+		await expect(started).rejects.toMatchObject({ count: 1, needed: 2, message: "approval_waiting" });
+		expect(api.startRun).not.toHaveBeenCalled();
+	});
+
+	it("reads a refused approval without counts as the first of one", async () => {
+		const api = fakeApi();
+		api.approve.mockResolvedValueOnce({ approved: false, approvedBy: null });
+		await expect(approveCard(api as unknown as Api, "p1", "001-login")).rejects.toMatchObject({ count: 0, needed: 1 });
+		// An older server answers without `approved`: its approval was the only one.
+		api.approve.mockResolvedValueOnce({});
+		await expect(approveCard(api as unknown as Api, "p1", "001-login")).resolves.toBeUndefined();
 	});
 
 	it("builds directly when no review is asked", async () => {

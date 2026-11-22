@@ -262,6 +262,12 @@ describe("quick add in a column", () => {
 
 		fireEvent.keyDown(document.body, { key: "n", ctrlKey: true });
 		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		const dialog = document.createElement("div");
+		dialog.setAttribute("role", "dialog");
+		document.body.appendChild(dialog);
+		fireEvent.keyDown(document.body, { key: "n" });
+		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		dialog.remove();
 		fireEvent.keyDown(document.body, { key: "n" });
 		expect(box()).toBeInTheDocument();
 	});

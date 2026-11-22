@@ -9,7 +9,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult, PRDetailsResult, Project } from "../../shared/types";
-import { readProjectEnv } from "../project-env-file";
+import { readProjectForgeEnv } from "../forge/forge-credentials";
 import { getGitHubConfig, githubFetch } from "./github/utils";
 import { findTaskAndProject } from "./task/shared";
 import { envWithoutCredentials } from "../utils/child-env";
@@ -459,7 +459,7 @@ async function callAzureDevOpsPythonWithExistingConfig(
 	if (!args) {
 		throw new Error("Invalid Azure DevOps PR URL format");
 	}
-	const projectEnv = readProjectEnv(project);
+	const projectEnv = readProjectForgeEnv(project);
 	return new Promise((resolve, reject) => {
 		const pythonProcess = spawn("python", args, {
 			cwd: project.path,

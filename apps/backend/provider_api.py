@@ -1653,26 +1653,6 @@ async def get_provider_usage(provider: str):
 _mount(providers_router, "providers")
 
 
-# --- Analytics API (prefer real DB implementation, fall back to minimal stub) ---
-try:
-    from analytics.database import init_database as _init_analytics_db
-
-    _init_analytics_db()
-    from analytics.api_simple import router as analytics_router
-
-    _mount(analytics_router, "analytics")
-except Exception as e:
-    logging.getLogger(__name__).warning(
-        "Could not load real analytics router (%s), falling back to minimal stub",
-        e,
-    )
-    try:
-        from analytics.api_minimal import router as analytics_router
-
-        _mount(analytics_router, "analytics")
-    except ImportError as e2:
-        logging.getLogger(__name__).warning("Could not import analytics router: %s", e2)
-
 # --- Mission Control API ---
 try:
     from mission_control.api import router as mission_control_router
@@ -1881,14 +1861,6 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import rtk router: {e}")
 
-# --- Watermarks API (is the generated-file cleaner working, and what it stripped) ---
-try:
-    from watermarks.api import router as watermarks_router
-
-    _mount(watermarks_router, "watermarks")
-except ImportError as e:
-    print(f"Warning: Could not import watermarks router: {e}")
-
 # --- Shared board and features (server mode: cards, roadmap..., by project_id) ---
 try:
     from shared_features import mount_all as mount_shared_project_routers
@@ -1946,14 +1918,6 @@ try:
     _mount(github_api_router, "github")
 except ImportError as e:
     print(f"Warning: Could not import github api router: {e}")
-
-# --- System Status API (extracted from this file) ---
-try:
-    from system_status.api import router as system_status_router
-
-    _mount(system_status_router, "system_status")
-except ImportError as e:
-    print(f"Warning: Could not import system_status router: {e}")
 
 # --- Dashboard + Sessions API (extracted from this file) ---
 try:

@@ -38,6 +38,7 @@ import {
 	defaultExportDeps,
 	exportRecording,
 	generateTest,
+	lastReviewedTest,
 	writeTestFile,
 } from "../recorder-export";
 import { resetRecorderSessionForTests, startRecording } from "../recorder-session";
@@ -139,6 +140,14 @@ describe("exportRecording", () => {
 			summary: 'Browser Agent recording "recorded flow" as playwright-ts (2 steps): e2e/log-in.spec.ts',
 		});
 		expect(outcome).toMatchObject({ success: true, path: "e2e/log-in.spec.ts", review });
+		expect(lastReviewedTest("/projects/app")).toEqual({
+			root: "/worktrees/007",
+			path: "e2e/log-in.spec.ts",
+			format: "playwright-ts",
+			specId: review.specId,
+			envVars: ["E2E_PASSWORD"],
+		});
+		expect(lastReviewedTest("/elsewhere")).toBeUndefined();
 	});
 
 	it("writes a WebDriver test with its format's extension", async () => {
@@ -146,6 +155,10 @@ describe("exportRecording", () => {
 			["selenium-java", "src/test/java/e2e/LogInTest.java"],
 			["selenium-python", "tests/e2e/test_log_in.py"],
 			["webdriverio", "test/specs/log-in.e2e.js"],
+			["selenium-csharp", "tests/E2E/LogInTests.cs"],
+			["selenium-ruby", "spec/e2e/log_in_spec.rb"],
+			["selenium-js", "test/e2e/log-in.e2e.cjs"],
+			["webdriverio-ts", "test/specs/log-in.e2e.ts"],
 		] as const) {
 			const { spawnRunner, spawned } = runnerPrinting([`RECORDER_EXPORT:${JSON.stringify({ ...generated, path: file })}`]);
 			const d = deps(spawnRunner);

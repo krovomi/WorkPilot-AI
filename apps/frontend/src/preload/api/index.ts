@@ -32,6 +32,10 @@ import {
 	type LocalBackendAPI,
 } from "./modules/local-backend-api";
 import {
+	createForgeAccountsAPI,
+	type ForgeAccountsAPI,
+} from "./modules/forge-accounts-api";
+import {
 	type BlastRadiusAPI,
 	createBlastRadiusAPI,
 } from "./modules/blast-radius-api";
@@ -188,6 +192,10 @@ import {
 } from "./modules/formula-matrix-api";
 import { type BenchAPI, createBenchAPI } from "./modules/bench-api";
 import { type BoardMcpAPI, createBoardMcpAPI } from "./modules/board-mcp-api";
+import {
+	createServerApprovalAPI,
+	type ServerApprovalAPI,
+} from "./modules/server-approval-api";
 import { type CicdTriggersAPI, createCicdTriggersAPI } from "./modules/cicd-triggers-api";
 import { createDebugAPI, type DebugAPI } from "./modules/debug-api";
 import { createGitHubAPI, type GitHubAPI } from "./modules/github-api";
@@ -339,6 +347,7 @@ export interface ElectronAPI
 		FormulaMatrixAPI,
 		BenchAPI,
 		BoardMcpAPI,
+		ServerApprovalAPI,
 		CicdTriggersAPI,
 		AccessibilityAPI,
 		SharedAnalysisAPI,
@@ -364,6 +373,7 @@ export interface ElectronAPI
 		GovernanceAPI,
 		AgentDebuggerAPI,
 		LocalBackendAPI,
+		ForgeAccountsAPI,
 		ReplayAPI,
 		BlastRadiusAPI,
 		Phase35FeaturesAPI,
@@ -494,6 +504,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createFormulaMatrixAPI(),
 		...createBenchAPI(),
 		...createBoardMcpAPI(),
+		...createServerApprovalAPI(),
 		...createCicdTriggersAPI(),
 		...createAccessibilityAPI(),
 		...createSharedAnalysisAPI(),
@@ -519,6 +530,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createGovernanceAPI(),
 		...createAgentDebuggerAPI(),
 		...createLocalBackendAPI(),
+		...createForgeAccountsAPI(),
 		...createReplayAPI(),
 		...createBlastRadiusAPI(),
 		...createPhase35FeaturesAPI(),

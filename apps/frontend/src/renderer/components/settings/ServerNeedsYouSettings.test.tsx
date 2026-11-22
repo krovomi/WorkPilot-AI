@@ -25,7 +25,7 @@ function overview(patch: Record<string, unknown> = {}) {
 			available: true,
 			vault: true,
 			locale: "en",
-			events: { plan_review: true, review_ready: true, failed: true },
+			events: { plan_review: true, review_ready: true, failed: true, approval_escalated: true },
 			channels: {
 				ntfy: { configured: false },
 				telegram: {
@@ -103,7 +103,12 @@ describe("ServerNeedsYouSettings", () => {
 		fireEvent.click(await screen.findByRole("switch", { name: "A run stopped on an error" }));
 		await waitFor(() =>
 			expect(bridge.saveNeedsYouPreferences).toHaveBeenCalledWith({
-				events: { plan_review: true, review_ready: true, failed: false },
+				events: {
+					plan_review: true,
+					review_ready: true,
+					failed: false,
+					approval_escalated: true,
+				},
 				locale: "en",
 			}),
 		);

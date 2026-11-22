@@ -83,6 +83,7 @@ import { registerDocDriftHandlers } from "./doc-drift-handlers";
 import { registerDocumentationHandlers } from "./documentation-handlers";
 import { registerCodeInsightsHandlers } from "./code-insights-handlers";
 import { registerEnvHandlers } from "./env-handlers";
+import { registerForgeAccountsHandlers } from "./forge-accounts-handlers";
 import { registerForgeBindingHandlers } from "./forge-binding-handlers";
 import { registerEnvSnapshotHandlers } from "./env-snapshot-handlers";
 import { registerOfflineModeHandlers } from "./offline-mode-handlers";
@@ -132,6 +133,7 @@ import { registerScreenshotHandlers } from "./screenshot-handlers";
 import { registerSelfHealingBisectHandlers } from "./self-healing-bisect-handlers";
 import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
+import { registerServerApprovalHandlers } from "./server-approval-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
 import { registerServerSsoHandlers } from "./server-sso-handlers";
 import { registerServerProjectHandlers } from "./server-project-handlers";
@@ -363,6 +365,8 @@ export function setupIpcHandlers(
 	registerServerAdminHandlers();
 	registerServerProjectHandlers();
 	registerServerWorkspaceHandlers();
+	// Spec Approval of a server card: criticality, approvals, lent approvals
+	registerServerApprovalHandlers();
 	// Build Analytics, "How you compare": a project of this computer
 	registerBuildCompareHandlers();
 	registerTeamRoomHandlers();
@@ -381,6 +385,7 @@ export function setupIpcHandlers(
 
 	// A project's forge settings checked against its git remotes
 	registerForgeBindingHandlers();
+	registerForgeAccountsHandlers();
 
 	// Linear integration handlers
 	registerLinearHandlers(agentManager, getMainWindow);

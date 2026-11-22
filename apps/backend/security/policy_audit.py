@@ -112,6 +112,7 @@ def record(
     task: str | None = None,
     provider: str | None = None,
     model: str | None = None,
+    approver: str | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any] | None:
     """Append one decision; the event written, or ``None`` when it could not be."""
@@ -140,6 +141,7 @@ def record(
         "reason": why,
         "provider": _name(provider or os.environ.get("SELECTED_LLM_PROVIDER")),
         "model": _name(model),
+        "approvedBy": _short(approver, 200) if decision == "approved" else None,
     }
     path = log_path(project, create=True)
     if path is None:
@@ -207,6 +209,21 @@ def metrics(project: Path, now: datetime | None = None) -> dict[str, int]:
     return {"blocked24h": blocked, "breakerTrips7d": trips}
 
 
+def approver_of(approval: dict[str, Any]) -> str | None:
+    """Who gave an approval, as the trail names them.
+
+    A server's answer names the account and the roles it held
+    (``Ada <u-1> [maintainer]``); a desktop answer is the local user's word,
+    so it says it was not verified.
+    """
+    by = str(approval.get("by") or "").strip()[:120]
+    if not approval.get("verified") or not approval.get("byId"):
+        return f"{by or 'user'} (local, not verified)"
+    roles = ",".join(str(r)[:64] for r in (approval.get("roles") or [])[:10])
+    name = f"{by} <{str(approval['byId'])[:64]}>"
+    return f"{name} [{roles}]" if roles else name
+
+
 def task_of(root: Path | None) -> str | None:
     """The task a worktree belongs to (``.../worktrees/tasks/<task>``)."""
     if root is None:
@@ -220,6 +237,7 @@ def task_of(root: Path | None) -> str | None:
 
 __all__ = [
     "AUDIT_NAME",
+    "approver_of",
     "DECISIONS",
     "KEEP_LINES",
     "MAX_BYTES",

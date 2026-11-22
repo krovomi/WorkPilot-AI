@@ -19,6 +19,12 @@ f-string, string interpolation or a text block, so ``${…}`` stays text.
   other character outside printable ASCII. Java decodes ``\\uXXXX`` before it
   reads the source (JLS 3.3), so that escape is never used for a quote, a
   backslash or a line break, which would end the literal.
+- :func:`cs_literal` (C#): a regular (not verbatim, not interpolated) string,
+  the same escapes as Java plus ``\\0``, and ``\\uXXXX`` for the rest; C#
+  decodes ``\\u`` inside the literal only, so it never ends one.
+- :func:`ruby_literal` (Ruby): double-quoted, with ``\\#`` before ``{``, ``@`` and ``$``,
+  so that ``#{…}``, ``#@x`` and ``#$x`` stay text, and ``\\u{…}`` for any character outside
+  printable ASCII.
 """
 
 from __future__ import annotations
@@ -71,6 +77,40 @@ def java_literal(text: str) -> str:
                 f"\\u{int.from_bytes(units[i : i + 2], 'big'):04x}"
                 for i in range(0, len(units), 2)
             )
+    return '"' + "".join(out) + '"'
+
+
+def cs_literal(text: str) -> str:
+    """``text`` as a double-quoted C# string literal."""
+    out: list[str] = []
+    for ch in text:
+        if ch in _JAVA_ESCAPES:
+            out.append(_JAVA_ESCAPES[ch])
+        elif ch == "\0":
+            out.append("\\0")
+        elif _printable(ch):
+            out.append(ch)
+        else:
+            units = ch.encode("utf-16-be", "surrogatepass")
+            out.extend(
+                f"\\u{int.from_bytes(units[i : i + 2], 'big'):04x}"
+                for i in range(0, len(units), 2)
+            )
+    return '"' + "".join(out) + '"'
+
+
+def ruby_literal(text: str) -> str:
+    """``text`` as a double-quoted Ruby string literal, never interpolated."""
+    out: list[str] = []
+    for i, ch in enumerate(text):
+        if ch in _PY_ESCAPES:
+            out.append(_PY_ESCAPES[ch])
+        elif ch == "#" and text[i + 1 : i + 2] in ("{", "@", "$"):
+            out.append("\\#")
+        elif _printable(ch):
+            out.append(ch)
+        else:
+            out.append(f"\\u{{{ord(ch):x}}}")
     return '"' + "".join(out) + '"'
 
 

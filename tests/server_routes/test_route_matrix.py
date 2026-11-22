@@ -27,6 +27,7 @@ from dataclasses import dataclass
 
 import jwt as pyjwt
 from fastapi.routing import APIRoute
+from server.authz.roles import system_role
 
 from tests.server_routes.world import World
 
@@ -298,6 +299,14 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/api/features/replay-shares"): scoped("lab.read"),
     ("POST", "/api/features/replay-shares/{share_id}/open"): scoped("lab.read"),
     ("DELETE", "/api/features/replay-shares/{share_id}"): scoped("lab.write"),
+    # Governance of a server project: reading is the audit domain, the rest
+    # carries the permission of the act (approving, stopping, exporting).
+    ("GET", "/api/features/governance"): scoped("audit.read"),
+    ("GET", "/api/features/governance/audit"): scoped("audit.export"),
+    ("POST", "/api/features/governance/approvals/{request_id}"): scoped(
+        "review.approve"
+    ),
+    ("POST", "/api/features/governance/stop"): scoped("agent.cancel"),
 }
 
 #: Values for the path parameters: ids that exist nowhere, except the
@@ -566,13 +575,21 @@ async def test_an_organization_administrator_reaches_every_project_of_it(world):
 async def test_a_group_gives_its_members_the_project(world):
     """``grouped_a`` is a viewer of the organization and on no project; their
     group gives them contributor rights and the project as a member. Reads
-    only, as above."""
+    only, as above. A read whose permission a contributor does not hold (an
+    export of the audit trail) is refused for that permission, and only it."""
+    held = system_role("contributor").permissions
     wrong = {}
-    for method, path, _ in _routes("permission", "project", project_named=True):
+    for method, path, rule in _routes("permission", "project", project_named=True):
         if method != "GET":
             continue
         answer = await ask(world, "grouped_a", method, path)
         detail = detail_of(answer)
-        if answer.status_code in {401, 403} or detail == "Project not found":
+        if rule.permission and rule.permission not in held:
+            if (answer.status_code, detail) != (
+                403,
+                f"Missing permission: {rule.permission}",
+            ):
+                wrong[f"{method} {path}"] = f"{answer.status_code} {detail}"
+        elif answer.status_code in {401, 403} or detail == "Project not found":
             wrong[f"{method} {path}"] = f"{answer.status_code} {detail}"
     assert not wrong, _fails(wrong)

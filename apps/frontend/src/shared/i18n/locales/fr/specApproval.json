@@ -37,6 +37,41 @@
 		"plan": "Plan"
 	},
 	"server": {
-		"waiting": "Votre approbation est enregistrée : {{count}} sur {{needed}}. Le build démarre quand la carte a toutes les approbations qu'il lui faut."
+		"waiting": "Votre approbation est enregistrée : {{count}} sur {{needed}}. Le build démarre quand la carte a toutes les approbations qu'il lui faut.",
+		"heading": "Approbations sur le serveur",
+		"criticality": "Criticité",
+		"levels": {
+			"low": "Basse",
+			"medium": "Moyenne",
+			"high": "Haute"
+		},
+		"sources": {
+			"set": "choisie par un approbateur",
+			"assessed": "d'après l'évaluation de la spec",
+			"default": "par défaut"
+		},
+		"count": "{{given}} approbations sur {{needed}}",
+		"approved": "Le build peut partir",
+		"missingRoles": "Encore attendus parmi les approbateurs : {{roles}}",
+		"by": "{{by}}, {{at}}",
+		"byFor": "{{by}} pour {{for}}, {{at}}",
+		"loadFailed": "Les approbations de cette carte n'ont pas pu être lues.",
+		"saveFailed": "La criticité n'a pas pu être changée."
+	},
+	"delegations": {
+		"heading": "Approbations prêtées",
+		"hint": "Prêtez votre approbation sur ce projet à un collègue pour un temps (congés, astreinte) : il approuve en votre nom, 90 jours au plus.",
+		"empty": "Aucune approbation n'est prêtée sur ce projet.",
+		"item": "{{from}} → {{to}}, {{start}} – {{end}}",
+		"active": "En cours",
+		"planned": "À venir",
+		"end": "Finir l'approbation prêtée à {{to}}",
+		"to": "Collègue",
+		"pick": "Choisissez un collègue",
+		"from": "À partir du (facultatif)",
+		"until": "Jusqu'au",
+		"lend": "Prêter mon approbation",
+		"loadFailed": "Les approbations prêtées n'ont pas pu être lues.",
+		"saveFailed": "L'approbation prêtée n'a pas pu être enregistrée."
 	}
 }

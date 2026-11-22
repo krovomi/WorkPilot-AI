@@ -5,15 +5,13 @@
  * secret on the phone), trades it with Microsoft for an id_token and hands
  * that to the server, which checks its signature, audience and issuer
  * (`POST /auth/oidc/exchange`). The redirect URI must be registered on the
- * Entra app as a "Mobile and desktop applications" platform.
+ * Entra app as a "Mobile and desktop applications" platform. The flow itself
+ * (`state`, `nonce`) is the one every provider shares: `code-flow.ts`.
  */
 
 import * as AuthSession from "expo-auth-session";
-import * as WebBrowser from "expo-web-browser";
 import type { AuthConfig } from "../api/types";
-
-// On the web build, the page Microsoft sends back to closes the popup.
-WebBrowser.maybeCompleteAuthSession();
+import { appRedirectUri, codeFlowIdToken } from "./code-flow";
 
 export const ENTRA_SCOPES = ["openid", "profile", "email"];
 
@@ -24,7 +22,7 @@ export function entraIssuer(tenantId: string): string {
 }
 
 export function entraRedirectUri(): string {
-	return AuthSession.makeRedirectUri({ scheme: "workpilot", path: "auth" });
+	return appRedirectUri();
 }
 
 /**
@@ -35,31 +33,11 @@ export async function entraIdToken(config: AuthConfig): Promise<string | null> {
 	if (!config.entra_enabled || !config.entra_tenant_id || !config.entra_client_id) {
 		throw new Error("entra_disabled");
 	}
-	const clientId = config.entra_client_id;
-	const discovery = await AuthSession.fetchDiscoveryAsync(entraIssuer(config.entra_tenant_id));
-	const redirectUri = entraRedirectUri();
-	const request = new AuthSession.AuthRequest({
-		clientId,
-		redirectUri,
+	return codeFlowIdToken({
+		discovery: await AuthSession.fetchDiscoveryAsync(entraIssuer(config.entra_tenant_id)),
+		clientId: config.entra_client_id,
 		scopes: ENTRA_SCOPES,
-		responseType: AuthSession.ResponseType.Code,
-		usePKCE: true,
 		prompt: AuthSession.Prompt.SelectAccount,
+		failure: "entra_failed",
 	});
-	const result = await request.promptAsync(discovery);
-	if (result.type !== "success") {
-		if (result.type === "error") throw new Error(result.error?.description || "entra_failed");
-		return null;
-	}
-	const tokens = await AuthSession.exchangeCodeAsync(
-		{
-			clientId,
-			redirectUri,
-			code: result.params.code,
-			extraParams: request.codeVerifier ? { code_verifier: request.codeVerifier } : undefined,
-		},
-		discovery,
-	);
-	if (!tokens.idToken) throw new Error("entra_failed");
-	return tokens.idToken;
 }

@@ -1,26 +1,18 @@
 import { MoreVertical } from "lucide-react";
-import { type SyntheticEvent, useMemo } from "react";
+import { type SyntheticEvent, useContext, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	type CardType,
 	cardTypeChoiceMetadata,
 	resolveCardType,
 } from "../../../shared/constants/card-types";
-import type {
-	Task,
-	TaskMetadata,
-	TaskPriority,
-	TaskStatus,
-} from "../../../shared/types";
+import type { Task, TaskPriority, TaskStatus } from "../../../shared/types";
 import { toast } from "../../hooks/use-toast";
 import { manualMoveTargets } from "../../lib/kanban-columns";
 import { extractTextFromHtml } from "../../lib/utils";
 import { openSmartEstimation } from "../../stores/smart-estimation-store";
-import {
-	pauseTask,
-	persistUpdateTask,
-	resumeTask,
-} from "../../stores/task-store";
+import { applyCardChoice, type CardChoice } from "../../lib/card-edits";
+import { pauseTask, resumeTask } from "../../stores/task-store";
 import { TaskEditDialog } from "../TaskEditDialog";
 import { Button } from "../ui/button";
 import {
@@ -29,7 +21,12 @@ import {
 	DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { type MenuPoint, PointerMenu } from "./PointerMenu";
-import { type TaskCardMenuActions, TaskCardMenuItems } from "./TaskCardMenuItems";
+import { BoardSelectionContext } from "./board-selection-context";
+import {
+	SelectionMenuItems,
+	type TaskCardMenuActions,
+	TaskCardMenuItems,
+} from "./TaskCardMenuItems";
 
 const stop = (e: SyntheticEvent) => e.stopPropagation();
 
@@ -77,10 +74,16 @@ export function TaskCardMenus({
 		[task.metadata],
 	);
 	const currentPriority = task.metadata?.priority ?? null;
+	// On a card of a selection of several, the right-click acts on them all.
+	const selection = useContext(BoardSelectionContext);
+	const inSelection =
+		!!selection &&
+		selection.selectedTaskIds.size > 1 &&
+		selection.selectedTaskIds.has(task.id);
 
 	const actions = useMemo((): TaskCardMenuActions => {
-		const save = async (metadata: Partial<TaskMetadata>) => {
-			if (await persistUpdateTask(task.id, { metadata })) return;
+		const save = async (change: CardChoice, label: string) => {
+			if ((await applyCardChoice([task], change, label)) === 0) return;
 			toast({
 				variant: "destructive",
 				title: t("tasks:kanban.cardMenu.saveFailed"),
@@ -89,11 +92,11 @@ export function TaskCardMenus({
 		return {
 			onEdit: () => onEditOpenChange(true),
 			onSetType: (type: CardType) => {
-				if (type !== currentType) void save(cardTypeChoiceMetadata(type));
+				if (type === currentType) return;
+				void save(cardTypeChoiceMetadata(type), t("tasks:kanban.undoLabels.type"));
 			},
-			onSetPriority: (priority: TaskPriority) => {
-				if (priority !== currentPriority) void save({ priority });
-			},
+			onSetPriority: (priority: TaskPriority) =>
+				void save({ priority }, t("tasks:kanban.undoLabels.priority")),
 			moves: onStatusChange && {
 				targets: manualMoveTargets({ status: task.status, metadata: { prUrl } }),
 				onMove: (status) => void onStatusChange(status),
@@ -112,15 +115,11 @@ export function TaskCardMenus({
 			onDelete,
 		};
 	}, [
-		task.id,
-		task.status,
-		task.description,
-		task.title,
+		task,
 		prUrl,
 		isRunning,
 		isPaused,
 		currentType,
-		currentPriority,
 		onStatusChange,
 		onDuplicate,
 		onDelete,
@@ -157,7 +156,17 @@ export function TaskCardMenus({
 					onClose={onContextMenuClose}
 					label={t("tasks:kanban.cardMenu.label")}
 				>
-					<TaskCardMenuItems onOpen={onOpen} {...itemProps} />
+					{selection && inSelection ? (
+						<SelectionMenuItems
+							count={selection.selectedTaskIds.size}
+							onSetType={selection.onSetType}
+							onSetPriority={selection.onSetPriority}
+							onDelete={selection.onDelete}
+							onClear={selection.onClear}
+						/>
+					) : (
+						<TaskCardMenuItems onOpen={onOpen} {...itemProps} />
+					)}
 				</PointerMenu>
 			)}
 

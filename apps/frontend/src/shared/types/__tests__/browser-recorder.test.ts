@@ -3,7 +3,7 @@
  * the page or the renderer sends beyond them is dropped (#387).
  */
 import { describe, expect, it } from "vitest";
-import { MAX_RECORDED_STEPS, parseRecordedStep, readExportRequest } from "../browser-recorder";
+import { MAX_RECORDED_STEPS, parseRecordedStep, readExportRequest, TEST_FORMATS } from "../browser-recorder";
 
 const button = { strategy: "role", role: "button", value: "Save" };
 
@@ -120,7 +120,7 @@ describe("parseRecordedStep: where the element lives, what its action caused", (
 	});
 
 	it("refuses a step whose place is malformed, drops a malformed wait", () => {
-		for (const chain of ["x", ["a", "b", "c", "d", "e"], [""], [3], ["a".repeat(301)]]) {
+		for (const chain of ["x", Array.from({ length: 9 }, (_, i) => `#f${i}`), [""], [3], ["a".repeat(301)]]) {
 			expect(parseRecordedStep({ ...click, frames: chain })).toBeNull();
 			expect(parseRecordedStep({ ...click, shadow: chain })).toBeNull();
 		}
@@ -142,10 +142,10 @@ describe("parseRecordedStep: where the element lives, what its action caused", (
 
 describe("readExportRequest", () => {
 	it("accepts each format of the closed list", () => {
-		for (const format of ["selenium-python", "selenium-java", "webdriverio"]) {
+		for (const format of TEST_FORMATS) {
 			expect(readExportRequest({ format, destination: "preview", stepIds: [] })?.format).toBe(format);
 		}
-		expect(readExportRequest({ format: "selenium-ruby", destination: "preview", stepIds: [] })).toBeNull();
+		expect(readExportRequest({ format: "selenium-perl", destination: "preview", stepIds: [] })).toBeNull();
 	});
 
 	it("keeps the step ids once, in order", () => {

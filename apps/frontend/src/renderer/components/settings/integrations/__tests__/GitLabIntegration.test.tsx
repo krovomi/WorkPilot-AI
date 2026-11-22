@@ -29,6 +29,7 @@ const api = {
 	getGitLabUser: vi.fn(async (_host?: string) => ({ success: true, data: { username: "ada" } })),
 	listGitLabUserProjects: vi.fn(async () => ({ success: true, data: { projects: [] } })),
 	getGitBranches: vi.fn(async () => ({ success: true, data: [] })),
+	listForgeAccounts: vi.fn(async () => ({ success: true, data: [] })),
 };
 
 beforeEach(() => {
@@ -77,5 +78,25 @@ describe("the glab sign-in of the GitLab settings", () => {
 		);
 		expect(api.startGitLabAuth).toHaveBeenCalledWith("gitlab.acme.dev");
 		expect(api.getGitLabToken).toHaveBeenCalledWith("gitlab.acme.dev");
+	});
+
+	it("uses a saved account instead of the instance and token fields, keeping the project", async () => {
+		const updateEnvConfig = vi.fn();
+		render(
+			<GitLabIntegration
+				envConfig={
+					{ gitlabEnabled: true, gitlabAccountId: "acct-1", gitlabProject: "acme/app" } as ProjectEnvConfig
+				}
+				updateEnvConfig={updateEnvConfig}
+				showGitLabToken={false}
+				setShowGitLabToken={vi.fn()}
+				gitLabConnectionStatus={null}
+				isCheckingGitLab={false}
+			/>,
+		);
+		expect(screen.queryByText("settings.useOAuth")).toBeNull();
+		expect(screen.getByDisplayValue("acme/app")).toBeInTheDocument();
+		fireEvent.change(screen.getByLabelText("forgeAccounts.picker.label"), { target: { value: "" } });
+		expect(updateEnvConfig).toHaveBeenCalledWith({ gitlabAccountId: "" });
 	});
 });

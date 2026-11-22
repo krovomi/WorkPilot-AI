@@ -43,9 +43,12 @@ async def record(
     """Append one administrative event.
 
     ``commit=False`` by default so the entry joins the caller's transaction and
-    a rolled-back change leaves no record of having happened.
+    a rolled-back change leaves no record of having happened. With the
+    ``request``, the entry names the sign-in its actor acted under.
     """
     ua, ip = client_meta(request)
+    # The sign-in the request's token comes from (`jwt_tokens.login_of`).
+    login = getattr(request.state, "login", None) if request is not None else None
     try:
         db.add(
             AuditLog(
@@ -56,6 +59,8 @@ async def record(
                 payload=payload,
                 ip=(ip or "")[:64] or None,
                 user_agent=(ua or "")[:400] or None,
+                login_id=login.id if login else None,
+                login_method=login.method if login else None,
             )
         )
         if commit:
