@@ -187,6 +187,7 @@ export async function openReviewWorkspace(
 		aiDescription: description,
 		displayDescription: description,
 		descriptionIsHtml: false,
+		createdBy: "system",
 		metadata: {
 			sourceType: "generated",
 			generatedBy: request.source,

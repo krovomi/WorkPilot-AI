@@ -662,6 +662,7 @@ class CiPipelineService {
 			{ type: startEvent.type } as TaskEvent,
 			startEvent.resetTask ?? task,
 			project,
+			"system",
 		);
 		taskStateManager.resetForNewRun(task.id);
 		this.getMainWindow?.()?.webContents.send(

@@ -42,6 +42,7 @@ from server.services.run_isolation import (
     project_brain_env,
 )
 from server.services.secrets import get_user_secret
+from server.services.status_history import follow_status, stop_following
 from server.services.usage_records import finish_collecting, usage_channel
 from sqlalchemy import select
 
@@ -602,6 +603,7 @@ class RunManager:
         may_skip_review: bool = False,
     ) -> None:
         status = "failed"
+        follower: asyncio.Task[None] | None = None
         try:
             async with self._get_semaphore():
                 if run_id in self._cancelled:
@@ -621,6 +623,10 @@ class RunManager:
                 await self._set_run_status(run_id, "running")
                 await self._notify(
                     project_id, spec_id, spec_name, run_id, phase, user_id, "running"
+                )
+                # Each status the run's agents give the card, in its history.
+                follower = asyncio.create_task(
+                    follow_status(Path(server_path), spec_name, user_id)
                 )
 
                 spec_dir = Path(server_path) / ".workpilot" / "specs" / spec_name
@@ -668,6 +674,7 @@ class RunManager:
                         proc.terminate()
                     _, stderr = await proc.communicate()
                     await finish_collecting(counting)
+                await stop_following(follower)
                 if approved:
                     _keep_approval(spec_dir)
 
@@ -690,6 +697,7 @@ class RunManager:
             logger.exception("Run %s crashed in the manager", run_id)
             await self._set_run_status(run_id, "failed", error=str(e)[:2000])
         finally:
+            await stop_following(follower)
             self._active.pop(run_id, None)
             self._running_specs.discard(spec_id)
             self._cancelled.discard(run_id)

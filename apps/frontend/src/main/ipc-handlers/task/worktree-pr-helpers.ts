@@ -213,7 +213,7 @@ export async function updateTaskStatusAfterPRCreation(
 
 	// Await status persistence to ensure completion before resolving
 	try {
-		const persisted = await persistPlanStatus(planPath, "done");
+		const persisted = await persistPlanStatus(planPath, "done", undefined, "user");
 		result.mainProjectStatus = persisted;
 		debug("Main project status persisted to done:", persisted);
 	} catch (err) {

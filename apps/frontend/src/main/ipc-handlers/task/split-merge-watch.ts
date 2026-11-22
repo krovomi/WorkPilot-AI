@@ -108,7 +108,13 @@ export function startSplitMergeWatch(
 	const deps: SplitMergeDeps = {
 		readState: readPrState,
 		markDone: (task, project) => {
-			taskStateManager.handleManualStatusChange(task.id, "done", task, project);
+			taskStateManager.handleManualStatusChange(
+				task.id,
+				"done",
+				task,
+				project,
+				"system",
+			);
 		},
 		writeMetadata,
 		moveOntoBase: (taskId) => stackUpdate(taskId, agentManager),

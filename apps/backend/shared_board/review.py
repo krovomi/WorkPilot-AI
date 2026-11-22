@@ -30,6 +30,8 @@ from server.db.engine import get_db
 from server.db.models import Project
 from server.services.events import emit_board_event
 from server.services.run_manager import set_approval_carry
+from server.services.status_history import plan_status, record_status_change
+from shared_board import listing
 from shared_board.approvals import give_approval
 from shared_board.attachments import (
     MAX_IMAGES,
@@ -234,10 +236,19 @@ async def request_changes(
         "origin": "change_request",
         "requested_at": now,
     }
+    shown = plan_status(listing.card_source(scope.path.resolve(), directory))
     for spec_dir in (directory, workspace_spec):
         plan = spec_dir / "implementation_plan.json"
         if plan.is_file():
             _reopen_plan(plan, dict(subtask))
+    # Back to In progress, by this person: in the card's history.
+    record_status_change(
+        directory,
+        "in_progress",
+        actor="user",
+        account_id=principal.id,
+        previous=shown,
+    )
     # Sending the work back is this person's approval of the build it starts,
     # one of those the card's criticality needs (``shared_board/approvals``),
     # and on one's own card as the deployment allows: otherwise the build
