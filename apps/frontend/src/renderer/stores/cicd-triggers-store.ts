@@ -270,11 +270,11 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set) => ({
 
 	loadLinks: async (projectDir) => {
 		show(projectDir);
-		await answer(projectDir, globalThis.electronAPI.getDeployLinks(projectDir), (links) => set({ links }));
+		await answer(projectDir, () => globalThis.electronAPI.getDeployLinks(projectDir), (links) => set({ links }));
 	},
 
 	saveLinks: async (projectDir, projectIds) => {
-		await answer(projectDir, globalThis.electronAPI.setDeployLinks(projectDir, projectIds), (links) =>
+		await answer(projectDir, () => globalThis.electronAPI.setDeployLinks(projectDir, projectIds), (links) =>
 			set({ links }),
 		);
 	},
@@ -285,7 +285,7 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set) => ({
 	},
 
 	reviewVerdict: async (projectDir, runId, review) => {
-		await answer(projectDir, globalThis.electronAPI.reviewDeployVerdict(projectDir, runId, review), () => undefined);
+		await answer(projectDir, () => globalThis.electronAPI.reviewDeployVerdict(projectDir, runId, review), () => undefined);
 		if (!isShown(projectDir)) return;
 		await readRuns(projectDir);
 		await readFigures(projectDir);
@@ -297,11 +297,11 @@ export const useCICDTriggersStore = create<CICDTriggersState>((set) => ({
 /** Applies a typed call's answer for the project on screen, or shows its error. */
 async function answer<T>(
 	projectDir: string,
-	call: Promise<{ success: boolean; data?: T; error?: string }>,
+	call: () => Promise<{ success: boolean; data?: T; error?: string }>,
 	apply: (data: T) => void,
 ): Promise<void> {
 	try {
-		const result = await call;
+		const result = await call();
 		if (!isShown(projectDir)) return;
 		if (result.success) apply(result.data as T);
 		else useCICDTriggersStore.setState({ error: result.error ?? "Request failed" });
@@ -311,7 +311,7 @@ async function answer<T>(
 }
 
 async function readFigures(projectDir: string): Promise<void> {
-	await answer(projectDir, globalThis.electronAPI.getDeployFigures(projectDir), (figures) =>
+	await answer(projectDir, () => globalThis.electronAPI.getDeployFigures(projectDir), (figures) =>
 		useCICDTriggersStore.setState({ figures }),
 	);
 }

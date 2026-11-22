@@ -121,7 +121,17 @@ describe("computeFigures", () => {
 				degradedAt: "2026-11-15T10:00:00Z",
 				rollbackAt: new Date(Date.parse("2026-11-15T10:00:00Z") + seconds * 1000).toISOString(),
 			});
-		const odd = computeFigures([timed("1", 60), timed("2", 600), timed("3", 120)], {});
+		const odd = computeFigures(
+			[
+				timed("1", 60),
+				timed("2", 600),
+				timed("3", 120),
+				// Asked by a person long ago: counted, in no month shown.
+				watch({ runId: "4", rollback: "started", rollbackByPerson: true, startedAt: "2020-01-01T00:00:00Z" }),
+			],
+			{},
+		);
+		expect(odd.personRollbacks).toBe(1);
 		expect([odd.meanSecondsToRollback, odd.medianSecondsToRollback]).toEqual([260, 120]);
 	});
 });
