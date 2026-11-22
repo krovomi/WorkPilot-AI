@@ -1,7 +1,7 @@
 """
 Usage Tracker — Records LLM token usage and costs from agent sessions.
 
-Writes to four destinations:
+Writes to four destinations, and tells a server run's server (``foundation.usage_channel``):
   1. {root}/.workpilot/cost_data.json          (Costs view, goal spend, coach)
   2. analytics.db SQLite                         (AnalyticsDashboard REST API)
   3. {root}/.workpilot/dashboard_snapshot.json (QA and merge counters, build times)
@@ -28,6 +28,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 from foundation.json_ledger import update_json
+from foundation.usage_channel import report as report_to_server
 
 COST_DATA = "cost_data.json"
 SNAPSHOT = "dashboard_snapshot.json"
@@ -214,6 +215,23 @@ def record_session_usage(
             cache_creation_input_tokens,
             cache_read_input_tokens,
         )
+
+    # 0 — the server that started this run, when there is one: it stores the
+    # session against the run and the person (foundation/usage_channel.py).
+    report_to_server(
+        {
+            "phase": phase,
+            "agent_type": agent_type,
+            "provider": provider,
+            "model": model,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cache_write_tokens": cache_creation_input_tokens,
+            "cache_read_tokens": cache_read_input_tokens,
+            "cost_usd": cost_usd,
+            "estimated": usage_source == "estimated",
+        }
+    )
 
     # Update in-process build totals
     key = str(spec_dir)
