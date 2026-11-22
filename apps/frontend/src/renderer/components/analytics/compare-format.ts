@@ -1,9 +1,10 @@
 /**
  * How "How you compare" writes its figures, on screen and in the team
- * report alike: every figure is per spec and lower is better.
+ * report alike: every figure is per spec, and lower is better except for
+ * the two in percent (`HIGHER_IS_BETTER`).
  */
 
-import type { CompareMetric } from "@shared/types/build-compare";
+import { type CompareMetric, HIGHER_IS_BETTER } from "@shared/types/build-compare";
 import type { Tone } from "../charter";
 
 /** The key of each metric's label under `analytics:compare.metrics`. */
@@ -12,22 +13,33 @@ export const METRIC_KEYS: Record<CompareMetric, string> = {
 	cost: "cost",
 	qa_iterations: "qaIterations",
 	agents: "agents",
+	mutation_score: "mutationScore",
+	ci_first_pass: "firstCi",
 };
 
 /** A metric's value as the person reads it; a dash when nothing recorded it. */
 export function formatMetric(metric: CompareMetric, value: number | null): string {
 	if (value === null) return "—";
 	if (metric === "cost") return `$${value.toFixed(2)}`;
+	if (HIGHER_IS_BETTER.has(metric)) return `${value.toFixed(0)}%`;
 	if (metric === "minutes") {
 		return value < 60 ? `${value.toFixed(0)} min` : `${(value / 60).toFixed(1)} h`;
 	}
 	return value.toFixed(1).replace(/\.0$/, "");
 }
 
-/** Lower is better for every metric: a fall is good news. */
-export function trendTone(value: number | null): Tone {
+/**
+ * How much a change is good news, in percent: a fall of a figure where
+ * lower is better, a rise of one where higher is.
+ */
+export function improvement(metric: CompareMetric, trend: number): number {
+	return HIGHER_IS_BETTER.has(metric) ? trend : -trend;
+}
+
+/** Green for good news, amber for bad, muted for a change under 5%. */
+export function trendTone(metric: CompareMetric, value: number | null): Tone {
 	if (value === null || Math.abs(value) < 5) return "muted";
-	return value < 0 ? "green" : "amber";
+	return improvement(metric, value) > 0 ? "green" : "amber";
 }
 
 export function formatTrend(value: number | null): string {

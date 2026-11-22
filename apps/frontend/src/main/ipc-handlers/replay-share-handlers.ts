@@ -19,6 +19,7 @@ import type {
 	ReplayImportResult,
 } from "../../shared/types/replay-share";
 import { showOpenDialog, showSaveDialog } from "../electron-utils";
+import { recordReplayExport } from "../replay-usage";
 import { backendFetch } from "./_backend-fetch";
 import { isReplayId } from "./replay-handlers";
 
@@ -123,6 +124,7 @@ async function exportSession(
 	const content = exportedFile(built.content_base64, extension);
 	if (!content) return { success: false, error: "bad_export" };
 	await writeFile(filePath, content);
+	await recordReplayExport(extension);
 	return { success: true, filePath };
 }
 

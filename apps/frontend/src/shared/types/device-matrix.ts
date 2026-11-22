@@ -33,6 +33,13 @@ export interface DevicePreset {
 	/** Écran tactile : `pointer: coarse`, évènements tactiles, cibles de 44 px vérifiées. */
 	readonly touch: boolean;
 	readonly userAgent: string;
+	/**
+	 * Le nom d'un appareil personnalisé, choisi par la personne. Un appareil du
+	 * catalogue n'en a pas : il est nommé par `appEmulator:devices.<id>`.
+	 */
+	readonly name?: string;
+	/** Posé par `orientDevice` sur un appareil mis dans l'autre sens que le sien. */
+	readonly rotated?: boolean;
 }
 
 /** Un profil de bridage réseau : la liste fermée de `NETWORK_PROFILES`. */
@@ -119,6 +126,12 @@ export interface DeviceCaptureRequest {
 	 * renderer ne les voit jamais.
 	 */
 	readonly previewSession: boolean;
+	/**
+	 * Rendre avec un persona enregistré (`app-emulator:save-persona`), nommé par
+	 * son id ; `null` sinon. Exclut `previewSession`. Le main déchiffre les
+	 * cookies du persona, le renderer ne les voit jamais.
+	 */
+	readonly persona: string | null;
 }
 
 export interface DeviceCapture {
@@ -140,6 +153,8 @@ export interface DeviceCapture {
 	readonly height: number;
 	/** Rendu avec les cookies de l'aperçu. */
 	readonly previewSession: boolean;
+	/** Le persona dont les cookies ont été rejoués, ou `null`. */
+	readonly persona: string | null;
 }
 
 /** Les refus et les échecs, en liste fermée : le renderer en fait un texte traduit. */
@@ -152,6 +167,9 @@ export type DeviceCaptureError =
 	| "busy"
 	| "throttling-failed"
 	| "session-failed"
+	| "unknown-persona"
+	| "persona-locked"
+	| "persona-elsewhere"
 	| "load-failed"
 	| "capture-failed";
 

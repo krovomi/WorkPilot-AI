@@ -93,6 +93,7 @@ import { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 import { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 import { registerGithubHandlers } from "./github-handlers";
 import { registerGitlabHandlers } from "./gitlab";
+import { registerBitbucketHandlers } from "./bitbucket";
 import { registerGovernanceHandlers } from "./governance-handlers";
 import { registerGuardrailsHandlers } from "./guardrails-handlers";
 import { registerI18nAgentHandlers } from "./i18n-agent-handlers";
@@ -165,6 +166,7 @@ import { registerLocalBackendHandlers } from "./local-backend-handlers";
 import { registerReplayHandlers } from "./replay-handlers";
 import { registerReplayShareHandlers } from "./replay-share-handlers";
 import { registerReplayTeamShareHandlers } from "./replay-team-share-handlers";
+import { registerReplayUsageHandlers } from "./replay-usage-handlers";
 import { registerReplayVideoHandlers } from "./replay-video-handlers";
 import {
 	registerVisualProgrammingHandlers,
@@ -231,6 +233,7 @@ export { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 export { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 export { registerGithubHandlers } from "./github-handlers";
 export { registerGitlabHandlers } from "./gitlab";
+export { registerBitbucketHandlers } from "./bitbucket";
 export { registerGovernanceHandlers } from "./governance-handlers";
 export { registerGuardrailsHandlers } from "./guardrails-handlers";
 export { registerI18nAgentHandlers } from "./i18n-agent-handlers";
@@ -285,6 +288,7 @@ export { registerTimeTravelHandlers } from "./time-travel-handlers";
 export { registerReplayHandlers } from "./replay-handlers";
 export { registerReplayShareHandlers } from "./replay-share-handlers";
 export { registerReplayTeamShareHandlers } from "./replay-team-share-handlers";
+export { registerReplayUsageHandlers } from "./replay-usage-handlers";
 export { registerReplayVideoHandlers } from "./replay-video-handlers";
 export {
 	registerVisualProgrammingHandlers,
@@ -403,6 +407,9 @@ export function setupIpcHandlers(
 
 	// GitLab integration handlers
 	registerGitlabHandlers(getMainWindow);
+
+	// Bitbucket Cloud integration handlers
+	registerBitbucketHandlers();
 
 	// Ideation handlers
 	registerIdeationHandlers(agentManager, getMainWindow);
@@ -586,6 +593,7 @@ export function setupIpcHandlers(
 	registerReplayShareHandlers();
 	registerReplayVideoHandlers();
 	registerReplayTeamShareHandlers();
+	registerReplayUsageHandlers();
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);
