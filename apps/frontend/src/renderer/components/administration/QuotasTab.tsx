@@ -24,12 +24,17 @@ const FIELDS: Field[] = [
 	"monthly_token_budget",
 ];
 
-const USAGE_OF: Partial<Record<Field, "used_users" | "used_projects" | "used_concurrent_runs">> =
-	{
-		max_users: "used_users",
-		max_projects: "used_projects",
-		max_concurrent_runs: "used_concurrent_runs",
-	};
+const USAGE_OF: Partial<
+	Record<
+		Field,
+		"used_users" | "used_projects" | "used_concurrent_runs" | "used_tokens_this_month"
+	>
+> = {
+	max_users: "used_users",
+	max_projects: "used_projects",
+	max_concurrent_runs: "used_concurrent_runs",
+	monthly_token_budget: "used_tokens_this_month",
+};
 
 export function QuotasTab() {
 	const { t } = useTranslation("administration");
@@ -79,7 +84,7 @@ export function QuotasTab() {
 			<div className="space-y-4">
 				{FIELDS.map((field) => {
 					const usageKey = USAGE_OF[field];
-					const used = usageKey && quotas ? quotas[usageKey] : null;
+					const used = usageKey && quotas ? (quotas[usageKey] ?? 0) : null;
 					return (
 						<div key={field} className="space-y-1">
 							<Label htmlFor={`quota-${field}`}>{t(`quotas.${camel(field)}`)}</Label>
@@ -98,7 +103,12 @@ export function QuotasTab() {
 								/>
 								{used !== null && (
 									<span className="text-xs text-muted-foreground whitespace-nowrap">
-										{t("quotas.currentlyUsed", { count: used })}
+										{t(
+											field === "monthly_token_budget"
+												? "quotas.usedThisMonth"
+												: "quotas.currentlyUsed",
+											{ count: used },
+										)}
 									</span>
 								)}
 							</div>

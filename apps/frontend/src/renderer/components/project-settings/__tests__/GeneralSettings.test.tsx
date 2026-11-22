@@ -236,6 +236,30 @@ describe("GeneralSettings, agent and switches", () => {
 	});
 });
 
+describe("General settings layout", () => {
+	it("groups the task settings in the order a task is built", () => {
+		render(<Host />);
+		const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+		const order = ["Agent Configuration", "Before coding", "While coding", "Before review", "Notifications"];
+		const at = order.map((title) => headings.indexOf(title));
+		expect(at.every((i) => i >= 0)).toBe(true);
+		expect([...at].sort((a, b) => a - b)).toEqual(at);
+	});
+
+	it("puts each setting in its group", () => {
+		render(<Host />);
+		const groupOf = (name: string) =>
+			screen.getByRole("switch", { name }).closest("section")?.querySelector("h3")?.textContent;
+		expect(groupOf("Split big tasks automatically")).toBe("Before coding");
+		expect(groupOf("Integration tests first (ASP.NET Core)")).toBe("Before coding");
+		expect(groupOf("TDD Mode")).toBe("While coding");
+		expect(groupOf("Verification loop")).toBe("Before review");
+		expect(screen.getByTestId("cross-review").closest("section")?.querySelector("h3")?.textContent).toBe(
+			"Before review",
+		);
+	});
+});
+
 describe("AutoSplitSettings", () => {
 	const split = () => screen.getByRole("switch", { name: "Split big tasks automatically" });
 

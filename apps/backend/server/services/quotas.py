@@ -24,6 +24,7 @@ from server.db.models import (
     ProjectJob,
     SpecIndex,
 )
+from server.services.usage_records import tokens_since
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,12 +68,12 @@ async def count_active_runs(db: AsyncSession, org_id: str) -> int:
 
 
 async def tokens_used_this_month(db: AsyncSession, org_id: str) -> int:
-    """Placeholder until per-run token accounting lands on ``AgentRun``.
+    """Every token the organization's runs and jobs used this month (UTC).
 
-    Returning 0 keeps the budget check inert rather than guessing: refusing a
-    run on a number nobody computed would be worse than not enforcing yet.
+    Input, output and cache tokens alike, as the sessions reported them over
+    their usage channel (``services/usage_records.py``).
     """
-    return 0
+    return await tokens_since(db, org_id, month_start())
 
 
 async def enforce_project_quota(db: AsyncSession, org_id: str) -> None:
@@ -146,6 +147,7 @@ async def quota_snapshot(db: AsyncSession, org_id: str) -> dict:
         "used_users": await count_users(db, org_id),
         "used_projects": await count_projects(db, org_id),
         "used_concurrent_runs": await count_active_runs(db, org_id),
+        "used_tokens_this_month": await tokens_used_this_month(db, org_id),
     }
 
 
