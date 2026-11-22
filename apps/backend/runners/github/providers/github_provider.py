@@ -77,9 +77,14 @@ class GitHubProvider:
         """Get the underlying GHClient."""
         return self._gh_client
 
-    async def _gh(self, args: list[str]) -> str:
-        """Run a gh command against this provider's repository; its stdout."""
-        result = await self._gh_client.run([*args, "-R", self._repo])
+    async def _gh(self, args: list[str], input_text: str | None = None) -> str:
+        """Run a gh command against this provider's repository; its stdout.
+
+        `input_text` goes to gh's stdin, for a body passed as `--body-file -`.
+        """
+        result = await self._gh_client.run(
+            [*args, "-R", self._repo], input_text=input_text
+        )
         return result.stdout
 
     # -------------------------------------------------------------------------
@@ -294,7 +299,8 @@ class GitHubProvider:
         assignees: list[str] | None = None,
     ) -> IssueData:
         """Create a new issue."""
-        cmd = ["issue", "create", "--title", title, "--body", body]
+        # The body on stdin, never on the command line (GHClient._body_on_stdin).
+        cmd = ["issue", "create", "--title", title, "--body-file", "-"]
 
         if labels:
             for label in labels:
@@ -304,7 +310,7 @@ class GitHubProvider:
             for assignee in assignees:
                 cmd.extend(["--assignee", assignee])
 
-        result = await self._gh(cmd)
+        result = await self._gh(cmd, input_text=body)
 
         # Parse the issue URL to get the number
         # gh issue create outputs the URL

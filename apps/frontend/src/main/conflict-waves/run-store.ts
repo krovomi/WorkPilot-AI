@@ -95,12 +95,18 @@ export function validateRunState(raw: unknown, projectId: string): WaveRunState 
 }
 
 /**
- * The project's own `.workpilot` folder, resolved: refused when it is a link
- * or not a folder, or when it does not resolve inside the project root.
+ * The project's own `.workpilot` folder, resolved: refused when the project
+ * path is not a folder, when it is a link or not a folder, or when it does not
+ * resolve inside the project root.
  * Created when `create` is set and it does not exist; null otherwise.
  */
 export function workpilotDir(projectPath: string, create: boolean): string | null {
 	const root = fs.realpathSync(projectPath);
+	// Checked here, not left to the lstat below: under a file, POSIX answers
+	// ENOTDIR but Windows ENOENT, which would read as "no run saved yet".
+	if (!fs.statSync(root).isDirectory()) {
+		throw new Error("Refusing a project path that is not a folder");
+	}
 	const dir = path.join(root, ".workpilot");
 	let stat: fs.Stats | null = null;
 	try {
