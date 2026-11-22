@@ -33,7 +33,7 @@ from offline_policy import airgap_status
 from .alerts import SmtpFactory, send_alerts
 from .collectors import Fetch, default_fetch, health_check
 from .config import WatchSettings, load_settings
-from .evaluate import Level, compare, sample_level, verdict
+from .evaluate import Level, MetricCheck, compare, sample_level, verdict
 from .flags import RollbackFlag, flag_from_env, turn_off
 from .incident import Ask, explain, markdown, summarize
 from .migrations import changed_paths, migration_files
@@ -136,22 +136,34 @@ def _measure(
     }
 
 
-def _sample(
+def _checks(
     settings: WatchSettings,
     baseline: dict[str, float | None],
     fetch: Fetch,
     now: datetime,
-) -> dict:
+) -> list[MetricCheck]:
+    source = settings.source
+    if source is None:
+        return []
     values = _measure(settings, fetch, now)
     checks = []
-    source = settings.source
-    for rule in settings.metrics if source is not None else ():
+    for rule in settings.metrics:
         if rule.canary_query:
             # Canary analysis: the canary against the stable fleet, now.
             canary = source.value(rule.canary_query, fetch, now)
             checks.append(compare(rule, values.get(rule.name), canary))
         else:
             checks.append(compare(rule, baseline.get(rule.name), values.get(rule.name)))
+    return checks
+
+
+def _sample(
+    settings: WatchSettings,
+    baseline: dict[str, float | None],
+    fetch: Fetch,
+    now: datetime,
+) -> dict:
+    checks = _checks(settings, baseline, fetch, now)
     canaries = {rule.name for rule in settings.metrics if rule.canary_query}
     health: HealthResult | None = (
         health_check(settings.health_url, fetch) if settings.health_url else None
