@@ -459,7 +459,12 @@ async def test_the_comparison_reads_only_the_peers_the_person_may_read(
     assert answer["previous"]["specs"] == 0
     assert answer["min_group"] == 5 and answer["min_top"] == 20
     # Four readable peers: their number, never their median.
-    assert answer["groups"]["all"] == {"projects": 4, "medians": None, "top": None}
+    assert answer["groups"]["all"] == {
+        "projects": 4,
+        "medians": None,
+        "top": None,
+        "trend": None,
+    }
     served = json.dumps(answer)
     for name in ("Secret peer", "Shop", str(tmp_path)):
         assert name not in served
