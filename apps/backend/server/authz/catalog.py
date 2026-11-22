@@ -172,6 +172,9 @@ _ALL: tuple[Permission, ...] = (
     _p("settings", "provider.write", privileged=True),
     # -- marketplace -------------------------------------------------------
     _p("marketplace", "read"),
+    # A review of a catalogue server left with a project's team (#369 lot 5):
+    # text, never code, so not privileged.
+    _p("marketplace", "write"),
     _p("marketplace", "install", privileged=True),
     # -- lab ---------------------------------------------------------------
     _p("lab", "read"),
@@ -332,6 +335,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # The schema guard's record and a re-check of the task's migrations.
         # Desktop-only like verify; files and git only, no agent.
         "schema_guard": "qa",
+        # A server project team's security reviews of catalogue MCP servers
+        # (shared_features/mcp_reviews.py).
+        "mcp_reviews": "marketplace",
     }
 )
 
@@ -363,6 +369,7 @@ SERVER_FEATURES: frozenset[str] = frozenset(
         "workspace",
         "replay_shares",
         "governance",
+        "mcp_reviews",
     }
 )
 

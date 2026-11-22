@@ -53,6 +53,7 @@ import { Label } from "../ui/label";
 import { McpErrorNotice } from "./McpErrorNotice";
 import { McpPolicyRefusalText, useCatalogPolicyRefusal } from "./McpPolicyNotice";
 import { McpSecurityBadge, McpSecurityDetails, useMcpServerSecurity } from "./McpSecurityScore";
+import { McpServerReviews } from "./McpServerReviews";
 
 interface McpServerCardProps {
 	readonly server: McpMarketplaceServer;
@@ -177,6 +178,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 						<div className="text-xs text-muted-foreground mb-3 space-y-2">
 							<p>{localized(server.description, language)}</p>
 							<McpSecurityDetails security={security} />
+							<McpServerReviews serverId={server.id} />
 							{server.requires && (
 								<p className="flex items-center gap-1 text-warning ">
 									<Info className="h-3 w-3 shrink-0" />

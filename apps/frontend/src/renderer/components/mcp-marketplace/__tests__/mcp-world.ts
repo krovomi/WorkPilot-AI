@@ -32,6 +32,9 @@ export async function resetWorld(): Promise<MainApi> {
 		getMcpInstallPolicy: vi.fn(async () => ({ success: true, data: { state: "none" } })),
 		getMcpInstalledWatch: vi.fn(async () => ({ success: true, data: { servers: [] } })),
 		acknowledgeMcpAlerts: vi.fn(async () => ({ success: true, data: true })),
+		listMcpReviews: vi.fn(async () => ({ success: true, data: [] })),
+		putMcpReview: vi.fn(async () => ({ success: true })),
+		deleteMcpReview: vi.fn(async () => ({ success: true, data: true })),
 	};
 	(globalThis as { electronAPI?: unknown }).electronAPI = api;
 	useMcpMarketplaceStore.setState(MARKETPLACE, true);
