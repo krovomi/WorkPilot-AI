@@ -356,12 +356,18 @@ class MCPToolManager:
             read, write = transport[0], transport[1]
         else:  # command / stdio
             from mcp import StdioServerParameters  # noqa: PLC0415
-            from mcp.client.stdio import stdio_client  # noqa: PLC0415
+            from mcp.client.stdio import (  # noqa: PLC0415
+                get_default_environment,
+                stdio_client,
+            )
 
+            # The server's environment is built, not inherited: the MCP SDK's
+            # short default list (PATH, HOME, user, terminal; the system
+            # folders on Windows) plus the entry's own `env`.
             params = StdioServerParameters(
                 command=cfg["command"],
                 args=cfg.get("args", []) or [],
-                env={**os.environ, **(cfg.get("env") or {})},
+                env={**get_default_environment(), **(cfg.get("env") or {})},
             )
             read, write = await self._stack.enter_async_context(stdio_client(params))
 
