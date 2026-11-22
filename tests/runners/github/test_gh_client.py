@@ -252,7 +252,9 @@ def test_a_review_is_posted_with_the_requested_verdict(client, gh):
         "--request-changes",
         "--comment",
     ]
-    assert gh.calls()[0][4:] == ["--body", "Looks good", "-R", REPO]
+    # The body goes on stdin, never on the command line.
+    assert gh.calls()[0][4:] == ["--body-file", "-", "-R", REPO]
+    assert gh.stdins() == ["Looks good", "Fix it", "Fix it", "Noted"]
 
 
 def test_a_merge_sends_the_method_and_the_optional_message(client, gh):
@@ -268,18 +270,20 @@ def test_a_merge_sends_the_method_and_the_optional_message(client, gh):
             "--rebase",
             "--subject",
             "Title",
-            "--body",
-            "Body",
+            "--body-file",
+            "-",
             "-R",
             REPO,
         ],
     ]
+    assert gh.stdins() == [None, "Body"]
 
 
 def test_a_pull_request_comment_goes_to_the_configured_repository(client, gh):
     gh.answer({"pr comment 7": {}})
     run(client.pr_comment(7, "Thanks"))
-    assert gh.calls() == [["pr", "comment", "7", "--body", "Thanks", "-R", REPO]]
+    assert gh.calls() == [["pr", "comment", "7", "--body-file", "-", "-R", REPO]]
+    assert gh.stdins() == ["Thanks"]
 
 
 def test_the_assignees_of_a_pull_request_are_their_logins(client, gh):
@@ -359,10 +363,11 @@ def test_issue_comments_and_labels_go_to_the_configured_repository(client, gh):
     run(client.issue_add_labels(5, ["bug", "p1"]))
     run(client.issue_remove_labels(5, ["needs-triage"]))
     assert gh.calls() == [
-        ["issue", "comment", "5", "--body", "Triaged", "-R", REPO],
+        ["issue", "comment", "5", "--body-file", "-", "-R", REPO],
         ["issue", "edit", "5", "--add-label", "bug,p1", "-R", REPO],
         ["issue", "edit", "5", "--remove-label", "needs-triage", "-R", REPO],
     ]
+    assert gh.stdins() == ["Triaged", None, None]
 
 
 def test_no_labels_means_no_edit(client, gh):

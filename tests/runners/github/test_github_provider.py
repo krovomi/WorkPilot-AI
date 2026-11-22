@@ -159,7 +159,15 @@ def test_a_review_is_posted_with_its_event(provider, gh):
     gh.answer({"pr review 7": {}})
     review = ReviewData(pr_number=7, event="request_changes", body="Please test")
     assert run(provider.post_review(7, review)) == 0
-    assert gh.calls()[0][:5] == ["pr", "review", "7", "--request-changes", "--body"]
+    assert gh.calls()[0][:6] == [
+        "pr",
+        "review",
+        "7",
+        "--request-changes",
+        "--body-file",
+        "-",
+    ]
+    assert gh.stdins() == ["Please test"]
 
 
 @pytest.mark.parametrize(
@@ -193,11 +201,12 @@ def test_closing_comments_first_then_closes(provider, gh):
         "issue",
         "comment",
         "7",
-        "--body",
-        "Superseded",
+        "--body-file",
+        "-",
         "-R",
         "own/repo",
     ]
+    assert gh.stdins()[0] == "Superseded"
     assert calls[1] == ["pr", "close", "7", "-R", "own/repo"]
     assert calls[3] == ["issue", "close", "5", "-R", "own/repo"]
 
@@ -254,8 +263,8 @@ def test_a_created_issue_is_read_back_from_its_url(provider, gh):
         "create",
         "--title",
         "Crash",
-        "--body",
-        "Body",
+        "--body-file",
+        "-",
         "--label",
         "bug",
         "--label",
@@ -265,6 +274,7 @@ def test_a_created_issue_is_read_back_from_its_url(provider, gh):
         "-R",
         "own/repo",
     ]
+    assert gh.stdins()[0] == "Body"
     gh.answer(
         {
             "issue create": {"stdout": "https://github.com/own/repo/issues/6"},
@@ -277,8 +287,8 @@ def test_a_created_issue_is_read_back_from_its_url(provider, gh):
         "create",
         "--title",
         "Plain",
-        "--body",
-        "Body",
+        "--body-file",
+        "-",
         "-R",
         "own/repo",
     ]
