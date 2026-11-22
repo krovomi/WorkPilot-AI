@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { MyPermissions } from "../../api/types";
 import { visiblePages } from "../../admin/pages";
 import { LockSection } from "../../auth/LockSection";
+import { SessionSection } from "../../auth/SessionSection";
 import { useSession } from "../../auth/session";
 import { describeError } from "../../i18n";
 import { Button, ErrorBanner, Section } from "../../ui/components";
@@ -16,7 +17,7 @@ import { orgRoleLabel } from "../../i18n/labels";
 export default function Settings() {
 	const { t } = useTranslation();
 	const theme = useTheme();
-	const { user, serverUrl, permissions, switchOrg, signOut, can } = useSession();
+	const { serverUrl, permissions, switchOrg, signOut, can } = useSession();
 	const router = useRouter();
 	const [busy, setBusy] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -39,10 +40,7 @@ export default function Settings() {
 	const administers = visiblePages(can).length > 0;
 	return (
 		<ScrollView contentContainerStyle={styles.content}>
-			<Section title={t("settings.account")}>
-				<Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>{user?.display_name}</Text>
-				<Text style={{ color: theme.textMuted }}>{user?.email}</Text>
-			</Section>
+			<SessionSection />
 			<Section title={t("settings.server")}>
 				<Text style={{ color: theme.text }} selectable>
 					{serverUrl}

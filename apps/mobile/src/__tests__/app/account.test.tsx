@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from "expo-router/testing-library";
 import { getSharedPayloads } from "expo-sharing";
 import { Alert } from "react-native";
 import { loadSession } from "../../auth/token-store";
+import { formatDate } from "../../ui/format";
 import { type Call, fakeServer, openApp, reply, restoreFetch, SERVER } from "../../../test-support/fake-server";
 
 jest.mock("expo-sharing", () => ({ getSharedPayloads: jest.fn(() => []), clearSharedPayloads: jest.fn() }));
@@ -82,6 +83,57 @@ describe("settings", () => {
 
 		await fireEvent.press(screen.getByRole("button", { name: "Manage my tokens" }));
 		await waitFor(() => expect(app.getPathname()).toBe("/tokens"));
+	});
+
+	it("says the session was opened with a password, and since when", async () => {
+		const server = fakeServer({});
+		await openApp("/settings");
+		expect(await screen.findByText("Password")).toBeTruthy();
+		expect(screen.getByText("My session")).toBeTruthy();
+		expect(screen.getByText("Opened with")).toBeTruthy();
+		expect(screen.getByText(formatDate("2026-11-02T16:30:00Z", "en"))).toBeTruthy();
+		// A password names no identity provider.
+		expect(screen.queryByText("Identity provider")).toBeNull();
+		expect(server.called("GET /auth/me/session")).toHaveLength(1);
+	});
+
+	it("names the single sign-on provider and its issuer, and nothing else it was sent", async () => {
+		fakeServer({
+			"GET /auth/me/session": {
+				method: "oidc",
+				provider_name: "Okta",
+				issuer_host: "acme.okta.com",
+				signed_in_at: "not a date",
+				login_id: "login-secret-id",
+			},
+		});
+		await openApp("/settings");
+		expect(await screen.findByText("Single sign-on: Okta")).toBeTruthy();
+		expect(screen.getByText("acme.okta.com")).toBeTruthy();
+		expect(screen.queryByText("Signed in at")).toBeNull();
+		expect(screen.queryByText(/login-secret-id/)).toBeNull();
+	});
+
+	it("says SSO for a provider with no name, and when the method was not recorded", async () => {
+		fakeServer({ "GET /auth/me/session": { method: "oidc" } });
+		await openApp("/settings");
+		expect(await screen.findByText("Single sign-on: SSO")).toBeTruthy();
+		restoreFetch();
+		fakeServer({ "GET /auth/me/session": { method: null } });
+		await openApp("/settings");
+		expect(await screen.findByText(/^Not recorded/)).toBeTruthy();
+	});
+
+	it("says why the session cannot be read, and still offers to sign out", async () => {
+		fakeServer({ "GET /auth/me/session": reply(500, { detail: "audit down" }) });
+		await openApp("/settings");
+		expect(await screen.findByText(/audit down/)).toBeTruthy();
+		expect(screen.getByText("Ada Lovelace")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+		restoreFetch();
+		fakeServer({ "GET /auth/me/session": "not a session" });
+		await openApp("/settings");
+		expect(await screen.findByText("The session cannot be read from the server")).toBeTruthy();
 	});
 
 	it("says why an organization switch failed", async () => {

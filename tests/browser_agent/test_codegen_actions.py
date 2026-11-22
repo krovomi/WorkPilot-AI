@@ -283,7 +283,7 @@ def test_selenium_csharp() -> None:
         'new string[] {"#inner"}})',
         "nth: 3",
         "AnswerDialog(true, null);",
-        'Fill(Locate(By.CssSelector("#pw")), Secret("E2E_PW"));',
+        'Fill(Locate(By.CssSelector("#pw")), Secret(TestData["pw_env"]));',
         "var element = Locate(",
         "using OpenQA.Selenium.Interactions;",
     ):
@@ -304,7 +304,7 @@ def test_selenium_ruby() -> None:
         '@driver.action.drag_and_drop(locate(:css, "#a"), locate(:css, "[placeholder=\\"Drop\\"]", nth: 2)).perform',
         'frames: [["x-shell", "#pay"], ["#inner"]]',
         "answer_dialog(true)",
-        'fill(locate(:css, "#pw"), ENV.fetch("E2E_PW"))',
+        'fill(locate(:css, "#pw"), ENV.fetch(test_data.fetch("pw_env")))',
         "DRAG_HTML5 = ",
         "def answer_dialog(accept, text = nil)",
     ):
@@ -325,7 +325,7 @@ def test_selenium_javascript() -> None:
         "await driver.actions().dragAndDrop(",
         'frames: [["x-shell", "#pay"], ["#inner"]]',
         "await answerDialog(true);",
-        'await fill((await locate(By.css("#pw"))), secret("E2E_PW"));',
+        'await fill((await locate(By.css("#pw"))), secret(TEST_DATA["pw_env"]));',
     ):
         assert line in code, line
     literals = re.findall(r'"(?:[^"\\\n]|\\.)*"', code)

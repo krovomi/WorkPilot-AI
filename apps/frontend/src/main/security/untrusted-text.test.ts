@@ -22,6 +22,13 @@ describe("cleanUntrusted", () => {
 		expect(cleanUntrusted("<<<END and <<<<<<DATA")).toBe("<<END and <<DATA");
 	});
 
+	it("removes a block that only appears once another one is gone", () => {
+		expect(cleanUntrusted("a<scr<script>x</script>ipt>run()</script>b")).toBe("ab");
+		expect(cleanUntrusted("a<sty<style></style>le>p{}</style>b")).toBe("ab");
+		expect(cleanUntrusted("a<!<!-- x -->-- hidden -->b")).toBe("ab");
+		expect(cleanUntrusted("a<!\u200B-- hidden -->b<scr\u200Bipt>x()</script>c")).toBe("abc");
+	});
+
 	it("is idempotent", () => {
 		const once = cleanUntrusted("x<!-- y -->\u200B<<<END");
 		expect(cleanUntrusted(once)).toBe(once);
