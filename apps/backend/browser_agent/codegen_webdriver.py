@@ -41,7 +41,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .codegen_data import TestData, constant_name, file_name, py_data_lines
+from .codegen_data import JAVA_RESOURCES, TestData, file_name, py_data_lines
 from .codegen_text import (
     css_string,
     java_literal,
@@ -282,9 +282,12 @@ def typed_value(
     secret: str,
     data: Callable[[str], str],
 ) -> str:
-    """The value a fill or a list takes: its secret, its key in the data, or itself."""
+    """The value a fill or a list takes: its secret, its key in the data, or itself.
+
+    A secret is read from the variable its key in the data names.
+    """
     if step.secret_env:
-        return secret.format(quote(step.secret_env))
+        return secret.format(data(step.data_key))
     return data(step.data_key) if step.data_key else quote(step.value)
 
 
@@ -541,7 +544,7 @@ def _java_locate(step: RecordedStep, loc: Locator) -> str:
 
 def _java_action(step: RecordedStep, el: str, target: str) -> str:
     value = typed_value(
-        step, java_literal, "secret({})", lambda key: f"TestData.{constant_name(key)}"
+        step, java_literal, "secret({})", lambda key: f"data({java_literal(key)})"
     )
     if step.kind == "click":
         return f"{el}.click();"
@@ -733,20 +736,47 @@ _JAVA_SECRET = """
 """
 
 
-def java_data_lines(data: TestData) -> list[str]:
-    """The block of constants a Java test reads its typed values from."""
+def java_data_lines(name: str, data: TestData) -> list[str]:
+    """How a Java test reads its data: a JSON resource of its package, by key."""
     if not data:
         return []
     return [
         "",
-        "\t/** The values typed while recording: edit them here. */",
-        "\tprivate static final class TestData {",
-        *(
-            f"\t\tstatic final String {constant_name(v.key)} = {java_literal(v.value)};"
-            for v in data.values
-        ),
+        "\t/** The values typed while recording and the secrets' variables, from "
+        f"{JAVA_RESOURCES}e2e/{file_name(name)}. */",
+        "\tprivate static final Map<String, Object> TEST_DATA = "
+        f"readTestData({java_literal(file_name(name))});",
+        "",
+        "\tprivate static Map<String, Object> readTestData(String file) {",
+        f"\t\ttry (InputStream in = {pascal(name)}Test.class.getResourceAsStream(file)) {{",
+        "\t\t\tif (in == null) {",
+        '\t\t\t\tthrow new IllegalStateException(file + " is not on the test classpath");',
+        "\t\t\t}",
+        "\t\t\treturn new Json().toType(new String(in.readAllBytes(), "
+        "StandardCharsets.UTF_8), Json.MAP_TYPE);",
+        "\t\t} catch (IOException e) {",
+        "\t\t\tthrow new UncheckedIOException(e);",
+        "\t\t}",
+        "\t}",
+        "",
+        "\tprivate static String data(String key) {",
+        "\t\tObject value = TEST_DATA.get(key);",
+        "\t\tif (!(value instanceof String)) {",
+        '\t\t\tthrow new IllegalStateException(key + " is missing from the test data");',
+        "\t\t}",
+        "\t\treturn (String) value;",
         "\t}",
     ]
+
+
+#: What reading the data takes in Java: the JDK, and Selenium's JSON reader.
+_JAVA_DATA_IMPORTS = [
+    "import java.io.IOException;",
+    "import java.io.InputStream;",
+    "import java.io.UncheckedIOException;",
+    "import java.nio.charset.StandardCharsets;",
+]
+_JAVA_JSON = "import org.openqa.selenium.json.Json;"
 
 
 def selenium_java(
@@ -757,6 +787,12 @@ def selenium_java(
     if needs & {"drag-html5", "scroll-element", "values"}:
         needs.add("script")
     imports = [*_JAVA_IMPORTS]
+    if data:
+        imports[:0] = _JAVA_DATA_IMPORTS
+        imports.insert(
+            imports.index("import java.util.List;") + 1, "import java.util.Map;"
+        )
+        imports.insert(imports.index(_CHROME) + 1, _JAVA_JSON)
     if "dialog" in needs:
         imports.insert(imports.index("import org.openqa.selenium.By;"), _ALERT)
     if needs & {"hover", "drag-pointer"}:
@@ -770,7 +806,7 @@ def selenium_java(
         f"class {pascal(name)}Test {{",
         *_JAVA_HELPERS.splitlines(),
         *extras(_JAVA_EXTRA, needs),
-        *java_data_lines(data),
+        *java_data_lines(name, data),
     ]
     if env:
         lines += _JAVA_SECRET.format(names=", ".join(env)).splitlines()
