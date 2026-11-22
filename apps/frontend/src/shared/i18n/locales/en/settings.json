@@ -618,6 +618,10 @@
 		"chronological": "Chronological (oldest first)",
 		"reverseChronological": "Reverse-chronological (newest first)"
 	},
+	"kanbanColumnSummary": {
+		"label": "Column summary",
+		"description": "Show a one-line summary under each Kanban column title (urgent cards, free slots, plans to approve…)."
+	},
 	"general": {
 		"providerSection": "Default provider",
 		"providerSectionDescription": "The provider new Kanban tasks start from, and the one used by features without a selector of their own (titles, auto-fix, test generation…). Each task keeps its own provider, model and effort: changing this never modifies an existing task.",

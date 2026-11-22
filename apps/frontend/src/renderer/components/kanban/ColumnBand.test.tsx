@@ -11,6 +11,7 @@ import {
 	ColumnEmptyState,
 	ColumnGauge,
 	ColumnIcon,
+	ColumnPulse,
 	columnIcon,
 	getEmptyStateContent,
 } from "./ColumnBand";
@@ -103,5 +104,30 @@ describe("empty states", () => {
 		const { container } = render(<ColumnEmptyState status="queue" isOver />);
 		expect(screen.getByText("Drop here")).toBeInTheDocument();
 		expect(container.querySelector(".kanban-col-empty")).toHaveClass("active");
+	});
+});
+
+describe("ColumnPulse", () => {
+	it("says nothing without items", () => {
+		const { container } = render(<ColumnPulse items={[]} />);
+		expect(container).toBeEmptyDOMElement();
+	});
+
+	it("writes each item in order, a warning in its own colour", () => {
+		render(
+			<ColumnPulse
+				items={[
+					{ key: "urgent", values: { count: 2 }, warn: true },
+					{ key: "next", values: { title: "Ship it" } },
+				]}
+			/>,
+		);
+		const line = screen.getByLabelText("Column summary");
+		expect(line).toHaveAttribute("title", "2 urgent · Next: Ship it");
+		const [urgent, next] = Array.from(line.children);
+		expect(urgent).toHaveTextContent("2 urgent");
+		expect(urgent).toHaveAttribute("data-warn");
+		expect(next).toHaveTextContent("Next: Ship it");
+		expect(next).not.toHaveAttribute("data-warn");
 	});
 });

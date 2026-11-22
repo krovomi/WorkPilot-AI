@@ -503,6 +503,30 @@
 			"wip": "limite {{limit}}",
 			"slotsAria": "{{count}} créneaux parallèles occupés sur {{limit}}",
 			"wipAria": "{{count}} cartes, limite {{limit}}"
+		},
+		"pulse": {
+			"urgent_one": "{{count}} urgente",
+			"urgent_other": "{{count}} urgentes",
+			"high_one": "{{count}} prioritaire",
+			"high_other": "{{count}} prioritaires",
+			"next": "Prochaine : {{title}}",
+			"plansToApprove_one": "{{count}} plan à approuver",
+			"plansToApprove_other": "{{count}} plans à approuver",
+			"toReview_one": "{{count}} à relire",
+			"toReview_other": "{{count}} à relire",
+			"needsFix_one": "{{count}} à corriger",
+			"needsFix_other": "{{count}} à corriger",
+			"doneThisWeek_one": "{{count}} cette semaine",
+			"doneThisWeek_other": "{{count}} cette semaine",
+			"label": "Résumé de la colonne",
+			"planning_one": "{{count}} en planification",
+			"planning_other": "{{count}} en planification",
+			"coding_one": "{{count}} en code",
+			"coding_other": "{{count}} en code",
+			"qa_one": "{{count}} en QA",
+			"qa_other": "{{count}} en QA",
+			"paused_one": "{{count}} en pause",
+			"paused_other": "{{count}} en pause"
 		}
 	},
 	"queue": {
