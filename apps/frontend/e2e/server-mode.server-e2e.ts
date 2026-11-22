@@ -70,11 +70,14 @@ test("Bob deletes that card and it leaves Alice's board", async () => {
 	// next column's drop zone overlaps it in a narrow window: press it directly.
 	const card = page.getByRole("option", { name: cardTitle });
 	await card.getByRole("button", { name: /^Delete$/ }).dispatchEvent("click");
-	await page.getByRole("button", { name: /^Delete Permanently$/ }).click();
 
-	await expect(page.getByText(cardTitle)).toHaveCount(0, { timeout: 15_000 });
+	// Nothing has worked on this card yet: it goes without a confirmation,
+	// leaves Bob's board at once and is deleted after the undo delay (8 s).
+	await expect(page.getByRole("option", { name: cardTitle })).toHaveCount(0, {
+		timeout: 15_000,
+	});
 	await expect(alice.page.getByText(cardTitle)).toHaveCount(0, {
-		timeout: 30_000,
+		timeout: 40_000,
 	});
 });
 
