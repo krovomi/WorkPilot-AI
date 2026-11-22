@@ -13,6 +13,7 @@ import {
 	type RendererApi,
 } from "../../../__tests__/helpers/renderer-api";
 import type { Task, TaskStatus } from "../../../shared/types";
+import { useSettingsStore } from "../../stores/settings-store";
 import { TooltipProvider } from "../ui/tooltip";
 import {
 	COLUMN_RENDER_CAP,
@@ -260,6 +261,27 @@ describe("WIP limit", () => {
 		expect(container.querySelectorAll(".kanban-col-gauge-seg[data-on]")).toHaveLength(2);
 		expect(within(container).getByText("2 of 2 parallel slots in use")).toBeInTheDocument();
 		expect(container.querySelector(".kanban-col-icon-busy")).not.toBeNull();
+	});
+});
+
+describe("column summary", () => {
+	const urgent = () =>
+		[makeTask("u", { metadata: { priority: "urgent" } } as Partial<Task>)];
+
+	const initial = useSettingsStore.getState().settings;
+	afterEach(() => {
+		useSettingsStore.setState({ settings: initial });
+	});
+
+	it("sums the column up under its title", () => {
+		renderColumn({ tasks: urgent() });
+		expect(screen.getByLabelText("Column summary")).toHaveTextContent("1 urgent");
+	});
+
+	it("is hidden when the setting is off", () => {
+		useSettingsStore.setState({ settings: { ...initial, kanbanColumnSummary: false } });
+		renderColumn({ tasks: urgent() });
+		expect(screen.queryByLabelText("Column summary")).toBeNull();
 	});
 });
 

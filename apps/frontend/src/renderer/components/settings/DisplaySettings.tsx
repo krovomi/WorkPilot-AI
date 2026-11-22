@@ -18,6 +18,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
+import { Switch } from "../ui/switch";
 import { SettingsSection } from "./SettingsSection";
 
 interface DisplaySettingsProps {
@@ -307,6 +308,28 @@ export function DisplaySettings({
 							</SelectContent>
 						</Select>
 					</div>
+				</div>
+
+				{/* Kanban column summary (« Bandeau », kanban-columns.md) */}
+				<div className="flex items-center justify-between max-w-md">
+					<div className="space-y-1">
+						<Label
+							htmlFor="kanbanColumnSummary"
+							className="text-sm font-medium text-foreground"
+						>
+							{t("kanbanColumnSummary.label")}
+						</Label>
+						<p className="text-sm text-muted-foreground">
+							{t("kanbanColumnSummary.description")}
+						</p>
+					</div>
+					<Switch
+						id="kanbanColumnSummary"
+						checked={settings.kanbanColumnSummary !== false}
+						onCheckedChange={(checked) =>
+							onSettingsChange({ ...settings, kanbanColumnSummary: checked })
+						}
+					/>
 				</div>
 			</div>
 		</SettingsSection>

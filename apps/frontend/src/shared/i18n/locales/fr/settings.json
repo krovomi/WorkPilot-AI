@@ -1668,6 +1668,10 @@
 		"label": "Ordre des logs",
 		"reverseChronological": "Anti-chronologique (plus récent en premier)"
 	},
+	"kanbanColumnSummary": {
+		"label": "Résumé des colonnes",
+		"description": "Affiche une ligne de résumé sous le titre de chaque colonne du Kanban (cartes urgentes, créneaux libres, plans à approuver…)."
+	},
 	"mcp": {
 		"addCustomServer": "Ajouter un serveur personnalisé",
 		"addMcpDescription": "Sélectionnez un serveur MCP à ajouter à cet agent",

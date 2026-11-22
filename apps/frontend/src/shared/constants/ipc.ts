@@ -889,6 +889,13 @@ export const IPC_CHANNELS = {
 	CONFLICT_WAVES_RUN_SAVE: "conflictWaves:saveRun",
 	CONFLICT_WAVES_RUN_CLEAR: "conflictWaves:clearRun",
 	CONFLICT_WAVES_HISTORY: "conflictWaves:history",
+	// The same for a server project: planned and run by the server, by project id
+	CONFLICT_WAVES_SERVER_PLAN: "conflictWaves:serverPlan",
+	CONFLICT_WAVES_SERVER_RUN: "conflictWaves:serverRun",
+	CONFLICT_WAVES_SERVER_START: "conflictWaves:serverStart",
+	CONFLICT_WAVES_SERVER_STEP: "conflictWaves:serverStep",
+	CONFLICT_WAVES_SERVER_STOP: "conflictWaves:serverStop",
+	CONFLICT_WAVES_SERVER_HISTORY: "conflictWaves:serverHistory",
 
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",

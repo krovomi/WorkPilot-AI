@@ -46,6 +46,7 @@ import {
 import { registerArenaHandlers } from "./arena-handlers";
 import { registerMissionControlHandlers } from "./mission-control-handlers";
 import { registerConflictWavesHandlers } from "./conflict-waves-handlers";
+import { registerServerConflictWavesHandlers } from "./server-conflict-waves-handlers";
 import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 import { registerBrowserRecorderHandlers } from "./browser-recorder-handlers";
@@ -192,6 +193,7 @@ export {
 export { registerArenaHandlers } from "./arena-handlers";
 export { registerMissionControlHandlers } from "./mission-control-handlers";
 export { registerConflictWavesHandlers } from "./conflict-waves-handlers";
+export { registerServerConflictWavesHandlers } from "./server-conflict-waves-handlers";
 export { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 export { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 export { registerBrowserRecorderHandlers } from "./browser-recorder-handlers";
@@ -545,6 +547,8 @@ export function setupIpcHandlers(
 
 	// Execution waves across specs (#358): plan by task id, started by the renderer
 	registerConflictWavesHandlers();
+	// The same for a server project: planned and run by the server, by project id
+	registerServerConflictWavesHandlers();
 
 	// CI/CD Deployment Triggers handlers (Feature 44)
 	registerCICDTriggersHandlers();

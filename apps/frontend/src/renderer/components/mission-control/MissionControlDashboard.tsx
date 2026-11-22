@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { appDateLocale } from "../../lib/date-format";
 import { useMissionControlStore } from "../../stores/mission-control-store";
+import { useProjectStore } from "../../stores/project-store";
 import {
 	CharterButton,
 	Chip,
@@ -26,6 +27,7 @@ import { WavesView } from "../conflict-predictor/WavesView";
 import { formatElapsed } from "./agent-format";
 import { AddAgentDialog, AgentEventLog, AgentPanel, DecisionTreeViewer } from "./index";
 import { MissionControlMetrics } from "./MissionControlMetrics";
+import { ServerMissionControl } from "./ServerMissionControl";
 import { SessionHealth } from "./SessionHealth";
 
 const FEATURES = [
@@ -36,6 +38,15 @@ const FEATURES = [
 ] as const;
 
 export function MissionControlDashboard() {
+	const serverProject = useProjectStore((s) => {
+		const project = s.projects.find((p) => p.id === s.selectedProjectId);
+		return project?.remote ? project : null;
+	});
+	// A server project's agents run on the server (`ServerMissionControl`).
+	return serverProject ? <ServerMissionControl project={serverProject} /> : <LocalMissionControl />;
+}
+
+function LocalMissionControl() {
 	const { t } = useTranslation(["missionControl", "common", "navigation"]);
 	const {
 		session,

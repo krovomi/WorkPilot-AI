@@ -30,6 +30,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TASK_STATUS_LABELS } from "../../../shared/constants";
 import type { Task, TaskStatus } from "../../../shared/types";
+import { columnPulse } from "../../lib/column-pulse";
 import { isQuickAddColumn } from "../../lib/kanban-columns";
 import { columnCapacity } from "../../lib/kanban-column-meta";
 import { installColumnStylesheet } from "../../lib/kanban-column-tokens";
@@ -41,6 +42,7 @@ import {
 	MAX_COLUMN_WIDTH,
 	MIN_COLUMN_WIDTH,
 } from "../../stores/kanban-settings-store";
+import { useSettingsStore } from "../../stores/settings-store";
 import { SortableTaskCard } from "../SortableTaskCard";
 import {
 	type ColumnMenuActions,
@@ -63,6 +65,7 @@ import {
 	ColumnCount,
 	ColumnEmptyState,
 	ColumnGauge,
+	ColumnPulse,
 	ColumnIcon,
 } from "./ColumnBand";
 import { QuickAddComposer } from "./QuickAddComposer";
@@ -659,6 +662,13 @@ export const DroppableColumn = memo(function DroppableColumn({
 			? columnCapacity(tasks.length, maxParallelTasks, "slots")
 			: columnCapacity(tasks.length, wipLimit, "wip");
 	const isBusy = status === "in_progress" && tasks.length > 0;
+	const showPulse = useSettingsStore(
+		(s) => s.settings.kanbanColumnSummary !== false,
+	);
+	const pulse = useMemo(
+		() => (showPulse ? columnPulse(status, tasks) : []),
+		[showPulse, status, tasks],
+	);
 
 	// Collapsed state: show narrow vertical strip with rotated title and task count
 	if (isCollapsed) {
@@ -991,6 +1001,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 					</div>
 				</div>
 				{capacity && <ColumnGauge count={tasks.length} capacity={capacity} />}
+				{showPulse && <ColumnPulse items={pulse} />}
 				</div>
 
 				{/* Task list */}
