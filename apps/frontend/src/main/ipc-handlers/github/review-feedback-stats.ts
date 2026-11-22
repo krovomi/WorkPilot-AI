@@ -7,7 +7,8 @@
  *
  * The threshold is the one the reviewer runs with:
  * `WORKPILOT_REVIEW_FEEDBACK_THRESHOLD` from the environment the runner
- * inherits, else from the backend's `.env`, else 3.
+ * inherits, else from the backend's `.env`, else 3. The figures by month
+ * (lot 4) are `review-feedback-metrics.ts`'s.
  */
 
 import type {
@@ -26,6 +27,7 @@ import {
 	tallyBySignature,
 	topReason,
 } from "./review-feedback-dataset";
+import { monthlyMetrics, type ReviewCount } from "./review-feedback-metrics";
 import { getBackendPath } from "./utils/subprocess-runner";
 
 export const THRESHOLD_ENV = "WORKPILOT_REVIEW_FEEDBACK_THRESHOLD";
@@ -103,10 +105,12 @@ export function learnedRules(
 export function computeStats(
 	records: readonly FeedbackRecord[],
 	threshold: number,
+	reviews: readonly ReviewCount[] = [],
 ): ReviewFeedbackStats {
 	return {
 		threshold,
 		categories: byCategory(records),
 		rules: learnedRules(records, threshold),
+		months: monthlyMetrics(records, reviews, threshold),
 	};
 }

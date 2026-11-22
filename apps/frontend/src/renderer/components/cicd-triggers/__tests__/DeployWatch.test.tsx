@@ -29,14 +29,17 @@ function watch(over: Partial<DeployWatch> = {}): DeployWatch {
 		notConfigured: false,
 		autoRollback: false,
 		lastMetrics: [
-			{ name: "errors", kind: "error_rate", baseline: 0.01, current: 0.05, changePct: 400, level: "critical" },
-			{ name: "p95", kind: "latency", baseline: null, current: null, changePct: null, level: "unknown" },
+			{ name: "errors", kind: "error_rate", baseline: 0.01, current: 0.05, changePct: 400, level: "critical", canary: false },
+			{ name: "p95", kind: "latency", baseline: null, current: null, changePct: null, level: "unknown", canary: false },
 		],
 		healthOk: false,
 		samples: 2,
 		problems: [],
 		rollback: "proposed",
 		rollbackByPerson: false,
+		linkedCause: "",
+		linkedOnly: false,
+		flagConfigured: false,
 		...over,
 	};
 }
@@ -57,6 +60,7 @@ describe("canRollBack", () => {
 			targetSha: "",
 			targetUrl: "",
 			currentSha: "",
+			targetAt: "",
 		};
 		expect(canRollBack(watch({ rollback: undefined, plan: manualPlan }))).toBe(false);
 		expect(isWatchRunning(undefined)).toBe(false);
@@ -104,6 +108,7 @@ describe("DeployWatchPanel", () => {
 						targetSha: "",
 						targetUrl: "https://github.com/acme/shop/actions/runs/10",
 						currentSha: "",
+						targetAt: "",
 					},
 				})}
 				busy={false}
@@ -133,6 +138,7 @@ describe("DeployWatchPanel", () => {
 						targetSha: "",
 						targetUrl: "",
 						currentSha: "",
+						targetAt: "",
 					},
 				})}
 				busy
@@ -328,6 +334,28 @@ describe("alert outcomes", () => {
 describe("CICDTriggersDashboard with a watch", () => {
 	const invoke = vi.fn();
 	const rollbackDeployment = vi.fn(async () => ({ success: true }));
+	const links = { linked: [{ id: "p2", name: "web" }], candidates: [{ id: "p3", name: "docs" }] };
+	const getDeployLinks = vi.fn(async () => ({ success: true, data: links }));
+	const setDeployLinks = vi.fn(async () => ({ success: true, data: links }));
+	const getDeployFigures = vi.fn(async () => ({
+		success: true,
+		data: {
+			watches: 3,
+			criticalVerdicts: 1,
+			warningVerdicts: 0,
+			automaticRollbacks: 1,
+			personRollbacks: 0,
+			incidentsAvoided: 1,
+			meanSecondsToRollback: 90,
+			medianSecondsToRollback: 90,
+			timedRollbacks: 1,
+			falsePositiveRollbacks: 0,
+			reviewedVerdicts: 0,
+			falsePositives: 0,
+			months: [{ month: "2026-11", automatic: 1, person: 0, critical: 1 }],
+		},
+	}));
+	const reviewDeployVerdict = vi.fn(async () => ({ success: true }));
 
 	beforeEach(() => {
 		vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -361,7 +389,14 @@ describe("CICDTriggersDashboard with a watch", () => {
 			}
 			return { success: true };
 		});
-		(window as unknown as { electronAPI: unknown }).electronAPI = { invoke, rollbackDeployment };
+		(window as unknown as { electronAPI: unknown }).electronAPI = {
+			invoke,
+			rollbackDeployment,
+			getDeployLinks,
+			setDeployLinks,
+			getDeployFigures,
+			reviewDeployVerdict,
+		};
 		useProjectStore.setState({
 			projects: [{ id: "p1", name: "shop", path: "/projects/shop" } as never],
 			activeProjectId: "p1",
@@ -414,5 +449,36 @@ describe("CICDTriggersDashboard with a watch", () => {
 		expect(invoke).toHaveBeenCalledWith("cicdTriggers:setConfig", "/projects/shop", {
 			alert_email_to: "oncall@example.com",
 		});
+
+		await act(async () => {
+			fireEvent.change(screen.getByLabelText("cicdTriggers:flag.rollback_flag_provider"), {
+				target: { value: "launchdarkly" },
+			});
+			await vi.advanceTimersByTimeAsync(10);
+		});
+		expect(invoke).toHaveBeenCalledWith("cicdTriggers:setConfig", "/projects/shop", {
+			rollback_flag_provider: "launchdarkly",
+		});
+	});
+
+	it("links services, shows the figures and records a word on a verdict (lot 4)", async () => {
+		render(<CICDTriggersDashboard />);
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(10);
+		});
+		expect(screen.getByTestId("deploy-figures").textContent).toContain("cicdTriggers:figures.heading");
+		await act(async () => {
+			fireEvent.click(screen.getByLabelText("docs"));
+			await vi.advanceTimersByTimeAsync(10);
+		});
+		expect(setDeployLinks).toHaveBeenCalledWith("/projects/shop", ["p2", "p3"]);
+		fireEvent.click(screen.getByText("cicdTriggers:watch.rollbackButton"));
+		expect(screen.getByText(/watch\.confirmLinked.*web/)).toBeTruthy();
+		await act(async () => {
+			fireEvent.click(screen.getByText("cicdTriggers:watch.review.false_positive"));
+			await vi.advanceTimersByTimeAsync(10);
+		});
+		expect(reviewDeployVerdict).toHaveBeenCalledWith("/projects/shop", "41", "false_positive");
+		expect(getDeployFigures.mock.calls.length).toBeGreaterThan(1);
 	});
 });

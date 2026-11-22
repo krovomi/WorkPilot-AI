@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from deploy_watch import cloudwatch
 from deploy_watch.cloudwatch import cloudwatch_value, sign, signing_key
-from deploy_watch.collectors import MAX_BODY_BYTES
+from deploy_watch.net import MAX_BODY_BYTES
 from deploy_watch.sources import MetricSource, source_from_env
 
 NOW = datetime(2026, 11, 15, 10, 0, tzinfo=UTC)

@@ -55,6 +55,7 @@ import enDesignToCode from "./locales/en/designToCode.json";
 import enDialogs from "./locales/en/dialogs.json";
 import enDocumentation from "./locales/en/documentation.json";
 import enErrors from "./locales/en/errors.json";
+import enBitbucket from "./locales/en/bitbucket.json";
 import enGitlab from "./locales/en/gitlab.json";
 import enGuidedTour from "./locales/en/guidedTour.json";
 import enIdeation from "./locales/en/ideation.json";
@@ -153,6 +154,7 @@ import frDesignToCode from "./locales/fr/designToCode.json";
 import frDialogs from "./locales/fr/dialogs.json";
 import frDocumentation from "./locales/fr/documentation.json";
 import frErrors from "./locales/fr/errors.json";
+import frBitbucket from "./locales/fr/bitbucket.json";
 import frGitlab from "./locales/fr/gitlab.json";
 import frGuidedTour from "./locales/fr/guidedTour.json";
 import frIdeation from "./locales/fr/ideation.json";
@@ -248,6 +250,7 @@ export const resources = {
 		dialogs: enDialogs,
 		documentation: enDocumentation,
 		errors: enErrors,
+		bitbucket: enBitbucket,
 		gitlab: enGitlab,
 		guidedTour: enGuidedTour,
 		initDialog: enInitDialog,
@@ -346,6 +349,7 @@ export const resources = {
 		dialogs: frDialogs,
 		documentation: frDocumentation,
 		errors: frErrors,
+		bitbucket: frBitbucket,
 		gitlab: frGitlab,
 		guidedTour: frGuidedTour,
 		initDialog: frInitDialog,
@@ -451,6 +455,7 @@ i18n.use(initReactI18next).init({
 		"dialogs",
 		"documentation",
 		"errors",
+		"bitbucket",
 		"gitlab",
 		"guidedTour",
 		"initDialog",

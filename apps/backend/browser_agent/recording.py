@@ -323,6 +323,9 @@ class RecordedStep:
     dialog: DialogAnswer | None = None
     #: The shadow hosts above each of ``frames``: empty, or one list per frame.
     frame_shadow: list[list[str]] = field(default_factory=list)
+    #: The key a generated test reads ``value`` by (``codegen_data``): set by the
+    #: export only, never read from JSON nor written to it.
+    data_key: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {

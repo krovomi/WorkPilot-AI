@@ -14,8 +14,16 @@ from typing import Any
 from . import metrics
 from .agent_slot import AgentRole, AgentSlot, AgentStatus
 from .decision_tree import DecisionTree
+from .helper import HELPER_ROLE, helper_task, plan_helper
 from .model_pick import normalise_provider
-from .rebalance import detect_loop, plan_rebalance, reason_of
+from .rebalance import (
+    STEP_PERIOD_MAX,
+    STEP_REPEATS,
+    detect_loop,
+    detect_step_loop,
+    plan_rebalance,
+    reason_of,
+)
 from .session_plan import SessionPlan, session_entry
 
 logger = logging.getLogger(__name__)
@@ -251,17 +259,18 @@ class MissionControlOrchestrator:
         if not rebalanced:
             slot.rebalances = 0
             slot.tried_providers = []
+            slot.helper_id = ""
         slot.start(task)
         tree = self._decision_trees.get(agent_id)
         if tree and not rebalanced:
             tree.create_root(f"Task: {task[:80]}" if task else "Start")
-        self._log_event(
-            "agent_started",
-            {
-                "agent_id": agent_id,
-                "task": task,
-            },
+        # A helper's task is a prompt written for its model, not the person's.
+        started = (
+            {"agent_id": agent_id}
+            if slot.helper_of
+            else {"agent_id": agent_id, "task": task}
         )
+        self._log_event("agent_started", started)
         return True
 
     def pause_agent(self, agent_id: str) -> bool:
@@ -308,6 +317,7 @@ class MissionControlOrchestrator:
         tree = self._decision_trees.get(agent_id)
         if tree:
             tree.add_thinking(thinking)
+            self._check_steps(slot, tree)
 
     def update_agent_tool_call(
         self,
@@ -324,6 +334,19 @@ class MissionControlOrchestrator:
         tree = self._decision_trees.get(agent_id)
         if tree:
             tree.add_tool_call(tool_name, tool_input)
+            self._check_steps(slot, tree)
+
+    def _check_steps(self, slot: AgentSlot, tree: DecisionTree) -> None:
+        """Flag a running agent whose tree repeats the same steps."""
+        if slot.loop_detected or slot.status != AgentStatus.RUNNING:
+            return
+        if detect_step_loop(tree.steps(STEP_PERIOD_MAX * STEP_REPEATS)):
+            self._flag_loop(slot, "steps")
+
+    def _flag_loop(self, slot: AgentSlot, source: str) -> None:
+        # The producer reads it in its next update and stops the run.
+        slot.loop_detected = True
+        self._log_event("agent_loop_detected", {"agent_id": slot.id, "source": source})
 
     def update_agent_file(self, agent_id: str, file_path: str):
         """Track file changes by the agent."""
@@ -370,9 +393,7 @@ class MissionControlOrchestrator:
             return
         slot.append_output(text)
         if not slot.loop_detected and detect_loop(slot.output):
-            # The main process reads it in its next update and stops the run.
-            slot.loop_detected = True
-            self._log_event("agent_loop_detected", {"agent_id": agent_id})
+            self._flag_loop(slot, "answer")
 
     def rebalance_agent(
         self,
@@ -405,6 +426,13 @@ class MissionControlOrchestrator:
                 over_budget=self.over_budget(),
                 alternate_profile=alternate_profile,
             ).to_dict()
+        if decision["action"] == "none" and decision["skipped"] in (
+            "limit",
+            "no_alternative",
+        ):
+            decision = self._spawn_helper(slot, reason) or decision
+        if decision["action"] == "helper":
+            return decision
         if decision["action"] == "none":
             self._log_event(
                 "agent_rebalance_skipped",
@@ -441,6 +469,54 @@ class MissionControlOrchestrator:
             },
         )
         return decision
+
+    def _spawn_helper(self, slot: AgentSlot, reason: str) -> dict[str, str] | None:
+        """Start a helper beside ``slot`` when nothing else is left (``helper.py``).
+
+        One per agent and task, none for a helper, none over budget.
+        """
+        if slot.helper_of or slot.helper_id or self.over_budget():
+            return None
+        found = plan_helper(
+            provider=slot.provider,
+            model=slot.model,
+            reason=reason,
+            providers=self._plan.fallback_providers(self._slots.values()),
+            tried=set(slot.tried_providers),
+        )
+        if found is None:
+            return None
+        helper = self.create_agent(
+            slot.name,
+            HELPER_ROLE,
+            found.provider,
+            found.model,
+            found.model_label,
+            origin=slot.origin,
+        )
+        helper.helper_of = slot.id
+        helper.helper_of_name = slot.name
+        helper.current_task = helper_task(slot.current_task, slot.output, reason)
+        slot.helper_id = helper.id
+        self._rebalances += 1
+        before = slot.model_label or slot.model or slot.provider
+        after = found.model_label or found.model or found.provider
+        self._decision_trees[slot.id].add_result(
+            "Helper", f"{reason}: {after}", success=False
+        )
+        self._log_event(
+            "agent_rebalanced",
+            {
+                "agent_id": slot.id,
+                "reason": reason,
+                "action": "helper",
+                "from": before,
+                "to": after,
+                "provider": found.provider,
+                "helper_id": helper.id,
+            },
+        )
+        return {**found.to_dict(), "helper_id": helper.id}
 
     def update_agent_status(self, agent_id: str, status: str, error: str = ""):
         """Update agent status; an end of run stops its clock and closes its tree."""

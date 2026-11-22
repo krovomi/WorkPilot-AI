@@ -31,6 +31,7 @@ import {
 	administrationNavGroup,
 	githubNavItems,
 	gitlabNavItems,
+	bitbucketNavItems,
 	navGroups,
 } from "../sidebar/nav-model";
 import { ESSENTIAL_VIEWS } from "../sidebar/spaces";
@@ -516,6 +517,17 @@ describe("project checks", () => {
 		await userEvent.click(railButton("Git & Integrations"));
 		expect(within(panel()).getAllByRole("button", { name: /GitHub/ }).length).toBeGreaterThan(0);
 	});
+
+	it("shows the Bitbucket pages of a local project that turned Bitbucket on", async () => {
+		api.fn("getProjectEnv").mockResolvedValue({ success: true, data: { bitbucketEnabled: true } });
+		renderSidebar();
+		await waitFor(() => expect(api.fn("getProjectEnv")).toHaveBeenCalledWith("p1"));
+		await userEvent.click(railButton("Git & Integrations"));
+		await waitFor(() =>
+			expect(within(panel()).getByRole("button", { name: /Bitbucket PRs/ })).toBeInTheDocument(),
+		);
+		expect(within(panel()).getByRole("button", { name: /Bitbucket issues/ })).toBeInTheDocument();
+	});
 });
 
 describe("more of the menu", () => {
@@ -524,6 +536,7 @@ describe("more of the menu", () => {
 			...navGroups.flatMap((g) => g.items),
 			...githubNavItems,
 			...gitlabNavItems,
+			...bitbucketNavItems,
 			...administrationNavGroup.items,
 			...SIDEBAR_HUBS.flatMap((hub) => hub.tabs),
 		]

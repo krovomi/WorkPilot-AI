@@ -234,6 +234,9 @@ describe("REPLAY_EXPORT_VIDEO", () => {
 		expect(result).toMatchObject({ success: true, stepsPlayed: 3, stepsTotal: 5 });
 		expect(String(result.filePath)).toMatch(/demo\.webm$/);
 		expect(readFileSync(String(result.filePath)).equals(WEBM)).toBe(true);
+		const [counted, counting] = fetchMock.mock.calls[1];
+		expect(counted).toBe("http://127.0.0.1:9000/replay/usage/exports");
+		expect(JSON.parse(counting.body)).toEqual({ kind: "video" });
 	});
 
 	it("a missing browser is an answer, an unknown refusal is not", async () => {

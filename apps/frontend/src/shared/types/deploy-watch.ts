@@ -27,6 +27,8 @@ export interface DeployMetricCheck {
 	current: number | null;
 	changePct: number | null;
 	level: DeployWatchLevel;
+	/** Canary analysis: `baseline` is the stable fleet now, `current` the canary. */
+	canary: boolean;
 }
 
 export interface DeployRollbackPlan {
@@ -39,6 +41,8 @@ export interface DeployRollbackPlan {
 	/** https only. */
 	targetUrl: string;
 	currentSha: string;
+	/** When the target run was created (ISO 8601); "" when unknown. */
+	targetAt: string;
 }
 
 /** What became of the revert PR of the deployed commit (`revert_pr: true`). */
@@ -105,8 +109,97 @@ export interface DeployWatch {
 	migrations?: string[] | null;
 	rollback?: DeployRollbackState;
 	rollbackByPerson: boolean;
+	/** Rolled back with another project the person linked to this one: its name. */
+	linkedCause: string;
+	/** This run was not watched; it went back with a linked project. */
+	linkedOnly: boolean;
+	/** Where the critical samples that ended the window began (ISO 8601). */
+	degradedAt?: string;
+	/** When the rollback started (ISO 8601). */
+	rollbackAt?: string;
+	/** The settings name a feature flag the rollback turns off first. */
+	flagConfigured: boolean;
+	/** What the started rollback did: turn the flag off, or redeploy the last good run. */
+	strategy?: "flag" | "deployment";
+	/** The flag the rollback tried to turn off, and what came of it. */
+	flag?: DeployRollbackFlag;
+	/** The linked projects this run's rollback took back with it. */
+	linked?: DeployLinkedRollback[];
+	/** What the person said of a bad verdict, afterwards. */
+	review?: DeployVerdictReview;
 	revertPr?: DeployRevertPr;
 	incident?: DeployIncident;
 	/** The configured alert channels and what became of each. */
 	alerts?: Partial<Record<DeployAlertChannel, DeployAlertStatus>>;
+}
+
+export interface DeployRollbackFlag {
+	provider: string;
+	key: string;
+	/** done | failed | offline (strict offline mode, provider off the machine) */
+	status: "done" | "failed" | "offline";
+}
+
+/**
+ * What became of a linked project when the run it is linked to rolled back
+ * (#366, lot 4): `not_deployed_since` when it has not changed since the good
+ * run, `missing` when the project is no longer in the app, `error` when its
+ * runner did not answer.
+ */
+export type DeployLinkedStatus =
+	| "started"
+	| "failed"
+	| "blocked_migrations"
+	| "manual"
+	| "not_deployed_since"
+	| "missing"
+	| "error";
+
+export interface DeployLinkedRollback {
+	projectId: string;
+	name: string;
+	status: DeployLinkedStatus;
+	runId: string;
+	/** The last good run of that project, https only; "" when none. */
+	targetUrl: string;
+	migrations: string[];
+}
+
+export interface DeployProjectRef {
+	id: string;
+	name: string;
+}
+
+/** The projects rolled back with this one, and those that could be. */
+export interface DeployLinksView {
+	linked: DeployProjectRef[];
+	candidates: DeployProjectRef[];
+}
+
+/** A person's word on a bad verdict: it was a false alarm, or a real problem. */
+export type DeployVerdictReview = "false_positive" | "confirmed";
+
+/**
+ * The figures of a project's watches, computed on this machine from the
+ * watch states it keeps; nothing is sent anywhere.
+ */
+export interface DeployWatchFigures {
+	watches: number;
+	criticalVerdicts: number;
+	warningVerdicts: number;
+	/** Rollbacks started without a person: by the watch, or with a linked project. */
+	automaticRollbacks: number;
+	personRollbacks: number;
+	/** Critical verdicts whose rollback started and no one called a false alarm. */
+	incidentsAvoided: number;
+	/** Seconds from the degradation to the rollback, over the rollbacks that have both. */
+	meanSecondsToRollback: number | null;
+	medianSecondsToRollback: number | null;
+	timedRollbacks: number;
+	/** Of the rollbacks that started, those a person called a false alarm. */
+	falsePositiveRollbacks: number;
+	reviewedVerdicts: number;
+	falsePositives: number;
+	/** The last six months, oldest first: "YYYY-MM" and its rollbacks. */
+	months: { month: string; automatic: number; person: number; critical: number }[];
 }

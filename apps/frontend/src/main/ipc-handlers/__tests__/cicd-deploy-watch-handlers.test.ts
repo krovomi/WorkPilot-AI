@@ -310,6 +310,9 @@ describe("CI/CD deployment watch", () => {
 			"CICD_MONITOR_DATADOG_API_KEY=dd-api-0000",
 			"CICD_ALERT_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/test0000",
 			"CICD_ALERT_EMAIL_TO=oncall@example.com",
+			"CICD_ROLLBACK_FLAG_PROVIDER=unleash",
+			"CICD_ROLLBACK_FLAG_KEY=new-checkout",
+			"CICD_ROLLBACK_FLAG_TOKEN=unleash-0000",
 		]);
 		const config = (await invoke(IPC_CHANNELS.CICD_TRIGGERS_GET_CONFIG, projectDir)) as {
 			data: Record<string, unknown>;
@@ -322,16 +325,23 @@ describe("CI/CD deployment watch", () => {
 			alert_slack_webhook_url: "***",
 			alert_smtp_password: "",
 			alert_email_to: "oncall@example.com",
+			rollback_flag_provider: "unleash",
+			rollback_flag_key: "new-checkout",
+			rollback_flag_token: "***",
+			rollback_flag_user: "",
 		});
 		expect(JSON.stringify(config.data)).not.toContain("test0000");
+		expect(JSON.stringify(config.data)).not.toContain("unleash-0000");
 		const { toCicdEnvUpdate } = await import("../cicd-triggers-handlers");
 		expect(
 			toCicdEnvUpdate({
 				alert_slack_webhook_url: "***",
 				monitor_datadog_api_key: "***",
 				alert_smtp_port: "465",
+				rollback_flag_token: "***",
+				rollback_flag_environment: "production",
 			}),
-		).toEqual({ ok: true, update: { CICD_ALERT_SMTP_PORT: "465" } });
+		).toEqual({ ok: true, update: { CICD_ALERT_SMTP_PORT: "465", CICD_ROLLBACK_FLAG_ENVIRONMENT: "production" } });
 	});
 
 	describe("rollback", () => {

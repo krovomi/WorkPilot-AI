@@ -371,3 +371,25 @@ export interface DesignWriteOutcome {
 	/** The review card the files were committed to (never the project folder). */
 	review?: GeneratedReview | null;
 }
+
+/**
+ * The project's own figures of the render loop (main/design-loop-history.ts),
+ * read from `.workpilot/design-to-code/` on this computer: nothing is sent.
+ */
+export interface DesignLoopStats {
+	/** Loops that ran (a skipped loop measured nothing and is not counted). */
+	loops: number;
+	converged: number;
+	/** Mean of the score each loop kept, over every loop that ran. */
+	averageScore: number | null;
+	/** Mean number of corrections of the loops that converged. */
+	averageIterations: number | null;
+	/** Writes recorded, and what became of their files (an approximation). */
+	writes: number;
+	/** Every file still as written, in the project folder. */
+	kept: number;
+	/** Every file still as written, on the review card's branch not merged yet. */
+	pending: number;
+	/** A file changed or gone: retouched, or not merged. */
+	retouched: number;
+}

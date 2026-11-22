@@ -91,6 +91,16 @@ export interface FeedbackRecord {
 	severity: string;
 	title: string;
 	signature: string;
+	/** `YYYY-MM` of the line's `at`, or `null` when it has no valid one. */
+	month: string | null;
+}
+
+const MONTH = /^(\d{4})-(0[1-9]|1[0-2])-\d{2}T/;
+
+/** `YYYY-MM` of an ISO timestamp the store or the runner wrote, else `null`. */
+export function monthOf(at: unknown): string | null {
+	const match = typeof at === "string" ? MONTH.exec(at) : null;
+	return match ? `${match[1]}-${match[2]}` : null;
 }
 
 function isVerdict(value: unknown): value is ReviewFeedbackVerdict {
@@ -117,7 +127,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 export function validRecord(value: unknown): FeedbackRecord | null {
 	const record = asRecord(value);
 	if (!record || record.v !== SCHEMA_VERSION) return null;
-	const { pr, finding_id, verdict, reason, category, severity, title } = record;
+	const { pr, finding_id, verdict, reason, category, severity, title, at } = record;
 	if (
 		typeof pr !== "number" ||
 		!Number.isInteger(pr) ||
@@ -144,6 +154,7 @@ export function validRecord(value: unknown): FeedbackRecord | null {
 		severity,
 		title: kept,
 		signature: signature(category, kept),
+		month: monthOf(at),
 	};
 }
 

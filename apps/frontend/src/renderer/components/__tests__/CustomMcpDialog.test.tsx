@@ -266,3 +266,39 @@ describe("editing a server", () => {
 		expect(within(dialog).getByRole("heading", { name: "Add Custom Server" })).toBeTruthy();
 	});
 });
+
+describe("a confined command server (#369 lot 5)", () => {
+	const CONFINED: CustomMcpServer = {
+		id: "docs",
+		name: "Docs",
+		type: "command",
+		command: "npx",
+		args: ["-y", "docs-mcp"],
+		confine: { hosts: ["docs.example.com", "*.cdn.example.com"] },
+	};
+
+	it("keeps its hosts when edited, and drops confine once unticked", async () => {
+		const view = show(CONFINED);
+		expect((screen.getByLabelText("Hosts it may reach") as HTMLInputElement).value).toBe(
+			"docs.example.com *.cdn.example.com",
+		);
+		await userEvent.click(save("Save"));
+		expect(onSave.mock.calls[0][0].confine).toEqual(CONFINED.confine);
+
+		view.reopen({ ...CONFINED });
+		await userEvent.click(screen.getByRole("checkbox", { name: /Run confined/ }));
+		expect(screen.queryByLabelText("Hosts it may reach")).toBeNull();
+		await userEvent.click(save("Save"));
+		expect(onSave.mock.calls[1][0]).not.toHaveProperty("confine");
+	});
+
+	it("confines a new server to the hosts typed, commas or spaces", async () => {
+		show();
+		await typeName("Docs");
+		await userEvent.type(screen.getByLabelText("Arguments"), "-y docs-mcp");
+		await userEvent.click(screen.getByRole("checkbox", { name: /Run confined/ }));
+		await userEvent.type(screen.getByLabelText("Hosts it may reach"), "a.example.com, b.example.com");
+		await userEvent.click(save());
+		expect(onSave.mock.calls[0][0].confine).toEqual({ hosts: ["a.example.com", "b.example.com"] });
+	});
+});

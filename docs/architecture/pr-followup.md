@@ -20,7 +20,7 @@ apps/backend/pr_followup/
   policy.py    decide() : la prochaine étape, sans effet de bord
   guards.py    ce qu'un correctif n'a pas le droit de faire pour obtenir du vert
   forge.py     GitHub par `gh`, en liste d'arguments
-  state.py     <spec>/pr_followup.json : tours dépensés, dernier push, fils traités
+  state.py     <spec>/pr_followup.json : tours dépensés, dernier push, fils traités, first_ci
   loop.py      run_round() : un regard sur la PR, et le tour de correction
 apps/backend/runners/pr_followup_runner.py      boucle, une ligne JSON par regard
 apps/frontend/src/main/ipc-handlers/task/pr-followup-handlers.ts
@@ -93,6 +93,11 @@ tout push, et le suivi s'arrête pour une personne. Rien n'a quitté la machine.
    (`pr_followup.json`). La signature du build reste celle de la boucle QA.
 5. Sans commit, la tête est notée (`no_progress_heads`). Avec un commit, les
    gardes sont lues ; puis `WorktreeManager.push_branch(force=False)`.
+
+Avant le premier tour de correction, le premier regard où chaque check de la tête est fini écrit
+`first_ci` (`passed` ou `failed`, `policy.first_ci_verdict`) : ce que la CI disait de la PR telle
+qu'elle a été ouverte. « Où vous en êtes » en tire le taux de CI verte du premier coup
+([build-compare.md](build-compare.md)).
 
 ## Frontières
 

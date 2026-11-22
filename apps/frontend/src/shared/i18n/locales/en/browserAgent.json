@@ -141,6 +141,20 @@
 		"savedTo": "Saved to {{path}}",
 		"envVars": "Set these environment variables before running the test: {{names}}",
 		"skipped": "{{count}} step(s) have no selector this framework can express and were left as comments.",
+		"data": {
+			"file": "The values typed while recording are read from {{path}}, written beside the test: edit them there.",
+			"block": "The values typed while recording are in the TestData block at the top of the test: edit them there.",
+			"keys": "Typed values",
+			"kinds": {
+				"email": "email",
+				"date": "date",
+				"number": "number",
+				"phone": "phone",
+				"url": "address",
+				"name": "name",
+				"text": "text"
+			}
+		},
 		"window": "the page",
 		"dropOn": "onto {{target}}",
 		"dialog": {

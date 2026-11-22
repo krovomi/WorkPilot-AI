@@ -68,6 +68,30 @@ describe("AgentTools custom MCP servers", () => {
 		expect(await screen.findByText("Connected")).toBeInTheDocument();
 	});
 
+	it("says a confined server is not tested here (#369 lot 5)", async () => {
+		testMcpConnection.mockResolvedValue({
+			success: true,
+			data: { serverId: "docs", success: false, confined: true, message: "English from main" },
+		});
+		render(<AgentTools />);
+		await screen.findByText("Docs server");
+		await userEvent.click(screen.getAllByRole("button", { name: /Test/ })[0]);
+		expect(
+			await screen.findByText(
+				"Not tested: this server runs confined, and only an agent starts it, in the OS sandbox.",
+			),
+		).toBeInTheDocument();
+		expect(screen.queryByText("English from main")).toBeNull();
+	});
+
+	it("says a test that got no answer failed", async () => {
+		testMcpConnection.mockResolvedValue({ success: false, error: "ipc refused" });
+		render(<AgentTools />);
+		await screen.findByText("Docs server");
+		await userEvent.click(screen.getAllByRole("button", { name: /Test/ })[0]);
+		expect(await screen.findByText("Connection test failed")).toBeInTheDocument();
+	});
+
 	it("marks a server whose check fails as unknown", async () => {
 		vi.spyOn(console, "warn").mockImplementation(() => undefined);
 		checkMcpHealth.mockRejectedValue(new Error("ipc down"));

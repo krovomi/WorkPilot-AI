@@ -7,7 +7,8 @@ Provides endpoints for:
 - File heatmap data
 - Breakpoint management
 - A/B session comparison
-- Sharing (#347): export, import, bookmarks, a video, a model's summary
+- Sharing (#347): export, import, bookmarks, a video, a model's summary,
+  and how this machine shares its replays (counted here, sent nowhere)
 """
 
 import asyncio
@@ -23,6 +24,7 @@ from pydantic import BaseModel, Field
 from . import bookmarks as bookmark_store
 from . import mp4 as mp4_module
 from . import summary as summary_module
+from . import usage as usage_module
 from . import video as video_module
 from .bundle import (
     MAX_BUNDLE_BYTES,
@@ -112,6 +114,10 @@ class SummarizeRequest(BaseModel):
         min_length=1, max_length=40, pattern=r"^[a-z0-9][a-z0-9_.-]*$"
     )
     language: Literal["en", "fr"] = "en"
+
+
+class RecordExportRequest(BaseModel):
+    kind: Literal["wpreplay", "html", "video", "team_link"]
 
 
 class AddCheckpointRequest(BaseModel):
@@ -574,6 +580,22 @@ async def export_comparison_video(req: CompareVideoRequest):
         build_bundle(session_a, options), build_bundle(session_b, options), req.language
     )
     return await _video_answer(page, file_name(session_a, "-compare"), req.format)
+
+
+@router.get("/usage")
+async def get_usage():
+    """How this machine shares its replays, counted here and sent nowhere."""
+    storage = get_replay_recorder().storage_dir
+    report = await asyncio.to_thread(usage_module.usage_report, storage)
+    return {"success": True, **report}
+
+
+@router.post("/usage/exports")
+async def record_export(req: RecordExportRequest):
+    """Count one export the app produced: its kind and its time, nothing else."""
+    storage = get_replay_recorder().storage_dir
+    await asyncio.to_thread(usage_module.record_export, storage, req.kind)
+    return {"success": True}
 
 
 @router.post(

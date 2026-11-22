@@ -11,6 +11,7 @@ import ast
 import json
 
 import pytest
+from browser_agent.codegen import FORMATS, export_recording
 from browser_agent.codegen_text import (
     css_string,
     java_literal,
@@ -20,8 +21,9 @@ from browser_agent.codegen_text import (
     slug,
     xpath_string,
 )
+from browser_agent.recording import RecordedStep, Recording, Selector
 
-from tests.browser_agent.literal_decoders import java_decode, xpath_decode
+from tests.browser_agent.literal_decoders import cs_decode, java_decode, xpath_decode
 
 HOSTILE = (
     'a"b\'c\\d\ne\rf\tg ${process.env.HOME} `tick` \\u0022 \\" '
@@ -66,3 +68,28 @@ def test_css_strings_slugs_and_class_names() -> None:
     assert slug("Log in!", "-") == "log-in" and slug("é", "_") == "recorded_flow"
     assert pascal("log in") == "LogIn" and pascal("3 steps") == "Recorded3Steps"
     assert pascal("class") == "Class"
+
+
+def _typed(value: str) -> Recording:
+    return Recording(
+        steps=[RecordedStep("s1", "fill", [Selector("label", "Note")], value=value)]
+    )
+
+
+@pytest.mark.parametrize("fmt", FORMATS)
+def test_a_typed_value_reads_back_exactly_from_the_test_data(fmt: str) -> None:
+    """The data file is JSON literals; a block of constants, the language's own."""
+    test = export_recording(_typed(HOSTILE), fmt)
+    if fmt == "selenium-java":
+        line = next(x for x in test.code.splitlines() if "String NOTE = " in x)
+        assert java_decode(line.split(" = ", 1)[1].rstrip(";")) == HOSTILE
+        assert test.data_code is None
+        return
+    if fmt == "selenium-csharp":
+        line = next(x for x in test.code.splitlines() if "string Note = " in x)
+        assert cs_decode(line.split(" = ", 1)[1].rstrip(";")) == HOSTILE
+        assert test.data_code is None
+        return
+    assert "${process" not in test.code and "`tick`" not in test.code
+    assert test.data_code is not None and test.data_code.isascii()
+    assert json.loads(test.data_code) == {"note": HOSTILE}

@@ -10,6 +10,10 @@
  * costs the server nothing and is shown with its reason. A reason is
  * required: an acceptance nobody explains is not one.
  *
+ * `confineBelow` (lot 5): a command server scoring under it, or outside the
+ * catalog, is written with `confine` and runs in the OS sandbox with only the
+ * hosts it lists (`policyConfines`, `apps/backend/core/mcp_confinement.py`).
+ *
  * Every field is optional. The schema is closed: a key it does not know, a
  * wrong type or a value out of range makes the file invalid, and an invalid
  * file is the strictest policy (nothing can be installed), said so in the
@@ -38,6 +42,7 @@ const KEYS = new Set([
 	"minScore",
 	"blockCustomServers",
 	"acceptedFindings",
+	"confineBelow",
 ]);
 const FINDING_KEYS = new Set(["server", "rule", "reason"]);
 const MAX_ACCEPTED = 200;
@@ -81,6 +86,10 @@ function isAcceptedFinding(value: unknown): value is McpAcceptedFinding {
 	);
 }
 
+function isScore(value: unknown): value is number {
+	return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 100;
+}
+
 /** The policy `text` (the file's content) describes. */
 export function parseMcpPolicy(text: string): McpPolicyState {
 	let raw: unknown;
@@ -93,7 +102,8 @@ export function parseMcpPolicy(text: string): McpPolicyState {
 	const unknownKey = Object.keys(raw).find((key) => !KEYS.has(key));
 	if (unknownKey !== undefined) return invalidPolicy("schema", unknownKey);
 
-	const { version, allowedServers, minScore, blockCustomServers, acceptedFindings } = raw;
+	const { version, allowedServers, minScore, blockCustomServers, acceptedFindings, confineBelow } =
+		raw;
 	if (version !== undefined && version !== 1) return invalidPolicy("schema", "version");
 	if (
 		allowedServers !== undefined &&
@@ -105,11 +115,11 @@ export function parseMcpPolicy(text: string): McpPolicyState {
 	) {
 		return invalidPolicy("schema", "allowedServers");
 	}
-	if (
-		minScore !== undefined &&
-		!(typeof minScore === "number" && Number.isInteger(minScore) && minScore >= 0 && minScore <= 100)
-	) {
+	if (minScore !== undefined && !isScore(minScore)) {
 		return invalidPolicy("schema", "minScore");
+	}
+	if (confineBelow !== undefined && !isScore(confineBelow)) {
+		return invalidPolicy("schema", "confineBelow");
 	}
 	if (blockCustomServers !== undefined && typeof blockCustomServers !== "boolean") {
 		return invalidPolicy("schema", "blockCustomServers");
@@ -129,6 +139,7 @@ export function parseMcpPolicy(text: string): McpPolicyState {
 		policy: {
 			...(allowedServers ? { allowedServers: [...new Set(allowedServers as string[])] } : {}),
 			...(minScore !== undefined ? { minScore } : {}),
+			...(confineBelow !== undefined ? { confineBelow } : {}),
 			blockCustomServers: blockCustomServers === true,
 			...(acceptedFindings
 				? {
@@ -185,4 +196,18 @@ export function policyRefusal(
 		return { reason: "scoreTooLow", ...base, score: subject.score, minScore: policy.minScore };
 	}
 	return null;
+}
+
+/**
+ * Whether `state` has `subject` run confined: a command server outside the
+ * catalog (it has no score), or one whose score is under `confineBelow`.
+ * Only an active policy confines; an invalid one installs nothing anyway.
+ */
+export function policyConfines(
+	state: McpPolicyState,
+	subject: { entry: McpMarketplaceServer | null; score?: number },
+): boolean {
+	if (state.state !== "active" || state.policy.confineBelow === undefined) return false;
+	if (!subject.entry || subject.score === undefined) return true;
+	return subject.score < state.policy.confineBelow;
 }

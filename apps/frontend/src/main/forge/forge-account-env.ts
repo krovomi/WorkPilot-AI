@@ -15,6 +15,7 @@ export const FORGE_ACCOUNT_FIELDS = {
 	githubAccountId: "github",
 	gitlabAccountId: "gitlab",
 	azureDevOpsAccountId: "azure_devops",
+	bitbucketAccountId: "bitbucket",
 } as const satisfies Partial<Record<keyof ProjectEnvConfig, ForgeKind>>;
 
 type AccountField = keyof typeof FORGE_ACCOUNT_FIELDS;
