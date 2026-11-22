@@ -2850,5 +2850,72 @@
 		"invalidBody_one": "The guardrails policy has {{count}} error: no agent runs until it is fixed. Settings > Guardrails lists it.",
 		"invalidBody_other": "The guardrails policy has {{count}} errors: no agent runs until they are fixed. Settings > Guardrails lists them.",
 		"hint": "Resume it when the policy allows again; the decision is in the audit trail of Settings > Guardrails."
+	},
+	"suitePlacement": {
+		"modes": {
+			"auto": "Automatic",
+			"machine": "This machine",
+			"ci": "The forge's CI"
+		},
+		"modeHints": {
+			"auto": "WorkPilot measures this machine (CPU, RAM, GPU, VRAM, running tasks) against what the suite took the last times. Without room, the suite goes to the CI or the WorkPilot server, else waits its turn here.",
+			"machine": "The full suite always runs on the machine that runs WorkPilot.",
+			"ci": "The task's branch is pushed (without a pull request when there is none yet) and the forge's CI runs the full suite. The change's own tests still run here."
+		},
+		"project": {
+			"label": "Where long test suites run",
+			"manual": "Manual",
+			"autoHint": "Automatic: run here when the machine has room, otherwise on the forge's CI or the WorkPilot server, otherwise queued here. Turn off to choose yourself.",
+			"manualHint": "Manual: you choose where every task's full suite runs.",
+			"branchPush": "Push the task's branch without a pull request to run the CI",
+			"branchPushHint": "Lets the suite start on the CI as soon as QA ends, without waiting for you to create the pull request."
+		},
+		"form": {
+			"label": "Where this task's long suites run",
+			"project": "Project setting",
+			"projectHint": "Follows the project's choice.",
+			"options": {
+				"auto": "Automatic",
+				"machine": "Manual: this machine",
+				"ci": "Manual: the forge's CI"
+			}
+		},
+		"targets": {
+			"machine": "this machine",
+			"server": "the WorkPilot server",
+			"ci": "the CI",
+			"queue": "the queue"
+		},
+		"badge": {
+			"queued": "Suite queued",
+			"sent": "Suite on {{target}}",
+			"pending": "Suite running on the CI",
+			"passed": "CI suite green",
+			"failed": "CI suite red",
+			"not_started": "CI suite not started"
+		},
+		"reasons": {
+			"chosen": "Chosen for this task or project.",
+			"alone": "No other task running: the suite runs here.",
+			"room": "The machine has room for the suite.",
+			"pr": "The machine lacks {{short}}: the suite runs on the pull request's CI.",
+			"server": "The machine lacks {{short}}: the suite runs on the WorkPilot server.",
+			"branch_push": "The machine lacks {{short}}: the branch was pushed without a pull request to run the CI.",
+			"no_route": "The machine lacks {{short}} and nothing else can run it: the suite waits its turn here.",
+			"turn": "Its turn came: the suite runs here.",
+			"not_followed": "The CI is not followed for this project yet: the suite runs here."
+		},
+		"short": {
+			"cpu": "CPU",
+			"ram": "RAM",
+			"vram": "VRAM"
+		},
+		"notStarted": {
+			"push_failed": "The branch could not be pushed. The full suite did not run: run it before merging.",
+			"no_remote": "The project has no remote to push to. The full suite did not run: run it before merging.",
+			"no_pipeline": "No pipeline started on the pushed commit within 20 minutes. The next suites stay on this machine for 24 hours."
+		},
+		"mergeHeld": "The full suite is running on the CI for this commit. Merge becomes available once it is green.",
+		"mergeHeldLink": "Open the run"
 	}
 }

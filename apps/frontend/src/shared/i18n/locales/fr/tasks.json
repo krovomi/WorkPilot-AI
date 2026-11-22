@@ -2850,5 +2850,72 @@
 		"invalidBody_one": "La politique de garde-fous a {{count}} erreur : aucun agent ne tourne tant qu'elle n'est pas corrigée. Réglages > Garde-fous la détaille.",
 		"invalidBody_other": "La politique de garde-fous a {{count}} erreurs : aucun agent ne tourne tant qu'elles ne sont pas corrigées. Réglages > Garde-fous les détaille.",
 		"hint": "Reprenez-la quand la politique le permet de nouveau ; la décision figure dans le journal d'audit de Réglages > Garde-fous."
+	},
+	"suitePlacement": {
+		"modes": {
+			"auto": "Automatique",
+			"machine": "Cette machine",
+			"ci": "La CI de la forge"
+		},
+		"modeHints": {
+			"auto": "WorkPilot mesure cette machine (CPU, RAM, GPU, VRAM, tâches en cours) face à ce que la suite a pris les dernières fois. Sans la place, la suite part sur la CI ou le serveur WorkPilot, sinon attend son tour ici.",
+			"machine": "La suite complète tourne toujours sur la machine où tourne WorkPilot.",
+			"ci": "La branche de la tâche est poussée (sans pull request s'il n'y en a pas encore) et la CI de la forge lance la suite complète. Les tests du changement tournent toujours ici."
+		},
+		"project": {
+			"label": "Où tournent les longues suites de tests",
+			"manual": "Manuel",
+			"autoHint": "Automatique : ici si la machine a la place, sinon sur la CI de la forge ou le serveur WorkPilot, sinon en file d'attente ici. Désactiver pour choisir vous-même.",
+			"manualHint": "Manuel : vous choisissez où tourne la suite complète de chaque tâche.",
+			"branchPush": "Pousser la branche de la tâche sans pull request pour lancer la CI",
+			"branchPushHint": "La suite démarre sur la CI dès la fin de la QA, sans attendre que vous créiez la pull request."
+		},
+		"form": {
+			"label": "Où tournent les longues suites de cette tâche",
+			"project": "Réglage du projet",
+			"projectHint": "Suit le choix du projet.",
+			"options": {
+				"auto": "Automatique",
+				"machine": "Manuel : cette machine",
+				"ci": "Manuel : la CI de la forge"
+			}
+		},
+		"targets": {
+			"machine": "cette machine",
+			"server": "le serveur WorkPilot",
+			"ci": "la CI",
+			"queue": "la file d'attente"
+		},
+		"badge": {
+			"queued": "Suite en file d'attente",
+			"sent": "Suite sur {{target}}",
+			"pending": "Suite en cours sur la CI",
+			"passed": "Suite verte sur la CI",
+			"failed": "Suite rouge sur la CI",
+			"not_started": "Suite CI non lancée"
+		},
+		"reasons": {
+			"chosen": "Choisi pour cette tâche ou ce projet.",
+			"alone": "Aucune autre tâche en cours : la suite tourne ici.",
+			"room": "La machine a la place pour la suite.",
+			"pr": "Il manque {{short}} à la machine : la suite tourne sur la CI de la pull request.",
+			"server": "Il manque {{short}} à la machine : la suite tourne sur le serveur WorkPilot.",
+			"branch_push": "Il manque {{short}} à la machine : la branche a été poussée sans pull request pour lancer la CI.",
+			"no_route": "Il manque {{short}} à la machine et rien d'autre ne peut la lancer : la suite attend son tour ici.",
+			"turn": "Son tour est venu : la suite tourne ici.",
+			"not_followed": "La CI n'est pas encore suivie pour ce projet : la suite tourne ici."
+		},
+		"short": {
+			"cpu": "du CPU",
+			"ram": "de la RAM",
+			"vram": "de la VRAM"
+		},
+		"notStarted": {
+			"push_failed": "La branche n'a pas pu être poussée. La suite complète n'a pas tourné : lancez-la avant de fusionner.",
+			"no_remote": "Le projet n'a pas de dépôt distant où pousser. La suite complète n'a pas tourné : lancez-la avant de fusionner.",
+			"no_pipeline": "Aucun pipeline n'a démarré sur le commit poussé en 20 minutes. Les prochaines suites restent sur cette machine pendant 24 heures."
+		},
+		"mergeHeld": "La suite complète tourne sur la CI pour ce commit. La fusion sera possible dès qu'elle sera verte.",
+		"mergeHeldLink": "Ouvrir le run"
 	}
 }
