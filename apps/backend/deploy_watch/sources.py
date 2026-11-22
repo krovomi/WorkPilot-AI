@@ -26,9 +26,9 @@ from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
 from .cloudwatch import cloudwatch_value
-from .collectors import MAX_BODY_BYTES, Fetch, prometheus_value
-from .config import is_local_host, valid_url
+from .collectors import prometheus_value
 from .grafana import DATASOURCE_UID, grafana_value
+from .net import MAX_BODY_BYTES, Fetch, is_local_host, valid_url
 
 LOOKBACK = timedelta(minutes=5)
 SOURCES = ("prometheus", "datadog", "newrelic", "cloudwatch", "grafana")

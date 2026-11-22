@@ -32,11 +32,12 @@ from offline_policy import airgap_status
 
 from .alerts import SmtpFactory, send_alerts
 from .collectors import Fetch, default_fetch, health_check
-from .config import WatchSettings, is_local_host, load_settings
-from .evaluate import HealthResult, Level, compare, sample_level, verdict
+from .config import WatchSettings, load_settings
+from .evaluate import Level, compare, sample_level, verdict
 from .flags import RollbackFlag, flag_from_env, turn_off
 from .incident import Ask, explain, markdown, summarize
 from .migrations import changed_paths, migration_files
+from .net import HealthResult, is_local_host
 from .revert import OpenRevertPR, open_revert
 from .rollback import RollbackPlan, execute_rollback, plan_rollback
 

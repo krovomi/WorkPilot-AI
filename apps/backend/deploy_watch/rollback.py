@@ -31,8 +31,8 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from urllib.parse import quote, urlencode
 
-from .collectors import MAX_BODY_BYTES, Fetch, default_fetch
-from .config import valid_url
+from .collectors import default_fetch
+from .net import MAX_BODY_BYTES, Fetch, valid_url
 
 _REPO = re.compile(r"^(?!\.{1,2}/)[A-Za-z0-9_.-]+/(?!\.{1,2}$)[A-Za-z0-9_.-]+$")
 _NAME = re.compile(r"^[A-Za-z0-9_. -]{1,200}$")

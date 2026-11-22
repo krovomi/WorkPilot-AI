@@ -25,8 +25,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from urllib.parse import quote, urlsplit
 
-from .collectors import Fetch
-from .config import is_local_host, valid_url
+from .net import Fetch, is_local_host, valid_url
 
 PROVIDERS = ("unleash", "launchdarkly", "configcat")
 DEFAULT_URLS = {

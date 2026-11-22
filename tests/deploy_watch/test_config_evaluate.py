@@ -11,9 +11,7 @@ from deploy_watch.config import (
     Kind,
     MetricRule,
     Worse,
-    is_local_host,
     load_settings,
-    valid_url,
 )
 from deploy_watch.evaluate import (
     HealthResult,
@@ -23,6 +21,7 @@ from deploy_watch.evaluate import (
     sample_level,
     verdict,
 )
+from deploy_watch.net import is_local_host, valid_url
 
 
 def _write(project: Path, text: str) -> None:

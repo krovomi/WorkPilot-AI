@@ -19,7 +19,7 @@ import re
 import urllib.request
 from datetime import datetime, timedelta
 
-from .collectors import MAX_BODY_BYTES, Fetch, _token_allowed
+from .net import MAX_BODY_BYTES, Fetch, token_allowed
 
 LOOKBACK = timedelta(minutes=5)
 DATASOURCE_UID = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
@@ -44,7 +44,7 @@ def grafana_value(
         "Content-Type": "application/json",
         "User-Agent": "WorkPilot",
     }
-    if token and _token_allowed(base_url):
+    if token and token_allowed(base_url):
         headers["Authorization"] = f"Bearer {token}"
     body = {
         "queries": [

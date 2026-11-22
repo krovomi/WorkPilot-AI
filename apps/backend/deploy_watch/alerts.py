@@ -26,7 +26,7 @@ from collections.abc import Callable
 from email.message import EmailMessage
 
 from .collectors import Fetch, default_fetch
-from .config import is_local_host, valid_url
+from .net import is_local_host, valid_url
 
 PAGERDUTY_HOSTS = {
     "us": "https://events.pagerduty.com/v2/enqueue",

@@ -17,14 +17,14 @@ Two sources, kept apart on purpose:
 
 from __future__ import annotations
 
-import ipaddress
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
-from urllib.parse import urlsplit
 
 import yaml
+
+from .net import valid_url
 
 if TYPE_CHECKING:
     from .sources import MetricSource
@@ -108,33 +108,6 @@ class WatchSettings:
     def configured(self) -> bool:
         """Something to watch: a health check, or a metric source with metrics."""
         return bool(self.health_url or (self.source and self.metrics))
-
-
-def valid_url(value: str) -> bool:
-    """An http(s) URL with a host and no credentials in it."""
-    try:
-        parts = urlsplit(value)
-    except ValueError:
-        return False
-    return (
-        parts.scheme in ("http", "https")
-        and bool(parts.hostname)
-        and parts.username is None
-        and parts.password is None
-        and not any(ch.isspace() for ch in value)
-    )
-
-
-def is_local_host(url: str) -> bool:
-    """Loopback or a private address literal: reachable without leaving the site."""
-    host = (urlsplit(url).hostname or "").strip("[]")
-    if host == "localhost":
-        return True
-    try:
-        address = ipaddress.ip_address(host)
-    except ValueError:
-        return False
-    return address.is_loopback or address.is_private
 
 
 def _number(value: object, default: float) -> float:
