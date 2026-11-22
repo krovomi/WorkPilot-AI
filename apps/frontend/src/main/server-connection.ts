@@ -566,6 +566,8 @@ export interface QuotaSummary {
 	used_users: number;
 	used_projects: number;
 	used_concurrent_runs: number;
+	/** Every token the organization's runs and jobs used this month. */
+	used_tokens_this_month?: number;
 }
 
 export interface AuditEntry {

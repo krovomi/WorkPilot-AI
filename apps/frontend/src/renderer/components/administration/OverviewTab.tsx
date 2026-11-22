@@ -194,6 +194,11 @@ export function OverviewTab() {
 						used={overview.quota.used_concurrent_runs}
 						limit={overview.quota.max_concurrent_runs}
 					/>
+					<QuotaBar
+						label={t("quotas.monthlyTokenBudget")}
+						used={overview.quota.used_tokens_this_month ?? 0}
+						limit={overview.quota.monthly_token_budget}
+					/>
 					<div className="pt-2 border-t border-border">
 						<div className="flex justify-between text-xs">
 							<span className="text-muted-foreground">

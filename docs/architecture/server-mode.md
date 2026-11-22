@@ -131,6 +131,27 @@ Docker. Il faut Linux 5.13 ou plus avec Landlock actif (Docker 23 ou plus l'auto
 confinement, pour un déploiement où chacun peut lire tous les projets, et le serveur le journalise.
 Git joint la forge comme le serveur : avec ses identifiants, qui servent à tous les projets.
 
+## Ce qu'un run a consommé
+
+Chaque session d'agent d'un run ou d'un job compte ses tokens et son coût
+(`core/usage_tracker.record_session_usage`, tous providers). Sur un serveur, ce compte va aussi au
+serveur, par un tube : le run démarre avec l'extrémité d'écriture ouverte (`WORKPILOT_USAGE_FD`,
+`foundation/usage_channel.py`), écrit une ligne JSON par session, et le serveur lit l'autre extrémité
+(`services/usage_records.py`) pour ranger chaque ligne dans `usage_records`, avec la personne qui a
+lancé le run, son organisation, son projet et son run ou job.
+
+Un tube et pas un fichier : le run est confiné à son clone, et un fichier qu'il peut écrire, les
+commandes de son agent peuvent le réécrire. Le descripteur devient non héritable dès que le run
+charge `foundation.usage_channel` : ni le CLI du modèle ni les commandes qu'il lance ne le
+reçoivent. Le serveur traite chaque ligne comme une entrée (forme fermée, bornes sur chaque champ,
+2 000 lignes par processus au plus) et n'y garde que des totaux : ni prompt, ni réponse, ni chemin.
+Un compte supprimé garde ses lignes sans son nom (`user_id` vidé), pour que les totaux de
+l'organisation restent justes.
+
+Le budget mensuel de tokens des quotas (`quotas.tokens_used_this_month`) somme ces lignes depuis le
+1er du mois. Le passage d'un descripteur à un processus est POSIX : sur un poste Windows de
+développement, le canal est vide et rien n'est compté (le serveur tourne sous Linux).
+
 ## Le tableau partagé
 
 Les cartes d'un projet serveur sont les fichiers que l'app et les agents lisent déjà :

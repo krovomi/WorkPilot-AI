@@ -24,7 +24,7 @@ export function ProjectTestPlacementSettings({
 	const mode = settings.testPlacement ?? "auto";
 	const automatic = mode === "auto";
 	return (
-		<div className="space-y-3 pt-2">
+		<div className="space-y-3">
 			<div className="flex items-center justify-between">
 				<div className="space-y-0.5">
 					<Label htmlFor="test-placement-auto" className="font-normal text-foreground">

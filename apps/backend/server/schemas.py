@@ -257,6 +257,7 @@ class QuotaPublic(BaseModel):
     used_users: int = 0
     used_projects: int = 0
     used_concurrent_runs: int = 0
+    used_tokens_this_month: int = 0
 
     model_config = {"from_attributes": True}
 
