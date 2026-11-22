@@ -15,6 +15,7 @@ import { IPC_CHANNELS } from "../../shared/constants";
 import type { Project, Task } from "../../shared/types";
 import { isServerTask, prUrlOf, splitPartOf } from "../../shared/utils/task-split";
 import { appLog } from "../app-logger";
+import { ciPipelineService } from "../ci-pipeline-service";
 import { autoTriggerForTask } from "../ipc-handlers/cicd-triggers-handlers";
 import { offlineStrict } from "../ipc-handlers/task/split-merge-watch";
 import { writeMetadata } from "../ipc-handlers/task/stack-handlers";
@@ -110,6 +111,10 @@ export function startMergedWatch(getMainWindow: () => BrowserWindow | null): voi
 				specId: task.specId,
 			});
 			if (cicdRun) writeMetadata(task, project, { cicdRun });
+			// The base moved on the forge: the other green cards take it.
+			await ciPipelineService.refreshAfterMerge(project, task.id).catch((error: unknown) => {
+				appLog.warn(`[MERGED] ${task.specId}: green cards not refreshed: ${String(error)}`);
+			});
 		},
 		reload: (project) => {
 			projectStore.invalidateTasksCache(project.id);
