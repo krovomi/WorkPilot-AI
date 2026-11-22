@@ -136,7 +136,8 @@ def awareness_section(root: Path | None = None) -> str:
         from .memories import instructions
 
         items = sorted(
-            instructions(root), key=lambda i: (-len(i.agents), i.text.lower())
+            instructions(root, signed_only=True),
+            key=lambda i: (-len(i.agents), i.text.lower()),
         )
     except Exception:  # noqa: BLE001 - a malformed note never breaks a prompt
         items = []
