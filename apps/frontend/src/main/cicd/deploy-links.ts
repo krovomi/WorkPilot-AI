@@ -14,6 +14,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { readJsonFile } from "./deploy-watch";
 
 export const DEPLOY_LINKS_FILE = "deploy-links.json";
 /** Projects one project may take back with it, and in all from one rollback. */
@@ -46,14 +47,8 @@ export function parseDeployLinks(raw: unknown): DeployLinks {
 }
 
 export function readDeployLinks(dir: string): DeployLinks {
-	const file = path.join(dir, DEPLOY_LINKS_FILE);
-	try {
-		const stat = fs.lstatSync(file);
-		if (!stat.isFile() || stat.size > MAX_FILE_BYTES) return {};
-		return parseDeployLinks(JSON.parse(fs.readFileSync(file, "utf-8")));
-	} catch {
-		return {};
-	}
+	// Read through one descriptor: a link, a larger file or bad JSON is none.
+	return parseDeployLinks(readJsonFile(path.join(dir, DEPLOY_LINKS_FILE), MAX_FILE_BYTES));
 }
 
 export function writeDeployLinks(dir: string, links: DeployLinks): void {
