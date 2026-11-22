@@ -433,6 +433,7 @@ def _consider(
     detail: str,
     summary: dict[str, int],
     found_by: str | None = None,
+    unverified: frozenset[str] = frozenset(),
 ) -> None:
     pair = _pair_id(a_rel, b_rel)
     if pair in data["dismissed"] or any(i.get("id") == pair for i in data["open"]):
@@ -443,6 +444,10 @@ def _consider(
         return
     summary["checked"] += 1
     verdict = _decide(a, b, textual=textual)
+    if a_rel in unverified or b_rel in unverified:
+        # A note no trusted key signed neither wins nor loses by a rule (its
+        # pin or its date are its author's word): a person decides.
+        verdict = None
     earlier = None
     if verdict is None or verdict[1] != "same-statement":
         earlier = earlier_decision(root, base, a_rel, b_rel)
@@ -497,8 +502,17 @@ def review_pull(
 ) -> dict[str, int]:
     """Settle or queue what a pull brought into the project memories. Never raises."""
     summary = {"checked": 0, "auto": 0, "queued": 0}
+    from . import provenance
+
     embedder: embeddings.Embedder | None = None
     opened = False
+    checked: dict[str, frozenset[str]] = {}
+
+    def unverified(base: str) -> frozenset[str]:
+        if base not in checked:
+            checked[base] = provenance.unverified(root, base)
+        return checked[base]
+
     try:
         data = _load(root)
         textual: dict[tuple[str, str], None] = {}
@@ -529,6 +543,7 @@ def review_pull(
                     signal="textual",
                     detail="",
                     summary=summary,
+                    unverified=unverified(where[0]),
                 )
         for rel in received:
             where = _memory_of(rel)
@@ -553,6 +568,7 @@ def review_pull(
                     detail=found.detail,
                     summary=summary,
                     found_by=found.found_by,
+                    unverified=unverified(where[0]),
                 )
         _save(root, data)
     except (OSError, ValueError) as exc:

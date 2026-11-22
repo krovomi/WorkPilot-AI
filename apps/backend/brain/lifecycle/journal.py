@@ -109,6 +109,7 @@ REASONS = (
     "maintainers-changed",
     "scoped",
     "conflict-announced",
+    "signers-changed",
 )
 
 _VERBS = {

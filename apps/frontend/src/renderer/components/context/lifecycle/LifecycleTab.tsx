@@ -2,6 +2,7 @@ import {
 	AlertTriangle,
 	GitMerge,
 	History,
+	KeyRound,
 	Pin,
 	RefreshCw,
 	RotateCcw,
@@ -20,6 +21,7 @@ import { LifecycleMetrics } from "./LifecycleMetrics";
 import { MaintainersEditor } from "./MaintainersEditor";
 import { entryLabel, errorLabel, shortPath } from "./lifecycle-labels";
 import { MemoryTimeline } from "./MemoryTimeline";
+import { SignersEditor } from "./SignersEditor";
 import { useMemoryLifecycle } from "./useMemoryLifecycle";
 
 interface LifecycleTabProps {
@@ -60,6 +62,7 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 	const expiring = view?.trash.filter((item) => item.expiring_soon).length ?? 0;
 	const lastUndo = view?.journal.find((entry) => entry.id === view.lastUndo);
 	const decisions = view?.journal.filter((entry) => entry.action === "resolve") ?? [];
+	const unverified = new Set(view?.unverified ?? []);
 
 	return (
 		<ScrollArea className="h-full">
@@ -142,6 +145,24 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 				</section>
 				)}
 
+				{!onServer && view && (
+					<section className="space-y-3" data-testid="memory-signers-section">
+						<h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+							<KeyRound className="h-4 w-4" />
+							{t("context:lifecycle.signers.title")}
+						</h3>
+						<SignersEditor
+							projectId={projectId}
+							signers={view.signers}
+							rejected={view.signersRejected}
+							signing={view.signing}
+							canEdit={view.canEditSigners}
+							unverified={view.unverified.length}
+							onSaved={reload}
+						/>
+					</section>
+				)}
+
 				{decisions.length > 0 && (
 					<Card data-testid="memory-decisions">
 						<CardHeader className="pb-3">
@@ -211,6 +232,7 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 								showNote
 								revertible={view.revertible}
 								onRevert={revert}
+								unverified={unverified}
 							/>
 						)}
 					</CardContent>

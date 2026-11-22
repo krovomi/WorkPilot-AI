@@ -98,6 +98,9 @@ jobs:
           # Fails the sandbox tests instead of skipping them where the
           # runner is meant to have a sandbox.
           WORKPILOT_EXPECT_SANDBOX: ${{ runner.os != 'Windows' && '1' || '' }}
+          # The same for the signed brain notes' tests (ssh-keygen signs git
+          # commits there): ships with the Linux and macOS runners.
+          WORKPILOT_EXPECT_SSH_SIGNING: ${{ runner.os != 'Windows' && '1' || '' }}
           WORKPILOT_TEST_SHARD: ${{ matrix.shard }}
           # sys.monitoring (Python 3.12+) instead of a trace function: the
           # Linux run with coverage took 10 minutes, 6 without.
@@ -220,6 +223,7 @@ jobs:
       - name: Run all tests
         env:
           WORKPILOT_EXPECT_SANDBOX: '1'
+          WORKPILOT_EXPECT_SSH_SIGNING: '1'
         run: |
           source apps/backend/.venv/bin/activate
           log="$(mktemp)"

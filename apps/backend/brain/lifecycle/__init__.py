@@ -15,6 +15,8 @@
 | `metrics.py` | restores, pins, conflicts and their resolution time, from the journal |
 | `api.py` | ``/api/brain/memory/*`` (a server project's: ``shared_features/context_lifecycle.py``) |
 | `embeddings.py` | the same pair in other words, read by an embeddings model the local Ollama already has (optional) |
+| `signers.py` | the keys whose signed commits the memory trusts (``trusted-signers.md``) |
+| `provenance.py` | each note's last commit checked by git: verified, unverified (kept from agents) or own |
 
 Everything lives under ``knowledge/projects/<project>/memory/.lifecycle/`` —
 inside the vault, so it syncs; hidden, so no agent recalls it. The conflict

@@ -170,6 +170,11 @@ describe("valid calls reach /api/brain/memory/*", () => {
 				pinned: 3,
 				pinLimit: 50,
 				retentionDays: 30,
+				signers: [],
+				signersRejected: 0,
+				signing: false,
+				canEditSigners: true,
+				unverified: [],
 			},
 		});
 		state.backendFetch.mockResolvedValueOnce({ success: false, error: "pin-limit", code: "pin-limit" });
@@ -278,6 +283,11 @@ describe("pins, conflicts and the arbiter's opinion", () => {
 				pinned: 0,
 				pinLimit: 50,
 				retentionDays: 30,
+				signers: [],
+				signersRejected: 0,
+				signing: false,
+				canEditSigners: true,
+				unverified: [],
 			},
 		});
 	});

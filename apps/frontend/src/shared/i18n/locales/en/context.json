@@ -267,7 +267,8 @@
 			"escalated": "contradicted again soon after a decision",
 			"maintainers-changed": "the maintainers changed",
 			"scoped": "where it applies changed",
-			"conflict-announced": "announced on the project's channels"
+			"conflict-announced": "announced on the project's channels",
+			"signers-changed": "the trusted signers changed"
 		},
 		"errors": {
 			"failed": "the action failed",
@@ -319,6 +320,24 @@
 		},
 		"decisions": {
 			"title": "Decisions"
+		},
+		"signers": {
+			"title": "Trusted signers",
+			"none": "No trusted signer: every note reaches the agents, as before.",
+			"list": "Trusted: {{names}}",
+			"edit": "Edit the list",
+			"save": "Save",
+			"cancel": "Cancel",
+			"placeholder": "One per line: name ssh-ed25519 AAAA… or name GPG fingerprint",
+			"hint": "A note a teammate synced reaches the agents only when its last commit is signed by one of these keys (the SSH or GPG key their git already signs commits with).",
+			"maintainerOnly": "Only a maintainer changes this list.",
+			"unverified_one": "{{count}} memory is unverified: readable here, kept out of the agents' prompts.",
+			"unverified_other": "{{count}} memories are unverified: readable here, kept out of the agents' prompts.",
+			"rejected_one": "{{count}} change to this list was not signed by a listed key and is ignored.",
+			"rejected_other": "{{count}} changes to this list were not signed by a listed key and are ignored.",
+			"notSigning": "This machine does not sign its commits: once synced, the notes written here are unverified for the team. Turn on commit signing in git (commit.gpgsign).",
+			"badge": "Unverified",
+			"badgeHint": "Its last change is signed by no trusted key: kept out of the agents' prompts."
 		}
 	}
 }

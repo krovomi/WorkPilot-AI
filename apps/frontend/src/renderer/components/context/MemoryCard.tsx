@@ -257,6 +257,7 @@ export function MemoryCard({ memory, actions }: MemoryCardProps) {
 						memoryId={memory.path}
 						pinned={memory.pinned === true}
 						appliesTo={memory.applies_to}
+						unverified={memory.verified === false}
 						onChanged={actions.onChanged}
 					/>
 				)}
