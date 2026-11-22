@@ -30,7 +30,6 @@ import { useProjectStore } from "../../stores/project-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import {
 	createTask,
-	kickQueue,
 	loadDraft,
 	persistTaskStatus,
 	saveDraft,
@@ -48,9 +47,19 @@ const BASE_COLOR = Object.fromEntries(
 	CARD_TYPES.map((type) => [type.id, type.color]),
 ) as Record<CardType, string>;
 
-// Text typed and closed without creating, per project and column, kept for
-// the life of the window so reopening the composer gives it back.
-const unsentText = new Map<string, string>();
+// What was typed and picked, then closed without creating, per project and
+// column, kept for the life of the window so reopening the composer gives it
+// back (Escape, ✕ or a click elsewhere on the board).
+interface UnsentCard {
+	text: string;
+	type: CardType | null;
+	priority: TaskPriority | null;
+}
+const unsentCards = new Map<string, UnsentCard>();
+
+// Layers the composer opens (its type and priority menus) live in portals:
+// a press there is not a press outside.
+const OWN_LAYERS = "[data-radix-popper-content-wrapper], [role='menu']";
 
 interface QuickAddComposerProps {
 	status: QuickAddColumn;
@@ -84,21 +93,23 @@ export function QuickAddComposer({
 		useShallow((s) => ({ settings: s.settings })),
 	);
 	const draftKey = `${projectId ?? ""}:${status}`;
-	const [text, setText] = useState(() => unsentText.get(draftKey) ?? "");
+	const [unsent] = useState(() => unsentCards.get(draftKey));
+	const [text, setText] = useState(unsent?.text ?? "");
 	const [splitChoice, setSplitChoice] = useState<boolean | null>(null);
-	const [type, setType] = useState<CardType | null>(null);
-	const [priority, setPriority] = useState<TaskPriority | null>(null);
+	const [type, setType] = useState<CardType | null>(unsent?.type ?? null);
+	const [priority, setPriority] = useState<TaskPriority | null>(unsent?.priority ?? null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const rootRef = useRef<HTMLDivElement>(null);
 
 	const lineCount = quickAddLines(text).length;
 	const split = lineCount > 1 && (splitChoice ?? splitsByDefault(text));
 	const cardCount = split ? lineCount : text.trim() ? 1 : 0;
 
 	useEffect(() => {
-		unsentText.set(draftKey, text);
-	}, [draftKey, text]);
+		unsentCards.set(draftKey, { text, type, priority });
+	}, [draftKey, text, type, priority]);
 
 	useEffect(() => {
 		textareaRef.current?.focus();
@@ -107,6 +118,18 @@ export function QuickAddComposer({
 	const close = useCallback(() => {
 		if (!busy) onClose();
 	}, [busy, onClose]);
+
+	// A press anywhere else closes the box; what was typed waits in it.
+	useEffect(() => {
+		const onPointerDown = (e: PointerEvent) => {
+			const target = e.target as Element;
+			const root = rootRef.current as HTMLDivElement;
+			if (root.contains(target) || target.closest(OWN_LAYERS)) return;
+			close();
+		};
+		document.addEventListener("pointerdown", onPointerDown);
+		return () => document.removeEventListener("pointerdown", onPointerDown);
+	}, [close]);
 
 	const create = useCallback(async () => {
 		if (!projectId || busy) return;
@@ -127,16 +150,15 @@ export function QuickAddComposer({
 				});
 				if (!task) break;
 				created++;
+				// Queued, it waits for a free slot like a card dropped there.
 				if (status === "queue") await persistTaskStatus(task.id, "queue");
 			}
 		} finally {
 			setBusy(false);
 		}
-		if (status === "queue" && created > 0) kickQueue();
 		if (created === items.length) {
 			setText("");
 			setSplitChoice(null);
-			unsentText.delete(draftKey);
 			toast({
 				title: t("tasks:kanban.quickAdd.created", {
 					count: created,
@@ -159,7 +181,6 @@ export function QuickAddComposer({
 		type,
 		priority,
 		status,
-		draftKey,
 		toast,
 		t,
 	]);
@@ -185,11 +206,10 @@ export function QuickAddComposer({
 				savedAt: new Date(),
 			});
 			setText("");
-			unsentText.delete(draftKey);
 		}
 		onClose();
 		onOpenWizard();
-	}, [projectId, onOpenWizard, text, priority, draftKey, onClose]);
+	}, [projectId, onOpenWizard, text, priority, onClose]);
 
 	const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.nativeEvent.isComposing) return;
@@ -213,9 +233,22 @@ export function QuickAddComposer({
 
 	return (
 		<div
-			className="kanban-quick-add rounded-xl border border-primary/60 bg-card p-2 shadow-md"
+			ref={rootRef}
+			className="kanban-quick-add relative rounded-xl border border-primary/60 bg-card p-2 shadow-md"
 			data-quick-add={status}
 		>
+			{/* Close in the corner, away from the create button. */}
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon"
+				className="absolute top-1.5 right-1.5 h-6 w-6 text-muted-foreground hover:text-foreground"
+				onClick={close}
+				aria-label={t("tasks:kanban.quickAdd.close")}
+				title={t("tasks:kanban.quickAdd.close")}
+			>
+				<X className="h-3.5 w-3.5" />
+			</Button>
 			<textarea
 				ref={textareaRef}
 				value={text}
@@ -228,7 +261,7 @@ export function QuickAddComposer({
 				disabled={busy}
 				aria-label={t("tasks:kanban.quickAdd.ariaLabel")}
 				placeholder={t("tasks:kanban.quickAdd.placeholder")}
-				className="block max-h-48 min-h-[2.75rem] w-full resize-none overflow-y-auto [field-sizing:content] bg-transparent px-1 py-0.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+				className="block max-h-48 min-h-[2.75rem] w-full resize-none overflow-y-auto [field-sizing:content] bg-transparent py-0.5 pr-7 pl-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
 			/>
 			<div className="mt-1.5 flex flex-wrap items-center gap-1">
 				<DropdownMenu>
@@ -307,17 +340,6 @@ export function QuickAddComposer({
 					</button>
 				)}
 				<span className="flex-1" />
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon"
-					className="h-7 w-7"
-					onClick={close}
-					aria-label={t("tasks:kanban.quickAdd.close")}
-					title={t("tasks:kanban.quickAdd.close")}
-				>
-					<X className="h-3.5 w-3.5" />
-				</Button>
 				<Button
 					type="button"
 					size="sm"

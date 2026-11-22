@@ -15,7 +15,7 @@ import {
 } from "../../../__tests__/helpers/renderer-api";
 import type { Task, TaskStatus } from "../../../shared/types";
 import { useProjectStore } from "../../stores/project-store";
-import { loadDraft, useTaskStore } from "../../stores/task-store";
+import { loadDraft, onQueueKick, useTaskStore } from "../../stores/task-store";
 import { TooltipProvider } from "../ui/tooltip";
 import { DroppableColumn, type DroppableColumnProps } from "./KanbanColumn";
 
@@ -133,6 +133,28 @@ describe("quick add in a column", () => {
 		expect(box()).toHaveValue("Half a thought");
 	});
 
+	it("closes on a press elsewhere and gives back the text, type and priority", async () => {
+		const outside = document.createElement("button");
+		document.body.append(outside);
+		renderColumn();
+		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		await userEvent.type(box(), "Half a thought");
+		// The box's own menus live in portals: picking there keeps it open.
+		await userEvent.click(screen.getByRole("button", { name: "Type" }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Bug" }));
+		await userEvent.click(screen.getByRole("button", { name: "Priority" }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: "High" }));
+		fireEvent.pointerDown(box());
+		expect(box()).toBeInTheDocument();
+		fireEvent.pointerDown(outside);
+		expect(screen.queryByRole("textbox", { name: "Describe the new card" })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
+		expect(box()).toHaveValue("Half a thought");
+		expect(screen.getByRole("button", { name: "Type" })).toHaveTextContent("Bug");
+		expect(screen.getByRole("button", { name: "Priority" })).toHaveTextContent("High");
+		outside.remove();
+	});
+
 	it("creates one card per pasted line", async () => {
 		renderColumn();
 		await userEvent.click(screen.getByRole("button", { name: "Add a card" }));
@@ -202,7 +224,9 @@ describe("quick add in a column", () => {
 		expect(metadata.priority).toBeUndefined();
 	});
 
-	it("queues what it creates in File d'attente", async () => {
+	it("queues what it creates in File d'attente, without starting it", async () => {
+		const kick = vi.fn();
+		const unregister = onQueueKick(kick);
 		renderColumn({ status: "queue" });
 		const [headerPlus] = screen.getAllByRole("button", { name: "Add and queue" });
 		await userEvent.click(headerPlus);
@@ -214,6 +238,9 @@ describe("quick add in a column", () => {
 				undefined,
 			),
 		);
+		// It waits for a free slot like a card dropped there.
+		expect(kick).not.toHaveBeenCalled();
+		unregister();
 	});
 
 	it("keeps the text and says so when creating fails", async () => {

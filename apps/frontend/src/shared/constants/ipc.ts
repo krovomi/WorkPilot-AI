@@ -946,6 +946,10 @@ export const IPC_CHANNELS = {
 	REPLAY_LIST_TEAM_SHARES: "replay:listTeamShares",
 	REPLAY_REVOKE_TEAM_SHARE: "replay:revokeTeamShare",
 	REPLAY_OPEN_TEAM_SHARE: "replay:openTeamShare",
+	REPLAY_LIST_MY_TEAM_SHARES: "replay:listMyTeamShares",
+	// How replays are shared, counted on this machine or on the person's server
+	REPLAY_GET_USAGE: "replay:getUsage",
+	REPLAY_GET_TEAM_USAGE: "replay:getTeamUsage",
 	// Session History — the same records, as history cards
 	SESSION_HISTORY_LIST: "sessionHistory:list",
 
@@ -1161,6 +1165,15 @@ export const IPC_CHANNELS = {
 	BENCH_EVENT: "bench:event",
 	BENCH_START: "bench:start",
 	BENCH_STATUS: "bench:status",
+	BITBUCKET_CHECK_CONNECTION: "bitbucket:checkConnection",
+	BITBUCKET_GET_ISSUE_COMMENTS: "bitbucket:getIssueComments",
+	BITBUCKET_GET_ISSUES: "bitbucket:getIssues",
+	BITBUCKET_GET_PIPELINE_STEPS: "bitbucket:getPipelineSteps",
+	BITBUCKET_GET_PIPELINES: "bitbucket:getPipelines",
+	BITBUCKET_GET_PR_COMMENTS: "bitbucket:getPullRequestComments",
+	BITBUCKET_GET_PR_DIFF: "bitbucket:getPullRequestDiff",
+	BITBUCKET_GET_PULL_REQUESTS: "bitbucket:getPullRequests",
+	BITBUCKET_IMPORT_ISSUES: "bitbucket:importIssues",
 	BLAST_RADIUS_ANALYZE: "blastRadius:analyze",
 	BOARD_MCP_APPLY: "boardMcp:apply",
 	BOARD_MCP_STATUS: "boardMcp:status",

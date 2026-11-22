@@ -24,6 +24,7 @@ def detect_git_provider(project_dir: str | Path, remote_name: str | None = None)
         'github' if GitHub remote detected
         'gitlab' if GitLab remote detected (cloud or self-hosted)
         'azure_devops' if Azure DevOps remote detected
+        'bitbucket' if Bitbucket Cloud remote detected
         'unknown' if no remote or unsupported provider
 
     Examples:
@@ -80,7 +81,7 @@ def detect_git_provider(project_dir: str | Path, remote_name: str | None = None)
 
 
 def _classify_hostname(hostname: str) -> str:
-    """Classify a hostname as github, gitlab, azure_devops, or unknown.
+    """Classify a hostname as github, gitlab, azure_devops, bitbucket, or unknown.
 
     Args:
         hostname: The git remote hostname (e.g., 'github.com', 'dev.azure.com')
@@ -94,6 +95,10 @@ def _classify_hostname(hostname: str) -> str:
         hostname = hostname.rsplit("@", 1)[-1]
 
     hostname_lower = hostname.lower()
+
+    # Bitbucket Cloud: bitbucket.org or one of its subdomains (altssh.bitbucket.org)
+    if hostname_lower == "bitbucket.org" or hostname_lower.endswith(".bitbucket.org"):
+        return "bitbucket"
 
     # Check for Azure DevOps (cloud and self-hosted)
     # Match dev.azure.com, ssh.dev.azure.com, *.visualstudio.com
