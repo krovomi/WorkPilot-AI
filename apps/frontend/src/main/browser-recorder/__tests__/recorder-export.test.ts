@@ -222,6 +222,68 @@ describe("exportRecording", () => {
 	});
 });
 
+describe("the test's data file", () => {
+	const fixture = { path: "e2e/log-in.data.json", code: '{\n  "email": "ada@x.io"\n}\n' };
+	const withData = {
+		...generated,
+		fixture,
+		dataValues: [{ name: "email", kind: "email" }, { name: "Bad Key", kind: "email" }, { name: "x", kind: "secret" }, 7],
+	};
+	const printing = (over: Record<string, unknown> = {}) =>
+		runnerPrinting([`RECORDER_EXPORT:${JSON.stringify({ ...withData, ...over })}`]).spawnRunner;
+
+	it("previews the data file and the keys, never a key outside the closed lists", async () => {
+		expect(await exportRecording("/projects/app", request(), deps(printing()))).toEqual({
+			success: true,
+			code: generated.code,
+			envVars: ["E2E_PASSWORD"],
+			skipped: 1,
+			dataValues: [{ name: "email", kind: "email" }],
+			fixture,
+		});
+		for (const bad of [{ path: "e2e/x.sh", code: "" }, { path: "", code: "" }, { path: "a.json" }, "a.json"]) {
+			const outcome = await exportRecording("/projects/app", request(), deps(printing({ fixture: bad })));
+			expect(outcome.fixture).toBeUndefined();
+		}
+		const none = await exportRecording("/projects/app", request(), deps(printing({ fixture: null, dataValues: "x" })));
+		expect(none).not.toHaveProperty("dataValues");
+	});
+
+	it("writes it beside the test on the review card, inside the worktree only", async () => {
+		const d = deps(printing());
+		const outcome = await exportRecording("/projects/app", request({ destination: "review" }), d);
+		expect(d.writeFile).toHaveBeenCalledWith(path.resolve("/worktrees/007", "e2e/log-in.spec.ts"), generated.code);
+		expect(d.writeFile).toHaveBeenCalledWith(path.resolve("/worktrees/007", fixture.path), fixture.code);
+		const run = await d.openRun.mock.results[0].value;
+		expect(run.finish).toHaveBeenCalledWith(
+			expect.objectContaining({ summary: expect.stringContaining("e2e/log-in.spec.ts, e2e/log-in.data.json") }),
+		);
+		expect(outcome).toMatchObject({ success: true, path: "e2e/log-in.spec.ts", fixture });
+
+		const escaped = fakeRun();
+		const refused = deps(printing({ fixture: { path: "../../etc/x.json", code: "{}" } }), { openRun: async () => escaped });
+		await expect(exportRecording("/projects/app", request({ destination: "review" }), refused)).rejects.toThrow(
+			"The test's data file has no place in the project.",
+		);
+		expect(escaped.abandon).toHaveBeenCalled();
+		expect(refused.writeFile).not.toHaveBeenCalled();
+	});
+
+	it("saves it next to the chosen file, under its own name", async () => {
+		const d = deps(printing());
+		const outcome = await exportRecording("/projects/app", request({ destination: "file" }), d);
+		const beside = path.join(path.resolve("/out"), "log-in.data.json");
+		expect(d.writeFile).toHaveBeenCalledWith(beside, fixture.code);
+		expect(outcome).toMatchObject({ success: true, fixture: { path: beside, code: fixture.code } });
+
+		const clash = deps(printing(), { chooseFile: async () => "/out/log-in.data.json" });
+		expect(await exportRecording("/projects/app", request({ destination: "file" }), clash)).toMatchObject({
+			success: false,
+		});
+		expect(clash.writeFile).not.toHaveBeenCalled();
+	});
+});
+
 describe("generateTest", () => {
 	const steps = [{ id: "s1", kind: "navigate" as const, selectors: [], url: "http://a.test/" }];
 
@@ -241,7 +303,13 @@ describe("generateTest", () => {
 
 	it("reads defaults for missing lists and counts, and fails when the process does", async () => {
 		const bare = runnerPrinting(['RECORDER_EXPORT:{"code":"c","path":"p"}']).spawnRunner;
-		expect(await generateTest(bare, steps, request(), "/r")).toEqual({ code: "c", path: "p", envVars: [], skipped: 0 });
+		expect(await generateTest(bare, steps, request(), "/r")).toEqual({
+			code: "c",
+			path: "p",
+			envVars: [],
+			skipped: 0,
+			dataValues: [],
+		});
 		const failing = vi.fn(async () => {
 			const proc = child();
 			setImmediate(() => proc.emit("error", new Error("ENOENT")));

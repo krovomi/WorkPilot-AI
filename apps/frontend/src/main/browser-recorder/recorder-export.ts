@@ -13,10 +13,16 @@
  * - `file`: to the path the person picked in the native save dialog, which
  *   is refused inside a project of this computer, since that is the review
  *   card's job.
+ *
+ * The values typed while recording come with the test as its data file
+ * (`browser-recorder-data.ts`): on a review card, at the path the exporter
+ * gave, inside the worktree and ending in `.json`; in a chosen folder, next
+ * to the test under its own name.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { dialog } from "electron";
+import { readTestData, type TestDataValue, type TestFixture } from "../../shared/types/browser-recorder-data";
 import type {
 	RecordedStep,
 	RecorderExportOutcome,
@@ -41,6 +47,8 @@ export interface GeneratedTestFile {
 	readonly path: string;
 	readonly envVars: readonly string[];
 	readonly skipped: number;
+	readonly dataValues: readonly TestDataValue[];
+	readonly fixture?: TestFixture;
 }
 
 export interface ExportDeps {
@@ -140,6 +148,7 @@ export async function generateTest(
 					? parsed.envVars.filter((v): v is string => typeof v === "string")
 					: [],
 				skipped: typeof parsed.skipped === "number" ? parsed.skipped : 0,
+				...readTestData(parsed),
 			});
 		});
 		child.stdin?.end(JSON.stringify({ steps }));
@@ -170,10 +179,17 @@ export async function exportRecording(
 			if (!isPathWithinBase(target, run.root) || !target.endsWith(`.${EXTENSIONS[request.format]}`)) {
 				throw new Error("The generated test has no place in the project.");
 			}
+			// A data file ends in `.json` (`readTestData`), the test never does: they never collide.
+			const fixture = test.fixture && { file: path.resolve(run.root, test.fixture.path), code: test.fixture.code };
+			if (fixture && !isPathWithinBase(fixture.file, run.root)) {
+				throw new Error("The test's data file has no place in the project.");
+			}
 			deps.writeFile(target, test.code);
+			if (fixture) deps.writeFile(fixture.file, fixture.code);
+			const files = test.fixture ? `${test.path}, ${test.fixture.path}` : test.path;
 			const review = await run.finish({
 				message: `test(e2e): add recorded test ${name}`,
-				summary: `Browser Agent recording "${name}" as ${request.format} (${steps.length} steps): ${test.path}`,
+				summary: `Browser Agent recording "${name}" as ${request.format} (${steps.length} steps): ${files}`,
 			});
 			reviewed.set(projectPath, {
 				root: run.root,
@@ -182,7 +198,7 @@ export async function exportRecording(
 				specId: review.specId,
 				envVars: test.envVars,
 			});
-			return { success: true, code: test.code, path: test.path, envVars: test.envVars, skipped: test.skipped, review };
+			return { ...outcomeOf(test), path: test.path, review };
 		} catch (error) {
 			await run.abandon().catch(() => undefined);
 			throw error;
@@ -190,7 +206,7 @@ export async function exportRecording(
 	}
 
 	const test = await generateTest(deps.spawnRunner, steps, request, projectPath);
-	const outcome = { success: true, code: test.code, envVars: test.envVars, skipped: test.skipped };
+	const outcome = outcomeOf(test);
 	if (request.destination === "preview") return outcome;
 
 	const chosen = await deps.chooseFile(path.basename(test.path));
@@ -202,6 +218,27 @@ export async function exportRecording(
 			error: "A file inside a project is proposed on a review card instead: choose a folder outside the project.",
 		};
 	}
+	const fixture = test.fixture && {
+		path: path.join(path.dirname(file), path.basename(test.fixture.path)),
+		code: test.fixture.code,
+	};
+	if (fixture?.path === file) {
+		return { success: false, error: "The test and its data file would have the same name: choose another name." };
+	}
 	deps.writeFile(file, test.code);
-	return { ...outcome, path: file };
+	if (!fixture) return { ...outcome, path: file };
+	deps.writeFile(fixture.path, fixture.code);
+	return { ...outcome, path: file, fixture };
+}
+
+/** What the renderer is shown of a generated test (its data file, relative to the project). */
+function outcomeOf(test: GeneratedTestFile): RecorderExportOutcome {
+	return {
+		success: true,
+		code: test.code,
+		envVars: test.envVars,
+		skipped: test.skipped,
+		...(test.dataValues.length ? { dataValues: test.dataValues } : {}),
+		...(test.fixture ? { fixture: test.fixture } : {}),
+	};
 }

@@ -245,7 +245,9 @@ def test_playwright_names_the_place_and_waits_for_the_loader() -> None:
     assert (
         'page.getByRole("button", { name: "Add", exact: true }).nth(1).click();' in ts
     )
-    assert 'page.getByPlaceholder("Qty", { exact: true }).nth(2).fill("3");' in ts
+    assert (
+        'page.getByPlaceholder("Qty", { exact: true }).nth(2).fill(data["qty"]);' in ts
+    )
     assert 'page.getByText("Added", { exact: true }).nth(0)' in ts
     assert (
         'await expect(page.locator(".spinner").locator("visible=true"))'

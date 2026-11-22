@@ -13,6 +13,7 @@ JSON form for JavaScript.
 
 from __future__ import annotations
 
+from .codegen_data import TestData, file_name, pascal_name
 from .codegen_text import cs_literal, literal, pascal, ruby_literal
 from .codegen_webdriver import (
     DRAG_HTML5,
@@ -26,18 +27,13 @@ from .codegen_webdriver import (
     Locator,
     extras,
     frame_hops,
+    js_data,
+    typed_value,
     uses,
     walk,
     wdio_code,
 )
 from .recording import RecordedStep
-
-
-def _value(step: RecordedStep, quote, secret: str) -> str:
-    return (
-        secret.format(quote(step.secret_env)) if step.secret_env else quote(step.value)
-    )
-
 
 # --- Selenium, C# ------------------------------------------------------------------
 
@@ -62,7 +58,9 @@ def _cs_locate(step: RecordedStep, loc: Locator) -> str:
 
 
 def _cs_action(step: RecordedStep, el: str, target: str) -> str:
-    value = _value(step, cs_literal, "Secret({})")
+    value = typed_value(
+        step, cs_literal, "Secret({})", lambda key: f"TestData.{pascal_name(key)}"
+    )
     if step.kind == "click":
         return f"{el}.Click();"
     if step.kind == "hover":
@@ -233,8 +231,25 @@ _CS_SECRET = """
 """
 
 
+def _cs_data(data: TestData) -> list[str]:
+    """The block of constants a C# test reads its typed values from."""
+    if not data:
+        return []
+    return [
+        "",
+        "\t\t/// <summary>The values typed while recording: edit them here.</summary>",
+        "\t\tprivate static class TestData",
+        "\t\t{",
+        *(
+            f"\t\t\tpublic const string {pascal_name(v.key)} = {cs_literal(v.value)};"
+            for v in data.values
+        ),
+        "\t\t}",
+    ]
+
+
 def selenium_csharp(
-    name: str, steps: list[RecordedStep], env: list[str]
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData
 ) -> tuple[str, int]:
     body, skipped = walk(steps, CSHARP)
     needs = uses(steps)
@@ -258,6 +273,7 @@ def selenium_csharp(
         "\t{",
         *_CS_HELPERS.splitlines(),
         *extras(_CS_EXTRA, needs),
+        *_cs_data(data),
     ]
     if env:
         lines += _CS_SECRET.format(names=", ".join(env)).splitlines()
@@ -297,7 +313,12 @@ def _rb_locate(step: RecordedStep, loc: Locator) -> str:
 
 
 def _rb_action(step: RecordedStep, el: str, target: str) -> str:
-    value = _value(step, ruby_literal, "ENV.fetch({})")
+    value = typed_value(
+        step,
+        ruby_literal,
+        "ENV.fetch({})",
+        lambda key: f"test_data.fetch({ruby_literal(key)})",
+    )
     if step.kind == "click":
         return f"{el}.click"
     if step.kind == "hover":
@@ -436,14 +457,28 @@ _RB_EXTRA = {
 }
 
 
+def _rb_data(name: str, data: TestData) -> list[str]:
+    """The ``let`` a Ruby test reads its typed values from (one per example group)."""
+    if not data:
+        return []
+    return [
+        "",
+        f"  # The values typed while recording, from {file_name(name)} next to this file.",
+        "  let(:test_data) do",
+        f'    JSON.parse(File.read(File.join(__dir__, {ruby_literal(file_name(name))}), encoding: "utf-8"))',
+        "  end",
+    ]
+
+
 def selenium_ruby(
-    name: str, steps: list[RecordedStep], env: list[str]
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData
 ) -> tuple[str, int]:
     body, skipped = walk(steps, RUBY)
     needs = uses(steps)
     lines = [
         "# frozen_string_literal: true",
         "",
+        *(['require "json"'] if data else []),
         'require "selenium-webdriver"',
         "",
         *_RB_HELPERS.splitlines(),
@@ -457,6 +492,7 @@ def selenium_ruby(
         f"RSpec.describe {ruby_literal(name)} do",
         *_RB_METHODS.splitlines(),
         *extras(_RB_EXTRA, needs),
+        *_rb_data(name, data),
         "",
         f"  it {ruby_literal('replays the recorded steps')} do",
         *(f"    {line}" for line in body),
@@ -488,7 +524,7 @@ def _sjs_locate(step: RecordedStep, loc: Locator) -> str:
 
 
 def _sjs_action(step: RecordedStep, el: str, target: str) -> str:
-    value = _value(step, literal, "secret({})")
+    value = typed_value(step, literal, "secret({})", js_data)
     if step.kind == "click":
         return f"await {el}.click();"
     if step.kind == "hover":
@@ -637,7 +673,7 @@ function secret(name) {{
 
 
 def selenium_js(
-    name: str, steps: list[RecordedStep], env: list[str]
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData
 ) -> tuple[str, int]:
     body, skipped = walk(steps, SELENIUM_JS)
     needs = uses(steps)
@@ -649,12 +685,28 @@ def selenium_js(
         *(["until"] if "dialog" in needs else []),
     ]
     lines = [
+        *(
+            [
+                'const { readFileSync } = require("node:fs");',
+                'const { join } = require("node:path");',
+            ]
+            if data
+            else []
+        ),
         f'const {{ {", ".join(names)} }} = require("selenium-webdriver");',
         'const { Select } = require("selenium-webdriver/lib/select");',
         "",
         *_SJS_HELPERS.splitlines(),
         *extras(_SJS_EXTRA, needs),
     ]
+    if data:
+        lines += [
+            "",
+            f"// The values typed while recording, from {file_name(name)} next to this file.",
+            "const TEST_DATA = JSON.parse(",
+            f'\treadFileSync(join(__dirname, {literal(file_name(name))}), "utf-8"),',
+            ");",
+        ]
     if env:
         lines += _SJS_SECRET.format(names=", ".join(env)).splitlines()
     lines += [
@@ -679,6 +731,6 @@ def selenium_js(
 
 
 def webdriverio_ts(
-    name: str, steps: list[RecordedStep], env: list[str]
+    name: str, steps: list[RecordedStep], env: list[str], data: TestData
 ) -> tuple[str, int]:
-    return wdio_code(name, steps, env, ts=True)
+    return wdio_code(name, steps, env, data, ts=True)
