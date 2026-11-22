@@ -497,6 +497,12 @@
 				"escape": "Échap",
 				"delete": "Suppr"
 			}
+		},
+		"capacity": {
+			"slots": "créneaux",
+			"wip": "limite {{limit}}",
+			"slotsAria": "{{count}} créneaux parallèles occupés sur {{limit}}",
+			"wipAria": "{{count}} cartes, limite {{limit}}"
 		}
 	},
 	"queue": {

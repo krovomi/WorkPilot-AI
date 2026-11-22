@@ -130,16 +130,20 @@ export function contrastRatio(a: string, b: string): number {
 	return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
-/** `color`, moved toward `foreground` only as far as AA on `background` needs. */
-function readable(
+/**
+ * `color`, moved toward `foreground` only as far as `min` (AA by default) on
+ * `background` needs.
+ */
+export function readable(
 	color: string,
 	foreground: string,
 	background: string,
 	startShare: number,
+	min = AA_TEXT,
 ): string {
 	for (let share = startShare; share >= 0; share -= 0.04) {
 		const c = mixColors(color, foreground, share);
-		if (contrastRatio(c, background) >= AA_TEXT) return c;
+		if (contrastRatio(c, background) >= min) return c;
 	}
 	return foreground;
 }
