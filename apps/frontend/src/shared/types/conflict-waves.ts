@@ -227,10 +227,29 @@ export interface WaveRunRecord {
 	riskAvoided: number;
 }
 
+/**
+ * A task's merge conflict, as the merge flow saw it (#358, lot 4): when a
+ * merge or its preview reported it, and when the task's next merge
+ * succeeded (null while it has not). Measured, never estimated.
+ */
+export interface MergeConflictTime {
+	taskId: string;
+	detectedAt: string;
+	resolvedAt: string | null;
+}
+
+/** The project's merge conflicts, newest first; `ignored` when the file could not be read. */
+export interface MergeConflictTimes {
+	entries: MergeConflictTime[];
+	ignored: boolean;
+}
+
 /** The project's run history, newest first; `ignored` when the file could not be read. */
 export interface WaveRunHistory {
 	records: WaveRunRecord[];
 	ignored: boolean;
+	/** When the residual merge conflicts appeared and were resolved. */
+	conflicts?: MergeConflictTimes;
 }
 
 /** A run read back from the project: when it was saved, by the main process. */

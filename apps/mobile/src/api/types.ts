@@ -294,3 +294,65 @@ export interface GovernanceReport {
 	agents: { mine: number; project: number };
 	may: { approve: boolean; stop: boolean; stopProject: boolean; export: boolean };
 }
+
+/** A wave of `GET /api/features/execution-waves/plan`: cards that may run side by side, in merge order. */
+export interface ExecutionWave {
+	index: number;
+	taskIds: string[];
+	residualRisk: number;
+}
+
+/**
+ * `GET /api/features/execution-waves/plan` (`shared_features/execution_waves.py`):
+ * the waves of the project's backlog, computed by the server from its clone, the
+ * same way as the desktop. Only what the phone shows is typed.
+ */
+export interface ExecutionWavePlan {
+	maxParallel: number;
+	waves: ExecutionWave[];
+	tasks: { taskId: string; title: string; planned: boolean }[];
+	cycles: string[][];
+	excluded: { taskId: string; reason: "cycle" | "blocked_by_cycle" }[];
+	totalRisk: number;
+	residualRisk: number;
+	mergeChecks: { checked: number; conflicts: number };
+}
+
+/** Why the run did not start a card (a closed list the server keeps). */
+export type WaveStartFailure = "needs_approval" | "claimed" | "already_running" | "quota" | "refused" | "missing";
+
+/** The run of "Execute in optimal order", as the server keeps it in the clone. */
+export interface WaveRun {
+	waves: string[][];
+	current: number;
+	advanceWhen: "merged" | "review";
+	maxParallel: number;
+	started: string[];
+	failures: Record<string, WaveStartFailure>;
+	savedAt: string;
+}
+
+/** `GET`, `POST .../run`, `POST .../run/step`: the run, each of its cards' column, and what waits. */
+export interface WaveRunAnswer {
+	run: WaveRun | null;
+	cards?: { id: string; title: string; column: string | null; running: boolean }[];
+	blocked?: string[];
+	ended: "done" | "stopped" | null;
+	ignored: boolean;
+}
+
+/** `GET .../history`: the last 14 days of runs, counted, and of merge conflicts, timed; never estimated. */
+export interface WaveHistory {
+	ignored: boolean;
+	summary: {
+		days: number;
+		runs: number;
+		stopped: number;
+		conflictsAvoided: number;
+		riskAvoided: number;
+		started: number;
+		lastFinishedAt: string | null;
+	};
+	/** The merge conflicts of the same days: how many were resolved, their median time (measured), those still open. */
+	conflicts: { ignored: boolean; resolved: number; medianSeconds: number | null; open: number };
+}
