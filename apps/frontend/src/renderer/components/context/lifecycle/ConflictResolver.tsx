@@ -134,6 +134,11 @@ export function ConflictResolver({
 					<Badge variant="outline" className="text-xs">
 						{t(`context:lifecycle.conflicts.signal.${conflict.signal}`)}
 					</Badge>
+					{conflict.found_by === "embeddings" && (
+						<Badge variant="secondary" className="text-xs" data-testid="memory-conflict-found-by">
+							{t("context:lifecycle.conflicts.foundBy.embeddings")}
+						</Badge>
+					)}
 					{conflict.detail && (
 						<code className="text-xs text-muted-foreground">{conflict.detail}</code>
 					)}

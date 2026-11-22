@@ -20,7 +20,11 @@ import type { PolicyPauseDetail } from "./governance";
 import type { TaskGoalSummary } from "./goal";
 import type { MobileBootstrapMark, MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
-import type { TestPlacementMode } from "./suite-placement";
+import type {
+	CiSuiteRecord,
+	SuitePlacement,
+	TestPlacementMode,
+} from "./suite-placement";
 
 /** What the circuit breaker saw when it paused a task (`agents/tool_breaker.py`). */
 export interface BreakerPauseDetail {
@@ -303,6 +307,8 @@ export interface TaskDraft {
 	requireReviewBeforeCoding?: boolean;
 	tddMode?: boolean;
 	verifyLoop?: boolean;
+	/** Where the long suites run (absent = the project's choice). */
+	testPlacement?: TestPlacementMode;
 	/** The automatic split as set in the wizard (absent = project defaults). */
 	autoSplit?: { noSplit: boolean; maxLines: string };
 	/** Part of the title of the one window a Windows app is verified in. */
@@ -748,6 +754,10 @@ export interface Task {
 	goal?: TaskGoalSummary;
 	/** The second engine's verdict (`apps/backend/cross_review/`), from the plan. */
 	crossReview?: TaskCrossReviewSummary;
+	/** Where the backend decided the full suite runs (`test_placement.json`). */
+	suitePlacement?: SuitePlacement;
+	/** The full suite sent to the forge's CI from the pushed branch (`plan.ciSuite`). */
+	ciSuite?: CiSuiteRecord;
 	/** The QA reviewer's last sign-off and the QA session it came from. */
 	qaSignoff?: TaskQaSignoff;
 	subtasks: Subtask[];

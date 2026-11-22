@@ -245,11 +245,17 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # agent_runtime (a leaf) and security (clean_untrusted): the model's
     # opinion on a queued memory conflict, asked by a person
     # (brain/lifecycle/advisor.py); neither reaches back to brain.
+    # offline_policy (local_endpoint, loopback only) and ollama_model_detector
+    # (is_embedding_model), two leaves docintel already reads: a local
+    # embeddings model finds memory conflicts in other words
+    # (brain/lifecycle/embeddings.py).
     "brain": {
         "agent_runtime",
         "docintel",
         "foundation",
         "learning_loop",
+        "offline_policy",
+        "ollama_model_detector",
         "security",
         "skills_registry",
     },

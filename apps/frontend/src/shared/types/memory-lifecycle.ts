@@ -101,6 +101,8 @@ export interface MemoryConflict {
 	kind: string;
 	signal: MemoryConflictSignal;
 	detail: string;
+	/** How a pair of notes was found: shared words, or a local model's reading. */
+	found_by?: "lexical" | "embeddings";
 	textual: boolean;
 	detected_at: string;
 	a: MemoryConflictSide;
