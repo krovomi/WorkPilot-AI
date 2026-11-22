@@ -241,11 +241,33 @@ describe("selection and settings", () => {
 			calmMode: false,
 			narratives: true,
 			narrativesAi: false,
+			agentSkin: "provider",
+			hiddenDecor: [],
 		});
 
 		localStorage.setItem("pixel-office-settings", JSON.stringify({ state: null, version: 0 }));
 		await usePixelOfficeStore.persist.rehydrate();
 		expect(store().settings.zoom).toBe(3);
+	});
+
+	it("reads a saved skin and hidden decor back from closed lists", async () => {
+		const read = async (settings: object) => {
+			localStorage.setItem("pixel-office-settings", JSON.stringify({ state: { settings }, version: 0 }));
+			await usePixelOfficeStore.persist.rehydrate();
+			return store().settings;
+		};
+		expect(await read({ agentSkin: "neon", hiddenDecor: ["arcade", "plants", "arcade"] })).toMatchObject({
+			agentSkin: "neon",
+			hiddenDecor: ["plants", "arcade"],
+		});
+		expect(await read({ agentSkin: "golden", hiddenDecor: ["<img>", 3] })).toMatchObject({
+			agentSkin: "provider",
+			hiddenDecor: [],
+		});
+		expect(await read({ agentSkin: 1, hiddenDecor: "plants" })).toMatchObject({
+			agentSkin: "provider",
+			hiddenDecor: [],
+		});
 	});
 
 	it("turns the model's scenes on only for a saved true", async () => {

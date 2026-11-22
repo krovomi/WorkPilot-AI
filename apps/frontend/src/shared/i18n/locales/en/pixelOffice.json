@@ -217,5 +217,52 @@
 			"neon-sign": "a neon sign",
 			"arcade": "an arcade cabinet"
 		}
+	},
+	"team": {
+		"open": "Show the team leaderboard",
+		"title": "Team leaderboard",
+		"scopeLabel": "Which projects",
+		"scope": {
+			"project": "This project",
+			"org": "Organization"
+		},
+		"periodLabel": "Which period",
+		"period": {
+			"season": "This season",
+			"all": "Since the start"
+		},
+		"loading": "Reading the board from your team's server…",
+		"error": "The server could not give the leaderboard.",
+		"empty": "Nobody shows by name here yet.",
+		"rank": "#{{rank}}",
+		"you": "{{name}} (you)",
+		"points_one": "{{count}} pt",
+		"points_other": "{{count}} pts",
+		"mine": "Your work",
+		"mySummary": "{{points}} points: {{delivered}} delivered, {{reviews}} reviews of a teammate's task.",
+		"noBadges": "No badge yet: deliver a task or review a teammate's.",
+		"showMe": "Show my name to the team",
+		"shown": "Your name and score show on the leaderboards of your organization.",
+		"hidden": "Off: your work is counted for you alone, nobody else sees it.",
+		"howItCounts": "Computed by your team's server, never sent elsewhere. A delivered task counts 1 to 3 points by its assessed complexity; reviewing a teammate's task counts 2. No token or price is counted.",
+		"badges": {
+			"first_delivery": "First task delivered",
+			"ten_deliveries": "Ten tasks delivered",
+			"complex_delivery": "A complex task delivered",
+			"first_review": "First review of a teammate's task",
+			"ten_reviews": "Ten reviews of teammates' tasks"
+		}
+	},
+	"cosmetics": {
+		"open": "Choose how the office looks",
+		"skins": "Characters",
+		"skin": {
+			"provider": "Provider colours",
+			"classic": "Their own colours",
+			"neon": "Neon"
+		},
+		"neonLocked": "Neon is a reward: meet every season goal once to wear it.",
+		"neonEarned": "Neon earned: every season goal has been met.",
+		"decor": "Earned decor"
 	}
 }
