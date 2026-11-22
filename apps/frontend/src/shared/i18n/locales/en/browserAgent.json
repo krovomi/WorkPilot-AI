@@ -143,7 +143,6 @@
 		"skipped": "{{count}} step(s) have no selector this framework can express and were left as comments.",
 		"data": {
 			"file": "The values typed while recording are read from {{path}}, written beside the test: edit them there.",
-			"block": "The values typed while recording are in the TestData block at the top of the test: edit them there.",
 			"keys": "Typed values",
 			"kinds": {
 				"email": "email",
@@ -153,7 +152,8 @@
 				"url": "address",
 				"name": "name",
 				"text": "text"
-			}
+			},
+			"secrets": "The test reads the name of each secret's environment variable from {{path}}, written beside the test: never its value."
 		},
 		"window": "the page",
 		"dropOn": "onto {{target}}",

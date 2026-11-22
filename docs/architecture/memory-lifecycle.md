@@ -310,7 +310,13 @@ arrivent chez le coéquipier au prochain pull, et une paire réglée ailleurs so
   `query_graph` du serveur `workpilot-brain` (sa config reçoit la branche du build,
   `WORKPILOT_BRAIN_BRANCH` ; lancé par l'agent d'une personne, il lit celle du dossier où il
   tourne ; dans le processus, `tool_executor` passe le dossier du build), et `mem_search`
-  (`BrainSource`). Un run du serveur reçoit les groupes de la personne qui l'a lancé dans
+  (`BrainSource`). Les patterns du learning loop suivent la même règle : leur injecteur
+  (`get_patterns_for_phase`) et la source `PatternSource` de `mem_search` lisent
+  `PatternStorage.recall_patterns`, qui retire ceux que `ProjectMemory.unrecalled_pattern_ids`
+  nomme (non vérifiés, ou portés ailleurs pour l'audience du dossier du build) ; l'écriture du
+  magasin relit, elle, tous les patterns (`load_patterns`), puisqu'elle oublie ceux qu'elle ne voit
+  pas : un build sur `main` qui enregistre une application ne retire pas le pattern de `dev`.
+  Un run du serveur reçoit les groupes de la personne qui l'a lancé dans
   l'organisation du projet (`WORKPILOT_RECALL_TEAMS`, liste JSON posée par `run_manager`, `[]`
   sans groupe ; la valeur du serveur n'est jamais transmise), et sa présence seule dit « mode
   serveur ». Les surfaces d'une personne (onglet Mémoires et sa recherche, Cycle de vie,
@@ -433,8 +439,27 @@ clés sont celles que chacun a déjà pour signer ses commits git (SSH ou GPG) :
   verdict et toutes vont aux agents comme avant. Un cerveau qui n'a jamais rien reçu (aucune
   référence distante) n'exécute même pas git pour le savoir. Quand la liste existe mais que git ne
   répond pas, rien de reçu ne va aux agents (échec fermé).
-- **Ce qui n'est pas couvert.** Une note hors du dossier d'un projet (le reste du vault, les
-  instructions partagées) n'est couverte par aucune liste. Un commit local, ou une fusion, posé
+- **Le reste du vault a sa liste.** Une note hors du dossier de tout projet — connaissances du
+  vault, instructions partagées, instantanés des agents, skills, un fichier posé directement sous
+  `knowledge/projects/` — relève de la liste du vault, `knowledge/.lifecycle/trusted-signers.md`
+  (`signers.VAULT_LIST`), au même format et sous les mêmes règles : mêmes verdicts, même
+  protection d'elle-même (une modification reçue ne compte que signée par une clé déjà dessus,
+  un retrait aussi), même opt-in (pas de liste, rien ne change), même échec fermé
+  (`provenance.vault_verdicts`, `vault_unverified`). Une note d'un projet ne relève que de la
+  liste de son projet, une note du vault que de celle du vault. `unverified_among` choisit la
+  liste par le chemin, donc `Brain.recall`, `Brain.read`, `query_graph`, `get_node` et
+  `brain_read_note` la respectent sans rien de plus. Ce qui n'y passait pas en reçoit le filtre :
+  les instructions partagées que reçoivent les agents (`memories.instructions(signed_only=True)` :
+  le paragraphe du prompt `awareness_section`, l'outil `brain_instructions`, le condensé
+  `INSTRUCTIONS.md`, les ponts écrits dans les fichiers mémoire des agents) et les skills du
+  cerveau (`brain_skill` et les ressources `brain://skills/…`, ni listés ni servis). Une personne
+  voit toujours chaque instruction pour l'activer ou la retirer. Le vault n'a pas de mainteneurs :
+  la liste se modifie là où se règle le cerveau, Réglages → Cerveau (`GET`/`POST
+  /api/brain/signers`, refusé en mode serveur), et son historique est le `git log` du vault, pas
+  le journal d'un projet. Le chemin sur le disque n'est pas un dossier de note (il est caché) ;
+  le jugement d'une note du vault demande à git l'historique de tout le vault hors projets, une
+  fois par tête du dépôt et par processus, seulement quand la liste existe.
+- **Ce qui n'est pas couvert.** Un commit local, ou une fusion, posé
   sur une modification reçue s'en porte garant, comme un commit signé en git. Les projets du
   serveur n'ont pas de liste : leur cerveau n'est jamais synchronisé, et aucune commande git n'y
   est lancée depuis une route.
@@ -457,6 +482,9 @@ et macOS de la CI posent `WORKPILOT_EXPECT_SSH_SIGNING`, sous lequel un `ssh-key
   `…/conflicts/resolve`, `…/conflicts/suggest`, `…/signers` (`brain/lifecycle/api.py`, inclus
   dans le routeur du cerveau : refusé en mode serveur comme lui, le projet est un nom lu dans
   `project_dir`).
+- Cerveau : `GET`/`POST /api/brain/signers` (la liste du vault) et `GET
+  /api/brain/settings/embeddings` (le serveur et le modèle d'embeddings trouvés), dans le routeur
+  du cerveau (`brain/api.py`), refusés en mode serveur comme lui.
 - Serveur : `/api/features/context/memory/{lifecycle,history,forget,restore,pin,scope,revert}`
   (`shared_features/context_lifecycle.py`, ci-dessus).
 - Desktop : canaux `CONTEXT_MEMORY_*` (`main/ipc-handlers/context/memory-lifecycle-handlers.ts`,
@@ -467,8 +495,8 @@ et macOS de la CI posent `WORKPILOT_EXPECT_SSH_SIGNING`, sous lequel un `ssh-key
 ## Les mêmes paires, formulées autrement (`embeddings.py`), si un modèle est déjà là
 
 Le détecteur demande des mots en commun : « toujours lancer les migrations avant les tests » contre
-« ne jamais appliquer le schéma avant la suite de tests » n'en a aucun, et passait. Quand Ollama a
-**déjà** un modèle d'embeddings, `review_pull` lui demande les vecteurs des notes reçues et des
+« ne jamais appliquer le schéma avant la suite de tests » n'en a aucun, et passait. Quand un serveur
+local (Ollama, sinon LM Studio) a **déjà** un modèle d'embeddings, `review_pull` lui demande les vecteurs des notes reçues et des
 notes vivantes du même dossier que la passe lexicale a laissées passer ; une paire dont la
 similarité cosinus atteint `SIMILAR` (0,8) et dont un signal `negation` ou `recommendation` dit le
 désaccord (`contradictions.compare_meaning`, sans exiger de mots communs) entre dans le même
@@ -478,29 +506,42 @@ arbitrage que les autres : mêmes règles sûres, même file, même escalade. El
 valeurs d'un réglage se trouvent par son nom, et un sens voisin n'est pas le même réglage.
 
 - **Aucun téléchargement, aucune dépendance.** Ni sentence-transformers ni torch : le modèle est
-  un de ceux qu'Ollama a déjà tirés (`/api/tags`), demandé sur `/api/embed`. Celui des réglages
-  s'il y est (`x` vaut `x:latest`), sinon le premier modèle d'embeddings de la liste
-  (`ollama_model_detector.is_embedding_model`), les multilingues d'abord (`bge-m3`,
+  un de ceux qu'Ollama a déjà tirés (`/api/tags`, demandé sur `/api/embed`) ou que LM Studio liste
+  sur son serveur compatible OpenAI (`/v1/models`, demandé sur `/v1/embeddings`, réponse remise
+  dans l'ordre de ses `index`). Celui des réglages s'il y est (sur Ollama, `x` vaut `x:latest`),
+  sinon le premier modèle d'embeddings de la liste (`ollama_model_detector.is_embedding_model`, qui
+  lit aussi les noms de LM Studio, `text-embedding-…`), les multilingues d'abord (`bge-m3`,
   `multilingual-e5`, `nomic-embed-text`…) ; un modèle cloud n'est jamais pris. Un modèle nommé
-  qu'Ollama n'a pas coupe la passe : il n'est jamais tiré.
-- **La machine, jamais le réseau.** L'adresse est `offline_policy.local_endpoint("ollama")`, qui
-  refuse tout ce qui n'est pas une boucle locale ; ni proxy ni redirection, un délai sur chaque
-  appel (2 s pour la liste, 10 s par lot). Un modèle local est ce vers quoi la politique hors
+  qu'aucun serveur interrogé ne liste coupe la passe : il n'est jamais tiré ni chargé par son nom.
+- **Quel serveur** (`embeddings.find`) : celui que les réglages nomment
+  (`BRAIN_CONFLICT_EMBEDDINGS_PROVIDER`, `ollama` ou `lm-studio`), seul ; sinon Ollama, puis LM
+  Studio ; sinon la détection reste lexicale. Un serveur nommé qui ne répond pas n'est pas
+  remplacé par l'autre : la personne a choisi où vont ses notes. llama.cpp n'est pas interrogé (son
+  serveur ne sert d'embeddings que lancé avec `--embeddings`, ce qu'aucune liste ne dit).
+- **La machine, jamais le réseau.** L'adresse est `offline_policy.local_endpoint("ollama")` ou
+  `local_endpoint("lm-studio")` (`LMSTUDIO_BASE_URL`, un `/v1` final retiré), qui refuse tout ce qui
+  n'est pas une boucle locale ; ni proxy ni redirection, un délai sur chaque appel (2 s pour la
+  liste, 10 s par lot). Un modèle local est ce vers quoi la politique hors
   ligne stricte route : la passe tourne donc aussi sous elle.
 - **Rien ne casse.** Pas d'Ollama, pas de modèle d'embeddings, un serveur arrêté, lent ou qui
   répond mal : la passe s'arrête là, sans erreur, et la détection est lexicale comme avant.
   Une réponse est lue comme des nombres (taille, dimension et finitude vérifiées), rien d'autre.
 - **Borné.** Au plus `MAX_EMBEDDED` (200) notes envoyées par revue, la note reçue d'abord ; un
-  vecteur est gardé par modèle et empreinte de la déclaration dans
+  vecteur est gardé par serveur, modèle et empreinte de la déclaration (deux serveurs qui nomment
+  pareil deux modèles différents ne partagent rien) dans
   `.workpilot-brain/embeddings.json` (cette machine, ignoré par git, 2 000 vecteurs au plus, les
   plus récents), donc le pull suivant n'envoie que ce qui a changé. Le fichier est ouvert par
   `notes.inside` : un lien qui sortirait du cerveau n'est pas suivi.
 - **Une note est une donnée.** Ce qui part est sa déclaration, expurgée (`memories.redact`) et
   coupée à 2 000 caractères ; deux notes de portées disjointes (`scopes.py`) ne sont même pas
   envoyées.
-- **Réglages** : `BRAIN_CONFLICT_EMBEDDINGS` (`off` coupe) et `BRAIN_CONFLICT_EMBEDDINGS_MODEL`,
-  sinon `brain.json` (`conflictEmbeddings`, `conflictEmbeddingsModel`), que Réglages → Cerveau
-  écrit ; une variable posée rend son contrôle en lecture seule.
+- **Réglages** : `BRAIN_CONFLICT_EMBEDDINGS` (`off` coupe), `BRAIN_CONFLICT_EMBEDDINGS_PROVIDER`
+  et `BRAIN_CONFLICT_EMBEDDINGS_MODEL`, sinon `brain.json` (`conflictEmbeddings`,
+  `conflictEmbeddingsProvider`, `conflictEmbeddingsModel`), que Réglages → Cerveau écrit ; une
+  variable posée rend son contrôle en lecture seule. Le champ dit ce qu'une synchronisation
+  interrogerait maintenant (« Trouvé : `bge-m3:latest` dans Ollama », ou aucun modèle), lu par
+  `GET /api/brain/settings/embeddings`, une route à part : interroger les serveurs attend leur délai,
+  et la page des réglages ne l'attend pas. La question est reposée après chaque enregistrement.
 - **Le prix.** Le détecteur lexical rend le même verdict sur chaque machine ; cette passe dépend
   du modèle de la machine. Elle ne fait qu'*ajouter* des paires à trancher, jamais en retirer, et
   une paire réglée ailleurs arrive par le vault comme toute décision.
@@ -513,13 +554,8 @@ pas, et `brain` n'importe toujours ni `core` ni `services`.
 
 Rien pour #348. Pour #352, ce qui attend une décision du mainteneur du projet :
 
-- Embeddings sans Ollama (LM Studio, llama.cpp) et sur un projet du serveur : la passe ne lit
-  que l'Ollama local, et un projet du serveur n'a pas de file de conflits.
-- Signatures : une liste par projet couvre le dossier de ce projet ; les notes du reste du vault
-  (connaissances hors projet, instructions partagées) n'en ont pas encore.
+- Embeddings par llama.cpp et sur un projet du serveur : la passe lit Ollama et LM Studio, pas
+  llama.cpp (rien ne dit qu'il sert des embeddings), et un projet du serveur n'a pas de file de
+  conflits.
 - Les projets du serveur n'ont pas de file de conflits (leur cerveau n'est jamais
   synchronisé), donc pas d'annonce ni de mainteneurs par portée.
-- Les patterns du learning loop (leur injecteur et la source `PatternSource` de `mem_search`)
-  ne sont pas encore filtrés par portée : une personne peut porter un tel pattern, mais il est
-  servi à chaque build. Le filtre se pose sur `PatternStorage` sans toucher son écriture, qui
-  relit tous les patterns pour retirer ceux qui ont disparu.

@@ -20,7 +20,8 @@ space, no ``..``, none of ``~^:?*[\\``), which is how a typo like
 ``branch:main feature`` is caught before it silently scopes nothing.
 
 **What an agent recalls** (`recalled`, the one filter the recall paths share:
-`ProjectMemory.search`, the ``workpilot-brain`` tools, ``mem_search``):
+`ProjectMemory.search`, the ``workpilot-brain`` tools, ``mem_search``, and the
+learning loop's patterns through `PatternStorage.recall_patterns`):
 
 | Scope | Recalled for |
 |---|---|

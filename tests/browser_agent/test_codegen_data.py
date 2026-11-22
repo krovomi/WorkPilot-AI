@@ -1,8 +1,9 @@
 """The values typed while recording become the generated test's data (#387).
 
 Each one gets a key from its field and a kind by rules; the test reads it by
-that key, from a JSON file next to it, a Cypress fixture, or a block of
-constants (Java, C#). A secret never becomes data.
+that key, from a JSON file next to it (Java: in its package's test resources)
+or a Cypress fixture. A secret never becomes data: the file holds the name of
+its environment variable, never a value.
 """
 
 from __future__ import annotations
@@ -13,12 +14,12 @@ import json
 import pytest
 from browser_agent.codegen import FORMATS, export_recording
 from browser_agent.codegen_data import (
+    SecretRef,
     classify,
-    constant_name,
     data_path,
     extract,
     field_text,
-    pascal_name,
+    json_file,
 )
 from browser_agent.recording import RecordedStep, Recording, Selector
 
@@ -95,25 +96,63 @@ def test_keys_are_ascii_words_unique_and_shared_by_a_repeat() -> None:
         ("value_2nd_line", "text"),
         ("test_data_value", "text"),
         ("x_1a", "text"),
-        ("x1a_2", "text"),
+        ("x1a", "text"),
     ]
     assert data.keys["s6"] == "value" and data.keys["s7"] == "work_e_mail"
     assert data.values[0].to_dict() == {"name": "work_e_mail", "kind": "email"}
-    assert constant_name("birth_date") == "BIRTH_DATE"
-    assert pascal_name("birth_date") == "BirthDate"
 
 
-def test_a_secret_or_an_empty_value_is_never_data() -> None:
-    field = Selector("label", "Password")
+def test_an_empty_value_or_a_list_choice_is_never_data() -> None:
+    field = Selector("label", "Country")
     data = extract(
         [
-            _fill("s1", field, secret_env="E2E_PASSWORD"),
-            _fill("s2", Selector("label", "Name")),
-            RecordedStep("s3", "select", [field], value="fr"),
-            RecordedStep("s4", "click", [field]),
+            _fill("s1", Selector("label", "Name")),
+            RecordedStep("s2", "select", [field], value="fr"),
+            RecordedStep("s3", "click", [field]),
         ]
     )
     assert not data and data.keys == {}
+
+
+def test_a_secret_is_the_name_of_its_variable_never_a_value() -> None:
+    data = extract(
+        [
+            _fill("s1", Selector("label", "Password"), secret_env="E2E_PASSWORD"),
+            _fill("s2", Selector("label", "Password env"), "not a secret"),
+            _fill("s3", Selector("label", "Confirm"), secret_env="E2E_PASSWORD"),
+            RecordedStep(
+                "s4", "select", [Selector("css", "div > select")], secret_env="E2E_PLAN"
+            ),
+            _fill("s5", Selector("label", "2 factor"), secret_env="E2E_OTP"),
+            # A secret step never carries a value; if one did, it is not read.
+            _fill("s6", Selector("label", "Token"), "sk-live-0000", secret_env="E2E_T"),
+        ]
+    )
+    assert data.secrets == [
+        SecretRef("password_env", "E2E_PASSWORD"),
+        SecretRef("secret_env", "E2E_PLAN"),
+        SecretRef("secret_2_factor_env", "E2E_OTP"),
+        SecretRef("token_env", "E2E_T"),
+    ]
+    assert [(v.key, v.value) for v in data.values] == [
+        ("password_env_2", "not a secret")
+    ]
+    assert data.keys == {
+        "s1": "password_env",
+        "s2": "password_env_2",
+        "s3": "password_env",
+        "s4": "secret_env",
+        "s5": "secret_2_factor_env",
+        "s6": "token_env",
+    }
+    assert json.loads(json_file(data)) == {
+        "password_env_2": "not a secret",
+        "password_env": "E2E_PASSWORD",
+        "secret_env": "E2E_PLAN",
+        "secret_2_factor_env": "E2E_OTP",
+        "token_env": "E2E_T",
+    }
+    assert "sk-live" not in json_file(data)
 
 
 @pytest.mark.parametrize("fmt", FORMATS)
@@ -129,26 +168,26 @@ def test_every_format_reads_its_typed_values_and_keeps_secrets_in_the_env(
         ]
     )
     test = export_recording(recording, fmt, "Sign up")
-    assert "ada@x.io" not in test.code or fmt in ("selenium-java", "selenium-csharp")
+    assert "ada@x.io" not in test.code and "1990-01-02" not in test.code
     assert test.env_vars == ["E2E_PW"]
     out = test.to_dict()
     assert out["dataValues"] == [
         {"name": "email", "kind": "email"},
         {"name": "birth", "kind": "date"},
     ]
-    if fmt in ("selenium-java", "selenium-csharp"):
-        assert "fixture" not in out and "TestData." in test.code
-        return
     assert out["fixture"] == {"path": test.data_path, "code": test.data_code}
     assert json.loads(test.data_code or "") == {
         "email": "ada@x.io",
         "birth": "1990-01-02",
+        "pw_env": "E2E_PW",
     }
-    assert "E2E_PW" not in (test.data_code or "")
     folder = test.path.rsplit("/", 1)[0]
     if fmt == "cypress":
         assert test.data_path == "cypress/fixtures/recorded/sign-up.json"
         assert 'cy.fixture("recorded/sign-up.json")' in test.code
+    elif fmt == "selenium-java":
+        assert test.data_path == "src/test/resources/e2e/sign-up.data.json"
+        assert 'readTestData("sign-up.data.json")' in test.code
     else:
         assert test.data_path == f"{folder}/sign-up.data.json"
         assert '"sign-up.data.json"' in test.code
@@ -164,4 +203,60 @@ def test_without_typed_values_there_is_no_data() -> None:
         assert out["dataValues"] == [] and "fixture" not in out
         assert "TEST_DATA" not in test.code and "TestData" not in test.code
         assert "readFileSync" not in test.code and "cy.fixture" not in test.code
-    assert data_path("selenium-java", "x", "src/test/java/e2e/XTest.java") is None
+    # A Java test outside Maven's layout keeps its data next to it.
+    assert data_path("selenium-java", "x", "it/XTest.java") == "it/x.data.json"
+
+
+SENTINEL = "hunter2-sk-live-0000"  # pragma: allowlist secret
+
+
+@pytest.mark.parametrize("fmt", FORMATS)
+def test_no_secret_value_lands_in_any_generated_file(fmt: str) -> None:
+    """A secret step's value never reaches the code, the data file or the app."""
+    raw = {
+        "steps": [
+            {"id": "s1", "kind": "navigate", "url": "http://localhost:3000/login"},
+            {
+                "id": "s2",
+                "kind": "fill",
+                "selectors": [{"strategy": "label", "value": "Password"}],
+                "secretEnv": "E2E_PASSWORD",
+                "value": SENTINEL,
+            },
+        ]
+    }
+    loaded = Recording.from_dict(raw)
+    # And a step built in memory with both, as if a reader had kept the value.
+    built = Recording(
+        steps=[
+            *loaded.steps,
+            RecordedStep(
+                "s3",
+                "fill",
+                [Selector("css", "#token")],
+                value=SENTINEL,
+                secret_env="E2E_TOKEN",
+            ),
+            RecordedStep(
+                "s4",
+                "select",
+                [Selector("css", "#plan")],
+                value=SENTINEL,
+                secret_env="E2E_PLAN",
+            ),
+        ]
+    )
+    test = export_recording(built, fmt, "Log in")
+    assert SENTINEL not in test.code
+    assert SENTINEL not in (test.data_code or "")
+    assert SENTINEL not in json.dumps(test.to_dict())
+    assert json.loads(test.data_code or "") == {
+        "password_env": "E2E_PASSWORD",
+        "token_env": "E2E_TOKEN",
+        "plan_env": "E2E_PLAN",
+    }
+    assert test.env_vars == ["E2E_PASSWORD", "E2E_PLAN", "E2E_TOKEN"]
+    # Each secret is read through its key (Cypress has no label query for s2).
+    for key in ("token_env", "plan_env"):
+        assert key in test.code
+    assert '"E2E_PASSWORD"' not in test.code

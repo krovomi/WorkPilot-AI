@@ -1,6 +1,7 @@
 /**
- * A server project team's security reviews of catalogue MCP servers (#369,
- * lot 5). The server keeps them with the project
+ * An organization's security reviews of catalogue MCP servers (#369, lots 5
+ * and 6). The server keeps them with the organization, read from any of its
+ * projects and by no other organization
  * (`apps/backend/shared_features/mcp_reviews.py`); the main reads and writes
  * them for the marketplace (`main/mcp-reviews.ts`).
  */
@@ -22,8 +23,14 @@ export interface McpServerReview {
 	updatedAt: string | null;
 	/** The caller wrote it. */
 	mine: boolean;
-	/** The caller may delete it: its author, or the project owner. */
+	/** The caller may delete it: its author, or an organization administrator. */
 	canDelete: boolean;
+}
+
+export interface McpReviewList {
+	reviews: McpServerReview[];
+	/** The server grants the caller `marketplace.write` (maintainers, administrators). */
+	canWrite: boolean;
 }
 
 export interface McpReviewRequest {

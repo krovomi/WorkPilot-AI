@@ -591,7 +591,7 @@ def test_a_list_that_cannot_be_checked_gives_agents_no_received_note(team, monke
     def broken(*_args, **_kwargs):
         raise subprocess.TimeoutExpired("git", 60)
 
-    monkeypatch.setattr(provenance, "verdicts", broken)
+    monkeypatch.setattr(provenance, "_verdicts", broken)
     everything = provenance.unverified(bob.root, BASE)
     assert "knowledge/projects/shop/memory/gotchas/any.md" in everything
     assert provenance.unverified_among(bob.root, ["knowledge/elsewhere.md"]) == set()

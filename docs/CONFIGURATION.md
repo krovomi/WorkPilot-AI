@@ -373,15 +373,18 @@ desktop applications** platform to the registration with the redirect URI
 | `WORKPILOT_PUSH_ENABLED` | `false` | Send notifications to the mobile app (a run you started succeeded or failed) through Expo's push service (`exp.host`), which hands them to Apple and Google. They carry the project's name, the card's number, the phase and its result, never a card's text. Off: nothing leaves the server and phones get no push. |
 | `WORKPILOT_NEEDS_YOU_ENABLED` | `false` | Tell each person, on the ntfy, Telegram or Teams channel they set up in the app (Settings, My notifications from the server), that a run they started needs them: a plan to approve, work to review, a stop on an error. Only the project's name and the card's number are sent. The server then posts to hosts its users chose, https only and never to a private address. Storing a channel also needs `WORKPILOT_SECRETS_MASTER_KEY`. Off: nothing is sent. |
 | `WORKPILOT_INVITATION_TTL_HOURS` | 72 | How long an invitation link stays usable. |
+| `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | 60 | How long a forgotten-password link stays usable, kept between 5 and 1440 minutes. A new link cancels the previous one; the link works once and signs the account out everywhere. |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | 12 | Minimum length of a local password. It can only raise the floor: a value below 12 keeps 12. |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | Refuses a new local password found in Have I Been Pwned. Only the first five hex characters of its SHA-1 leave the server; when the service cannot be reached, the password is accepted. |
 | `WORKPILOT_ADMIN_PASSWORD` | — | Password of the first administrator, read by `python -m server.scripts.create_admin <email>` (run from `apps/backend`) instead of prompting. Remove it from the environment once the account exists. |
 
 ### Invitation email (SMTP)
 
-Invitation emails go out only when both `WORKPILOT_SMTP_HOST` and
+Invitation and forgotten-password emails go out only when both `WORKPILOT_SMTP_HOST` and
 `WORKPILOT_SMTP_FROM` are set. Otherwise, or when sending fails, the API returns
-the link for the administrator to pass on.
+the link for the administrator to pass on. Without SMTP, the sign-in screen's
+"Forgot password?" sends people to a platform administrator, who issues the link from
+Administration, Members.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
@@ -798,8 +801,9 @@ uses no network.
 | `UTILITY_THINKING_BUDGET` | off | Thinking budget, in tokens, of the same calls; empty or `0` turns it off. |
 | `INSIGHT_EXTRACTION_ENABLED` | `true` | After each coder session, an LLM pass extracts insights into the project memory. Only `true`, `1` or `yes` keep it on (`on` turns it off). It also needs a Claude token. |
 | `INSIGHT_EXTRACTOR_MODEL` | `DEFAULT_EXTRACTION_MODEL` ([analysis/insight_extractor.py](../apps/backend/analysis/insight_extractor.py)) | Model of that pass. It always runs on Claude: give a Claude model id. |
-| `BRAIN_CONFLICT_EMBEDDINGS` | on | After a brain sync, an embeddings model that the local Ollama already has also reads the received gotchas and patterns, to flag two notes that disagree in different words ([memory-lifecycle.md](architecture/memory-lifecycle.md)). `0`, `false`, `no` or `off` turns it off; unset, the switch in Settings > Brain decides (`brain.json`). Nothing is pulled and nothing leaves the machine: only `OLLAMA_BASE_URL` on a loopback address is asked, with a timeout, so strict offline mode allows it. Without Ollama or an embeddings model, only shared words count, as before. At most 200 notes are sent per sync; vectors are cached in `.workpilot-brain/embeddings.json` (ignored by git). |
-| `BRAIN_CONFLICT_EMBEDDINGS_MODEL` | first pulled | The Ollama model of that pass (`nomic-embed-text`, `bge-m3`…; `x` also matches `x:latest`). Unset, the model named in Settings > Brain, else the first embeddings model Ollama lists, multilingual ones first. A model Ollama does not have turns the pass off: it is never pulled. |
+| `BRAIN_CONFLICT_EMBEDDINGS` | on | After a brain sync, an embeddings model that a local server (Ollama, else LM Studio) already has also reads the received gotchas and patterns, to flag two notes that disagree in different words ([memory-lifecycle.md](architecture/memory-lifecycle.md)). `0`, `false`, `no` or `off` turns it off; unset, the switch in Settings > Brain decides (`brain.json`). Nothing is pulled and nothing leaves the machine: only `OLLAMA_BASE_URL` / `LMSTUDIO_BASE_URL` on a loopback address is asked, with a timeout, so strict offline mode allows it. Without a local server or an embeddings model, only shared words count, as before. At most 200 notes are sent per sync; vectors are cached in `.workpilot-brain/embeddings.json` (ignored by git). |
+| `BRAIN_CONFLICT_EMBEDDINGS_MODEL` | first listed | The local model of that pass (`nomic-embed-text`, `bge-m3`… in Ollama, where `x` also matches `x:latest`; `text-embedding-nomic-embed-text-v1.5`… in LM Studio). Unset, the model named in Settings > Brain, else the first embeddings model the server lists, multilingual ones first. A named model is looked for on each server asked; one no server lists turns the pass off: it is never pulled nor loaded by name. |
+| `BRAIN_CONFLICT_EMBEDDINGS_PROVIDER` | automatic | The local server of that pass: `ollama` or `lm-studio` (`lmstudio` too). Unset, the one chosen in Settings > Brain (`brain.json`, `conflictEmbeddingsProvider`), else Ollama, else LM Studio (its OpenAI-compatible `/v1/models` and `/v1/embeddings`). A server named here is the only one asked: when it is down or has no embeddings model, only shared words count. Another value counts as automatic. |
 
 ## Forges, notifications and MCP servers
 

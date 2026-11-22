@@ -13,7 +13,7 @@ JSON form for JavaScript.
 
 from __future__ import annotations
 
-from .codegen_data import TestData, file_name, pascal_name
+from .codegen_data import TestData, file_name
 from .codegen_text import cs_literal, literal, pascal, ruby_literal
 from .codegen_webdriver import (
     DRAG_HTML5,
@@ -59,7 +59,7 @@ def _cs_locate(step: RecordedStep, loc: Locator) -> str:
 
 def _cs_action(step: RecordedStep, el: str, target: str) -> str:
     value = typed_value(
-        step, cs_literal, "Secret({})", lambda key: f"TestData.{pascal_name(key)}"
+        step, cs_literal, "Secret({})", lambda key: f"TestData[{cs_literal(key)}]"
     )
     if step.kind == "click":
         return f"{el}.Click();"
@@ -231,19 +231,25 @@ _CS_SECRET = """
 """
 
 
-def _cs_data(data: TestData) -> list[str]:
-    """The block of constants a C# test reads its typed values from."""
+def _cs_data(name: str, data: TestData) -> list[str]:
+    """How a C# test reads its data: a JSON file next to its source, by key."""
     if not data:
         return []
     return [
         "",
-        "\t\t/// <summary>The values typed while recording: edit them here.</summary>",
-        "\t\tprivate static class TestData",
+        "\t\t/// <summary>The values typed while recording and the secrets' variables, from "
+        f"{file_name(name)} next to this file.</summary>",
+        "\t\tprivate static readonly Dictionary<string, string> TestData = "
+        f"ReadTestData({cs_literal(file_name(name))});",
+        "",
+        "\t\t/// <summary>The file next to this source file, else copied to the build output.</summary>",
+        "\t\tprivate static Dictionary<string, string> ReadTestData(string file, "
+        '[CallerFilePath] string source = "")',
         "\t\t{",
-        *(
-            f"\t\t\tpublic const string {pascal_name(v.key)} = {cs_literal(v.value)};"
-            for v in data.values
-        ),
+        '\t\t\tvar path = Path.Combine(Path.GetDirectoryName(source) ?? "", file);',
+        "\t\t\tif (!File.Exists(path)) path = Path.Combine(AppContext.BaseDirectory, file);",
+        "\t\t\treturn JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(path))",
+        '\t\t\t\t?? throw new InvalidOperationException(file + " holds no test data");',
         "\t\t}",
     ]
 
@@ -255,6 +261,16 @@ def selenium_csharp(
     needs = uses(steps)
     lines = [
         "using System;",
+        *(
+            [
+                "using System.Collections.Generic;",
+                "using System.IO;",
+                "using System.Runtime.CompilerServices;",
+                "using System.Text.Json;",
+            ]
+            if data
+            else []
+        ),
         "using NUnit.Framework;",
         "using OpenQA.Selenium;",
         "using OpenQA.Selenium.Chrome;",
@@ -273,7 +289,7 @@ def selenium_csharp(
         "\t{",
         *_CS_HELPERS.splitlines(),
         *extras(_CS_EXTRA, needs),
-        *_cs_data(data),
+        *_cs_data(name, data),
     ]
     if env:
         lines += _CS_SECRET.format(names=", ".join(env)).splitlines()

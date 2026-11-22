@@ -1266,9 +1266,9 @@
 		},
 		"reviews": {
 			"title": "Avis de l'équipe",
-			"hint": "Ce que votre équipe a constaté en utilisant ce serveur. Seuls les membres de ce projet serveur les lisent.",
+			"hint": "Ce que votre organisation a constaté en utilisant ce serveur, partagé par tous ses projets. Seuls les membres de cette organisation les lisent ; mainteneurs et administrateurs les écrivent.",
 			"loading": "Chargement des avis",
-			"none": "Personne dans l'équipe n'a encore donné son avis sur ce serveur.",
+			"none": "Personne dans l'organisation n'a encore donné son avis sur ce serveur.",
 			"by": "par {{author}}",
 			"unknownAuthor": "un ancien membre",
 			"delete": "Supprimer cet avis",
@@ -1284,9 +1284,22 @@
 				"unsafe": "Dangereux"
 			},
 			"errors": {
-				"too_many_reviews": "Ce projet contient déjà le nombre maximal d'avis.",
+				"too_many_reviews": "Cette organisation contient déjà le nombre maximal d'avis.",
 				"review_not_found": "Cet avis n'existe plus.",
 				"failed": "Le serveur a refusé ou est injoignable."
+			}
+		},
+		"sandbox": {
+			"refused": "Non lancé sur cette machine : ce serveur doit tourner confiné, dans le bac à sable de l'OS, et il n'y en a pas ici. Il n'est jamais lancé sans.",
+			"policyRefused": "Sur cette machine, les serveurs que cette politique confine ne se lancent pas : il n'y a pas de bac à sable de l'OS ici.",
+			"why": "Pourquoi ?",
+			"recheck": "Vérifier à nouveau",
+			"kinds": {
+				"off": "Le bac à sable de l'OS est désactivé (WORKPILOT_SANDBOX=off).",
+				"unsupported": "Ce système n'a pas encore de bac à sable de l'OS que WorkPilot sache utiliser (Windows, pour l'instant).",
+				"missing": "Le programme du bac à sable ({{backend}}) n'est pas installé sur cette machine.",
+				"refused": "Le programme du bac à sable ({{backend}}) est installé, mais le système a refusé de le lancer.",
+				"unknown": "WorkPilot n'a pas pu vérifier le bac à sable de l'OS de cette machine."
 			}
 		}
 	},
@@ -1585,7 +1598,25 @@
 		"localAccountButton": "Connexion",
 		"localModeButton": "Mode local",
 		"haveInvite": "J'ai une invitation",
+		"forgotPassword": "Mot de passe oublié ?",
 		"failed": "Connexion impossible"
+	},
+	"passwordReset": {
+		"title": "Réinitialiser votre mot de passe",
+		"askDescription": "Saisissez l'e-mail de votre compte : si le serveur le connaît, il vous envoie un lien pour choisir un nouveau mot de passe.",
+		"setDescription": "Collez le lien reçu, puis choisissez votre nouveau mot de passe. Vos autres sessions seront fermées.",
+		"noEmail": "Ce serveur ne peut pas envoyer d'e-mail. Demandez un lien de réinitialisation à un administrateur du serveur (Administration, Membres), puis choisissez « J'ai un lien ».",
+		"send": "Envoyer le lien",
+		"sent": "Si un compte utilise cette adresse, un lien est en route. Il sert une fois et expire bientôt.",
+		"haveLink": "J'ai un lien",
+		"needLink": "Il me faut un lien",
+		"link": "Lien ou code de réinitialisation",
+		"forAccount": "Pour le compte {{email}}",
+		"newPassword": "Nouveau mot de passe",
+		"save": "Enregistrer mon mot de passe",
+		"invalidLink": "Ce lien de réinitialisation est invalide ou a expiré",
+		"failed": "Le mot de passe n'a pas pu être réinitialisé",
+		"done": "Votre mot de passe a été changé. Connectez-vous avec le nouveau."
 	},
 	"acceptInvite": {
 		"title": "Créer votre compte",

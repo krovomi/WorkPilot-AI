@@ -7,13 +7,21 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import CurrentUser
 from server.auth.jwt_tokens import revoke_all_sessions
+from server.auth.password_reset import (
+    PasswordResetError,
+    build_reset_link,
+    issue_reset,
+    ttl,
+)
 from server.authz.delegation import end_delegations_of
 from server.authz.deps import require_org, require_permission, require_platform_admin
 from server.authz.principal import Principal
+from server.config import get_settings
 from server.db.engine import get_db
 from server.db.models import AuthSession, GlobalRole, OrgMember, User
-from server.schemas import SessionPublic, UserPublic
+from server.schemas import PasswordResetIssued, SessionPublic, UserPublic
 from server.services.audit import record
+from server.services.email import EmailError, send_password_reset_email
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -143,6 +151,52 @@ async def set_platform_role(
     )
     await db.commit()
     return UserPublic.model_validate(user)
+
+
+@router.post("/users/{user_id}/password-reset", response_model=PasswordResetIssued)
+async def issue_password_reset(
+    user_id: str,
+    request: Request,
+    actor: CurrentUser = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db),
+) -> PasswordResetIssued:
+    """A link for the account to set a new password, for someone who lost theirs.
+
+    Platform admin only: an account can belong to several organizations, and
+    the admin of one must not take it over in the others. The link goes by
+    email when the server has SMTP; otherwise, or when sending fails, it is
+    in this answer, once, for the admin to hand over.
+    """
+    user = await db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    await record(
+        db,
+        action="auth.password_reset.issued",
+        actor_id=actor.id,
+        payload={"user_id": user_id},
+        request=request,
+    )
+    try:
+        issued = await issue_reset(db, user, created_by=actor.id)
+    except PasswordResetError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    link = build_reset_link(issued.token)
+    email_sent = False
+    if get_settings().email_enabled:
+        try:
+            minutes = int(ttl().total_seconds() // 60)
+            await send_password_reset_email(user.email, link, minutes)
+            email_sent = True
+        except EmailError:
+            pass  # logged by the sender, without the link
+    return PasswordResetIssued(
+        email=user.email,
+        expires_at=issued.expires_at,
+        email_sent=email_sent,
+        reset_link=None if email_sent else link,
+    )
 
 
 @router.get("/sessions", response_model=list[SessionPublic])

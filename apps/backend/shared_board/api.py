@@ -41,6 +41,7 @@ from server.db.models import ProjectRole
 from server.services import push
 from server.services.events import emit_board_event
 from server.services.needs_you import set_approval_check
+from server.services.status_history import plan_status, record_status_change
 from shared_board import attachments as card_images
 from shared_board import listing, review, steering, unblock
 from shared_board import settings as card_settings
@@ -62,6 +63,8 @@ SNAPSHOT_FILES: dict[str, int] = {
     "requirements.json": 200_000,
     "pause_state.json": 50_000,
     "review_state.json": 50_000,
+    # Every status the card went through (server/services/status_history.py).
+    "status_history.json": 100_000,
     "spec.md": 300_000,
     "qa_report.md": 300_000,
 }
@@ -229,6 +232,15 @@ async def create_card(
         card_settings.apply_settings(scope.path.resolve(), directory, body.settings)
     if images:
         _attach(directory, card_images.store_images(directory / "attachments", images))
+    # The first entry of the card's history: where its lead time starts.
+    status, reason = plan_status(directory)
+    record_status_change(
+        directory,
+        status or "backlog",
+        actor="user",
+        reason=reason,
+        account_id=principal.id,
+    )
     row = await _index_row(db, scope, directory.name)
     if row is not None and row.created_by is None:
         row.created_by = principal.id

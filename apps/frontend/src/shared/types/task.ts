@@ -787,8 +787,34 @@ export interface Task {
 	location?: "main" | "worktree"; // Where task was loaded from (main project or worktree)
 	specsPath?: string; // Full path to specs directory for this task
 	prUrl?: string; // URL of the PR created automatically when task is completed
+	/**
+	 * Every status the task went through, oldest first
+	 * (`<spec>/status_history.json`, `main/task-status-history.ts`). Read by
+	 * the board's reports (cycle time, flow); bounded, never a person's name.
+	 */
+	statusHistory?: TaskStatusTransition[];
 	createdAt: Date;
 	updatedAt: Date;
+}
+
+/** Who moved a task: its agents, a person, or the app on its own (a watcher). */
+export type TaskStatusActor = "agent" | "user" | "system";
+
+/** One status change of a task, as `status_history.json` keeps it. */
+export interface TaskStatusTransition {
+	/** The status it left; null for its creation or a history begun mid-way. */
+	from: TaskStatus | null;
+	to: TaskStatus;
+	/** The review reason that came with `to`, when it has one. */
+	reason?: ReviewReason;
+	/** ISO 8601 date of the change. */
+	at: string;
+	actor: TaskStatusActor;
+	/**
+	 * Server mode only: the account that made the change, or that started the
+	 * run whose agent made it. An opaque id, never a name or an e-mail.
+	 */
+	accountId?: string;
 }
 
 /**
