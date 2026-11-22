@@ -450,6 +450,7 @@
 		"quickAdd": {
 			"addCard": "Add a task",
 			"addQueued": "Add and queue",
+			"addStarted": "Add and start",
 			"addTooltip": "Add a task (N)",
 			"ariaLabel": "Describe the new task",
 			"placeholder": "Describe the task… Paste a list to create one task per line.",
@@ -463,6 +464,9 @@
 			"queue": "Queue",
 			"createMany_one": "Create {{count}} task",
 			"createMany_other": "Create {{count}} tasks",
+			"start": "Start",
+			"startMany_one": "Start {{count}} task",
+			"startMany_other": "Start {{count}} tasks",
 			"moreOptions": "More options…",
 			"close": "Close (Esc)",
 			"hint": "Enter to create · Shift+Enter for a new line · Esc to close",
