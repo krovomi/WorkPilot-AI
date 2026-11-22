@@ -16,14 +16,9 @@ import {
 	Archive,
 	Ban,
 	Check,
-	CheckCircle2,
 	ChevronRight,
-	Eye,
 	Gauge,
-	GitPullRequest,
 	GripVertical,
-	Inbox,
-	Loader2,
 	Lock,
 	MoreHorizontal,
 	Plus,
@@ -36,6 +31,8 @@ import { useTranslation } from "react-i18next";
 import { TASK_STATUS_LABELS } from "../../../shared/constants";
 import type { Task, TaskStatus } from "../../../shared/types";
 import { isQuickAddColumn } from "../../lib/kanban-columns";
+import { columnCapacity } from "../../lib/kanban-column-meta";
+import { installColumnStylesheet } from "../../lib/kanban-column-tokens";
 import { cn } from "../../lib/utils";
 import { useQuickAddShortcut } from "../../hooks/useQuickAddShortcut";
 import {
@@ -62,6 +59,12 @@ import {
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { ScrollArea } from "../ui/scroll-area";
+import {
+	ColumnCount,
+	ColumnEmptyState,
+	ColumnGauge,
+	ColumnIcon,
+} from "./ColumnBand";
 import { QuickAddComposer } from "./QuickAddComposer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
@@ -212,67 +215,7 @@ export function droppableColumnPropsAreEqual(
 	return tasksAreEquivalent(prevProps.tasks, nextProps.tasks);
 }
 
-// Empty state content for each column
-export const getEmptyStateContent = (
-	status: TaskStatus,
-	t: (key: string) => string,
-): { icon: React.ReactNode; message: string; subtext?: string } => {
-	switch (status) {
-		case "backlog":
-			return {
-				icon: <Inbox className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyBacklog"),
-				subtext: t("kanban.emptyBacklogHint"),
-			};
-		case "queue":
-			return {
-				icon: <Loader2 className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyQueue"),
-				subtext: t("kanban.emptyQueueHint"),
-			};
-		case "in_progress":
-			return {
-				icon: <Loader2 className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyInProgress"),
-				subtext: t("kanban.emptyInProgressHint"),
-			};
-		case "ai_review":
-			return {
-				icon: <Eye className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyAiReview"),
-				subtext: t("kanban.emptyAiReviewHint"),
-			};
-		case "human_review":
-			return {
-				icon: <Eye className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyHumanReview"),
-				subtext: t("kanban.emptyHumanReviewHint"),
-			};
-		case "build_failed":
-			return {
-				icon: <CheckCircle2 className="h-6 w-6 text-success/50" />,
-				message: t("kanban.emptyBuildFailed"),
-				subtext: t("kanban.emptyBuildFailedHint"),
-			};
-		case "pr_created":
-			return {
-				icon: <GitPullRequest className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyPrOpen"),
-				subtext: t("kanban.emptyPrOpenHint"),
-			};
-		case "done":
-			return {
-				icon: <CheckCircle2 className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyDone"),
-				subtext: t("kanban.emptyDoneHint"),
-			};
-		default:
-			return {
-				icon: <Inbox className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyDefault"),
-			};
-	}
-};
+export { getEmptyStateContent } from "./ColumnBand";
 
 export interface WipLimitPopoverProps {
 	wipLimit?: number;
@@ -706,7 +649,16 @@ export const DroppableColumn = memo(function DroppableColumn({
 		}
 	};
 
-	const emptyState = getEmptyStateContent(status, t);
+	useEffect(() => {
+		installColumnStylesheet();
+	}, []);
+	// « En cours » counts its parallel-task slots, any other column its
+	// optional WIP limit (kanban-columns.md).
+	const capacity =
+		status === "in_progress" && maxParallelTasks
+			? columnCapacity(tasks.length, maxParallelTasks, "slots")
+			: columnCapacity(tasks.length, wipLimit, "wip");
+	const isBusy = status === "in_progress" && tasks.length > 0;
 
 	// Collapsed state: show narrow vertical strip with rotated title and task count
 	if (isCollapsed) {
@@ -751,57 +703,29 @@ export const DroppableColumn = memo(function DroppableColumn({
 					</Tooltip>
 				</div>
 
-				{/* Rotated title and task count */}
-				<div className="flex-1 flex flex-col items-center justify-center">
-					<div
-						className="flex items-center gap-2 whitespace-nowrap"
+				{/* Icon, count and rotated title, in the column's accent */}
+				<div className="kanban-col-collapsed flex flex-1 flex-col items-center gap-2 pt-2">
+					<ColumnIcon status={status} busy={isBusy} />
+					<ColumnCount count={tasks.length} capacity={capacity} />
+					<h2
+						className="whitespace-nowrap font-semibold text-sm text-foreground"
 						style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
 					>
-						<span className="column-count-badge">{tasks.length}</span>
-						<h2 className="font-semibold text-sm text-foreground">
-							{t(TASK_STATUS_LABELS[status])}
-						</h2>
-					</div>
+						{t(TASK_STATUS_LABELS[status])}
+					</h2>
 				</div>
 
 				{/* Task list */}
 				<div className="flex-1 min-h-0">
-					<ScrollArea className="h-full px-3 pb-3 pt-2">
+					<ScrollArea className="kanban-col-collapsed-list h-full px-1 pb-3 pt-2">
 						<SortableContext
 							items={taskIds}
 							strategy={verticalListSortingStrategy}
 						>
 							<div className="space-y-3 min-h-0">
 								{tasks.length === 0 ? (
-									<div
-										className={cn(
-											"empty-column-dropzone flex flex-col items-center justify-center py-6",
-											isOver && "active",
-										)}
-									>
-										{isOver ? (
-											<>
-												<div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center mb-2">
-													<Plus className="h-4 w-4 text-primary" />
-												</div>
-												<span className="text-sm font-medium text-primary">
-													{t("kanban.dropHere")}
-												</span>
-											</>
-										) : (
-											<>
-												{emptyState.icon}
-												<span className="mt-2 text-sm font-medium text-muted-foreground/70">
-													{emptyState.message}
-												</span>
-												{emptyState.subtext && (
-													<span className="mt-0.5 text-xs text-muted-foreground/50">
-														{emptyState.subtext}
-													</span>
-												)}
-											</>
-										)}
-									</div>
+									// Too narrow for the message: only the drop target shows.
+									isOver ? <ColumnEmptyState status={status} isOver /> : null
 								) : (
 									taskCards
 								)}
@@ -842,49 +766,31 @@ export const DroppableColumn = memo(function DroppableColumn({
 				    or the keyboard focus is on the column, so a resting board reads
 				    as six names and six numbers. State worth seeing (a locked
 				    column, a partial selection) stays visible. */}
-				<div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
-					<div className="flex min-w-0 items-center gap-1.5">
-						<span
-							aria-hidden="true"
-							className="kanban-column-dot h-2 w-2 shrink-0 rounded-full"
-						/>
+				<div className="kanban-col-band grid gap-2 px-3 pt-2.5 pb-2.5">
+				<div className="flex items-center justify-between gap-2">
+					<div className="flex min-w-0 flex-1 items-center gap-2">
+						<ColumnIcon status={status} busy={isBusy} />
 						<h2 className="truncate font-semibold text-sm text-foreground">
 							{t(TASK_STATUS_LABELS[status])}
 						</h2>
-						{status === "in_progress" && maxParallelTasks ? (
-							<span
-								className={cn(
-									"column-count-badge",
-									tasks.length >= maxParallelTasks &&
-										"bg-warning/20 text-warning border-warning/30",
-								)}
-							>
-								{tasks.length}/{maxParallelTasks}
-							</span>
-						) : wipLimit ? (
+						{capacity?.kind === "wip" && capacity.state === "over" ? (
 							<Tooltip delayDuration={200}>
 								<TooltipTrigger asChild>
-									<span
-										className={cn(
-											"column-count-badge",
-											tasks.length > wipLimit &&
-												"bg-warning/20 text-warning border-warning/30",
-										)}
-									>
-										{tasks.length}/{wipLimit}
+									<span className="ml-auto">
+										<ColumnCount count={tasks.length} capacity={capacity} />
 									</span>
 								</TooltipTrigger>
-								{tasks.length > wipLimit && (
-									<TooltipContent>
-										{t("kanban.wipLimit.exceeded", {
-											count: tasks.length,
-											limit: wipLimit,
-										})}
-									</TooltipContent>
-								)}
+								<TooltipContent>
+									{t("kanban.wipLimit.exceeded", {
+										count: tasks.length,
+										limit: capacity.limit,
+									})}
+								</TooltipContent>
 							</Tooltip>
 						) : (
-							<span className="column-count-badge">{tasks.length}</span>
+							<span className="ml-auto">
+								<ColumnCount count={tasks.length} capacity={capacity} />
+							</span>
 						)}
 					</div>
 					<div className="flex shrink-0 items-center gap-0.5">
@@ -1084,10 +990,12 @@ export const DroppableColumn = memo(function DroppableColumn({
 						)}
 					</div>
 				</div>
+				{capacity && <ColumnGauge count={tasks.length} capacity={capacity} />}
+				</div>
 
 				{/* Task list */}
 				<div ref={listAreaRef} className="flex-1 min-h-0">
-					<ScrollArea className="h-full px-2.5 pb-2.5 pt-1">
+					<ScrollArea className="h-full px-2.5 pb-2.5 pt-2">
 						{canQuickAdd && isQuickAdding && isQuickAddColumn(status) && (
 							<div className="mb-2">
 								<QuickAddComposer
@@ -1103,37 +1011,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 						>
 							<div className="space-y-2 min-h-0">
 								{tasks.length === 0 && isQuickAdding ? null : tasks.length === 0 ? (
-									<div
-										className={cn(
-											"empty-column-dropzone flex flex-col items-center justify-center py-6",
-											isOver && "active",
-										)}
-									>
-										{isOver ? (
-											<>
-												<div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center mb-2">
-													<Plus className="h-4 w-4 text-primary" />
-												</div>
-												<span className="text-sm font-medium text-primary">
-													{t("kanban.dropHere")}
-												</span>
-											</>
-										) : (
-											<>
-												<span className="opacity-60 [&>svg]:h-5 [&>svg]:w-5">
-													{emptyState.icon}
-												</span>
-												<span className="mt-2 text-xs font-medium text-muted-foreground/80">
-													{emptyState.message}
-												</span>
-												{emptyState.subtext && (
-													<span className="mt-0.5 max-w-[22ch] text-2xs leading-snug text-muted-foreground/50">
-														{emptyState.subtext}
-													</span>
-												)}
-											</>
-										)}
-									</div>
+									<ColumnEmptyState status={status} isOver={isOver} />
 								) : (
 									taskCards
 								)}
