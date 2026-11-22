@@ -14,26 +14,32 @@
  * the server's review jobs run with. On a server, a member's rejection waits
  * for a maintainer (the project's owner) before the reviewer learns from it:
  * the view lists those held rejections, and a maintainer approves or discards
- * each one. Only a maintainer may reset a rule; the server checks it.
+ * each one. Only a maintainer may reset a rule; the server checks it. The
+ * conventions file is built from the server's dataset and saved where the
+ * person chooses (lot 4).
  */
 
 import type { Project } from "../../../shared/types";
 import {
 	REVIEW_FEEDBACK_VERDICTS,
 	type HeldRejection,
+	type ReviewConventionsResult,
 	type ReviewFeedbackMap,
 	type ReviewFeedbackResult,
 	type ReviewFeedbackStatsResult,
 	type ReviewFeedbackVerdict,
 } from "../../../shared/types/review-feedback";
 import { authedFetch } from "../../server-connection";
+import { saveConventionsAs } from "./review-conventions";
 import {
 	displayLabel,
+	type FeedbackRecord,
 	FINDING_ID,
 	parseDataset,
 	resolveThreshold,
 	validRecord,
 } from "./review-feedback-dataset";
+import { serverReviewCounts } from "./review-feedback-metrics";
 import { computeStats } from "./review-feedback-stats";
 import type { ValidFeedback } from "./review-feedback-store";
 
@@ -133,21 +139,39 @@ function heldRejection(value: unknown): HeldRejection | null {
 	};
 }
 
-/** The project-wide view of a server project, computed as a local one's. */
-export async function serverFeedbackStats(
-	project: Project,
-): Promise<ReviewFeedbackStatsResult> {
+interface ServerDataset {
+	records: FeedbackRecord[];
+	threshold: number;
+	body: Record<string, unknown> | null;
+}
+
+/** The server's dataset as the reviewer reads it, and its threshold. */
+async function serverDataset(project: Project): Promise<ServerDataset | null> {
 	const result = await authedFetch<unknown>(
 		`${ROUTE}/feedback?${query(project)}`,
 		"GET",
 	);
-	if (!result.ok) return { success: false, error: "not_found" };
+	if (!result.ok) return null;
 	const body = asObject(result.data);
 	const dataset = typeof body?.dataset === "string" ? body.dataset : "";
 	const threshold =
 		typeof body?.threshold === "number" && Number.isInteger(body.threshold)
 			? String(body.threshold)
 			: undefined;
+	return {
+		records: parseDataset(dataset),
+		threshold: resolveThreshold(threshold),
+		body,
+	};
+}
+
+/** The project-wide view of a server project, computed as a local one's. */
+export async function serverFeedbackStats(
+	project: Project,
+): Promise<ReviewFeedbackStatsResult> {
+	const fetched = await serverDataset(project);
+	if (!fetched) return { success: false, error: "not_found" };
+	const { records, threshold, body } = fetched;
 	const held = (Array.isArray(body?.held) ? body.held : [])
 		.slice(-MAX_HELD)
 		.map(heldRejection)
@@ -155,10 +179,19 @@ export async function serverFeedbackStats(
 	return {
 		success: true,
 		stats: {
-			...computeStats(parseDataset(dataset), resolveThreshold(threshold)),
+			...computeStats(records, threshold, serverReviewCounts(body?.reviews)),
 			server: { maintainer: body?.maintainer === true, held },
 		},
 	};
+}
+
+/** The conventions file of a server project, from its dataset, saved here. */
+export async function saveServerConventions(
+	project: Project,
+): Promise<ReviewConventionsResult> {
+	const fetched = await serverDataset(project);
+	if (!fetched) return { success: false, error: "not_found" };
+	return saveConventionsAs(fetched.records, fetched.threshold);
 }
 
 /** Forget a learned rule on the server (a maintainer's), then the new view. */

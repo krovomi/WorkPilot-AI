@@ -10,11 +10,13 @@ import {
 	COMPARE_GROUPS,
 	COMPARE_METRICS,
 	type CompareGroup,
+	type CompareMetric,
 	type CompareGroupName,
 	type CompareKindLine,
 	type CompareMedians,
 	type CompareProjectLine,
 	type CompareWindow,
+	HIGHER_IS_BETTER,
 } from "../shared/types/build-compare";
 
 /** The person's other projects compared, as the runner reads at most. */
@@ -44,6 +46,12 @@ function median(value: unknown): number | null {
 		: null;
 }
 
+/** A figure: a median, at most 100 for the two given in percent. */
+function figure(metric: CompareMetric, value: unknown): number | null {
+	const found = median(value);
+	return found !== null && HIGHER_IS_BETTER.has(metric) && found > 100 ? null : found;
+}
+
 /** A trend in percent: finite, possibly negative, or null. */
 function trend(value: unknown): number | null {
 	return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -57,11 +65,18 @@ function text(value: unknown, limit: number, fallback: string): string {
 
 function medians(
 	raw: Record<string, unknown>,
-	read: (value: unknown) => number | null = median,
+	read: (metric: CompareMetric, value: unknown) => number | null = figure,
 ): CompareMedians {
 	const out = {} as CompareMedians;
-	for (const metric of COMPARE_METRICS) out[metric] = read(raw[metric]);
+	for (const metric of COMPARE_METRICS) out[metric] = read(metric, raw[metric]);
 	return out;
+}
+
+const trends = (_metric: CompareMetric, value: unknown) => trend(value);
+
+/** A segment's bucket the project left, or null. */
+function bucketFrom(value: unknown): string | null {
+	return typeof value === "string" && value.length > 0 ? value.slice(0, MAX_SEGMENT) : null;
 }
 
 function toWindow(raw: unknown): CompareWindow {
@@ -75,6 +90,7 @@ function toGroup(raw: unknown): CompareGroup {
 		projects: count(record.projects),
 		medians: isRecord(record.medians) ? medians(record.medians) : null,
 		top: isRecord(record.top) ? medians(record.top) : null,
+		trend: isRecord(record.trend) ? medians(record.trend, trends) : null,
 	};
 }
 
@@ -117,10 +133,12 @@ export function comparisonFrom(raw: Record<string, unknown>): BuildComparison {
 			stack: text(segment.stack, MAX_SEGMENT, "other"),
 			size: text(segment.size, MAX_SEGMENT, "unknown"),
 			team: text(segment.team, MAX_SEGMENT, "unknown"),
+			size_from: bucketFrom(segment.size_from),
+			team_from: bucketFrom(segment.team_from),
 		},
 		recent: toWindow(raw.recent),
 		previous: toWindow(raw.previous),
-		trend: medians(isRecord(raw.trend) ? raw.trend : {}, trend),
+		trend: medians(isRecord(raw.trend) ? raw.trend : {}, trends),
 		weeks: list(raw.weeks, MAX_WEEKS).map(toWindow),
 		groups: Object.fromEntries(
 			COMPARE_GROUPS.map((name) => [name, toGroup(groups[name])]),

@@ -8,8 +8,9 @@
 | `arbitration.py` | after a sync: safe rules settle a pair, the rest waits for a person |
 | `advisor.py` | a model's opinion on one queued pair, asked by a person |
 | `undo.py` | take a decision back: the last automatic one within the hour, or a merge |
+| `folds.py` | the pattern a learning-loop merge folded in, kept so that the merge can be separated |
 | `metrics.py` | restores, pins, conflicts and their resolution time, from the journal |
-| `api.py` | ``/api/brain/memory/*`` |
+| `api.py` | ``/api/brain/memory/*`` (a server project's: ``shared_features/context_lifecycle.py``) |
 
 Everything lives under ``knowledge/projects/<project>/memory/.lifecycle/`` —
 inside the vault, so it syncs; hidden, so no agent recalls it. The conflict

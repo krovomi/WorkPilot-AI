@@ -72,7 +72,9 @@ def handle(request: dict[str, Any], now: datetime) -> dict[str, Any]:
         if path != current_path and path not in {p for p, _n in peers}:
             peers.append((path, name))
 
-    current = build_compare.project_facts(current_path)
+    current = build_compare.with_history(
+        build_compare.project_facts(current_path), current_path, now
+    )
     facts = [(name, build_compare.project_facts(path)) for path, name in peers]
     result = build_compare.compare(
         current,

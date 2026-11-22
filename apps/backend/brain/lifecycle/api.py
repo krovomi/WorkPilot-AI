@@ -35,7 +35,16 @@ from pydantic import BaseModel
 
 from ..tasks import project_name_from
 from ..vault import Brain
-from . import arbitration, identity, journal, maintainers, metrics, store, undo
+from . import (
+    arbitration,
+    folds,
+    identity,
+    journal,
+    maintainers,
+    metrics,
+    store,
+    undo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +107,7 @@ def lifecycle(project_dir: str = "", limit: int = 100) -> dict:
         return scope
     brain, base = scope
     purged = store.purge_expired(brain.root, base)
+    purged += folds.purge_expired(brain.root, base)
     if purged:
         _sync(brain, f"brain: purge {purged} forgotten memory note(s)")
     limit = max(1, min(int(limit or 100), 500))

@@ -12,17 +12,9 @@ import json
 import math
 import urllib.error
 import urllib.request
-from collections.abc import Callable
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode
 
-from .config import is_local_host
-from .evaluate import HealthResult
-
-TIMEOUT_SECONDS = 10
-MAX_BODY_BYTES = 1024 * 1024
-
-# (request) -> (status, body); raises OSError when the host cannot be reached.
-Fetch = Callable[[urllib.request.Request], tuple[int, bytes]]
+from .net import MAX_BODY_BYTES, TIMEOUT_SECONDS, Fetch, HealthResult, token_allowed
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -52,16 +44,12 @@ def health_check(url: str, fetch: Fetch = default_fetch) -> HealthResult:
     return HealthResult(ok=200 <= status < 400, status=status)
 
 
-def _token_allowed(url: str) -> bool:
-    return urlsplit(url).scheme == "https" or is_local_host(url)
-
-
 def prometheus_value(
     base_url: str, token: str, query: str, fetch: Fetch = default_fetch
 ) -> float | None:
     """The value of an instant query: a scalar, or the sum of a vector."""
     headers = {"Accept": "application/json", "User-Agent": "WorkPilot"}
-    if token and _token_allowed(base_url):
+    if token and token_allowed(base_url):
         headers["Authorization"] = f"Bearer {token}"
     url = f"{base_url}/api/v1/query?{urlencode({'query': query})}"
     try:

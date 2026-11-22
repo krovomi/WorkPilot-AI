@@ -7,6 +7,7 @@ The journal says why a memory went; this module lets a person answer "no".
 | ``forget`` by an automation (an agent, the learning loop) | the note comes back from the trash | within `UNDO_WINDOW` (1 h): **Undo** |
 | ``archive`` by an automation (a sync arbitration) | the variant comes back and the pair waits for a person | within the hour: **Undo** |
 | ``archive``, whoever decided | the same, at any time | while the variant is in the archive: **Separate** |
+| ``merge`` of two learning-loop patterns | the folded pattern comes back as its own, its share taken out of the other (`folds.py`) | within the hour: **Undo**; then while the fold is kept (30 days): **Separate** |
 
 **Separate** is the issue's manual un-merge. A team-consensus note — the one
 a person wrote from two variants — is separated whole: it goes to the trash
@@ -15,8 +16,8 @@ Any other canonical note stays; the variant comes back beside it and the pair
 is queued (`arbitration.requeue`), since the two still disagree.
 
 What cannot be taken back: a person's own forget is restored from the trash,
-not undone here; a purge deleted the note; a learning-loop merge folded a
-pattern that was never a note of its own.
+not undone here; a purge deleted the note; a learning-loop merge older than
+its fold's retention, or made before folds were kept.
 
 Each step is journalled (``restore``, reason ``undone`` or ``unmerged``) with
 the id of the entry it takes back (``undoes``), so an entry is taken back once.
@@ -30,7 +31,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from ..notes import Note, inside, read_note, write_note
-from . import journal
+from . import folds, journal
 from .arbitration import requeue
 from .journal import LIFECYCLE_DIR, JournalEntry
 from .store import _journal, forget, memory_rel, restore
@@ -104,6 +105,10 @@ def _candidates(
             archived = _archived_of(base, entry)
             if archived and _is_file(root, archived):
                 out[entry.id] = ("undo" if recent else "unmerge", archived)
+        elif entry.action == "merge":
+            kept = folds.kept(root, base, entry, now)
+            if kept:
+                out[entry.id] = ("undo" if recent else "unmerge", kept[0])
         elif entry.action == "forget" and recent:
             trash_id = _trash_of(root, base, entry)
             if trash_id:
@@ -300,6 +305,16 @@ def revert(
             now=moment,
         )
         outcome["restored"] = [outcome["path"]] if outcome["ok"] else []
+    elif entry.action == "merge":
+        outcome = folds.unfold(
+            root,
+            base,
+            folds.kept(root, base, entry, moment),
+            actor=actor,
+            reason_code=reason_code,
+            undoes=entry.id,
+            now=moment,
+        )
     else:
         outcome = _separate(
             root, base, entry, what, actor=actor, reason_code=reason_code, now=moment
