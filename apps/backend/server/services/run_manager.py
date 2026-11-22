@@ -23,6 +23,7 @@ import os
 import sys
 import tempfile
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -224,13 +225,24 @@ def set_approval_carry(
     _approval_holds, _carry_approval = holds, carry
 
 
-#: Told the project of every run that ended, once the manager let go of it:
-#: installed by the execution waves (``shared_features.waves.driver``), which
-#: then take their next step, for the same reason as the approval carry.
-_run_ended: Callable[[str], None] | None = None
+@dataclass(frozen=True)
+class RunEnded:
+    """A run the manager let go of: its project, card, phase and outcome."""
+
+    project_id: str
+    spec_name: str
+    phase: str
+    status: str
 
 
-def set_run_ended_listener(listener: Callable[[str], None] | None) -> None:
+#: Told of every run that ended, once the manager let go of it: installed by
+#: the execution waves (``shared_features.waves.driver``), which then take
+#: their next step and time merge conflicts, for the same reason as the
+#: approval carry.
+_run_ended: Callable[[RunEnded], None] | None = None
+
+
+def set_run_ended_listener(listener: Callable[[RunEnded], None] | None) -> None:
     """Install what hears that a run of a project ended (or nothing)."""
     global _run_ended
     _run_ended = listener
@@ -558,10 +570,12 @@ class RunManager:
         pr: dict | None = None,
         may_skip_review: bool = False,
     ) -> None:
+        status = "failed"
         try:
             async with self._get_semaphore():
                 if run_id in self._cancelled:
                     # Stopped while it waited for a slot: never start the agent.
+                    status = "cancelled"
                     await self._set_run_status(run_id, "cancelled")
                     await self._notify(
                         project_id,
@@ -639,7 +653,7 @@ class RunManager:
             self._projects.pop(run_id, None)
             self._starters.pop(run_id, None)
             if _run_ended is not None:
-                _run_ended(project_id)
+                _run_ended(RunEnded(project_id, spec_name, phase, status))
 
     async def _set_run_status(
         self, run_id: str, status: str, error: str | None = None

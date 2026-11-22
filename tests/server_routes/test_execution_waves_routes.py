@@ -460,7 +460,63 @@ async def test_a_step_on_its_own_finds_nothing_to_do_without_a_project_or_a_run(
     driver.remember(world.projects["a"], True)
     await driver.advance_as_owner(world.projects["a"])
     assert world.projects["a"] not in driver._active
-    driver.on_run_ended("not-active")  # nothing scheduled, nothing raised
+    from server.services.run_manager import RunEnded
+
+    # Nothing scheduled, nothing raised: no wave run, not a merge.
+    driver.on_run_ended(RunEnded("not-active", "001-a", "build", "succeeded"))
+    driver.on_run_ended(RunEnded("not-active", "001-a", "merge", "cancelled"))
+    await driver.time_merge(RunEnded("no-such-project", "001-a", "merge", "failed"))
+
+
+async def test_a_merge_run_times_the_conflict_it_meets_and_resolves(world):
+    from server.services.run_manager import RunEnded
+    from shared_features.waves import driver
+
+    from tests.server_routes.world import git
+
+    clone = world.clone("a")
+    card(clone, "001-a", ["README.md"], baseBranch="main")
+    card(clone, "002-b", ["docs.md"])
+    tasks = clone / ".workpilot" / "worktrees" / "tasks"
+    git(
+        "worktree",
+        "add",
+        "-q",
+        "-b",
+        "wp/001-a",
+        str(tasks / "001-a"),
+        "main",
+        cwd=clone,
+    )
+    (tasks / "001-a" / "README.md").write_text("# Card\n", encoding="utf-8")
+    git("commit", "-q", "-am", "card", cwd=tasks / "001-a")
+    (clone / "README.md").write_text("# Main\n", encoding="utf-8")
+    git("commit", "-q", "-am", "main moves", cwd=clone)
+
+    async def history():
+        return (await world.ok("viewer_a", "GET", url(world, "/history")))["conflicts"]
+
+    assert await history() == {
+        "ignored": False,
+        "resolved": 0,
+        "medianSeconds": None,
+        "open": 0,
+    }
+    project = world.projects["a"]
+    # A card without a workspace whose merge failed met no conflict git can see.
+    driver.on_run_ended(RunEnded(project, "002-b", "merge", "failed"))
+    driver.on_run_ended(RunEnded(project, "001-a", "merge", "failed"))
+    await until(lambda: _open_conflicts(history, 1), "the conflict was recorded")
+    driver.on_run_ended(RunEnded(project, "001-a", "merge", "succeeded"))
+    answer = await until(
+        lambda: _open_conflicts(history, 0), "the conflict was resolved"
+    )
+    assert answer["resolved"] == 1 and answer["medianSeconds"] >= 0
+
+
+async def _open_conflicts(history, count: int):
+    answer = await history()
+    return answer["open"] == count and answer["resolved"] == 1 - count and answer
 
 
 async def test_a_failed_step_on_its_own_is_logged(caplog):

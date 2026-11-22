@@ -13,7 +13,8 @@ A step is taken when a person asks (``POST .../run/step``, which the views do
 when they open) and when a run of the project ends on the server
 (``run_manager.set_run_ended_listener``): the step is then taken as the
 person who started the wave run, whose rights are read again first. Steps of
-one project never overlap.
+one project never overlap. A card's ``merge`` run that ends also times its
+merge conflict (``conflict_times``).
 """
 
 from __future__ import annotations
@@ -28,9 +29,10 @@ from fastapi import HTTPException
 from server.authz.principal import Principal
 from server.authz.scope import ProjectScope
 from server.db.models import AuditLog, Project, SpecIndex
+from server.services.run_manager import RunEnded
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import run_store
+from . import conflict_times, run_store
 from .execution import NOT_STARTED, CardState, step
 from .service import WaveOptions, avoided_by, build_plan, parse_options, read_cards
 
@@ -304,13 +306,38 @@ async def advance_as_owner(project_id: str) -> None:
         await advance(db, project, scope, owner, run)
 
 
-def on_run_ended(project_id: str) -> None:
-    """The run manager's listener: the step runs beside, never in its way."""
-    if project_id not in _active:
+async def time_merge(event: RunEnded) -> None:
+    """After a card's ``merge`` run: the conflict it met, or the one it resolved."""
+    from server.db.engine import get_session_factory
+
+    async with get_session_factory()() as db:
+        project = await db.get(Project, event.project_id)
+    if project is None:
         return
+    clone = Path(project.server_path)
+
+    def record() -> None:
+        cards = read_cards(clone, project.default_branch)
+        base = next(
+            (c.base_branch for c in cards if c.id == event.spec_name),
+            project.default_branch or "main",
+        )
+        conflict_times.record_merge_run(
+            clone, event.spec_name, event.status == "succeeded", base
+        )
+
+    await asyncio.to_thread(record)
+
+
+def on_run_ended(event: RunEnded) -> None:
+    """The run manager's listener: the work runs beside, never in its way."""
     # Called from the run manager's own task: a loop is running.
-    task = asyncio.get_running_loop().create_task(advance_as_owner(project_id))
-    task.add_done_callback(_log_failure)
+    loop = asyncio.get_running_loop()
+    if event.phase == "merge" and event.status in {"succeeded", "failed"}:
+        loop.create_task(time_merge(event)).add_done_callback(_log_failure)
+    if event.project_id in _active:
+        task = loop.create_task(advance_as_owner(event.project_id))
+        task.add_done_callback(_log_failure)
 
 
 def _log_failure(task: asyncio.Task[None]) -> None:

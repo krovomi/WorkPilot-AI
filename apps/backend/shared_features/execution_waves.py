@@ -33,7 +33,7 @@ from server.services.run_manager import set_run_ended_listener
 from shared_board.cards import _require_writer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .waves import driver, run_store
+from .waves import conflict_times, driver, run_store
 from .waves.service import (
     MAX_DRIFT_THRESHOLD,
     MAX_PARALLEL_CEILING,
@@ -243,9 +243,13 @@ async def stop_run(
 async def history(
     scope: ProjectScope = Depends(resolve_project_scope),
 ) -> dict[str, Any]:
-    """The runs that ended, newest first, and the last 14 days in counts."""
+    """The runs that ended, newest first, the last 14 days in counts, and how
+    long the merge conflicts of those days took to resolve (measured)."""
     recorded = await asyncio.to_thread(run_store.load_history, scope.path)
+    times = await asyncio.to_thread(conflict_times.load_times, scope.path)
+    now = datetime.now(UTC)
     return {
         **recorded,
-        "summary": run_store.sprint_summary(recorded, datetime.now(UTC)),
+        "summary": run_store.sprint_summary(recorded, now),
+        "conflicts": conflict_times.resolution_summary(times, now),
     }
