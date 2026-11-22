@@ -21,6 +21,7 @@ import type {
 	ReviewReason,
 	Task,
 	TaskStatus,
+	TaskStatusActor,
 } from "../shared/types";
 import type { TaskEventPayload } from "./agent/task-event-schema";
 import {
@@ -72,6 +73,12 @@ export class TaskStateManager {
 	private taskContextById = new Map<string, TaskContextEntry>();
 	private terminalEventSeen = new Set<string>();
 	private getMainWindow: (() => BrowserWindow | null) | null = null;
+	/**
+	 * Who is moving the task while an event goes through the machine: a
+	 * person (a UI event) or the app's own watchers name themselves; anything
+	 * else is the build's agents. Written in the status history.
+	 */
+	private movedBy: TaskStatusActor = "agent";
 
 	configure(getMainWindow: () => BrowserWindow | null): void {
 		this.getMainWindow = getMainWindow;
@@ -166,17 +173,26 @@ export class TaskStateManager {
 		} satisfies TaskEvent);
 	}
 
+	/**
+	 * An event from the app rather than from the build. `by` says who: a
+	 * person (the default) or one of the app's watchers (`"system"`).
+	 */
 	handleUiEvent(
 		taskId: string,
 		event: TaskEvent,
 		task: Task,
 		project: Project,
+		by: TaskStatusActor = "user",
 	): void {
 		this.setTaskContext(taskId, task, project);
 		const actor = this.getOrCreateActor(taskId);
-		const _stateBefore = String(actor.getSnapshot().value);
-		actor.send(event);
-		const _stateAfter = String(actor.getSnapshot().value);
+		const before = this.movedBy;
+		this.movedBy = by;
+		try {
+			actor.send(event);
+		} finally {
+			this.movedBy = before;
+		}
 	}
 
 	handleManualStatusChange(
@@ -184,44 +200,37 @@ export class TaskStateManager {
 		status: TaskStatus,
 		task: Task,
 		project: Project,
+		by: TaskStatusActor = "user",
 	): boolean {
+		const send = (event: TaskEvent) =>
+			this.handleUiEvent(taskId, event, task, project, by);
 		switch (status) {
 			case "done":
-				this.handleUiEvent(taskId, { type: "MARK_DONE" }, task, project);
+				send({ type: "MARK_DONE" });
 				return true;
 			case "pr_created":
-				this.handleUiEvent(
-					taskId,
-					{ type: "PR_CREATED", prUrl: task.metadata?.prUrl ?? "" },
-					task,
-					project,
-				);
+				send({ type: "PR_CREATED", prUrl: task.metadata?.prUrl ?? "" });
 				return true;
 			case "in_progress": {
 				// Use XState as source of truth for determining correct event
 				const currentState = this.getCurrentState(taskId);
 				if (currentState === "plan_review") {
-					this.handleUiEvent(taskId, { type: "PLAN_APPROVED" }, task, project);
+					send({ type: "PLAN_APPROVED" });
 				} else if (
 					currentState === "human_review" ||
 					currentState === "error"
 				) {
-					this.handleUiEvent(taskId, { type: "USER_RESUMED" }, task, project);
+					send({ type: "USER_RESUMED" });
 				} else if (!currentState && task.reviewReason === "plan_review") {
 					// Fallback: No actor exists (e.g., after app restart), use task data
-					this.handleUiEvent(taskId, { type: "PLAN_APPROVED" }, task, project);
+					send({ type: "PLAN_APPROVED" });
 				} else {
-					this.handleUiEvent(taskId, { type: "USER_RESUMED" }, task, project);
+					send({ type: "USER_RESUMED" });
 				}
 				return true;
 			}
 			case "backlog":
-				this.handleUiEvent(
-					taskId,
-					{ type: "USER_STOPPED", hasPlan: false },
-					task,
-					project,
-				);
+				send({ type: "USER_STOPPED", hasPlan: false });
 				return true;
 			case "human_review":
 				// Already in human_review (e.g., stage-only merge keeps task in review).
@@ -430,6 +439,7 @@ export class TaskStateManager {
 		errorMessage?: string,
 	): void {
 		const mainPlanPath = getPlanPath(project, task);
+		// Only the main project's copy keeps the history: one per task.
 		persistPlanStatusAndReasonSync(
 			mainPlanPath,
 			status,
@@ -438,6 +448,7 @@ export class TaskStateManager {
 			xstateState,
 			executionPhase,
 			errorMessage,
+			this.movedBy,
 		);
 
 		const worktreePath = findTaskWorktree(project.path, task.specId);

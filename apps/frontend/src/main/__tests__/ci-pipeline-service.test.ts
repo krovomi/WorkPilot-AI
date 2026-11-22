@@ -147,6 +147,8 @@ describe("red build", () => {
 			{ type: "USER_RESUMED" },
 			expect.anything(),
 			expect.anything(),
+			// The app's own repair loop, not a person: in the status history.
+			"system",
 		);
 		expect(startTaskExecution).toHaveBeenCalledTimes(1);
 	});

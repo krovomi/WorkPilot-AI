@@ -124,6 +124,8 @@ describe("startSplitMergeWatch", () => {
 			"done",
 			expect.objectContaining({ id: "020-split-part1" }),
 			online,
+			// The watcher, not a person: in the task's status history.
+			"system",
 		);
 		expect(state.stackUpdate).toHaveBeenCalledWith("020-split-part2", agentManager);
 		expect(state.invalidate).toHaveBeenCalledWith("online");

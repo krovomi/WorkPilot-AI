@@ -401,6 +401,20 @@ describe("TASK_RERUN_PHASE", () => {
 		agent.startTaskExecution.mockRejectedValueOnce("plain");
 		expect(await rerun("coding")).toEqual({ success: false, error: "Failed to re-run phase" });
 	});
+
+	it("notes the return to review in the main copy's history only", async () => {
+		const worktree = addWorktree();
+		setTask({ specsPath: worktree });
+		planFile(specDir);
+		planFile(worktree);
+		agent.startsProcess = false;
+		await rerun("validation");
+		const history = path.join(specDir, "status_history.json");
+		expect(read(history).entries).toEqual([
+			expect.objectContaining({ to: "human_review", actor: "system" }),
+		]);
+		expect(existsSync(path.join(worktree, "status_history.json"))).toBe(false);
+	});
 });
 
 describe("TASK_HOT_SWAP", () => {

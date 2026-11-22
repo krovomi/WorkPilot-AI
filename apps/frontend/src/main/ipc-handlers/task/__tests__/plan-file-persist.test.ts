@@ -286,3 +286,36 @@ describe("addChangeRequestSubtaskToPlan", () => {
 		expect(addChangeRequestSubtaskToPlan(path.join(base, "missing.json"), subtask)).toBe(false);
 	});
 });
+
+describe("the status history beside the plan", () => {
+	const history = () =>
+		JSON.parse(readFileSync(path.join(path.dirname(plan), "status_history.json"), "utf-8")).entries;
+
+	it("records a change with who made it, only when asked", async () => {
+		seed({ phases: [], status: "human_review", reviewReason: "plan_review" });
+		expect(await persistPlanStatus(plan, "in_progress", "p1")).toBe(true);
+		expect(existsSync(path.join(path.dirname(plan), "status_history.json"))).toBe(false);
+
+		expect(await persistPlanStatus(plan, "ai_review", "p1", "system")).toBe(true);
+		expect(
+			persistPlanStatusAndReasonSync(plan, "human_review", "completed", "p1", "human_review", "complete", undefined, "agent"),
+		).toBe(true);
+		expect(history().map((e: { from: string; to: string; reason?: string; actor: string }) => [e.from, e.to, e.reason, e.actor])).toEqual([
+			// An empty history starts from what the plan said before.
+			["in_progress", "ai_review", undefined, "system"],
+			["ai_review", "human_review", "completed", "agent"],
+		]);
+	});
+
+	it("starts from nothing when the plan did not exist", () => {
+		expect(persistPlanStatusAndReasonSync(plan, "in_progress", undefined, undefined, undefined, undefined, undefined, "user")).toBe(true);
+		expect(history()).toEqual([expect.objectContaining({ from: null, to: "in_progress", actor: "user" })]);
+	});
+
+	it("records nothing for a plan that is not an object", async () => {
+		seed(null as never);
+		expect(await persistPlanStatus(plan, "done", "p1", "user")).toBe(false);
+		expect(persistPlanStatusAndReasonSync(plan, "done", undefined, "p1", undefined, undefined, undefined, "user")).toBe(false);
+		expect(existsSync(path.join(path.dirname(plan), "status_history.json"))).toBe(false);
+	});
+});
