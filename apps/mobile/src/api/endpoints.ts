@@ -77,6 +77,8 @@ export function api(client: ServerClient) {
 	return {
 		authConfig: () => client.publicRequest<AuthConfig>("GET", "/auth/config"),
 		permissions: () => client.request<MyPermissions>("GET", "/auth/me/permissions"),
+		/** How the current sign-in was opened; read through `auth/my-session.ts`, never shown raw. */
+		mySession: () => client.request<unknown>("GET", "/auth/me/session"),
 		projects: () => client.request<ServerProject[]>("GET", "/projects"),
 		project: (projectId: string) => client.request<ServerProject>("GET", `/projects/${enc(projectId)}`),
 		cards: async (projectId: string) =>
