@@ -41,6 +41,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
+from core.workspace.recipe_detect import detected_steps
 from foundation.platform import is_windows
 
 __all__ = [
@@ -302,77 +303,14 @@ def load_recipe(project_dir: Path | str) -> Recipe | None:
 # ── what the stack implies ───────────────────────────────────────────────────
 
 
-def _has(root: Path, *names: str) -> bool:
-    return any((root / n).exists() for n in names)
-
-
-def _glob(root: Path, pattern: str, depth: int = 2) -> bool:
-    for level in range(depth + 1):
-        if next(root.glob("/".join(["*"] * level + [pattern])), None):
-            return True
-    return False
-
-
-def _venv_python() -> str:
-    return ".venv\\Scripts\\python.exe" if is_windows() else ".venv/bin/python"
-
-
 def detect_recipe(project_dir: Path | str) -> Recipe:
-    """The setup a project's stack implies, from the files at its root.
+    """The setup a project's stack implies, from its files (`recipe_detect`).
 
-    One command per package manager the lockfiles name, so a polyglot
-    repository (a .NET API and an Angular front) gets both.
+    One command per package manager its folders name, root and sub-folders,
+    so a polyglot repository (a .NET API and an Angular front) gets both.
     """
-    root = Path(project_dir)
-    steps: list[tuple[str, ...]] = []
-    notes: list[str] = []
-    # JavaScript and TypeScript: the lockfile names the manager.
-    if _has(root, "pnpm-lock.yaml"):
-        steps.append(("pnpm", "install", "--frozen-lockfile"))
-    elif _has(root, "yarn.lock"):
-        steps.append(("yarn", "install"))
-    elif _has(root, "bun.lockb", "bun.lock"):
-        steps.append(("bun", "install"))
-    elif _has(root, "package-lock.json"):
-        steps.append(("npm", "ci"))
-    elif _has(root, "package.json"):
-        steps.append(("npm", "install"))
-    # Python
-    if _has(root, "uv.lock"):
-        steps.append(("uv", "sync"))
-    elif _has(root, "poetry.lock"):
-        steps.append(("poetry", "install"))
-    elif _has(root, "requirements.txt"):
-        steps.append(("python", "-m", "venv", ".venv"))
-        steps.append((_venv_python(), "-m", "pip", "install", "-r", "requirements.txt"))
-    # .NET
-    if _glob(root, "*.sln") or _glob(root, "*.slnx") or _glob(root, "*.csproj"):
-        steps.append(("dotnet", "restore"))
-        if _has(root, ".config/dotnet-tools.json"):
-            steps.append(("dotnet", "tool", "restore"))
-    # Go, Rust, PHP, Ruby
-    if _has(root, "go.mod"):
-        steps.append(("go", "mod", "download"))
-    if _has(root, "Cargo.toml"):
-        steps.append(("cargo", "fetch"))
-    if _has(root, "composer.json"):
-        steps.append(("composer", "install", "--no-interaction"))
-    if _has(root, "Gemfile"):
-        steps.append(("bundle", "install"))
-    # Dart and Flutter
-    pubspec = root / "pubspec.yaml"
-    if pubspec.is_file():
-        flutter = "flutter" in pubspec.read_text(encoding="utf-8", errors="replace")
-        steps.append(("flutter", "pub", "get") if flutter else ("dart", "pub", "get"))
-    # JVM
-    if _has(root, "gradlew", "gradlew.bat"):
-        wrapper = "gradlew.bat" if is_windows() else "./gradlew"
-        steps.append((wrapper, "dependencies", "--quiet"))
-    elif _has(root, "pom.xml"):
-        steps.append(("mvn", "-q", "dependency:go-offline"))
-    if not steps:
-        notes.append("no package manager recognised at the project root")
-    return Recipe("detected", setup=tuple(steps), notes=tuple(notes))
+    steps, notes = detected_steps(Path(project_dir), MAX_COMMANDS)
+    return Recipe("detected", setup=steps, notes=notes)
 
 
 def recipe_for(project_dir: Path | str) -> Recipe:

@@ -170,6 +170,9 @@ export interface TaskAPI {
 	generateSpecInterview: (
 		taskId: string,
 	) => Promise<IPCResult<import("../../shared/types").SpecInterviewQuestion[]>>;
+	checkTaskReadiness: (
+		taskId: string,
+	) => Promise<IPCResult<import("../../shared/types").TaskReadiness>>;
 	checkPlanConflicts: (
 		taskId: string,
 	) => Promise<IPCResult<import("../../shared/types").PlanConflictReport>>;
@@ -672,6 +675,11 @@ export const createTaskAPI = (): TaskAPI => ({
 		taskId: string,
 	): Promise<IPCResult<import("../../shared/types").SpecInterviewQuestion[]>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_SPEC_INTERVIEW, taskId),
+
+	checkTaskReadiness: (
+		taskId: string,
+	): Promise<IPCResult<import("../../shared/types").TaskReadiness>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_CHECK_READINESS, taskId),
 
 	checkPlanConflicts: (
 		taskId: string,

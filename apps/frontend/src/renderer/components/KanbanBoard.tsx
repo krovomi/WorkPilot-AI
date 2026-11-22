@@ -1214,8 +1214,8 @@ export function KanbanBoard({
 						isProcessing: false,
 						error: undefined,
 					});
-				} else {
-					// Show error toast for other failures
+				} else if (!result.held) {
+					// Show error toast for other failures (a held card has its own dialog)
 					toast({
 						title: t("common:errors.operationFailed"),
 						description: result.error || t("common:errors.unknownError"),
