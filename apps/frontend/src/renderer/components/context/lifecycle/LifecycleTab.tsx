@@ -24,23 +24,18 @@ import { useMemoryLifecycle } from "./useMemoryLifecycle";
 
 interface LifecycleTabProps {
 	readonly projectId: string;
-	/** A server project's memory: its lifecycle is not served yet. */
+	/**
+	 * A server project's memory: its own brain on the server, which no git
+	 * sync feeds, so there is no conflict between teammates' notes to resolve.
+	 */
 	readonly onServer?: boolean;
 }
 
 /** The memory's journal, its trash and the sync conflicts to resolve. */
 export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps) {
 	const { t } = useTranslation(["context"]);
-	const { view, loading, error, reload } = useMemoryLifecycle(onServer ? "" : projectId);
+	const { view, loading, error, reload } = useMemoryLifecycle(projectId);
 	const [notice, setNotice] = useState<string | null>(null);
-
-	if (onServer) {
-		return (
-			<div className="mx-auto max-w-5xl px-5 pt-2 text-sm text-muted-foreground">
-				{t("context:lifecycle.serverProject")}
-			</div>
-		);
-	}
 
 	const restore = async (trashId: string) => {
 		const result = await window.electronAPI.restoreMemory(projectId, trashId);
@@ -110,6 +105,13 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 					</div>
 				)}
 
+				{onServer && (
+					<p className="text-xs text-muted-foreground" data-testid="memory-server-note">
+						{t("context:lifecycle.serverProject")}
+					</p>
+				)}
+
+				{!onServer && (
 				<section className="space-y-3">
 					<h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
 						<GitMerge className="h-4 w-4" />
@@ -132,6 +134,7 @@ export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps)
 						/>
 					))}
 				</section>
+				)}
 
 				{decisions.length > 0 && (
 					<Card data-testid="memory-decisions">

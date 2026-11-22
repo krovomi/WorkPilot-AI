@@ -144,7 +144,7 @@
 		"description": "Chaque décision sur la mémoire du projet, les mémoires oubliées que tu peux restaurer, et les conflits de synchronisation à trancher",
 		"refresh": "Actualiser",
 		"error": "Impossible de lire le cycle de vie de la mémoire : {{error}}",
-		"serverProject": "Le cycle de vie de la mémoire d'un projet du serveur n'est pas encore disponible.",
+		"serverProject": "La mémoire de ce projet est son propre cerveau, sur le serveur. Aucune synchronisation d'un coéquipier ne l'alimente : il n'y a donc pas de conflit entre notes à trancher ici.",
 		"pins": "{{count}} / {{limit}} épinglées",
 		"entry": "{{action}} {{actor}} — {{reason}}",
 		"conflicts": {
