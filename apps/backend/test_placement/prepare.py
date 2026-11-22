@@ -151,6 +151,7 @@ async def prepare(
     ticket = ticket if ticket is not None else Ticket(label=Path(spec_dir).name)
     ticket.__enter__()
     started = time.monotonic()
+    placed = False
     try:
         while True:
             if settings.mode == "machine":
@@ -177,9 +178,12 @@ async def prepare(
             on_wait(decision)
             check_pause()
             await sleep(poll_seconds)
-    except BaseException:
-        ticket.release()
-        raise
+        placed = True
+    finally:
+        # Paused, cancelled or failed while waiting: the ticket is freed
+        # before the signal propagates.
+        if not placed:
+            ticket.release()
 
     placement = Placement(
         decision=decision,
