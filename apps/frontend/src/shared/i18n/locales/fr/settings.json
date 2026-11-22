@@ -1417,7 +1417,9 @@
 				"name": "Webhook générique",
 				"hint": "POST JSON brut vers n'importe quel endpoint HTTP (intégrations maison)"
 			}
-		}
+		},
+		"triggerMemoryConflict": "Quand la synchronisation d'un coéquipier apporte une mémoire qui en contredit une autre",
+		"triggerMemoryConflictHint": "Sur demande : publie le titre des deux notes, un court aperçu nettoyé et le nom de leurs auteurs (jamais un e-mail)."
 	},
 	"cicd": {
 		"title": "Pipeline CI/CD",
@@ -1604,7 +1606,9 @@
 		"expires": "expire le",
 		"revoke": "Révoquer",
 		"copyLink": "Copier le lien",
-		"copyFailed": "Le lien n'a pas pu être copié"
+		"copyFailed": "Le lien n'a pas pu être copié",
+		"orgRole": "Rôle dans l'organisation",
+		"orgRoleDefault": "Par défaut pour cet accès"
 	},
 	"jiraImport": {
 		"cancel": "Annuler",
@@ -1670,7 +1674,7 @@
 	},
 	"kanbanColumnSummary": {
 		"label": "Résumé des colonnes",
-		"description": "Affiche une ligne de résumé sous le titre de chaque colonne du Kanban (cartes urgentes, créneaux libres, plans à approuver…)."
+		"description": "Affiche une ligne de résumé sous le titre de chaque colonne du Kanban (tâches urgentes, phase des agents, plans à approuver…)."
 	},
 	"mcp": {
 		"addCustomServer": "Ajouter un serveur personnalisé",

@@ -1508,7 +1508,7 @@ describe("KanbanBoard — quick selection, deferred delete and undo", () => {
 		fireEvent.click(within(screen.getByRole("option", { name: "Task two" })).getByTitle("Delete"));
 		expect(screen.queryByRole("option", { name: "Task two" })).toBeNull();
 		fireEvent.keyDown(document.body, { key: "z", ctrlKey: true });
-		expect(await screen.findByText("Undone: deletion of 1 card")).toBeInTheDocument();
+		expect(await screen.findByText("Undone: deletion of 1 task")).toBeInTheDocument();
 		expect(screen.getByRole("option", { name: "Task two" })).toBeInTheDocument();
 
 		fireEvent.click(within(screen.getByRole("option", { name: "Task one" })).getByTitle("Delete"));
@@ -1557,7 +1557,7 @@ describe("KanbanBoard — quick selection, deferred delete and undo", () => {
 		fireEvent.click(cardsOf("backlog")[0], { ctrlKey: true });
 		await user.click(within(bulkBar()).getByRole("button", { name: "Priority" }));
 		await user.click(await screen.findByRole("menuitem", { name: "Low" }));
-		expect(await screen.findByText("1 card could not be changed")).toBeInTheDocument();
+		expect(await screen.findByText("1 task could not be changed")).toBeInTheDocument();
 	});
 
 	it("acts on the whole selection from a selected card's right-click", async () => {
@@ -1573,7 +1573,7 @@ describe("KanbanBoard — quick selection, deferred delete and undo", () => {
 		await user.keyboard("{Escape}");
 
 		fireEvent.contextMenu(a, { clientX: 5, clientY: 5 });
-		expect(screen.getByRole("menu", { name: "Card actions" })).toHaveTextContent(
+		expect(screen.getByRole("menu", { name: "Task menu" })).toHaveTextContent(
 			"2 tasks selected",
 		);
 		await pickSubmenuItem(user, "Priority", "Urgent");
@@ -1606,6 +1606,6 @@ describe("KanbanBoard — quick selection, deferred delete and undo", () => {
 		await waitFor(() =>
 			expect(api.fn("updateTaskStatus")).toHaveBeenLastCalledWith("t1", "backlog", undefined),
 		);
-		expect(await screen.findByText("Undone: move of 1 card")).toBeInTheDocument();
+		expect(await screen.findByText("Undone: move of 1 task")).toBeInTheDocument();
 	});
 });

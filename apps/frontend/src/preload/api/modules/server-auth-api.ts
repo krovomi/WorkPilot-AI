@@ -113,6 +113,7 @@ export interface ServerAuthAPI {
 	createInvite: (payload: {
 		email: string;
 		role?: string;
+		org_role?: string | null;
 		project_id?: string | null;
 		project_role?: string | null;
 	}) => Promise<DataResult<CreateInvitationResult>>;

@@ -354,3 +354,49 @@ class TestPlanFiles:
 )
 def test_the_closing_banner_is_read_when_no_status_line_says_it(text, verdict):
     assert reviewer._extract_verdict_from_response(text) == verdict
+
+
+class TestSuitePlacement:
+    """The full suite's placement (`test_placement`) as the reviewer reads it."""
+
+    async def _prompt(self, qa_kit, spec, **kwargs) -> str:
+        client = qa_kit.Client([])
+        await _review(client, spec, **kwargs)
+        return client.prompts[0]
+
+    async def test_a_suite_moved_to_the_ci_is_said_in_the_prompt(
+        self, qa_kit, qa_spec, replays, monkeypatch
+    ):
+        from test_placement.decide import GIB, Machine
+
+        busy = Machine(
+            cores=4, cpu_busy=99.0, ram_total=8 * GIB, ram_free=GIB, builds=2
+        )
+        monkeypatch.setattr("test_placement.machine.sample", lambda suites: busy)
+        monkeypatch.delenv("WORKPILOT_TEST_PLACEMENT")
+        monkeypatch.setenv("WORKPILOT_TEST_PLACEMENT_ROUTES", "ci")
+        monkeypatch.setenv("TEST_PLACEMENT_ALLOW_BRANCH_PUSH", "true")
+
+        prompt = await self._prompt(qa_kit, qa_spec)
+
+        assert "WHERE THE LONG SUITES RUN FOR THIS TASK" in prompt
+        decision = json.loads(
+            (qa_spec / "test_placement.json").read_text(encoding="utf-8")
+        )
+        assert (decision["target"], decision["reason"]) == ("ci", "branch_push")
+
+    async def test_a_suite_run_here_adds_nothing_and_is_measured(
+        self, qa_kit, qa_spec, replays
+    ):
+        prompt = await self._prompt(qa_kit, qa_spec)
+
+        assert "WHERE THE LONG SUITES RUN" not in prompt
+        history = qa_spec.parents[2] / ".workpilot" / "test-placement" / "history.json"
+        assert history.is_file()
+
+    async def test_a_targeted_review_is_not_placed(self, qa_kit, qa_spec, replays):
+        scope = ChangeScope(level="targeted", reason="test")
+
+        await self._prompt(qa_kit, qa_spec, review_scope=scope)
+
+        assert not (qa_spec / "test_placement.json").exists()

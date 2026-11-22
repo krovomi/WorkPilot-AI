@@ -97,13 +97,13 @@ describe("column right-click menu", () => {
 		rightClick(column);
 		expect(screen.getByRole("menu", { name: "Column options" })).toBeInTheDocument();
 		expect(items()).toEqual([
-			"Add a card",
+			"Add a task",
 			"Add All to Queue",
 			"Lock column width",
 			"Collapse column",
 		]);
-		await user.click(screen.getByRole("menuitem", { name: "Add a card" }));
-		expect(screen.getByRole("textbox", { name: "Describe the new card" })).toBeInTheDocument();
+		await user.click(screen.getByRole("menuitem", { name: "Add a task" }));
+		expect(screen.getByRole("textbox", { name: "Describe the new task" })).toBeInTheDocument();
 	});
 
 	it("leaves a right-click on a card or in a text field to them", async () => {
@@ -116,8 +116,8 @@ describe("column right-click menu", () => {
 		if (!card) throw new Error("no card");
 		rightClick(card);
 		expect(screen.queryByRole("menu", { name: "Column options" })).toBeNull();
-		await user.click(within(column).getByRole("button", { name: "Add a card" }));
-		rightClick(screen.getByRole("textbox", { name: "Describe the new card" }));
+		await user.click(within(column).getByRole("button", { name: "Add a task" }));
+		rightClick(screen.getByRole("textbox", { name: "Describe the new task" }));
 		expect(screen.queryByRole("menu", { name: "Column options" })).toBeNull();
 	});
 

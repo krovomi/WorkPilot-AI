@@ -32,7 +32,7 @@ function renderBar(overrides: Partial<ComponentProps<typeof BulkActionBar>> = {}
 	return props;
 }
 
-const bar = () => screen.getByRole("toolbar", { name: "Selected cards" });
+const bar = () => screen.getByRole("toolbar", { name: "Selected tasks" });
 const buttons = () => within(bar()).getAllByRole("button").map((b) => b.textContent);
 
 describe("BulkActionBar", () => {

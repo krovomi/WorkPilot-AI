@@ -177,10 +177,10 @@ export interface ServerAdminAPI {
 	deleteRole: (roleId: string) => Promise<DataResult<{ deleted: boolean }>>;
 
 	listMembers: () => Promise<DataResult<OrgMemberSummary[]>>;
-	addMember: (body: {
-		user_id: string;
-		role_slug: string;
-	}) => Promise<DataResult<OrgMemberSummary>>;
+	/** An existing account, by id or (platform administrators) by email. */
+	addMember: (
+		body: { user_id: string; role_slug: string } | { email: string; role_slug: string },
+	) => Promise<DataResult<OrgMemberSummary>>;
 	updateMemberRole: (
 		userId: string,
 		roleSlug: string,

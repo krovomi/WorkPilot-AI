@@ -381,8 +381,8 @@
 			"runAsTaskHint": "Run as an interactive Kanban task (planning, review, conversation) instead of a direct run.",
 			"taskCreated": "Task created: {{name}}",
 			"uncommitted": "The files written could not be committed on the review branch; they are still in {{path}}.",
-			"reviewCard_other": "{{count}} files committed on {{branch}} (card “{{card}}”, in Human Review). Review the diff, then create the PR from the card.",
-			"reviewCard_one": "{{count}} file committed on {{branch}} (card “{{card}}”, in Human Review). Review the diff, then create the PR from the card.",
+			"reviewCard_other": "{{count}} files committed on {{branch}} (task “{{card}}”, in Human Review). Review the diff, then create the PR from the task.",
+			"reviewCard_one": "{{count}} file committed on {{branch}} (task “{{card}}”, in Human Review). Review the diff, then create the PR from the task.",
 			"helpTitle": "Available commands"
 		},
 		"blockers": {
@@ -410,31 +410,31 @@
 			"qaIterations_other": "{{count}} QA passes expected."
 		},
 		"serverBoard": "Shared board · {{role}}",
-		"serverBoardHint": "This project lives on the WorkPilot server: everyone on it sees the same cards, and its builds run there. The board refreshes every few seconds.",
+		"serverBoardHint": "This project lives on the WorkPilot server: everyone on it sees the same tasks, and its builds run there. The board refreshes every few seconds.",
 		"serverRole": {
 			"viewer": "Viewer",
 			"member": "Member",
 			"owner": "Owner"
 		},
 		"bulk": {
-			"label": "Selected cards",
-			"saveFailed_one": "{{count}} card could not be changed",
-			"saveFailed_other": "{{count}} cards could not be changed"
+			"label": "Selected tasks",
+			"saveFailed_one": "{{count}} task could not be changed",
+			"saveFailed_other": "{{count}} tasks could not be changed"
 		},
 		"undoLabels": {
 			"type": "type change",
 			"priority": "priority change",
-			"move_one": "move of {{count}} card",
-			"move_other": "move of {{count}} cards",
-			"delete_one": "deletion of {{count}} card",
-			"delete_other": "deletion of {{count}} cards",
+			"move_one": "move of {{count}} task",
+			"move_other": "move of {{count}} tasks",
+			"delete_one": "deletion of {{count}} task",
+			"delete_other": "deletion of {{count}} tasks",
 			"rename": "rename"
 		},
 		"undone": "Undone: {{label}}",
-		"undoStale": "Could not fully undo ({{label}}): a card has changed since",
+		"undoStale": "Could not fully undo ({{label}}): a task has changed since",
 		"undoNothing": "Nothing to undo",
 		"cardMenu": {
-			"label": "Card actions",
+			"label": "Task menu",
 			"open": "Open",
 			"edit": "Edit…",
 			"type": "Type",
@@ -442,51 +442,51 @@
 			"saveFailed": "The change could not be saved"
 		},
 		"quickAdd": {
-			"addCard": "Add a card",
+			"addCard": "Add a task",
 			"addQueued": "Add and queue",
-			"addTooltip": "Add a card (N)",
-			"ariaLabel": "Describe the new card",
-			"placeholder": "Describe the task… Paste a list to create one card per line.",
+			"addTooltip": "Add a task (N)",
+			"ariaLabel": "Describe the new task",
+			"placeholder": "Describe the task… Paste a list to create one task per line.",
 			"type": "Type",
 			"noType": "No type (detected automatically)",
 			"priority": "Priority",
 			"noPriority": "No priority",
-			"splitLines_one": "One card per line ({{count}})",
-			"splitLines_other": "One card per line ({{count}})",
+			"splitLines_one": "One task per line ({{count}})",
+			"splitLines_other": "One task per line ({{count}})",
 			"create": "Create",
 			"queue": "Queue",
-			"createMany_one": "Create {{count}} card",
-			"createMany_other": "Create {{count}} cards",
+			"createMany_one": "Create {{count}} task",
+			"createMany_other": "Create {{count}} tasks",
 			"moreOptions": "More options…",
 			"close": "Close (Esc)",
 			"hint": "Enter to create · Shift+Enter for a new line · Esc to close",
-			"created_one": "Card created in {{column}}",
-			"created_other": "{{count}} cards created in {{column}}",
-			"createFailed": "The card could not be created. Your text is kept: try again."
+			"created_one": "Task created in {{column}}",
+			"created_other": "{{count}} tasks created in {{column}}",
+			"createFailed": "The task could not be created. Your text is kept: try again."
 		},
 		"rename": {
-			"label": "Card title"
+			"label": "Task title"
 		},
 		"shortcuts": {
 			"open": "Keyboard shortcuts",
 			"title": "Keyboard shortcuts",
 			"description": "Keys of the board. They wait while you type or while a menu or a dialog is open.",
 			"groups": {
-				"cards": "Cards",
+				"cards": "Tasks",
 				"selection": "Selection",
 				"board": "Board"
 			},
 			"rows": {
-				"navigate": "Move between cards",
-				"open": "Open the card",
-				"rename": "Rename the card (or double-click its title)",
-				"menu": "Card menu (or right-click)",
-				"toggle": "Add or remove a card",
+				"navigate": "Move between tasks",
+				"open": "Open the task",
+				"rename": "Rename the task (or double-click its title)",
+				"menu": "Task menu (or right-click)",
+				"toggle": "Add or remove a task",
 				"range": "Select a range in a column",
 				"column": "Select the column",
 				"clear": "Clear the selection",
 				"delete": "Delete the selection",
-				"add": "New card in Planning",
+				"add": "New task in Planning",
 				"undo": "Undo the last change",
 				"help": "Show this list (or ?)"
 			},
@@ -502,7 +502,7 @@
 			"slots": "slots",
 			"wip": "limit {{limit}}",
 			"slotsAria": "{{count}} of {{limit}} parallel slots in use",
-			"wipAria": "{{count}} cards, limit {{limit}}"
+			"wipAria": "{{count}} tasks, limit {{limit}}"
 		},
 		"pulse": {
 			"urgent_one": "{{count}} urgent",
@@ -817,7 +817,7 @@
 		"help": "Decided without AI from the category, the imported item or the words of the title. Change it if it is wrong: later versions will pick the workflow from it."
 	},
 	"cardType": {
-		"label": "Card type",
+		"label": "Task type",
 		"values": {
 			"feature": "Feature",
 			"ux": "UI / UX",
@@ -842,7 +842,7 @@
 			"import": "from the imported item",
 			"keywords": "from the title",
 			"severity": "from the security severity",
-			"origin": "from the card's origin"
+			"origin": "from the task's origin"
 		},
 		"preview": {
 			"field": "{{label}}: {{value}}",
@@ -2197,7 +2197,7 @@
 			"screenshots": "Screenshots",
 			"scenario": "Scenario (replayed after QA)",
 			"findings": "Findings",
-			"cardScenario": "Scenario written on the card"
+			"cardScenario": "Scenario written on the task"
 		},
 		"kind": {
 			"web-frontend": "web front end",
@@ -2679,7 +2679,7 @@
 		"button": "Purge",
 		"buttonTitle": "Free the room taken by the worktrees whose work is over",
 		"title": "Purge finished worktrees",
-		"description": "Every card works in a full copy of the project. These belong to cards whose PR is merged, or that are done, archived or abandoned. Purging removes the folder and the local workpilot/… branch; the card, its spec and its PR stay. A merged PR is purged automatically.",
+		"description": "Every task works in a full copy of the project. These belong to tasks whose PR is merged, or that are done, archived or abandoned. Purging removes the folder and the local workpilot/… branch; the task, its spec and its PR stay. A merged PR is purged automatically.",
 		"loading": "Measuring the room they take…",
 		"empty": "No worktree to purge: nothing takes room for nothing.",
 		"dirty": "uncommitted changes, kept",

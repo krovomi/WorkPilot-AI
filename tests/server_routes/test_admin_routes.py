@@ -156,6 +156,50 @@ class TestMembers:
         assert again.json()["detail"] == "Already a member"
         assert "org.member.added" in await audit_actions(world)
 
+    async def test_the_platform_adds_an_account_of_another_org_by_email(self, world):
+        """Someone already on the server joins a second organization: an
+        invitation refuses an address that has an account."""
+        added = await world.call(
+            "platform",
+            "POST",
+            "/admin/members",
+            org="a",
+            json={"email": "Member_B@example.com", "role_slug": "reviewer"},
+        )
+        assert added.status_code == 201, added.text
+        assert added.json()["user_id"] == world.users["member_b"]
+        assert added.json()["role_slug"] == "reviewer"
+        unknown = await world.call(
+            "platform",
+            "POST",
+            "/admin/members",
+            org="a",
+            json={"email": "nobody-here@example.com"},
+        )
+        assert unknown.status_code == 404
+
+    async def test_an_organization_admin_cannot_look_an_account_up_by_email(
+        self, world
+    ):
+        answer = await world.call(
+            "admin_a",
+            "POST",
+            "/admin/members",
+            json={"email": "member_b@example.com"},
+        )
+        assert answer.status_code == 403
+        members = await world.ok("admin_a", "GET", "/admin/members")
+        assert world.users["member_b"] not in {m["user_id"] for m in members}
+
+    @pytest.mark.parametrize(
+        "body", [{}, {"user_id": "x", "email": "member_b@example.com"}]
+    )
+    async def test_exactly_one_account_is_named(self, world, body):
+        answer = await world.call(
+            "platform", "POST", "/admin/members", org="a", json=body
+        )
+        assert answer.status_code == 422
+
     async def test_an_unknown_account_or_role_is_refused(self, world):
         unknown = await world.call(
             "admin_a", "POST", "/admin/members", json={"user_id": str(uuid.uuid4())}
@@ -223,6 +267,51 @@ class TestMembers:
         assert answer.json()["detail"] == (
             "The organization would be left without an administrator"
         )
+
+    async def test_roles_change_in_an_organization_with_no_administrator_yet(
+        self, world
+    ):
+        """An organization a platform administrator created has no member who
+        manages members: changing the role of someone who never could is not
+        losing an administrator, and must not be refused."""
+        from server.db.engine import get_session_factory
+        from server.db.models import OrgMember
+        from sqlalchemy import delete
+
+        async with get_session_factory()() as db:
+            await db.execute(
+                delete(OrgMember).where(
+                    OrgMember.org_id == world.orgs["b"],
+                    OrgMember.user_id == world.users["admin_b"],
+                )
+            )
+            await db.commit()
+        for role_slug in ("viewer", "reviewer", "contributor"):
+            changed = await world.ok(
+                "platform",
+                "PATCH",
+                f"/admin/members/{world.users['member_b']}",
+                org="b",
+                json={"role_slug": role_slug},
+            )
+            assert changed["role_slug"] == role_slug
+        promoted = await world.ok(
+            "platform",
+            "PATCH",
+            f"/admin/members/{world.users['member_b']}",
+            org="b",
+            json={"role_slug": "admin"},
+        )
+        assert promoted["role_slug"] == "admin"
+        # Now the organization has one administrator, and keeps them.
+        answer = await world.call(
+            "platform",
+            "PATCH",
+            f"/admin/members/{world.users['member_b']}",
+            org="b",
+            json={"role_slug": "viewer"},
+        )
+        assert answer.status_code == 400
 
     async def test_removing_a_member_ends_their_access(self, world):
         assert await world.ok(
