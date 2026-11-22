@@ -22,7 +22,9 @@ let project: string;
 let worktree: string;
 
 beforeAll(() => {
-	base = realpathSync(mkdtempSync(path.join(tmpdir(), "code-reader-")));
+	// The native realpath, as the code uses: on Windows it also expands an 8.3
+	// short name of the temp folder (RUNNER~1), which realpathSync keeps.
+	base = realpathSync.native(mkdtempSync(path.join(tmpdir(), "code-reader-")));
 	project = path.join(base, "project");
 	worktree = path.join(base, "worktree");
 	for (const dir of [project, worktree, path.join(project, "src"), path.join(worktree, "src")]) {
