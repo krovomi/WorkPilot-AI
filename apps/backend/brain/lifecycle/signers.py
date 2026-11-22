@@ -24,6 +24,13 @@ edited from the Lifecycle tab, journalled (``designate``,
 it. That is the local rule; the one that holds on a teammate's machine is
 cryptographic: a change to the list that someone else pushed counts only
 when a key already on the list signed it (`provenance.effective`).
+
+The notes outside every project (vault-wide knowledge, shared instructions,
+agents' snapshots, skills) have the vault's own list, `VAULT_LIST`, in the
+same format and under the same cryptographic rule. The vault has no
+maintainers, so it is edited where the vault's other settings are (Settings
+→ Brain, `write_vault`), and its history is the vault's git log: a project's
+journal is not the place of a decision that covers every project.
 """
 
 from __future__ import annotations
@@ -42,6 +49,7 @@ from .journal import LIFECYCLE_DIR, JournalEntry, append
 __all__ = [
     "FILE",
     "MAX_SIGNERS",
+    "VAULT_LIST",
     "Signer",
     "clean",
     "list_rel",
@@ -49,9 +57,12 @@ __all__ = [
     "parse_line",
     "render",
     "write",
+    "write_vault",
 ]
 
 FILE = "trusted-signers.md"
+VAULT_LIST = f"knowledge/{LIFECYCLE_DIR}/{FILE}"
+"""The vault's list, for the notes outside every project's folder."""
 MAX_SIGNERS = 50
 _MAX_LINE = 1200
 """An RSA-4096 public key is about 730 characters."""
@@ -163,8 +174,37 @@ def parse(text: str) -> list[Signer]:
     return out[:MAX_SIGNERS]
 
 
-def render(signers: list[Signer]) -> str:
-    return _HEADER + "".join(f"- {s.line()}\n" for s in signers)
+_VAULT_HEADER = (
+    "# Signataires de confiance du cerveau\n\n"
+    "Une note hors des projets (connaissances, instructions partagées, skills) reçue\n"
+    "d'un coéquipier ne va aux agents que si son dernier commit est signé par l'une\n"
+    "de ces clés. Chaque projet a sa propre liste pour ses notes.\n"
+    "Sans liste, toutes les notes sont crues comme avant.\n\n"
+)
+
+
+def render(signers: list[Signer], *, header: str = _HEADER) -> str:
+    return header + "".join(f"- {s.line()}\n" for s in signers)
+
+
+def _replace(root: Path, rel: str, kept: list[Signer], header: str) -> None:
+    target = inside(root, rel)
+    if kept:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(render(kept, header=header), encoding="utf-8", newline="\n")
+    else:
+        target.unlink(missing_ok=True)
+
+
+def write_vault(root: Path, lines: list[str]) -> list[Signer] | None:
+    """Replace the vault's list; ``None`` when a line is refused (nothing is
+    written). An empty list removes the file: every note outside the projects
+    is trusted again."""
+    kept = clean(lines)
+    if kept is None:
+        return None
+    _replace(root, VAULT_LIST, kept, _VAULT_HEADER)
+    return kept
 
 
 def write(
@@ -177,12 +217,7 @@ def write(
     kept = clean(lines)
     if kept is None:
         return None
-    target = inside(root, list_rel(base))
-    if kept:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(render(kept), encoding="utf-8", newline="\n")
-    else:
-        target.unlink(missing_ok=True)
+    _replace(root, list_rel(base), kept, _HEADER)
     append(
         root,
         base,

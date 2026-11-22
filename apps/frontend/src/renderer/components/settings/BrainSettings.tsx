@@ -12,6 +12,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
 import { BrainConflictEmbeddings } from "./BrainConflictEmbeddings";
+import { BrainTrustedSigners } from "./BrainTrustedSigners";
 import { SettingsSection } from "./SettingsSection";
 
 /**
@@ -268,6 +269,8 @@ export function BrainSettings() {
 			{settings.conflictEmbeddings && (
 				<BrainConflictEmbeddings embeddings={settings.conflictEmbeddings} />
 			)}
+
+			{settings.exists && <BrainTrustedSigners />}
 
 			<div className="space-y-1 rounded-lg border p-3">
 				<h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

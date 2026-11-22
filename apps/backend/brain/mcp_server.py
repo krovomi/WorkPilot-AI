@@ -214,12 +214,24 @@ TOOLS: list[dict[str, Any]] = [
 
 
 def _skills(brain: Brain, name: str | None) -> Any:
+    """The brain's skills, or one's text. A skill no key of the vault's
+    trusted list signed (`lifecycle.provenance`) is neither listed nor served:
+    an agent follows a skill as it follows an instruction."""
+    from .lifecycle.provenance import unverified_among
+
     base = brain.root / "skills"
     if not name:
-        return sorted(p.parent.name for p in base.glob("*/SKILL.md"))
+        found = {
+            p.parent.name: p.relative_to(brain.root).as_posix()
+            for p in base.glob("*/SKILL.md")
+        }
+        hidden = unverified_among(brain.root, found.values())
+        return sorted(n for n, rel in found.items() if rel not in hidden)
     path = base / Path(name).name / "SKILL.md"
     if not path.is_file():
         raise ValueError(f"no skill named {name!r} in the brain")
+    if unverified_among(brain.root, [path.relative_to(brain.root).as_posix()]):
+        raise ValueError(f"the skill {name!r} is not signed by a trusted key")
     return path.read_text(encoding="utf-8")
 
 
@@ -339,7 +351,7 @@ def _call(
         who = args.get("agent")
         return [
             {**item.to_dict(), "yours": bool(who and who in item.agents)}
-            for item in list_instructions(brain.root)
+            for item in list_instructions(brain.root, signed_only=True)
         ]
     if name == "brain_skill":
         brain.before_read()

@@ -1501,6 +1501,38 @@ export async function fetchBrainEmbeddingsFound(
 	return _get<BrainEmbeddingsFound>("/api/brain/settings/embeddings", {}, signal);
 }
 
+/** A key of the vault's trusted list: its name and fingerprint, never the key. */
+export interface BrainVaultSigner {
+	readonly name: string;
+	readonly kind: "ssh" | "gpg";
+	readonly fingerprint: string;
+}
+
+/** The vault's trusted signers, for the notes outside every project. */
+export interface BrainVaultSigners {
+	readonly signers: readonly BrainVaultSigner[];
+	/** Changes to the list someone pushed that no listed key signed. */
+	readonly rejected: number;
+	/** Whether this machine's git signs its commits. */
+	readonly signing: boolean;
+	/** The notes outside the projects that no trusted key signed. */
+	readonly unverified: number;
+}
+
+export async function fetchBrainVaultSigners(
+	signal?: AbortSignal,
+): Promise<ApiResult<BrainVaultSigners>> {
+	return _get<BrainVaultSigners>("/api/brain/signers", {}, signal);
+}
+
+/** One `<name> <key>` per line; an empty list trusts every note again. */
+export async function saveBrainVaultSigners(
+	lines: readonly string[],
+	signal?: AbortSignal,
+): Promise<ApiResult<BrainVaultSigners>> {
+	return _post<BrainVaultSigners>("/api/brain/signers", { lines }, signal);
+}
+
 export async function saveBrainSettings(
 	update: BrainSettingsUpdate,
 	signal?: AbortSignal,

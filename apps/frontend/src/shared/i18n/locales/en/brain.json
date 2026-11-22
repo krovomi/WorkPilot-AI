@@ -122,6 +122,24 @@
 			"searching": "Looking for a local embeddings model…",
 			"found": "Found: {{model}} in {{provider}}.",
 			"notFound": "No local embeddings model found: only shared words count."
+		},
+		"signers": {
+			"title": "Trusted signers of the shared notes",
+			"hint": "The notes outside every project (shared knowledge, instructions, skills) that a teammate synced reach the agents only when their last commit is signed by one of these keys (the SSH or GPG key their git already signs commits with). Each project has its own list for its notes, in its Lifecycle tab.",
+			"none": "No trusted signer: every shared note reaches the agents, as before.",
+			"list": "Trusted: {{names}}",
+			"edit": "Edit the list",
+			"save": "Save",
+			"cancel": "Cancel",
+			"placeholder": "One per line: name ssh-ed25519 AAAA… or name GPG fingerprint",
+			"unverified_one": "{{count}} shared note is unverified: readable here, kept out of the agents.",
+			"unverified_other": "{{count}} shared notes are unverified: readable here, kept out of the agents.",
+			"rejected_one": "{{count}} change to this list was not signed by a listed key and is ignored.",
+			"rejected_other": "{{count}} changes to this list were not signed by a listed key and are ignored.",
+			"notSigning": "This machine does not sign its commits: once synced, the notes written here are unverified for the team. Turn on commit signing in git (commit.gpgsign).",
+			"invalid": "A line is neither an SSH public key nor a GPG fingerprint after a one-word name.",
+			"noBrain": "Create the brain first.",
+			"failed": "The list could not be saved."
 		}
 	}
 }

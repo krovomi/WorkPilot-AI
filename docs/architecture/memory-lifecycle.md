@@ -439,8 +439,27 @@ clés sont celles que chacun a déjà pour signer ses commits git (SSH ou GPG) :
   verdict et toutes vont aux agents comme avant. Un cerveau qui n'a jamais rien reçu (aucune
   référence distante) n'exécute même pas git pour le savoir. Quand la liste existe mais que git ne
   répond pas, rien de reçu ne va aux agents (échec fermé).
-- **Ce qui n'est pas couvert.** Une note hors du dossier d'un projet (le reste du vault, les
-  instructions partagées) n'est couverte par aucune liste. Un commit local, ou une fusion, posé
+- **Le reste du vault a sa liste.** Une note hors du dossier de tout projet — connaissances du
+  vault, instructions partagées, instantanés des agents, skills, un fichier posé directement sous
+  `knowledge/projects/` — relève de la liste du vault, `knowledge/.lifecycle/trusted-signers.md`
+  (`signers.VAULT_LIST`), au même format et sous les mêmes règles : mêmes verdicts, même
+  protection d'elle-même (une modification reçue ne compte que signée par une clé déjà dessus,
+  un retrait aussi), même opt-in (pas de liste, rien ne change), même échec fermé
+  (`provenance.vault_verdicts`, `vault_unverified`). Une note d'un projet ne relève que de la
+  liste de son projet, une note du vault que de celle du vault. `unverified_among` choisit la
+  liste par le chemin, donc `Brain.recall`, `Brain.read`, `query_graph`, `get_node` et
+  `brain_read_note` la respectent sans rien de plus. Ce qui n'y passait pas en reçoit le filtre :
+  les instructions partagées que reçoivent les agents (`memories.instructions(signed_only=True)` :
+  le paragraphe du prompt `awareness_section`, l'outil `brain_instructions`, le condensé
+  `INSTRUCTIONS.md`, les ponts écrits dans les fichiers mémoire des agents) et les skills du
+  cerveau (`brain_skill` et les ressources `brain://skills/…`, ni listés ni servis). Une personne
+  voit toujours chaque instruction pour l'activer ou la retirer. Le vault n'a pas de mainteneurs :
+  la liste se modifie là où se règle le cerveau, Réglages → Cerveau (`GET`/`POST
+  /api/brain/signers`, refusé en mode serveur), et son historique est le `git log` du vault, pas
+  le journal d'un projet. Le chemin sur le disque n'est pas un dossier de note (il est caché) ;
+  le jugement d'une note du vault demande à git l'historique de tout le vault hors projets, une
+  fois par tête du dépôt et par processus, seulement quand la liste existe.
+- **Ce qui n'est pas couvert.** Un commit local, ou une fusion, posé
   sur une modification reçue s'en porte garant, comme un commit signé en git. Les projets du
   serveur n'ont pas de liste : leur cerveau n'est jamais synchronisé, et aucune commande git n'y
   est lancée depuis une route.
@@ -463,6 +482,9 @@ et macOS de la CI posent `WORKPILOT_EXPECT_SSH_SIGNING`, sous lequel un `ssh-key
   `…/conflicts/resolve`, `…/conflicts/suggest`, `…/signers` (`brain/lifecycle/api.py`, inclus
   dans le routeur du cerveau : refusé en mode serveur comme lui, le projet est un nom lu dans
   `project_dir`).
+- Cerveau : `GET`/`POST /api/brain/signers` (la liste du vault) et `GET
+  /api/brain/settings/embeddings` (le serveur et le modèle d'embeddings trouvés), dans le routeur
+  du cerveau (`brain/api.py`), refusés en mode serveur comme lui.
 - Serveur : `/api/features/context/memory/{lifecycle,history,forget,restore,pin,scope,revert}`
   (`shared_features/context_lifecycle.py`, ci-dessus).
 - Desktop : canaux `CONTEXT_MEMORY_*` (`main/ipc-handlers/context/memory-lifecycle-handlers.ts`,
@@ -535,7 +557,5 @@ Rien pour #348. Pour #352, ce qui attend une décision du mainteneur du projet :
 - Embeddings par llama.cpp et sur un projet du serveur : la passe lit Ollama et LM Studio, pas
   llama.cpp (rien ne dit qu'il sert des embeddings), et un projet du serveur n'a pas de file de
   conflits.
-- Signatures : une liste par projet couvre le dossier de ce projet ; les notes du reste du vault
-  (connaissances hors projet, instructions partagées) n'en ont pas encore.
 - Les projets du serveur n'ont pas de file de conflits (leur cerveau n'est jamais
   synchronisé), donc pas d'annonce ni de mainteneurs par portée.

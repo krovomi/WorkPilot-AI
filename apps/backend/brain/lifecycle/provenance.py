@@ -27,6 +27,13 @@ person's own edit (on disk, or a commit no remote has) always counts.
 **Opt-in.** No list, or an empty one: `verdicts` answers no verdict and
 every note behaves as before, at the cost of one ``git log`` per reading.
 
+**The rest of the vault.** A note outside every project's folder — the
+vault-wide knowledge, the shared instructions, the agents' snapshots, the
+skills — is covered by the vault's own list (`signers.VAULT_LIST`,
+``knowledge/.lifecycle/trusted-signers.md``), with the same rules: the same
+verdicts, the same self-protection, the same opt-in (`vault_verdicts`,
+`vault_unverified`). A project's notes are covered by its list only.
+
 **Cached per commit.** What git says of a signature does not change for a
 commit, so it is kept in ``.workpilot-brain/signatures.json`` (this
 machine's, git-ignored): ``G`` and ``U`` (a good signature, known key or
@@ -65,6 +72,9 @@ __all__ = [
     "signing_enabled",
     "unverified",
     "unverified_among",
+    "vault_effective",
+    "vault_unverified",
+    "vault_verdicts",
     "verdicts",
 ]
 
@@ -76,6 +86,8 @@ _MAX_CACHE = 20_000
 _CHUNK = 200
 _MEMO_SIZE = 32
 _FORMAT = "--format=%H%x1f%G?%x1f%GF%x1f%GP"
+_VAULT_NOTES = (".", ":(exclude,glob)knowledge/projects/*/**")
+"""The vault list's notes: everything but what lives in a project's folder."""
 
 Fact = tuple[str, str, str]
 """``(%G?, %GF, %GP)``: the status, the key's fingerprint, the primary key's."""
@@ -140,10 +152,10 @@ def _own(root: Path) -> frozenset[str]:
     return frozenset(out.split())
 
 
-def _dirty(root: Path, pathspec: str) -> frozenset[str]:
+def _dirty(root: Path, *pathspec: str) -> frozenset[str]:
     """Paths changed on disk and not committed (new files too)."""
     out = _git(
-        root, "status", "--porcelain", "-z", "--untracked-files=all", "--", pathspec
+        root, "status", "--porcelain", "-z", "--untracked-files=all", "--", *pathspec
     ).stdout
     found: set[str] = set()
     parts = out.split("\0")
@@ -159,9 +171,9 @@ def _dirty(root: Path, pathspec: str) -> frozenset[str]:
     return frozenset(found)
 
 
-def _last_commits(root: Path, pathspec: str) -> dict[str, str]:
+def _last_commits(root: Path, *pathspec: str) -> dict[str, str]:
     """Each path's last commit (merges aside: they carry their parents' work)."""
-    out = _git(root, "log", "--format=%x1e%H", "--name-only", "-z", "--", pathspec)
+    out = _git(root, "log", "--format=%x1e%H", "--name-only", "-z", "--", *pathspec)
     last: dict[str, str] = {}
     for chunk in out.stdout.split("\x1e"):
         sha, _, names = chunk.partition("\0")
@@ -287,7 +299,15 @@ def effective(root: Path, base: Path | str) -> Trust:
     opt-in) or when a key of the list in effect signed it, and is set aside
     otherwise. An edit on disk, not committed yet, is the person's own.
     """
-    rel = signers_list.list_rel(base)
+    return _effective(root, signers_list.list_rel(base))
+
+
+def vault_effective(root: Path) -> Trust:
+    """The trusted signers in effect for the notes outside every project."""
+    return _effective(root, signers_list.VAULT_LIST)
+
+
+def _effective(root: Path, rel: str) -> Trust:
     on_disk = _disk(root, rel)
     if not git_available() or not (root / ".git").exists():
         return Trust(signers_list.parse(on_disk))
@@ -325,15 +345,14 @@ def effective(root: Path, base: Path | str) -> Trust:
 
 def _judge(
     root: Path,
-    base: Path | str,
+    pathspec: tuple[str, ...],
     trust: Trust,
     dirty: frozenset[str],
     own: frozenset[str],
 ) -> dict[str, Verdict]:
-    project = Path(base).parent.as_posix()
-    tracked = _git(root, "ls-files", "-z", "--", project).stdout.split("\0")
+    tracked = _git(root, "ls-files", "-z", "--", *pathspec).stdout.split("\0")
     notes = {rel for rel in [*tracked, *dirty] if rel.endswith(".md")}
-    last = _last_commits(root, project)
+    last = _last_commits(root, *pathspec)
     received = {last[rel] for rel in notes if rel in last and last[rel] not in own}
     facts = _facts(root, received, trust.signers)
     out: dict[str, Verdict] = {}
@@ -354,18 +373,30 @@ def _judge(
 def verdicts(root: Path, base: Path | str) -> tuple[Trust, dict[str, Verdict]]:
     """The list in effect and, when it names a key, a verdict per note of the
     project (vault paths). No list: no verdict, every note is trusted."""
-    if not git_available() or not (root / ".git").exists():
-        return effective(root, base), {}
     project = Path(base).parent.as_posix()
+    return _verdicts(root, signers_list.list_rel(base), (project,))
+
+
+def vault_verdicts(root: Path) -> tuple[Trust, dict[str, Verdict]]:
+    """The vault list in effect and, when it names a key, a verdict per note
+    outside every project's folder. No list: no verdict, as before."""
+    return _verdicts(root, signers_list.VAULT_LIST, _VAULT_NOTES)
+
+
+def _verdicts(
+    root: Path, rel: str, pathspec: tuple[str, ...]
+) -> tuple[Trust, dict[str, Verdict]]:
+    if not git_available() or not (root / ".git").exists():
+        return _effective(root, rel), {}
     head = _git(root, "rev-parse", "--verify", "-q", "HEAD").stdout.strip()
-    dirty = _dirty(root, project)
+    dirty = _dirty(root, *pathspec)
     own = _own(root)
-    key = (str(root), Path(base).as_posix(), head, *sorted(dirty), "|", *sorted(own))
+    key = (str(root), rel, head, *sorted(dirty), "|", *sorted(own))
     with _memo_lock:
         if key in _memo:
             return _memo[key]
-    trust = effective(root, base)
-    judged = _judge(root, base, trust, dirty, own) if trust.active else {}
+    trust = _effective(root, rel)
+    judged = _judge(root, pathspec, trust, dirty, own) if trust.active else {}
     with _memo_lock:
         if len(_memo) >= _MEMO_SIZE:
             _memo.clear()
@@ -394,40 +425,61 @@ def unverified(root: Path, base: Path | str) -> frozenset[str]:
     note is: a list that is there but unreadable must not let a pushed note
     through.
     """
+    project = Path(base).parent.as_posix()
+    return _unverified(root, signers_list.list_rel(base), (project,))
+
+
+def vault_unverified(root: Path) -> frozenset[str]:
+    """The notes outside every project's folder that agents are not given:
+    the vault list's (`unverified`'s rules)."""
+    return _unverified(root, signers_list.VAULT_LIST, _VAULT_NOTES)
+
+
+def _unverified(root: Path, rel: str, pathspec: tuple[str, ...]) -> frozenset[str]:
     if not _has_remote_refs(root):
         # Never fetched: every commit is this machine's, nothing was received.
         return frozenset()
     try:
-        _, judged = verdicts(root, base)
+        _, judged = _verdicts(root, rel, pathspec)
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        if not _disk(root, signers_list.list_rel(base)).strip():
+        if not _disk(root, rel).strip():
             return frozenset()
         logger.warning("brain: note signatures not checked: %s", exc)
         return _Everything()
-    return frozenset(rel for rel, v in judged.items() if v.status == "unverified")
+    return frozenset(path for path, v in judged.items() if v.status == "unverified")
 
 
 def _memory_base(rel: str) -> str | None:
+    """The memory whose list covers *rel*: a note inside a project's folder;
+    ``None`` for the rest of the vault, which the vault list covers."""
     parts = PurePosixPath(rel).parts
-    if len(parts) >= 3 and parts[0] == "knowledge" and parts[1] == "projects":
+    if len(parts) >= 4 and parts[0] == "knowledge" and parts[1] == "projects":
         return f"knowledge/projects/{parts[2]}/memory"
     return None
 
 
 def unverified_among(root: Path, rels: Iterable[str]) -> set[str]:
-    """Which of *rels* (vault paths, any project) agents are not given.
+    """Which of *rels* (vault paths, any project or none) agents are not given.
 
-    A note outside a project's folder is not covered by any list.
+    A note in a project's folder is judged by that project's list; any other
+    by the vault's (`vault_unverified`).
     """
     paths = [str(rel) for rel in rels]
     by_base: dict[str, frozenset[str]] = {}
+    vault: frozenset[str] | None = None
     out: set[str] = set()
     for rel in paths:
+        if not rel:
+            continue
         base = _memory_base(rel)
         if base is None:
-            continue
-        if base not in by_base:
-            by_base[base] = unverified(root, base)
-        if rel in by_base[base]:
+            if vault is None:
+                vault = vault_unverified(root)
+            hidden = vault
+        else:
+            if base not in by_base:
+                by_base[base] = unverified(root, base)
+            hidden = by_base[base]
+        if rel in hidden:
             out.add(rel)
     return out

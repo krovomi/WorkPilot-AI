@@ -630,6 +630,62 @@ def instruction(request: InstructionRequest) -> dict:
     return {"success": True, "path": str(changed["path"]), "status": request.status}
 
 
+class VaultSignersRequest(BaseModel):
+    lines: list[str] = []
+    """One ``<name> <key>`` per line: an SSH public key or a GPG fingerprint."""
+
+
+def _vault_signers_view(brain: Brain) -> dict:
+    """The vault list in effect, for the notes outside every project."""
+    import subprocess
+
+    from .lifecycle import provenance
+
+    if not brain.exists:
+        return {"signers": [], "rejected": 0, "signing": False, "unverified": 0}
+    try:
+        trust, judged = provenance.vault_verdicts(brain.root)
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        logger.warning("brain: vault signatures not read: %s", exc)
+        trust, judged = provenance.Trust(), {}
+    return {
+        "signers": [s.to_dict() for s in trust.signers],
+        "rejected": len(trust.rejected),
+        "signing": provenance.signing_enabled(brain.root),
+        "unverified": sum(1 for v in judged.values() if v.status == "unverified"),
+    }
+
+
+@router.get("/signers")
+def get_vault_signers() -> dict:
+    """The keys whose signed notes outside every project reach agents."""
+    if _refused():
+        return _DESKTOP_ONLY
+    return {"success": True, **_vault_signers_view(Brain())}
+
+
+@router.post("/signers")
+def set_vault_signers(request: VaultSignersRequest) -> dict:
+    """Replace the vault's trusted signers (`lifecycle.signers.write_vault`).
+
+    The vault has no maintainers: whoever edits its settings here edits the
+    list, and a teammate's machine counts the change only when a key already
+    on the list signed it (`lifecycle.provenance`).
+    """
+    if _refused():
+        return _DESKTOP_ONLY
+    from .lifecycle import signers
+
+    brain = Brain()
+    if not brain.exists:
+        return {"success": False, "error": "no-brain", "code": "no-brain"}
+    kept = signers.write_vault(brain.root, request.lines[: signers.MAX_SIGNERS + 1])
+    if kept is None:
+        return {"success": False, "error": "invalid", "code": "invalid"}
+    brain.after_write("brain: change the vault's trusted signers")
+    return {"success": True, **_vault_signers_view(brain)}
+
+
 @router.get("/status")
 def status() -> dict:
     if _refused():

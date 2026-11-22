@@ -122,6 +122,24 @@
 			"searching": "Recherche d'un modèle d'embeddings local…",
 			"found": "Trouvé : {{model}} dans {{provider}}.",
 			"notFound": "Aucun modèle d'embeddings local trouvé : seuls les mots en commun comptent."
+		},
+		"signers": {
+			"title": "Signataires de confiance des notes partagées",
+			"hint": "Les notes hors des projets (connaissances partagées, instructions, skills) synchronisées par un coéquipier ne vont aux agents que si leur dernier commit est signé par l'une de ces clés (la clé SSH ou GPG avec laquelle son git signe déjà ses commits). Chaque projet a sa propre liste pour ses notes, dans son onglet Cycle de vie.",
+			"none": "Aucun signataire de confiance : toutes les notes partagées vont aux agents, comme avant.",
+			"list": "De confiance : {{names}}",
+			"edit": "Modifier la liste",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"placeholder": "Une par ligne : nom ssh-ed25519 AAAA… ou nom empreinte GPG",
+			"unverified_one": "{{count}} note partagée n'est pas vérifiée : lisible ici, tenue hors des agents.",
+			"unverified_other": "{{count}} notes partagées ne sont pas vérifiées : lisibles ici, tenues hors des agents.",
+			"rejected_one": "{{count}} modification de cette liste n'est signée par aucune clé listée : elle est ignorée.",
+			"rejected_other": "{{count}} modifications de cette liste ne sont signées par aucune clé listée : elles sont ignorées.",
+			"notSigning": "Cette machine ne signe pas ses commits : une fois synchronisées, les notes écrites ici ne sont pas vérifiées pour l'équipe. Active la signature des commits dans git (commit.gpgsign).",
+			"invalid": "Une ligne n'est ni une clé publique SSH ni une empreinte GPG après un nom d'un seul mot.",
+			"noBrain": "Crée d'abord le cerveau.",
+			"failed": "La liste n'a pas pu être enregistrée."
 		}
 	}
 }
