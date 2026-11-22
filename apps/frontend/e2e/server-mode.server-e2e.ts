@@ -68,9 +68,10 @@ test("Bob deletes that card and it leaves Alice's board", async () => {
 	const { page } = bob;
 	// The card's delete button shows on hover, at the card's corner, where the
 	// next column's drop zone overlaps it in a narrow window: press it directly.
+	// Nothing has worked on this card yet, so it goes without a confirmation:
+	// hidden at once, deleted on the server when its undo window closes.
 	const card = page.getByRole("option", { name: cardTitle });
 	await card.getByRole("button", { name: /^Delete$/ }).dispatchEvent("click");
-	await page.getByRole("button", { name: /^Delete Permanently$/ }).click();
 
 	await expect(page.getByText(cardTitle)).toHaveCount(0, { timeout: 15_000 });
 	await expect(alice.page.getByText(cardTitle)).toHaveCount(0, {
