@@ -14,6 +14,8 @@ import {
 	type ProviderFamily,
 	taskProviderFamily,
 } from "../lib/pixel-office-providers";
+import type { DecorId } from "../lib/pixel-office-seasons";
+import { type AgentSkin, savedHiddenDecor, savedSkin } from "../lib/pixel-office-skins";
 import { getDisplayProgress } from "../lib/utils";
 import type { Terminal } from "./terminal-store";
 
@@ -68,6 +70,10 @@ export interface PixelOfficeSettings {
 	narratives: boolean;
 	/** Have the page's model write the scenes (sends the task's title to it). */
 	narrativesAi: boolean;
+	/** How the characters are dressed (`lib/pixel-office-skins.ts`). */
+	agentSkin: AgentSkin;
+	/** Earned decor the person chose not to show. */
+	hiddenDecor: DecorId[];
 }
 
 /**
@@ -413,6 +419,8 @@ const DEFAULT_SETTINGS: PixelOfficeSettings = {
 	calmMode: false,
 	narratives: true,
 	narrativesAi: false,
+	agentSkin: "provider",
+	hiddenDecor: [],
 };
 
 export const usePixelOfficeStore = create<PixelOfficeState>()(
@@ -536,6 +544,8 @@ export const usePixelOfficeStore = create<PixelOfficeState>()(
 						...saved,
 						// Sending titles to a model is opt-in: only a saved `true` turns it on.
 						narrativesAi: saved.narrativesAi === true,
+						agentSkin: savedSkin(saved.agentSkin),
+						hiddenDecor: savedHiddenDecor(saved.hiddenDecor),
 					},
 				};
 			},

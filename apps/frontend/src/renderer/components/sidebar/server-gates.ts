@@ -39,6 +39,10 @@ export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarVie
 	// and run by the server (`main/server-governance.ts`); the rules editor of
 	// this computer is not shown for it.
 	"guardrails",
+	// Its board's cards in the office, and the team leaderboard computed by
+	// the server (`main/server-pixel-office.ts`); no terminal is opened on the
+	// mirror and no local runner reads it.
+	"pixel-office",
 	"administration",
 ]);
 

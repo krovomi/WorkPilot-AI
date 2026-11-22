@@ -64,3 +64,72 @@ export interface NarrativeRequest {
 export type NarrativeResult =
 	| { success: true; text: string }
 	| { success: false };
+
+/**
+ * A person's badges on a server, counted there since the start
+ * (`apps/backend/shared_features/pixel_office.py`, `BADGES`).
+ */
+export const TEAM_BADGE_IDS = [
+	"first_delivery",
+	"ten_deliveries",
+	"complex_delivery",
+	"first_review",
+	"ten_reviews",
+] as const;
+
+export type TeamBadgeId = (typeof TEAM_BADGE_IDS)[number];
+
+/** The project alone, or its organization's projects the person may read. */
+export const TEAM_BOARD_SCOPES = ["project", "org"] as const;
+export type TeamBoardScope = (typeof TEAM_BOARD_SCOPES)[number];
+
+/** This quarter, or since the start. */
+export const TEAM_BOARD_PERIODS = ["season", "all"] as const;
+export type TeamBoardPeriod = (typeof TEAM_BOARD_PERIODS)[number];
+
+export interface TeamBoardRequest {
+	scope: TeamBoardScope;
+	period: TeamBoardPeriod;
+}
+
+/** Someone who agreed to show by name on the leaderboard. */
+export interface TeamBoardEntry {
+	rank: number;
+	name: string;
+	delivered: number;
+	reviews: number;
+	points: number;
+	badges: TeamBadgeId[];
+	/** The person looking at it. */
+	you: boolean;
+}
+
+/** The person's own score and badges, whether or not they show by name. */
+export interface TeamBoardSelf {
+	visible: boolean;
+	delivered: number;
+	reviews: number;
+	points: number;
+	badges: TeamBadgeId[];
+	/** Their rank among the people named; null when they are not named. */
+	rank: number | null;
+}
+
+export interface TeamBoard {
+	scope: TeamBoardScope;
+	period: TeamBoardPeriod;
+	seasonStart: string;
+	seasonEnd: string;
+	/** How many projects were counted. */
+	projects: number;
+	entries: TeamBoardEntry[];
+	me: TeamBoardSelf;
+}
+
+export type TeamBoardResult =
+	| { success: true; board: TeamBoard }
+	| { success: false; error: string };
+
+export type TeamConsentResult =
+	| { success: true; visible: boolean }
+	| { success: false; error: string };

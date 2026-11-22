@@ -311,6 +311,8 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/api/features/mcp-reviews"): scoped("marketplace.read"),
     ("PUT", "/api/features/mcp-reviews"): scoped("marketplace.write"),
     ("DELETE", "/api/features/mcp-reviews/{review_id}"): scoped("marketplace.write"),
+    ("GET", "/api/features/pixel-office/leaderboard"): scoped("analytics.read"),
+    ("PUT", "/api/features/pixel-office/consent"): scoped("analytics.read"),
     ("GET", "/api/features/replay-shares/mine"): needs("lab.read"),
     ("GET", "/api/features/replay-shares/usage"): scoped("lab.read"),
     # Governance of a server project: reading is the audit domain, the rest

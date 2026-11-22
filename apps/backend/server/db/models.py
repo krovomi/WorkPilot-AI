@@ -1025,3 +1025,27 @@ class McpServerReview(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
+
+
+class LeaderboardConsent(Base):
+    """Whether a person agreed to show by name on their organization's
+    Pixel Office leaderboards (#350).
+
+    No row, or ``visible`` false, is no: the leaderboard then counts the
+    person's work without naming it to anyone but them
+    (``shared_features/pixel_office.py``). One row per person and
+    organization, written only by that person.
+    """
+
+    __tablename__ = "leaderboard_consents"
+
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    visible: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )

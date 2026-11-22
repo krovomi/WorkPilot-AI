@@ -217,5 +217,52 @@
 			"neon-sign": "une enseigne néon",
 			"arcade": "une borne d'arcade"
 		}
+	},
+	"team": {
+		"open": "Afficher le classement de l'équipe",
+		"title": "Classement de l'équipe",
+		"scopeLabel": "Quels projets",
+		"scope": {
+			"project": "Ce projet",
+			"org": "Organisation"
+		},
+		"periodLabel": "Quelle période",
+		"period": {
+			"season": "Cette saison",
+			"all": "Depuis le début"
+		},
+		"loading": "Lecture du classement sur le serveur de l'équipe…",
+		"error": "Le serveur n'a pas pu donner le classement.",
+		"empty": "Personne n'apparaît encore par son nom ici.",
+		"rank": "{{rank}}ᵉ",
+		"you": "{{name}} (vous)",
+		"points_one": "{{count}} pt",
+		"points_other": "{{count}} pts",
+		"mine": "Votre travail",
+		"mySummary": "{{points}} points : {{delivered}} livrées, {{reviews}} revues de la tâche d'un collègue.",
+		"noBadges": "Aucun badge pour l'instant : livrez une tâche ou relisez celle d'un collègue.",
+		"showMe": "Montrer mon nom à l'équipe",
+		"shown": "Votre nom et votre score apparaissent dans les classements de votre organisation.",
+		"hidden": "Désactivé : votre travail n'est compté que pour vous, personne d'autre ne le voit.",
+		"howItCounts": "Calculé par le serveur de votre équipe, jamais envoyé ailleurs. Une tâche livrée vaut 1 à 3 points selon sa complexité évaluée ; relire la tâche d'un collègue en vaut 2. Aucun jeton ni prix n'est compté.",
+		"badges": {
+			"first_delivery": "Première tâche livrée",
+			"ten_deliveries": "Dix tâches livrées",
+			"complex_delivery": "Une tâche complexe livrée",
+			"first_review": "Première revue de la tâche d'un collègue",
+			"ten_reviews": "Dix revues de tâches de collègues"
+		}
+	},
+	"cosmetics": {
+		"open": "Choisir l'apparence du bureau",
+		"skins": "Personnages",
+		"skin": {
+			"provider": "Couleurs du fournisseur",
+			"classic": "Leurs propres couleurs",
+			"neon": "Néon"
+		},
+		"neonLocked": "Le néon est une récompense : atteignez une fois chaque objectif de saison pour le porter.",
+		"neonEarned": "Néon gagné : chaque objectif de saison a été atteint.",
+		"decor": "Décor gagné"
 	}
 }
