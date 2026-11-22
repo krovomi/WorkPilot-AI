@@ -35,15 +35,21 @@ __all__ = ["FakeGh", "write_fake_gh"]
 _PROGRAM = """
 import json, os, sys, time
 from pathlib import Path
-# gh writes UTF-8; `-I` ignores PYTHONUTF8, so say it here (Windows: cp1252).
-sys.stdout.reconfigure(encoding="utf-8")
-sys.stderr.reconfigure(encoding="utf-8")
+# gh writes UTF-8 and bare LF; `-I` ignores PYTHONUTF8, so say it here
+# (Windows: cp1252, and a text stream turns each "\\n" into "\\r\\n").
+sys.stdout.reconfigure(encoding="utf-8", newline="\\n")
+sys.stderr.reconfigure(encoding="utf-8", newline="\\n")
 here = Path(__file__).parent
 args = sys.argv[1:]
 with open(here / "gh-calls.jsonl", "a", encoding="utf-8") as log:
     log.write(json.dumps(args) + "\\n")
 with open(here / "gh-repos.jsonl", "a", encoding="utf-8") as log:
     log.write(json.dumps(os.environ.get("GH_REPO")) + "\\n")
+# Like gh, stdin is read only when a flag names it ("--body-file -").
+reads_stdin = any(a == "--body-file" and b == "-" for a, b in zip(args, args[1:]))
+stdin = sys.stdin.buffer.read().decode("utf-8") if reads_stdin else None
+with open(here / "gh-stdin.jsonl", "a", encoding="utf-8") as log:
+    log.write(json.dumps(stdin) + "\\n")
 answers = json.loads((here / "gh-answers.json").read_text(encoding="utf-8"))
 joined = " ".join(args)
 keys = sorted((k for k in answers if joined == k or joined.startswith(k + " ")), key=len)
@@ -71,6 +77,15 @@ class FakeGh:
     def repos(self) -> list[str | None]:
         """The GH_REPO each call ran with, in the order of `calls()` (None: unset)."""
         log = self.directory / "gh-repos.jsonl"
+        if not log.exists():
+            return []
+        return [
+            json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()
+        ]
+
+    def stdins(self) -> list[str | None]:
+        """What each call read on stdin, in the order of `calls()` (None: nothing)."""
+        log = self.directory / "gh-stdin.jsonl"
         if not log.exists():
             return []
         return [
