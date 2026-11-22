@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
 	handlers: new Map<string, (...args: unknown[]) => unknown>(),
 	projects: new Map<string, { id: string; path: string; remote?: unknown }>(),
 	backendFetch: vi.fn(),
+	authedFetch: vi.fn(),
 }));
 
 vi.mock("electron", () => ({
@@ -19,6 +20,7 @@ vi.mock("electron", () => ({
 	},
 }));
 vi.mock("../../_backend-fetch", () => ({ backendFetch: state.backendFetch }));
+vi.mock("../../../server-connection", () => ({ authedFetch: state.authedFetch }));
 vi.mock("../../server-feature-files", () => ({
 	featureProject: (id: unknown) =>
 		typeof id === "string" ? state.projects.get(id) : undefined,
@@ -35,6 +37,7 @@ import {
 } from "../memory-lifecycle-validation";
 
 const MEMORY = "knowledge/projects/shop/memory/gotchas/never-push-on-friday.md";
+const INVALID = { success: false, error: "invalid" };
 
 function call(channel: string, ...args: unknown[]) {
 	const handler = state.handlers.get(channel);
@@ -46,6 +49,7 @@ beforeEach(() => {
 	state.handlers.clear();
 	state.projects.clear();
 	state.backendFetch.mockReset();
+	state.authedFetch.mockReset();
 	state.projects.set("p1", { id: "p1", path: "/work/shop" });
 	state.projects.set("remote", { id: "remote", path: "/srv/x", remote: { serverId: "s" } });
 	registerMemoryLifecycleHandlers();
@@ -120,10 +124,6 @@ describe("a memory is named by its vault path, checked in main", () => {
 		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "/etc")).toEqual({
 			success: false,
 			error: "project-not-found",
-		});
-		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "remote")).toEqual({
-			success: false,
-			error: "server-project",
 		});
 		expect(state.backendFetch).not.toHaveBeenCalled();
 	});
@@ -246,18 +246,13 @@ describe("history, restore and the backend's refusals", () => {
 		});
 	});
 
-	it("answers server-project for history, forget and restore of a server project", async () => {
-		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_HISTORY, "remote", MEMORY)).toEqual({
-			success: false,
-			error: "server-project",
-		});
-		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_FORGET, "remote", MEMORY, "old")).toEqual({
-			success: false,
-			error: "server-project",
-		});
-		expect(
-			await call(IPC_CHANNELS.CONTEXT_MEMORY_RESTORE, "remote", "gotchas/never-push-on-friday.md"),
-		).toEqual({ success: false, error: "server-project" });
+	it("checks a server project's ids in main too, before the server is called", async () => {
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_HISTORY, "remote", "../x.md")).toEqual(INVALID);
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_FORGET, "remote", "/etc/x.md", "old")).toEqual(
+			INVALID,
+		);
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_RESTORE, "remote", "../x.md")).toEqual(INVALID);
+		expect(state.authedFetch).not.toHaveBeenCalled();
 		expect(state.backendFetch).not.toHaveBeenCalled();
 	});
 });
@@ -371,7 +366,6 @@ describe("pins, conflicts and the arbiter's opinion", () => {
 			await call(IPC_CHANNELS.CONTEXT_MEMORY_SUGGEST_RESOLUTION, "p1", "../../x"),
 		).toEqual({ success: false, error: "invalid" });
 		for (const [channel, args] of [
-			[IPC_CHANNELS.CONTEXT_MEMORY_PIN, [MEMORY, true]],
 			[IPC_CHANNELS.CONTEXT_MEMORY_RESOLVE_CONFLICT, [CONFLICT, "dismiss"]],
 			[IPC_CHANNELS.CONTEXT_MEMORY_SUGGEST_RESOLUTION, [CONFLICT]],
 		] as const) {
@@ -396,11 +390,9 @@ describe("taking a decision back", () => {
 				error: "invalid",
 			});
 		}
-		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "remote", ENTRY)).toEqual({
-			success: false,
-			error: "server-project",
-		});
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "remote", "../../x")).toEqual(INVALID);
 		expect(state.backendFetch).not.toHaveBeenCalled();
+		expect(state.authedFetch).not.toHaveBeenCalled();
 	});
 
 	it("reverts with the project's own path and reads the outcome", async () => {
@@ -467,15 +459,10 @@ describe("a memory's scope and the maintainers", () => {
 				error: "invalid",
 			});
 		}
-		for (const [channel, args] of [
-			[IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, [MEMORY, "apps/"]],
-			[IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, [["Bob"]]],
-		] as const) {
-			expect(await call(channel, "remote", ...args)).toEqual({
-				success: false,
-				error: "server-project",
-			});
-		}
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, "remote", ["Bob"])).toEqual({
+			success: false,
+			error: "server-project",
+		});
 		expect(state.backendFetch).not.toHaveBeenCalled();
 	});
 
@@ -526,5 +513,107 @@ describe("a memory's scope and the maintainers", () => {
 		};
 		expect(view.data.maintainers).toEqual(["Bob"]);
 		expect(view.data.canArbitrate).toBe(false);
+	});
+});
+
+describe("a server project's memory is its own brain, on the server", () => {
+	it("reads the lifecycle and a history by the project's id, never a path", async () => {
+		state.authedFetch
+			.mockResolvedValueOnce({
+				ok: true,
+				data: { success: true, journal: [{ id: "0123456789ab" }], pinned: 2, conflicts: [] },
+			})
+			.mockResolvedValueOnce({ ok: true, data: { success: true, entries: [{ id: "e" }] } });
+		const view = await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "remote");
+		expect(view).toMatchObject({ success: true, data: { pinned: 2, maintainers: [] } });
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_HISTORY, "remote", MEMORY)).toEqual({
+			success: true,
+			data: [{ id: "e" }],
+		});
+		expect(state.authedFetch.mock.calls).toEqual([
+			["/api/features/context/memory/lifecycle?project_id=remote&limit=200", "GET"],
+			[
+				`/api/features/context/memory/history?project_id=remote&id=${encodeURIComponent(MEMORY)}`,
+				"GET",
+			],
+		]);
+		expect(JSON.stringify(state.authedFetch.mock.calls)).not.toContain("/srv/x");
+		expect(state.backendFetch).not.toHaveBeenCalled();
+	});
+
+	it("sends each decision with the project's id in the query and the fields in the body", async () => {
+		state.authedFetch.mockResolvedValue({ ok: true, data: { success: true, count: 1 } });
+		await call(IPC_CHANNELS.CONTEXT_MEMORY_FORGET, "remote", MEMORY, "old");
+		await call(IPC_CHANNELS.CONTEXT_MEMORY_RESTORE, "remote", "gotchas/x.md");
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_PIN, "remote", MEMORY, true)).toEqual({
+			success: true,
+			data: { count: 1 },
+		});
+		await call(IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, "remote", MEMORY, "apps/");
+		await call(IPC_CHANNELS.CONTEXT_MEMORY_REVERT, "remote", "0123456789ab");
+		const query = "?project_id=remote";
+		expect(state.authedFetch.mock.calls).toEqual([
+			[`/api/features/context/memory/forget${query}`, "POST", { id: MEMORY, reason: "old" }],
+			[`/api/features/context/memory/restore${query}`, "POST", { id: "gotchas/x.md" }],
+			[`/api/features/context/memory/pin${query}`, "POST", { id: MEMORY, pinned: true }],
+			[`/api/features/context/memory/scope${query}`, "POST", { id: MEMORY, applies_to: "apps/" }],
+			[`/api/features/context/memory/revert${query}`, "POST", { entry_id: "0123456789ab" }],
+		]);
+		expect(state.backendFetch).not.toHaveBeenCalled();
+	});
+
+	it("passes the server's refusals and failures through", async () => {
+		state.authedFetch
+			.mockResolvedValueOnce({ ok: false, error: "Missing permission: insight.write" })
+			.mockResolvedValueOnce({ ok: true, data: { success: false, error: "no-brain", code: "no-brain" } })
+			.mockResolvedValueOnce({ ok: true, data: { success: false } })
+			.mockResolvedValueOnce({ ok: true, data: ["not", "a", "view"] })
+			.mockResolvedValueOnce({ ok: true, data: null });
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_PIN, "remote", MEMORY, true)).toEqual({
+			success: false,
+			error: "Missing permission: insight.write",
+		});
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "remote")).toEqual({
+			success: false,
+			error: "no-brain",
+		});
+		expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_FORGET, "remote", MEMORY, "")).toEqual({
+			success: false,
+			error: "failed",
+		});
+		for (let i = 0; i < 2; i++) {
+			expect(await call(IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE, "remote")).toEqual({
+				success: false,
+				error: "invalid-answer",
+			});
+		}
+	});
+
+	it("keeps the conflict queue, its maintainers and the model's opinion on the desktop", async () => {
+		for (const [channel, args] of [
+			[IPC_CHANNELS.CONTEXT_MEMORY_RESOLVE_CONFLICT, ["0123456789abcdef", "dismiss"]],
+			[IPC_CHANNELS.CONTEXT_MEMORY_SUGGEST_RESOLUTION, ["0123456789abcdef"]],
+			[IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, [["Bob"]]],
+		] as const) {
+			expect(await call(channel, "remote", ...args)).toEqual({
+				success: false,
+				error: "server-project",
+			});
+		}
+		for (const [channel, args] of [
+			[IPC_CHANNELS.CONTEXT_MEMORY_HISTORY, [MEMORY]],
+			[IPC_CHANNELS.CONTEXT_MEMORY_FORGET, [MEMORY, ""]],
+			[IPC_CHANNELS.CONTEXT_MEMORY_RESTORE, ["gotchas/x.md"]],
+			[IPC_CHANNELS.CONTEXT_MEMORY_PIN, [MEMORY, true]],
+			[IPC_CHANNELS.CONTEXT_MEMORY_REVERT, ["0123456789ab"]],
+			[IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE, [MEMORY, ""]],
+			[IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS, [["Bob"]]],
+		] as const) {
+			expect(await call(channel, "nowhere", ...args)).toEqual({
+				success: false,
+				error: "project-not-found",
+			});
+		}
+		expect(state.authedFetch).not.toHaveBeenCalled();
 	});
 });
