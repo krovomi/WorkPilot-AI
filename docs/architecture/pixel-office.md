@@ -1,10 +1,10 @@
 ---
 feature: Pixel Office
 summary: >-
-  Les agents du projet en personnages pixel art, aux couleurs de leur fournisseur ; succès et
-  saisons trimestrielles calculés à partir de faits normalisés (tâche livrée, QA du premier coup,
-  incident résolu, accord d'un second moteur) sur tous les providers ; mini-scènes quand une tâche
-  change de mains, écrites par le modèle de la page sur option ; mode TV plein écran et mode calme.
+  Les agents en personnages pixel art ; succès et saisons tirés de faits normalisés (tâche livrée,
+  QA du premier coup, incident résolu) sur tous les providers ; mini-scènes ; mode TV et mode
+  calme ; habits et décor au choix ; sur un projet du serveur, classement d'équipe opt-in et
+  badges par personne calculés par le serveur, sans télémétrie.
 ---
 
 # Pixel Office (#350)
@@ -13,7 +13,9 @@ Pixel Office montre chaque terminal d'agent, chaque tâche active du Kanban et c
 d'un swarm en personnage à son bureau (`components/pixel-office/`, état dans
 `stores/pixel-office-store.ts`). #350 y ajoute des **succès** qui racontent ce que le projet a
 livré et un **mode TV** pour l'écran d'une équipe (lot 1), puis des **saisons** qui décorent le
-bureau, des **mini-scènes** et la **couleur du fournisseur** de chaque personnage (lot 3).
+bureau, des **mini-scènes** et la **couleur du fournisseur** de chaque personnage (lot 3), enfin
+les **cosmétiques au choix** et, sur un projet du serveur, le **classement d'équipe** et les
+**badges par personne** (lot 4).
 
 ## Succès
 
@@ -128,15 +130,68 @@ Gemini, un modèle Ollama local), et `runOneShotLLM` les exécute. La réponse e
 ligne bornée sans caractère de contrôle (`narrativeText`) ; un refus, un échec ou une réponse
 vide laissent le gabarit.
 
+## Cosmétiques
+
+`renderer/lib/pixel-office-skins.ts`, `CosmeticsPanel.tsx`. Trois habits : la couleur du
+fournisseur (par défaut), les couleurs propres du personnage, ou le **néon**, une récompense
+portée une fois chaque objectif de saison atteint au moins une fois (les cinq pièces de décor
+gagnées). Un néon choisi sur un projet qui ne l'a pas gagné n'y est pas porté : le bureau
+s'habille alors par fournisseur (`wornSkin`). Chaque pièce de décor gagnée peut être cachée ; le
+canvas dessine le reste (`shownDecor`). Les deux choix sont des préférences d'affichage de ce
+poste (`settings.agentSkin`, `settings.hiddenDecor`), relues depuis des listes fermées. Le canvas
+et la file d'attente prennent la chemise de `agentShirt(famille, habit)`.
+
+## Classement d'équipe et badges (mode serveur)
+
+Sur l'ordinateur, rien ne dit qui a fait le travail ; un serveur le sait. La feature
+`pixel_office` (domaine `analytics`, servie par un serveur) calcule, **sur le serveur et pour la
+seule personne qui demande**, à partir de sa base et des fichiers du clone
+(`apps/backend/shared_features/pixel_office.py`). Rien n'est envoyé à un service central : pas
+de télémétrie.
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire le classement et son propre score | `GET /api/features/pixel-office/leaderboard?project_id=…&scope=project\|org&period=season\|all` | `analytics.read`, un rôle sur le projet |
+| Montrer ou cacher son nom | `PUT /api/features/pixel-office/consent?project_id=…`, corps `{"visible": bool}` | `analytics.read` (`ROUTE_OVERRIDES`) : la route n'écrit que la ligne de la personne ; écrit au journal d'audit |
+
+**Ce qui compte.** Une carte livrée (`done` ou `pr_created`) est créditée à la personne qui a
+lancé son dernier build réussi (`agent_runs.started_by`) et vaut la complexité évaluée par
+l'agent de spec (`complexity_assessment.json`, lu par `approval_policy.assessed_criticality`,
+dossier de carte résolu par `board_mcp.card_dir`, lien refusé) : 1, 2 ou 3 points, 1 sans
+évaluation. La criticité qu'une personne choisit n'est pas lue : personne ne relève son propre
+score. L'approbation d'une carte écrite et livrée par un autre (`spec_approvals`) compte comme de
+l'**entraide**, 2 points, une fois par carte et par personne : relire pèse comme livrer une carte
+standard, le classement ne récompense pas le travail en solo ni les petites cartes. **Aucun
+jeton ni prix** n'est lu : le même travail vaut autant sur Claude, un modèle local ou un autre
+fournisseur. C'est la forme stricte de « pondérer par le coût normalisé » : un coût, même
+normalisé, suit le nombre de jetons, qu'un modèle bavard gonfle.
+
+**Qui est nommé.** Personne, sans son accord (`leaderboard_consents`, une ligne par personne et
+organisation, migration `0023`, écrite par la seule personne). Sans accord, le travail de la
+personne n'est compté que pour elle : `me` donne toujours son score et ses badges, `entries` ne
+liste que les personnes qui ont dit oui, au plus 50, rang partagé à points égaux. Aucun total des
+autres n'est donné : avec une seule personne absente, ce serait le sien.
+
+**Où et quand.** `scope=project` lit le projet ; `scope=org`, chaque projet de son organisation
+que la personne lit elle-même (`load_project_scope`, au plus 100), comme `/workspace/compare`.
+`period=season` est le trimestre civil en UTC (l'heure du serveur, pour que chacun lise le même
+classement), `all` depuis le début ; les badges (`BADGES` : première livraison, dix livraisons,
+une carte complexe, première revue, dix revues) comptent toujours depuis le début.
+
+**Dans l'app.** Pixel Office s'ouvre sur un projet du serveur (`SERVER_PROJECT_VIEWS`) : ses
+personnages sont ses cartes, aucun terminal ne s'ouvre sur le miroir et aucun runner
+Self-Healing local ne le lit. La barre d'outils y ajoute `TeamBoardPanel.tsx`
+(`use-team-board.ts`), lu seulement tant qu'il est ouvert ; une réponse pour un choix ou un
+projet quitté est jetée. Le main (`main/server-pixel-office.ts`, canaux
+`PIXEL_OFFICE_TEAM_BOARD` et `PIXEL_OFFICE_TEAM_CONSENT`) revérifie l'id de projet (un projet
+listé du serveur), la portée et la période (listes fermées), le booléen, et relit la réponse
+champ par champ (nom ramené à un libellé, entiers, badges connus).
+
 ## Pas encore fait
 
-- **Classement d'équipe**, opt-in par personne (aucun nom affiché sans accord), pondéré par la
-  complexité estimée et le coût normalisé (catalogue Cost Intelligence), qui compte l'entraide
-  (revues, approbations) ; en mode serveur, agrégé par organisation. Il faut une personne derrière
-  chaque fait : seul le mode serveur en a (`specs_index.claimed_by`, `spec_approvals`). C'est une
-  route du serveur avec sa permission, une table d'accord et sa migration, puis un client dans
-  l'app : un lot à lui.
-- **Succès d'équipe et profil** : badges par personne en mode serveur (aujourd'hui, par projet
-  et sur ce poste), sur la même route que le classement.
-- Récompenses cosmétiques au choix (skins d'agents) : aujourd'hui, le décor gagné s'affiche
-  entier, sans réglage.
+Rien de ce que demande #350 et qui se construit ici. Hors de portée :
+
+- **Mesurer l'engagement** (temps passé sur l'onglet, équipes qui activent le mode TV, part des
+  personnes qui ont un succès) : ce sont des métriques d'usage du produit, qui demandent de la
+  télémétrie, et la décision est de ne pas en envoyer. Les mesurer sur le serveur d'une équipe,
+  pour cette équipe, serait une autre décision produit.
