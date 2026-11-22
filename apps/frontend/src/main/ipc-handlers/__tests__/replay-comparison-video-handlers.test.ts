@@ -77,8 +77,10 @@ describe("the format", () => {
 	});
 
 	it("ends the file name in the format's extension", async () => {
+		// The native realpath, as saveTarget uses: on Windows it expands an 8.3
+		// short name of the temp folder (RUNNER~1), which realpathSync keeps.
 		expect(await saveTarget(path.join(dir, "demo"), ".mp4")).toBe(
-			path.join(realpathSync(dir), "demo.mp4"),
+			path.join(realpathSync.native(dir), "demo.mp4"),
 		);
 		expect(await saveTarget(path.join(dir, "demo.webm"), ".mp4")).toMatch(/demo\.webm\.mp4$/);
 	});

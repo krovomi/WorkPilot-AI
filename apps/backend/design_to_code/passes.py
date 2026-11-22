@@ -160,7 +160,8 @@ def clean_layout(raw: object) -> dict:
     """The layout probe's answer, typed and bounded."""
     data = raw if isinstance(raw, dict) else {}
     overflow = data.get("overflow_px")
-    overlaps = data.get("overlaps") if isinstance(data.get("overlaps"), list) else []
+    overlaps = data.get("overlaps")
+    overlaps = overlaps if isinstance(overlaps, list) else []
     return {
         "overflow_px": int(overflow)
         if isinstance(overflow, int | float) and overflow > 0
@@ -235,9 +236,13 @@ def _targets(raw: object, limit: int) -> list[_Target]:
     for item in raw if isinstance(raw, list) else []:
         if not isinstance(item, dict):
             continue
-        values = [item.get(k) for k in ("x", "y", "w", "h")]
-        if all(isinstance(v, int | float) for v in values):
-            x, y, w, h = (float(v) for v in values)
+        values = [
+            float(v)
+            for k in ("x", "y", "w", "h")
+            if isinstance(v := item.get(k), int | float)
+        ]
+        if len(values) == 4:
+            x, y, w, h = values
             found.append(_Target(_label(item.get("label", "")), (x, y, w, h)))
     return found[:limit]
 
