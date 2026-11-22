@@ -497,6 +497,12 @@
 				"escape": "Esc",
 				"delete": "Delete"
 			}
+		},
+		"capacity": {
+			"slots": "slots",
+			"wip": "limit {{limit}}",
+			"slotsAria": "{{count}} of {{limit}} parallel slots in use",
+			"wipAria": "{{count}} cards, limit {{limit}}"
 		}
 	},
 	"queue": {

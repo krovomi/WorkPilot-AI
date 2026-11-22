@@ -1,0 +1,200 @@
+/* Kanban columns, « Bandeau » style (docs/architecture/kanban-columns.md).
+   Each column keeps its accent (--col-accent, set by the .column-* rules of
+   globals.css). The body is a neutral surface so the Halo cards carry the
+   colour; the header is a band washed with the accent, holding the icon,
+   the name, the big count and the capacity gauge. Text colours that sit on
+   the band (--col-ink, --col-warn-ink, --col-on, --col-icon) are computed per
+   theme by lib/kanban-column-tokens.ts; each falls back to a theme token. */
+
+.kanban-column {
+  background-color: color-mix(in oklab, var(--card) 40%, var(--background));
+  border: 1px solid var(--border);
+}
+
+.kanban-col-band {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 22%, var(--card)),
+    color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 11%, var(--card))
+  );
+  border-bottom: 1px solid color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 30%, var(--border));
+  border-radius: calc(0.75rem - 1px) calc(0.75rem - 1px) 0 0;
+}
+
+.kanban-col-icon {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.5rem;
+  background-color: var(--col-accent, var(--muted-foreground));
+  color: var(--col-on, var(--background));
+}
+
+.kanban-col-icon svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.kanban-col-icon-busy {
+  animation: kanban-col-turn 2.4s linear infinite;
+}
+
+@keyframes kanban-col-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.kanban-col-count {
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--col-ink, var(--foreground));
+  white-space: nowrap;
+}
+
+.kanban-col-count small {
+  margin-left: 1px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted-foreground);
+}
+
+.kanban-col-count[data-warn] {
+  color: var(--col-warn-ink, var(--foreground));
+}
+
+.kanban-col-gauge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.kanban-col-gauge-seg,
+.kanban-col-gauge-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 3px;
+  background-color: color-mix(in oklab, var(--foreground) 12%, transparent);
+  overflow: hidden;
+}
+
+.kanban-col-gauge-seg[data-on],
+.kanban-col-gauge-bar > span {
+  background-color: var(--col-accent, var(--muted-foreground));
+}
+
+.kanban-col-gauge-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.kanban-col-gauge[data-warn] .kanban-col-gauge-seg[data-on],
+.kanban-col-gauge[data-warn] .kanban-col-gauge-bar > span {
+  background-color: var(--warning);
+}
+
+.kanban-col-gauge-label {
+  margin-left: 0.25rem;
+  font-size: 0.625rem;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Collapsed column: the whole strip is the band. */
+.kanban-column:has(> .kanban-col-collapsed) {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 22%, var(--card)),
+    color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 6%, var(--card)) 60%
+  );
+}
+
+.kanban-col-collapsed .kanban-col-count {
+  font-size: 1rem;
+}
+
+/* The strip is too narrow for words: the drop target keeps its icon, its
+   words stay for screen readers. */
+.kanban-col-collapsed-list .kanban-col-empty {
+  padding-block: 0.75rem;
+}
+
+.kanban-col-collapsed-list .kanban-col-empty-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Empty column: the icon in a halo of the accent, inside a dashed frame
+   that shows where a card goes. */
+.kanban-col-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  border-color: var(--border);
+  padding-block: 1.5rem;
+}
+
+.kanban-col-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-bottom: 0.25rem;
+  border-radius: 999px;
+  color: var(--col-icon, var(--muted-foreground));
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 20%, transparent) 0%,
+    color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 6%, transparent) 70%
+  );
+}
+
+.kanban-col-empty-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.kanban-col-empty-hint {
+  max-width: 22ch;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  color: var(--muted-foreground);
+}
+
+.kanban-col-empty.active {
+  border-color: color-mix(in oklab, var(--col-accent, var(--primary)) 60%, transparent);
+  background-color: color-mix(in oklab, var(--col-accent, var(--primary)) 8%, transparent);
+}
+
+/* The column under a dragged card lights up in its own accent. */
+.kanban-column.drop-zone-highlight {
+  border-color: color-mix(in oklab, var(--col-accent, var(--primary)) 70%, transparent);
+  background-color: color-mix(
+    in oklab,
+    var(--col-accent, var(--primary)) 6%,
+    color-mix(in oklab, var(--card) 40%, var(--background))
+  );
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--col-accent, var(--primary)) 18%, transparent),
+    0 0 28px -6px color-mix(in oklab, var(--col-accent, var(--primary)) 45%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kanban-col-icon-busy {
+    animation: none;
+  }
+}
