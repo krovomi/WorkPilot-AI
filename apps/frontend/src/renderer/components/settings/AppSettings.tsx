@@ -26,6 +26,7 @@ import { CollaborationSettings } from "../collaboration/CollaborationSettings";
 import { ServerMcpSettings } from "./ServerMcpSettings";
 import { ServerNeedsYouSettings } from "./ServerNeedsYouSettings";
 import { ServerReplayLinksSettings } from "./ServerReplayLinksSettings";
+import { ServerConnectSettings } from "./ServerConnectSettings";
 import { ServerSessionSettings } from "./ServerSessionSettings";
 import { ServerTokensSettings } from "./ServerTokensSettings";
 import { ModuleStage, Notice, toneClass } from "../charter";
@@ -175,8 +176,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	// The person's own tokens on the server: anyone signed in to one.
 	const hidden = new Set([
 		...(isServerAdmin ? [] : ["team-invitations"]),
+		// "server-session" stays: in local mode it is where one signs in.
 		...(serverMode === "server" ? [] : [
-					"server-session",
 					"server-tokens",
 					"server-mcp",
 					"server-needs-you",
@@ -456,7 +457,11 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 			case "team-invitations":
 				return isServerAdmin ? <InvitationsAdmin /> : null;
 			case "server-session":
-				return serverMode === "server" ? <ServerSessionSettings /> : null;
+				return serverMode === "server" ? (
+					<ServerSessionSettings />
+				) : (
+					<ServerConnectSettings onConnect={() => onOpenChange(false)} />
+				);
 			case "server-tokens":
 				return serverMode === "server" ? <ServerTokensSettings /> : null;
 			case "server-mcp":
