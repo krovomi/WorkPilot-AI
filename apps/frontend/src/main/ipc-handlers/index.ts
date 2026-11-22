@@ -93,6 +93,7 @@ import { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 import { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 import { registerGithubHandlers } from "./github-handlers";
 import { registerGitlabHandlers } from "./gitlab";
+import { registerBitbucketHandlers } from "./bitbucket";
 import { registerGovernanceHandlers } from "./governance-handlers";
 import { registerGuardrailsHandlers } from "./guardrails-handlers";
 import { registerI18nAgentHandlers } from "./i18n-agent-handlers";
@@ -232,6 +233,7 @@ export { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 export { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 export { registerGithubHandlers } from "./github-handlers";
 export { registerGitlabHandlers } from "./gitlab";
+export { registerBitbucketHandlers } from "./bitbucket";
 export { registerGovernanceHandlers } from "./governance-handlers";
 export { registerGuardrailsHandlers } from "./guardrails-handlers";
 export { registerI18nAgentHandlers } from "./i18n-agent-handlers";
@@ -405,6 +407,9 @@ export function setupIpcHandlers(
 
 	// GitLab integration handlers
 	registerGitlabHandlers(getMainWindow);
+
+	// Bitbucket Cloud integration handlers
+	registerBitbucketHandlers();
 
 	// Ideation handlers
 	registerIdeationHandlers(agentManager, getMainWindow);
