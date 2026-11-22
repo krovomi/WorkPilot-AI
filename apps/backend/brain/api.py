@@ -92,7 +92,10 @@ class SettingsRequest(BaseModel):
     conflict_embeddings: bool | None = None
     """Let a local embeddings model find memory conflicts in other words."""
     conflict_embeddings_model: str | None = None
-    """The Ollama model it uses; ``""`` for the first one Ollama has."""
+    """The local model it uses; ``""`` for the first one the server has."""
+    conflict_embeddings_provider: str | None = None
+    """The local server it asks (``ollama``, ``lm-studio``); ``""`` for Ollama,
+    else LM Studio."""
 
 
 class InstructionRequest(BaseModel):
@@ -304,8 +307,10 @@ def _embeddings_view() -> dict:
     return {
         "enabled": embeddings.enabled(),
         "model": embeddings.configured_model(),
+        "provider": embeddings.configured_provider(),
         "enabledLocked": bool(os.environ.get(embeddings.SWITCH_ENV, "").strip()),
         "modelLocked": bool(os.environ.get(embeddings.MODEL_ENV, "").strip()),
+        "providerLocked": bool(os.environ.get(embeddings.PROVIDER_ENV, "").strip()),
     }
 
 
@@ -321,8 +326,17 @@ def _save_embeddings(request: SettingsRequest) -> str | None:
             return "env-locked"
         if not embeddings.valid_model(model):
             return "invalid-model"
+    provider = request.conflict_embeddings_provider
+    if provider is not None:
+        if view["providerLocked"]:
+            return "env-locked"
+        provider = embeddings.valid_provider(provider)
+        if provider is None:
+            return "invalid-provider"
     if request.conflict_embeddings is not None and view["enabledLocked"]:
         return "env-locked"
+    if provider is not None:
+        write_config(**{embeddings.CONFIG_PROVIDER: provider or None})
     if model is not None:
         write_config(**{embeddings.CONFIG_MODEL: model or None})
     if request.conflict_embeddings is not None:
@@ -335,6 +349,27 @@ def get_settings() -> dict:
     if _refused():
         return _DESKTOP_ONLY
     return {"success": True, "settings": settings_view()}
+
+
+@router.get("/settings/embeddings")
+def get_embeddings_found() -> dict:
+    """Which local server and model a sync's review would ask now, if any.
+
+    Its own route: asking the servers waits on them (a timeout each), and the
+    settings page should not. ``found`` is ``None`` when the check is off or
+    no local server has an embedding model.
+    """
+    if _refused():
+        return _DESKTOP_ONLY
+    from .lifecycle import embeddings
+
+    found = embeddings.find() if embeddings.enabled() else None
+    return {
+        "success": True,
+        "found": (
+            {"provider": found.provider, "model": found.model} if found else None
+        ),
+    }
 
 
 def _unexpected(what: str) -> dict:
@@ -593,6 +628,62 @@ def instruction(request: InstructionRequest) -> dict:
         logger.info("brain: instruction status not changed: %s", type(exc).__name__)
         return {"success": False, "error": "invalid-path", "code": "invalid-path"}
     return {"success": True, "path": str(changed["path"]), "status": request.status}
+
+
+class VaultSignersRequest(BaseModel):
+    lines: list[str] = []
+    """One ``<name> <key>`` per line: an SSH public key or a GPG fingerprint."""
+
+
+def _vault_signers_view(brain: Brain) -> dict:
+    """The vault list in effect, for the notes outside every project."""
+    import subprocess
+
+    from .lifecycle import provenance
+
+    if not brain.exists:
+        return {"signers": [], "rejected": 0, "signing": False, "unverified": 0}
+    try:
+        trust, judged = provenance.vault_verdicts(brain.root)
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        logger.warning("brain: vault signatures not read: %s", exc)
+        trust, judged = provenance.Trust(), {}
+    return {
+        "signers": [s.to_dict() for s in trust.signers],
+        "rejected": len(trust.rejected),
+        "signing": provenance.signing_enabled(brain.root),
+        "unverified": sum(1 for v in judged.values() if v.status == "unverified"),
+    }
+
+
+@router.get("/signers")
+def get_vault_signers() -> dict:
+    """The keys whose signed notes outside every project reach agents."""
+    if _refused():
+        return _DESKTOP_ONLY
+    return {"success": True, **_vault_signers_view(Brain())}
+
+
+@router.post("/signers")
+def set_vault_signers(request: VaultSignersRequest) -> dict:
+    """Replace the vault's trusted signers (`lifecycle.signers.write_vault`).
+
+    The vault has no maintainers: whoever edits its settings here edits the
+    list, and a teammate's machine counts the change only when a key already
+    on the list signed it (`lifecycle.provenance`).
+    """
+    if _refused():
+        return _DESKTOP_ONLY
+    from .lifecycle import signers
+
+    brain = Brain()
+    if not brain.exists:
+        return {"success": False, "error": "no-brain", "code": "no-brain"}
+    kept = signers.write_vault(brain.root, request.lines[: signers.MAX_SIGNERS + 1])
+    if kept is None:
+        return {"success": False, "error": "invalid", "code": "invalid"}
+    brain.after_write("brain: change the vault's trusted signers")
+    return {"success": True, **_vault_signers_view(brain)}
 
 
 @router.get("/status")

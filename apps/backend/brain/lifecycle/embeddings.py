@@ -8,30 +8,34 @@ the machine** for the vectors, and `contradictions.compare_meaning` keeps the
 pairs that also disagree.
 
 **Optional, never a download.** No Python dependency is added: the model is
-one Ollama has already pulled, asked on its ``/api/embed``. No Ollama, no
-embedding model in its tags, a server down or slow: the pass is skipped and
-the detector is what it was, lexical only, with no error. Nothing is ever
-pulled; a model named in the settings that Ollama does not have turns the pass
-off rather than fetching it.
+one a local server already has — Ollama (pulled, listed by ``/api/tags``,
+asked on ``/api/embed``) or LM Studio (listed by its OpenAI-compatible
+``/v1/models``, asked on ``/v1/embeddings``). The provider named in the
+settings, else Ollama, else LM Studio (`PROVIDERS`); none, no embedding model,
+a server down or slow: the pass is skipped and the detector is what it was,
+lexical only, with no error. Nothing is ever pulled; a model named in the
+settings that no server asked has turns the pass off rather than fetching it.
 
 **The machine, never the network.** The endpoint is
-`offline_policy.local_endpoint` (``OLLAMA_BASE_URL``), which refuses anything
-but a loopback address, and the requests ignore proxies and follow no
-redirect. A local model is what the strict offline policy routes to, so the
-pass runs under it too. Each call has a timeout.
+`offline_policy.local_endpoint` (``OLLAMA_BASE_URL``, ``LMSTUDIO_BASE_URL``),
+which refuses anything but a loopback address, and the requests ignore proxies
+and follow no redirect. A local model is what the strict offline policy routes
+to, so the pass runs under it too. Each call has a timeout.
 
 **Bounded.** At most `MAX_EMBEDDED` notes are sent per review; a vector is
-kept per model and note statement hash in ``.workpilot-brain/embeddings.json``
-(this machine's, ignored by git), at most `MAX_CACHED` of them, so the next
-pull only sends what changed.
+kept per provider, model and note statement hash in
+``.workpilot-brain/embeddings.json`` (this machine's, ignored by git), at most
+`MAX_CACHED` of them, so the next pull only sends what changed.
 
 **A note is data.** What is sent is the note's statement, expurgated
 (`memories.redact`) and cut to `MAX_CHARS`; what comes back is read as numbers
 and nothing else.
 
 Settings (`brain.json`, the variable winning): ``BRAIN_CONFLICT_EMBEDDINGS``
-(``off`` turns it off) and ``BRAIN_CONFLICT_EMBEDDINGS_MODEL`` (empty: the
-first embedding model Ollama has, in `PREFERRED` order).
+(``off`` turns it off), ``BRAIN_CONFLICT_EMBEDDINGS_PROVIDER`` (``ollama`` or
+``lm-studio``; empty: Ollama, else LM Studio) and
+``BRAIN_CONFLICT_EMBEDDINGS_MODEL`` (empty: the first embedding model the
+server has, in `PREFERRED` order).
 """
 
 from __future__ import annotations
@@ -45,6 +49,7 @@ import math
 import os
 import re
 from array import array
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
@@ -63,20 +68,31 @@ __all__ = [
     "CACHE_FILE",
     "MAX_EMBEDDED",
     "MODEL_ENV",
+    "PROVIDERS",
+    "PROVIDER_ENV",
     "SWITCH_ENV",
     "Embedder",
+    "Found",
     "configured_model",
+    "configured_provider",
     "enabled",
+    "find",
     "open_embedder",
     "pick_model",
     "similarity",
     "valid_model",
+    "valid_provider",
 ]
 
 SWITCH_ENV = "BRAIN_CONFLICT_EMBEDDINGS"
 MODEL_ENV = "BRAIN_CONFLICT_EMBEDDINGS_MODEL"
+PROVIDER_ENV = "BRAIN_CONFLICT_EMBEDDINGS_PROVIDER"
 CONFIG_SWITCH = "conflictEmbeddings"
 CONFIG_MODEL = "conflictEmbeddingsModel"
+CONFIG_PROVIDER = "conflictEmbeddingsProvider"
+PROVIDERS = ("ollama", "lm-studio")
+"""The local servers asked, in this order when the settings name none
+(`offline_policy.local_endpoint` names)."""
 CACHE_FILE = ".workpilot-brain/embeddings.json"
 
 MAX_EMBEDDED = 200
@@ -98,7 +114,24 @@ PREFERRED = (
 """Multilingual first: the notes are in English and French."""
 
 _OFF = ("0", "false", "no", "off")
-_MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$")
+_MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,199}$")
+_ALIASES = {"lmstudio": "lm-studio"}
+
+
+@dataclass(frozen=True)
+class _Runtime:
+    """How one local server lists its models and embeds a batch."""
+
+    models_path: str
+    listing: str
+    name_field: str
+    embed_path: str
+
+
+_RUNTIMES = {
+    "ollama": _Runtime("/api/tags", "models", "name", "/api/embed"),
+    "lm-studio": _Runtime("/v1/models", "data", "id", "/v1/embeddings"),
+}
 _FAILURES = (OSError, ValueError, TypeError, http.client.HTTPException)
 
 
@@ -111,17 +144,40 @@ def enabled() -> bool:
 
 
 def valid_model(name: str) -> bool:
-    """An Ollama model name (``nomic-embed-text``, ``bge-m3:567m``), or empty."""
+    """A local model name (``nomic-embed-text``, ``bge-m3:567m``,
+    ``text-embedding-nomic-embed-text-v1.5@q8_0``), or empty."""
     return not name or bool(_MODEL.match(name))
 
 
-def configured_model() -> str:
-    """The model the person named, ``""`` for the first one Ollama has."""
-    raw = os.environ.get(MODEL_ENV, "").strip()
+def _setting(variable: str, key: str) -> str:
+    raw = os.environ.get(variable, "").strip()
     if not raw:
-        value = read_config().get(CONFIG_MODEL)
+        value = read_config().get(key)
         raw = value.strip() if isinstance(value, str) else ""
+    return raw
+
+
+def configured_model() -> str:
+    """The model the person named, ``""`` for the first one the server has."""
+    raw = _setting(MODEL_ENV, CONFIG_MODEL)
     return raw if valid_model(raw) else ""
+
+
+def valid_provider(name: str) -> str | None:
+    """*name* as one of `PROVIDERS` (``lmstudio`` is ``lm-studio``), ``""``
+    for automatic, ``None`` when it names no local server this pass asks."""
+    value = str(name or "").strip().lower()
+    value = _ALIASES.get(value, value)
+    return value if not value or value in PROVIDERS else None
+
+
+def configured_provider() -> str:
+    """The local server the person named, ``""`` for Ollama then LM Studio.
+
+    A value that names none counts as automatic: it never sends a note
+    anywhere but to a loopback server `offline_policy` accepts.
+    """
+    return valid_provider(_setting(PROVIDER_ENV, CONFIG_PROVIDER)) or ""
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -145,17 +201,19 @@ def _call(url: str, payload: dict[str, Any] | None, timeout: float) -> Any:
     return json.loads(raw.decode("utf-8"))
 
 
-def pick_model(tags: Any, wanted: str = "") -> str | None:
-    """The embedding model to use among those an ``/api/tags`` answer lists.
+def pick_model(tags: Any, wanted: str = "", provider: str = "ollama") -> str | None:
+    """The embedding model to use among those a server lists (Ollama's
+    ``/api/tags``, LM Studio's ``/v1/models``).
 
-    *wanted* when Ollama has it (``x`` matches ``x:latest``); otherwise the
-    first embedding model, `PREFERRED` ones first. A cloud model is never
-    picked: its text would leave the machine.
+    *wanted* when the server has it (on Ollama, ``x`` matches ``x:latest``);
+    otherwise the first embedding model, `PREFERRED` ones first. A cloud model
+    is never picked: its text would leave the machine.
     """
-    models = tags.get("models") if isinstance(tags, dict) else None
+    runtime = _RUNTIMES[provider]
+    models = tags.get(runtime.listing) if isinstance(tags, dict) else None
     names = []
     for entry in models if isinstance(models, list) else []:
-        name = entry.get("name") if isinstance(entry, dict) else None
+        name = entry.get(runtime.name_field) if isinstance(entry, dict) else None
         if (
             isinstance(name, str)
             and valid_model(name)
@@ -166,7 +224,11 @@ def pick_model(tags: Any, wanted: str = "") -> str | None:
             names.append(name)
     if wanted:
         for name in names:
-            if name == wanted or (":" not in wanted and name == f"{wanted}:latest"):
+            if name == wanted or (
+                provider == "ollama"
+                and ":" not in wanted
+                and name == f"{wanted}:latest"
+            ):
                 return name
         return None
 
@@ -220,12 +282,38 @@ def similarity(a: list[float], b: list[float]) -> float:
     return dot / norm if norm else 0.0
 
 
+def _embedded(provider: str, answer: Any, size: int) -> list[Any]:
+    """The vectors of one batch, in the order asked, or ``ValueError``.
+
+    Ollama answers ``{"embeddings": [[...], ...]}``; LM Studio, as the OpenAI
+    API, ``{"data": [{"embedding": [...], "index": 0}, ...]}``.
+    """
+    if not isinstance(answer, dict):
+        raise ValueError("unexpected answer")
+    if provider == "ollama":
+        found = answer.get("embeddings")
+    else:
+        data = answer.get("data")
+        if not isinstance(data, list) or not all(isinstance(d, dict) for d in data):
+            raise ValueError("unexpected answer")
+        indexes = [d.get("index") for d in data]
+        if sorted(i for i in indexes if type(i) is int) == list(range(len(data))):
+            data = sorted(data, key=lambda d: d["index"])
+        found = [d.get("embedding") for d in data]
+    if not isinstance(found, list) or len(found) != size:
+        raise ValueError("unexpected answer")
+    return found
+
+
 class Embedder:
     """One review's access to the local model: its budget and the cache."""
 
-    def __init__(self, root: Path, endpoint: str, model: str) -> None:
+    def __init__(
+        self, root: Path, endpoint: str, model: str, provider: str = "ollama"
+    ) -> None:
         self.endpoint = endpoint
         self.model = model
+        self.provider = provider
         self.budget = MAX_EMBEDDED
         self.down = False
         self.sent = 0
@@ -253,7 +341,9 @@ class Embedder:
         }
 
     def _key(self, text: str) -> str:
-        digest = hashlib.sha256(f"{self.model}\0{text}".encode()).hexdigest()
+        digest = hashlib.sha256(
+            f"{self.provider}\0{self.model}\0{text}".encode()
+        ).hexdigest()
         return digest[:40]
 
     def vectors(self, texts: list[str]) -> list[list[float] | None]:
@@ -286,13 +376,11 @@ class Embedder:
             chunk = keys[start : start + BATCH]
             try:
                 answer = _call(
-                    f"{self.endpoint}/api/embed",
+                    f"{self.endpoint}{_RUNTIMES[self.provider].embed_path}",
                     {"model": self.model, "input": [missing[k] for k in chunk]},
                     EMBED_TIMEOUT_S,
                 )
-                found = answer.get("embeddings") if isinstance(answer, dict) else None
-                if not isinstance(found, list) or len(found) != len(chunk):
-                    raise ValueError("unexpected answer")
+                found = _embedded(self.provider, answer, len(chunk))
                 vectors = [_vector(v) for v in found]
             except _FAILURES as exc:
                 logger.info("brain: local embeddings skipped: %s", type(exc).__name__)
@@ -316,17 +404,46 @@ class Embedder:
             logger.info("brain: embeddings cache not saved: %s", exc)
 
 
+@dataclass(frozen=True)
+class Found:
+    """The local server and model a review would ask."""
+
+    provider: str
+    endpoint: str
+    model: str
+
+
+def find() -> Found | None:
+    """The first local server with an embedding model: the one the settings
+    name, else Ollama, else LM Studio; ``None`` for lexical detection only.
+
+    Only listed, never pulled nor loaded by name: a model the settings name
+    is looked for on each server asked, and none that has it is none.
+    """
+    named = configured_provider()
+    wanted = configured_model()
+    for provider in (named,) if named else PROVIDERS:
+        try:
+            endpoint = local_endpoint(provider)
+        except ValueError:
+            continue
+        try:
+            listing = _call(
+                f"{endpoint}{_RUNTIMES[provider].models_path}", None, TAGS_TIMEOUT_S
+            )
+        except _FAILURES:
+            continue
+        model = pick_model(listing, wanted, provider)
+        if model:
+            return Found(provider, endpoint, model)
+    return None
+
+
 def open_embedder(root: Path) -> Embedder | None:
     """The local model for this review, or ``None``: lexical detection only."""
     if not enabled():
         return None
-    try:
-        endpoint = local_endpoint("ollama")
-    except ValueError:
+    found = find()
+    if found is None:
         return None
-    try:
-        tags = _call(f"{endpoint}/api/tags", None, TAGS_TIMEOUT_S)
-    except _FAILURES:
-        return None
-    model = pick_model(tags, configured_model())
-    return Embedder(root, endpoint, model) if model else None
+    return Embedder(root, found.endpoint, found.model, found.provider)

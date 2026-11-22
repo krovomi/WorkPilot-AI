@@ -26,6 +26,7 @@ import {
 	validBuilderProjects,
 } from "./mcp-builder-args";
 import { registerMcpReviewHandlers } from "./mcp-reviews-handlers";
+import { registerMcpSandboxHandlers } from "./mcp-sandbox-handlers";
 import {
 	installedWatchView,
 	McpWatchRequestError,
@@ -219,6 +220,9 @@ export function registerMcpMarketplaceHandlers(): void {
 
 	// The team's reviews of a catalog server, for a server project (#369).
 	registerMcpReviewHandlers();
+
+	// Whether a confined server starts on this machine, and why not (#369).
+	registerMcpSandboxHandlers();
 
 	startMcpInstalledWatch();
 

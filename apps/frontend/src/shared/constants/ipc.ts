@@ -684,6 +684,7 @@ export const IPC_CHANNELS = {
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project
+	MCP_MARKETPLACE_GET_SANDBOX: "mcpMarketplace:getSandbox", // Whether this machine starts a confined server (#369)
 
 	// Hugging Face Hub discovery (via the official HF MCP server)
 	HUGGINGFACE_SEARCH_MODELS: "huggingface:searchModels", // Live model search on the Hub

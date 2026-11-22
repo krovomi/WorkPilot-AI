@@ -165,11 +165,10 @@ class PatternSource:
         try:
             from learning_loop.pattern_storage import PatternStorage
 
+            # What an agent may recall: not a pattern no trusted key signed,
+            # nor one scoped to another branch or team.
             self._cache = [
-                p.to_dict()
-                for p in PatternStorage(self.project_dir).load_patterns(
-                    trusted_only=True
-                )
+                p.to_dict() for p in PatternStorage(self.project_dir).recall_patterns()
             ]
         except Exception as exc:  # noqa: BLE001 - no patterns is an empty source
             logger.debug("could not read the learning patterns: %s", exc)
