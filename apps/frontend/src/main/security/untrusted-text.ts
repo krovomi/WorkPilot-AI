@@ -16,14 +16,23 @@ const SCRIPT_TAG = /<script\b[\s\S]*?<\/script\b[^>]*>/gi;
 const STYLE_TAG = /<style\b[\s\S]*?<\/style\b[^>]*>/gi;
 const MARKER = /<<<+/g;
 
-/** `text` without what hides instructions from a reader, its markers defused. */
+/**
+ * `text` without what hides instructions from a reader, its markers defused.
+ * The removals repeat until nothing changes: taking one block out can join
+ * the text around it into another.
+ */
 export function cleanUntrusted(text: string): string {
-	return text
-		.replace(HTML_COMMENT, "")
-		.replace(INVISIBLE, "")
-		.replace(SCRIPT_TAG, "")
-		.replace(STYLE_TAG, "")
-		.replace(MARKER, "<<");
+	let cleaned = text;
+	let previous: string;
+	do {
+		previous = cleaned;
+		cleaned = cleaned
+			.replace(INVISIBLE, "")
+			.replace(HTML_COMMENT, "")
+			.replace(SCRIPT_TAG, "")
+			.replace(STYLE_TAG, "");
+	} while (cleaned !== previous);
+	return cleaned.replace(MARKER, "<<");
 }
 
 /** A cleaned value on one line, for a label outside the quote (a name, a path). */

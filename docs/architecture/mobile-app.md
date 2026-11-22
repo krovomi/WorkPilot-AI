@@ -35,7 +35,7 @@ applications mobiles pour un projet.
 | Sessions | `src/app/(app)/projects/[projectId]/sessions.tsx` | `GET /api/features/workspace/sessions` (les 100 dernières) |
 | Analyses | `src/app/(app)/projects/[projectId]/analyses/` | `GET /api/features/analyses/<analyse>/report`, `POST .../jobs` pour la lancer, suivie comme un job |
 | Gouvernance | `src/app/(app)/projects/[projectId]/governance.tsx` | `GET /api/features/governance`, `POST .../approvals/{id}` pour approuver ou refuser un appel, `POST .../stop` pour l'arrêt d'urgence (voir « La gouvernance ») |
-| Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout`, `PUT /users/me/preferences` (le thème, `src/ui/ThemeSection.tsx`) |
+| Réglages | `src/app/(app)/settings.tsx` | `GET /auth/me/session` (« Ma session », `src/auth/SessionSection.tsx`), `POST /auth/switch-org`, `POST /auth/logout`, `PUT /users/me/preferences` (le thème, `src/ui/ThemeSection.tsx`) |
 | Administration | `src/app/(app)/admin/` | `/admin/members`, `/auth/invitations`, `/admin/groups` (membres et projets), `/admin/roles` et `/admin/permissions` (`src/admin/api.ts`) |
 | Mes jetons sur le serveur | `src/app/(app)/tokens.tsx` | `GET`, `PUT /users/me/secrets`, `DELETE /users/me/secrets/{kind}` |
 

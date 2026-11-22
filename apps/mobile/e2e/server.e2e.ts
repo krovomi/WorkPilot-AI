@@ -13,8 +13,8 @@
  * project, creates a card that the board lists through `GET /api/board/cards`,
  * starts it (the fake agent writes the spec), and a teammate sees the card;
  * a person of another organization never sees the project; a refused password
- * says so; a theme chosen in Settings is kept on the person's account and
- * applies on another device; the team's pull requests, issues and merge
+ * says so; Settings say how the person's session was opened; a theme chosen
+ * in Settings is kept on the person's account and applies on another device; the team's pull requests, issues and merge
  * requests read and commented through the server with each person's own
  * token, which the fake forge saw and the page never shows; a card's spec
  * approved from the phone, built (the fake agent checks the approval as a
@@ -329,6 +329,8 @@ test("the project's context, and a personal token kept on the server", async () 
 	await bob.goBack();
 	await bob.goBack();
 	await bob.getByText("Settings", { exact: true }).click();
+	// His session, as the server tells it: opened with his password.
+	await expect(bob.getByText("Password", { exact: true })).toBeVisible({ timeout: 30_000 });
 	await bob.getByRole("button", { name: "Manage my tokens" }).click();
 	await bob.getByRole("button", { name: "Add" }).first().click({ timeout: 30_000 });
 	const token = bobGitHub;

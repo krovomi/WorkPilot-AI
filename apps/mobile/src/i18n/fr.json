@@ -196,7 +196,6 @@
 	},
 	"settings": {
 		"title": "Réglages",
-		"account": "Compte",
 		"server": "Serveur",
 		"organization": "Organisation",
 		"signOut": "Se déconnecter",
@@ -706,5 +705,20 @@
 		"conflictsIgnored": "Les temps des conflits de fusion étaient illisibles.",
 		"minutes": "{{count}} min",
 		"hours": "{{hours}} h {{minutes}} min"
+	},
+	"mySession": {
+		"title": "Ma session",
+		"loading": "Lecture de la session",
+		"unavailable": "La session ne peut pas être lue sur le serveur",
+		"method": "Ouverte avec",
+		"methods": {
+			"local": "Mot de passe",
+			"entra": "Microsoft Entra ID",
+			"oidc": "Connexion unique : {{name}}",
+			"invite": "Invitation acceptée",
+			"unknown": "Non enregistrée (session ouverte avant que le serveur ne nomme les connexions)"
+		},
+		"issuer": "Fournisseur d'identité",
+		"signedInAt": "Connecté le"
 	}
 }
