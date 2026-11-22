@@ -20,6 +20,7 @@ import type { PolicyPauseDetail } from "./governance";
 import type { TaskGoalSummary } from "./goal";
 import type { MobileBootstrapMark, MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
+import type { TestPlacementMode } from "./suite-placement";
 
 /** What the circuit breaker saw when it paused a task (`agents/tool_breaker.py`). */
 export interface BreakerPauseDetail {
@@ -633,6 +634,11 @@ export interface TaskMetadata {
 	appliedFormula?: AppliedFormula;
 
 	// Git/Worktree configuration
+	/**
+	 * Where this card's long suites run, over the project's `testPlacement`
+	 * (read by the backend from task_metadata.json). Absent: the project's.
+	 */
+	testPlacement?: TestPlacementMode;
 	baseBranch?: string; // Override base branch for this task's worktree
 	prUrl?: string; // GitHub PR URL if task has been submitted as a PR
 	/**

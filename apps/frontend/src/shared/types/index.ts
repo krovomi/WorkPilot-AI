@@ -47,6 +47,7 @@ export * from "./smart-estimation";
 export * from "./task";
 export * from "./team-room";
 export * from "./task-sandbox";
+export * from "./suite-placement";
 export * from "./task-permission";
 export * from "./test-generation";
 export * from "./terminal";
