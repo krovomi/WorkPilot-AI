@@ -81,6 +81,7 @@ class TestGithub:
             target_sha=GOOD_SHA,
             target_url="https://github.com/acme/shop/actions/runs/10",
             current_sha=BAD_SHA,
+            target_at="2026-11-15T08:00:00+00:00",
         )
         assert fetch.requests[0].get_header("Authorization") == "Bearer gh-test-0000"
 

@@ -92,6 +92,11 @@ const GitLabMergeRequests = lazy(() =>
 		default: m.GitLabMergeRequests,
 	})),
 );
+const BitbucketViews = lazy(() =>
+	import("./components/bitbucket/BitbucketViews").then((m) => ({
+		default: m.BitbucketViews,
+	})),
+);
 const Changelog = lazy(() =>
 	import("./components/Changelog").then((m) => ({ default: m.Changelog })),
 );
@@ -623,6 +628,11 @@ export function App() {
 		setSettingsInitialProjectSection("general");
 		setIsSettingsDialogOpen(true);
 	}, []);
+	// A view's "open settings": the dialog on that view's section.
+	const openSectionSettings = (section: ProjectSettingsSection) => () => {
+		setSettingsInitialProjectSection(section);
+		setIsSettingsDialogOpen(true);
+	};
 	const [activeView, setActiveView] = useState<SidebarView>("kanban");
 	const [hasRestoredView, setHasRestoredView] = useState(false);
 	const isRestoringView = useRef(false);
@@ -1441,14 +1451,8 @@ export function App() {
 				onNewTaskClick={() => setIsNewTaskDialogOpen(true)}
 				onRefresh={() => handleRefreshTasks(project.id)}
 				isRefreshing={isRefreshingTasks}
-				onOpenJiraSettings={() => {
-					setSettingsInitialProjectSection("jira");
-					setIsSettingsDialogOpen(true);
-				}}
-				onOpenAzureDevOpsSettings={() => {
-					setSettingsInitialProjectSection("azure-devops");
-					setIsSettingsDialogOpen(true);
-				}}
+				onOpenJiraSettings={openSectionSettings("jira")}
+				onOpenAzureDevOpsSettings={openSectionSettings("azure-devops")}
 			/>
 		);
 	};
@@ -1620,20 +1624,14 @@ export function App() {
 												{activeView === "github-issues" &&
 													(activeProjectId || selectedProjectId) && (
 														<GitHubIssues
-															onOpenSettings={() => {
-																setSettingsInitialProjectSection("github");
-																setIsSettingsDialogOpen(true);
-															}}
+															onOpenSettings={openSectionSettings("github")}
 															onNavigateToTask={handleGoToTask}
 														/>
 													)}
 												{activeView === "gitlab-issues" &&
 													(activeProjectId || selectedProjectId) && (
 														<GitLabIssues
-															onOpenSettings={() => {
-																setSettingsInitialProjectSection("gitlab");
-																setIsSettingsDialogOpen(true);
-															}}
+															onOpenSettings={openSectionSettings("gitlab")}
 															onNavigateToTask={handleGoToTask}
 														/>
 													)}
@@ -1645,10 +1643,7 @@ export function App() {
 														}
 													>
 														<GitHubPRs
-															onOpenSettings={() => {
-																setSettingsInitialProjectSection("github");
-																setIsSettingsDialogOpen(true);
-															}}
+															onOpenSettings={openSectionSettings("github")}
 															isActive={activeView === "github-prs"}
 														/>
 													</div>
@@ -1659,10 +1654,15 @@ export function App() {
 															projectId={
 																(activeProjectId || selectedProjectId) as string
 															}
-															onOpenSettings={() => {
-																setSettingsInitialProjectSection("gitlab");
-																setIsSettingsDialogOpen(true);
-															}}
+															onOpenSettings={openSectionSettings("gitlab")}
+														/>
+													)}
+												{activeView.startsWith("bitbucket-") &&
+													(activeProjectId || selectedProjectId) && (
+														<BitbucketViews
+															view={activeView}
+															projectId={(activeProjectId || selectedProjectId) as string}
+															onOpenSettings={openSectionSettings("bitbucket")}
 														/>
 													)}
 												{activeView === "changelog" && <Changelog />}

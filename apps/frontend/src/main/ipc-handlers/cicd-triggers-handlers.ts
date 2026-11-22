@@ -8,7 +8,8 @@
  *   cicdTriggers:trigger        — Manually trigger a pipeline for a PR
  *   cicdTriggers:getRunStatus   — Get status of a specific pipeline run
  *   cicdTriggers:cancelRun      — Cancel a running pipeline
- *   cicdTriggers:rollback       — Roll a watched deployment back (#366)
+ *   cicdTriggers:rollback       — Roll a watched deployment back (#366), and the
+ *                                 services linked to it (`cicd-deploy-handlers.ts`)
  *
  * A triggered run is then watched when the settings name a health check or
  * Prometheus (`main/cicd/deploy-watch.ts`, `apps/backend/deploy_watch/`).
@@ -47,9 +48,13 @@ import {
 	isCicdSecret,
 	MASKED_TOKEN,
 	WATCH_ALERT_KEYS,
+	WATCH_FLAG_KEYS,
 	WATCH_SOURCE_KEYS,
 	watchSettingsView,
 } from "../cicd/watch-settings";
+import { readReviews } from "../cicd/deploy-figures";
+import { readLinkedRollbacks } from "../cicd/linked-rollback";
+import { registerCicdDeployHandlers, rollBackLinkedOf } from "./cicd-deploy-handlers";
 import {
 	CICD_PROVIDERS,
 	isProviderRunId,
@@ -121,6 +126,8 @@ export const CICD_CONFIG_KEYS: Readonly<Record<string, string>> = {
 	// Other metric sources and the alert channels (#366, lot 3).
 	...WATCH_SOURCE_KEYS,
 	...WATCH_ALERT_KEYS,
+	// The feature flag the rollback turns off first (#366, lot 4).
+	...WATCH_FLAG_KEYS,
 };
 
 export { MASKED_TOKEN };
@@ -270,6 +277,9 @@ type RunnerResult = Awaited<ReturnType<typeof runRunner>>;
 
 const liveWatches = new LiveDeployWatches();
 
+/** A linked project's rollback: its own CI/CD settings, never the root's. */
+const linkedRunner = (linked: Project, args: string[]) => runRunner(linked, args, DEPLOY_WATCH_RUNNER);
+
 /** Starts the watch of a triggered run when the settings name something to watch. */
 function startDeployWatch(project: Project, runId: string): void {
 	let config: Record<string, string>;
@@ -304,6 +314,8 @@ function startDeployWatch(project: Project, runId: string): void {
 			DEPLOY_WATCH_RUNNER,
 			env,
 		);
+		// The rollback started: the services linked to this one go back too.
+		await rollBackLinkedOf(project, runId, linkedRunner);
 		// A warning or critical verdict reaches the person on the app's
 		// notification channels (desktop, ntfy, Telegram).
 		const alert = deployAlertText(getAppLanguage(), project.name, readDeployWatch(project.path, runId, true));
@@ -431,15 +443,23 @@ export async function autoTriggerForTask(
 	}
 }
 
-/** A run of the log with its deployment watch, when it has one. */
-function withWatch(projectPath: string, run: object): object {
+/**
+ * A run of the log with its deployment watch, when it has one: what its
+ * rollback took back with it, and what the person said of its verdict.
+ */
+function withWatch(projectPath: string, run: object, reviews: Record<string, string>): object {
 	const id = (run as { id?: unknown }).id;
 	if (typeof id !== "string") return run;
 	const watch = readDeployWatch(projectPath, id, liveWatches.isLive(projectPath, id));
-	return watch ? { ...run, watch } : run;
+	if (!watch) return run;
+	const linked = readLinkedRollbacks(projectPath, id);
+	const review = reviews[id];
+	return { ...run, watch: { ...watch, ...(linked ? { linked } : {}), ...(review ? { review } : {}) } };
 }
 
 export function registerCICDTriggersHandlers(): void {
+	registerCicdDeployHandlers(findKnownProject);
+
 	ipcMain.handle(IPC_CHANNELS.CICD_TRIGGERS_GET_CONFIG, (_event, projectDir: unknown) => {
 		const project = findKnownProject(projectDir);
 		if (!project) return UNKNOWN_PROJECT;
@@ -507,9 +527,10 @@ export function registerCICDTriggersHandlers(): void {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
 			try {
+				const reviews = readReviews(project.path);
 				const runs = loadRuns(project.path)
 					.slice(0, runsLimit(limit))
-					.map((run) => withWatch(project.path, run));
+					.map((run) => withWatch(project.path, run, reviews));
 				return { success: true, data: runs };
 			} catch (err) {
 				return { success: false, error: String(err) };
@@ -580,6 +601,7 @@ export function registerCICDTriggersHandlers(): void {
 				DEPLOY_WATCH_RUNNER,
 			);
 			if (!result.success) return { success: false, error: result.error };
+			await rollBackLinkedOf(project, runId, linkedRunner);
 			return { success: true, data: readDeployWatch(project.path, runId, false) };
 		},
 	);

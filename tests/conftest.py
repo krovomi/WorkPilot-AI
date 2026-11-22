@@ -1252,6 +1252,18 @@ def _learning_loop_model_off_by_default(monkeypatch):
     monkeypatch.setenv("WORKPILOT_LEARNING_LOOP_MODEL", "0")
 
 
+# A PR review asks the selected provider's model whether two nearby findings
+# contradict each other (`runners/github/services/contradiction_check.py`):
+# every orchestrator test with two findings in one file would make a real
+# model call. The check's own tests (`tests/test_review_contradictions.py`)
+# turn it back on, against a fake runtime.
+
+
+@pytest.fixture(autouse=True)
+def _review_contradiction_check_off_by_default(monkeypatch):
+    monkeypatch.setenv("WORKPILOT_REVIEW_CONTRADICTION_CHECK", "0")
+
+
 # The desktop app starts every Python runner with PYTHONUTF8=1 and
 # PYTHONIOENCODING=utf-8 (`apps/frontend/src/main/utils/python-runner-env.ts`).
 # A test that starts a runner from this environment gets the same switches:

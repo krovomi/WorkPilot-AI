@@ -25,6 +25,7 @@ import { InvitationsAdmin } from "../auth/InvitationsAdmin";
 import { CollaborationSettings } from "../collaboration/CollaborationSettings";
 import { ServerMcpSettings } from "./ServerMcpSettings";
 import { ServerNeedsYouSettings } from "./ServerNeedsYouSettings";
+import { ServerReplayLinksSettings } from "./ServerReplayLinksSettings";
 import { ServerTokensSettings } from "./ServerTokensSettings";
 import { ModuleStage, Notice, toneClass } from "../charter";
 import { Button } from "../ui/button";
@@ -100,6 +101,7 @@ export type AppSection =
 	| "server-mcp"
 	| "server-needs-you"
 	| "server-collaboration"
+	| "server-replay-links"
 	// Système & Maintenance
 	| "updates"
 	| "notifications"
@@ -117,6 +119,7 @@ export type ProjectSettingsSection =
 	| "board-mcp"
 	| "github"
 	| "gitlab"
+	| "bitbucket"
 	| "linear"
 	| "teams";
 
@@ -175,6 +178,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 					"server-mcp",
 					"server-needs-you",
 					"server-collaboration",
+					"server-replay-links",
 				]),
 	]);
 	SETTINGS_THEMES.integrations.sections =
@@ -456,6 +460,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return serverMode === "server" ? <ServerNeedsYouSettings /> : null;
 			case "server-collaboration":
 				return serverMode === "server" ? <CollaborationSettings /> : null;
+			case "server-replay-links":
+				return serverMode === "server" ? <ServerReplayLinksSettings /> : null;
 			default:
 				return null;
 		}

@@ -37,6 +37,7 @@ from typing import Any
 
 from design_to_code.budget import read_usage
 from offline_policy import is_local_provider, local_endpoint
+from services import design_to_code_edit_calls as edit_calls
 from services.design_to_code_providers import (
     cloud_refusal,
     guard_cloud,
@@ -874,13 +875,14 @@ Return ONLY the JSON, no additional text."""
         return self._mock_vision_analysis()
 
     async def _call_local_vision(
-        self, provider: str, image_data: str, prompt: str
+        self, provider: str, image_data: str, prompt: str, *, forced: bool = False
     ) -> str:
         """Ask the model running on this machine (Ollama, LM Studio, llama.cpp).
 
         All three serve the OpenAI-compatible chat route. The endpoint comes
         from ``offline_policy.local_endpoint``, which only answers a loopback
-        address, and the request never goes through a proxy.
+        address, and the request never goes through a proxy. ``forced``
+        constrains the answer to the render loop's edits schema.
         """
         import httpx
         from core.oneshot import _resolve_model
@@ -894,16 +896,22 @@ Return ONLY the JSON, no additional text."""
                     "model": _resolve_model(provider, None, None),
                     "max_tokens": 4096,
                     "messages": _openai_vision_messages(prompt, image_data),
+                    **(edit_calls.local_fields() if forced else {}),
                 },
             )
             response.raise_for_status()
             data = response.json()
+            if forced:
+                return edit_calls.openai_answer(data)
             return data["choices"][0]["message"]["content"]
 
     async def _call_claude_vision(
-        self, api_key: str, image_data: str, prompt: str
+        self, api_key: str, image_data: str, prompt: str, *, forced: bool = False
     ) -> str:
-        """Call Claude Vision API for image analysis."""
+        """Call Claude Vision API for image analysis.
+
+        ``forced``: the answer is the call of the edits' tool (``tool_choice``).
+        """
         import httpx
 
         self._guard_cloud()
@@ -944,11 +952,14 @@ Return ONLY the JSON, no additional text."""
                             ],
                         }
                     ],
+                    **(edit_calls.anthropic_fields() if forced else {}),
                 },
             )
             response.raise_for_status()
             data = response.json()
             self.last_usage = read_usage(data)
+            if forced:
+                return edit_calls.anthropic_answer(data)
             return data["content"][0]["text"]
 
     async def _call_claude_subscription_vision(
@@ -1012,9 +1023,12 @@ Return ONLY the JSON, no additional text."""
         return answer
 
     async def _call_openai_vision(
-        self, api_key: str, image_data: str, prompt: str
+        self, api_key: str, image_data: str, prompt: str, *, forced: bool = False
     ) -> str:
-        """Call OpenAI GPT-4o Vision API for image analysis."""
+        """Call OpenAI GPT-4o Vision API for image analysis.
+
+        ``forced``: the answer is the call of the edits' function.
+        """
         import httpx
 
         self._guard_cloud()
@@ -1029,17 +1043,23 @@ Return ONLY the JSON, no additional text."""
                     "model": OPENAI_VISION_MODEL,
                     "max_tokens": 4096,
                     "messages": _openai_vision_messages(prompt, image_data),
+                    **(edit_calls.openai_fields() if forced else {}),
                 },
             )
             response.raise_for_status()
             data = response.json()
             self.last_usage = read_usage(data)
+            if forced:
+                return edit_calls.openai_answer(data)
             return data["choices"][0]["message"]["content"]
 
     async def _call_gemini_vision(
-        self, api_key: str, image_data: str, prompt: str
+        self, api_key: str, image_data: str, prompt: str, *, forced: bool = False
     ) -> str:
-        """Call Google Gemini Vision for image analysis."""
+        """Call Google Gemini Vision for image analysis.
+
+        ``forced``: the answer is the call of the edits' function (mode ``ANY``).
+        """
         import httpx
 
         self._guard_cloud()
@@ -1073,12 +1093,15 @@ Return ONLY the JSON, no additional text."""
                                 },
                             ]
                         }
-                    ]
+                    ],
+                    **(edit_calls.gemini_fields() if forced else {}),
                 },
             )
             response.raise_for_status()
             data = response.json()
             self.last_usage = read_usage(data)
+            if forced:
+                return edit_calls.gemini_answer(data)
             return data["candidates"][0]["content"]["parts"][0]["text"]
 
     def _mock_vision_analysis(self) -> str:

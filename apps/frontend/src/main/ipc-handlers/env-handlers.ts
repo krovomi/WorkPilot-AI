@@ -37,6 +37,11 @@ import { withMcpConfinement } from "../mcp-security/confine-guard";
 import { mcpInstallRefusal, refusalMessage } from "../mcp-security/install-guard";
 import { withGhCliToken } from "./github/oauth-token";
 import { withGlabCliToken } from "./gitlab/oauth-token";
+import {
+	applyBitbucketEnvUpdate,
+	bitbucketEnvSection,
+	readBitbucketEnvConfig,
+} from "./bitbucket/env-config";
 import { projectStore } from "../project-store";
 import {
 	envTemplateKeys,
@@ -133,6 +138,7 @@ export const PROJECT_ENV_SECRET_FIELDS = [
 	"linearApiKey",
 	"githubToken",
 	"gitlabToken",
+	"bitbucketToken",
 	"azureDevOpsPat",
 	"jiraApiToken",
 	"cicdJenkinsToken",
@@ -370,6 +376,8 @@ export function registerEnvHandlers(
 				? "true"
 				: "false";
 		}
+
+		applyBitbucketEnvUpdate(existingVars, config);
 
 		// Azure DevOps Integration
 		// Guard: don't overwrite existing non-empty values with empty strings.
@@ -695,6 +703,7 @@ ${envLine(existingVars, "GITLAB_ACCOUNT_ID")}
 ${envLine(existingVars, GITLAB_ENV_KEYS.PROJECT, "group/project")}
 ${envLine(existingVars, GITLAB_ENV_KEYS.AUTO_SYNC, "false")}
 
+${bitbucketEnvSection(existingVars)}
 
 # =============================================================================
 # AZURE DEVOPS INTEGRATION (OPTIONAL)
@@ -957,6 +966,8 @@ ${otherLines.join("\n")}
 			if (vars[GITLAB_ENV_KEYS.AUTO_SYNC]?.toLowerCase() === "true") {
 				config.gitlabAutoSync = true;
 			}
+
+			Object.assign(config, readBitbucketEnvConfig(vars));
 
 			// Azure DevOps config
 			if (vars[AZURE_DEVOPS_ENV_KEYS.PAT]) {

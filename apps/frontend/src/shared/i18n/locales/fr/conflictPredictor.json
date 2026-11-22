@@ -168,6 +168,14 @@
 			"summary": "{{days}} derniers jours : {{runs}} exécutions terminées ({{stopped}} arrêtées), {{conflicts}} conflits évités (risque {{risk}} retiré), {{started}} specs lancées.",
 			"last": "Dernière exécution terminée le {{finishedAt}}.",
 			"ignored": "L'historique des exécutions de ce projet est illisible : il repart de la prochaine exécution."
+		},
+		"conflictTimes": {
+			"resolved_one": "{{days}} derniers jours : {{count}} conflit de fusion résolu, en {{median}} du conflit à la fusion.",
+			"resolved_other": "{{days}} derniers jours : {{count}} conflits de fusion résolus, médiane de {{median}} du conflit à la fusion.",
+			"noneResolved": "{{days}} derniers jours : aucun conflit de fusion résolu.",
+			"open_one": "{{count}} conflit encore ouvert.",
+			"open_other": "{{count}} conflits encore ouverts.",
+			"ignored": "Les temps de résolution des conflits de ce projet sont illisibles : ils repartent du prochain conflit."
 		}
 	}
 }

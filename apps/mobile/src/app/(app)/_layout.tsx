@@ -43,6 +43,7 @@ export default function SignedInLayout() {
 				<Stack.Screen name="projects/[projectId]/forge/index" options={{ title: "" }} />
 				<Stack.Screen name="projects/[projectId]/dashboard" options={{ title: t("dashboard.title") }} />
 				<Stack.Screen name="projects/[projectId]/governance" options={{ title: t("features.governance") }} />
+				<Stack.Screen name="projects/[projectId]/waves" options={{ title: t("features.waves") }} />
 				<Stack.Screen name="projects/[projectId]/sessions" options={{ title: t("dashboard.sessions") }} />
 				<Stack.Screen name="projects/[projectId]/analyses/index" options={{ title: t("dashboard.analyses") }} />
 				<Stack.Screen name="projects/[projectId]/analyses/[kind]" options={{ title: "" }} />

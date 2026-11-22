@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import {
 	detectDesignStack,
+	loadDesignLoopStats,
 	useDesignToCodeStore,
 } from "../../stores/design-to-code-store";
 import { useProjectStore } from "../../stores/project-store";
@@ -34,11 +35,14 @@ export function DesignImportPanel() {
 				stackChosen: false,
 				detection: null,
 				designSystemPath: "",
+				loopStats: null,
 			});
 			const running = !["idle", "complete", "error"].includes(state.phase);
 			if (!running) resetPipeline();
 			void detectDesignStack(projectId);
 		}
+		// Read again on each visit: a card may have been merged or retouched since.
+		void loadDesignLoopStats(projectId);
 	}, [projectId, resetPipeline]);
 
 	return (

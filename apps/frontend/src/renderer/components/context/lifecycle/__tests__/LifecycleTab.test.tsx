@@ -164,10 +164,13 @@ describe("the Lifecycle tab", () => {
 		expect(api.restoreMemory).toHaveBeenCalledWith("p1", "gotchas/old.md");
 	});
 
-	it("reads nothing for a server project", () => {
+	it("reads a server project's journal and trash, with no conflict queue", async () => {
 		render(<LifecycleTab projectId="p1" onServer />);
-		expect(screen.getByText(/not available yet/)).toBeInTheDocument();
-		expect(api.getMemoryLifecycle).not.toHaveBeenCalled();
+		expect(await screen.findByRole("button", { name: "Restore" })).toBeInTheDocument();
+		expect(api.getMemoryLifecycle).toHaveBeenCalledWith("p1");
+		expect(screen.getByTestId("memory-server-note")).toHaveTextContent(/own brain on the server/);
+		expect(screen.queryByText("One says to do it, the other not to")).not.toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "Keep this one" })).not.toBeInTheDocument();
 	});
 
 	it("speaks French", async () => {

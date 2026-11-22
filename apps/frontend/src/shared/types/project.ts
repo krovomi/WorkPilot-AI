@@ -3,6 +3,7 @@
  */
 
 import type { EngineTrio, TaskKind } from "./task";
+import type { RemoteProvider } from "../utils/git-remote-provider";
 
 export interface Project {
 	id: string;
@@ -329,6 +330,16 @@ export interface ProjectEnvConfig {
 	gitlabAutoSync?: boolean; // Auto-sync issues on project load
 	gitlabAuthMethod?: "oauth" | "pat"; // How the token was obtained
 
+	// Bitbucket Cloud Integration (main/ipc-handlers/bitbucket/env-config.ts)
+	bitbucketEnabled?: boolean;
+	bitbucketWorkspace?: string; // Workspace slug
+	bitbucketRepo?: string; // Repository slug, `workspace/repo` or a clone URL
+	bitbucketUsername?: string; // Atlassian account (Basic auth); empty = access token (Bearer)
+	bitbucketToken?: string; // API token, app password or access token
+	/** A saved Bitbucket account (Settings, Forge accounts); its username and token replace the two above. */
+	bitbucketAccountId?: string;
+	bitbucketAutoSync?: boolean;
+
 	// Azure DevOps Integration
 	azureDevOpsEnabled: boolean;
 	azureDevOpsPat?: string; // Personal Access Token
@@ -350,7 +361,7 @@ export interface ProjectEnvConfig {
 	// CI/CD pipeline loop (« Build rouge » — see ci-pipeline-service.ts)
 	// Azure DevOps / GitHub / GitLab credentials are reused from the sections
 	// above; only the provider choice, the loop knobs and Jenkins live here.
-	cicdProvider?: "" | "azure" | "github" | "gitlab" | "jenkins" | "none"; // "" = auto-detect
+	cicdProvider?: "" | "azure" | "github" | "gitlab" | "bitbucket" | "jenkins" | "none"; // "" = auto-detect
 	cicdAutoFix?: boolean; // default true: agent repairs red builds automatically
 	cicdPollSeconds?: number; // default 60
 	cicdJenkinsUrl?: string; // Jenkins base URL
@@ -582,7 +593,7 @@ export interface GitStatus {
 }
 
 export interface RepoProviderDetectionResult {
-	provider: "github" | "gitlab" | "azure_devops" | "unknown";
+	provider: RemoteProvider;
 	remoteName?: string;
 	remoteUrl?: string;
 }

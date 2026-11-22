@@ -25,7 +25,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Insights** — AI chat interface for exploring and understanding your codebase
 - **Roadmap** — AI-assisted feature planning with strategic roadmap generation
 - **Ideation** — Discover improvements, performance issues, and security vulnerabilities
-- **GitHub/GitLab Integration** — Import issues, AI-powered investigation, PR/MR review and creation
+- **GitHub/GitLab Integration** — Import issues, AI-powered investigation, PR/MR review and creation; Bitbucket Cloud: issues, pull requests, pipelines and a task's pull request
 - **PR Follow-Through** — A task's open GitHub PR is driven to merge: red checks and review threads go to the QA fixer, the commit is checked for weakened tests or CI edits, then pushed (never forced, never merged)
 - **Best-of-N** — One task built 2 to 4 ways, one worktree and engine each; ranked on finished build, QA, goal, diff size and cost, and the person keeps one
 - **Goal Mode** — A task carries a command and the exit code that means "done"; QA loops until it holds, within a pass and spending cap, and cannot edit the tests it runs
@@ -178,3 +178,5 @@ it, inside its hub. The hubs are listed in
 | `github-prs` | GitHub Pull Requests | Git & Integrations, when GitHub is enabled | — |  |
 | `gitlab-issues` | GitLab Issues | Git & Integrations, when GitLab is enabled | — |  |
 | `gitlab-merge-requests` | GitLab Merge Requests | Git & Integrations, when GitLab is enabled | — |  |
+| `bitbucket-issues` | Bitbucket Issues | Git & Integrations, when Bitbucket is enabled (local project) | [bitbucket.md](bitbucket.md) |  |
+| `bitbucket-pull-requests` | Bitbucket Pull Requests | Git & Integrations, when Bitbucket is enabled (local project) | [bitbucket.md](bitbucket.md) |  |
