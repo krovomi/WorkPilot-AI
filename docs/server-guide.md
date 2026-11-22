@@ -157,6 +157,7 @@ Les plus utilisées :
 | `WORKPILOT_MAX_CONCURRENT_RUNS` | `3` | la machine a plus de cœurs et de mémoire : runs et jobs simultanés, tout le serveur |
 | `WORKPILOT_INVITATION_TTL_HOURS` | `72` | un lien d'invitation doit durer plus ou moins longtemps |
 | `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | `60` | un lien de mot de passe oublié doit durer plus ou moins longtemps (de 5 à 1440 minutes) |
+| `WORKPILOT_USAGE_RETENTION_DAYS` | `365` | votre registre RGPD fixe une autre durée pour la consommation et la présence (de 30 à 3650 jours) ; ce qui est gardé : [server-usage-data.md](server-usage-data.md) |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | `12` | une politique de mot de passe plus stricte (jamais moins de 12) |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | refuser les mots de passe connus des fuites |
 | `WORKPILOT_ACCESS_TOKEN_TTL_MINUTES` | `15` | rarement |

@@ -16,7 +16,7 @@ def _server_settings(monkeypatch, tmp_path):
     from server import integration
     from server.db import engine as db_engine
     from server.ratelimit import limiter
-    from server.services import project_jobs, run_manager
+    from server.services import presence, project_jobs, run_manager
 
     for key in clean_environment():
         monkeypatch.delenv(key, raising=False)
@@ -32,6 +32,7 @@ def _server_settings(monkeypatch, tmp_path):
     monkeypatch.setattr(integration, "_db_init_lock", None)
     monkeypatch.setattr(run_manager, "_run_manager", None)
     monkeypatch.setattr(project_jobs, "_jobs", None)
+    monkeypatch.setattr(presence, "_written", {})
     limiter.reset()
     yield
     server_config.reset_settings_cache()

@@ -336,6 +336,8 @@ class ServerSettings:
     password_hibp_check: bool
     # How long a password reset link stays usable.
     password_reset_ttl_minutes: int
+    # How long usage data is kept (tokens per run, presence days), in days.
+    usage_retention_days: int
 
     # SMTP for transactional email (invitation links). All empty => email
     # disabled and the API returns the invite link for manual delivery.
@@ -433,6 +435,7 @@ class ServerSettings:
             password_reset_ttl_minutes=_env_int(
                 "WORKPILOT_PASSWORD_RESET_TTL_MINUTES", 60
             ),
+            usage_retention_days=_env_int("WORKPILOT_USAGE_RETENTION_DAYS", 365),
             smtp_host=os.environ.get("WORKPILOT_SMTP_HOST", ""),
             smtp_port=_env_int("WORKPILOT_SMTP_PORT", 587),
             smtp_user=os.environ.get("WORKPILOT_SMTP_USER", ""),
