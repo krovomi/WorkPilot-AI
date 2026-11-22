@@ -31,8 +31,8 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from urllib.parse import quote, urlencode
 
-from .collectors import MAX_BODY_BYTES, Fetch, default_fetch
-from .config import valid_url
+from .collectors import default_fetch
+from .net import MAX_BODY_BYTES, Fetch, valid_url
 
 _REPO = re.compile(r"^(?!\.{1,2}/)[A-Za-z0-9_.-]+/(?!\.{1,2}$)[A-Za-z0-9_.-]+$")
 _NAME = re.compile(r"^[A-Za-z0-9_. -]{1,200}$")
@@ -54,6 +54,9 @@ class RollbackPlan:
     target_sha: str = ""
     target_url: str = ""
     current_sha: str = ""
+    # When the target run was created (ISO 8601): the state a coordinated
+    # rollback takes the linked services back to.
+    target_at: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -161,6 +164,7 @@ def _github_plan(
         target_run=good["id"],
         target_sha=good["sha"],
         target_url=good["url"],
+        target_at=good["at"].isoformat(),
         current_sha=current["sha"] if current else "",
     )
 
@@ -242,6 +246,7 @@ def _azure_plan(env: dict, triggered: datetime, fetch: Fetch) -> RollbackPlan:
         target_run=good["id"],
         target_sha=sha,
         target_url=good["url"],
+        target_at=good["at"].isoformat(),
         current_sha=current_sha,
     )
 
@@ -304,6 +309,7 @@ def _gitlab_plan(env: dict, triggered: datetime, fetch: Fetch) -> RollbackPlan:
         target_run=good["id"],
         target_sha=good["sha"],
         target_url=good["url"],
+        target_at=good["at"].isoformat(),
         current_sha=current["sha"] if current else "",
     )
 
@@ -365,6 +371,7 @@ def _jenkins_plan(env: dict, triggered: datetime, fetch: Fetch) -> RollbackPlan:
         target_run=good["id"],
         target_sha=good["sha"],
         target_url=good["url"],
+        target_at=good["at"].isoformat(),
         current_sha=current["sha"] if current else "",
     )
 

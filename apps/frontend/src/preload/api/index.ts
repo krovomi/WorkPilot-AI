@@ -156,6 +156,7 @@ import {
 	type AutomationsAPI,
 	createAutomationsAPI,
 } from "./modules/automations-api";
+import { type BitbucketAPI, createBitbucketAPI } from "./modules/bitbucket-api";
 import { createSwarmAPI, type SwarmAPI } from "./modules/swarm-api";
 import {
 	createGenericIpcAPI,
@@ -397,6 +398,8 @@ export interface ElectronAPI
 	swarm: SwarmAPI;
 	/** Automations: an event (issue labelled, CI red, schedule) creates a card */
 	automations: AutomationsAPI;
+	/** Bitbucket Cloud: issues, pull requests and pipelines of a project's repository */
+	bitbucket: BitbucketAPI;
 	/** Multi-user server mode: connection + login (local / Entra ID) */
 	serverAuth: ServerAuthAPI;
 	serverAdmin: ServerAdminAPI;
@@ -554,6 +557,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		github: createGitHubAPI(),
 		swarm: createSwarmAPI(),
 		automations: createAutomationsAPI(),
+		bitbucket: createBitbucketAPI(),
 		serverAuth: createServerAuthAPI(), // Multi-user server mode
 		serverAdmin: createServerAdminAPI(), // Multi-tenant administration
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
@@ -641,6 +645,8 @@ export { createArenaAPI } from "./modules/arena-api";
 export { createAutoRefactorAPI } from "./modules/auto-refactor-api";
 export type { AutomationsAPI } from "./modules/automations-api";
 export { createAutomationsAPI } from "./modules/automations-api";
+export type { BitbucketAPI } from "./modules/bitbucket-api";
+export { createBitbucketAPI } from "./modules/bitbucket-api";
 export type { SwarmAPI } from "./modules/swarm-api";
 export { createSwarmAPI } from "./modules/swarm-api";
 export type { ClaudeCodeAPI } from "./modules/claude-code-api";

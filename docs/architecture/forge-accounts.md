@@ -40,7 +40,7 @@ enregistré :
 | Bitbucket | `BITBUCKET_TOKEN`, `BITBUCKET_USERNAME` (Basic avec un nom, Bearer sans) |
 
 Il est appelé par les lecteurs de forge, pas par `readProjectEnvFile` : `getGitHubConfig`,
-`getGitLabConfig`, les handlers Azure DevOps, les détails et l'état des PR, la création d'une PR
+`getGitLabConfig`, `getBitbucketConfig`, les handlers Azure DevOps, les détails et l'état des PR, la création d'une PR
 depuis une tâche, les pipelines CI, l'environnement de l'agent, la vérification du dépôt
 (`forge-binding-handlers.ts`). La page de réglages lit et écrit le fichier par
 `readProjectEnvFile` : si le prêt s'y faisait, elle enregistrerait le jeton du compte dans le

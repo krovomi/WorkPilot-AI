@@ -776,3 +776,50 @@ describe("TASK_WORKTREE_MERGE_PREVIEW", () => {
 		expect(result.success).toBe(false);
 	});
 });
+
+describe("merge conflict times (#358, lot 4)", () => {
+	const times = () =>
+		JSON.parse(readFileSync(path.join(state.root, ".workpilot", "merge-conflict-times.json"), "utf-8")) as {
+			entries: { taskId: string; detectedAt: string; resolvedAt: string | null }[];
+		};
+
+	it("records when a preview or a merge sees a conflict, and when a merge resolves it", async () => {
+		// A clean preview and a merge with nothing to stage record nothing.
+		scenario({ stdout: [`${JSON.stringify({ success: true, gitConflicts: { hasConflicts: false } })}\n`] });
+		await preview();
+		scenario({});
+		await merge({ noCommit: true });
+		expect(existsSync(path.join(state.root, ".workpilot", "merge-conflict-times.json"))).toBe(false);
+
+		scenario({ stdout: [`${JSON.stringify({ success: true, gitConflicts: { hasConflicts: true } })}\n`] });
+		await preview();
+		scenario({ stdout: ["CONFLICT (content): Merge conflict in a.txt\n"], code: 1 });
+		await merge();
+		expect(times().entries).toEqual([{ taskId: SPEC, detectedAt: expect.any(String), resolvedAt: null }]);
+
+		// A failure that is not a conflict leaves it open; the merge that goes through closes it.
+		scenario({ stderr: "boom", code: 1 });
+		await merge();
+		expect(times().entries[0].resolvedAt).toBeNull();
+		scenario({ git: [["merge", "-q", "--no-ff", "-m", "merge", `workpilot/${SPEC}`]] });
+		await merge();
+		const [entry] = times().entries;
+		expect(Date.parse(entry.resolvedAt as string)).toBeGreaterThanOrEqual(Date.parse(entry.detectedAt));
+	});
+
+	it("closes the conflict on a staged merge, and on a branch already merged and committed", async () => {
+		scenario({ stdout: ["CONFLICT (content): Merge conflict in a.txt\n"], code: 1 });
+		await merge();
+		scenario({ git: [["merge", "--squash", `workpilot/${SPEC}`]] });
+		await merge({ noCommit: true });
+		expect(times().entries[0].resolvedAt).not.toBeNull();
+
+		git(state.root, "commit", "-q", "-m", "squashed");
+		scenario({ stdout: ["CONFLICT (content): Merge conflict in a.txt\n"], code: 1 });
+		await merge();
+		git(state.root, "merge", "-q", "--no-ff", "-m", "merge", `workpilot/${SPEC}`);
+		scenario({});
+		await merge({ noCommit: true });
+		expect(times().entries.map((e) => e.resolvedAt === null)).toEqual([false, false]);
+	});
+});

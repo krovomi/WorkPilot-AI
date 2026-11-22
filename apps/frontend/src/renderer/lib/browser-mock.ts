@@ -316,7 +316,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		}),
 		getReviewFeedbackStats: async () => ({
 			success: true as const,
-			stats: { threshold: 3, categories: [], rules: [] },
+			stats: { threshold: 3, categories: [], rules: [], months: [] },
 		}),
 		resetReviewFeedbackRule: async () => ({
 			success: false as const,

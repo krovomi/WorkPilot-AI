@@ -24,7 +24,7 @@ from xml.etree.ElementTree import Element
 from defusedxml import ElementTree
 from defusedxml.common import DefusedXmlException
 
-from .collectors import MAX_BODY_BYTES, Fetch
+from .net import MAX_BODY_BYTES, Fetch
 
 SERVICE = "monitoring"
 LOOKBACK = timedelta(minutes=5)

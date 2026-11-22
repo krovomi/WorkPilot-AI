@@ -56,11 +56,13 @@ const server = vi.hoisted(() => ({
 	stats: vi.fn(),
 	reset: vi.fn(),
 	decide: vi.fn(),
+	conventions: vi.fn(),
 }));
 vi.mock("../review-feedback-server", () => ({
 	serverFeedbackStats: server.stats,
 	resetServerRule: server.reset,
 	decideServerHeld: server.decide,
+	saveServerConventions: server.conventions,
 }));
 vi.mock("../utils/subprocess-runner", () => ({ getBackendPath: () => null }));
 vi.mock("../../../source-env", () => ({ loadBackendEnv: () => ({}) }));
@@ -236,11 +238,15 @@ describe("conventions", () => {
 		);
 	});
 
-	it("answers a server project, an invalid id and an unknown project", async () => {
-		expect(await call(WRITE, "remote")).toEqual({
-			success: false,
-			error: "server_project",
-		});
+	it("sends a server project's to the server's dataset, never a folder", async () => {
+		const saved = { success: true, path: "/home/me/repo/review-conventions.md", rules: 2 };
+		server.conventions.mockResolvedValue(saved);
+		expect(await call(WRITE, "remote")).toEqual(saved);
+		expect(server.conventions).toHaveBeenCalledWith({ id: "remote" });
+		expect(state.looked).not.toContain("remote");
+	});
+
+	it("answers an invalid id and an unknown project", async () => {
 		expect(await call(WRITE, null)).toEqual({ success: false, error: "invalid" });
 		expect(await call(WRITE, "nope")).toEqual({ success: false, error: "not_found" });
 	});

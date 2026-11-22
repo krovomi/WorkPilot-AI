@@ -9,7 +9,9 @@
  * The run itself is saved in the project (`run-store.ts`) by project id: the
  * renderer never names a path, and the state it sends is revalidated here.
  * When a run ends, the renderer says how (a closed list) and the record of
- * the run history (`run-history.ts`) is built here from the saved run.
+ * the run history (`run-history.ts`) is built here from the saved run. The
+ * history also carries the merge conflict times the merge flow recorded
+ * (`conflict-times.ts`).
  */
 
 import { ipcMain } from "electron";
@@ -22,6 +24,7 @@ import type {
 } from "../../shared/types/conflict-waves";
 import type { Project } from "../../shared/types/project";
 import { readSpecCode } from "../conflict-waves/code-reader";
+import { readConflictTimes } from "../conflict-waves/conflict-times";
 import { readCoChanges } from "../conflict-waves/fragile-zones";
 import { gitTestMerge, readWorktreeHead } from "../conflict-waves/merge-check";
 import { buildExecutionWavePlan, PROJECT_ID, type WavePlanDeps } from "../conflict-waves/plan-service";
@@ -139,7 +142,10 @@ export function registerConflictWavesHandlers(deps: WavePlanDeps = defaultDeps):
 			const project = projectOf(projectId);
 			if (!project) return { success: false, error: "Project not found" };
 			try {
-				return { success: true, data: readRunHistory(project.path) };
+				return {
+					success: true,
+					data: { ...readRunHistory(project.path), conflicts: readConflictTimes(project.path) },
+				};
 			} catch (error) {
 				console.error("[conflictWaves:history] reading the history failed:", error);
 				return { success: true, data: { records: [], ignored: true } };

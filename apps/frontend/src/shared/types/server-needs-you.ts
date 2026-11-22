@@ -13,6 +13,7 @@ export const NEEDS_YOU_EVENTS = [
 	"review_ready",
 	"failed",
 	"approval_escalated",
+	"review_feedback_held",
 ] as const;
 export type NeedsYouEventKind = (typeof NEEDS_YOU_EVENTS)[number];
 

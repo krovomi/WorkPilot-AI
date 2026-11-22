@@ -25,7 +25,13 @@ function overview(patch: Record<string, unknown> = {}) {
 			available: true,
 			vault: true,
 			locale: "en",
-			events: { plan_review: true, review_ready: true, failed: true, approval_escalated: true },
+			events: {
+				plan_review: true,
+				review_ready: true,
+				failed: true,
+				approval_escalated: true,
+				review_feedback_held: true,
+			},
 			channels: {
 				ntfy: { configured: false },
 				telegram: {
@@ -108,6 +114,7 @@ describe("ServerNeedsYouSettings", () => {
 					review_ready: true,
 					failed: false,
 					approval_escalated: true,
+					review_feedback_held: true,
 				},
 				locale: "en",
 			}),
