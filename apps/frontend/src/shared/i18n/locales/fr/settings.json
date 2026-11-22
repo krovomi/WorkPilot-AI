@@ -1970,6 +1970,23 @@
 				"byKindTitle": "Lignes à relire max par PR, selon le type de tâche",
 				"byKindHelp": "Le code compte pleinement, les tests et la documentation pour moitié, les fichiers générés et les lockfiles pas du tout. Les valeurs par défaut suivent les études sur la revue de code : au-delà de 200 à 400 lignes ou d'une heure, le relecteur trouve moins de défauts. Laisser vide pour la valeur par défaut.",
 				"neverSplit": "Les investigations, les spikes et les tâches d'exploitation ne sont jamais découpées : elles n'ouvrent pas de code à relire."
+			},
+			"groups": {
+				"agent": {
+					"description": "Le modèle qui travaille sur les tâches et ce qu'il lit du projet."
+				},
+				"planning": {
+					"title": "Avant le code",
+					"description": "Comment une tâche est préparée : sa taille et ce qui est écrit avant de coder."
+				},
+				"coding": {
+					"title": "Pendant le code",
+					"description": "Comment l'agent écrit le code."
+				},
+				"checks": {
+					"title": "Avant la revue",
+					"description": "Ce qui est vérifié avant qu'une tâche arrive en revue, et où tournent les tests."
+				}
 			}
 		},
 		"github": {
