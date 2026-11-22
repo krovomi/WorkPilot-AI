@@ -1,11 +1,11 @@
 """Password resets: single-use links to set a new local password.
 
-Revision ID: 0043_password_resets
-Revises: 0042_usage_records
+Revision ID: 0044_password_resets
+Revises: 0043_mcp_reviews_per_org
 Create Date: 2026-11-22
 
 One new table, nothing changed in the existing ones. Like ``0042``, the step
-inspects first: revision ``0001`` runs ``create_all``, so a database created
+inspects first (it follows `0043_mcp_reviews_per_org`, merged the same day): revision ``0001`` runs ``create_all``, so a database created
 by a newer build may already have it.
 """
 
@@ -14,8 +14,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0043_password_resets"
-down_revision = "0042_usage_records"
+revision = "0044_password_resets"
+down_revision = "0043_mcp_reviews_per_org"
 branch_labels = None
 depends_on = None
 
