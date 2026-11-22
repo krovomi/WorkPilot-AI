@@ -1,5 +1,5 @@
 /**
- * The Pixel Office bridge: one constant channel, the scene request as given.
+ * The Pixel Office bridge: one constant channel per call, its arguments as given.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -21,5 +21,17 @@ describe("pixel office bridge", () => {
 			text: "Done.",
 		});
 		expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.PIXEL_OFFICE_NARRATE, request);
+	});
+
+	it("asks for the team board and saves the consent on their own channels", async () => {
+		const api = createPixelOfficeAPI();
+		invoke.mockResolvedValue({ success: false, error: "x" });
+		await api.getTeamBoard("p1", { scope: "org", period: "all" });
+		expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.PIXEL_OFFICE_TEAM_BOARD, "p1", {
+			scope: "org",
+			period: "all",
+		});
+		await api.setTeamConsent("p1", true);
+		expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.PIXEL_OFFICE_TEAM_CONSENT, "p1", true);
 	});
 });

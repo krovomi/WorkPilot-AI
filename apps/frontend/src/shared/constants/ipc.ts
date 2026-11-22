@@ -676,6 +676,9 @@ export const IPC_CHANNELS = {
 	MCP_MARKETPLACE_GET_POLICY: "mcpMarketplace:getPolicy", // The project's MCP install policy (#369)
 	MCP_MARKETPLACE_GET_INSTALLED_WATCH: "mcpMarketplace:getInstalledWatch", // Alerts on installed servers (#369)
 	MCP_MARKETPLACE_ACKNOWLEDGE_ALERTS: "mcpMarketplace:acknowledgeAlerts", // Acknowledge a server's alerts (#369)
+	MCP_MARKETPLACE_LIST_REVIEWS: "mcpMarketplace:listReviews", // Team reviews of a catalog server, server project (#369)
+	MCP_MARKETPLACE_PUT_REVIEW: "mcpMarketplace:putReview", // Write one's own review of a catalog server (#369)
+	MCP_MARKETPLACE_DELETE_REVIEW: "mcpMarketplace:deleteReview", // Delete a review of a catalog server (#369)
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project
@@ -837,6 +840,9 @@ export const IPC_CHANNELS = {
 	// Pipeline Generator (Feature 23) — AI-powered CI/CD pipeline generation
 	// Pixel Office: a mini-scene written by the page's model
 	PIXEL_OFFICE_NARRATE: "pixelOffice:narrate",
+	// Pixel Office on a server project: the team leaderboard, and showing one's name on it
+	PIXEL_OFFICE_TEAM_BOARD: "pixelOffice:teamBoard",
+	PIXEL_OFFICE_TEAM_CONSENT: "pixelOffice:teamConsent",
 
 	PIPELINE_GENERATOR_GENERATE: "pipelineGenerator:generate",
 	PIPELINE_GENERATOR_CANCEL: "pipelineGenerator:cancel",
@@ -1257,6 +1263,8 @@ export const IPC_CHANNELS = {
 	DASHBOARD_COMPARE_EXPORT: "dashboard:compareExport",
 	DASHBOARD_GET_SNAPSHOT: "dashboard:getSnapshot",
 	DESIGN_TO_CODE_DETECT_STACK: "designToCode:detectStack",
+	// The render loop's figures on this project (main/design-loop-history.ts)
+	DESIGN_TO_CODE_LOOP_STATS: "designToCode:loopStats",
 	DESIGN_TO_CODE_PROGRESS: "designToCode:progress",
 	DESIGN_TO_CODE_RUN: "designToCode:run",
 	DESIGN_TO_CODE_WRITE_FILES: "designToCode:writeFiles",

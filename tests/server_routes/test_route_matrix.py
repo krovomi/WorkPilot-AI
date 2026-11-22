@@ -235,6 +235,14 @@ RULES: dict[tuple[str, str], Rule] = {
     ),
     ("POST", "/api/features/ideation/ideas/{idea_id}/convert"): scoped("task.write"),
     ("GET", "/api/features/context/memories"): scoped("insight.read"),
+    # The lifecycle of the project's memory: every member reads why a memory
+    # went; a decision on it is a write of the project's insights.
+    ("GET", "/api/features/context/memory/lifecycle"): scoped("insight.read"),
+    ("GET", "/api/features/context/memory/history"): scoped("insight.read"),
+    **{
+        ("POST", f"/api/features/context/memory/{action}"): scoped("insight.write")
+        for action in ("forget", "restore", "pin", "scope", "revert")
+    },
     ("GET", "/api/features/insights/sessions"): scoped("insight.read"),
     ("POST", "/api/features/insights/sessions"): scoped("insight.write"),
     ("GET", "/api/features/insights/sessions/{session_id}"): scoped("insight.read"),
@@ -299,6 +307,12 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/api/features/replay-shares"): scoped("lab.read"),
     ("POST", "/api/features/replay-shares/{share_id}/open"): scoped("lab.read"),
     ("DELETE", "/api/features/replay-shares/{share_id}"): scoped("lab.write"),
+    # --- Team reviews of catalogue MCP servers (#369 lot 5) ---------------
+    ("GET", "/api/features/mcp-reviews"): scoped("marketplace.read"),
+    ("PUT", "/api/features/mcp-reviews"): scoped("marketplace.write"),
+    ("DELETE", "/api/features/mcp-reviews/{review_id}"): scoped("marketplace.write"),
+    ("GET", "/api/features/pixel-office/leaderboard"): scoped("analytics.read"),
+    ("PUT", "/api/features/pixel-office/consent"): scoped("analytics.read"),
     ("GET", "/api/features/replay-shares/mine"): needs("lab.read"),
     ("GET", "/api/features/replay-shares/usage"): scoped("lab.read"),
     # Governance of a server project: reading is the audit domain, the rest

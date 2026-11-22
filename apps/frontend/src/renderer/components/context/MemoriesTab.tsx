@@ -416,7 +416,7 @@ export function MemoriesTab({
 									key={memory.id}
 									memory={memory}
 									actions={
-										projectId && onMemoryChanged && !memoryStatus?.onServer
+										projectId && onMemoryChanged
 											? { projectId, onChanged: onMemoryChanged }
 											: undefined
 									}

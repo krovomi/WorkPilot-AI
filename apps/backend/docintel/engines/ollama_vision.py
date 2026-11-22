@@ -126,13 +126,16 @@ class OllamaVisionEngine:
         return OcrOutcome(text=text, engine=self.name, described=True)
 
 
-def ask(image: Path, prompt: str, env: dict[str, str]) -> tuple[str, str]:
+def ask(
+    image: Path, prompt: str, env: dict[str, str], *, schema: dict | None = None
+) -> tuple[str, str]:
     """(answer, "") from the local vision model, or ("", reason). Never raises.
 
     The one request to the model, shared by the OCR chain and by anything else
     that needs a local reading of an image (`docintel/whiteboard.py`): the
     loopback rule, the proxy bypass and the refused redirects are decided here
-    once, not re-derived by each caller.
+    once, not re-derived by each caller. `schema`, a JSON schema, is sent as
+    Ollama's `format`: the answer is then JSON in that shape.
     """
     reason = OllamaVisionEngine().available(env)
     if reason:
@@ -141,15 +144,16 @@ def ask(image: Path, prompt: str, env: dict[str, str]) -> tuple[str, str]:
         encoded = base64.b64encode(image.read_bytes()).decode("ascii")
     except OSError:
         return "", "failed"
-    body = json.dumps(
-        {
-            "model": settings.vision_model(env),
-            "prompt": prompt,
-            "images": [encoded],
-            "stream": False,
-            "options": {"temperature": 0},
-        }
-    ).encode("utf-8")
+    fields: dict = {
+        "model": settings.vision_model(env),
+        "prompt": prompt,
+        "images": [encoded],
+        "stream": False,
+        "options": {"temperature": 0},
+    }
+    if schema is not None:
+        fields["format"] = schema
+    body = json.dumps(fields).encode("utf-8")
     request = urllib.request.Request(
         f"{ollama_root()}/api/generate",
         data=body,

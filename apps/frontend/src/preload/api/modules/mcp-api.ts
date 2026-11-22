@@ -13,6 +13,12 @@ import type {
 } from "../../../shared/types/mcp-marketplace";
 import type { McpPolicyState } from "../../../shared/types/mcp-policy";
 import type {
+	McpReviewDeleteRequest,
+	McpReviewListRequest,
+	McpReviewRequest,
+	McpServerReview,
+} from "../../../shared/types/mcp-reviews";
+import type {
 	McpInstalledWatchView,
 	McpSecurityRequest,
 	McpSecurityScore,
@@ -55,6 +61,12 @@ export interface McpAPI {
 	}) => Promise<IPCResult<McpInstalledWatchView>>;
 	/** Acknowledges every alert of a catalog server; false when it had none */
 	acknowledgeMcpAlerts: (request: { serverId: string }) => Promise<IPCResult<boolean>>;
+	/** The team's reviews of a catalog server, for a server project, the latest first */
+	listMcpReviews: (request: McpReviewListRequest) => Promise<IPCResult<McpServerReview[]>>;
+	/** Writes the caller's review of a catalog server, replacing the one they left */
+	putMcpReview: (request: McpReviewRequest) => Promise<IPCResult<McpServerReview>>;
+	/** Deletes a review: its author's or the project owner's to do */
+	deleteMcpReview: (request: McpReviewDeleteRequest) => Promise<IPCResult<boolean>>;
 }
 
 export function createMcpAPI(): McpAPI {
@@ -79,5 +91,14 @@ export function createMcpAPI(): McpAPI {
 
 		acknowledgeMcpAlerts: (request: { serverId: string }) =>
 			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_ACKNOWLEDGE_ALERTS, request),
+
+		listMcpReviews: (request: McpReviewListRequest) =>
+			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_LIST_REVIEWS, request),
+
+		putMcpReview: (request: McpReviewRequest) =>
+			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_PUT_REVIEW, request),
+
+		deleteMcpReview: (request: McpReviewDeleteRequest) =>
+			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_DELETE_REVIEW, request),
 	};
 }

@@ -1340,17 +1340,7 @@ body {
   border-top-color: var(--col-accent);
 }
 
-/* Column surface: a faint wash of its accent instead of a glass panel with a
-   heavy top border. */
-.kanban-column {
-  background-color: color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 4%, transparent);
-  border: 1px solid color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 14%, transparent);
-}
-
-.kanban-column-dot {
-  background-color: var(--col-accent, var(--muted-foreground));
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--col-accent, var(--muted-foreground)) 18%, transparent);
-}
+/* Column surface, header band, icon, count and gauge: styles/kanban-columns.css. */
 
 /* The card's rail: a short pill in the column accent along the left edge.
    Cards that already carry a source marker on their left border (Azure
@@ -1981,7 +1971,7 @@ body {
 /* Drop zone highlight when dragging over */
 .drop-zone-highlight {
   border-color: var(--primary);
-  background-color: rgba(214, 216, 118, 0.08);
+  background-color: color-mix(in oklab, var(--primary) 8%, transparent);
 }
 
 /* Column count badge styling */

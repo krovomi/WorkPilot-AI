@@ -5,8 +5,11 @@
  * its path never comes from the renderer — and revalidates the rest
  * (`memory-lifecycle-validation.ts`) before calling `/api/brain/memory/*`,
  * where the backend checks every id again. A server project's memory is its
- * own brain's, on the server, which does not serve this surface yet: those
- * calls answer `server-project`.
+ * own brain, on the server, which serves the journal, the trash, the pins,
+ * the scope and the undo (`/api/features/context/memory/*`,
+ * `memory-lifecycle-target.ts`); its brain is never synced with a teammate's,
+ * so the conflict queue, its maintainers and the model's opinion answer
+ * `server-project`.
  */
 
 import { ipcMain } from "electron";
@@ -21,7 +24,7 @@ import type {
 	MemoryRevertOutcome,
 } from "../../../shared/types";
 import { backendFetch } from "../_backend-fetch";
-import { featureProject } from "../server-feature-files";
+import { localOnly, type MemoryTarget, memoryFetch, memoryTarget } from "./memory-lifecycle-target";
 import {
 	boundedText,
 	conflictChoice,
@@ -51,14 +54,6 @@ interface LifecycleResponse {
 	retention_days?: number;
 }
 
-/** The local project's path, or why there is none. */
-function localProject(projectId: unknown): { path: string } | { error: string } {
-	const project = featureProject(projectId);
-	if (!project) return { error: "project-not-found" };
-	if (project.remote) return { error: "server-project" };
-	return { path: project.path };
-}
-
 function post(body: Record<string, unknown>): RequestInit {
 	// No headers: backendFetch sets the JSON content type itself.
 	return { method: "POST", body: JSON.stringify(body) };
@@ -70,12 +65,13 @@ function failure(result: { success: false; error: string; code?: unknown }): IPC
 }
 
 export async function loadMemoryLifecycle(
-	projectPath: string,
+	target: MemoryTarget,
 ): Promise<IPCResult<MemoryLifecycleView>> {
-	const query = new URLSearchParams({ project_dir: projectPath, limit: "200" });
-	const result = await backendFetch<LifecycleResponse>(
-		`/api/brain/memory/lifecycle?${query.toString()}`,
-		{ method: "GET" },
+	const result = await memoryFetch<LifecycleResponse>(
+		target,
+		"/lifecycle",
+		"GET",
+		{ limit: 200 },
 		15_000,
 	);
 	if (!result.success) return failure(result);
@@ -101,23 +97,24 @@ export function registerMemoryLifecycleHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_LIFECYCLE,
 		async (_, projectId: unknown): Promise<IPCResult<MemoryLifecycleView>> => {
-			const project = localProject(projectId);
-			if ("error" in project) return { success: false, error: project.error };
-			return loadMemoryLifecycle(project.path);
+			const target = memoryTarget(projectId);
+			if ("error" in target) return { success: false, error: target.error };
+			return loadMemoryLifecycle(target);
 		},
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_HISTORY,
 		async (_, projectId: unknown, rawId: unknown): Promise<IPCResult<MemoryJournalEntry[]>> => {
-			const project = localProject(projectId);
-			if ("error" in project) return { success: false, error: project.error };
+			const target = memoryTarget(projectId);
+			if ("error" in target) return { success: false, error: target.error };
 			const id = memoryId(rawId);
 			if (!id) return INVALID;
-			const query = new URLSearchParams({ project_dir: project.path, id });
-			const result = await backendFetch<{ entries?: MemoryJournalEntry[] }>(
-				`/api/brain/memory/history?${query.toString()}`,
-				{ method: "GET" },
+			const result = await memoryFetch<{ entries?: MemoryJournalEntry[] }>(
+				target,
+				"/history",
+				"GET",
+				{ id },
 				15_000,
 			);
 			return result.success
@@ -129,14 +126,16 @@ export function registerMemoryLifecycleHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_FORGET,
 		async (_, projectId: unknown, rawId: unknown, rawReason: unknown): Promise<IPCResult<void>> => {
-			const project = localProject(projectId);
-			if ("error" in project) return { success: false, error: project.error };
+			const target = memoryTarget(projectId);
+			if ("error" in target) return { success: false, error: target.error };
 			const id = memoryId(rawId);
 			const reason = boundedText(rawReason, MAX_REASON_LENGTH);
 			if (!id || reason === null) return INVALID;
-			const result = await backendFetch(
-				"/api/brain/memory/forget",
-				post({ project_dir: project.path, id, reason }),
+			const result = await memoryFetch(
+				target,
+				"/forget",
+				"POST",
+				{ id, reason },
 			);
 			return result.success ? { success: true } : failure(result);
 		},
@@ -145,13 +144,15 @@ export function registerMemoryLifecycleHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_RESTORE,
 		async (_, projectId: unknown, rawId: unknown): Promise<IPCResult<MemoryRestoreOutcome>> => {
-			const project = localProject(projectId);
-			if ("error" in project) return { success: false, error: project.error };
+			const target = memoryTarget(projectId);
+			if ("error" in target) return { success: false, error: target.error };
 			const id = trashId(rawId);
 			if (!id) return INVALID;
-			const result = await backendFetch<Partial<MemoryRestoreOutcome>>(
-				"/api/brain/memory/restore",
-				post({ project_dir: project.path, id }),
+			const result = await memoryFetch<Partial<MemoryRestoreOutcome>>(
+				target,
+				"/restore",
+				"POST",
+				{ id },
 			);
 			if (!result.success) return failure(result);
 			return {
@@ -164,13 +165,15 @@ export function registerMemoryLifecycleHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_PIN,
 		async (_, projectId: unknown, rawId: unknown, pinned: unknown): Promise<IPCResult<{ count: number }>> => {
-			const project = localProject(projectId);
-			if ("error" in project) return { success: false, error: project.error };
+			const target = memoryTarget(projectId);
+			if ("error" in target) return { success: false, error: target.error };
 			const id = memoryId(rawId);
 			if (!id || typeof pinned !== "boolean") return INVALID;
-			const result = await backendFetch<{ count?: number }>(
-				"/api/brain/memory/pin",
-				post({ project_dir: project.path, id, pinned }),
+			const result = await memoryFetch<{ count?: number }>(
+				target,
+				"/pin",
+				"POST",
+				{ id, pinned },
 			);
 			return result.success
 				? { success: true, data: { count: result.count ?? 0 } }
@@ -187,7 +190,7 @@ export function registerMemoryLifecycleHandlers(): void {
 			rawChoice: unknown,
 			rawText: unknown,
 		): Promise<IPCResult<{ canonical: string | null }>> => {
-			const project = localProject(projectId);
+			const project = localOnly(projectId);
 			if ("error" in project) return { success: false, error: project.error };
 			const id = conflictId(rawConflict);
 			const choice = conflictChoice(rawChoice);
@@ -207,13 +210,15 @@ export function registerMemoryLifecycleHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_REVERT,
 		async (_, projectId: unknown, rawEntry: unknown): Promise<IPCResult<MemoryRevertOutcome>> => {
-			const project = localProject(projectId);
-			if ("error" in project) return { success: false, error: project.error };
+			const target = memoryTarget(projectId);
+			if ("error" in target) return { success: false, error: target.error };
 			const id = entryId(rawEntry);
 			if (!id) return INVALID;
-			const result = await backendFetch<Partial<MemoryRevertOutcome>>(
-				"/api/brain/memory/revert",
-				post({ project_dir: project.path, entry_id: id }),
+			const result = await memoryFetch<Partial<MemoryRevertOutcome>>(
+				target,
+				"/revert",
+				"POST",
+				{ entry_id: id },
 			);
 			if (!result.success) return failure(result);
 			return {
@@ -230,14 +235,16 @@ export function registerMemoryLifecycleHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_SET_SCOPE,
 		async (_, projectId: unknown, rawId: unknown, rawScope: unknown): Promise<IPCResult<{ appliesTo: string }>> => {
-			const project = localProject(projectId);
-			if ("error" in project) return { success: false, error: project.error };
+			const target = memoryTarget(projectId);
+			if ("error" in target) return { success: false, error: target.error };
 			const id = memoryId(rawId);
 			const scope = scopeText(rawScope);
 			if (!id || scope === null) return INVALID;
-			const result = await backendFetch<{ applies_to?: string }>(
-				"/api/brain/memory/scope",
-				post({ project_dir: project.path, id, applies_to: scope }),
+			const result = await memoryFetch<{ applies_to?: string }>(
+				target,
+				"/scope",
+				"POST",
+				{ id, applies_to: scope },
 			);
 			return result.success
 				? { success: true, data: { appliesTo: result.applies_to ?? "" } }
@@ -248,7 +255,7 @@ export function registerMemoryLifecycleHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_SET_MAINTAINERS,
 		async (_, projectId: unknown, rawNames: unknown): Promise<IPCResult<string[]>> => {
-			const project = localProject(projectId);
+			const project = localOnly(projectId);
 			if ("error" in project) return { success: false, error: project.error };
 			const names = maintainerNames(rawNames);
 			if (!names) return INVALID;
@@ -265,7 +272,7 @@ export function registerMemoryLifecycleHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_SUGGEST_RESOLUTION,
 		async (_, projectId: unknown, rawConflict: unknown): Promise<IPCResult<MemoryConflictOpinion>> => {
-			const project = localProject(projectId);
+			const project = localOnly(projectId);
 			if ("error" in project) return { success: false, error: project.error };
 			const id = conflictId(rawConflict);
 			if (!id) return INVALID;

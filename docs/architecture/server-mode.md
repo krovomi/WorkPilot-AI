@@ -505,6 +505,19 @@ le domaine des analyses. Le détail : [changelog.md](changelog.md).
 | Lire les commits d'une plage | `GET /api/features/changelog/commits?mode=&type=&…` | `insight.read` ; plage refusée (422) hors du modèle fermé |
 | Corriger le changelog partagé | `PUT /api/features/changelog/report` | `insight.write`, rôle `member` ou plus ; refusé (409) pendant une génération |
 
+**Les avis de l'équipe sur un serveur MCP du catalogue sont ceux du projet.** Dans le Marketplace MCP
+d'un projet du serveur, chaque membre laisse un avis par serveur du catalogue (sûr, prudence,
+dangereux, et un commentaire en texte brut) ; les membres du projet les lisent, l'auteur ou le
+propriétaire du projet en supprime un. Table `mcp_server_reviews` (Alembic `0041`), feature
+`mcp_reviews` (`shared_features/mcp_reviews.py`), domaine `marketplace` ; l'app passe par
+`main/mcp-reviews.ts`. Conception : [mcp-security-score.md](mcp-security-score.md#avis-de-léquipe-mode-serveur-lot-5).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire les avis d'un projet, ou d'un serveur | `GET /api/features/mcp-reviews?server_id=` | `marketplace.read` |
+| Écrire son avis (le remplace) | `PUT /api/features/mcp-reviews` | `marketplace.write` (contributeur, relecteur et au-dessus) |
+| Supprimer un avis | `DELETE /api/features/mcp-reviews/{review_id}` | `marketplace.write` ; le sien, ou propriétaire du projet, ou administrateur de l'organisation |
+
 **Les automatisations tournent sur le serveur.** Les règles d'un projet du serveur (une issue
 GitHub ou GitLab étiquetée, la CI de la forge au rouge, une heure, une PR ou une MR d'un autre)
 sont enregistrées en base (`project_automations`, Alembic `0010`) et le processus de l'API les

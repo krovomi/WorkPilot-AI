@@ -218,6 +218,18 @@ describe("PixelOfficeCanvas drawing", () => {
 		expect(contextOf(sprite).calls.map((c) => c.fillStyle)).toContain("#10A37F");
 	});
 
+	it("dresses every agent in the skin chosen", () => {
+		seat([agent({ providerFamily: "openai" })]);
+		const view = render(
+			<PixelOfficeCanvas width={WIDTH} height={HEIGHT} emptyDeskLabel="free" skin="neon" />,
+		);
+		const canvas = view.container.querySelector("canvas") as HTMLCanvasElement;
+		const [character] = imagesOf(drawFrame(() => contextOf(canvas).calls), 16, 24);
+		const shirts = contextOf(character.args[0] as HTMLCanvasElement).calls.map((c) => c.fillStyle);
+		expect(shirts).toContain("#FF2E97");
+		expect(shirts).not.toContain("#10A37F");
+	});
+
 	it("draws the decor the seasons earned, and none by default", () => {
 		seat([agent({})]);
 		const plain = mount();

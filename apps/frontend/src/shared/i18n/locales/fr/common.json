@@ -1220,6 +1220,7 @@
 			"allowed": "Serveurs du catalogue autorisés : {{ids}}.",
 			"allowedNone": "Aucun serveur du catalogue n'est autorisé.",
 			"minScore": "Score de sécurité minimum : {{min}}.",
+			"confineBelow": "Les serveurs dont le score de sécurité est sous {{min}}, et ceux hors catalogue, tournent confinés (bac à sable de l'OS, réseau limité aux hôtes qu'ils listent).",
 			"customBlocked": "Les serveurs hors catalogue sont refusés.",
 			"invalidTitle": "La politique MCP du projet (.workpilot/mcp-policy.json) est invalide : aucun serveur ne peut être installé tant qu'elle n'est pas corrigée.",
 			"invalid": {
@@ -1261,6 +1262,31 @@
 				"lowScore": "Le score de sécurité est tombé à {{score}} (il était de {{previous}}).",
 				"newCodeFinding": "La version {{version}} apporte du code que la précédente n'avait pas : {{rule}} ({{file}}).",
 				"sourceUnavailable": "Le code de la version {{version}} ne peut plus être lu : il ne peut pas être audité."
+			}
+		},
+		"reviews": {
+			"title": "Avis de l'équipe",
+			"hint": "Ce que votre équipe a constaté en utilisant ce serveur. Seuls les membres de ce projet serveur les lisent.",
+			"loading": "Chargement des avis",
+			"none": "Personne dans l'équipe n'a encore donné son avis sur ce serveur.",
+			"by": "par {{author}}",
+			"unknownAuthor": "un ancien membre",
+			"delete": "Supprimer cet avis",
+			"write": "Votre avis",
+			"yours": "Votre avis (l'enregistrer le remplace)",
+			"comment": "Commentaire",
+			"commentPlaceholder": "Qu'avez-vous constaté ? Hôtes appelés, fichiers lus, tout ce que la doc ne dit pas.",
+			"save": "Publier l'avis",
+			"update": "Mettre à jour l'avis",
+			"verdicts": {
+				"safe": "Sûr",
+				"caution": "À utiliser avec prudence",
+				"unsafe": "Dangereux"
+			},
+			"errors": {
+				"too_many_reviews": "Ce projet contient déjà le nombre maximal d'avis.",
+				"review_not_found": "Cet avis n'existe plus.",
+				"failed": "Le serveur a refusé ou est injoignable."
 			}
 		}
 	},

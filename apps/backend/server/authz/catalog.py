@@ -172,6 +172,9 @@ _ALL: tuple[Permission, ...] = (
     _p("settings", "provider.write", privileged=True),
     # -- marketplace -------------------------------------------------------
     _p("marketplace", "read"),
+    # A review of a catalogue server left with a project's team (#369 lot 5):
+    # text, never code, so not privileged.
+    _p("marketplace", "write"),
     _p("marketplace", "install", privileged=True),
     # -- lab ---------------------------------------------------------------
     _p("lab", "read"),
@@ -301,6 +304,10 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # A recorded agent session left with a server project's team, behind
         # a link that expires and can be revoked (replay is lab, like it).
         "replay_shares": "lab",
+        # Pixel Office's team leaderboard and each person's badges, computed
+        # from a server project's runs and approvals (analytics, like the
+        # workspace views it sits beside).
+        "pixel_office": "analytics",
         # A server project's workpilot.policy.yaml, the audit trail its agents
         # write in the clone, the approvals they wait on and its kill switch
         # (shared_features/governance.py): reading it is the audit domain.
@@ -335,6 +342,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # The schema guard's record and a re-check of the task's migrations.
         # Desktop-only like verify; files and git only, no agent.
         "schema_guard": "qa",
+        # A server project team's security reviews of catalogue MCP servers
+        # (shared_features/mcp_reviews.py).
+        "mcp_reviews": "marketplace",
     }
 )
 
@@ -365,7 +375,9 @@ SERVER_FEATURES: frozenset[str] = frozenset(
         "analyses",
         "workspace",
         "replay_shares",
+        "pixel_office",
         "governance",
+        "mcp_reviews",
         "execution_waves",
     }
 )
