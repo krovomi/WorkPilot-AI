@@ -8,3 +8,5 @@ section: 📚 Documentation
   e-mail, réseau local, essai, SSO OpenID Connect, approbations à plusieurs), rôles, groupes,
   projets, quotas, usage depuis l'app et le téléphone, accès MCP, l'API avec `curl` et ses codes
   de réponse, et un tableau de dépannage.
+  Les deux README, `FEATURES.md` et `CONFIGURATION.md` y renvoient, et le wiki gagne une page
+  « Serveur d'équipe » en anglais et en français.
