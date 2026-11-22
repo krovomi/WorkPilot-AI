@@ -176,6 +176,50 @@
 			"open_one": "{{count}} conflit encore ouvert.",
 			"open_other": "{{count}} conflits encore ouverts.",
 			"ignored": "Les temps de résolution des conflits de ce projet sont illisibles : ils repartent du prochain conflit."
+		},
+		"server": {
+			"intro": "Le serveur planifie le backlog de ce projet depuis sa copie du code et l'exécute vague après vague : les cartes qui ne partagent aucun fichier tournent côte à côte, dans l'ordre qui fusionne le mieux. Ouvrir cette vue fait avancer l'exécution.",
+			"loading": "Lecture des vagues du serveur…",
+			"loadError": "Impossible de lire les vagues du serveur : {{error}}",
+			"actionError": "Le serveur ne l'a pas fait : {{error}}",
+			"finished": "La dernière exécution a passé toutes ses vagues.",
+			"ignored": "L'exécution enregistrée était illisible ; elle a été écartée.",
+			"start": "Lancer la première vague",
+			"noRight": "Vous n'avez pas le droit de lancer des agents sur ce projet.",
+			"empty": "Rien à planifier en Planification ni en File.",
+			"step": "Vérifier maintenant",
+			"stopConfirm": "Arrêter l'exécution ? Les cartes lancées continuent ; aucune autre vague ne démarre.",
+			"running": "Vague {{wave}} sur {{total}}",
+			"advance": {
+				"merged": "Vague suivante une fois fusionnée",
+				"review": "Vague suivante une fois en revue"
+			},
+			"failure": {
+				"needs_approval": "attend l'approbation de sa spec",
+				"claimed": "prise par quelqu'un d'autre",
+				"already_running": "déjà en cours",
+				"quota": "au-delà du quota d'agents",
+				"refused": "le serveur a refusé de la lancer",
+				"missing": "n'est plus sur le tableau"
+			},
+			"blocked": "attend une carte dont elle dépend",
+			"gone": "n'est plus sur le tableau",
+			"agentRunning": "agent en cours",
+			"plan_one": "Plan : {{count}} vague, jusqu'à {{parallel}} à la fois",
+			"plan_other": "Plan : {{count}} vagues, jusqu'à {{parallel}} à la fois",
+			"mergeChecks": "Fusions d'essai : {{checked}} vérifiées, {{conflicts}} en conflit",
+			"cycles": "Des cartes dépendent les unes des autres en boucle et sont écartées :",
+			"excluded": {
+				"cycle": "dans une boucle de dépendances",
+				"blocked_by_cycle": "dépend d'une carte prise dans une boucle"
+			},
+			"history": "{{days}} derniers jours",
+			"historyIgnored": "L'historique des exécutions était illisible.",
+			"historyLine": "Exécutions : {{runs}} (arrêtées : {{stopped}}) · conflits évités : {{conflicts}} · risque évité : {{risk}} · cartes lancées : {{started}}",
+			"lastRun": "Dernière exécution terminée le {{at}}",
+			"conflictsLine": "Conflits de fusion résolus : {{resolved}}, en {{median}} (médiane) · encore ouverts : {{open}}",
+			"conflictsNone": "Aucun conflit de fusion résolu · encore ouverts : {{open}}",
+			"conflictsIgnored": "Les temps des conflits de fusion étaient illisibles."
 		}
 	}
 }

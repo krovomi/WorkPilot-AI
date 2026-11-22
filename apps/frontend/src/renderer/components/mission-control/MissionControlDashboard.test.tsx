@@ -15,6 +15,10 @@ import { MissionControlDashboard } from "./MissionControlDashboard";
 
 // Its own test: WavesView.test.tsx. It adds buttons these tests do not click.
 vi.mock("../conflict-predictor/WavesView", () => ({ WavesView: () => null }));
+// Its own test: ServerWavesView.test.tsx.
+vi.mock("../conflict-predictor/ServerWavesView", () => ({
+	ServerWavesView: ({ project }: { project: { id: string } }) => <div data-testid="server-waves">{project.id}</div>,
+}));
 
 const session = {
 	session_id: "test-session",
@@ -291,5 +295,23 @@ describe("during a session", () => {
 		await user.click(screen.getByRole("button", { name: "Stop" }));
 		expect(await screen.findByRole("button", { name: "Launch Mission Control" })).toBeInTheDocument();
 		expect(api.missionControlStopSession).toHaveBeenCalled();
+	});
+});
+
+describe("on a server project", () => {
+	it("shows the waves the server plans and runs, and no session of this computer", async () => {
+		useProjectStore.setState({
+			selectedProjectId: "srv-1",
+			projects: [
+				{ id: "p1", name: "Local", path: "/p1" },
+				{ id: "srv-1", name: "Shop", path: "/mirror", remote: { repoUrl: "https://x/r.git", defaultBranch: "main", role: "member" } },
+			] as never,
+		});
+		render(<MissionControlDashboard />);
+		expect(screen.getByTestId("server-waves")).toHaveTextContent("srv-1");
+		expect(screen.getByText(/its agents run on the server/)).toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "Launch Mission Control" })).toBeNull();
+		expect(api.missionControlGetState).not.toHaveBeenCalled();
+		useProjectStore.setState({ projects: [] });
 	});
 });

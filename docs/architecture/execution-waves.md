@@ -3,8 +3,9 @@ feature: Execution waves (Conflict Predictor)
 summary: >-
   Groupe les specs en attente en vagues sans fichier commun (plan, worktree, zones fragiles, liens
   de code ; zéro LLM), vérifiées par merge de test ; « Exécuter dans l'ordre optimal » lance vague
-  après vague, survit à un redémarrage, tourne aussi sur le serveur (route, app mobile) et compte
-  par sprint les conflits évités et le temps médian mesuré de résolution des conflits restants.
+  après vague, survit à un redémarrage, tourne aussi sur le serveur (route, mobile, Mission
+  Control) et compte par sprint les conflits évités et le temps médian mesuré de résolution des
+  conflits restants.
 ---
 
 # Execution waves (Conflict Predictor)
@@ -16,7 +17,8 @@ plans **across specs**: which of the specs waiting in the backlog or the queue m
 side, in which order, and runs them that way.
 
 Shown in Mission Control (a "Execution waves" section, with or without a Mission Control session),
-and, for a project of a team server, by the server itself and the mobile app ("Server mode" below).
+and, for a project of a team server, by the server itself, the mobile app and the desktop's
+Mission Control ("Server mode" below).
 
 ## Code
 
@@ -44,6 +46,8 @@ and, for a project of a team server, by the server itself and the mobile app ("S
 | Server: the run (wave rules, starting cards, steps) | `apps/backend/shared_features/waves/execution.py`, `driver.py` |
 | Server routes `/api/features/execution-waves/*` | `apps/backend/shared_features/execution_waves.py` |
 | Mobile: the Waves page of a project | `apps/mobile/src/app/(app)/projects/[projectId]/waves.tsx` |
+| Desktop, server project: the routes, answers rebuilt field by field | `apps/frontend/src/main/conflict-waves/server-waves.ts`, `ipc-handlers/server-conflict-waves-handlers.ts`, `shared/types/server-conflict-waves.ts` |
+| Desktop, server project: Mission Control shows the server's waves | `apps/frontend/src/renderer/components/mission-control/ServerMissionControl.tsx`, `conflict-predictor/ServerWavesView.tsx`, `ServerWavesParts.tsx` |
 
 ## Why in the main process, in TypeScript
 
@@ -265,6 +269,14 @@ Routes (`/api/features/execution-waves`, each with its permission, `project_id` 
 The mobile app shows the plan, the run going on (each card's column, or why it waits), the
 counts of the last 14 days, and starts, steps and stops the run for those who may.
 
+The desktop app is a second client of the same routes. When the selected project is a server
+project, Mission Control (offered for it by `sidebar/server-gates.ts`) shows no session of this
+computer, whose agents would run on the mirror: it shows the server's waves, as the mobile page
+does (plan, run going on, start with the advance rule, "Check now" for a step, stop after a
+confirmation, and the run and merge conflict figures of the server's window). Opening it takes
+the run's next step for someone who may start agents. The buttons follow the person's
+permissions (`agent.execute`, `task.write`) and project role, the server checks them again.
+
 ## Boundary
 
 `conflictWaves:plan` takes `{ projectId, taskIds?, options? }`. The handler checks every field:
@@ -296,6 +308,14 @@ among them) are never read, their diff sections are dropped, and a removed symbo
 redaction would mask is dropped: a value never becomes a link shown in the view. Only paths and
 identifiers taken from the diff reach the renderer (`code-reader.test.ts`).
 
+The server channels (`conflictWaves:serverPlan`, `:serverRun`, `:serverStart`, `:serverStep`,
+`:serverStop`, `:serverHistory`) take the id of a project the server listed (any other id,
+a local project's included, is refused before a request) and, for `serverStart`, the advance rule
+from a closed list. The main process sends them through `authedFetch` with the person's session,
+and rebuilds every answer before the renderer sees it: task and card ids of the planner's shape,
+start failures, advance rules, outcomes, exclusion reasons and board columns from closed lists,
+titles and dates bounded, counts and scores finite and capped (`server-waves.test.ts`).
+
 `clearRun` takes a project id and, optionally, an outcome from a closed list; anything else is
 refused before the disk is touched. `history` takes a project id. The history file goes through
 the same folder checks, bounded read (128 KB) and atomic write as the saved run, and each record is
@@ -303,6 +323,7 @@ rebuilt field by field when read (`run-history.test.ts`).
 
 ## Still to do
 
-Nothing the issue asks for. Not done, on purpose: the desktop's Mission Control does not show the
-waves of a server project (the server and the mobile app do); time saved by parallelism is not
-shown, since it would be an estimate.
+Nothing the issue asks for. Not done, on purpose: time saved by parallelism is not shown, since it
+would be an estimate. The desktop's server view does not offer the planning options of the local
+view (tolerance, unplanned policy, fragile zones, code links): like the mobile page, it uses the
+server's defaults.

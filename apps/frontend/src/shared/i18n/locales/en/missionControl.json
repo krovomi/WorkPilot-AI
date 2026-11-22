@@ -260,5 +260,6 @@
 		"ratio": "× {{value}}",
 		"rebalances": "Rebalancings per session",
 		"overrun": "Budgets exceeded"
-	}
+	},
+	"serverDescription": "A project of the team server: its agents run on the server, which plans and runs its execution waves."
 }
