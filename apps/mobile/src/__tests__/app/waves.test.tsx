@@ -52,11 +52,13 @@ const HISTORY: WaveHistory = {
 		started: 5,
 		lastFinishedAt: "2026-11-20T10:00:00Z",
 	},
+	conflicts: { ignored: false, resolved: 3, medianSeconds: 3 * 3600 + 5 * 60, open: 1 },
 };
 
 const NO_HISTORY: WaveHistory = {
 	ignored: true,
 	summary: { days: 14, runs: 0, stopped: 0, conflictsAvoided: 0, riskAvoided: 0, started: 0, lastFinishedAt: null },
+	conflicts: { ignored: true, resolved: 0, medianSeconds: null, open: 0 },
 };
 
 const RUN = {
@@ -130,6 +132,9 @@ describe("execution waves", () => {
 			"Runs: 2 (stopped: 1) · conflicts avoided: 3 · risk avoided: 4 · cards started: 5",
 		);
 		expect(screen.getByText(/^Last run finished /)).toBeTruthy();
+		expect(screen.getByTestId("waves-conflicts").props.children).toBe(
+			"Merge conflicts resolved: 3, median time to resolve 3 h 05 min · still open: 1",
+		);
 		// Opening the page with no run takes no step.
 		expect(server.called(`POST ${BASE}/run/step`)).toHaveLength(0);
 
@@ -181,6 +186,7 @@ describe("execution waves", () => {
 		expect(screen.queryByText(/^Conflict risk avoided/)).toBeNull();
 		expect(screen.queryByText(/^Trial merges/)).toBeNull();
 		expect(screen.getByText("The run history could not be read.")).toBeTruthy();
+		expect(screen.getByText("The merge conflict times could not be read.")).toBeTruthy();
 		expect(screen.queryByText(/^Last run finished /)).toBeNull();
 		expect(server.called(`POST ${BASE}/run/step`)).toHaveLength(0);
 	});
@@ -205,7 +211,10 @@ describe("execution waves", () => {
 			{
 				[`GET ${BASE}/plan`]: PLAN,
 				[`GET ${BASE}/run`]: { run: null, ended: "done", ignored: false },
-				[`GET ${BASE}/history`]: HISTORY,
+				[`GET ${BASE}/history`]: {
+					...HISTORY,
+					conflicts: { ignored: false, resolved: 0, medianSeconds: null, open: 0 },
+				},
 			},
 			READER,
 		);
@@ -213,6 +222,7 @@ describe("execution waves", () => {
 		expect(await screen.findByText("You don't have the rights to start agents on this project.")).toBeTruthy();
 		expect(screen.getByText("The last run went through all its waves.")).toBeTruthy();
 		expect(screen.queryByRole("button", { name: "Start the first wave" })).toBeNull();
+		expect(screen.queryByTestId("waves-conflicts")).toBeNull();
 	});
 
 	it("says when there is nothing to plan, and shows a start the server refuses", async () => {
@@ -231,13 +241,27 @@ describe("execution waves", () => {
 		expect(await screen.findByText("Something went wrong: Nothing to plan")).toBeTruthy();
 	});
 
-	it("says the backlog is empty", async () => {
+	it("says the backlog is empty, and times a short conflict in minutes", async () => {
+		const history = { ...HISTORY, conflicts: { ignored: false, resolved: 1, medianSeconds: 20, open: 0 } };
 		fakeServer(
-			{ [`GET ${BASE}/plan`]: EMPTY_PLAN, [`GET ${BASE}/run`]: NONE, [`GET ${BASE}/history`]: HISTORY },
+			{ [`GET ${BASE}/plan`]: EMPTY_PLAN, [`GET ${BASE}/run`]: NONE, [`GET ${BASE}/history`]: history },
 			RUNNER,
 		);
 		await openApp("/projects/p1/waves");
 		expect(await screen.findByText("Nothing in Planning or Queue to plan.")).toBeTruthy();
+		expect(screen.getByTestId("waves-conflicts").props.children).toBe(
+			"Merge conflicts resolved: 1, median time to resolve 1 min · still open: 0",
+		);
+	});
+
+	it("counts open conflicts when none was resolved, and shows nothing without one", async () => {
+		const history = { ...HISTORY, conflicts: { ignored: false, resolved: 0, medianSeconds: null, open: 2 } };
+		fakeServer(
+			{ [`GET ${BASE}/plan`]: EMPTY_PLAN, [`GET ${BASE}/run`]: NONE, [`GET ${BASE}/history`]: history },
+			RUNNER,
+		);
+		await openApp("/projects/p1/waves");
+		expect(await screen.findByText("No merge conflict resolved · still open: 2")).toBeTruthy();
 	});
 
 	it("shows a plan that cannot be read", async () => {

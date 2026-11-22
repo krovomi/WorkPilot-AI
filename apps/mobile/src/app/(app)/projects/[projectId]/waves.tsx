@@ -1,8 +1,9 @@
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import type { ExecutionWavePlan, WaveRunAnswer } from "../../../../api/types";
+import type { ExecutionWavePlan, WaveHistory, WaveRunAnswer } from "../../../../api/types";
 import { useApi, useSession } from "../../../../auth/session";
 import { useLoad } from "../../../../hooks/useLoad";
 import { describeError } from "../../../../i18n";
@@ -136,6 +137,7 @@ export default function Waves() {
 								started: data.history.summary.started,
 							})}
 						</Text>
+						<ConflictTimes conflicts={data.history.conflicts} />
 						{data.history.summary.lastFinishedAt ? (
 							<Text style={muted}>
 								{t("waves.lastRun", { at: formatDate(data.history.summary.lastFinishedAt, i18n.language) })}
@@ -145,6 +147,32 @@ export default function Waves() {
 				</>
 			) : null}
 		</ScrollView>
+	);
+}
+
+/** "12 min", "3 h 05 min": a time the server measured. */
+function duration(seconds: number, t: TFunction): string {
+	const minutes = Math.max(1, Math.round(seconds / 60));
+	if (minutes < 60) return t("waves.minutes", { count: minutes });
+	return t("waves.hours", { hours: Math.floor(minutes / 60), minutes: String(minutes % 60).padStart(2, "0") });
+}
+
+/** How long the residual merge conflicts took to resolve, as the server measured it. */
+function ConflictTimes({ conflicts }: { conflicts: WaveHistory["conflicts"] }) {
+	const { t } = useTranslation();
+	const theme = useTheme();
+	if (conflicts.ignored) return <Text style={{ color: theme.textMuted }}>{t("waves.conflictsIgnored")}</Text>;
+	if (!conflicts.resolved && !conflicts.open) return null;
+	return (
+		<Text style={{ color: theme.text }} testID="waves-conflicts">
+			{conflicts.medianSeconds === null
+				? t("waves.conflictsNone", { open: conflicts.open })
+				: t("waves.conflictsLine", {
+						resolved: conflicts.resolved,
+						median: duration(conflicts.medianSeconds, t),
+						open: conflicts.open,
+					})}
+		</Text>
 	);
 }
 

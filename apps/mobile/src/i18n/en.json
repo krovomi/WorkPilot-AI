@@ -700,6 +700,11 @@
 		"history": "Last {{days}} days",
 		"historyIgnored": "The run history could not be read.",
 		"historyLine": "Runs: {{runs}} (stopped: {{stopped}}) · conflicts avoided: {{conflicts}} · risk avoided: {{risk}} · cards started: {{started}}",
-		"lastRun": "Last run finished {{at}}"
+		"lastRun": "Last run finished {{at}}",
+		"conflictsLine": "Merge conflicts resolved: {{resolved}}, median time to resolve {{median}} · still open: {{open}}",
+		"conflictsNone": "No merge conflict resolved · still open: {{open}}",
+		"conflictsIgnored": "The merge conflict times could not be read.",
+		"minutes": "{{count}} min",
+		"hours": "{{hours}} h {{minutes}} min"
 	}
 }

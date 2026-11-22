@@ -700,6 +700,11 @@
 		"history": "{{days}} derniers jours",
 		"historyIgnored": "L'historique des exécutions était illisible.",
 		"historyLine": "Exécutions : {{runs}} (arrêtées : {{stopped}}) · conflits évités : {{conflicts}} · risque évité : {{risk}} · cartes lancées : {{started}}",
-		"lastRun": "Dernière exécution terminée le {{at}}"
+		"lastRun": "Dernière exécution terminée le {{at}}",
+		"conflictsLine": "Conflits de fusion résolus : {{resolved}}, en {{median}} (médiane) · encore ouverts : {{open}}",
+		"conflictsNone": "Aucun conflit de fusion résolu · encore ouverts : {{open}}",
+		"conflictsIgnored": "Les temps des conflits de fusion étaient illisibles.",
+		"minutes": "{{count}} min",
+		"hours": "{{hours}} h {{minutes}} min"
 	}
 }

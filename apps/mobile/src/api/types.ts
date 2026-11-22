@@ -341,7 +341,7 @@ export interface WaveRunAnswer {
 	ignored: boolean;
 }
 
-/** `GET .../history`: the last 14 days of runs, counted, never estimated. */
+/** `GET .../history`: the last 14 days of runs, counted, and of merge conflicts, timed; never estimated. */
 export interface WaveHistory {
 	ignored: boolean;
 	summary: {
@@ -353,4 +353,6 @@ export interface WaveHistory {
 		started: number;
 		lastFinishedAt: string | null;
 	};
+	/** The merge conflicts of the same days: how many were resolved, their median time (measured), those still open. */
+	conflicts: { ignored: boolean; resolved: number; medianSeconds: number | null; open: number };
 }
