@@ -9,9 +9,15 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { AUTO_BUILD_PATHS, getSpecsDir } from "../../../shared/constants";
-import type { Project, Task, TaskMetadata } from "../../../shared/types";
+import type {
+	Project,
+	Task,
+	TaskMetadata,
+	TaskStatusActor,
+} from "../../../shared/types";
 import { slugifySpecTitle } from "../../../shared/utils/spec-slug";
 import { projectStore } from "../../project-store";
+import { recordStatusChange } from "../../task-status-history";
 
 export interface NewLocalTask {
 	/** Plain-text title, already generated when the user gave none. */
@@ -22,6 +28,8 @@ export interface NewLocalTask {
 	readonly displayDescription: string;
 	readonly descriptionIsHtml: boolean;
 	readonly metadata?: TaskMetadata;
+	/** Who opens the card, for its status history; a person by default. */
+	readonly createdBy?: TaskStatusActor;
 }
 
 export function createLocalTask(project: Project, input: NewLocalTask): Task {
@@ -164,6 +172,12 @@ export function createLocalTask(project: Project, input: NewLocalTask): Task {
 		JSON.stringify(implementationPlan, null, 2),
 		"utf-8",
 	);
+	// The first entry of its history: where lead time starts.
+	recordStatusChange(specDir, {
+		to: "backlog",
+		actor: input.createdBy ?? "user",
+		previous: null,
+	});
 
 	// Always written: it carries at least the source type.
 	writeFileSync(

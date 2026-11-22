@@ -60,7 +60,7 @@ describe("rerunQaReview", () => {
 	it("writes the status itself when the state machine does not", async () => {
 		state.handled = false;
 		expect(await rerunQaReview(task, project, agents() as never, () => null)).toBe(true);
-		expect(persistPlanStatus).toHaveBeenCalledWith(expect.any(String), "ai_review", "p1");
+		expect(persistPlanStatus).toHaveBeenCalledWith(expect.any(String), "ai_review", "p1", "system");
 	});
 
 	it("does nothing while the card runs, without profiles or without a sign-in", async () => {

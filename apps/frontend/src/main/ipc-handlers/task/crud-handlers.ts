@@ -53,6 +53,7 @@ import {
 	specIsStale,
 } from "./stale-spec";
 import { resolveUnder } from "../../security/renderer-path";
+import { recordStatusChange } from "../../task-status-history";
 
 /** Charge le PAT et l'URL d'organisation Azure DevOps depuis le `.env` projet. */
 function loadAzureDevOpsConfig(
@@ -405,6 +406,12 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				JSON.stringify(implementationPlan, null, 2),
 				"utf-8",
 			);
+			// A clean ticket: its history starts here, not with the source's.
+			recordStatusChange(newSpecDir, {
+				to: "backlog",
+				actor: "user",
+				previous: null,
+			});
 
 			const duplicatedTask: Task = {
 				id: newSpecId,

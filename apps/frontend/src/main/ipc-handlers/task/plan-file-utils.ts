@@ -20,9 +20,20 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { AUTO_BUILD_PATHS, getSpecsDir } from "../../../shared/constants";
-import type { Project, Task, TaskStatus } from "../../../shared/types";
+import type {
+	Project,
+	ReviewReason,
+	Task,
+	TaskStatus,
+	TaskStatusActor,
+} from "../../../shared/types";
 import type { TaskEventPayload } from "../../agent/task-event-schema";
 import { projectStore } from "../../project-store";
+import {
+	asReviewReason,
+	asTaskStatus,
+	recordStatusChange,
+} from "../../task-status-history";
 import type { VisualProofRun } from "../../../shared/types";
 import { applyPlanEdit, type SubtaskEdit } from "./plan-edit";
 
@@ -72,6 +83,18 @@ function isFileNotFoundError(err: unknown): boolean {
 	return (err as NodeJS.ErrnoException).code === "ENOENT";
 }
 
+/** The status and review reason a plan held before it is rewritten. */
+function previousStatusOf(
+	plan: unknown,
+): { status: TaskStatus | null; reason?: ReviewReason } | null {
+	if (!plan || typeof plan !== "object") return null;
+	const record = plan as Record<string, unknown>;
+	return {
+		status: asTaskStatus(record.status),
+		reason: asReviewReason(record.reviewReason),
+	};
+}
+
 /**
  * Get the plan file path for a task
  */
@@ -108,12 +131,16 @@ export function mapStatusToPlanStatus(status: TaskStatus): string {
  * @param planPath - Path to the implementation_plan.json file
  * @param status - The TaskStatus to persist
  * @param projectId - Optional project ID to invalidate cache (recommended for performance)
+ * @param historyActor - Who made the change, to append it to the task's
+ *   `status_history.json`; only for the main project's plan, never a
+ *   worktree's copy (one history per task)
  * @returns true if status was persisted, false if plan file doesn't exist
  */
 export async function persistPlanStatus(
 	planPath: string,
 	status: TaskStatus,
 	projectId?: string,
+	historyActor?: TaskStatusActor,
 ): Promise<boolean> {
 	return withPlanLock(planPath, async () => {
 		try {
@@ -124,6 +151,7 @@ export async function persistPlanStatus(
 			// Read file directly without existence check to avoid TOCTOU race condition
 			const planContent = readFileSync(planPath, "utf-8");
 			const plan = JSON.parse(planContent);
+			const previous = previousStatusOf(plan);
 
 			plan.status = status;
 			plan.planStatus = mapStatusToPlanStatus(status);
@@ -133,6 +161,13 @@ export async function persistPlanStatus(
 			console.warn(
 				`[plan-file-utils] Successfully persisted status: ${status} to implementation_plan.json`,
 			);
+			if (historyActor) {
+				recordStatusChange(path.dirname(planPath), {
+					to: status,
+					actor: historyActor,
+					previous,
+				});
+			}
 
 			// Invalidate tasks cache since status changed
 			if (projectId) {
@@ -260,6 +295,9 @@ export function persistPlanLastEventSync(
  *
  * If the plan file doesn't exist, creates a minimal plan with the status fields.
  * This ensures XState state is persisted even during early phases like spec creation.
+ *
+ * `historyActor`, given for the main project's plan only, appends the change
+ * to the task's `status_history.json` (`task-status-history.ts`).
  */
 export function persistPlanStatusAndReasonSync(
 	planPath: string,
@@ -269,13 +307,16 @@ export function persistPlanStatusAndReasonSync(
 	xstateState?: string,
 	executionPhase?: string,
 	errorMessage?: string,
+	historyActor?: TaskStatusActor,
 ): boolean {
 	try {
 		let plan: Record<string, unknown>;
+		let previous: ReturnType<typeof previousStatusOf> = null;
 
 		try {
 			const planContent = readFileSync(planPath, "utf-8");
 			plan = JSON.parse(planContent);
+			previous = previousStatusOf(plan);
 		} catch (readErr) {
 			if (!isFileNotFoundError(readErr)) {
 				throw readErr;
@@ -309,6 +350,14 @@ export function persistPlanStatusAndReasonSync(
 		plan.updated_at = new Date().toISOString();
 
 		writeFileSync(planPath, JSON.stringify(plan, null, 2), "utf-8");
+		if (historyActor) {
+			recordStatusChange(path.dirname(planPath), {
+				to: status,
+				reason: asReviewReason(reviewReason),
+				actor: historyActor,
+				previous,
+			});
+		}
 
 		if (projectId) {
 			projectStore.invalidateTasksCache(projectId);
