@@ -236,7 +236,7 @@ describe("WIP limit", () => {
 		const count = container.querySelector(".kanban-col-count");
 		expect(count).toHaveTextContent("3/2");
 		expect(count).toHaveAttribute("data-warn");
-		expect(within(container).getByText("3 cards, limit 2")).toBeInTheDocument();
+		expect(within(container).getByText("3 tasks, limit 2")).toBeInTheDocument();
 		expect(container.querySelector(".kanban-col-gauge-bar > span")).toHaveStyle({ width: "100%" });
 	});
 

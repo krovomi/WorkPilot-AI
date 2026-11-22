@@ -176,6 +176,7 @@
 /* The strip is too narrow for words: the drop target keeps its icon, its
    words stay for screen readers. */
 .kanban-col-collapsed-list .kanban-col-empty {
+  min-height: 0;
   padding-block: 0.75rem;
 }
 
@@ -189,14 +190,18 @@
 }
 
 /* Empty column: the icon in a halo of the accent, inside a dashed frame
-   that shows where a card goes. */
+   that shows where a task goes. The text spreads over the column width,
+   and every frame has the same height, so the « Add a task » buttons
+   under the empty columns line up across the board. */
 .kanban-col-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  justify-content: center;
+  gap: 0.375rem;
+  min-height: 11rem;
   border-color: var(--border);
-  padding-block: 1.5rem;
+  padding: 1.5rem 0.75rem;
 }
 
 .kanban-col-empty-icon {
@@ -215,15 +220,16 @@
 }
 
 .kanban-col-empty-title {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--foreground);
 }
 
 .kanban-col-empty-hint {
-  max-width: 22ch;
-  font-size: 0.6875rem;
-  line-height: 1.35;
+  width: 100%;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  text-wrap: pretty;
   color: var(--muted-foreground);
 }
 
