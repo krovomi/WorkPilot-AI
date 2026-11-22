@@ -1,3 +1,4 @@
+import { ciPipelineService } from "../ci-pipeline-service";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
@@ -449,6 +450,10 @@ export function registerAgenteventsHandlers(
 				rateLimitedTaskIds.delete(taskId);
 			} else if (!isPaused) {
 				taskStateManager.handleProcessExited(taskId, code, exitTask, exitProject);
+				// A suite the build sent to the forge's CI: push the branch.
+				if (code === 0 && exitTask && exitProject) {
+					void ciPipelineService.startCiSuite(exitProject, exitTask);
+				}
 			} else if (exitTask && exitProject) {
 				// The backend pauses a task itself: its cost budget, or the circuit breaker.
 				announceBackendPause(

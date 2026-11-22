@@ -7,6 +7,7 @@
 
 import type { PipelineRunState } from "../../../shared/types";
 import type { PipelineProviderAdapter, PipelineRun } from "../../ci-pipeline-providers";
+import { foldRuns } from "../../ci-run-fold";
 import { toPipeline, toPipelineStep } from "./transform";
 import {
 	type BitbucketConfig,
@@ -40,19 +41,51 @@ export function runState(state: string): PipelineRunState {
 
 const FAILED_STEP = new Set(["FAILED", "ERROR"]);
 
+/** The commit a raw pipeline built, lower-cased, or "" when it says none. */
+function commitOf(raw: unknown): string {
+	const target = (raw as { target?: { commit?: { hash?: unknown } } } | null)?.target;
+	const hash = target?.commit?.hash;
+	return typeof hash === "string" ? hash.toLowerCase() : "";
+}
+
 export class BitbucketPipelinesAdapter implements PipelineProviderAdapter {
 	readonly id = "bitbucket-pipelines" as const;
 	readonly label = "Bitbucket Pipelines";
 
 	constructor(private readonly cfg: BitbucketConfig) {}
 
-	async fetchLatestRun(branch: string): Promise<PipelineRun | null> {
-		const query = `target.ref_name=${encodeURIComponent(branch)}&sort=-created_on&pagelen=1`;
+	private async branchPipelines(branch: string, pagelen: number): Promise<unknown[]> {
+		const query = `target.ref_name=${encodeURIComponent(branch)}&sort=-created_on&pagelen=${pagelen}`;
 		const body = (await bitbucketFetch(this.cfg, `${repoPath(this.cfg)}/pipelines/?${query}`)) as {
 			values?: unknown[];
 		};
-		const raw = Array.isArray(body?.values) ? body.values[0] : undefined;
-		if (!raw) return null;
+		return Array.isArray(body?.values) ? body.values : [];
+	}
+
+	async fetchLatestRun(branch: string): Promise<PipelineRun | null> {
+		const raw = (await this.branchPipelines(branch, 1))[0];
+		return raw ? this.toRun(raw) : null;
+	}
+
+	async fetchCommitRun(branch: string, sha: string): Promise<PipelineRun | null> {
+		const wanted = sha.toLowerCase();
+		const runs = (await this.branchPipelines(branch, 20))
+			.filter((raw) => commitOf(raw) === wanted)
+			.map((raw) => this.toRun(raw))
+			.filter((run): run is PipelineRun => run !== null);
+		return foldRuns(runs);
+	}
+
+	async triggerRun(branch: string): Promise<boolean> {
+		// The branch's section of bitbucket-pipelines.yml (or `default`) runs.
+		await bitbucketFetch(this.cfg, `${repoPath(this.cfg)}/pipelines/`, {
+			method: "POST",
+			body: { target: { type: "pipeline_ref_target", ref_type: "branch", ref_name: branch } },
+		});
+		return true;
+	}
+
+	private toRun(raw: unknown): PipelineRun | null {
 		const web = `https://bitbucket.org/${encodeURIComponent(this.cfg.workspace)}/${encodeURIComponent(this.cfg.repo)}`;
 		const pipeline = toPipeline(raw, web);
 		if (!isPipelineUuid(pipeline.uuid)) return null;

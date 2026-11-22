@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project, Task, TaskStatus } from "../../shared/types";
 
 const fetchLatestRun = vi.fn();
+const fetchCommitRun = vi.fn();
 const tasks: Task[] = [];
 const projects: Project[] = [];
 const recordTaskOutcome = vi.fn();
@@ -22,6 +23,7 @@ vi.mock("../ci-pipeline-providers", () => ({
 		id: "github",
 		label: "GitHub Actions",
 		fetchLatestRun,
+		fetchCommitRun,
 		fetchRunErrors: async () => ["error TS2322 in src/app.ts"],
 	}),
 }));
@@ -100,6 +102,7 @@ beforeEach(() => {
 		settings: {},
 	} as unknown as Project);
 	fetchLatestRun.mockReset();
+	fetchCommitRun.mockReset();
 	recordTaskOutcome.mockReset();
 	handleUiEvent.mockReset();
 	resetForNewRun.mockReset();
@@ -251,5 +254,44 @@ describe("green build", () => {
 
 		expect(readPlanFile().status).toBe("human_review");
 		expect(statusChanges()).toEqual([]);
+	});
+});
+
+describe("a task's suite sent to the CI", () => {
+	const SHA = "e".repeat(40);
+	const suite = {
+		state: "pending",
+		branch: `workpilot/${SPEC}`,
+		sha: SHA,
+		pushedAt: "2026-11-22T10:00:00.000Z",
+	};
+
+	it("is judged on its pushed commit, not on the branch's latest run", async () => {
+		setTask("human_review");
+		writePlan({ status: "human_review", phases: [], ciSuite: suite });
+		fetchCommitRun.mockResolvedValue({ state: "succeeded", runId: 7, webUrl: "https://ci/7" });
+		const { ciPipelineService } = await loadService();
+
+		await ciPipelineService.refreshTask("t1");
+
+		expect(fetchCommitRun).toHaveBeenCalledWith(`workpilot/${SPEC}`, SHA);
+		expect(fetchLatestRun).not.toHaveBeenCalled();
+		expect(readPlanFile().ciSuite).toMatchObject({ state: "passed", webUrl: "https://ci/7" });
+		expect(ciPipelineService.getStatus("t1")?.state).toBe("succeeded");
+	});
+
+	it("a red commit goes down the « Build rouge » path", async () => {
+		setTask("human_review");
+		writePlan({ status: "human_review", phases: [], ciSuite: suite });
+		fetchCommitRun.mockResolvedValue({ state: "failed", runId: 8 });
+		const { ciPipelineService } = await loadService();
+
+		await ciPipelineService.refreshTask("t1");
+
+		// The red path writes BUILD_FAILURE.md and starts the repair, whose
+		// next approved build pushes again.
+		expect(readPlanFile().ciSuite).toMatchObject({ state: "failed" });
+		expect(readPlanFile().statusBeforeBuildFailed).toBe("human_review");
+		expect(startTaskExecution).toHaveBeenCalledTimes(1);
 	});
 });
