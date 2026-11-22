@@ -1,13 +1,14 @@
 /** @vitest-environment jsdom */
 /**
- * The team's reviews of a catalog server (#369, lot 5): shown in a server
- * project only, the caller's own review prefilled, written, replaced and
- * deleted through the main; a viewer reads without a form; a failure is named.
+ * The organization's reviews of a catalog server (#369, lots 5 and 6): shown
+ * in a server project only, the caller's own review prefilled, written,
+ * replaced and deleted through the main; whoever the server does not let
+ * write (members, viewers) reads without a form; a failure is named.
  */
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { McpServerReview } from "../../../../shared/types/mcp-reviews";
+import type { McpReviewList, McpServerReview } from "../../../../shared/types/mcp-reviews";
 import { useProjectStore } from "../../../stores/project-store";
 import { McpServerReviews } from "../McpServerReviews";
 import { type MainApi, resetWorld, selectProject } from "./mcp-world";
@@ -34,6 +35,12 @@ const MINE: McpServerReview = {
 	mine: true,
 	canDelete: true,
 };
+
+/** The list the main answers; writable unless said otherwise. */
+const list = (reviews: McpServerReview[], canWrite = true): McpReviewList => ({
+	reviews,
+	canWrite,
+});
 
 function deferred() {
 	let resolve!: (value: unknown) => void;
@@ -73,7 +80,7 @@ describe("McpServerReviews", () => {
 	});
 
 	it("lists the team's reviews and prefills the caller's own", async () => {
-		api.listMcpReviews.mockResolvedValue({ success: true, data: [MINE, OTHER] });
+		api.listMcpReviews.mockResolvedValue({ success: true, data: list([MINE, OTHER]) });
 		serverProject();
 		render(<McpServerReviews serverId="github" />);
 		expect(await screen.findByText("by Bob")).toBeInTheDocument();
@@ -90,12 +97,12 @@ describe("McpServerReviews", () => {
 	it("posts a review and reads the list again", async () => {
 		serverProject();
 		render(<McpServerReviews serverId="github" />);
-		expect(await screen.findByText(/No one on the team/)).toBeInTheDocument();
+		expect(await screen.findByText(/No one in the organization/)).toBeInTheDocument();
 		fireEvent.change(screen.getByLabelText("Your review"), { target: { value: "unsafe" } });
 		fireEvent.change(screen.getByLabelText("Comment"), { target: { value: "Sends telemetry." } });
 		api.listMcpReviews.mockResolvedValueOnce({
 			success: true,
-			data: [{ ...MINE, verdict: "unsafe", comment: "Sends telemetry." }],
+			data: list([{ ...MINE, verdict: "unsafe", comment: "Sends telemetry." }]),
 		});
 		fireEvent.click(screen.getByRole("button", { name: "Post the review" }));
 		await waitFor(() =>
@@ -110,21 +117,21 @@ describe("McpServerReviews", () => {
 	});
 
 	it("deletes the caller's review and empties the form", async () => {
-		api.listMcpReviews.mockResolvedValueOnce({ success: true, data: [MINE] });
+		api.listMcpReviews.mockResolvedValueOnce({ success: true, data: list([MINE]) });
 		serverProject();
 		render(<McpServerReviews serverId="github" />);
 		fireEvent.click(await screen.findByRole("button", { name: "Delete this review" }));
 		await waitFor(() =>
 			expect(api.deleteMcpReview).toHaveBeenCalledWith({ projectId: "p-1", reviewId: MINE.id }),
 		);
-		expect(await screen.findByText(/No one on the team/)).toBeInTheDocument();
+		expect(await screen.findByText(/No one in the organization/)).toBeInTheDocument();
 		expect(screen.getByLabelText("Comment")).toHaveValue("");
 	});
 
-	it("lets the owner delete a teammate's review, and keeps the form", async () => {
+	it("lets an administrator delete a colleague's review, and keeps the form", async () => {
 		api.listMcpReviews.mockResolvedValueOnce({
 			success: true,
-			data: [{ ...OTHER, canDelete: true }],
+			data: list([{ ...OTHER, canDelete: true }]),
 		});
 		serverProject("owner");
 		render(<McpServerReviews serverId="github" />);
@@ -134,16 +141,26 @@ describe("McpServerReviews", () => {
 		expect(screen.getByLabelText("Comment")).toHaveValue("draft");
 	});
 
-	it("gives a viewer the reviews without a form", async () => {
-		api.listMcpReviews.mockResolvedValue({ success: true, data: [OTHER] });
-		serverProject("viewer");
+	it("gives whoever may not write the reviews without a form", async () => {
+		// A member of the project: the server grants `marketplace.write` to
+		// maintainers and administrators only, whatever the project role.
+		api.listMcpReviews.mockResolvedValue({ success: true, data: list([OTHER], false) });
+		serverProject("member");
 		render(<McpServerReviews serverId="github" />);
 		expect(await screen.findByText("by Bob")).toBeInTheDocument();
 		expect(screen.queryByLabelText("Comment")).not.toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "Post the review" })).not.toBeInTheDocument();
+	});
+
+	it("offers the form to a writer whatever the project role", async () => {
+		api.listMcpReviews.mockResolvedValue({ success: true, data: list([OTHER]) });
+		serverProject("viewer");
+		render(<McpServerReviews serverId="github" />);
+		expect(await screen.findByLabelText("Comment")).toBeInTheDocument();
 	});
 
 	it.each([
-		["too_many_reviews", "This project holds as many reviews as it can."],
+		["too_many_reviews", "This organization holds as many reviews as it can."],
 		["Forbidden", "The server refused or could not be reached."],
 		[undefined, "The server refused or could not be reached."],
 	])("names a refused write (%s)", async (error, text) => {
@@ -156,7 +173,7 @@ describe("McpServerReviews", () => {
 	});
 
 	it("names a write that throws, and a delete of a review gone", async () => {
-		api.listMcpReviews.mockResolvedValueOnce({ success: true, data: [MINE] });
+		api.listMcpReviews.mockResolvedValueOnce({ success: true, data: list([MINE]) });
 		api.putMcpReview.mockRejectedValueOnce(new Error("bridge"));
 		api.deleteMcpReview.mockResolvedValueOnce({ success: false, error: "review_not_found" });
 		serverProject();
@@ -170,7 +187,7 @@ describe("McpServerReviews", () => {
 
 	it("keeps the list when the reread fails", async () => {
 		api.listMcpReviews
-			.mockResolvedValueOnce({ success: true, data: [OTHER] })
+			.mockResolvedValueOnce({ success: true, data: list([OTHER]) })
 			.mockResolvedValueOnce({ success: false });
 		serverProject();
 		render(<McpServerReviews serverId="github" />);
@@ -187,7 +204,7 @@ describe("McpServerReviews", () => {
 		serverProject();
 		render(<McpServerReviews serverId="github" />);
 		expect(await screen.findByRole("alert")).toHaveTextContent(text);
-		expect(screen.getByText(/No one on the team/)).toBeInTheDocument();
+		expect(screen.getByText(/No one in the organization/)).toBeInTheDocument();
 	});
 
 	it("names a read that throws, and ignores an answer after unmount", async () => {
@@ -201,7 +218,7 @@ describe("McpServerReviews", () => {
 		api.listMcpReviews.mockImplementationOnce(() => answer.promise);
 		const late = render(<McpServerReviews serverId="github" />);
 		late.unmount();
-		await act(async () => answer.resolve({ success: true, data: [OTHER] }));
+		await act(async () => answer.resolve({ success: true, data: list([OTHER]) }));
 		const failure = deferred();
 		api.listMcpReviews.mockImplementationOnce(() => failure.promise);
 		const gone = render(<McpServerReviews serverId="github" />);

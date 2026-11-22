@@ -78,14 +78,30 @@ describe("toReview", () => {
 });
 
 describe("listMcpReviews", () => {
-	it("asks the server for a server project's reviews of one server", async () => {
-		deps.authedFetch.mockResolvedValue({ ok: true, data: { reviews: [RAW, { id: "bad" }] } });
+	it("asks the server for the organization's reviews of one server, from a project", async () => {
+		deps.authedFetch.mockResolvedValue({
+			ok: true,
+			data: { reviews: [RAW, { id: "bad" }], can_write: true },
+		});
 		const answer = await listMcpReviews({ projectId: "p-1", serverId: "github" });
 		expect(deps.authedFetch).toHaveBeenCalledWith(
 			"/api/features/mcp-reviews?project_id=p-1&server_id=github",
 			"GET",
 		);
-		expect(answer).toEqual({ success: true, data: [toReview(RAW)] });
+		expect(answer).toEqual({
+			success: true,
+			data: { reviews: [toReview(RAW)], canWrite: true },
+		});
+	});
+
+	it.each([
+		[{ reviews: [] }, false],
+		[{ reviews: [], can_write: "yes" }, false],
+		[{ reviews: [], can_write: 1 }, false],
+	])("writes only when the server says so exactly: %j", async (data, canWrite) => {
+		deps.authedFetch.mockResolvedValue({ ok: true, data });
+		const answer = await listMcpReviews({ projectId: "p-1", serverId: "github" });
+		expect(answer).toEqual({ success: true, data: { reviews: [], canWrite } });
 	});
 
 	it("refuses before any request", async () => {

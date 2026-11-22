@@ -1266,9 +1266,9 @@
 		},
 		"reviews": {
 			"title": "Team reviews",
-			"hint": "What your team saw using this server. Only members of this server project read them.",
+			"hint": "What your organization saw using this server, shared by all its projects. Only members of this organization read them; maintainers and administrators write them.",
 			"loading": "Loading the reviews",
-			"none": "No one on the team has reviewed this server yet.",
+			"none": "No one in the organization has reviewed this server yet.",
 			"by": "by {{author}}",
 			"unknownAuthor": "a former member",
 			"delete": "Delete this review",
@@ -1284,9 +1284,22 @@
 				"unsafe": "Unsafe"
 			},
 			"errors": {
-				"too_many_reviews": "This project holds as many reviews as it can.",
+				"too_many_reviews": "This organization holds as many reviews as it can.",
 				"review_not_found": "This review no longer exists.",
 				"failed": "The server refused or could not be reached."
+			}
+		},
+		"sandbox": {
+			"refused": "Not started on this machine: this server must run confined, in the OS sandbox, and there is none here. It is never started without it.",
+			"policyRefused": "On this machine, the servers this policy confines do not start: there is no OS sandbox here.",
+			"why": "Why?",
+			"recheck": "Check again",
+			"kinds": {
+				"off": "The OS sandbox is turned off (WORKPILOT_SANDBOX=off).",
+				"unsupported": "This system has no OS sandbox WorkPilot can use yet (Windows, for now).",
+				"missing": "The sandbox program ({{backend}}) is not installed on this machine.",
+				"refused": "The sandbox program ({{backend}}) is installed, but the system refused to run it.",
+				"unknown": "WorkPilot could not check this machine's OS sandbox."
 			}
 		}
 	},
