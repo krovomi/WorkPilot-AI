@@ -1,7 +1,8 @@
 /**
- * The OpenID Connect sign-in channel: the server URL from the renderer is
- * checked in main, the provider is the one the server describes, and only an
- * id_token of this sign-in goes to the server.
+ * The sign-in channels of the server's identity providers: the server URL
+ * from the renderer is checked in main, the provider is the one the server
+ * describes (its OpenID Connect provider, or Entra through the same flow),
+ * and only an id_token of this sign-in goes to the server.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
@@ -22,6 +23,7 @@ const connection = vi.hoisted(() => ({
 	getAuthState: vi.fn(() => ({ mode: "server", isAuthenticated: true })),
 	getServerAuthConfig: vi.fn(),
 	loginWithSsoIdToken: vi.fn(),
+	loginWithEntraIdToken: vi.fn(),
 	setMode: vi.fn(),
 }));
 vi.mock("../../server-connection", () => connection);
@@ -34,6 +36,7 @@ vi.mock("../../oidc-pkce", async (importOriginal) => ({
 
 import {
 	loginSso,
+	loginWithProvider,
 	registerServerSsoHandlers,
 	serverUrlFrom,
 } from "../server-sso-handlers";
@@ -57,6 +60,7 @@ beforeEach(() => {
 	state.sent.length = 0;
 	connection.getServerAuthConfig.mockResolvedValue({ ok: true, data: CONFIG });
 	connection.loginWithSsoIdToken.mockResolvedValue({ ok: true, user: USER });
+	connection.loginWithEntraIdToken.mockResolvedValue({ ok: true, user: USER });
 	pkce.acquireIdToken.mockResolvedValue("the-id-token");
 });
 
@@ -149,6 +153,60 @@ describe("loginSso", () => {
 	});
 });
 
+const TENANT = "11111111-2222-4333-8444-555555555555";
+const ENTRA_CLIENT = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+const ENTRA = {
+	...CONFIG,
+	sso_enabled: false,
+	entra_enabled: true,
+	entra_tenant_id: TENANT,
+	entra_client_id: ENTRA_CLIENT,
+};
+
+describe("the Entra sign-in", () => {
+	it("runs the generic flow on the tenant and hands the id_token to Entra's exchange", async () => {
+		connection.getServerAuthConfig.mockResolvedValueOnce({ ok: true, data: ENTRA });
+		expect(await loginWithProvider("entra", "https://wp.example.test")).toEqual({
+			ok: true,
+			user: USER,
+		});
+		const base = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0`;
+		expect(pkce.acquireIdToken).toHaveBeenCalledWith(
+			{
+				authorizationEndpoint: `${base}/authorize`,
+				tokenEndpoint: `${base}/token`,
+				clientId: ENTRA_CLIENT,
+				scopes: "openid profile email",
+			},
+			{},
+		);
+		expect(connection.loginWithEntraIdToken).toHaveBeenCalledWith("the-id-token");
+		expect(connection.loginWithSsoIdToken).not.toHaveBeenCalled();
+	});
+
+	it("stops before the browser when Entra is off or its ids are not valid", async () => {
+		connection.getServerAuthConfig.mockResolvedValueOnce({ ok: true, data: CONFIG });
+		expect(await loginWithProvider("entra", "https://wp.example.test")).toEqual({
+			ok: false,
+			error: "Microsoft Entra ID is not configured on this server",
+		});
+		connection.getServerAuthConfig.mockResolvedValueOnce({
+			ok: true,
+			data: { ...ENTRA, entra_tenant_id: "evil.example/x" },
+		});
+		expect(await loginWithProvider("entra", "https://wp.example.test")).toEqual({
+			ok: false,
+			error: "The server's Entra ID tenant is not a valid tenant id",
+		});
+		expect(await loginWithProvider("entra", "file:///etc")).toEqual({
+			ok: false,
+			error: "Invalid server URL",
+		});
+		expect(connection.setMode).not.toHaveBeenCalled();
+		expect(pkce.acquireIdToken).not.toHaveBeenCalled();
+	});
+});
+
 describe("the channel", () => {
 	it("signs in and tells the window the new state", async () => {
 		const send = vi.fn();
@@ -168,6 +226,19 @@ describe("the channel", () => {
 			ok: false,
 			error: "Invalid server URL",
 		});
+		expect(send).toHaveBeenCalledTimes(1);
+	});
+
+	it("signs in with Entra on its own channel", async () => {
+		connection.getServerAuthConfig.mockResolvedValueOnce({ ok: true, data: ENTRA });
+		const send = vi.fn();
+		registerServerSsoHandlers(() => ({ webContents: { send } }) as never);
+		const handler = state.handlers.get(IPC_CHANNELS.SERVER_AUTH_LOGIN_ENTRA);
+		expect(await handler?.({}, "https://wp.example.test")).toEqual({
+			ok: true,
+			user: USER,
+		});
+		expect(connection.loginWithEntraIdToken).toHaveBeenCalledWith("the-id-token");
 		expect(send).toHaveBeenCalledTimes(1);
 	});
 });

@@ -101,6 +101,18 @@ function get(url: URL): Promise<{ status: number; text: string }> {
 	});
 }
 
+/** A POST on the loopback port: never the provider's redirect. */
+function post(url: URL): Promise<number> {
+	return new Promise((resolve, reject) => {
+		const req = http.request(url, { method: "POST" }, (res) => {
+			res.resume();
+			res.on("end", () => resolve(res.statusCode ?? 0));
+		});
+		req.on("error", reject);
+		req.end();
+	});
+}
+
 type Answer = (authorize: URL) => Record<string, string> | "other-path";
 
 /** A browser that follows the authorize URL to the provider's redirect. */
@@ -220,6 +232,26 @@ describe("the browser sign-in", () => {
 		await expect(
 			acquireIdToken(PROVIDER, { openBrowser, timeoutMs: 200 }),
 		).rejects.toThrow("Sign-in timed out");
+	});
+
+	it("answers 404 to anything but a GET on the callback", async () => {
+		const statuses: number[] = [];
+		const { fetchToken } = tokenEndpoint(200, () => ({}));
+		await acquireIdToken(PROVIDER, {
+			openBrowser: async (raw) => {
+				const authorize = new URL(raw);
+				const redirect = new URL(authorize.searchParams.get("redirect_uri") ?? "");
+				redirect.searchParams.set("code", "c");
+				redirect.searchParams.set("state", authorize.searchParams.get("state") ?? "");
+				statuses.push(await post(redirect));
+				statuses.push((await get(new URL("/elsewhere", redirect))).status);
+				await get(redirect);
+			},
+			fetchToken,
+		}).catch(() => undefined);
+		expect(statuses).toEqual([404, 404]);
+		// The POST did not end the attempt: the GET after it did.
+		expect(fetchToken).toHaveBeenCalledTimes(1);
 	});
 
 	it("fails when the browser cannot be opened", async () => {

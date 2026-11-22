@@ -4,6 +4,7 @@
  * from the main process (RFC 8252). The WorkPilot server says which provider
  * (`/auth/config`, from the provider's discovery document) and checks the
  * id_token this returns (`apps/backend/server/auth/oidc_generic.py`).
+ * Microsoft Entra ID is one configuration of this flow (`entra-sign-in.ts`).
  *
  * What comes from the server is checked here again before it is used: every
  * endpoint is an https URL (http only on loopback), the client id and the
@@ -132,7 +133,8 @@ function awaitCode(
 		server.on("request", (req, res) => {
 			// A request on an http.Server always has its path.
 			const url = new URL(String(req.url), "http://localhost");
-			if (url.pathname !== "/callback") {
+			// Only the provider's redirect, a GET on the callback path.
+			if (req.method !== "GET" || url.pathname !== "/callback") {
 				res.writeHead(404).end();
 				return;
 			}

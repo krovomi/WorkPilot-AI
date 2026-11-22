@@ -46,6 +46,22 @@ class UserPublic(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class MySessionResponse(BaseModel):
+    """How the caller's current session was opened, and who it is.
+
+    ``method`` is one of ``jwt_tokens.LOGIN_METHODS``, or None for a session
+    from before sign-ins were named. The provider (its name and its issuer's
+    host) is given for an Entra or OpenID Connect sign-in.
+    """
+
+    user: UserPublic
+    login_id: str | None = None
+    method: str | None = None
+    provider_name: str | None = None
+    issuer_host: str | None = None
+    signed_in_at: datetime | None = None
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str

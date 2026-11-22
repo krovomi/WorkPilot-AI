@@ -2022,6 +2022,28 @@
 		"pollLabel": "Polling interval (seconds)",
 		"pollDescription": "How often the pipeline status is checked (minimum 15s, default 60s)"
 	},
+	"serverSession": {
+		"navLabel": "My session on the server",
+		"title": "My session on the server",
+		"description": "Who is signed in to the team server on this computer, and how the session was opened, as the server reports it.",
+		"loading": "Loading the session",
+		"unavailable": "The session cannot be read from the server",
+		"server": "Server",
+		"identity": "Signed in as",
+		"identityValue": "{{name}} ({{email}})",
+		"role": "Role",
+		"method": "Opened with",
+		"methods": {
+			"local": "Password",
+			"entra": "Microsoft Entra ID",
+			"oidc": "Single sign-on: {{name}}",
+			"invite": "Accepted invitation",
+			"unknown": "Not recorded (session opened before the server named sign-ins)"
+		},
+		"issuer": "Identity provider",
+		"signedInAt": "Signed in at",
+		"signOut": "Sign out"
+	},
 	"serverTokens": {
 		"navLabel": "My tokens on the server",
 		"title": "My tokens on the server",

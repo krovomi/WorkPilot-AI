@@ -23,7 +23,7 @@ from server.auth.local import (
     create_local_user,
 )
 from server.auth.oidc import OidcError, provision_entra_user, validate_id_token
-from server.auth.sign_in import signed_in
+from server.auth.sign_in import session_of, signed_in
 from server.authz.engine import user_organizations
 from server.authz.principal import get_principal
 from server.authz.tenancy import can_act_in
@@ -37,6 +37,7 @@ from server.schemas import (
     LoginRequest,
     LogoutRequest,
     MyPermissionsResponse,
+    MySessionResponse,
     OidcExchangeRequest,
     OrganizationPublic,
     RefreshRequest,
@@ -180,6 +181,24 @@ async def me(
     if db_user is None or not db_user.is_active:
         raise HTTPException(status_code=401, detail="Account is disabled or gone")
     return UserPublic.model_validate(db_user)
+
+
+@router.get("/me/session", response_model=MySessionResponse)
+async def my_session(
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MySessionResponse:
+    """The caller's own session: who is signed in, how and when.
+
+    Read from the sign-in the access token names (``sid``, ``amr``) and that
+    sign-in's line in the audit log; the caller's own data only.
+    """
+    db_user = await db.get(User, user.id)
+    if db_user is None or not db_user.is_active:
+        raise HTTPException(status_code=401, detail="Account is disabled or gone")
+    described = await session_of(db, user.id, getattr(request.state, "login", None))
+    return MySessionResponse(user=UserPublic.model_validate(db_user), **described)
 
 
 @router.get("/me/permissions", response_model=MyPermissionsResponse)
