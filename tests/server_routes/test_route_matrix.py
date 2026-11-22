@@ -235,6 +235,14 @@ RULES: dict[tuple[str, str], Rule] = {
     ),
     ("POST", "/api/features/ideation/ideas/{idea_id}/convert"): scoped("task.write"),
     ("GET", "/api/features/context/memories"): scoped("insight.read"),
+    # The lifecycle of the project's memory: every member reads why a memory
+    # went; a decision on it is a write of the project's insights.
+    ("GET", "/api/features/context/memory/lifecycle"): scoped("insight.read"),
+    ("GET", "/api/features/context/memory/history"): scoped("insight.read"),
+    **{
+        ("POST", f"/api/features/context/memory/{action}"): scoped("insight.write")
+        for action in ("forget", "restore", "pin", "scope", "revert")
+    },
     ("GET", "/api/features/insights/sessions"): scoped("insight.read"),
     ("POST", "/api/features/insights/sessions"): scoped("insight.write"),
     ("GET", "/api/features/insights/sessions/{session_id}"): scoped("insight.read"),
