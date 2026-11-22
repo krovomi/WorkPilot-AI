@@ -155,6 +155,36 @@ def test_the_escalations_table_comes_and_goes_with_its_revision(alembic_config):
     assert "approval_escalations" not in _tables(db)
 
 
+def test_the_leaderboard_consents_table_comes_and_goes_with_its_revision(
+    alembic_config,
+):
+    config, db = alembic_config
+    command.upgrade(config, "head")
+    assert "leaderboard_consents" in _tables(db)
+    command.downgrade(config, "0019_login_sessions")
+    assert "leaderboard_consents" not in _tables(db)
+    # A table already there (``create_all`` of a newer build) is kept.
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text("CREATE TABLE leaderboard_consents (org_id VARCHAR(36))")
+            )
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    assert "leaderboard_consents" in _tables(db)
+    # A table already gone (dropped by hand) does not stop the downgrade.
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(sa.text("DROP TABLE leaderboard_consents"))
+    finally:
+        engine.dispose()
+    command.downgrade(config, "0019_login_sessions")
+    assert "leaderboard_consents" not in _tables(db)
+
+
 def _columns(db: Path, table: str) -> set[str]:
     engine = sa.create_engine(f"sqlite:///{db}")
     try:

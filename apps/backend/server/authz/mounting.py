@@ -103,6 +103,9 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     # Opening a shared replay reads it; the POST carries its link's token in
     # the body, out of the URL.
     ("POST", "/api/features/replay-shares/{share_id}/open"): "lab.read",
+    # Saying yes or no to showing one's own name on Pixel Office's leaderboard
+    # writes only the caller's consent: whoever may read the board decides it.
+    ("PUT", "/api/features/pixel-office/consent"): "analytics.read",
     # A server project's governance: the export of its policy trail names
     # people; answering an agent's request is a review; its kill switch is
     # the right to stop a run.

@@ -301,6 +301,10 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # A recorded agent session left with a server project's team, behind
         # a link that expires and can be revoked (replay is lab, like it).
         "replay_shares": "lab",
+        # Pixel Office's team leaderboard and each person's badges, computed
+        # from a server project's runs and approvals (analytics, like the
+        # workspace views it sits beside).
+        "pixel_office": "analytics",
         # A server project's workpilot.policy.yaml, the audit trail its agents
         # write in the clone, the approvals they wait on and its kill switch
         # (shared_features/governance.py): reading it is the audit domain.
@@ -362,6 +366,7 @@ SERVER_FEATURES: frozenset[str] = frozenset(
         "analyses",
         "workspace",
         "replay_shares",
+        "pixel_office",
         "governance",
     }
 )
