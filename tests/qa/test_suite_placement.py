@@ -21,11 +21,29 @@ def _spec(tmp_path, metadata=None):
     return project, spec
 
 
-def test_the_pr_comes_from_the_card(tmp_path):
-    _project, spec = _spec(tmp_path, {"prUrl": "https://example.test/pr/1"})
-    assert suite_placement._has_pr(spec)
-    _project, bare = _spec(tmp_path / "b", {"prUrl": "  "})
-    assert not suite_placement._has_pr(bare)
+def test_the_pr_comes_from_the_card():
+    assert suite_placement._has_pr({"prUrl": "https://example.test/pr/1"})
+    assert not suite_placement._has_pr({"prUrl": "  "})
+    assert not suite_placement._has_pr({})
+
+
+def test_the_cards_choice_is_the_tasks_choice(monkeypatch):
+    monkeypatch.setenv("WORKPILOT_TEST_PLACEMENT", "machine")
+    env = suite_placement._environment({"testPlacement": " CI "})
+    assert env is not None and env["WORKPILOT_TEST_PLACEMENT"] == "ci"
+    assert suite_placement._environment({"testPlacement": "cloud"}) is None
+    assert suite_placement._environment({}) is None
+
+
+async def test_a_card_set_to_this_machine_stays_here(tmp_path, monkeypatch):
+    project, spec = _spec(
+        tmp_path, {"prUrl": "https://example.test/pr/1", "testPlacement": "machine"}
+    )
+    monkeypatch.setenv("WORKPILOT_TEST_PLACEMENT", "ci")
+    monkeypatch.setenv("WORKPILOT_TEST_PLACEMENT_ROUTES", "ci")
+    placement = await suite_placement.place_full_suite(project, spec, None)
+    assert placement is not None and placement.runs_here
+    assert placement.decision.reason == "chosen"
 
 
 def test_a_pause_stops_the_wait_with_the_builds_signal(tmp_path):

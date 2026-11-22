@@ -19,7 +19,7 @@ tâches finies pendant une absence, rouges une fois les PR ouvertes). Le paquet
 
 | Valeur | Qui la pose | Effet |
 |---|---|---|
-| `WORKPILOT_TEST_PLACEMENT` = `auto`, `machine` ou `ci` | la carte, sur l'environnement du build | gagne sur le projet |
+| `WORKPILOT_TEST_PLACEMENT` = `auto`, `machine` ou `ci` | la carte : `testPlacement` de `task_metadata.json`, sinon l'environnement du build | gagne sur le projet |
 | `TEST_PLACEMENT` | le projet (`.workpilot/.env` ou l'environnement) | défaut du projet |
 | `TEST_PLACEMENT_ALLOW_BRANCH_PUSH` | le projet ; l'app le pose quand le projet a une CI | `auto` peut pousser la branche sans PR |
 | `WORKPILOT_TEST_PLACEMENT_ROUTES` = `ci`, `server` | l'app seulement, sur l'environnement | les routes hors machine que l'app suit après le build |
