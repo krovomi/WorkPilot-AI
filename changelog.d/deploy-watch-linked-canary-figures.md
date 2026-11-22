@@ -8,6 +8,10 @@ section: ✨ Nouveautés
   la dernière bonne exécution du premier ; une migration ou un fournisseur sans rollback par API
   le laisse à une personne, et la page dit ce que chacun a fait. Le lien est gardé par l'app,
   jamais dans un dépôt.
+- **Rollback par feature flag** : quand les réglages CI/CD nomment le flag qui garde la release
+  (Unleash, LaunchDarkly ou ConfigCat), un verdict critique le coupe d'abord : rien n'est
+  redéployé et une migration ne bloque pas. Si le flag ne peut pas être coupé, le déploiement
+  revient en arrière comme avant. Le jeton est gardé chiffré.
 - **Analyse canary** : une métrique de `.workpilot/deploy-monitors.yaml` peut porter une
   `canary_query` ; chaque mesure compare alors le canary au parc stable au même moment.
 - **Grafana** rejoint Prometheus, Datadog, New Relic et CloudWatch comme source de métriques

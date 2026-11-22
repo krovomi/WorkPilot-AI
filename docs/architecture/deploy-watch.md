@@ -3,7 +3,8 @@ feature: "Surveillance après déploiement et rollback"
 summary: >-
   Après un pipeline lancé depuis les déclencheurs CI/CD, health check et métriques (cinq
   sources) comparés à avant, ou canary contre parc stable ; deux mesures critiques d'affilée
-  proposent (ou lancent) le rollback, services liés compris ; une migration le bloque. Puis
+  coupent un feature flag ou proposent (ou lancent) le rollback, services liés compris ; une
+  migration le bloque. Puis
   rapport d'incident, alertes, PR de revert, et chiffres calculés sur la machine.
 ---
 
@@ -45,6 +46,17 @@ contrôle des migrations et la PR de revert.
 
 Le rollback part tout seul seulement si `CICD_AUTO_ROLLBACK` est activé ; sinon il est proposé
 sur la page, avec une confirmation. La branche garde le commit fautif : la page le rappelle.
+
+**Feature flag** (`flags.py`, lot 4) : quand les réglages CI/CD nomment le flag qui garde ce qui
+a été déployé (Unleash, LaunchDarkly ou ConfigCat), le rollback le coupe d'abord, qu'il parte
+tout seul ou qu'une personne le demande. Le code reste en place, son chemin est fermé, et une
+migration ne bloque pas puisque le schéma n'est pas touché ; un fournisseur CI sans rollback par
+API (GitLab, Jenkins) propose donc quand même le rollback. Les appels sont ceux des flags du
+Release Train (Unleash `POST …/environments/<env>/off`, LaunchDarkly semantic patch
+`turnFlagOff`, ConfigCat `PUT …/value` à `false`). Si le flag ne peut pas être coupé (refus,
+pas de réponse, hors-ligne strict), le déploiement est remis en arrière comme avant et la page
+dit pourquoi. L'état garde `strategy` (`flag` ou `deployment`) et `flag` (`done`, `failed`,
+`offline`). Un flag coupé ne redéploie rien : les services liés ne reviennent pas avec lui.
 
 5. **Migrations** (`migrations.py`) : entre le commit de la dernière bonne exécution et celui
    déployé (s'ils sont dans le clone local, rien n'est récupéré), un fichier de migration
@@ -156,7 +168,8 @@ Depuis une référence nulle (taux d'erreur à 0), toute hausse au-delà du brui
 ## Qui décide de quoi (frontières)
 
 - **Réglages CI/CD du projet** (`.workpilot/.env` chiffré, page CI/CD) : URL du health check,
-  la source de métriques et ses clés, fenêtre, attente, rollback automatique. Un dépôt ne peut ni
+  la source de métriques et ses clés, fenêtre, attente, rollback automatique, le feature flag
+  à couper (service, clé, environnement, projet, URL, jeton). Un dépôt ne peut ni
   choisir où part un jeton, ni activer un rollback en committant un fichier.
 - **Réglages de l'app** (`deploy-links.json`) : les services liés. Le renderer ne donne que des
   ids de projets de l'app, revérifiés ; un projet lié reçoit ses propres réglages, jamais ceux
@@ -167,15 +180,17 @@ Depuis une référence nulle (taux d'erreur à 0), toute hausse au-delà du brui
   du fichier, et la PR attend la revue d'une personne. Borné (64 Ko, 20 métriques, requêtes de 2 000
   caractères) ; une entrée invalide est ignorée et nommée sur la page.
 - **Réseau** (`collectors.py`, `sources.py`, `rollback.py`, `alerts.py`) : 10 s, 1 Mo, aucune
-  redirection suivie ; les jetons Prometheus et Grafana ne partent qu'en https ou vers la machine ; Datadog,
+  redirection suivie ; les jetons Prometheus, Grafana et du service de flags ne partent qu'en
+  https ou vers la machine (LaunchDarkly et ConfigCat ont leur hôte par défaut) ; Datadog,
   New Relic, CloudWatch et PagerDuty sont leurs hôtes fixes, choisis par une liste fermée ou un
   motif, jamais par le fichier du dépôt ; les API des fournisseurs CI sont leurs hôtes fixes
   (api.github.com, dev.azure.com, l'hôte GitLab configuré en https). Les clés des sources, le
-  webhook Slack, la clé PagerDuty et le mot de passe SMTP sont des secrets du `.env` de projet
+  webhook Slack, la clé PagerDuty, le mot de passe SMTP et le jeton du service de flags sont des
+  secrets du `.env` de projet
   (`encrypted`), masqués pour le renderer (`main/cicd/watch-settings.ts`).
 - **Hors-ligne strict** : seuls un health check et un Prometheus ou un Grafana sur la machine ou
   une adresse privée sont lus (Datadog, New Relic et CloudWatch sont ignorés et nommés), aucun fournisseur
-  n'est appelé (rollback à la main), une alerte ne part que vers un webhook ou un SMTP local,
+  n'est appelé (rollback à la main), un flag n'est coupé que sur un service local, une alerte ne part que vers un webhook ou un SMTP local,
   jamais vers PagerDuty ; une politique illisible compte comme stricte.
 - **Renderer** : il ne nomme qu'un dossier de projet enregistré et un id d'exécution
   (`^[0-9]{1,20}$`) ; le runner relit l'exécution dans `.workpilot/cicd_runs.json`. L'état écrit
