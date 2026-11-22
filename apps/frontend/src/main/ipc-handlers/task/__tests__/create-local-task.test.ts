@@ -70,6 +70,28 @@ describe("createLocalTask", () => {
 		expect(invalidate).toHaveBeenCalledWith("proj-1");
 	});
 
+	it("starts the task's status history: a person's card, or the app's", () => {
+		const byHand = createLocalTask(project, {
+			title: "By hand",
+			aiDescription: "d",
+			displayDescription: "d",
+			descriptionIsHtml: false,
+		});
+		const generated = createLocalTask(project, {
+			title: "Generated",
+			aiDescription: "d",
+			displayDescription: "d",
+			descriptionIsHtml: false,
+			createdBy: "system",
+		});
+		const history = (task: { specsPath?: string }) =>
+			read(path.join(task.specsPath as string, "status_history.json")).entries;
+		expect(history(byHand)).toEqual([
+			expect.objectContaining({ from: null, to: "backlog", actor: "user" }),
+		]);
+		expect(history(generated)[0].actor).toBe("system");
+	});
+
 	it("writes the plan, the metadata and the requirements the pipeline reads", () => {
 		const task = createLocalTask(project, {
 			title: "Rich",

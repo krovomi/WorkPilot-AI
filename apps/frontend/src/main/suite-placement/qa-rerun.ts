@@ -32,8 +32,21 @@ export async function rerunQaReview(
 		console.warn(`[BaseRefresh] ${task.specId}: QA not restarted, the provider needs a sign-in`);
 		return false;
 	}
-	if (!taskStateManager.handleManualStatusChange(task.id, "ai_review", task, project)) {
-		await persistPlanStatus(getPlanPath(project, task), "ai_review", project.id);
+	if (
+		!taskStateManager.handleManualStatusChange(
+			task.id,
+			"ai_review",
+			task,
+			project,
+			"system",
+		)
+	) {
+		await persistPlanStatus(
+			getPlanPath(project, task),
+			"ai_review",
+			project.id,
+			"system",
+		);
 	}
 	const specDir = path.join(project.path, getSpecsDir(project.autoBuildPath), task.specId);
 	fileWatcher.watch(task.id, specDir);

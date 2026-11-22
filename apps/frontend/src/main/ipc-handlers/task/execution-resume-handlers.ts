@@ -221,9 +221,17 @@ export function registerTaskResumeHandlers(ctx: ExecutionHandlerContext): void {
 				return { success: true };
 			} catch (err) {
 				fileWatcher.unwatch(taskId);
-				const failedPaths = getPlanPaths(getSpecPaths(task, project), project);
+				const failedSpecs = getSpecPaths(task, project);
+				const failedPaths = getPlanPaths(failedSpecs, project);
 				for (const planFile of failedPaths.all) {
-					await persistPlanStatus(planFile, "human_review", project.id);
+					// The history is the main project's copy's alone.
+					const main = path.dirname(planFile) === failedSpecs.mainSpecDir;
+					await persistPlanStatus(
+						planFile,
+						"human_review",
+						project.id,
+						main ? "system" : undefined,
+					);
 				}
 				getMainWindow()?.webContents.send(
 					IPC_CHANNELS.TASK_STATUS_CHANGE,

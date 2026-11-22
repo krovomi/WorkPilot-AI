@@ -87,6 +87,11 @@ export async function followMergedPrs(
 	return { closed, purged: purged.length, freed };
 }
 
+/** Close a card whose PR was merged: the app's doing, in its status history. */
+export function closeMergedCard(task: Task, project: Project): void {
+	taskStateManager.handleManualStatusChange(task.id, "done", task, project, "system");
+}
+
 let timer: ReturnType<typeof setInterval> | null = null;
 let first: ReturnType<typeof setTimeout> | null = null;
 let looking = false;
@@ -95,9 +100,7 @@ export function startMergedWatch(getMainWindow: () => BrowserWindow | null): voi
 	if (timer) return;
 	const deps: MergedWatchDeps = {
 		readState: readPrState,
-		markDone: (task, project) => {
-			taskStateManager.handleManualStatusChange(task.id, "done", task, project);
-		},
+		markDone: closeMergedCard,
 		writeMetadata,
 		purge: (project, tasks, specIds) => purgeWorktrees(project, tasks, specIds),
 		onMerged: async (task, project) => {

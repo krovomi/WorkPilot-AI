@@ -521,6 +521,8 @@ async def test_the_snapshot_sends_only_the_card_files_the_app_reads(tmp_path):
         "requirements.json",
         "task_metadata.json",
         "spec.md",
+        # Written by the card's creation (server/services/status_history.py).
+        "status_history.json",
     }
     assert snapshot["worktrees"] == {}
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project, Task } from "../../shared/types";
+import { persistPlanStatusAndReasonSync } from "../ipc-handlers/task/plan-file-utils";
 import { TaskStateManager } from "../task-state-manager";
 
 // Mock dependencies
@@ -268,6 +269,68 @@ describe("TaskStateManager", () => {
 			);
 
 			// Should not throw
+		});
+	});
+
+	describe("who moved the task, for its status history", () => {
+		const movedBy = () =>
+			vi.mocked(persistPlanStatusAndReasonSync).mock.calls.map((call) => [call[1], call[7]]);
+		const planning = {
+			type: "PLANNING_STARTED",
+			taskId: "test-task-id",
+			specId: "001-test-spec",
+			projectId: "test-project-id",
+			timestamp: new Date().toISOString(),
+			eventId: "evt-1",
+			sequence: 0,
+		};
+
+		it("names the agents for the build's events and a person for the board's", () => {
+			manager.handleTaskEvent(mockTask.id, planning, mockTask, mockProject);
+			manager.handleManualStatusChange(mockTask.id, "backlog", mockTask, mockProject);
+			expect(movedBy()).toContainEqual(["in_progress", "agent"]);
+			expect(movedBy().at(-1)).toEqual(["backlog", "user"]);
+		});
+
+		it("sends a person's In progress as the event the machine's state wants", () => {
+			// A plan waiting for approval: approving it.
+			manager.handleTaskEvent(mockTask.id, planning, mockTask, mockProject);
+			manager.handleTaskEvent(
+				mockTask.id,
+				{
+					...planning,
+					type: "PLANNING_COMPLETE",
+					eventId: "evt-2",
+					sequence: 1,
+					hasSubtasks: true,
+					subtaskCount: 1,
+					requireReviewBeforeCoding: true,
+				},
+				mockTask,
+				mockProject,
+			);
+			expect(manager.getCurrentState(mockTask.id)).toBe("plan_review");
+			expect(manager.handleManualStatusChange(mockTask.id, "in_progress", mockTask, mockProject)).toBe(true);
+			expect(manager.getCurrentState(mockTask.id)).not.toBe("plan_review");
+
+			// A task in review: resuming it.
+			const reviewed = createMockTask({ id: "t-2", status: "human_review", reviewReason: "completed" });
+			manager.handleProcessExited("t-2", 1, reviewed, mockProject);
+			expect(manager.getCurrentState("t-2")).toBe("human_review");
+			manager.handleManualStatusChange("t-2", "in_progress", reviewed, mockProject);
+			expect(movedBy().at(-1)).toEqual(["in_progress", "user"]);
+
+			// A PR without its address yet.
+			expect(manager.handleManualStatusChange("t-3", "pr_created", createMockTask({ id: "t-3" }), mockProject)).toBe(true);
+		});
+
+		it("names the app when one of its watchers moves the task", () => {
+			manager.handleTaskEvent(mockTask.id, planning, mockTask, mockProject);
+			manager.handleManualStatusChange(mockTask.id, "backlog", mockTask, mockProject, "system");
+			expect(movedBy().at(-1)).toEqual(["backlog", "system"]);
+			// Back to the agents once the watcher's event went through.
+			manager.handleTaskEvent(mockTask.id, { ...planning, sequence: 1 }, mockTask, mockProject);
+			expect(movedBy().at(-1)).toEqual(["in_progress", "agent"]);
 		});
 	});
 

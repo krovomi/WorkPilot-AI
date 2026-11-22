@@ -25,7 +25,13 @@ vi.mock("../purge", () => ({
 	purgeWorktrees: vi.fn(),
 }));
 
-import { cardsAwaitingMerge, followMergedPrs, type MergedWatchDeps } from "../merged-watch";
+import { taskStateManager } from "../../task-state-manager";
+import {
+	cardsAwaitingMerge,
+	closeMergedCard,
+	followMergedPrs,
+	type MergedWatchDeps,
+} from "../merged-watch";
 
 const project = { id: "p1", path: "/p" } as Project;
 const card = (specId: string, extra: Record<string, unknown> = {}): Task =>
@@ -127,5 +133,19 @@ describe("followMergedPrs", () => {
 		const result = await followMergedPrs(project, deps);
 		expect(deps.readState).not.toHaveBeenCalled();
 		expect(result.purged).toBe(1);
+	});
+});
+
+describe("closeMergedCard", () => {
+	it("closes the card through the state machine, as the app's doing", () => {
+		const task = card("001-pr");
+		closeMergedCard(task, project);
+		expect(taskStateManager.handleManualStatusChange).toHaveBeenCalledWith(
+			"001-pr",
+			"done",
+			task,
+			project,
+			"system",
+		);
 	});
 });
