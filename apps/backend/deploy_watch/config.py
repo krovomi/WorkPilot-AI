@@ -9,7 +9,7 @@ Two sources, kept apart on purpose:
   turn a rollback on by committing a file;
 * `.workpilot/deploy-monitors.yaml`, which a team may commit: the window, the
   pauses and the metrics (a query in the source's language, a kind,
-  thresholds), and what follows
+  thresholds, a `canary_query` for canary analysis), and what follows
   a bad verdict (`revert_pr`, `explain_incident`). Bounded and validated; a bad
   entry is dropped and named in `problems`. A revert PR goes to the forge the
   project already pushes to, with its own credentials: the file only says yes.
@@ -17,14 +17,14 @@ Two sources, kept apart on purpose:
 
 from __future__ import annotations
 
-import ipaddress
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
-from urllib.parse import urlsplit
 
 import yaml
+
+from .net import valid_url
 
 if TYPE_CHECKING:
     from .sources import MetricSource
@@ -82,6 +82,9 @@ class MetricRule:
     critical_pct: float
     worse: Worse
     min_absolute: float = 0.0
+    # Canary analysis: the same metric on the canary only. Each sample then
+    # compares the canary with the stable fleet (`query`) at that moment.
+    canary_query: str = ""
 
 
 @dataclass(frozen=True)
@@ -107,33 +110,6 @@ class WatchSettings:
         return bool(self.health_url or (self.source and self.metrics))
 
 
-def valid_url(value: str) -> bool:
-    """An http(s) URL with a host and no credentials in it."""
-    try:
-        parts = urlsplit(value)
-    except ValueError:
-        return False
-    return (
-        parts.scheme in ("http", "https")
-        and bool(parts.hostname)
-        and parts.username is None
-        and parts.password is None
-        and not any(ch.isspace() for ch in value)
-    )
-
-
-def is_local_host(url: str) -> bool:
-    """Loopback or a private address literal: reachable without leaving the site."""
-    host = (urlsplit(url).hostname or "").strip("[]")
-    if host == "localhost":
-        return True
-    try:
-        address = ipaddress.ip_address(host)
-    except ValueError:
-        return False
-    return address.is_loopback or address.is_private
-
-
 def _number(value: object, default: float) -> float:
     if isinstance(value, bool) or not isinstance(value, int | float):
         return default
@@ -157,6 +133,12 @@ def _metric(raw: object, problems: list[str]) -> MetricRule | None:
     if len(query) > MAX_QUERY:
         problems.append(f"{name}: query too long")
         return None
+    canary = raw.get("canary_query")
+    if canary is not None and (
+        not isinstance(canary, str) or not canary.strip() or len(canary) > MAX_QUERY
+    ):
+        problems.append(f"{name}: canary_query must be a query")
+        return None
     warning, critical, worse, floor = DEFAULTS[kind]
     if raw.get("worse") is not None:
         try:
@@ -177,6 +159,7 @@ def _metric(raw: object, problems: list[str]) -> MetricRule | None:
         critical_pct=critical,
         worse=worse,
         min_absolute=abs(_number(raw.get("min_absolute"), floor)),
+        canary_query=canary.strip() if canary else "",
     )
 
 

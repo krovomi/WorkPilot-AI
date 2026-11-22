@@ -1,21 +1,22 @@
 ---
 feature: Execution waves (Conflict Predictor)
 summary: >-
-  Groupe les specs en attente en vagues sans fichier commun (plan ∪ worktree, zones fragiles,
-  imports croisés, symboles supprimés ; toutes langues, zéro LLM), merge de test des paires sous la
-  tolérance, cycles signalés ; « Exécuter dans l'ordre optimal » lance vague après vague,
-  replanifie, survit à un redémarrage et compte les conflits évités par sprint.
+  Groupe les specs en attente en vagues sans fichier commun (plan, worktree, zones fragiles, liens
+  de code ; zéro LLM), vérifiées par merge de test ; « Exécuter dans l'ordre optimal » lance vague
+  après vague, survit à un redémarrage, tourne aussi sur le serveur (route, app mobile) et compte
+  par sprint les conflits évités et le temps médian mesuré de résolution des conflits restants.
 ---
 
 # Execution waves (Conflict Predictor)
 
-Issue #358 (lots 1 to 3). The Conflict Predictor already scored pairs of live worktrees
+Issue #358 (lots 1 to 4). The Conflict Predictor already scored pairs of live worktrees
 (`apps/backend/services/conflict_predictor_service.py`) and the swarm groups the subtasks of
 **one** spec into waves (`apps/backend/agents/swarm/dependency_analyzer.py`). This feature
 plans **across specs**: which of the specs waiting in the backlog or the queue may run side by
 side, in which order, and runs them that way.
 
-Shown in Mission Control (a "Execution waves" section, with or without a Mission Control session).
+Shown in Mission Control (a "Execution waves" section, with or without a Mission Control session),
+and, for a project of a team server, by the server itself and the mobile app ("Server mode" below).
 
 ## Code
 
@@ -35,6 +36,14 @@ Shown in Mission Control (a "Execution waves" section, with or without a Mission
 | Run, wave after wave, saved at every step | `apps/frontend/src/renderer/lib/wave-execution.ts`, `stores/execution-waves-store.ts` |
 | View, sprint metrics | `apps/frontend/src/renderer/components/conflict-predictor/WavesView.tsx`, `WavesNotices.tsx` |
 | Types | `apps/frontend/src/shared/types/conflict-waves.ts` |
+| Merge conflict times (`.workpilot/merge-conflict-times.json`), written by the merge flow | `apps/frontend/src/main/conflict-waves/conflict-times.ts`, `ipc-handlers/task/worktree-merge-handlers.ts` |
+| Their sprint figures | `apps/frontend/src/renderer/components/conflict-predictor/ConflictTimesSummary.tsx` |
+| Server: scorer, code links, planner, merge check (ports of the files above) | `apps/backend/shared_features/waves/scorer.py`, `code_links.py`, `planner.py`, `merge_check.py` |
+| Server: clone reads (git by argument list, card files), cards and options | `apps/backend/shared_features/waves/git_reads.py`, `service.py` |
+| Server: saved run, history, merge conflict times | `apps/backend/shared_features/waves/run_store.py`, `conflict_times.py` |
+| Server: the run (wave rules, starting cards, steps) | `apps/backend/shared_features/waves/execution.py`, `driver.py` |
+| Server routes `/api/features/execution-waves/*` | `apps/backend/shared_features/execution_waves.py` |
+| Mobile: the Waves page of a project | `apps/mobile/src/app/(app)/projects/[projectId]/waves.tsx` |
 
 ## Why in the main process, in TypeScript
 
@@ -201,6 +210,61 @@ those two counters from the start, so a resumed run keeps them.
 The view sums the last 14 days: runs ended (and stopped), conflicts avoided, risk taken out, specs
 started, and when the last run ended. Counts only: no duration is estimated (project rule).
 
+## Resolution time of residual conflicts
+
+The plan avoids the conflicts it can see; the issue also asks how long the others take to resolve.
+That is measured, from two dates the merge flow records for each conflict, never estimated:
+
+- **Desktop.** A merge (`TASK_WORKTREE_MERGE`) whose output reports a git conflict, or a merge
+  preview whose `gitConflicts.hasConflicts` is true, opens an entry for the task; one open entry
+  per task, so a second preview keeps the first date. The task's next merge that goes through
+  (full, staged, or a branch already merged and committed) closes it. A merge with nothing to
+  stage, a failure that is not a conflict, and the timeout's guess record nothing.
+- **Server.** A card's `merge` run that fails opens an entry only when git finds a conflict
+  between the card's workspace head and its base branch (`git merge-tree` in the object store, as
+  the preventive check); its next `merge` run that succeeds closes it.
+
+Both write `<project>/.workpilot/merge-conflict-times.json` (version 1, newest first, at most 200
+entries: task, `detectedAt`, `resolvedAt` or null) with the main process's or the server's clock.
+The view and the mobile page show, over the same 14 days as the run metrics, the conflicts
+resolved, the median time from conflict to merge and the conflicts still open. Time saved by
+parallelism is still not shown: it would be an estimate (project rule).
+
+## Server mode
+
+A project of a team server has no Electron main process to plan it: the server does, from its
+clone, with a port of the same planner (`apps/backend/shared_features/waves/`, same weights,
+fragile zones, code links, preventive merge check, bounds and file formats). The run is the
+server's too:
+
+- **Starting a card** goes through the server's run manager, the way the board starts it, as the
+  person who takes the step, with `agent.execute` on the project: a card with a spec builds; one
+  without writes its spec first, and goes on to its build only when that person's approval alone
+  is enough. A card claimed by someone else, waiting for an approval, already running, or refused
+  by the run manager or the quotas is not started, and the run says why (a closed list). The card
+  is claimed only once its run started.
+- **A step** (start what may start, move to the next wave once this one settled, replan it) is
+  taken on `POST .../run/step`, which the mobile page sends when it opens, and when a run of the
+  project ends on the server: the run manager's listener (`set_run_ended_listener`) takes it as
+  the person who started the wave run, whose rights are read again first. Steps of one project
+  never overlap (a lock per project).
+- **The parallelism** is the request's (1 to 32), capped by the organisation's
+  `max_concurrent_runs`.
+- **The saved run and its history** are the desktop's files, in the clone's `.workpilot`, with the
+  same checks; a stop is recorded as `stopped`.
+
+Routes (`/api/features/execution-waves`, each with its permission, `project_id` only):
+
+| Route | Permission |
+|---|---|
+| `GET /plan` (bounded options in the query) | `task.read` |
+| `GET /run`, `GET /history` | `task.read` |
+| `POST /run` (options, advance rule), `POST /run/step` | `agent.execute` |
+| `DELETE /run` | `task.write` |
+
+The mobile app shows the plan, the run going on (each card's column, or why it waits), the
+counts of the last 14 days, and starts, steps and stops the run for those who may.
+
 ## Boundary
 
 `conflictWaves:plan` takes `{ projectId, taskIds?, options? }`. The handler checks every field:
@@ -239,10 +303,6 @@ rebuilt field by field when read (`run-history.test.ts`).
 
 ## Still to do
 
-- Server mode: a backend route over the same planner (and merge check, code links) for server
-  projects and the mobile app; the saved run and its history would then live with the server's
-  project. Not done in lot 3: a port of the planner to the backend plus a mobile view, a lot of its
-  own.
-- Resolution time of residual conflicts (an issue metric): nothing records yet when a merge
-  conflict of a task appears and is resolved; it needs the merge flow to keep those two dates.
-  Time saved by parallelism is not shown: it would be an estimate (project rule).
+Nothing the issue asks for. Not done, on purpose: the desktop's Mission Control does not show the
+waves of a server project (the server and the mobile app do); time saved by parallelism is not
+shown, since it would be an estimate.

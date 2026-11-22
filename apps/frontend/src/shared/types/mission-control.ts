@@ -50,8 +50,13 @@ export interface MissionControlAgent {
 	estimated_tokens?: number;
 	/** How many times live rebalancing moved it on its current task. */
 	rebalances?: number;
-	/** Its answer repeats itself: the run is stopped and rebalanced. */
+	/** Its answer, or its decision tree, repeats itself: the run is stopped and rebalanced. */
 	loop_detected?: boolean;
+	/** A helper started beside a stuck agent: the agent it helps, and its name. */
+	helper_of?: string;
+	helper_of_name?: string;
+	/** On a stuck agent, the helper started for its current task. */
+	helper_id?: string;
 }
 
 export interface MissionControlDecisionNode {
@@ -148,7 +153,9 @@ export type MissionControlEventType =
 
 /** Why a run was rebalanced, what was done, and why nothing was. */
 export type MissionControlRebalanceReason = "loop" | "rate_limited" | "provider_failed" | "failed";
-export type MissionControlRebalanceAction = "retry_profile" | "reroute" | "escalate";
+export type MissionControlRebalanceAction = "retry_profile" | "reroute" | "escalate" | "helper";
+/** Where a loop was read: the answer, or the steps of the decision tree. */
+export type MissionControlLoopSource = "answer" | "steps";
 export type MissionControlRebalanceSkip = "limit" | "over_budget" | "no_alternative" | "disabled";
 
 export interface MissionControlEvent {
@@ -165,6 +172,7 @@ export interface MissionControlEvent {
 		/** A rebalancing's models, as the card names them. */
 		from?: string;
 		to?: string;
+		source?: MissionControlLoopSource;
 	} & Record<string, unknown>;
 }
 

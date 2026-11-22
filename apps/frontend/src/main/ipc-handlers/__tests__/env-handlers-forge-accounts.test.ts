@@ -63,7 +63,11 @@ vi.mock("../../env-utils", () => ({
 
 vi.mock("../../forge/forge-accounts", () => ({
 	forgeAccountStore: () => ({
-		get: (id: string) => (id === "acct-github" ? { id, forge: "github" } : undefined),
+		get: (id: string) =>
+			({
+				"acct-github": { id, forge: "github" },
+				"acct-bitbucket": { id, forge: "bitbucket", username: "dev@example.com" },
+			})[id],
 		tokenOf: () => "pat-test-account",
 	}),
 }));
@@ -106,6 +110,24 @@ describe("env-handlers and forge accounts", () => {
 			success: true,
 		});
 		expect(readFileSync(envPath(), "utf-8")).not.toMatch(/^GITHUB_ACCOUNT_ID=/m);
+	});
+
+	it("saves the Bitbucket account a project uses in its Bitbucket section", async () => {
+		expect(
+			await invoke(IPC_CHANNELS.ENV_UPDATE, project.id, {
+				bitbucketEnabled: true,
+				bitbucketAccountId: "acct-bitbucket",
+			}),
+		).toEqual({ success: true });
+		const written = readFileSync(envPath(), "utf-8");
+		expect(written).toMatch(/^BITBUCKET_ACCOUNT_ID=acct-bitbucket$/m);
+		expect(written).not.toContain("pat-test-account");
+		expect(written).not.toMatch(/^BITBUCKET_USERNAME=/m);
+		const read = await invoke<ProjectEnvConfig>(IPC_CHANNELS.ENV_GET, project.id);
+		expect(read.data?.bitbucketAccountId).toBe("acct-bitbucket");
+		expect(
+			await invoke(IPC_CHANNELS.ENV_UPDATE, project.id, { bitbucketAccountId: "acct-github" }),
+		).toEqual({ success: false, error: "Unknown account (bitbucketAccountId)" });
 	});
 
 	it("refuses an account that is not one of that forge, writing nothing", async () => {

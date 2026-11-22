@@ -1,6 +1,7 @@
 /**
  * What to watch after a deployment, in the CI/CD settings (#366): the health
- * check and one metric source (Prometheus, Datadog, New Relic or CloudWatch;
+ * check and one metric source (Prometheus, Datadog, New Relic, CloudWatch or
+ * Grafana;
  * their URLs and keys stay in the project's encrypted settings, never in a
  * committed file), the window, and the automatic rollback, off unless turned
  * on here.
@@ -23,7 +24,7 @@ interface FieldSpec {
 	readonly placeholder?: string;
 }
 
-export const METRIC_SOURCES = ["prometheus", "datadog", "newrelic", "cloudwatch"] as const;
+export const METRIC_SOURCES = ["prometheus", "datadog", "newrelic", "cloudwatch", "grafana"] as const;
 export type MetricSourceKind = (typeof METRIC_SOURCES)[number];
 
 // The closed lists the runner accepts (apps/backend/deploy_watch/sources.py).
@@ -56,6 +57,11 @@ const SOURCE_FIELDS: Readonly<Record<MetricSourceKind, readonly FieldSpec[]>> = 
 		{ key: "monitor_aws_access_key_id", type: "text" },
 		{ key: "monitor_aws_secret_access_key", type: "password" },
 		{ key: "monitor_aws_session_token", type: "password" },
+	],
+	grafana: [
+		{ key: "monitor_grafana_url", type: "url", placeholder: "https://grafana.example.com" },
+		{ key: "monitor_grafana_token", type: "password" },
+		{ key: "monitor_grafana_datasource_uid", type: "text", placeholder: "prometheus" },
 	],
 };
 

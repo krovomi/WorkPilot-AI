@@ -472,6 +472,7 @@ environment wins:
 | `WORKPILOT_QA_TARGETED` | 1 | `0` turns the targeted QA off alone: small code changes get the full review (see *Small code changes* below). |
 | `WORKPILOT_QA_SCHEMA_GUARD` | `warn` | The schema guard after QA ([schema-guard.md](architecture/schema-guard.md)): what the task's migrations do to a live database (data loss, renames, NOT NULL without default, an applied migration edited; PostgreSQL locks, type changes, a missing down), on every stack. `warn` shows the findings without blocking; `strict` sends an error back to the fixer with the expand/contract plan; `off` switches it off, and the hard gate `migration-safe` then reads unknown. A workflow that declares `migration-safe` runs it `strict`. Any other value reads as `warn`. |
 | `WORKPILOT_QA_RECHECK` | 1 | `0` turns the re-review by delta off: from the second QA pass on, the reviewer no longer checks the fixer's delta first ([docs/architecture/qa-recheck.md](architecture/qa-recheck.md)). |
+| `WORKPILOT_REVIEW_CONTRADICTION_CHECK` | 1 | `0` turns off the PR review's contradiction check ([review-feedback.md](architecture/review-feedback.md)): nearby findings of one file that may ask for opposite changes are no longer sent to the model. On, it makes one completion on the selected provider per review that has such a pair, none otherwise. |
 | `WORKPILOT_LEARNING_LOOP_MODEL` | 1 | `0` turns off the learning loop's model analysis (after each build and from its dashboard): only the rule-based patterns remain. On, it makes one completion on the selected provider, whichever it is. |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
 | `WORKPILOT_QA_API_CONTRACT` | `warn` | The API contract watcher after QA ([api-contract-watcher.md](architecture/api-contract-watcher.md)): `warn` records the contract changes and lists them in the PR body; `strict` also sends a breaking change the contract does not acknowledge back to the fixer; `off` stops it. Any other value reads as `warn`. |
@@ -800,13 +801,19 @@ uses no network.
 
 ### Forges
 
-Project settings writes `GITHUB_REPO` and `GITLAB_PROJECT` into the project's
-`.workpilot/.env`.
+Project settings writes `GITHUB_REPO`, `GITLAB_PROJECT` and the `BITBUCKET_*` keys into the project's
+`.workpilot/.env` ([architecture/bitbucket.md](architecture/bitbucket.md)). `CICD_PROVIDER=bitbucket` picks Bitbucket Pipelines for the CI loop; `auto` picks it when the Bitbucket settings are complete and Azure DevOps, GitHub and GitLab are not.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `GITHUB_REPO` | detected | The project's `owner/repo`, for the GitHub views, the CI loop and the GitHub runner when it cannot detect it. |
 | `GITLAB_PROJECT` | — | The project's `group/project`, for the same uses on GitLab. |
+| `BITBUCKET_ENABLED` | off | `true` shows the project's Bitbucket Cloud views (local projects only). Without it, a stored token turns them on. |
+| `BITBUCKET_WORKSPACE`, `BITBUCKET_REPO` | from the remote | The repository's workspace and slug on bitbucket.org. Project settings fills them from a bitbucket.org remote when empty; `BITBUCKET_REPO` also takes `workspace/repo` or a clone URL. A value that is not a slug, or a URL on another host, gives no Bitbucket config. A task's pull request uses the pushed remote first. |
+| `BITBUCKET_USERNAME` | — | With an API token or an app password, the account's email or username (HTTP Basic). Empty: `BITBUCKET_TOKEN` is sent as a Bearer access token (repository or workspace access token). |
+| `BITBUCKET_TOKEN` | — | Reads issues, pull requests and pipelines; opening a task's pull request also needs pull request write access. Stored `enc:` in `.workpilot/.env` and given to the backend only in its environment; sent only to `https://api.bitbucket.org/2.0`. Secret. |
+| `BITBUCKET_ACCOUNT_ID` | — | A Bitbucket account saved once for the app (Settings, Forge accounts): its username and token take the place of `BITBUCKET_USERNAME` and `BITBUCKET_TOKEN`. The file holds only the id; an id that names no Bitbucket account gives no token. `GITHUB_ACCOUNT_ID`, `GITLAB_ACCOUNT_ID` and `AZURE_DEVOPS_ACCOUNT_ID` do the same for the other forges. |
+| `BITBUCKET_AUTO_SYNC` | off | Stored like the GitHub and GitLab switches. |
 | `AZURE_DEVOPS_EXT_PAT` | — | Read when `AZURE_DEVOPS_PAT` is unset (it is the Azure DevOps CLI's name for it): pushes a task branch and opens its pull request. Secret. |
 | `GITHUB_BOT_TOKEN` | — | Token of the GitHub automation runner's bot account (PR review, auto-fix, triage) when `--bot-token` is not given. It only identifies that account, so the runner skips what the bot wrote itself; nothing is posted with it. Secret. |
 | `ISSUE_EMBEDDINGS_PROVIDER` | first with a key | Which service compares issues by meaning for triage's possible duplicates: `huggingface`, `openai`, `voyage`, `local` (sentence-transformers), or `none` for shared title words. Unset, the first of Hugging Face, OpenAI and Voyage with a key; under strict offline mode only `local`, and only when named. A failing service falls back to shared words. |

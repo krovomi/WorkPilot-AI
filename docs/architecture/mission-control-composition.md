@@ -2,9 +2,9 @@
 feature: Mission Control, composition automatique
 summary: >-
   Une équipe d'agents proposée d'après une description, une spec ou un modèle de session, sur les
-  providers mélangés, filtrés par capacités et chiffrés par Cost Intelligence, moins chère sous un
-  budget ; un agent bloqué rééquilibré (profil Claude, provider, modèle plus puissant) ; un
-  historique local mesure l'adoption et calibre les estimations.
+  providers mélangés, filtrés par capacités et chiffrés par Cost Intelligence ; un agent bloqué
+  rééquilibré (profil, provider, modèle plus puissant, agent d'appoint), une boucle lue dans la
+  réponse ou l'arbre ; un historique local calibre les estimations.
 ---
 
 # Mission Control : composer l'équipe et la rééquilibrer (#344)
@@ -154,20 +154,62 @@ ont été ajoutés.
   médiane de dépensé / attendu (bornée entre 0,25 et 4) ; la composition le dit (`calibrated`) et le
   panneau nomme les rôles calibrés.
 
+## Agent d'appoint, boucles de l'arbre, Ollama hors ligne (lot 4)
+
+| Morceau | Où | Rôle |
+|---|---|---|
+| Agent d'appoint | `mission_control/helper.py`, `MissionControlOrchestrator._spawn_helper`, `main/mission-control/mission-control-runs.ts` | le dernier remède, quand le rééquilibrage n'a plus rien à tenter |
+| Boucle de l'arbre | `rebalance.detect_step_loop`, `DecisionTree.steps` | les mêmes étapes, encore et encore |
+| Outils d'un modèle Ollama | `offline_policy/local_model_catalog.ollama_tool_use`, `model_pick._tool_use` | ce que le serveur local dit du modèle |
+| Modèles de session hors ligne | `tests/mission_control/test_ollama_offline.py` | chaque modèle composé et affiné contre un Ollama local, en CI |
+| UI | `AgentPanel.tsx`, `AgentEventLog.tsx` | pastilles « Aide … » et « Agent d'appoint lancé », ligne du journal, source d'une boucle |
+
+**L'agent d'appoint.** Quand `plan_rebalance` répond `limit` (deux rééquilibrages déjà) ou
+`no_alternative`, Mission Control lance un second agent au lieu d'abandonner : un débogueur sur le
+modèle haut de gamme du premier provider du plan qui fait tourner un agent et sait tenir le rôle ;
+jamais le modèle de l'agent bloqué, jamais un provider qui a déjà échoué quand le provider était la
+cause. Il reçoit la tâche, la raison du blocage (liste fermée de `reason_of`, jamais le texte de
+l'erreur) et la fin de la dernière tentative, nettoyée et délimitée (`quote_untrusted`), et doit
+trouver ce qui a mal tourné puis faire la tâche. L'agent bloqué garde son échec ; l'agent d'appoint
+est une carte à lui, qui tourne dans le même projet. Un seul par agent et par tâche, aucun pour un
+agent d'appoint, aucun au-delà du budget ni quand la case est décochée. Il compte comme un
+rééquilibrage, laisse un nœud « Helper » et un événement `agent_rebalanced` (`action: helper`) ;
+son démarrage ne journalise pas sa tâche, écrite pour le modèle, et sa carte dit ce qu'il fait au
+lieu d'afficher ce prompt.
+
+Ce n'est pas un second exécutant du même prompt (le lot 2 l'avait écarté pour cette raison) : il
+lit la tentative ratée, ce qu'un rééquilibrage sur un autre modèle ne fait pas.
+
+**La boucle de l'arbre.** Un agent qui rapporte ses réflexions et ses appels d'outils
+(`/agents/{id}/update`, `thinking`, `tool_name`) est signalé quand son arbre répète le même bloc
+d'une à trois étapes quatre fois de suite : le même outil avec la même entrée, la même réflexion
+(casse et espaces mis à part ; moins de 30 caractères, c'est un battement de cœur, pas une étape).
+Seul le run en cours compte : un nœud de résultat (réponse, erreur, rééquilibrage) le clôt, si bien
+qu'un run monté d'un niveau repart propre. Le drapeau est celui d'une réponse en boucle, et
+`agent_loop_detected` dit où la boucle a été lue (`answer` ou `steps`). Les runs à un seul appel de
+Mission Control ne remontent aujourd'hui ni réflexion ni appel d'outil : pour eux, la boucle se lit
+toujours dans la réponse.
+
+**Les outils d'un modèle Ollama.** models.dev ne connaît pas une étiquette locale comme
+`qwen3-coder` : le modèle restait « inconnu », donc gardé. Quand models.dev ne dit rien, le serveur
+Ollama lui-même est interrogé (`POST /api/show`, son champ `capabilities`) : seulement un
+`OLLAMA_BASE_URL` de bouclage (`local_endpoint`), sans proxy, sans suivre de redirection, deux
+secondes au plus ; une réponse est gardée dix minutes, un silence une minute. Le nom du modèle ne
+sert jamais à deviner ; un serveur arrêté ou trop ancien laisse la capacité inconnue.
+
+**Hors ligne, en CI.** La CI n'héberge aucun modèle : le test compose chaque modèle de session sur
+`ollama` seul, envoie la demande du second avis par `core.oneshot` à un vrai serveur HTTP local qui
+parle `/api/show` et `/api/chat`, et réinjecte la réponse. Pendant le test, toute connexion hors du
+bouclage est refusée au niveau du socket : un appel qui quitterait la machine le ferait échouer.
+
 ## Pas encore fait
 
-- **Lancer un agent secondaire** à côté d'un agent bloqué. Un run de Mission Control est un seul
-  appel sans outils (`main/mission-control/mission-control-runs.ts`) : un second agent répondrait
-  au même prompt une seconde fois, sans travail à se partager. Changer le modèle de l'agent bloqué
-  est le remède qui convient à ce run ; un agent d'appoint aura un sens avec des runs longs, qui
-  appellent des outils.
-- **Boucle lue dans l'arbre de décision** (réflexions ou appels d'outils répétés) : ces runs ne
-  remontent ni réflexion ni appel d'outil, la boucle se lit donc dans la réponse. Même raison.
-- **Test en CI contre un Ollama local** des modèles de session : il faut un serveur Ollama et un
-  modèle téléchargé sur les runners, ce que la CI n'héberge pas. La composition et le rééquilibrage
-  n'appellent aucun modèle et marchent hors ligne ; le second avis n'est testé qu'avec un double.
-- Capacité d'appel d'outils d'un modèle Ollama : seul le cache de models.dev est lu ; la
-  détection en direct d'`ollama_model_detector` n'est pas appelée, pour ne pas joindre le serveur
-  local pendant une composition ou un rééquilibrage.
-- Les métriques sont celles de la personne, sur sa machine : aucune n'est envoyée ni agrégée entre
-  utilisateurs, faute d'un service qui les recevrait.
+Rien de ce que l'issue demande et qui se fait ici. Restent, avec leur raison :
+
+- **Un vrai modèle Ollama en CI** : il faudrait un serveur Ollama et un modèle téléchargé sur les
+  runners (plusieurs gigaoctets à chaque run), ce que la CI n'héberge pas. Le serveur local du test
+  parle le même protocole ; la qualité des réponses d'un vrai petit modèle n'est pas mesurée. À
+  décider : un runner auto-hébergé avec Ollama, ou s'en tenir au protocole.
+- **Les métriques entre utilisateurs** : décision de Leub, aucune télémétrie. Les quatre mesures de
+  l'issue sont calculées sur la machine de la personne et n'en sortent pas ; Mission Control reste
+  local (`LOCAL_ONLY_FEATURES`), le serveur d'équipe n'a donc pas de sessions à compter.

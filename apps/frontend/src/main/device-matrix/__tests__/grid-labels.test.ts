@@ -29,6 +29,12 @@ describe("gridCaption", () => {
 		expect(gridCaption(device, network("4g"), cpu("1x"), "en").detail).toBe("1920 × 1080 @1x · 4G");
 	});
 
+	it("names a custom device as the person named it", () => {
+		expect(gridCaption({ ...device, id: "custom-x", name: "Kiosk 1366" }, network("none"), cpu("1x"), "fr").label).toBe(
+			"Kiosk 1366",
+		);
+	});
+
 	it("falls back to the id of a device without a name", () => {
 		expect(gridCaption({ ...device, id: "prototype" }, network("none"), cpu("2x"), "en")).toEqual({
 			label: "prototype",
