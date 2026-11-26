@@ -1,7 +1,7 @@
 {
 	"source": "NousResearch/hermes-agent",
-	"ref": "v0.23.1",
-	"commit": "3b421578588243f920886e6fe79a6faa87ea026e",
+	"ref": "v0.23.3",
+	"commit": "caafe5389ae585ef77387a962aee05b1bcf17029",
 	"skills": 12,
 	"follows": "latest-release",
 	"subdirs": [
