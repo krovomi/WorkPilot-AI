@@ -23,7 +23,7 @@ metadata:
     - python-debugpy
   workpilot:
     pack: hermes
-    version: 0.2.0
+    version: 0.3.0
     content_sha256: c3ad579c84deaacd080ccaa5652319561474024fb66b43f8f5bff31af31d10bb
 ---
 

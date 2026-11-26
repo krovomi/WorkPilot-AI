@@ -23,8 +23,8 @@ metadata:
     - node-inspect-debugger
   workpilot:
     pack: hermes
-    version: 0.2.0
-    content_sha256: 76383a4d01ff6a2c40d04c4034948356bc2a2830c81001fceeef179350a9abbb
+    version: 0.3.0
+    content_sha256: 2f0761144ffaa5c83458d7596f98b6311cd569f09c6266b7c0c519a53a25a483
 ---
 
 # Python Debugger (pdb + debugpy)
@@ -94,10 +94,7 @@ def compute(x, y):
 
 Run the code normally. You land at the `breakpoint()` line with full access to locals.
 
-**Don't forget to remove `breakpoint()` before committing.** Use `git diff` or a pre-commit grep:
-```bash
-rg -n 'breakpoint\(\)' --type py
-```
+**Don't forget to remove `breakpoint()` before committing.** Use `git diff` or `search_files` with `pattern="breakpoint\(\)"`, `file_glob="*.py"`.
 
 ## Recipe 2: Launch a script under pdb (no source edits)
 
@@ -367,9 +364,7 @@ Long-lived. Use `remote-pdb` at a handler, or `debugpy` with `--wait-for-client`
 - [ ] First breakpoint actually hits (if it doesn't, you likely have `PYTHONBREAKPOINT=0`, you're under a parallel/capturing runner, or execution finished before attach)
 - [ ] `where` / `w` shows the expected call stack
 - [ ] Post-debug cleanup: no stray `breakpoint()` / `set_trace()` in committed code
-  ```bash
-  rg -n 'breakpoint\(\)|set_trace\(|debugpy\.listen' --type py
-  ```
+  (`search_files` with `pattern="breakpoint\(\)|set_trace\(|debugpy\.listen"`, `file_glob="*.py"`)
 
 ## One-Shot Recipes
 
