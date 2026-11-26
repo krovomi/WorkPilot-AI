@@ -60,7 +60,7 @@ aiosqlite>=0.22.1        # SQLite async driver (dev/tests fallback)
 argon2-cffi>=25.1.0      # Password hashing for local accounts
 PyJWT[crypto]>=2.15.1     # JWT access/refresh tokens + Entra ID JWKS validation
 cryptography>=50.0.2     # Fernet encryption for per-user integration secrets
-email-validator>=2.3.0   # pydantic EmailStr support (auth schemas)
+email-validator>=2.4.0   # pydantic EmailStr support (auth schemas)
 requests>=2.34.2
 httpx[http2]>=0.28.1
 # Imported unconditionally by the Copilot / GitHub Models agent client
