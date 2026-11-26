@@ -16,7 +16,7 @@ websockets>=17.4
 # scheduling/task_templates.py, and required outright by
 # skills_registry/frontmatter.py -- it was pulled in transitively and those
 # modules silently degraded whenever it was not. Declared so they don't.
-PyYAML>=6.0.3
+PyYAML>=6.0.4
 
 # Linux Secret Service support for credential storage
 # Provides access to the Freedesktop.org Secret Service API via DBus
