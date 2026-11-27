@@ -608,6 +608,16 @@ curl -sS -X POST $WP/admin/users/<user_id>/password-reset -H "Authorization: Bea
 # L'audit, 500 lignes au plus par appel
 curl -sS "$WP/admin/audit?limit=100&offset=0" -H "Authorization: Bearer $TOKEN"
 
+# L'usage de l'organisation (usage.read) : période en jours UTC (30 derniers jours par défaut),
+# filtres user_id, group_id, project_id, provider, model ; vues summary, daily, people,
+# people/<user_id>, models, projects, pages, delivery, presence
+curl -sS "$WP/admin/usage/summary?start=2026-11-01&end=2026-11-30&provider=anthropic" -H "Authorization: Bearer $TOKEN"
+# → { "tokens": { "total": 1234567, … }, "cost_usd": 18.42, "budget": { "percent": 24.7, … },
+#     "active": { "day": 6, "week": 11, "month": 14 }, "runs": { "success_rate": 0.83, … }, … }
+# Une table en CSV (daily, people, models, phases, projects, pages ou failures), inscrit à l'audit
+curl -sS "$WP/admin/usage/export?view=people" -H "Authorization: Bearer $TOKEN" -o usage-people.csv
+# Les mêmes vues pour toute la plateforme (administrateur de la plateforme) : /admin/platform/usage/…
+
 # Enregistrer mon jeton GitHub pour mes runs ; kind : github_token, gitlab_token,
 # jira_token, linear_api_key, azure_pat ou sentry_token
 curl -sS -X PUT $WP/users/me/secrets -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
