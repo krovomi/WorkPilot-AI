@@ -1,5 +1,5 @@
 import type { AuthMethod, ProfileUsageSummary } from "@shared/types/agent";
-import { KeyRound, LogIn, Pencil, Star } from "lucide-react";
+import { KeyRound, LogIn, Pencil, Star, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { formatAppDateTime } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,12 @@ export interface ProviderCardData {
 		/** When the stored key got its value; undefined when unknown. */
 		setAt?: string | number;
 	};
+	/** Its accounts (Settings → AI accounts), when it can have several. */
+	accounts?: {
+		count: number;
+		/** The account it runs on, when one is named. */
+		defaultName?: string;
+	};
 }
 
 export type ProviderCardStatus = "connected" | "reauth" | "failing" | "off";
@@ -54,6 +60,7 @@ interface CleanProviderCardProps {
 	readonly onConfigure?: (providerId: string, options?: { startOAuth?: boolean }) => void;
 	readonly onTest?: (providerId: string) => void;
 	readonly onSetDefault?: (providerId: string) => void;
+	readonly onManageAccounts?: (providerId: string) => void;
 }
 
 /** One provider of Settings → AI accounts: its state, how it signs in, what to do next. */
@@ -64,6 +71,7 @@ export function CleanProviderCard({
 	onConfigure,
 	onTest,
 	onSetDefault,
+	onManageAccounts,
 }: CleanProviderCardProps) {
 	const { t } = useTranslation("settings");
 	const status = providerCardStatus(provider);
@@ -80,7 +88,9 @@ export function CleanProviderCard({
 
 	const facts: string[] = [];
 	if (status !== "off" && authMethod) facts.push(t(`aiAccounts.card.auth.${authMethod}`));
-	if (provider.realApiKeyInfo?.provider) facts.push(provider.realApiKeyInfo.provider);
+	if (provider.accounts?.defaultName) {
+		facts.push(t("aiAccounts.card.account", { name: provider.accounts.defaultName }));
+	} else if (provider.realApiKeyInfo?.provider) facts.push(provider.realApiKeyInfo.provider);
 	if (hasStoredKey && keyAgeDays !== undefined) {
 		facts.push(
 			keyAgeDays === 0
@@ -177,6 +187,17 @@ export function CleanProviderCard({
 						onClick={() => onConfigure?.(provider.id, { startOAuth: true })}
 					>
 						{t("aiAccounts.card.reconnect")}
+					</CharterButton>
+				)}
+				{provider.accounts && onManageAccounts && (
+					<CharterButton
+						size="sm"
+						variant="ghost"
+						icon={Users}
+						data-action="accounts"
+						onClick={() => onManageAccounts(provider.id)}
+					>
+						{t("aiAccounts.card.accounts", { count: provider.accounts.count })}
 					</CharterButton>
 				)}
 				{status !== "off" && (

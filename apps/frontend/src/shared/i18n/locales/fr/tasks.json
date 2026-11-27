@@ -619,6 +619,40 @@
 			},
 			"privacy": "La question et les tickets vont au provider IA choisi dans les réglages. Rien n'est enregistré.",
 			"newConversation": "Nouvelle conversation"
+		},
+		"lanes": {
+			"title": "Couloirs",
+			"button": "Couloirs",
+			"buttonActive": "Couloirs : {{grouping}}",
+			"groupings": {
+				"none": "Aucun",
+				"priority": "Priorité",
+				"type": "Type",
+				"area": "Sous-projet",
+				"source": "Origine",
+				"parent": "Tâche découpée"
+			},
+			"readOnly": "lecture seule",
+			"pinFlagged": "Cartes bloquées dans un couloir à part, en premier",
+			"flagged": "Bloquées",
+			"noValue": {
+				"none": "Cartes",
+				"priority": "Sans priorité",
+				"type": "Pas encore de type",
+				"area": "Sans sous-projet",
+				"source": "Sans origine",
+				"parent": "Non découpées"
+			},
+			"expand": "Déplier le couloir",
+			"collapse": "Replier le couloir",
+			"addArea": "Ajouter un sous-projet",
+			"addAreaPlaceholder": "Nom du sous-projet",
+			"addAreaHint": "Un couloir vide apparaît : glissez-y des cartes.",
+			"addAreaRefused": "Ce sous-projet existe déjà, ou le nom n'est pas valable.",
+			"readOnlyDrop": "Les cartes ne changent pas de couloir ici : on ne choisit pas « {{grouping}} » en déplaçant une carte.",
+			"undoLabel": "changement de couloir",
+			"saveFailed_one": "{{count}} carte n'a pas pu passer dans ce couloir.",
+			"saveFailed_other": "{{count}} cartes n'ont pas pu passer dans ce couloir."
 		}
 	},
 	"queue": {
@@ -3045,5 +3079,33 @@
 		"reasonPlaceholder": "Ce qui la bloque (facultatif), par ex. on attend la clé d'API du client",
 		"failedTitle": "Drapeau non enregistré",
 		"failedDescription": "Impossible d'enregistrer le drapeau. Réessayez."
+	},
+	"runFacts": {
+		"title": "Bilan",
+		"unknown": "inconnu",
+		"automation": "Automatisation",
+		"agentTime": "Temps de travail des agents",
+		"leadTime": "Du lancement à la fin",
+		"spendTitle": "Tokens et coût de toutes les sessions d'agents",
+		"tokens": "{{value}} tokens",
+		"tokensEstimated": "≈ {{value}} tokens",
+		"tokensUnknown": "Tokens inconnus",
+		"costShort": "· {{cost}}",
+		"tokensLabel": "Tokens",
+		"tokensDetail": "{{total}} (entrée {{input}}, sortie {{output}}, cache {{cache}})",
+		"costLabel": "Coût",
+		"estimatedNote_one": "{{count}} session sur {{total}} estimée : son fournisseur n'a donné aucun compte.",
+		"estimatedNote_other": "{{count}} sessions sur {{total}} estimées : leur fournisseur n'a donné aucun compte.",
+		"models": "Modèles",
+		"createdBy": "Créée par",
+		"startedBy": "Lancée par",
+		"peopleShort": "{{creator}} → {{launcher}}",
+		"peopleTitle": "Créée par {{creator}}, lancée par {{launcher}}",
+		"duration": {
+			"seconds": "{{seconds}} s",
+			"minutes": "{{minutes}} min",
+			"hours": "{{hours}} h {{minutes}} min",
+			"days": "{{days}} j {{hours}} h"
+		}
 	}
 }

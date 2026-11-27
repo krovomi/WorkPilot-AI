@@ -326,7 +326,8 @@ async def test_a_new_card_starts_its_history_and_the_snapshot_sends_it(tmp_path)
         "user",
         "u-1",
     )
-    snapshot = await board_snapshot(scope)
+    async with factory() as db:
+        snapshot = await board_snapshot(scope, db)
     sent = json.loads(snapshot["cards"][card["id"]][sh.HISTORY_FILE])
     assert sent["entries"] == [entry]
 

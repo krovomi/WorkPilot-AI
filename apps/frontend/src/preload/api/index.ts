@@ -35,6 +35,7 @@ import {
 	createForgeAccountsAPI,
 	type ForgeAccountsAPI,
 } from "./modules/forge-accounts-api";
+import { type AiAccountsAPI, createAiAccountsAPI } from "./modules/ai-accounts-api";
 import {
 	type BlastRadiusAPI,
 	createBlastRadiusAPI,
@@ -381,6 +382,7 @@ export interface ElectronAPI
 		AgentDebuggerAPI,
 		LocalBackendAPI,
 		ForgeAccountsAPI,
+		AiAccountsAPI,
 		ReplayAPI,
 		BlastRadiusAPI,
 		Phase35FeaturesAPI,
@@ -543,6 +545,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createAgentDebuggerAPI(),
 		...createLocalBackendAPI(),
 		...createForgeAccountsAPI(),
+		...createAiAccountsAPI(),
 		...createReplayAPI(),
 		...createBlastRadiusAPI(),
 		...createPhase35FeaturesAPI(),

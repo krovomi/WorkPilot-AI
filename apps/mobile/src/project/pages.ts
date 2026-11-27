@@ -2,13 +2,23 @@
  * A project's pages on the phone and who sees them. The tab bar keeps the
  * four a person opens most (the board, Insights, the forge, the dashboard);
  * the rest are rows of the "More" tab. A page the person's permissions
- * would refuse is not shown (the server checks again).
+ * would refuse is not shown (the server checks again). The team's pages
+ * (its chat, its leaderboard) come first.
  */
 
 import type { IconName } from "../ui/Icon";
 
 export type TabPage = "insights" | "forge" | "dashboard";
-export type MorePage = "roadmap" | "ideas" | "context" | "sessions" | "analyses" | "delegations" | "governance" | "waves";
+export type MorePage =
+	| "chat"
+	| "leaderboard"
+	| "roadmap" 	| "ideas"
+	| "context"
+	| "sessions"
+	| "analyses"
+	| "delegations"
+	| "governance"
+	| "waves";
 
 export const PAGE_ICONS: Record<TabPage | MorePage | "board" | "more", IconName> = {
 	board: "trello",
@@ -16,6 +26,8 @@ export const PAGE_ICONS: Record<TabPage | MorePage | "board" | "more", IconName>
 	forge: "git-pull-request",
 	dashboard: "bar-chart-2",
 	more: "grid",
+	chat: "message-square",
+	leaderboard: "award",
 	roadmap: "map",
 	ideas: "zap",
 	context: "book-open",
@@ -27,6 +39,8 @@ export const PAGE_ICONS: Record<TabPage | MorePage | "board" | "more", IconName>
 };
 
 const MORE_PERMISSIONS: Record<MorePage, string> = {
+	chat: "task.read",
+	leaderboard: "analytics.read",
 	roadmap: "insight.read",
 	ideas: "insight.read",
 	context: "insight.read",

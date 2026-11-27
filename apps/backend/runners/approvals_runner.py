@@ -73,7 +73,9 @@ def run(argv: list[str]) -> dict:
         files,
         title=(args.title or "")[:MAX_TITLE_CHARS],
         kind=args.kind,
-        base=args.base_branch,
+        # A remote-tracking ref (the stack autopilot's ``origin/develop``) is
+        # judged as the branch it tracks, so a rule on ``pr/base`` reads one name.
+        base=args.base_branch.removeprefix("origin/"),
         labels=args.label,
         ci=args.ci,
         review=args.review,

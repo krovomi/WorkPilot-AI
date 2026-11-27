@@ -28,6 +28,16 @@ suivi d'usage la met à jour dans la même PR.
 | Connexions refusées | `audit_logs`, action `auth.login_failed` | méthode, raison (`bad_password`, `disabled`, `unknown_account`, `provider_refused`), IP, navigateur, date ; la personne seulement si le compte existe | historique de l'audit |
 | Jobs lancés | `audit_logs`, action `project.job.started` | personne, projet, feature, identifiant du job | historique de l'audit |
 
+### Ce que le tableau en montre
+
+Une carte terminée affiche qui l'a créée, qui a lancé son dernier run (hors fusion) et ce que ses
+sessions ont consommé (`shared_board/run_facts.py`). Rien de nouveau n'est enregistré pour cela :
+le serveur calcule ces trois faits à chaque instantané du tableau, à partir de `specs_index`,
+`agent_runs` et `usage_records`, et ne les écrit nulle part. Le nom est le nom d'affichage du
+compte au moment de l'instantané ; un compte supprimé (`SET NULL`) laisse la carte sans nom. Les
+voit quiconque lit le tableau du projet, qui montre déjà qui tient une carte, comme les vues
+d'espace de travail montrent déjà le coût des sessions.
+
 **Jamais enregistré** : le texte d'un prompt, du code, ce qu'une personne a tapé, un nom de
 fichier, le chemin ou le corps d'une requête, un mot de passe, ni l'adresse tapée pour un compte
 qui n'existe pas.
