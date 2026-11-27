@@ -3,6 +3,7 @@
  * in and whether it answers, then the automatic failover between them.
  */
 import { ProviderService } from "@shared/services/providerService";
+import { accountProviderOf } from "@shared/types/ai-accounts";
 import type { AppSettings } from "@shared/types/settings";
 import { type CanonicalProvider, getStaticProviders } from "@shared/utils/providers";
 import { AlertCircle, ArrowDownUp, Plug } from "lucide-react";
@@ -11,12 +12,14 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useToast } from "@/hooks/use-toast";
 import { saveSettings as saveSettingsToDisk, useSettingsStore } from "@/stores/settings-store";
+import { aiAccountsOf, defaultAiAccountOf, useAiAccountsStore } from "../../stores/ai-accounts-store";
 import { loadClaudeProfiles, useClaudeProfileStore } from "../../stores/claude-profile-store";
 import { CharterButton, Notice, ScanLine, Stat, Stats, Tabs } from "../charter";
 import { useProviderContext } from "../ProviderContext";
 import { Dialog, DialogContent } from "../ui/dialog";
 import { type ProviderCardData, providerCardStatus } from "./CleanProviderCard";
 import { CleanProviderGrid } from "./CleanProviderGrid";
+import { ProviderAccountsDialog, supportsAccounts } from "./ai-accounts/ProviderAccountsDialog";
 import { buildFailoverAccounts, isAccountExcluded } from "./failover-accounts";
 import { GlobalAutoSwitching } from "./GlobalAutoSwitching";
 import { getAllConnectors } from "./multiconnector/utils";
@@ -69,9 +72,13 @@ export function CleanProviderSection({
 	const [providerStatus, setProviderStatus] = useState<Record<string, boolean>>({});
 	const [copilotLogin, setCopilotLogin] = useState<string>();
 	const [failoverEnabled, setFailoverEnabled] = useState<boolean>();
+	const [accountsProvider, setAccountsProvider] = useState<{ id: string; name: string } | null>(null);
 
 	const { profiles, activeApiProfileId, settings } = useSettingsStore(
 		useShallow((s) => ({ profiles: s.profiles, activeApiProfileId: s.activeProfileId, settings: s.settings as Settings })),
+	);
+	const aiAccounts = useAiAccountsStore(
+		useShallow((s) => ({ accounts: s.accounts, defaults: s.defaults, mainKeys: s.mainKeys })),
 	);
 	const claudeProfiles = useClaudeProfileStore((s) => s.profiles);
 	const activeClaudeProfileId = useClaudeProfileStore((s) => s.activeProfileId);
@@ -106,6 +113,7 @@ export function CleanProviderSection({
 		if (!isOpen) return;
 		void loadConnectors();
 		void loadClaudeProfiles();
+		void useAiAccountsStore.getState().load();
 		const api = globalThis.electronAPI;
 		api.checkCopilotAuth?.()
 			.then((result) => setCopilotLogin(result.data?.authenticated ? result.data.username : undefined))
@@ -131,7 +139,29 @@ export function CleanProviderSection({
 		return () => {
 			cancelled = true;
 		};
-	}, [profiles, settings, configDialogOpen]);
+	}, [profiles, settings, configDialogOpen, accountsProvider]);
+
+	/** How many accounts a provider has and which one it runs on (Claude: its active profile). */
+	const providerAccounts = useCallback(
+		(providerId: string, defaultName: string | undefined): ProviderCardData["accounts"] => {
+			if (!supportsAccounts(providerId)) return undefined;
+			if (providerId === "anthropic" || providerId === "claude") {
+				const active = claudeProfiles.find((profile) => profile.id === activeClaudeProfileId);
+				return {
+					count: claudeProfiles.length,
+					defaultName: claudeProfiles.length > 1 ? active?.name : undefined,
+				};
+			}
+			const accountProvider = accountProviderOf(providerId) ?? providerId;
+			const hasMainKey = aiAccounts.mainKeys.includes(accountProvider);
+			const count = aiAccountsOf(aiAccounts.accounts, accountProvider).length + (hasMainKey ? 1 : 0);
+			return {
+				count,
+				defaultName: defaultName ?? (count > 1 && hasMainKey ? t("aiAccounts.accounts.mainKey") : undefined),
+			};
+		},
+		[claudeProfiles, activeClaudeProfileId, aiAccounts, t],
+	);
 
 	const activeClaudeUsage = useMemo(() => {
 		const all = [...claudeUsage.values()];
@@ -141,7 +171,10 @@ export function CleanProviderSection({
 	const providers = useMemo<ProviderCardData[]>(
 		() =>
 			staticProviders.map((provider) => {
-				const connected = providerStatus[provider.name] === true;
+				const accountProvider = accountProviderOf(provider.name);
+				const defaultAccount = accountProvider ? defaultAiAccountOf(aiAccounts, accountProvider) : undefined;
+				// A default account is a sign-in of its own, even with no key on the provider's page.
+				const connected = providerStatus[provider.name] === true || defaultAccount !== undefined;
 				const test = testResults.get(provider.name);
 				const other = providerUsage.get(provider.name);
 				const usage =
@@ -167,9 +200,10 @@ export function CleanProviderSection({
 					lastTested: test?.date,
 					realUsageData: usage,
 					realApiKeyInfo: providerKeyInfo(provider.name, profiles, settings, connected),
+					accounts: providerAccounts(provider.name, defaultAccount?.name),
 				};
 			}),
-		[staticProviders, providerStatus, testResults, providerUsage, activeClaudeUsage, profiles, settings, t],
+		[staticProviders, providerStatus, testResults, providerUsage, activeClaudeUsage, profiles, settings, t, providerAccounts, aiAccounts],
 	);
 
 	const failoverAccounts = useMemo(
@@ -377,6 +411,10 @@ export function CleanProviderSection({
 							onConfigure={openConfig}
 							onTest={(id) => void runTest(id, false)}
 							onSetDefault={(id) => void setDefaultProvider(id)}
+							onManageAccounts={(id) => {
+								const provider = providers.find((p) => p.id === id);
+								if (provider) setAccountsProvider({ id: provider.id, name: provider.name });
+							}}
 						/>
 					) : (
 						<GlobalAutoSwitching
@@ -389,6 +427,13 @@ export function CleanProviderSection({
 					)}
 				</>
 			)}
+
+			<ProviderAccountsDialog
+				provider={accountsProvider}
+				onOpenChange={(open) => {
+					if (!open) setAccountsProvider(null);
+				}}
+			/>
 
 			{/* Wide enough for the model lists of Hugging Face. */}
 			<Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>

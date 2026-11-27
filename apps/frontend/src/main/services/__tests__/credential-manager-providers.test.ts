@@ -26,6 +26,13 @@ const store = vi.hoisted(() => ({
 	saveProfilesError: null as Error | null,
 	writeSettingsError: null as Error | null,
 	claudeManager: null as unknown,
+	/** Default account key per provider (Settings → AI accounts). */
+	accountKeys: {} as Record<string, string>,
+}));
+
+vi.mock("../../ai-accounts/ai-account-key", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../../ai-accounts/ai-account-key")>()),
+	defaultAccountKey: (provider: string) => store.accountKeys[provider],
 }));
 
 vi.mock("../../settings-utils", () => ({
@@ -97,6 +104,7 @@ beforeEach(() => {
 	store.saveProfilesError = null;
 	store.writeSettingsError = null;
 	store.claudeManager = null;
+	store.accountKeys = {};
 	home = mkdtempSync(join(tmpdir(), "cred-manager-"));
 	process.env.HOME = home;
 	process.env.USERPROFILE = home;
@@ -656,6 +664,18 @@ describe("testProvider: API-key providers", () => {
 		expect(result.details).toMatchObject({ profileName: "mistral", modelCount: 1 });
 	});
 
+	it("tests the default AI account on the provider's own endpoint", async () => {
+		setProfiles([profile("m", "https://eu.mistral.ai/v1", "profile-key")]);
+		store.accountKeys = { mistral: "account-key" };
+		fetchRoutes.push((url) =>
+			url === "https://api.mistral.ai/v1/models" ? json({ data: [1, 2, 3] }) : undefined,
+		);
+		const result = await new CredentialManager().testProvider("mistral");
+		expect(result).toMatchObject({ success: true, details: { modelCount: 3 } });
+		expect(fetchCalls.map((call) => call.url)).toEqual(["https://api.mistral.ai/v1/models"]);
+		expect(fetchCalls[0].init?.headers).toEqual({ Authorization: "Bearer account-key" });
+	});
+
 	it("prefers an OpenAI Codex CLI login over any key", async () => {
 		const result = await new CredentialManager(async () => true).testProvider(
 			"openai",
@@ -956,6 +976,27 @@ describe("environment for the Python backend", () => {
 			SELECTED_LLM_PROVIDER: "mistral",
 			MISTRAL_API_KEY: "profile-key",
 			MISTRAL_BASE_URL: "https://api.mistral.ai/v1",
+		});
+	});
+
+	it("runs on the default AI account first, on the provider's own endpoint", async () => {
+		setProfiles([profile("p", "https://eu.mistral.ai/v1", "profile-key")]);
+		const manager = new CredentialManager();
+		await manager.initialize();
+		store.accountKeys = { mistral: "account-key" };
+		store.settings = { selectedProvider: "mistral", globalMistralApiKey: "global" };
+		// The profile's URL never carries the account's key.
+		expect(manager.getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "mistral",
+			MISTRAL_API_KEY: "account-key",
+		});
+	});
+
+	it("keeps the provider's main key when no default account is chosen", async () => {
+		store.settings = { selectedProvider: "deepseek", globalDeepSeekApiKey: " main " };
+		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "deepseek",
+			DEEPSEEK_API_KEY: "main",
 		});
 	});
 

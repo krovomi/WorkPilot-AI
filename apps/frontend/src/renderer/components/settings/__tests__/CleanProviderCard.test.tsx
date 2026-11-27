@@ -116,6 +116,36 @@ describe("CleanProviderCard", () => {
 		expect(screen.getByRole("button", { name: t("aiAccounts.card.testing") })).toBeDisabled();
 	});
 
+	it("names the account it runs on and opens its accounts", async () => {
+		const onManageAccounts = vi.fn();
+		render(
+			<CleanProviderCard
+				provider={provider({
+					realApiKeyInfo: { hasKey: true, authMethod: "api-key", provider: "Work key" },
+					accounts: { count: 3, defaultName: "Client X" },
+				})}
+				onManageAccounts={onManageAccounts}
+			/>,
+		);
+		const meta = screen.getByText(/Client X/);
+		expect(meta.textContent).toContain(t("aiAccounts.card.account", { name: "Client X" }));
+		expect(meta.textContent).not.toContain("Work key");
+		await userEvent.click(screen.getByRole("button", { name: t("aiAccounts.card.accounts", { count: 3 }) }));
+		expect(onManageAccounts).toHaveBeenCalledWith("openai");
+	});
+
+	it("offers its accounts even before it is connected, and not without a handler", () => {
+		const { rerender } = render(
+			<CleanProviderCard
+				provider={provider({ isConfigured: false, accounts: { count: 0 } })}
+				onManageAccounts={vi.fn()}
+			/>,
+		);
+		expect(screen.getByRole("button", { name: t("aiAccounts.card.accounts", { count: 0 }) })).toBeInTheDocument();
+		rerender(<CleanProviderCard provider={provider({ accounts: { count: 2 } })} />);
+		expect(screen.queryByRole("button", { name: t("aiAccounts.card.accounts", { count: 2 }) })).toBeNull();
+	});
+
 	it("works without any callback", async () => {
 		const { rerender } = render(<CleanProviderCard provider={provider({ isConfigured: false })} />);
 		await userEvent.click(screen.getByRole("button", { name: t("aiAccounts.card.connect") }));
