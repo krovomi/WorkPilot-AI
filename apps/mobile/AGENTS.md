@@ -30,7 +30,7 @@ EXPO_OFFLINE=1 pnpm exec expo export --platform web --output-dir dist   # bundle
   jamais dans un log, une URL ou `AsyncStorage`. Le jeton du flux part dans l'en-tête.
 - **HTTPS** sauf réseau local (`api/server-url.ts` : IPv4 privée, `localhost`, `*.local`, nom de machine sans domaine) ; ne pas élargir la liste des hôtes locaux, que suivent `NSAllowsLocalNetworking` (iOS) et `plugins/with-local-network-http.js` (Android).
 - **Navigation** : Expo Router, les écrans dans `src/app/` (`(app)/` = connecté) ; le reste
-  (`admin/`, `api/`, `auth/`, `board/`, `card/`, `context/`, `features/`, `forge/`, `insights/`, `new-card/`, `project/`, `push/`, `ui/`, `i18n/`) hors de `src/app/`.
+  (`admin/`, `api/`, `auth/`, `board/`, `card/`, `context/`, `features/`, `forge/`, `inbox/`, `insights/`, `needs-you/`, `new-card/`, `project/`, `push/`, `ui/`, `usage/`, `i18n/`) hors de `src/app/`.
 - **Interface** : les pièces communes dans `ui/components.tsx` et `ui/kit.tsx`, les icônes par `ui/Icon.tsx` (Feather), les tailles de texte par `TYPE` (`ui/theme.ts`) ; un onglet d'un projet lit son id par `useProjectId()`.
 - **Les dossiers natifs iOS et Android sont générés** (`expo prebuild`) : ne jamais les créer ni les commiter ;
   configurer par `app.json` et les plugins. iOS ne se construit que sur macOS (CI : job `ios`).

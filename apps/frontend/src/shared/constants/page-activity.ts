@@ -1,0 +1,100 @@
+/**
+ * The desktop's pages whose opens are counted for the server's page activity
+ * (server mode, only while the organization turned it on): every view of the
+ * left menu (`SidebarView`), by name and nothing else. The server keeps the
+ * same closed list (`apps/backend/server/services/page_activity.py`) and
+ * refuses a batch naming any other page; a test checks both lists against
+ * `SidebarView`.
+ */
+export const PAGE_ACTIVITY_PAGES = [
+	"kanban",
+	"terminals",
+	"roadmap",
+	"context",
+	"ideation",
+	"github-issues",
+	"gitlab-issues",
+	"github-prs",
+	"gitlab-merge-requests",
+	"bitbucket-issues",
+	"bitbucket-pull-requests",
+	"changelog",
+	"insights",
+	"worktrees",
+	"agent-tools",
+	"migration",
+	"architecture-visualizer",
+	"performance-profiler",
+	"visual-to-code",
+	"dashboard",
+	"analytics",
+	"code-review",
+	"refactoring",
+	"documentation",
+	"cost-estimator",
+	"session-history",
+	"voice-control",
+	"test-generation",
+	"prompt-optimizer",
+	"code-playground",
+	"dependency-sentinel",
+	"natural-language-git",
+	"conflict-predictor",
+	"context-aware-snippets",
+	"app-emulator",
+	"learning-loop",
+	"mcp-marketplace",
+	"mission-control",
+	"agent-replay",
+	"pixel-office",
+	"self-healing",
+	"browser-agent",
+	"pair-programming",
+	"pipeline-generator",
+	"plugin-marketplace",
+	"arena-mode",
+	"api-explorer",
+	"sandbox",
+	"regression-guardian",
+	"injection-guard",
+	"api-watcher",
+	"accessibility-agent",
+	"i18n-agent",
+	"onboarding-agent",
+	"onboarding-guide",
+	"flaky-tests",
+	"doc-drift",
+	"compliance",
+	"git-surgeon",
+	"release-coordinator",
+	"carbon-profiler",
+	"consensus-arbiter",
+	"notebook-agent",
+	"agent-coach",
+	"bounty-board",
+	"repo-bench",
+	"tech-debt",
+	"agent-debugger",
+	"team-bot",
+	"blast-radius",
+	"guardrails",
+	"env-snapshot",
+	"offline-mode",
+	"cicd-triggers",
+	"cross-language-translation",
+	"spec-approval",
+	"live-companion",
+	"context-mesh",
+	"administration",
+	"phase35-hub",
+	"smart-estimation",
+] as const;
+
+export type PageActivityPage = (typeof PAGE_ACTIVITY_PAGES)[number];
+
+const KNOWN: ReadonlySet<string> = new Set(PAGE_ACTIVITY_PAGES);
+
+/** Whether `value` is one of the counted pages. */
+export function isPageActivityPage(value: unknown): value is PageActivityPage {
+	return typeof value === "string" && KNOWN.has(value);
+}

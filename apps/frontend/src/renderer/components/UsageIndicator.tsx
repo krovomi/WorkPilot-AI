@@ -45,6 +45,7 @@ import { CopilotUsageContent } from "./usage/CopilotUsageContent";
 import { DefaultUsageContent } from "./usage/DefaultUsageContent";
 import { OpenAIUsageContent } from "./usage/OpenAIUsageContent";
 import { ProfileRenderer } from "./usage/ProfileRenderer";
+import { ProviderAccountSwitcher } from "./usage/ProviderAccountSwitcher";
 import { UsagePlanBadge } from "./usage/UsagePlanBadge";
 import { ReauthContent } from "./usage/ReauthContent";
 import { THRESHOLD_ELEVATED, THRESHOLD_WARNING } from "./usage/usageConstants";
@@ -1199,6 +1200,9 @@ export function UsageIndicator() {
 							})}
 						</div>
 					)}
+
+					{/* The provider's other API-key accounts (OpenAI, Mistral…), one click away */}
+					<ProviderAccountSwitcher provider={selectedProvider} />
 				</div>
 			</PopoverContent>
 		</Popover>

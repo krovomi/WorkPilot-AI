@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { LockGate } from "../../auth/LockGate";
 import { PushBridge } from "../../push/PushBridge";
+import { PageActivityBridge } from "../../usage/PageActivityBridge";
 import { useTheme } from "../../ui/theme";
 
 export default function SignedInLayout() {
@@ -10,6 +11,7 @@ export default function SignedInLayout() {
 	return (
 		<LockGate>
 			<PushBridge />
+			<PageActivityBridge />
 			<Stack
 				screenOptions={{
 					headerStyle: { backgroundColor: theme.surface },
@@ -21,6 +23,7 @@ export default function SignedInLayout() {
 				}}
 			>
 				<Stack.Screen name="index" options={{ title: t("projects.title") }} />
+				<Stack.Screen name="inbox" options={{ title: t("inbox.title") }} />
 				<Stack.Screen name="settings" options={{ title: t("settings.title") }} />
 				<Stack.Screen name="share" options={{ title: t("share.title") }} />
 				<Stack.Screen name="projects/[projectId]/(tabs)" options={{ headerShown: false }} />
@@ -33,6 +36,7 @@ export default function SignedInLayout() {
 				<Stack.Screen name="projects/[projectId]/roadmap" options={{ title: t("features.roadmap") }} />
 				<Stack.Screen name="projects/[projectId]/ideas" options={{ title: t("features.ideas") }} />
 				<Stack.Screen name="projects/[projectId]/context" options={{ title: t("features.context") }} />
+				<Stack.Screen name="needs-you" options={{ title: t("needsYou.title") }} />
 				<Stack.Screen name="tokens" options={{ title: t("tokens.title") }} />
 				<Stack.Screen name="admin/index" options={{ title: t("admin.title") }} />
 				<Stack.Screen name="admin/members" options={{ title: t("admin.members.title") }} />

@@ -24,6 +24,7 @@ import { OrganizationsTab } from "./OrganizationsTab";
 import { OverviewTab } from "./OverviewTab";
 import { QuotasTab } from "./QuotasTab";
 import { RolesTab } from "./RolesTab";
+import { UsageTab } from "./UsageTab";
 import { useSwitchOrg } from "./use-switch-org";
 import { PageHeader } from "../ui/page-header";
 
@@ -36,7 +37,8 @@ type TabId =
 	| "organizations"
 	| "invitations"
 	| "audit"
-	| "quotas";
+	| "quotas"
+	| "usage";
 
 /** A tab is gated by one permission, or reserved to platform administrators (cross-tenant). */
 type TabDef = {
@@ -46,6 +48,8 @@ type TabDef = {
 
 const TABS: readonly TabDef[] = [
 	{ id: "overview", labelKey: "tabs.overview", permission: "analytics.read" },
+	// Who used the server and how much: its own permission, not analytics.read.
+	{ id: "usage", labelKey: "tabs.usage", permission: "usage.read" },
 	{ id: "members", labelKey: "tabs.members", permission: "org.member.read" },
 	{ id: "groups", labelKey: "tabs.groups", permission: "org.member.read" },
 	{ id: "roles", labelKey: "tabs.roles", permission: "org.role.read" },
@@ -183,6 +187,7 @@ export function AdministrationView() {
 						{current === "invitations" && <InvitationsAdmin />}
 						{current === "audit" && <AuditTab />}
 						{current === "quotas" && <QuotasTab />}
+						{current === "usage" && <UsageTab />}
 					</div>
 				</>
 			)}

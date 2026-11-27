@@ -25,10 +25,10 @@ import {
 	NON_CLAUDE_PROVIDERS,
 	PROVIDER_BASE_URL_ENV_VARS,
 	PROVIDER_KEY_ENV_VARS,
-	PROVIDER_SETTINGS_KEYS,
 	providerPageEnv,
 } from "./provider-settings-keys";
 import { loadBetterSqlite } from "./windsurf-sqlite";
+import { defaultAccountKey, settingsApiKey } from "../ai-accounts/ai-account-key";
 
 const execFileAsync = promisify(execFile);
 
@@ -561,17 +561,18 @@ export class CredentialManager extends EventEmitter {
 			}
 
 			// Pour les autres providers (openai, mistral, google, deepseek, grok, ollama, etc.)
+			// Source 0: the default account of Settings → AI accounts (its own endpoint).
 			// Source 1: Chercher un profil API dans profiles.json (Custom Endpoints)
-			let apiKey: string | undefined;
+			let apiKey: string | undefined = defaultAccountKey(provider);
 			let baseUrl: string | undefined;
 			let profileName: string | undefined;
-
+			if (apiKey) profileName = provider;
 			try {
 				const profilesFile = await loadProfilesFile();
 				const apiProfile = profilesFile.profiles.find((p) => {
 					return detectProvider(p.baseUrl) === provider;
 				});
-				if (apiProfile?.apiKey && !isPlaceholderApiKey(apiProfile.apiKey)) {
+				if (!apiKey && apiProfile?.apiKey && !isPlaceholderApiKey(apiProfile.apiKey)) {
 					apiKey = apiProfile.apiKey;
 					baseUrl = apiProfile.baseUrl;
 					profileName = apiProfile.name;
@@ -584,21 +585,8 @@ export class CredentialManager extends EventEmitter {
 			// Try multiple possible settings keys for each provider
 			if (!apiKey) {
 				try {
-					const settings = readSettingsFile();
-					const settingsKeys = PROVIDER_SETTINGS_KEYS[provider] || [];
-					if (settings) {
-						for (const settingsKey of settingsKeys) {
-							// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-							const globalKey = (settings as any)[settingsKey] as
-								| string
-								| undefined;
-							if (globalKey?.trim()) {
-								apiKey = globalKey.trim();
-								profileName = provider;
-								break;
-							}
-						}
-					}
+					apiKey = settingsApiKey(provider, readSettingsFile()) || undefined;
+					if (apiKey) profileName = provider;
 				} catch {
 					// settings file not available
 				}
@@ -827,7 +815,7 @@ export class CredentialManager extends EventEmitter {
 	 * Tester la connexion API pour un provider donné avec une clé API
 	 * Utilise les endpoints spécifiques à chaque provider pour valider la connexion.
 	 */
-	private async testApiKeyConnection(
+	async testApiKeyConnection(
 		provider: string,
 		apiKey: string,
 		baseUrl?: string,
@@ -1478,7 +1466,8 @@ export class CredentialManager extends EventEmitter {
 				// which bypasses the switch statement below — so we must inject the key here.
 				// Source priority: profiles.json → globalXxxApiKey in settings.json
 				// Check profiles.json first (most specific), then global settings
-				let apiKey = "";
+				// The default account (Settings → AI accounts) first, on its own endpoint.
+				let apiKey = defaultAccountKey(selectedProvider) ?? "";
 				let baseUrl = "";
 				try {
 					const profiles = this.profiles;
@@ -1493,7 +1482,7 @@ export class CredentialManager extends EventEmitter {
 							return false;
 						}
 					});
-					if (profile?.apiKey) {
+					if (!apiKey && profile?.apiKey) {
 						apiKey = profile.apiKey;
 						baseUrl = profile?.baseUrl ?? "";
 					}
@@ -1501,16 +1490,7 @@ export class CredentialManager extends EventEmitter {
 					/* profiles.json not available */
 				}
 
-				if (!apiKey) {
-					for (const key of PROVIDER_SETTINGS_KEYS[selectedProvider] ?? []) {
-						// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-						const val = (settings as any)?.[key] as string | undefined;
-						if (val?.trim()) {
-							apiKey = val.trim();
-							break;
-						}
-					}
-				}
+				if (!apiKey) apiKey = settingsApiKey(selectedProvider, settings);
 
 				// Note: Codex CLI OAuth tokens are NOT used as fallback — they require
 				// specific OpenAI scopes that the ChatGPT OAuth flow does not grant.

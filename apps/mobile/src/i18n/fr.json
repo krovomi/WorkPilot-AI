@@ -3,7 +3,8 @@
 		"cancel": "Annuler",
 		"retry": "Réessayer",
 		"loading": "Chargement…",
-		"back": "Retour"
+		"back": "Retour",
+		"close": "Fermer"
 	},
 	"errors": {
 		"network": "Le serveur est injoignable. Vérifiez votre connexion.",
@@ -88,6 +89,18 @@
 		"showAll": "Afficher toutes les cartes",
 		"sync": "Synchro",
 		"emptyHint": "Les cartes arrivent ici en avançant sur le tableau.",
+		"quickHint": "Appui long pour les actions rapides",
+		"quickActions": "Actions rapides",
+		"openCard": "Ouvrir la carte",
+		"search": "Chercher dans le tableau",
+		"clearSearch": "Effacer la recherche",
+		"filters": "Filtres",
+		"filtersOn_one": "Filtres, {{count}} actif",
+		"filtersOn_other": "Filtres, {{count}} actifs",
+		"mine": "Les miennes",
+		"clearFilters": "Effacer les filtres",
+		"noMatch": "Aucune carte ne correspond.",
+		"noMatchHint": "D'autres mots ou moins de filtres la trouveront peut-être.",
 		"flagged": "Bloquée"
 	},
 	"columns": {
@@ -800,5 +813,92 @@
 		"hours_other": "il y a {{count}} h",
 		"days_one": "il y a {{count}} j",
 		"days_other": "il y a {{count}} j"
+	},
+	"inbox": {
+		"title": "Pour vous",
+		"open": "Ce qui vous attend",
+		"waiting_one": "{{count}} carte vous attend",
+		"waiting_other": "{{count}} cartes vous attendent",
+		"parts": {
+			"plan_one": "{{count}} plan à approuver",
+			"plan_other": "{{count}} plans à approuver",
+			"attention": "{{count}} à regarder",
+			"review": "{{count}} à relire"
+		},
+		"reasons": {
+			"plan": "Plans à approuver",
+			"attention": "Arrêtées, à regarder",
+			"review": "Terminées, à relire"
+		},
+		"chips": {
+			"plan": "Plan",
+			"attention": "Arrêtée",
+			"review": "Revue"
+		},
+		"empty": "Rien ne vous attend.",
+		"emptyHint": "Les cartes que vous pouvez approuver, relire ou relancer arrivent ici, de tous vos projets.",
+		"unreachable": "Lecture impossible : {{names}}. Tirez pour réessayer.",
+		"intro": "De tous vos projets : les cartes en revue humaine sur lesquelles vous pouvez agir, sauf celles qu'une autre personne a réservées."
+	},
+	"needsYou": {
+		"title": "Me prévenir ailleurs",
+		"summary": "ntfy, Telegram ou Teams, quand une carte vous attend",
+		"intro": "Quand une carte vous attend, le serveur vous prévient aussi sur le service choisi. Le nom du projet et le numéro de la carte partent vers ce service, rien d'autre de la carte.",
+		"off": "Ce serveur ne les envoie pas encore : un administrateur les active. Vous pouvez déjà les régler.",
+		"noVault": "Ce serveur n'a pas de clé de secrets : il ne peut pas enregistrer de canal. Demandez à un administrateur.",
+		"readOnly": "Votre rôle ne permet pas de régler un canal : il faut pouvoir lancer des agents.",
+		"moments": "Quand",
+		"language": "Langue des messages",
+		"languages": {
+			"en": "English",
+			"fr": "Français"
+		},
+		"events": {
+			"plan_review": "Un plan attend mon approbation",
+			"review_ready": "Une carte est prête pour ma revue",
+			"failed": "Une tâche que j'ai lancée s'est arrêtée sur une erreur",
+			"approval_escalated": "Un plan attend un approbateur depuis trop longtemps",
+			"review_feedback_held": "Un rejet de revue attend un mainteneur"
+		},
+		"channels": {
+			"ntfy": "ntfy",
+			"telegram": "Telegram",
+			"teams": "Microsoft Teams"
+		},
+		"hints": {
+			"ntfy": "Des notifications push par un topic ntfy, sur ntfy.sh ou votre propre serveur. Abonnez-vous au topic dans l'app ntfy.",
+			"telegram": "Des messages de votre propre bot (à créer avec @BotFather), vers votre identifiant numérique.",
+			"teams": "Un webhook entrant Teams ou une URL Workflows de votre canal."
+		},
+		"fields": {
+			"server": "Serveur (https)",
+			"topic": "Topic",
+			"access_token": "Jeton d'accès (facultatif)",
+			"bot_token": "Jeton du bot",
+			"chat_id": "Votre identifiant",
+			"webhook_url": "URL du webhook"
+		},
+		"keep": "Défini : laissez vide pour le garder",
+		"generate": "Générer un topic",
+		"state": {
+			"notSet": "Non réglé",
+			"on": "Actif",
+			"paused": "En pause",
+			"unreadable": "À ressaisir"
+		},
+		"enabled": "Envoyer sur {{channel}}",
+		"set": "Régler",
+		"change": "Modifier",
+		"save": "Enregistrer",
+		"test": "Envoyer un test",
+		"remove": "Retirer",
+		"removeTitle": "Retirer {{channel}} ?",
+		"removeBody": "Le serveur oublie ce canal et ses secrets.",
+		"result": {
+			"sent": "Test envoyé. Regardez {{channel}}.",
+			"blocked": "Non envoyé : le serveur a refusé la destination.",
+			"refused": "Non envoyé : {{channel}} a refusé le message. Vérifiez les réglages.",
+			"unreachable": "Non envoyé : {{channel}} est injoignable."
+		}
 	}
 }

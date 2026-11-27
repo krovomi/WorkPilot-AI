@@ -17,6 +17,7 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `ColumnBand.tsx` | ~200 | bandeau d'une colonne : icône, compteur, jauge de capacité, ligne de résumé (`lib/column-pulse.ts`), état vide ([kanban-columns.md](../../../../../../docs/architecture/kanban-columns.md)) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
 | `BoardLanes.tsx` · `LaneGroupingMenu.tsx` | ~200 · ~140 | couloirs (swimlanes) : la rangée de colonnes ou un couloir par valeur ; glisser entre couloirs par `../../hooks/useLaneDrag.ts`, logique dans `../../lib/kanban-lanes.ts` ([kanban-swimlanes.md](../../../../../../docs/architecture/kanban-swimlanes.md)) |
+| `board-ask/` | — | « Interroger le tableau » : bouton de la barre et panneau de conversation, réponse par `main/board-ask/` ([board-ask.md](../../../../../../docs/architecture/board-ask.md)) |
 | `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F182) |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |
 | `../task-detail/TaskMobilePreview.tsx` | ~430 | onglet *Mobile* : plateforme, appareil, run, capture, logs |

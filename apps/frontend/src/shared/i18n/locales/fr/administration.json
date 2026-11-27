@@ -10,7 +10,8 @@
 		"organizations": "Organisations",
 		"invitations": "Invitations",
 		"audit": "Audit",
-		"quotas": "Quotas"
+		"quotas": "Quotas",
+		"usage": "Usage"
 	},
 	"common": {
 		"loading": "Chargement…",
@@ -164,5 +165,26 @@
 		"usedThisMonth": "{{count}} utilisés ce mois-ci",
 		"enforceHardStop": "Bloquer les nouvelles exécutions quand le budget de tokens est épuisé",
 		"hardStopHint": "Si décoché, le dépassement est signalé mais les exécutions démarrent quand même."
+	},
+	"usage": {
+		"description": "Ce que le serveur collecte sur les membres de cette organisation, et combien de temps il le garde. Jamais un prompt, du code, un texte tapé ni un nom de fichier.",
+		"failed": "Le serveur a refusé : {{error}}",
+		"saved": "Enregistré.",
+		"pageActivity": {
+			"title": "Activité par page",
+			"what": "Activée, l'app de bureau et le téléphone de chaque membre envoient combien de fois il a ouvert chaque page par jour (le nom de la page seulement : ni projet, ni carte, ni texte).",
+			"toggle": "Compter les pages que les membres ouvrent",
+			"inform": "Désactivée. Dites aux membres ce qui est mesuré et pourquoi avant de l'activer : le changement est inscrit au journal d'audit.",
+			"since": "Activée depuis le {{date}}. Chaque changement est inscrit au journal d'audit.",
+			"erase": "La désactiver efface, à l'enregistrement, les comptes de pages gardés jusqu'ici."
+		},
+		"retention": {
+			"title": "Durée de conservation",
+			"usage": "Consommation et présence (jours)",
+			"pages": "Activité par page (jours)",
+			"serverDefault": "Défaut du serveur : {{count}} jours",
+			"hint": "Vide garde le défaut du serveur. De {{min}} à {{max}} jours ; ce qui est plus vieux s'efface chaque heure.",
+			"invalid": "Saisissez un nombre entier de jours de {{min}} à {{max}}, ou laissez vide."
+		}
 	}
 }

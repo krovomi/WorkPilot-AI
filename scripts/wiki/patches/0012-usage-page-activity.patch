@@ -1,0 +1,50 @@
+From a46d7dc7ceeec8bc5e0d920e6659f16ee8c79009 Mon Sep 17 00:00:00 2001
+From: WorkPilot Wiki Bot <noreply@workpilot.ai>
+Date: Fri, 27 Nov 2026 18:15:31 +0000
+Subject: [PATCH] docs(wiki): page activity and retention per organization
+
+---
+ Team-Server.fr.md | 8 ++++++--
+ Team-Server.md    | 7 +++++--
+ 2 files changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/Team-Server.fr.md b/Team-Server.fr.md
+index 84c8ef8..53fdfb9 100644
+--- a/Team-Server.fr.md
++++ b/Team-Server.fr.md
+@@ -96,8 +96,12 @@ Un projet est un dépôt git que le serveur clone avec sa propre clé SSH
+ 
+ La consommation de tokens de chacun par run et par job, les jours où il a utilisé le serveur, les
+ connexions (refusées aussi, avec leur raison, jamais le mot de passe) et les jobs lancés. Jamais
+-un prompt, du code, un texte tapé ni un nom de fichier. Consommation et présence s'effacent après
+-`WORKPILOT_USAGE_RETENTION_DAYS` (365 jours par défaut, de 30 à 3650). La page pour votre registre
++un prompt, du code, un texte tapé ni un nom de fichier. L'**activité par page** (combien de fois
++chacun ouvre chaque page) reste désactivée tant qu'un administrateur de l'organisation ne l'active
++pas dans **Administration → Usage**, une fois les membres informés ; la désactiver efface les
++comptes. Chaque organisation règle combien de temps elle garde la consommation et la présence
++(365 jours par défaut, `WORKPILOT_USAGE_RETENTION_DAYS`) et l'activité par page (183 jours,
++`WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS`), de 30 à 3650 jours. La page pour votre registre
+ RGPD : [docs/server-usage-data.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/server-usage-data.md).
+ 
+ ## Dépannage rapide
+diff --git a/Team-Server.md b/Team-Server.md
+index d6ea0e3..5cc5fac 100644
+--- a/Team-Server.md
++++ b/Team-Server.md
+@@ -94,8 +94,11 @@ A project is a git repository the server clones with its own SSH key
+ 
+ Each person's token use per run and job, the days they used the server, sign-ins (refused ones
+ too, with their reason, never the password) and the jobs they started. Never a prompt, code,
+-typed text or file name. Token use and presence days are erased after
+-`WORKPILOT_USAGE_RETENTION_DAYS` (365 by default, 30 to 3650). The page for your GDPR register:
++typed text or file name. **Page activity** (how often each person opens each page) is off until
++an organization's administrator turns it on in **Administration → Usage**, once the members are
++told; turning it off erases the counts. Each organization sets how long it keeps token use and
++presence (365 days by default, `WORKPILOT_USAGE_RETENTION_DAYS`) and page activity (183 days,
++`WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS`), from 30 to 3650 days. The page for your GDPR register:
+ [docs/server-usage-data.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/server-usage-data.md).
+ 
+ ## Quick troubleshooting
+-- 
+2.43.0
+

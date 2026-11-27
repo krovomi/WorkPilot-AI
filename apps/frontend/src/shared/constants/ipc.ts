@@ -609,6 +609,12 @@ export const IPC_CHANNELS = {
 	FORGE_ACCOUNTS_SAVE: "forgeAccounts:save",
 	FORGE_ACCOUNTS_DELETE: "forgeAccounts:delete",
 	FORGE_ACCOUNTS_TEST: "forgeAccounts:test",
+	// AI accounts: several API-key accounts per provider (main/ai-accounts/ai-accounts.ts)
+	AI_ACCOUNTS_LIST: "aiAccounts:list",
+	AI_ACCOUNTS_SAVE: "aiAccounts:save",
+	AI_ACCOUNTS_DELETE: "aiAccounts:delete",
+	AI_ACCOUNTS_TEST: "aiAccounts:test",
+	AI_ACCOUNTS_SET_DEFAULT: "aiAccounts:setDefault",
 	GIT_INITIALIZE: "git:initialize",
 	GIT_SET_REMOTE: "git:setRemote",
 	GIT_CHECKOUT_BRANCH: "git:checkoutBranch",
@@ -1191,6 +1197,7 @@ export const IPC_CHANNELS = {
 	BITBUCKET_GET_PULL_REQUESTS: "bitbucket:getPullRequests",
 	BITBUCKET_IMPORT_ISSUES: "bitbucket:importIssues",
 	BLAST_RADIUS_ANALYZE: "blastRadius:analyze",
+	BOARD_ASK: "boardAsk:ask", // « Interroger le tableau »: a question answered with the related tickets
 	BOARD_MCP_APPLY: "boardMcp:apply",
 	BOARD_MCP_STATUS: "boardMcp:status",
 	BOUNTY_BOARD_LIST_ARCHIVES: "bountyBoard:listArchives",
@@ -1438,6 +1445,11 @@ export const IPC_CHANNELS = {
 	SERVER_ADMIN_UPDATE_MEMBER_ROLE: "server-admin:update-member-role",
 	SERVER_ADMIN_UPDATE_ORG: "server-admin:update-org",
 	SERVER_ADMIN_UPDATE_ROLE: "server-admin:update-role",
+	// Usage (main/server-usage.ts): a view opened, counted only while the
+	// organization has page activity on; the organization's usage settings.
+	SERVER_USAGE_PAGE_VISIT: "server-usage:page-visit",
+	SERVER_USAGE_GET_SETTINGS: "server-usage:get-settings",
+	SERVER_USAGE_SET_SETTINGS: "server-usage:set-settings",
 	SERVER_AUTH_ACCEPT_INVITE: "server-auth:accept-invite",
 	SERVER_AUTH_CREATE_INVITE: "server-auth:create-invite",
 	SERVER_AUTH_GET_CONFIG: "server-auth:get-config",

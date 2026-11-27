@@ -713,7 +713,9 @@
 		"needsReauthTitle": "Needs re-authentication",
 		"sessionUsage": "Session usage",
 		"weeklyUsage": "Weekly usage",
-		"inOut": "{{model}}: {{input}} in, {{output}} out"
+		"inOut": "{{model}}: {{input}} in, {{output}} out",
+		"providerAccounts": "Accounts of this provider",
+		"accountSwitchFailed": "Could not switch: {{error}}"
 	},
 	"oauth": {
 		"enterCode": "Manual Code Entry (Fallback)",

@@ -580,6 +580,46 @@
 			"failedDropRefused": "Only a failed run lands in Failed. Restart a task from its card or move it to the queue.",
 			"doneCannotBeAbandoned": "A completed task cannot be abandoned."
 		},
+		"ask": {
+			"button": "Ask",
+			"open": "Ask a question about the board's tickets",
+			"title": "Ask the board",
+			"description": "Ask in any language: every related ticket comes up, finished and archived ones included, even when written in another language.",
+			"emptyHint": "For instance, before planning a feature, ask whether it was already built, even partly.",
+			"examples": {
+				"adminPage": "How was the admin page reworked?",
+				"export": "Can we already export data to CSV?",
+				"login": "What was done about sign-in errors?"
+			},
+			"placeholder": "Ask a question about the tickets…",
+			"send": "Ask",
+			"searching": "Reading the tickets…",
+			"failed": "The question could not be answered. Try again in a moment.",
+			"serverProject": "A server board cannot be asked yet.",
+			"modeAi": "Answered by AI",
+			"modeKeywords": "Keyword search",
+			"keywordsHint": "No AI answer (no provider, or it did not reply): these tickets share words with the question.",
+			"searched_one": "{{count}} ticket searched",
+			"searched_other": "{{count}} tickets searched",
+			"noMatch": "No ticket relates to this question.",
+			"citation": "Ticket {{index}}: {{title}}",
+			"archived": "Archived",
+			"coverage": {
+				"full": "Already covered",
+				"partial": "Partly covered",
+				"related": "Related"
+			},
+			"state": {
+				"done": "Done",
+				"in_review": "In review",
+				"in_progress": "In progress",
+				"planned": "Planned",
+				"failed": "Failed",
+				"abandoned": "Abandoned"
+			},
+			"privacy": "The question and the tickets go to the AI provider chosen in Settings. Nothing is saved.",
+			"newConversation": "New conversation"
+		},
 		"lanes": {
 			"title": "Swimlanes",
 			"button": "Swimlanes",
