@@ -399,7 +399,8 @@ describe("Task Store — Kanban Order Management", () => {
 
 			useTaskStore.getState().loadTaskOrder("project-1");
 
-			expect(useTaskStore.getState().taskOrder).toEqual(storedOrder);
+			// The outcome columns (« Échec », « Abandonnée ») get an empty list.
+			expect(useTaskStore.getState().taskOrder).toEqual({ ...storedOrder, failed: [], abandoned: [] });
 		});
 
 		it("should create empty order when no stored data exists", () => {

@@ -9,23 +9,39 @@ import type { ExecutionPhase, TaskStatus } from "@shared/types/task";
 // Task Status (Kanban columns)
 // ============================================
 
-// Task status columns in Kanban board order
+// Kanban columns in board order. All but two are task statuses; « Échec »
+// (`failed`) and « Abandonnée » (`abandoned`) are outcome columns, computed from
+// the task (renderer/lib/kanban-columns.ts `getBoardColumn`): no pipeline status
+// is named after them, so the agents, XState and the backend never see them.
 export const TASK_STATUS_COLUMNS = [
 	"backlog",
 	"queue",
 	"in_progress",
 	"ai_review",
 	"human_review",
+	"failed",
 	"build_failed",
 	"pr_created",
 	"done",
+	"abandoned",
 ] as const;
 
 export type TaskStatusColumn = (typeof TASK_STATUS_COLUMNS)[number];
 
+/** The columns that hold a way a task ended badly, not a status. */
+export const OUTCOME_COLUMNS = ["failed", "abandoned"] as const;
+export type OutcomeColumn = (typeof OUTCOME_COLUMNS)[number];
+
+/** The columns that are task statuses. */
+export type StatusColumn = Exclude<TaskStatusColumn, OutcomeColumn>;
+
+export function isOutcomeColumn(column: string): column is OutcomeColumn {
+	return (OUTCOME_COLUMNS as readonly string[]).includes(column);
+}
+
 // Status label translation keys (use with t() from react-i18next)
 // Note: pr_created has its own column (« PR ouverte »), shown once a card has an open PR
-// Note: error maps to 'human_review' column in Kanban view (errors need human attention)
+// Note: error is drawn in the « Échec » column (failed), with the reviews that ended in errors
 export const TASK_STATUS_LABELS: Record<
 	TaskStatusColumn | "error",
 	string
@@ -35,14 +51,16 @@ export const TASK_STATUS_LABELS: Record<
 	in_progress: "columns.in_progress",
 	ai_review: "columns.ai_review",
 	human_review: "columns.human_review",
+	failed: "columns.failed",
 	build_failed: "columns.build_failed",
 	pr_created: "columns.pr_created",
 	done: "columns.done",
+	abandoned: "columns.abandoned",
 	error: "columns.error",
 };
 
 // Status colors for UI
-// Note: error maps to 'human_review' column in Kanban view (errors need human attention)
+// Note: error is drawn in the « Échec » column (failed)
 export const TASK_STATUS_COLORS: Record<
 	TaskStatusColumn | "error",
 	string
@@ -52,9 +70,11 @@ export const TASK_STATUS_COLORS: Record<
 	in_progress: "bg-info/10 text-info",
 	ai_review: "bg-warning/10 text-warning",
 	human_review: "bg-purple-500/10 text-purple-400",
+	failed: "bg-orange-500/10 text-orange-500",
 	build_failed: "bg-destructive/10 text-destructive",
 	pr_created: "bg-indigo-500/10 text-indigo-400",
 	done: "bg-success/10 text-success",
+	abandoned: "bg-slate-500/10 text-slate-400",
 	error: "bg-destructive/10 text-destructive",
 };
 

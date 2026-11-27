@@ -98,7 +98,9 @@
 		"build_failed": "Build rouge",
 		"pr_created": "PR ouverte",
 		"done": "Terminé",
-		"error": "Erreur"
+		"error": "Erreur",
+		"failed": "Échec",
+		"abandoned": "Abandonnée"
 	},
 	"kinds": {
 		"none": "Non précisé",

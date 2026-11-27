@@ -8,11 +8,12 @@ import {
 } from "../../../shared/constants/card-types";
 import type { Task, TaskPriority, TaskStatus } from "../../../shared/types";
 import { toast } from "../../hooks/use-toast";
-import { manualMoveTargets } from "../../lib/kanban-columns";
+import { canMoveTaskTo, manualMoveTargets } from "../../lib/kanban-columns";
+import { useAbandonRequestStore } from "../../stores/abandon-request-store";
 import { extractTextFromHtml } from "../../lib/utils";
 import { openSmartEstimation } from "../../stores/smart-estimation-store";
 import { applyCardChoice, type CardChoice } from "../../lib/card-edits";
-import { pauseTask, resumeTask } from "../../stores/task-store";
+import { pauseTask, resumeAbandonedTask, resumeTask } from "../../stores/task-store";
 import { TaskEditDialog } from "../TaskEditDialog";
 import { Button } from "../ui/button";
 import {
@@ -98,7 +99,11 @@ export function TaskCardMenus({
 			onSetPriority: (priority: TaskPriority) =>
 				void save({ priority }, t("tasks:kanban.undoLabels.priority")),
 			moves: onStatusChange && {
-				targets: manualMoveTargets({ status: task.status, metadata: { prUrl } }),
+				targets: manualMoveTargets({
+					status: task.status,
+					reviewReason: task.reviewReason,
+					metadata: { prUrl, abandoned: task.metadata?.abandoned },
+				}),
 				onMove: (status) => void onStatusChange(status),
 			},
 			// A description with no text (empty, or only markup) says less
@@ -112,6 +117,11 @@ export function TaskCardMenus({
 			onPause: isRunning && !isPaused ? () => void pauseTask(task.id) : undefined,
 			onResume: isPaused ? () => void resumeTask(task.id) : undefined,
 			onSyncFromBranch: onSync,
+			onAbandon: canMoveTaskTo(task, "abandoned")
+				? () => useAbandonRequestStore.getState().request([task.id])
+				: undefined,
+			onUnabandon:
+				task.metadata?.abandoned === true ? () => void resumeAbandonedTask(task.id) : undefined,
 			onDelete,
 		};
 	}, [

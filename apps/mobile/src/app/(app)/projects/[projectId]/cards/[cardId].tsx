@@ -15,7 +15,7 @@ import {
 	startCard,
 	stopCard,
 } from "../../../../../board/actions";
-import { ACTIVE_COLUMNS } from "../../../../../board/columns";
+import { ACTIVE_COLUMNS, boardColumn } from "../../../../../board/columns";
 import { ApprovalSection } from "../../../../../card/ApprovalSection";
 import { ChangesSection } from "../../../../../card/ChangesSection";
 import { LogsSection } from "../../../../../card/LogsSection";
@@ -161,15 +161,17 @@ export default function CardScreen() {
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
 			<Stack.Screen options={{ headerTitle: card.id.split("-")[0] }} />
-			<View style={{ gap: SPACE.sm }}>
-				<View style={styles.columnRow}>
-					<View style={[styles.status, { backgroundColor: theme.elevated }]}>
-						<View style={[styles.dot, { backgroundColor: columnColor(theme, card.column) }]} />
-						<Text style={[TYPE.caption, { color: theme.text, fontWeight: "700" }]}>{t(`columns.${card.column}`)}</Text>
-					</View>
-					{card.kind ? <Chip label={t(`kinds.${card.kind}`)} /> : null}
-					{working ? <Chip label={t("card.working")} icon="activity" color={theme.accent} /> : null}
-				</View>
+      <View style={{ gap: SPACE.sm }}>
+        <View style={styles.columnRow}>
+          <View style={[styles.status, { backgroundColor: theme.elevated }]}>
+            <View style={[styles.dot, { backgroundColor: columnColor(theme, boardColumn(card)) }]} />
+            <Text style={[TYPE.caption, { color: theme.text, fontWeight: "700" }]}>
+              {t(`columns.${boardColumn(card)}`)}
+            </Text>
+          </View>
+          {card.kind ? <Chip label={t(`kinds.${card.kind}`)} /> : null}
+          {working ? <Chip label={t("card.working")} icon="activity" color={theme.accent} /> : null}
+        </View>
 				<Text accessibilityRole="header" style={[TYPE.title, { color: theme.text }]}>
 					{card.title}
 				</Text>

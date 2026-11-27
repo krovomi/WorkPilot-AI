@@ -5,9 +5,9 @@
  * that has a pull request, and « En cours » takes what its free slots allow;
  * the rest waits in « File d'attente ». Design: docs/architecture/kanban-quick-edit.md.
  */
-import { TASK_STATUS_COLUMNS, type TaskStatusColumn } from "../../shared/constants/task";
+import { type StatusColumn, TASK_STATUS_COLUMNS, type TaskStatusColumn } from "../../shared/constants/task";
 import type { Task, TaskStatus } from "../../shared/types";
-import { canMoveTaskTo, getVisualColumn } from "./kanban-columns";
+import { canMoveTaskTo } from "./kanban-columns";
 
 export interface CardMove {
 	readonly task: Task;
@@ -29,7 +29,7 @@ export function countRunning(tasks: readonly Task[]): number {
 
 export function planGroupMove(
 	selection: readonly Task[],
-	target: TaskStatusColumn,
+	target: StatusColumn,
 	freeSlots: number,
 ): GroupMovePlan {
 	const moves: CardMove[] = [];
@@ -37,7 +37,7 @@ export function planGroupMove(
 	let queued = 0;
 	let slots = Math.max(0, freeSlots);
 	for (const task of selection) {
-		if (getVisualColumn(task.status) === target || !canMoveTaskTo(task, target)) {
+		if (!canMoveTaskTo(task, target)) {
 			skipped++;
 		} else if (target !== "in_progress" || slots > 0) {
 			if (target === "in_progress") slots--;
@@ -54,7 +54,7 @@ export function planGroupMove(
 export function groupMoveTargets(selection: readonly Task[]): ReadonlySet<TaskStatusColumn> {
 	return new Set(
 		TASK_STATUS_COLUMNS.filter((column) =>
-			selection.some((task) => getVisualColumn(task.status) !== column && canMoveTaskTo(task, column)),
+			selection.some((task) => canMoveTaskTo(task, column)),
 		),
 	);
 }

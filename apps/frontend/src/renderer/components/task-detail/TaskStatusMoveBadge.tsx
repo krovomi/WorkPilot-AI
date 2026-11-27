@@ -29,9 +29,11 @@ const STATUS_DOT_CLASS: Record<TaskStatusColumn, string> = {
 	in_progress: "bg-info",
 	ai_review: "bg-warning",
 	human_review: "bg-purple-400",
+	failed: "bg-orange-500",
 	build_failed: "bg-destructive",
 	pr_created: "bg-indigo-400",
 	done: "bg-success",
+	abandoned: "bg-slate-400",
 };
 
 interface TaskStatusMoveBadgeProps {

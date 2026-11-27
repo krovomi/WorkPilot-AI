@@ -13,7 +13,7 @@
 import { TASK_STATUS_COLUMNS } from "../../shared/constants";
 import type { TaskStatusColumn } from "../../shared/constants/task";
 import type { Task, TaskOrderState } from "../../shared/types";
-import { getVisualColumn } from "./kanban-columns";
+import { getBoardColumn } from "./kanban-columns";
 
 function sortByCreatedAtDesc(a: Task, b: Task): number {
 	return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -66,7 +66,7 @@ export function getKanbanOrderedTasks(
 	}
 
 	for (const task of tasks) {
-		const column = getVisualColumn(task.status);
+		const column = getBoardColumn(task);
 		grouped.get(column)?.push(task);
 	}
 

@@ -202,17 +202,13 @@
 		"build_failed": "Build rouge",
 		"done": "Terminé",
 		"pr_created": "PR ouverte",
-		"error": "Erreur"
+		"error": "Erreur",
+		"failed": "Échec",
+		"abandoned": "Abandonnée"
 	},
 	"kanban": {
 		"more": {
 			"label": "Autres actions du tableau"
-		},
-		"abandoned": {
-			"chip": "{{count}} abandonnée",
-			"chip_other": "{{count}} abandonnées",
-			"hideChip": "Masquer les tâches abandonnées",
-			"showChip": "Afficher les tâches abandonnées"
 		},
 		"emptyBacklog": "Aucune tâche planifiée",
 		"emptyBacklogHint": "Ajoutez une tâche pour commencer",
@@ -556,7 +552,33 @@
 			"qa_one": "{{count}} en QA",
 			"qa_other": "{{count}} en QA",
 			"paused_one": "{{count}} en pause",
-			"paused_other": "{{count}} en pause"
+			"paused_other": "{{count}} en pause",
+			"failedErrors_one": "{{count}} exécution en échec",
+			"failedErrors_other": "{{count}} exécutions en échec",
+			"failedQa_one": "{{count}} refusée par la QA",
+			"failedQa_other": "{{count}} refusées par la QA",
+			"failedContext_one": "{{count}} contexte trop long",
+			"failedContext_other": "{{count}} contextes trop longs",
+			"resolution_wont_do_one": "{{count}} ne sera pas faite",
+			"resolution_wont_do_other": "{{count}} ne seront pas faites",
+			"resolution_duplicate_one": "{{count}} doublon",
+			"resolution_duplicate_other": "{{count}} doublons",
+			"resolution_obsolete_one": "{{count}} obsolète",
+			"resolution_obsolete_other": "{{count}} obsolètes",
+			"resolution_replaced_one": "{{count}} remplacée",
+			"resolution_replaced_other": "{{count}} remplacées",
+			"resolution_pr_closed_one": "{{count}} PR fermée",
+			"resolution_pr_closed_other": "{{count}} PR fermées",
+			"resolution_other_one": "{{count}} autre",
+			"resolution_other_other": "{{count}} autres"
+		},
+		"emptyFailed": "Aucun échec",
+		"emptyFailedHint": "Une exécution qui échoue, ou que la QA n’a pas réussi à faire passer, attend ici d’être relancée ou abandonnée",
+		"emptyAbandoned": "Rien de mis de côté",
+		"emptyAbandonedHint": "Déposez une tâche ici pour l’abandonner : ne sera pas faite, doublon, obsolète, remplacée",
+		"outcome": {
+			"failedDropRefused": "Seule une exécution en échec arrive dans Échec. Relancez la tâche depuis sa carte ou mettez-la en file d’attente.",
+			"doneCannotBeAbandoned": "Une tâche terminée ne peut pas être abandonnée."
 		}
 	},
 	"queue": {
@@ -965,7 +987,7 @@
 		"dialogTitle": "Abandonner la tâche",
 		"dialogPrefix": "Voulez-vous abandonner",
 		"dialogSuffix": " ? Le développement s'arrête et la tâche est mise de côté.",
-		"dialogReversible": "Rien n'est supprimé : la tâche est grisée sur le tableau et vous pourrez la reprendre à tout moment.",
+		"dialogReversible": "Rien n’est supprimé : la tâche passe dans la colonne Abandonnée et vous pourrez la reprendre à tout moment.",
 		"reasonPlaceholder": "Raison (facultatif) — ex. : le product owner ne veut plus la développer",
 		"abandoning": "Abandon…",
 		"abandonedTitle": "Tâche abandonnée",
@@ -973,7 +995,29 @@
 		"failedTitle": "Échec de l'abandon",
 		"failedDescription": "Impossible d'abandonner la tâche. Veuillez réessayer.",
 		"resumeFailedTitle": "Échec de la reprise",
-		"resumeFailedDescription": "Impossible de reprendre la tâche. Veuillez réessayer."
+		"resumeFailedDescription": "Impossible de reprendre la tâche. Veuillez réessayer.",
+		"dialogTitleMany_one": "Abandonner {{count}} tâche",
+		"dialogTitleMany_other": "Abandonner {{count}} tâches",
+		"dialogMany_one": "Abandonner {{count}} tâche ? Le développement s’arrête et elle est mise de côté.",
+		"dialogMany_other": "Abandonner {{count}} tâches ? Le développement s’arrête et elles sont mises de côté.",
+		"resolutionLabel": "Pourquoi",
+		"reasonLabel": "Note",
+		"linkNone": "Pas sur le tableau",
+		"linkLabel": {
+			"duplicate": "Doublon de",
+			"replaced": "Remplacée par"
+		},
+		"resolutions": {
+			"wont_do": "Ne sera pas faite",
+			"duplicate": "Doublon",
+			"obsolete": "Obsolète",
+			"replaced": "Remplacée par une autre tâche",
+			"pr_closed": "PR fermée sans fusion",
+			"other": "Autre"
+		},
+		"abandonedTitleMany_one": "Tâche abandonnée",
+		"abandonedTitleMany_other": "{{count}} tâches abandonnées",
+		"abandonMenu": "Abandonner…"
 	},
 	"edit": {
 		"title": "Modifier la tâche",

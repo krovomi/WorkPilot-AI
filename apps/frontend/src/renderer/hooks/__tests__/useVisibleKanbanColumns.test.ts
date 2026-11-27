@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../../shared/types";
 import {
+	occupiedOutcomeColumns,
 	shouldShowBuildFailedColumn,
 	shouldShowPrOpenColumn,
 } from "../useVisibleKanbanColumns";
@@ -46,5 +47,25 @@ describe("shouldShowPrOpenColumn", () => {
 		expect(
 			shouldShowPrOpenColumn([task("a", "done"), task("b", "pr_created")]),
 		).toBe(true);
+	});
+});
+
+describe("occupiedOutcomeColumns", () => {
+	it("lists Failed and Abandoned only while a live task sits there", () => {
+		expect(occupiedOutcomeColumns([task("a", "backlog")])).toEqual(new Set());
+		expect(
+			occupiedOutcomeColumns([
+				task("b", "error"),
+				{ ...task("c", "queue"), metadata: { abandoned: true } } as Task,
+			]),
+		).toEqual(new Set(["failed", "abandoned"]));
+	});
+
+	it("ignores an archived task", () => {
+		const archived = {
+			...task("d", "error"),
+			metadata: { archivedAt: "2026-11-01" },
+		} as Task;
+		expect(occupiedOutcomeColumns([archived])).toEqual(new Set());
 	});
 });

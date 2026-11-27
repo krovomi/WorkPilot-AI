@@ -1340,6 +1340,18 @@ body {
   border-top-color: var(--col-accent);
 }
 
+/* « Échec » (a run that failed) and « Abandonnée » (set aside): outcome
+   columns, orange to stay apart from the red CI build, slate for closed. */
+.column-failed {
+  --col-accent: #F97316;
+  border-top-color: var(--col-accent);
+}
+
+.column-abandoned {
+  --col-accent: #94A3B8;
+  border-top-color: var(--col-accent);
+}
+
 /* Column surface, header band, icon, count and gauge: styles/kanban-columns.css. */
 
 /* The card's rail: a short pill in the column accent along the left edge.
