@@ -248,6 +248,14 @@ export interface UiPreferences {
 	colorTheme: ColorThemeId | null;
 }
 
+/** One screen's opens on one day, sent for the server's page activity. */
+export interface PageVisitCount {
+	/** YYYY-MM-DD, in UTC as the server counts days. */
+	day: string;
+	page: string;
+	count: number;
+}
+
 /** A decision of the policy audit trail (`security/policy_audit.py`). */
 export type PolicyDecision =
 	| "deny"

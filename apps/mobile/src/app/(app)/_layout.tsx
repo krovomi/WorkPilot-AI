@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { LockGate } from "../../auth/LockGate";
 import { PushBridge } from "../../push/PushBridge";
+import { PageActivityBridge } from "../../usage/PageActivityBridge";
 import { useTheme } from "../../ui/theme";
 
 export default function SignedInLayout() {
@@ -10,6 +11,7 @@ export default function SignedInLayout() {
 	return (
 		<LockGate>
 			<PushBridge />
+			<PageActivityBridge />
 			<Stack
 				screenOptions={{
 					headerStyle: { backgroundColor: theme.surface },
