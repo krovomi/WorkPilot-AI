@@ -101,7 +101,7 @@ l'activité par page.
 
 ## Les droits des personnes
 
-- **Accès** : chacun voit dans **Mon usage** exactement ce que les administrateurs voient de lui
+- **Accès** : chacun voit dans **Mon usage** (Réglages de l'app mobile) exactement ce que les administrateurs voient de lui
   dans l'onglet Usage (`GET /users/me/usage`), et quels rôles de l'organisation le lisent.
 - **Portabilité** : **Mon usage** exporte en un fichier JSON tout ce que le serveur garde de son
   usage, dans toutes ses organisations (`GET /users/me/usage/export`) : compte, consommation,
