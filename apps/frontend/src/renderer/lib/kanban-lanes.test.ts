@@ -133,3 +133,27 @@ describe("lane drop ids", () => {
 		expect(parseLaneDropId("lane::::x")).toBeNull();
 	});
 });
+
+describe("sprint lanes", () => {
+	const sprints = [
+		{ id: "sp-0000000a", state: "active" },
+		{ id: "sp-0000000b", state: "planned" },
+		{ id: "sp-0000000c", state: "closed" },
+	];
+
+	it("shows the open sprints even empty, in reading order, then the backlog", () => {
+		const done = card("old", { sprintId: "sp-0000000c" });
+		const lanes = buildLanes({ backlog: [plain, done] }, { grouping: "sprint", pinFlagged: false, knownSprints: sprints });
+		expect(lanes.map((lane) => lane.key)).toEqual(["sp-0000000a", "sp-0000000b", "sp-0000000c", NO_VALUE_LANE]);
+		expect(laneKeyOf(card("x", { sprintId: "../x" }), { grouping: "sprint", pinFlagged: false })).toBe(NO_VALUE_LANE);
+	});
+
+	it("moves a card into an open sprint or the backlog, never into a closed or unknown one", () => {
+		const open = ["sp-0000000a", "sp-0000000b"];
+		expect(isEditableGrouping("sprint")).toBe(true);
+		expect(laneMetadata("sprint", "sp-0000000b", open)).toEqual({ sprintId: "sp-0000000b" });
+		expect(laneMetadata("sprint", NO_VALUE_LANE, open)).toEqual({ sprintId: undefined });
+		expect(laneMetadata("sprint", "sp-0000000c", open)).toBeNull();
+		expect(laneMetadata("sprint", "not-a-sprint", ["not-a-sprint"])).toBeNull();
+	});
+});

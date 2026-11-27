@@ -152,6 +152,8 @@ interface KanbanFilterState {
 	togglePriority: (priority: TaskPriority) => void;
 	/** Show only one split group, or everything again for the same group. */
 	toggleGroup: (group: string) => void;
+	/** Show one sprint's cards (or "none": the backlog), or every card with undefined. */
+	setSprint: (sprint: string | undefined) => void;
 	setSortField: (field: TaskSortField) => void;
 	setSortDirection: (direction: TaskSortDirection) => void;
 	toggleSortDirection: () => void;
@@ -279,6 +281,14 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 			set((state) => {
 				const { group: current, ...rest } = state.filters;
 				return { filters: current === group ? rest : { ...rest, group } };
+			});
+			persist();
+		},
+
+		setSprint: (sprint) => {
+			set((state) => {
+				const { sprint: _current, ...rest } = state.filters;
+				return { filters: sprint ? { ...rest, sprint } : rest };
 			});
 			persist();
 		},

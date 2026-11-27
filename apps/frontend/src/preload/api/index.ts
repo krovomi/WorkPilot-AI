@@ -194,6 +194,7 @@ import {
 } from "./modules/formula-matrix-api";
 import { type BenchAPI, createBenchAPI } from "./modules/bench-api";
 import { type BoardAskAPI, createBoardAskAPI } from "./modules/board-ask-api";
+import { createSprintsAPI, type SprintsAPI } from "./modules/sprints-api";
 import { type BoardMcpAPI, createBoardMcpAPI } from "./modules/board-mcp-api";
 import {
 	createServerApprovalAPI,
@@ -355,6 +356,7 @@ export interface ElectronAPI
 		BenchAPI,
 		BoardMcpAPI,
 		BoardAskAPI,
+		SprintsAPI,
 		ServerApprovalAPI,
 		CicdTriggersAPI,
 		AccessibilityAPI,
@@ -518,6 +520,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createBenchAPI(),
 		...createBoardMcpAPI(),
 		...createBoardAskAPI(),
+		...createSprintsAPI(),
 		...createServerApprovalAPI(),
 		...createCicdTriggersAPI(),
 		...createAccessibilityAPI(),

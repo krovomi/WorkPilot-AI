@@ -47,6 +47,8 @@ export interface ServerCardSettings {
 	flaggedAt?: string | null;
 	/** The card's sub-project (Kanban lanes, `renderer/lib/kanban-lanes.ts`). */
 	area?: string | null;
+	/** The sprint the card is planned in (`shared/types/sprint.ts`). */
+	sprintId?: string | null;
 }
 
 /** Metadata fields the server stores as they are given (`shared_board/settings.py`). */
@@ -60,6 +62,7 @@ const OPTIONAL_TEXT_KEYS = [
 	"flaggedReason",
 	"flaggedAt",
 	"area",
+	"sprintId",
 ] as const;
 
 interface CardRef {

@@ -13,6 +13,7 @@ import {
 	EMPTY_FILTERS,
 	getTaskSource,
 	hasActiveFilters,
+	NO_SPRINT,
 	TASK_SOURCES,
 	taskMatchesFilters,
 } from "./kanban-filter";
@@ -81,5 +82,34 @@ describe("the generated source", () => {
 		const filters = { ...EMPTY_FILTERS, sources: ["generated" as const] };
 		expect(taskMatchesFilters(generated, filters)).toBe(true);
 		expect(taskMatchesFilters(whole, filters)).toBe(false);
+	});
+});
+
+describe("the sprint filter", () => {
+	const inSprint = { ...whole, id: "s1", metadata: { sprintId: "sp-0000000a" } } as unknown as Task;
+
+	beforeEach(() => {
+		useKanbanFilterStore.setState({ projectId: null, filters: { ...EMPTY_FILTERS } });
+	});
+
+	it("keeps one sprint's cards, or the backlog's", () => {
+		const sprint = { ...EMPTY_FILTERS, sprint: "sp-0000000a" };
+		expect(taskMatchesFilters(inSprint, sprint)).toBe(true);
+		expect(taskMatchesFilters(whole, sprint)).toBe(false);
+		const backlog = { ...EMPTY_FILTERS, sprint: NO_SPRINT };
+		expect(taskMatchesFilters(whole, backlog)).toBe(true);
+		expect(taskMatchesFilters(inSprint, backlog)).toBe(false);
+		expect(activeFilterCount(sprint)).toBe(1);
+		expect(hasActiveFilters(sprint)).toBe(true);
+	});
+
+	it("is set, replaced and cleared from the store", () => {
+		const { setSprint } = useKanbanFilterStore.getState();
+		setSprint("sp-0000000a");
+		expect(useKanbanFilterStore.getState().filters.sprint).toBe("sp-0000000a");
+		setSprint(NO_SPRINT);
+		expect(useKanbanFilterStore.getState().filters.sprint).toBe(NO_SPRINT);
+		setSprint(undefined);
+		expect("sprint" in useKanbanFilterStore.getState().filters).toBe(false);
 	});
 });

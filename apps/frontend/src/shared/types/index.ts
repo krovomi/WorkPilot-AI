@@ -17,6 +17,7 @@ export * from "./changelog";
 export * from "./cli";
 // Common types
 export * from "./common";
+export * from "./sprint";
 // Context Mesh types (Cross-Project Intelligence)
 export * from "./context-mesh";
 // Live context-window telemetry (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED)

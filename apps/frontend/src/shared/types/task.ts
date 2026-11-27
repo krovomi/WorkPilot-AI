@@ -774,6 +774,8 @@ export interface TaskMetadata {
 	flaggedAt?: string;
 	/** The sub-project the card belongs to (Kanban lanes, `renderer/lib/kanban-lanes.ts`). */
 	area?: string;
+	/** The sprint the card is planned in (`shared/types/sprint.ts`). */
+	sprintId?: string;
 
 	// Archive status
 	archivedAt?: string; // ISO date when task was archived
