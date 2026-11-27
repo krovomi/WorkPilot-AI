@@ -306,6 +306,18 @@ class TestTheSandbox:
 
         assert "network refused: pypi.example:443" in str(failure.value)
 
+    def test_a_refused_host_is_kept_for_the_approval_tier(self, executor, tmp_path):
+        from os_sandbox.evidence import read_evidence
+
+        spec = tmp_path / "spec-k1"
+        spec.mkdir()
+        executor.spec_dir = spec
+        executor._sandbox = StandInSandbox(["registry.example:443"])
+
+        run(executor, "run_command", {"command": "echo sandboxed"})
+
+        assert read_evidence(spec)[1] == ["registry.example:443"]
+
     def test_nothing_refused_adds_nothing(self, executor):
         executor._sandbox = StandInSandbox([])
 

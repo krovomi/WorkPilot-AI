@@ -5,6 +5,7 @@
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { microvmStatus } from "../microvm/sbx";
 import { parseSandboxStatus, taskSandboxes } from "../task-sandbox";
 import { safeSendToRenderer } from "./utils";
 
@@ -26,4 +27,6 @@ export function handleSandboxTaskEvent(
 
 export function registerTaskSandboxHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.TASK_SANDBOX_LIST, () => taskSandboxes.list());
+	// No argument: what sbx says about itself, read, never acted on.
+	ipcMain.handle(IPC_CHANNELS.TASK_SANDBOX_MICROVM_STATUS, () => microvmStatus());
 }
