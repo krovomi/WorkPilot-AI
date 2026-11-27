@@ -1168,3 +1168,37 @@ class PresenceDay(Base):
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
+
+
+class PageVisit(Base):
+    """How many times one person opened one page of one app on one day.
+
+    Sent in batches by the desktop and the phone, only while the person's
+    organization has page activity on (``services/page_activity.py``, off by
+    default), and only for a name of the closed lists there: no project, card,
+    path or text, only which screen and how often. Rows older than the
+    organization's retention are erased (``services/usage_retention.py``);
+    turning page activity off erases the organization's rows at once. A
+    deleted account keeps its counts with ``user_id`` emptied.
+    """
+
+    __tablename__ = "page_visits"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "org_id", "day", "client", "page", name="uq_page_visit"
+        ),
+        Index("ix_page_visit_org_day", "org_id", "day"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    day: Mapped[date] = mapped_column(Date)
+    #: ``desktop`` or ``mobile``.
+    client: Mapped[str] = mapped_column(String(10))
+    page: Mapped[str] = mapped_column(String(60))
+    count: Mapped[int] = mapped_column(Integer, default=0)

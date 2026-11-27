@@ -302,6 +302,7 @@ class TestRetention:
         assert await usage_retention.sweep(now) == {
             "usage_records": 1,
             "presence_days": 1,
+            "page_visits": 0,
         }
         async with get_session_factory()() as db:
             assert len(list(await db.scalars(select(PresenceDay)))) == 1
