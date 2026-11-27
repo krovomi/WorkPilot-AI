@@ -421,6 +421,31 @@
 				}
 			}
 		},
+		"codeMode": {
+			"title": "Code mode",
+			"description": "Agents chain their tools in a short script instead of one model turn per call",
+			"mode": {
+				"title": "When agents may write a script",
+				"description": "A script searches, reads, edits and runs commands in one step, several at a time, and returns only what the agent needs. Off keeps every agent as it works today.",
+				"off": {
+					"label": "Off",
+					"description": "No agent writes a script. The default."
+				},
+				"auto": {
+					"label": "Auto",
+					"description": "Only where it pays: coding, QA and the analyses of the code. Spec writing, reviews and ideation stay as they are."
+				},
+				"on": {
+					"label": "On",
+					"description": "Every agent that has tools may write a script."
+				}
+			},
+			"safety": {
+				"title": "Each call of a script is checked like a direct call",
+				"description": "The script itself reads no file, starts no process and reaches no network. Each of its calls goes through the agent's rights, the protected paths, the guardrails, the command allowlist and the OS sandbox, and the anomaly watch scores every one."
+			},
+			"providers": "Works with every provider whose tools WorkPilot runs: OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio and the compatible providers and gateways. A task can choose its own mode per phase."
+		},
 		"anomaly-detection": {
 			"title": "Anomaly Detection",
 			"description": "The trust score of each agent session, and what pauses or stops it",

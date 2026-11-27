@@ -586,6 +586,8 @@ Agent commands run under bubblewrap (Linux) or Seatbelt (macOS), see
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `WORKPILOT_SANDBOX` | `auto` | `auto`: sandboxed when the machine can, otherwise the build runs and its card says commands are not isolated. `required`: a build that cannot be sandboxed does not start. `off`: never sandboxed (the card says so). |
+| `WORKPILOT_CODE_MODE` | `off` | Code mode (`run_script`) for the providers of the WorkPilot loop. Set by Settings, Code mode. `off`: no agent is offered it. `auto`: coding, QA and the analyses of the code. `on`: every agent that declares tools. A task's `codeMode` or `phaseCodeMode` in `task_metadata.json` chooses within it, never while it is `off`. See [code-mode.md](architecture/code-mode.md). |
+| `WORKPILOT_CODE_MODE_TIMEOUT` | `600` | Seconds one script may run, at most 600. |
 | `WORKPILOT_SANDBOX_HOSTS` | — | Extra hosts a sandboxed process may reach, comma separated: `nexus.corp.example`, `*.corp.example` (subdomains only), `127.0.0.1:5000` (a local port). Remote hosts open 443 and 80 only. |
 
 On Ubuntu 24.04 and later, unprivileged user namespaces are restricted by AppArmor and bubblewrap
