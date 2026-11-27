@@ -139,6 +139,7 @@ import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerApprovalHandlers } from "./server-approval-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
 import { registerServerSsoHandlers } from "./server-sso-handlers";
+import { registerServerUsageHandlers } from "./server-usage-handlers";
 import { registerServerProjectHandlers } from "./server-project-handlers";
 import { registerServerWorkspaceHandlers } from "./server-workspace-handlers";
 import { registerBuildCompareHandlers } from "./build-compare-handlers";
@@ -368,6 +369,7 @@ export function setupIpcHandlers(
 	registerServerSsoHandlers(getMainWindow);
 	// Multi-tenant administration console (orgs, roles, members, quotas, audit)
 	registerServerAdminHandlers();
+	registerServerUsageHandlers();
 	registerServerProjectHandlers();
 	registerServerWorkspaceHandlers();
 	// Spec Approval of a server card: criticality, approvals, lent approvals

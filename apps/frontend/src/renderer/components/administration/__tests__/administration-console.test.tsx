@@ -255,8 +255,9 @@ describe("AdministrationView", () => {
 		grant([], { unrestricted: true });
 		render(<AdministrationView />);
 		const tabs = within(screen.getByRole("navigation")).getAllByRole("button");
-		expect(tabs).toHaveLength(7);
+		expect(tabs).toHaveLength(8);
 		expect(screen.queryByRole("button", { name: "Organizations" })).toBeNull();
+		expect(screen.getByRole("button", { name: "Usage" })).toBeInTheDocument();
 	});
 
 	it("shows a store error and lets it be dismissed", async () => {
