@@ -7,9 +7,13 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
 	checkDevPort,
+	chooseDevPort,
 	DEV_HOST,
-	DEV_PORT,
 	exitCodeAfterUvicorn,
+	invalidPortMessage,
+	movedPortMessage,
+	noFreePortMessage,
+	parsePort,
 } from "./dev-port.mjs";
 import { devReloadArgs } from "./dev-reload-args.mjs";
 
@@ -52,7 +56,7 @@ function ensureDeps(cb) {
 	});
 }
 
-function runUvicorn() {
+function runUvicorn(devPort) {
 	const uvicornArgs = [
 		"-m",
 		"uvicorn",
@@ -60,7 +64,7 @@ function runUvicorn() {
 		"--host",
 		DEV_HOST,
 		"--port",
-		String(DEV_PORT),
+		String(devPort),
 		// Watch only the backend source directory; the shared virtualenv lives at
 		// the repo root (../../.venv). Why the .venv exclude is conditional:
 		// dev-reload-args.mjs.
@@ -72,9 +76,24 @@ function runUvicorn() {
 	});
 	// A busy port fails uvicorn with exit code 3; why that is not always a
 	// failure of `pnpm run dev`: dev-port.mjs.
-	proc.on("exit", async (code) => process.exit(await exitCodeAfterUvicorn(code)));
+	proc.on("exit", async (code) =>
+		process.exit(await exitCodeAfterUvicorn(code, { port: devPort })),
+	);
 }
 
-const port = await checkDevPort();
-if (port.start) ensureVenv(() => ensureDeps(runUvicorn));
+// `pnpm run dev` (scripts/dev.mjs) passes the port it chose for the backend
+// and the app; run alone, this launcher makes the same choice, and the app's
+// main (local-backend-port.ts) finds the backend there.
+const raw = process.env.BACKEND_PORT;
+const chosen = parsePort(raw);
+if (raw !== undefined && raw !== "" && chosen === null) console.warn(invalidPortMessage(raw));
+const choice = await chooseDevPort({ chosen });
+if (choice === null) {
+	console.error(noFreePortMessage());
+	process.exit(1);
+}
+if (choice.movedFrom !== undefined) console.log(movedPortMessage(choice.movedFrom, choice.port));
+const devPort = choice.port;
+const port = await checkDevPort({ port: devPort });
+if (port.start) ensureVenv(() => ensureDeps(() => runUvicorn(devPort)));
 else process.exit(port.exitCode);

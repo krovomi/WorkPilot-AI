@@ -9,7 +9,8 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../../../shared/i18n";
-import type { AiAccountsSnapshot } from "../../../../../shared/types/ai-accounts";
+import type { AiAccountsSnapshot, AiAccountTestResult } from "../../../../../shared/types/ai-accounts";
+import type { IPCResult } from "../../../../../shared/types/common";
 import { useAiAccountsStore } from "../../../../stores/ai-accounts-store";
 import { ApiKeyAccounts } from "../ApiKeyAccounts";
 
@@ -33,7 +34,12 @@ const bridge = {
 	listAiAccounts: vi.fn(async () => ({ success: true, data: snapshot })),
 	saveAiAccount: vi.fn(),
 	deleteAiAccount: vi.fn(async () => ({ success: true })),
-	testAiAccount: vi.fn(async () => ({ success: true, data: { ok: true, modelCount: 12 } })),
+	testAiAccount: vi.fn(
+		async (_id: string): Promise<IPCResult<AiAccountTestResult>> => ({
+			success: true,
+			data: { ok: true, modelCount: 12 },
+		}),
+	),
 	setDefaultAiAccount: vi.fn(async (provider: string, id: string | null) => {
 		snapshot = { ...snapshot, defaults: id ? { ...snapshot.defaults, [provider]: id } : {} };
 		return { success: true };

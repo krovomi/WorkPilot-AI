@@ -42,6 +42,7 @@ import {
 } from "../ui/full-screen-dialog";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { AnomalyDetectionSettings } from "./AnomalyDetectionSettings";
+import { ApprovalTiersSettings } from "./ApprovalTiersSettings";
 import { CleanProviderSection } from "./CleanProviderSection";
 import { DebugSettings } from "./DebugSettings";
 import { DevToolsSettings } from "./DevToolsSettings";
@@ -99,6 +100,7 @@ export type AppSection =
 	| "sandbox"
 	| "guardrails"
 	| "anomaly-detection"
+	| "approvals"
 	// Multi-utilisateurs (serveur ; les invitations pour les admins seulement)
 	| "team-invitations"
 	| "server-session"
@@ -454,6 +456,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return (
 					<AnomalyDetectionSettings settings={settings} onSettingsChange={setSettings} />
 				);
+			case "approvals":
+				return <ApprovalTiersSettings settings={settings} onSettingsChange={setSettings} />;
 			case "scheduler":
 				return <SchedulerSettings />;
 			case "swarm-mode":

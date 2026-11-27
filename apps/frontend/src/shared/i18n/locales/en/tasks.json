@@ -619,6 +619,40 @@
 			},
 			"privacy": "The question and the tickets go to the AI provider chosen in Settings. Nothing is saved.",
 			"newConversation": "New conversation"
+		},
+		"lanes": {
+			"title": "Swimlanes",
+			"button": "Swimlanes",
+			"buttonActive": "Lanes: {{grouping}}",
+			"groupings": {
+				"none": "None",
+				"priority": "Priority",
+				"type": "Type",
+				"area": "Sub-project",
+				"source": "Origin",
+				"parent": "Split task"
+			},
+			"readOnly": "read only",
+			"pinFlagged": "Blocked cards in a lane of their own, first",
+			"flagged": "Blocked",
+			"noValue": {
+				"none": "Cards",
+				"priority": "No priority",
+				"type": "No type yet",
+				"area": "No sub-project",
+				"source": "No origin",
+				"parent": "Not split"
+			},
+			"expand": "Expand the lane",
+			"collapse": "Collapse the lane",
+			"addArea": "Add a sub-project",
+			"addAreaPlaceholder": "Sub-project name",
+			"addAreaHint": "An empty lane appears: drag cards into it.",
+			"addAreaRefused": "This sub-project is already there, or the name is not valid.",
+			"readOnlyDrop": "Cards cannot change lanes here: {{grouping}} is not set by moving a card.",
+			"undoLabel": "lane move",
+			"saveFailed_one": "{{count}} card could not be moved to this lane.",
+			"saveFailed_other": "{{count}} cards could not be moved to this lane."
 		}
 	},
 	"queue": {
@@ -3045,5 +3079,71 @@
 		"reasonPlaceholder": "What blocks it (optional), e.g. waiting for the API key from the client",
 		"failedTitle": "Flag not saved",
 		"failedDescription": "Could not save the flag. Please try again."
+	},
+	"runFacts": {
+		"title": "How it went",
+		"unknown": "unknown",
+		"automation": "Automation",
+		"agentTime": "Agents' working time",
+		"leadTime": "From launch to finish",
+		"spendTitle": "Tokens and cost of every agent session",
+		"tokens": "{{value}} tokens",
+		"tokensEstimated": "≈ {{value}} tokens",
+		"tokensUnknown": "Tokens unknown",
+		"costShort": "· {{cost}}",
+		"tokensLabel": "Tokens",
+		"tokensDetail": "{{total}} (in {{input}}, out {{output}}, cache {{cache}})",
+		"costLabel": "Cost",
+		"estimatedNote_one": "{{count}} session of {{total}} estimated: its provider reported no count.",
+		"estimatedNote_other": "{{count}} sessions of {{total}} estimated: their provider reported no count.",
+		"models": "Models",
+		"createdBy": "Created by",
+		"startedBy": "Launched by",
+		"peopleShort": "{{creator}} → {{launcher}}",
+		"peopleTitle": "Created by {{creator}}, launched by {{launcher}}",
+		"duration": {
+			"seconds": "{{seconds}} s",
+			"minutes": "{{minutes}} min",
+			"hours": "{{hours}} h {{minutes}} min",
+			"days": "{{days}} d {{hours}} h"
+		}
+	},
+	"approvalTier": {
+		"cardBadge": "{{tier}} · {{outcome}}",
+		"tooltip": "Approval tier: {{outcome}}. Why: {{reasons}}",
+		"outcome": {
+			"merged": "merged by itself",
+			"waiting": "waits for a person",
+			"observed": "observed",
+			"mergeFailed": "merge refused"
+		},
+		"reasons": {
+			"sensitive_paths": "sensitive paths",
+			"protected_files": "policy or agent files",
+			"requires_review": "files that need a review",
+			"ci_files": "CI files",
+			"ci_files_bump": "bump that touches CI",
+			"feature": "new feature",
+			"breaking": "breaking change",
+			"migration": "migration",
+			"contract": "public contract",
+			"layers": "several layers",
+			"size_files": "many files",
+			"size_lines": "many lines",
+			"trust": "low trust score",
+			"major_bump": "major bump",
+			"bump_with_code": "bump with code",
+			"bump_unknown": "bump of unknown level",
+			"dependency_bump": "dependency bump",
+			"docs_only": "documentation only",
+			"empty": "no change",
+			"code_change": "code change",
+			"review_missing": "no cross-review on this code",
+			"review_inconclusive": "cross-review without a verdict",
+			"policy_invalid": "invalid approvals section",
+			"rule": "project rule",
+			"unsandboxed": "ran without a sandbox",
+			"blocked_hosts": "tried a refused host"
+		}
 	}
 }

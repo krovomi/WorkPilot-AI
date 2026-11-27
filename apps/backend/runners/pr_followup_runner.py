@@ -4,7 +4,9 @@ PR follow-through runner — spawned by the Electron main process for one task.
 Reads the task's pull request, and while a check fails or a review thread
 waits, runs the QA fixer in the task's worktree and pushes the fix (never
 forced). Stops on green, merged, closed, a failure that is red on the base
-branch too, the round cap, or anything it cannot judge.
+branch too, the round cap, or anything it cannot judge. On green, the PR's
+approval tier (``pr_followup/approval.py``) is recorded, and the PR merged
+when the tier and the mode (``WORKPILOT_APPROVALS=enforce``) allow it.
 
 One JSON line per look at the PR on stdout:
 
@@ -103,6 +105,26 @@ def _pusher(project: Path, spec_name: str):
     return push
 
 
+def _merger(forge):
+    merge = getattr(forge, "merge", None)
+
+    async def run(head_sha: str) -> tuple[bool, str]:
+        if merge is None:
+            return False, "this forge cannot merge a pull request"
+        return await merge(head_sha)
+
+    return run
+
+
+def _approver(project: Path, worktree: Path, spec: Path, forge):
+    async def approve(snap):
+        from pr_followup.approval import approve_green
+
+        return await approve_green(project, worktree, spec, snap, _merger(forge))
+
+    return approve
+
+
 def _learn_from_review(project: Path, pr_url: str, result: RoundResult) -> None:
     """A review thread fixed and pushed becomes a rule candidate (IA1).
 
@@ -141,6 +163,7 @@ async def _run(args: argparse.Namespace) -> int:
             fixer=_qa_fixer,
             pusher=_pusher(project, args.spec_name),
             config=config,
+            approver=_approver(project, worktree, spec, forge),
         )
         _emit({"event": "round", "round": last.to_dict()})
         _learn_from_review(project, args.pr_url, last)

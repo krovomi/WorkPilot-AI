@@ -3,7 +3,8 @@ feature: Bac à sable de l'OS
 summary: >-
   Processus d'agent sous bubblewrap (Linux) ou Seatbelt (macOS) : écritures dans le worktree,
   identifiants masqués, réseau par un proxy filtrant (provider + registres) ; sans bac à sable la
-  carte le dit au lancement, `WORKPILOT_SANDBOX=required` refuse de démarrer ; Windows pas encore.
+  carte le dit au lancement, `WORKPILOT_SANDBOX=required` refuse de démarrer ; en option (coupée
+  par défaut), une microVM Docker Sandboxes (`sbx`) par tâche, seule isolation sous Windows.
 ---
 
 # Bac à sable de l'OS autour des commandes d'agent
@@ -103,11 +104,66 @@ autorisées, refus d'écriture sur la lecture seule, refus de lecture et d'écri
 `(deny network-outbound)` puis `localhost:*` seulement, où écoute le proxy (TCP). Les variantes
 `/private/…` des chemins sont ajoutées (`/tmp` et `/var` sont des liens).
 
-### Windows : pas encore
+### Windows : la microVM, sinon rien
 
-AppContainer et job object ne sont pas livrés. Le probe répond `unavailable` avec la raison
-« AppContainer is planned », et la carte dit que les commandes ne sont pas isolées. Ce n'est pas
-présenté comme un bac à sable qui marche.
+AppContainer et job object ne sont pas livrés. Sans la microVM ci-dessous, le probe répond
+`unavailable` avec la raison « AppContainer is planned », et la carte dit que les commandes ne sont
+pas isolées. Ce n'est pas présenté comme un bac à sable qui marche.
+
+## En option : une microVM Docker Sandboxes par tâche
+
+`os_sandbox/microvm.py`. Coupée par défaut : Paramètres > Sandbox, « Lancer chaque tâche dans une
+microVM Docker » (`agentSafety.sandbox.microvm`, porté par `WORKPILOT_AGENT_SAFETY` et relu, borné,
+par `security/agent_safety_settings.py`). Coupée, rien de ce qui précède ne change.
+
+**Ce qui y tourne (lot C1)** : les commandes de la boucle WorkPilot (`run_command`), par
+`sbx exec`. Les appels au modèle restent dans le backend, sur l'hôte : aucun identifiant n'entre
+dans la VM, et seules `LANG`, `LC_ALL`, `TZ`, `CI`, `NO_COLOR` et `FORCE_COLOR` y passent. Un CLI qui
+lance ses propres commandes garde le bac à sable de l'OS (`session_sandbox(…, microvm=False)`).
+Le modèle est prévenu dans la description de `run_command` que ses commandes tournent en
+`/bin/sh` dans une VM Linux, quel que soit l'hôte.
+
+**Une VM par worktree**, `workpilot-<hash du chemin>`, créée au lancement de la première session
+(`ensure_vm`, appelée par `session_sandbox`) et reprise par les suivantes (planification,
+code, QA) : ce qu'une session installe reste pour la suivante. Sa configuration est fixée à la
+création ; une VM créée pour d'autres montages ou une autre allowlist est supprimée et recréée
+(empreinte dans `<scratch>/sandbox-vm/<nom>/vm.json`). `remove_vm` la supprime avec le worktree.
+
+| Ce que la VM voit | Comment |
+|---|---|
+| Le worktree, la spec, le dépôt git où il commite, `WORKPILOT_WRITE_ROOTS` | montés en lecture-écriture, le worktree en premier (dossier par défaut de `sbx exec`) ; au même chemin sous macOS et Linux, sous `/mnt/<lecteur>/…` sous Windows |
+| `.git/hooks`, `.git/config`, la configuration de sécurité | remontés en lecture seule par-dessus |
+| `.workpilot/.env` et les autres chemins masqués à l'intérieur des montages | couverts par un fichier ou un dossier vide, en lecture seule |
+| Le dossier personnel, ses identifiants, les caches de paquets de l'hôte | jamais montés : la VM a les siens |
+| Le pointeur `.git` d'un worktree, sous Windows | un fichier `gitdir:` réécrit pour la VM, monté par-dessus ; celui de l'hôte n'est pas touché |
+| Git | `safe.directory '*'` et le `core.autocrlf` de l'hôte, dans la configuration globale de la VM, jamais dans celle du dépôt |
+
+**Réseau** : la VM est créée avec `--deny-network`, puis reçoit l'allowlist du bac à sable de l'OS
+en règles propres à elle (`sbx policy allow network --sandbox <nom>`, ports 443 et 80), plus les
+sources de son système et de son moteur Docker (`VM_HOSTS`). Une entrée locale (`127.0.0.1:11434`)
+devient `localhost:11434`, joint depuis la VM par `host.docker.internal`. Les refus sont lus dans
+`sbx policy log --json` et ajoutés à la sortie de la commande comme ceux du proxy.
+
+**Taille** : la mémoire et les processeurs des réglages, sinon `vm_resources` : la mémoire libre
+partagée entre cette tâche et les builds en cours (`test_placement.machine`), entre 2 et 16 Gio,
+et la moitié des cœurs, au moins 2. Sans `--memory`, sbx donnerait la moitié de la RAM à chaque VM.
+
+**Quand la VM n'est pas là** (sbx absent, pas connecté par `sbx login`, plateforme d'hyperviseur
+Windows coupée, création refusée) : le bac à sable de l'OS prend le relais et la ligne du fil
+dit « Docker Sandboxes microVM not used: … » avec les mots de sbx ; sans bac à sable de l'OS non
+plus, la raison réunit les deux, et `WORKPILOT_SANDBOX=required` refuse de démarrer. Le probe
+lance `sbx version` et `sbx ls --json` ; la vraie preuve est la création.
+
+**RGPD** : chaque appel à `sbx` porte `SBX_NO_TELEMETRY=1` ; en local, aucun code ni prompt ne part
+chez Docker. Un compte Docker reste exigé par `sbx login` : c'est pourquoi l'option est coupée par
+défaut.
+
+Limites connues : sous Windows, les dépendances installées dans la VM sont des binaires Linux (un
+`node_modules` installé par l'hôte n'y tourne pas toujours, et inversement) ; une commande arrêtée
+par le délai l'est côté hôte (`sbx exec`), son processus dans la VM n'est pas encore tué ; sbx
+exige Windows 11 avec la plateforme d'hyperviseur, macOS 14 sur Apple silicon ou Ubuntu 24.04 avec
+KVM. Les CLI d'agents dans la VM, les secrets par le proxy de sbx et la purge avec le worktree sont
+le lot C2.
 
 ## Le garde-fou : la carte le dit au lancement
 
@@ -156,6 +212,9 @@ isolées ou déléguées. La raison vient du backend en anglais stable et s'affi
   chaînage d'un proxy amont.
 - `tests/os_sandbox/test_session.py` : les trois modes, `required` qui refuse le lancement, le
   rapport émis une fois, le choix par type de client, le CLI lancé par son enveloppe.
+- `tests/os_sandbox/test_microvm.py` : la microVM par un faux `sbx` : chemins et noms, montages
+  (lecture seule, masques, pointeur git sous Windows), règles réseau, taille, création, reprise,
+  recréation, refus, commande sans les secrets de l'hôte, repli sur le bac à sable de l'OS.
 - `tests/os_sandbox/test_real_sandbox.py` : le vrai bac à sable, sur une machine qui en a un
   (écriture hors projet refusée, allowlist en lecture seule, `~/.ssh` illisible, réseau limité à
   l'allowlist, `run_command`). Sous `WORKPILOT_EXPECT_SANDBOX` (runners Linux et macOS de la CI),

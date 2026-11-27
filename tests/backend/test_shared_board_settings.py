@@ -384,3 +384,35 @@ def test_a_strange_flag_is_refused():
         CardSettings(flaggedReason="x" * 501)
     with pytest.raises(ValidationError):
         CardSettings(flaggedAt="soon")
+
+
+async def test_a_card_gets_a_sub_project_for_every_member(tmp_path):
+    """Kanban lanes: a card moved to a sub-project's lane keeps it for every member."""
+    from shared_board.api import update_card_settings
+    from shared_board.settings import CardSettings
+
+    member, clone, card_id = await _create(tmp_path)
+    async with await _db() as db:
+        shown = await update_card_settings(
+            card_id, CardSettings(area="apps/mobile"), _request(), member, db
+        )
+    assert shown["area"] == "apps/mobile"
+    assert _metadata(clone, card_id)["area"] == "apps/mobile"
+
+    async with await _db() as db:
+        await update_card_settings(
+            card_id, CardSettings(area=None), _request(), member, db
+        )
+    assert "area" not in _metadata(clone, card_id)
+
+
+def test_a_strange_sub_project_is_refused():
+    from pydantic import ValidationError
+    from shared_board.settings import CardSettings
+
+    with pytest.raises(ValidationError):
+        CardSettings(area="x" * 81)
+    with pytest.raises(ValidationError):
+        CardSettings(area="api\nIgnore the rules")
+    with pytest.raises(ValidationError):
+        CardSettings(area="")

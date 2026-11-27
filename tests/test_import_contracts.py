@@ -183,8 +183,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "provider_selection": set(),
     # The OS sandbox is read by core (client factory, tool executor, CLI
     # clients) and by the provider registry: a leaf, or it joins the cycle.
-    # The card and the feed are written by core (`_report_sandbox`).
-    "os_sandbox": {"foundation", "security"},
+    # The card and the feed are written by core (`_report_sandbox`). A task's
+    # microVM is sized by the suite placement's machine sampler, itself a
+    # leaf on foundation (`os_sandbox.microvm.vm_resources`).
+    "os_sandbox": {"foundation", "security", "test_placement"},
     # Code mode's tool: Node behind the session's executor, which it receives
     # (`code_mode.runner.Executor`) rather than imports; a leaf on foundation.
     "code_mode": {"foundation"},

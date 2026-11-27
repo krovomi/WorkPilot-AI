@@ -772,6 +772,8 @@ export interface TaskMetadata {
 	flagged?: boolean;
 	flaggedReason?: string;
 	flaggedAt?: string;
+	/** The sub-project the card belongs to (Kanban lanes, `renderer/lib/kanban-lanes.ts`). */
+	area?: string;
 
 	// Archive status
 	archivedAt?: string; // ISO date when task was archived
@@ -803,6 +805,8 @@ export interface Task {
 	goal?: TaskGoalSummary;
 	/** The second engine's verdict (`apps/backend/cross_review/`), from the plan. */
 	crossReview?: TaskCrossReviewSummary;
+	/** The approval tier of the green PR (`apps/backend/pr_followup/approval.py`). */
+	approval?: TaskApprovalSummary;
 	/** Where the backend decided the full suite runs (`test_placement.json`). */
 	suitePlacement?: SuitePlacement;
 	/** The full suite sent to the forge's CI from the pushed branch (`plan.ciSuite`). */
@@ -826,8 +830,49 @@ export interface Task {
 	 * the board's reports (cycle time, flow); bounded, never a person's name.
 	 */
 	statusHistory?: TaskStatusTransition[];
+	/**
+	 * Who created and who launched the task, and what its agents spent
+	 * (`main/task-run-facts.ts`). The board shows them once the task is done;
+	 * a missing part is unknown, never zero.
+	 */
+	runFacts?: TaskRunFacts;
 	createdAt: Date;
 	updatedAt: Date;
+}
+
+/** Who did something to a task: a person by their display name, or an automation. */
+export interface TaskPerson {
+	kind: "person" | "automation";
+	/** The person's name (local git identity, or a server account's display name). */
+	name?: string;
+	/** ISO 8601 date, for a launch. */
+	at?: string;
+}
+
+/**
+ * What every agent session of a task used, added up across providers
+ * (`core/usage_tracker.py` on this computer, `usage_records` on a server).
+ */
+export interface TaskUsageTotals {
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
+	/** US dollars: the provider's price, or the catalog's; 0 when nobody priced it. */
+	costUsd: number;
+	sessions: number;
+	/** Sessions whose provider reported no count, counted from the text instead. */
+	estimatedSessions: number;
+	/** The models used, most used first (a handful at most). */
+	models: string[];
+}
+
+export interface TaskRunFacts {
+	createdBy?: TaskPerson;
+	/** The person who launched its last run. */
+	startedBy?: TaskPerson;
+	/** Absent when no session reported anything: the cost is unknown. */
+	usage?: TaskUsageTotals;
 }
 
 /** Who moved a task: its agents, a person, or the app on its own (a watcher). */
@@ -855,6 +900,22 @@ export interface TaskStatusTransition {
  * `disagree` names at least one blocking problem and holds the pull request
  * back; `inconclusive` is everything unclear and never reads as `agree`.
  */
+/**
+ * The approval tier of the task's green pull request
+ * (`pr_followup/approval.py::plan_summary`): read from the plan, never trusted
+ * as typed (the badge shows only a known tier).
+ */
+export interface TaskApprovalSummary {
+	tier?: string;
+	action?: string;
+	mode?: string;
+	merged?: boolean;
+	mergeError?: string;
+	reasons?: { code: string; tier: string }[];
+	error?: string;
+	at?: string;
+}
+
 export interface TaskCrossReviewSummary {
 	verdict: "agree" | "disagree" | "inconclusive";
 	provider: string;
@@ -905,6 +966,8 @@ export interface ImplementationPlan {
 	goal?: TaskGoalSummary;
 	/** Written by the cross review (`cross_review/review.py::write_verdict`). */
 	crossReview?: TaskCrossReviewSummary;
+	/** Written by the PR follow-through (`pr_followup/approval.py`). */
+	approval?: TaskApprovalSummary;
 	/** Written by the QA reviewer (`qa/reviewer.py`); read, never trusted as typed. */
 	qa_signoff?: { status?: unknown; qa_session?: unknown };
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')

@@ -9,12 +9,23 @@
 // because this launcher was still installing dependencies. Both serve the app
 // as well as a new one would, so the launcher reuses them; anything else is
 // named with the command that shows who holds the port.
+//
+// When that other program sits on the default port and nobody chose a port
+// (BACKEND_PORT), the backend moves to the next free one (chooseDevPort):
+// under WSL with mirrored networking, a Windows program that only keeps dead
+// connections on 9000 (VS Code's port forwarding does) blocks it with nothing
+// listening, and stopping it is not always the user's wish. The root launcher
+// (scripts/dev.mjs) makes that choice once and hands the port to both the
+// backend and the app as BACKEND_PORT.
 
 import { request } from "node:http";
 import { createServer } from "node:net";
 
 export const DEV_HOST = "127.0.0.1";
 export const DEV_PORT = 9000;
+
+/** How many ports after the default one the backend may move to. */
+export const FALLBACK_SPAN = 20;
 
 /** How long a WorkPilot backend found starting up may take to answer /health. */
 export const STARTING_GRACE_MS = 10_000;
@@ -97,6 +108,20 @@ export function canListen(host, port) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * The port BACKEND_PORT names: a whole number from 1024 to 65535, or null when
+ * it is unset or not one (the caller says so).
+ *
+ * @param {string | undefined} raw
+ * @returns {number | null}
+ */
+export function parsePort(raw) {
+	const text = String(raw ?? "").trim();
+	if (!/^\d{4,5}$/.test(text)) return null;
+	const port = Number(text);
+	return port >= 1024 && port <= 65535 ? port : null;
+}
+
+/**
  * "workpilot" when a WorkPilot backend serves the port (one that is still
  * starting gets graceMs to answer), "free" when nothing listens, "other" when
  * something that is not a WorkPilot backend holds it.
@@ -117,6 +142,50 @@ export async function devPortState(
 		if (await listen(host, port)) return "free";
 	}
 	return "other";
+}
+
+/**
+ * The port this run's backend uses. A port the user chose (BACKEND_PORT) is
+ * kept as it is, even when busy: checkDevPort then names its holder. Otherwise
+ * the default port, or the first port after it that is free or already serves
+ * a WorkPilot backend (one an earlier run moved there is reused).
+ *
+ * @returns {Promise<{ port: number, movedFrom?: number } | null>} null when
+ *   every port of the span is held by another program
+ */
+export async function chooseDevPort({
+	host = DEV_HOST,
+	preferred = DEV_PORT,
+	chosen = null,
+	span = FALLBACK_SPAN,
+	state = devPortState,
+} = {}) {
+	if (chosen !== null) return { port: chosen };
+	if ((await state(host, preferred)) !== "other") return { port: preferred };
+	for (let port = preferred + 1; port <= preferred + span && port <= 65535; port++) {
+		if ((await state(host, port, { graceMs: 0 })) !== "other") {
+			return { port, movedFrom: preferred };
+		}
+	}
+	return null;
+}
+
+/** @returns {string} */
+export function movedPortMessage(from, to) {
+	return [
+		`[backend] Port ${from} is used by a program that is not a WorkPilot backend: this run uses port ${to}, for the backend and the app alike.`,
+		"[backend] To always use the same port, set BACKEND_PORT in .env-files/.env.",
+	].join("\n");
+}
+
+/** @returns {string} */
+export function noFreePortMessage(from = DEV_PORT, span = FALLBACK_SPAN) {
+	return `[backend] Ports ${from} to ${from + span} are all used by other programs. Set BACKEND_PORT in .env-files/.env to a free port, then run \`pnpm run dev\` again.`;
+}
+
+/** @returns {string} */
+export function invalidPortMessage(raw) {
+	return `[backend] BACKEND_PORT=${JSON.stringify(String(raw))} is not a port from 1024 to 65535: it is ignored.`;
 }
 
 /** @returns {string} */
@@ -155,6 +224,7 @@ export function portBusyMessage(
 		if (env.WSL_DISTRO_NAME) {
 			lines.push(
 				`[backend] Under WSL with mirrored networking a Windows program can hold it too: \`netstat -ano | findstr :${port}\` in PowerShell.`,
+				"[backend] Connections left in CLOSE_WAIT with no LISTENING line still hold it: VS Code's port forwarding leaves those; reloading its window frees them.",
 			);
 		}
 	}

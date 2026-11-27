@@ -23,7 +23,9 @@ function parseEnvFile(filePath) {
 }
 
 const rootEnvVars = parseEnvFile(ROOT_ENV);
-const backendPort = rootEnvVars.BACKEND_PORT || "9000";
+// The port `pnpm run dev` chose (scripts/dev.mjs) first: it can differ from
+// the file's when another program held that one.
+const backendPort = process.env.BACKEND_PORT || rootEnvVars.BACKEND_PORT || "9000";
 const backendUrlLine = `VITE_BACKEND_URL=http://localhost:${backendPort}`;
 
 fs.mkdirSync(path.dirname(FRONTEND_ENV), { recursive: true });

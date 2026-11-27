@@ -30,6 +30,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FlagBanner } from "./kanban/FlagBanner";
 import { AutomationBadge } from "./kanban/AutomationBadge";
+import { ApprovalTierBadge, shownApprovalTier } from "./approval-tiers/ApprovalTierBadge";
 import { ReviewLoadBadge, SplitPartBadge } from "./kanban/SplitPartBadge";
 import { SuitePlacementBadge, shownSuiteState } from "./suite-placement/SuitePlacementBadge";
 import { TaskLockBadge } from "./collaboration/TaskLockBadge";
@@ -77,6 +78,7 @@ import { SessionCompactionBadge } from "./SessionCompactionBadge";
 import { StreamingSessionButton } from "./streaming/StreamingSessionButton";
 import { CardTypeChip } from "./kanban/CardTypeChip";
 import { TaskCardPreview } from "./kanban/TaskCardPreview";
+import { sameRunFacts, TaskRunFactsRow } from "./kanban/TaskRunFacts";
 import {
 	contextMenuPoint,
 	isFromPortal,
@@ -333,6 +335,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 		task.verification?.status === "pass" ||
 		task.verification?.status === "fail" ||
 		!!task.crossReview ||
+		shownApprovalTier(task.approval) !== null ||
 		shownSuiteState(task) !== null;
 	const hasBlockers =
 		!!blockers && (blockers.pending.length > 0 || blockers.missing.length > 0);
@@ -641,6 +644,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					{t(`tasks:crossReview.cardBadge.${task.crossReview.verdict}`)}
 				</Badge>
 			) : null}
+
+			{/* The approval tier of the green PR, and what it led to */}
+			<ApprovalTierBadge task={task} />
 
 			{/* Where the full suite runs when not simply here, then the CI's verdict */}
 			<SuitePlacementBadge task={task} />
@@ -1171,7 +1177,10 @@ function taskCardPropsAreEqual(
 		prevTask.verification?.status === nextTask.verification?.status &&
 		prevTask.crossReview?.verdict === nextTask.crossReview?.verdict &&
 		prevTask.crossReview?.at === nextTask.crossReview?.at &&
+		prevTask.approval?.at === nextTask.approval?.at &&
 		prevTask.verification?.score === nextTask.verification?.score &&
+		// The finished card's run facts (time, spend, people).
+		sameRunFacts(prevTask, nextTask) &&
 		// Check if any subtask statuses changed (compare all subtasks)
 		prevTask.subtasks.every(
 			(s, i) => s.status === nextTask.subtasks[i]?.status,
@@ -1606,6 +1615,9 @@ export const TaskCard = memo(function TaskCard({
 							reviewReasonInfo={reviewReasonInfo}
 							t={t}
 						/>
+
+						{/* Once done: agents' time, tokens and cost, creator and launcher */}
+						<TaskRunFactsRow task={task} />
 
 						{/* Azure DevOps pipeline badge (CI/CD loop) */}
 						<PipelineBadge task={task} t={t} />
