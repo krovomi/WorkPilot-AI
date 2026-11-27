@@ -3141,7 +3141,9 @@
 			"review_missing": "pas de revue croisée sur ce code",
 			"review_inconclusive": "revue croisée sans verdict",
 			"policy_invalid": "section approvals invalide",
-			"rule": "règle du projet"
+			"rule": "règle du projet",
+			"unsandboxed": "lancée sans bac à sable",
+			"blocked_hosts": "a tenté un hôte refusé"
 		}
 	}
 }

@@ -355,3 +355,22 @@ async def test_the_runner_approver_judges_with_the_forge_merge(pr_repo, monkeypa
     forge = Forge()
     record = await runner._approver(project, project, spec, forge)(snap)
     assert record["merged"] is True and forge.heads == [snap.head_sha]
+
+
+async def test_the_task_sandbox_reaches_the_tier(pr_repo, monkeypatch):
+    project, spec = pr_repo
+    monkeypatch.setenv("WORKPILOT_APPROVALS", "enforce")
+    snap = _push_change(project, "README.md", "x\n", "docs: x")
+    (spec / "sandbox_evidence.json").write_text(
+        json.dumps(
+            {"sessions": [{"kind": "none"}], "blockedHosts": ["evil.example:443"]}
+        ),
+        encoding="utf-8",
+    )
+    merger = Merger()
+    record = await approve_green(project, project, spec, snap, merger)
+    decision = record["decision"]
+    assert decision["facts"]["sandbox"] == "none"
+    assert decision["facts"]["blockedHosts"] == ["evil.example:443"]
+    assert {"unsandboxed", "blocked_hosts"} <= {r["code"] for r in decision["reasons"]}
+    assert decision["tier"] == "N2" and merger.heads == []
