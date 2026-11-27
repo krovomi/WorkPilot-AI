@@ -94,6 +94,21 @@ describe("BoardAskPanel", () => {
 		expect(await screen.findByText(/could not be answered/)).toBeInTheDocument();
 	});
 
+	it("a citation points at its own answer's ticket, not an earlier answer's", async () => {
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="p1" />);
+		const box = screen.getByRole("textbox", { name: /Ask a question/ });
+		await userEvent.type(box, "first{Enter}");
+		await screen.findByText("Answered by AI");
+		await userEvent.type(box, "second{Enter}");
+		await waitFor(() => expect(screen.getAllByText("Answered by AI")).toHaveLength(2));
+		const citations = screen.getAllByRole("button", { name: "Ticket 1: Refonte de la page d'administration" });
+		await userEvent.click(citations[1] as HTMLElement);
+		const rows = screen.getAllByRole("button", { name: /Rebuilt it/ });
+		expect(rows[0]).not.toHaveAttribute("aria-current");
+		expect(rows[1]).toHaveAttribute("aria-current", "true");
+	});
+
 	it("asks an example question from the empty state", async () => {
 		useBoardAskStore.setState({ open: true });
 		render(<BoardAskButton projectId="p1" />);

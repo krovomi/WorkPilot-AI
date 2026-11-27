@@ -338,6 +338,7 @@ class ServerSettings:
     password_reset_ttl_minutes: int
     # How long usage data is kept (tokens per run, presence days), in days.
     usage_retention_days: int
+    page_activity_retention_days: int
 
     # SMTP for transactional email (invitation links). All empty => email
     # disabled and the API returns the invite link for manual delivery.
@@ -436,6 +437,9 @@ class ServerSettings:
                 "WORKPILOT_PASSWORD_RESET_TTL_MINUTES", 60
             ),
             usage_retention_days=_env_int("WORKPILOT_USAGE_RETENTION_DAYS", 365),
+            page_activity_retention_days=_env_int(
+                "WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS", 183
+            ),
             smtp_host=os.environ.get("WORKPILOT_SMTP_HOST", ""),
             smtp_port=_env_int("WORKPILOT_SMTP_PORT", 587),
             smtp_user=os.environ.get("WORKPILOT_SMTP_USER", ""),

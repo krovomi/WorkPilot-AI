@@ -20,8 +20,10 @@ suivi d'usage la met à jour dans la même PR.
 
 | Donnée | Table | Contenu | Durée |
 |---|---|---|---|
-| Consommation par run et par job | `usage_records` | personne, projet, phase, type d'agent, provider, modèle, tokens en entrée et en sortie, coût estimé, date | `WORKPILOT_USAGE_RETENTION_DAYS` (365 jours par défaut) |
+| Consommation par run et par job | `usage_records` | personne, projet, phase, type d'agent, provider, modèle, tokens en entrée et en sortie, coût estimé, date | celle de l'organisation, sinon `WORKPILOT_USAGE_RETENTION_DAYS` (365 jours par défaut) |
 | Présence | `presence_days` | une ligne par personne, organisation et jour : le jour et l'heure de la dernière requête | même durée |
+| Activité par page (**désactivée par défaut**) | `page_visits` | une ligne par personne, organisation, jour, app (`desktop` ou `mobile`) et page : combien de fois la page a été ouverte. La page est un nom d'une liste fermée (`kanban`, `roadmap`, `projects/cards/detail`…), jamais un projet, une carte ou un texte | celle de l'organisation, sinon `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS` (183 jours par défaut) |
+| Réglages du suivi | `audit_logs`, action `org.usage_settings.updated` | qui a activé ou désactivé l'activité par page, changé une durée, avant et après | historique de l'audit |
 | Connexions réussies | `audit_logs`, action `auth.login.<méthode>` | personne, méthode (`local`, `entra`, `oidc`, `invite`), IP, navigateur, date | historique de l'audit |
 | Connexions refusées | `audit_logs`, action `auth.login_failed` | méthode, raison (`bad_password`, `disabled`, `unknown_account`, `provider_refused`), IP, navigateur, date ; la personne seulement si le compte existe | historique de l'audit |
 | Jobs lancés | `audit_logs`, action `project.job.started` | personne, projet, feature, identifiant du job | historique de l'audit |
@@ -40,12 +42,25 @@ d'espace de travail montrent déjà le coût des sessions.
 fichier, le chemin ou le corps d'une requête, un mot de passe, ni l'adresse tapée pour un compte
 qui n'existe pas.
 
+## L'activité par page
+
+Elle est **désactivée** tant qu'un administrateur de l'organisation (permission `usage.write`) ne
+l'active pas dans **Administration → Usage**, après avoir informé les membres de ce qui est mesuré
+et pourquoi (et, en France, consulté le CSE quand il y en a un). Activée, l'app de bureau et
+l'app mobile de chaque membre comptent les pages qu'il ouvre et envoient les comptes toutes les
+5 minutes ; le serveur refuse tout nom hors des listes fermées
+(`server/services/page_activity.py`). La désactiver efface aussitôt les comptes de
+l'organisation. Chaque changement est inscrit au journal d'audit.
+
 ## Combien de temps
 
-Le serveur efface chaque heure les lignes de `usage_records` et `presence_days` plus vieilles que
-`WORKPILOT_USAGE_RETENTION_DAYS` (365 par défaut, ramené entre 30 et 3650 jours). La présence
-s'écrit au plus toutes les 5 minutes par personne : on sait qu'une personne a utilisé le serveur
-tel jour, et jusqu'à quelle heure, pas ce qu'elle y a fait.
+Chaque organisation règle sa durée dans **Administration → Usage** : une pour la consommation et
+la présence, une pour l'activité par page, de 30 à 3650 jours. Laissée vide, elle suit le
+serveur : `WORKPILOT_USAGE_RETENTION_DAYS` (365 jours par défaut) et
+`WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS` (183 jours, soit 6 mois), ramenés entre 30 et 3650. Le
+serveur efface chaque heure ce qui est plus vieux. La présence s'écrit au plus toutes les
+5 minutes par personne : on sait qu'une personne a utilisé le serveur tel jour, et jusqu'à quelle
+heure, pas ce qu'elle y a fait.
 
 ## Les droits des personnes
 
@@ -55,5 +70,6 @@ tel jour, et jusqu'à quelle heure, pas ce qu'elle y a fait.
   `users` supprimée laisse ses lignes de consommation et de présence sans personne (`SET NULL`) :
   les totaux de l'organisation restent justes sans la nommer. Une route d'effacement qui
   anonymise aussi l'audit arrive avec la vue Usage.
-- **Opposition** : une organisation qui ne veut pas de ce suivi abaisse la durée au minimum ; la
-  présence et la consommation servent aussi aux quotas et aux budgets.
+- **Opposition** : l'activité par page reste désactivée, ou se désactive (ses comptes sont alors
+  effacés) ; pour la consommation et la présence, qui servent aussi aux quotas et aux budgets,
+  l'organisation abaisse la durée jusqu'à 30 jours.
