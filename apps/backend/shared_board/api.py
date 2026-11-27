@@ -134,14 +134,18 @@ async def board_stream() -> dict[str, str | None]:
 @router.get("/snapshot")
 async def board_snapshot(
     scope: ProjectScope = Depends(resolve_project_scope),
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """The board's cards as files, for the app to draw them as it draws its own.
 
     ``cards`` are the project's specs; ``worktrees`` the same cards as their
     build workspace has them, which the app prefers while a build runs. Only
     :data:`SNAPSHOT_FILES`, each under its size limit; a symlink is skipped.
+    Each card also gets who created and launched it and what it spent,
+    computed from the database (``run_facts``), never read from the clone.
     """
     from board_mcp.server import CARD_ID, SPECS
+    from shared_board.run_facts import card_fact_files
 
     root = scope.path.resolve()
 
@@ -161,6 +165,9 @@ async def board_snapshot(
         return out
 
     cards = collect(scope.path / SPECS)
+    facts = await card_fact_files(db, scope.project_id, cards)
+    for card_id, files in cards.items():
+        files.update(facts.get(card_id, {}))
     worktrees: dict[str, dict[str, str]] = {}
     tasks_dir = scope.path / ".workpilot" / "worktrees" / "tasks"
     for card_id in cards:
