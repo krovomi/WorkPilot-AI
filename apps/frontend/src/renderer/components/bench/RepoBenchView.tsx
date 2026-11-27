@@ -20,7 +20,9 @@ import type {
 	BenchTableRow,
 } from "../../../shared/types";
 import type { ReviewLesson } from "../../../shared/types/learning-loop";
+import { codeModeArms } from "../../../shared/utils/bench-code-mode";
 import { armsFor, MAX_RULE_CHARS, normalizeRule, ruleVerdict } from "../../../shared/utils/bench-rule";
+import { normalizeCodeMode } from "../../../shared/utils/code-mode";
 import {
 	defaultEngineProvider,
 	type EngineTrio,
@@ -41,6 +43,7 @@ import {
 } from "../charter";
 import { EngineTrioPicker } from "../task-engine/EngineTrioPicker";
 import { BenchRecommendationList } from "./BenchRecommendation";
+import { CodeModeVerdictLine } from "./CodeModeVerdictLine";
 import { dollars, minutes, percent } from "./format";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -243,6 +246,11 @@ function RunCard({
 												{t("run.withRule")}
 											</Badge>
 										)}
+										{e.codeMode === "on" && (
+											<Badge variant="outline" className="ml-1 text-2xs">
+												{t("run.withCodeMode")}
+											</Badge>
+										)}
 									</th>
 								))}
 							</tr>
@@ -272,6 +280,7 @@ function RunCard({
 				</div>
 			)}
 			<RuleVerdictLine run={run} />
+			<CodeModeVerdictLine run={run} />
 		</div>
 	);
 }
@@ -321,6 +330,7 @@ export function RepoBenchView({ projectId }: Props) {
 	const [commits, setCommits] = useState<Record<string, string>>({});
 	const [engines, setEngines] = useState<EngineTrio[]>([]);
 	const [rule, setRule] = useState("");
+	const [measureCodeMode, setMeasureCodeMode] = useState(false);
 	const [lessons, setLessons] = useState<ReviewLesson[]>([]);
 	const [error, setError] = useState<string | null>(null);
 	const [starting, setStarting] = useState(false);
@@ -395,7 +405,12 @@ export function RepoBenchView({ projectId }: Props) {
 	};
 
 	const ruleText = normalizeRule(rule);
-	const arms = armsFor(engines, ruleText);
+	// Code mode is measured only while the person's switch lets a build use it
+	// (Settings, Code mode), and not in the same run as a rule: each arm must
+	// differ from its twin by one thing.
+	const codeModeAllowed = normalizeCodeMode(settings?.codeMode) !== "off";
+	const codeModeMeasured = measureCodeMode && codeModeAllowed && !ruleText;
+	const arms = codeModeMeasured ? codeModeArms(engines, true) : armsFor(engines, ruleText);
 	const builds = selected.length * arms.length;
 	const tooManyArms = arms.length > MAX_ENGINES;
 	const busy = !!status?.activeRunId;
@@ -636,9 +651,39 @@ export function RepoBenchView({ projectId }: Props) {
 					)}
 				</div>
 
+				<div className="space-y-2">
+					<h3 className="wp-kicker">{t("bench:new.codeMode.title")}</h3>
+					<div className="flex items-start gap-2">
+						<Checkbox
+							id="bench-code-mode"
+							checked={codeModeMeasured}
+							disabled={busy || !codeModeAllowed || !!ruleText}
+							onCheckedChange={(value) => setMeasureCodeMode(value === true)}
+						/>
+						<label htmlFor="bench-code-mode" className="text-sm">
+							{t("bench:new.codeMode.label")}
+						</label>
+					</div>
+					<p className="text-xs text-muted-foreground">
+						{t(
+							!codeModeAllowed
+								? "bench:new.codeMode.switchOff"
+								: ruleText
+									? "bench:new.codeMode.notWithRule"
+									: "bench:new.codeMode.help",
+						)}
+					</p>
+				</div>
+
 				<div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
 					<span className="text-xs text-muted-foreground">
-						{t(ruleText ? "bench:new.summaryRule" : "bench:new.summary", {
+						{t(
+							ruleText
+								? "bench:new.summaryRule"
+								: codeModeMeasured
+									? "bench:new.summaryCodeMode"
+									: "bench:new.summary",
+							{
 							cards: selected.length,
 							engines: engines.length,
 							builds,

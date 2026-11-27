@@ -19,6 +19,7 @@ import type {
 } from "@shared/types";
 import type { APIProfile } from "@shared/types/profile";
 import { frontendDebugLog } from "../../shared/utils/debug-logger";
+import { localBackendUrl } from "../local-backend-port";
 import {
 	type ApiProvider,
 	getProviderLabel,
@@ -2036,8 +2037,7 @@ export class UsageMonitor extends EventEmitter {
 			);
 
 			try {
-				// Call our FastAPI backend endpoint
-				const backendUrl = "http://localhost:9000/providers/usage/copilot";
+				const backendUrl = `${localBackendUrl()}/providers/usage/copilot`;
 				const response = await fetch(backendUrl, {
 					method: "GET",
 					headers: {
@@ -2276,8 +2276,7 @@ export class UsageMonitor extends EventEmitter {
 				);
 
 				try {
-					// Call our FastAPI backend endpoint
-					const backendUrl = `http://localhost:9000/providers/usage/${provider}`;
+					const backendUrl = `${localBackendUrl()}/providers/usage/${provider}`;
 					const response = await this.fetchBackendWithRetry(
 						backendUrl,
 						{
@@ -3813,7 +3812,7 @@ export class UsageMonitor extends EventEmitter {
 			);
 			try {
 				const resp = await fetch(
-					"http://localhost:9000/providers/usage/copilot",
+					`${localBackendUrl()}/providers/usage/copilot`,
 					{
 						signal: AbortSignal.timeout(5000),
 					},
@@ -4243,7 +4242,7 @@ export class UsageMonitor extends EventEmitter {
 					// OpenAI special case — usage API has a different format
 					try {
 						const resp = await fetch(
-							"http://localhost:9000/providers/usage/openai",
+							`${localBackendUrl()}/providers/usage/openai`,
 						);
 						if (!resp.ok) {
 							return null;

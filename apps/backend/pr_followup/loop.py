@@ -41,17 +41,23 @@ Fixer = Callable[[Path, Path, int], Awaitable[tuple[str, str]]]
 `qa.fixer.run_qa_fixer_session` returns it."""
 Pusher = Callable[[], tuple[bool, str]]
 """Push the worktree's branch, never forced. (ok, error)."""
+Approver = Callable[[PRSnapshot], Awaitable[dict[str, Any]]]
+"""A green PR -> the approval record (``approval.approve_green``): its tier,
+and whether it was merged because of it."""
 
 
 @dataclass
 class RoundResult:
     decision: Decision
     action: str = "none"
-    """none, fixed, no_change, reverted, push_failed, fixer_error, diverged."""
+    """none, fixed, no_change, reverted, push_failed, fixer_error, diverged,
+    steward (another steward fixes the PR)."""
     head_sha: str = ""
     pushed_sha: str = ""
     detail: str = ""
     violations: list[Violation] = field(default_factory=list)
+    approval: dict[str, Any] | None = None
+    """On green: the approval record (tier, action, mode, merged)."""
 
     @property
     def finished(self) -> bool:
@@ -75,6 +81,7 @@ class RoundResult:
             "base_failing": [c.name for c in self.decision.base_failing],
             "threads": [t.id for t in self.decision.threads],
             "violations": [v.describe() for v in self.violations],
+            "approval": self.approval,
             "finished": self.finished,
         }
 
@@ -87,6 +94,8 @@ async def run_round(
     fixer: Fixer,
     pusher: Pusher,
     config: FollowupConfig | None = None,
+    approver: Approver | None = None,
+    stand_down: Callable[[PRSnapshot], bool] | None = None,
 ) -> RoundResult:
     cfg = config or FollowupConfig()
     state = load_state(spec_dir)
@@ -105,9 +114,24 @@ async def run_round(
     else:
         state.no_checks_polls += 1
 
+    if decision.kind == DecisionKind.GREEN and approver is not None:
+        record = await approver(snap)
+        tier = (record.get("decision") or {}).get("tier", "")
+        if record.get("merged"):
+            _remember(spec_dir, state, "merged_by_tier", snap.head_sha, tier)
+        else:
+            _remember(spec_dir, state, "green", snap.head_sha, decision.reason)
+        return RoundResult(decision, head_sha=snap.head_sha, approval=record)
+
     if decision.kind != DecisionKind.FIX:
         _remember(spec_dir, state, decision.kind.value, snap.head_sha, decision.reason)
         return RoundResult(decision, head_sha=snap.head_sha)
+
+    if stand_down is not None and stand_down(snap):
+        # Another steward (Claude PR Steward) fixes this PR: one per PR. The
+        # loop keeps watching for green, and spends no round.
+        _remember(spec_dir, state, "steward", snap.head_sha, decision.reason)
+        return RoundResult(decision, action="steward", head_sha=snap.head_sha)
 
     # The fixer works on the commit the forge judged, nothing older or newer.
     synced, detail = _sync_worktree(worktree_dir, snap)

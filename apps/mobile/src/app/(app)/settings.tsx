@@ -72,6 +72,14 @@ export default function Settings() {
 					subtitle={t("needsYou.summary")}
 					onPress={() => router.push("/needs-you")}
 				/>
+				{can("lab.read") ? (
+					<ListRow
+						icon="film"
+						title={t("replays.title")}
+						subtitle={t("replays.summary")}
+						onPress={() => router.push("/replays")}
+					/>
+				) : null}
 				<ListRow icon="key" title={t("tokens.title")} subtitle={t("tokens.summary")} onPress={() => router.push("/tokens")} />
 			</View>
 			<LockSection />

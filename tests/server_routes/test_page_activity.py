@@ -313,3 +313,45 @@ def test_the_lists_are_the_apps_own_screens():
         set(re.findall(r'^\t"([a-z/-]+)",$', mobile, re.M))
         == page_activity.MOBILE_PAGES
     )
+
+
+async def test_old_counts_and_an_unknown_app_are_left_out(world):
+    import pytest
+    from server.db.engine import get_session_factory
+
+    with pytest.raises(page_activity.UnknownPage, match="Unknown app"):
+        page_activity.check("watch", [])
+    async with get_session_factory()() as db:
+        recorded = await page_activity.record(
+            db,
+            user_id=world.users["viewer_a"],
+            org_id=world.orgs["a"],
+            client="desktop",
+            visits=[
+                page_activity.Visit(date(2026, 11, 1), "kanban", 2),
+                page_activity.Visit(date(2026, 11, 22), "kanban", 0),
+            ],
+            today=date(2026, 11, 22),
+        )
+    assert recorded == 0
+    assert await counts(world) == []
+
+
+async def test_settings_of_an_organization_gone_meanwhile_are_not_found(
+    world, monkeypatch
+):
+    """The organization deleted between the permission check and the write."""
+    from server.db.models import Organization
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    real = AsyncSession.get
+
+    async def gone(self, entity, ident, **kwargs):
+        if entity is Organization:
+            return None
+        return await real(self, entity, ident, **kwargs)
+
+    monkeypatch.setattr(AsyncSession, "get", gone)
+    answer = await world.call("admin_a", "PUT", SETTINGS, json={"page_activity": True})
+    assert answer.status_code == 404
+    assert answer.json()["detail"] == "Organization not found"

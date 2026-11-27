@@ -45,6 +45,7 @@ import { TaskCard } from "../TaskCard";
 import { Toaster } from "../ui/toaster";
 import { TooltipProvider } from "../ui/tooltip";
 import { pickSubmenuItem } from "../../../__tests__/helpers/menus";
+import { useSprintStore } from "../../stores/sprint-store";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
 	return {
@@ -1371,6 +1372,26 @@ describe("TaskCard — right-click menu and quick edits", () => {
 				metadata: { priority: "high" },
 			}),
 		);
+	});
+
+	it("puts the card in a sprint, or back in the backlog, from its submenu", async () => {
+		saving();
+		useSprintStore.setState({
+			projectId: "p",
+			sprints: [{ id: "sp-0000000b", name: "Sprint 13", state: "planned", createdAt: "t" }],
+		});
+		const user = userEvent.setup();
+		const { unmount } = renderCard({ task: makeTask() });
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		await pickSubmenuItem(user, "Sprint", "Sprint 13");
+		await waitFor(() =>
+			expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", { metadata: { sprintId: "sp-0000000b" } }),
+		);
+		unmount();
+		renderCard({ task: makeTask({ metadata: { sprintId: "sp-0000000b" } as never }) });
+		fireEvent.contextMenu(cardOf(), { clientX: 10, clientY: 10 });
+		await pickSubmenuItem(user, "Sprint", "Backlog (no sprint)");
+		await waitFor(() => expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", { metadata: { sprintId: undefined } }));
 	});
 
 	it("saves nothing when the type or priority picked is the card's own", async () => {

@@ -42,6 +42,7 @@ import {
 } from "../ui/full-screen-dialog";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { AnomalyDetectionSettings } from "./AnomalyDetectionSettings";
+import { ApprovalTiersSettings } from "./ApprovalTiersSettings";
 import { CleanProviderSection } from "./CleanProviderSection";
 import { DebugSettings } from "./DebugSettings";
 import { DevToolsSettings } from "./DevToolsSettings";
@@ -52,6 +53,7 @@ import { LanguageSettings } from "./LanguageSettings";
 import { VoiceAssistantSettings } from "./VoiceAssistantSettings";
 import { ProjectSettingsContent } from "./ProjectSettingsContent";
 import { GuardrailsSettings } from "./GuardrailsSettings";
+import { CodeModeSettings } from "./CodeModeSettings";
 import { SandboxSettings } from "./SandboxSettings";
 import { SchedulerSettings } from "./SchedulerSettings";
 import { ForgeAccountsSettings } from "./ForgeAccountsSettings";
@@ -93,10 +95,12 @@ export type AppSection =
 	| "devtools"
 	| "paths"
 	| "agent"
+	| "code-mode"
 	// Sécurité & Performance
 	| "sandbox"
 	| "guardrails"
 	| "anomaly-detection"
+	| "approvals"
 	// Multi-utilisateurs (serveur ; les invitations pour les admins seulement)
 	| "team-invitations"
 	| "server-session"
@@ -444,12 +448,16 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return <DebugSettings />;
 			case "sandbox":
 				return <SandboxSettings settings={settings} onSettingsChange={setSettings} />;
+			case "code-mode":
+				return <CodeModeSettings settings={settings} onSettingsChange={setSettings} />;
 			case "guardrails":
 				return <GuardrailsSettings />;
 			case "anomaly-detection":
 				return (
 					<AnomalyDetectionSettings settings={settings} onSettingsChange={setSettings} />
 				);
+			case "approvals":
+				return <ApprovalTiersSettings settings={settings} onSettingsChange={setSettings} />;
 			case "scheduler":
 				return <SchedulerSettings />;
 			case "swarm-mode":

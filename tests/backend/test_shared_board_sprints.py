@@ -239,3 +239,44 @@ async def test_a_card_gets_its_sprint_even_while_it_runs(tmp_path, monkeypatch):
     assert running.value.status_code == 409
     with pytest.raises(ValidationError):
         CardSettings(sprintId="sprint-1")
+
+
+async def test_a_sprint_changes_only_from_the_state_that_allows_it(
+    tmp_path, monkeypatch
+):
+    from shared_board import sprints as board_sprints
+    from shared_board.sprints import (
+        CompleteBody,
+        SprintDraft,
+        StartBody,
+        complete_sprint,
+        list_sprints,
+        save_sprint,
+        start_sprint,
+    )
+
+    scope, clone = await _member(tmp_path)
+    sprint = (await save_sprint(SprintDraft(name="S"), _request(), scope))["sprints"][0]
+    report = CompleteBody(
+        report={"done": 0, "donePoints": 0, "carried": 0, "carriedPoints": 0}
+    )
+    with pytest.raises(HTTPException) as planned:
+        await complete_sprint(sprint["id"], report, _request(), scope)
+    assert planned.value.status_code == 409
+    begun = StartBody(committed={"cards": 0, "points": 0})
+    await start_sprint(sprint["id"], begun, _request(), scope)
+    with pytest.raises(HTTPException) as again:
+        await start_sprint(sprint["id"], begun, _request(), scope)
+    assert again.value.status_code == 409
+
+    # A sprint written twice in the file is read once.
+    path = clone / ".workpilot" / "sprints.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["sprints"].append(data["sprints"][0])
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert len((await list_sprints(scope))["sprints"]) == 1
+
+    monkeypatch.setattr(board_sprints, "MAX_SPRINTS", 1)
+    with pytest.raises(HTTPException) as full:
+        await save_sprint(SprintDraft(name="T"), _request(), scope)
+    assert full.value.status_code == 409

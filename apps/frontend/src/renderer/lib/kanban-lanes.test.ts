@@ -146,6 +146,9 @@ describe("sprint lanes", () => {
 		const lanes = buildLanes({ backlog: [plain, done] }, { grouping: "sprint", pinFlagged: false, knownSprints: sprints });
 		expect(lanes.map((lane) => lane.key)).toEqual(["sp-0000000a", "sp-0000000b", "sp-0000000c", NO_VALUE_LANE]);
 		expect(laneKeyOf(card("x", { sprintId: "../x" }), { grouping: "sprint", pinFlagged: false })).toBe(NO_VALUE_LANE);
+		// Before the sprints are read, the board shows the sprints its cards name.
+		const early = buildLanes({ backlog: [done] }, { grouping: "sprint", pinFlagged: false });
+		expect(early.map((lane) => lane.key)).toEqual(["sp-0000000c", NO_VALUE_LANE]);
 	});
 
 	it("moves a card into an open sprint or the backlog, never into a closed or unknown one", () => {

@@ -88,6 +88,7 @@ import { registerCodeInsightsHandlers } from "./code-insights-handlers";
 import { registerEnvHandlers } from "./env-handlers";
 import { registerForgeAccountsHandlers } from "./forge-accounts-handlers";
 import { registerAiAccountsHandlers } from "./ai-accounts-handlers";
+import { registerApprovalsHandlers } from "./approvals-handlers";
 import { registerForgeBindingHandlers } from "./forge-binding-handlers";
 import { registerEnvSnapshotHandlers } from "./env-snapshot-handlers";
 import { registerOfflineModeHandlers } from "./offline-mode-handlers";
@@ -396,6 +397,7 @@ export function setupIpcHandlers(
 	registerForgeBindingHandlers();
 	registerForgeAccountsHandlers();
 	registerAiAccountsHandlers();
+	registerApprovalsHandlers();
 
 	// Linear integration handlers
 	registerLinearHandlers(agentManager, getMainWindow);

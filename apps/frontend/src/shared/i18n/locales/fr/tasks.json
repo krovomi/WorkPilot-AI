@@ -3130,5 +3130,73 @@
 		"reasonPlaceholder": "Ce qui la bloque (facultatif), par ex. on attend la clé d'API du client",
 		"failedTitle": "Drapeau non enregistré",
 		"failedDescription": "Impossible d'enregistrer le drapeau. Réessayez."
+	},
+	"runFacts": {
+		"title": "Bilan",
+		"unknown": "inconnu",
+		"automation": "Automatisation",
+		"agentTime": "Temps de travail des agents",
+		"leadTime": "Du lancement à la fin",
+		"spendTitle": "Tokens et coût de toutes les sessions d'agents",
+		"tokens": "{{value}} tokens",
+		"tokensEstimated": "≈ {{value}} tokens",
+		"tokensUnknown": "Tokens inconnus",
+		"costShort": "· {{cost}}",
+		"tokensLabel": "Tokens",
+		"tokensDetail": "{{total}} (entrée {{input}}, sortie {{output}}, cache {{cache}})",
+		"costLabel": "Coût",
+		"estimatedNote_one": "{{count}} session sur {{total}} estimée : son fournisseur n'a donné aucun compte.",
+		"estimatedNote_other": "{{count}} sessions sur {{total}} estimées : leur fournisseur n'a donné aucun compte.",
+		"models": "Modèles",
+		"createdBy": "Créée par",
+		"startedBy": "Lancée par",
+		"peopleShort": "{{creator}} → {{launcher}}",
+		"peopleTitle": "Créée par {{creator}}, lancée par {{launcher}}",
+		"duration": {
+			"seconds": "{{seconds}} s",
+			"minutes": "{{minutes}} min",
+			"hours": "{{hours}} h {{minutes}} min",
+			"days": "{{days}} j {{hours}} h"
+		}
+	},
+	"approvalTier": {
+		"cardBadge": "{{tier}} · {{outcome}}",
+		"tooltip": "Niveau de validation : {{outcome}}. Pourquoi : {{reasons}}",
+		"outcome": {
+			"merged": "fusionnée seule",
+			"waiting": "attend une personne",
+			"observed": "observé",
+			"mergeFailed": "fusion refusée"
+		},
+		"reasons": {
+			"sensitive_paths": "chemins sensibles",
+			"protected_files": "fichiers de politique ou d'agent",
+			"requires_review": "fichiers à faire relire",
+			"ci_files": "fichiers de CI",
+			"ci_files_bump": "montée qui touche la CI",
+			"feature": "nouvelle feature",
+			"breaking": "changement cassant",
+			"migration": "migration",
+			"contract": "contrat public",
+			"layers": "plusieurs couches",
+			"size_files": "beaucoup de fichiers",
+			"size_lines": "beaucoup de lignes",
+			"trust": "score de confiance bas",
+			"major_bump": "montée majeure",
+			"bump_with_code": "montée avec du code",
+			"bump_unknown": "montée de niveau inconnu",
+			"dependency_bump": "montée de dépendance",
+			"docs_only": "documentation seule",
+			"empty": "aucun changement",
+			"code_change": "changement de code",
+			"review_missing": "pas de revue croisée sur ce code",
+			"review_inconclusive": "revue croisée sans verdict",
+			"policy_invalid": "section approvals invalide",
+			"rule": "règle du projet",
+			"claude_approvals_pending": "Claude Approvals encore en cours",
+			"claude_approvals_failed": "Claude Approvals n'est pas passé",
+			"unsandboxed": "lancée sans bac à sable",
+			"blocked_hosts": "a tenté un hôte refusé"
+		}
 	}
 }

@@ -33,7 +33,8 @@ import {
 
 const MAX_PROJECT_ID = 200;
 
-type Target = { server: string } | { local: NonNullable<ReturnType<typeof projectStore.getProject>> };
+type LocalProject = NonNullable<ReturnType<typeof projectStore.getProject>>;
+type Target = { server: string } | { local: LocalProject };
 
 function targetOf(projectId: unknown): Target | string {
 	if (typeof projectId !== "string" || !projectId || projectId.length > MAX_PROJECT_ID) return "Invalid project id";
@@ -43,13 +44,12 @@ function targetOf(projectId: unknown): Target | string {
 }
 
 async function local(
-	target: Target,
+	project: LocalProject,
 	change: (sprints: Sprint[]) => { sprints: Sprint[] } | { error: SprintError },
 ): Promise<IPCResult<Sprint[]>> {
-	if (!("local" in target)) return { success: false, error: "server_project" };
 	let result: { sprints: Sprint[] } | { error: SprintError };
 	try {
-		result = await updateLocalSprints(target.local, (sprints) => {
+		result = await updateLocalSprints(project, (sprints) => {
 			const outcome = change(sprints);
 			return "error" in outcome ? { error: outcome.error } : { sprints: outcome.sprints };
 		});
@@ -57,9 +57,7 @@ async function local(
 		// Unwritable file, or a folder that leaves the project.
 		return { success: false, error: "write_failed" };
 	}
-	return "error" in result && result.error
-		? { success: false, error: result.error }
-		: { success: true, data: (result as { sprints: Sprint[] }).sprints };
+	return "error" in result ? { success: false, error: result.error } : { success: true, data: result.sprints };
 }
 
 export async function handleListSprints(projectId: unknown): Promise<IPCResult<Sprint[]>> {
@@ -75,7 +73,7 @@ export async function handleSaveSprint(projectId: unknown, draft: unknown): Prom
 	const clean = cleanSprintDraft(draft);
 	if (!clean) return { success: false, error: "invalid" };
 	if ("server" in target) return saveServerSprint(target.server, clean);
-	return local(target, (sprints) => saveSprint(sprints, clean, new Date().toISOString()));
+	return local(target.local, (sprints) => saveSprint(sprints, clean, new Date().toISOString()));
 }
 
 export async function handleStartSprint(
@@ -88,7 +86,7 @@ export async function handleStartSprint(
 	const commitment = cleanCommitment(committed);
 	if (!isSprintId(sprintId) || !commitment) return { success: false, error: "invalid" };
 	if ("server" in target) return startServerSprint(target.server, sprintId, commitment);
-	return local(target, (sprints) => startSprint(sprints, sprintId, commitment, new Date().toISOString()));
+	return local(target.local, (sprints) => startSprint(sprints, sprintId, commitment, new Date().toISOString()));
 }
 
 export async function handleCompleteSprint(
@@ -101,7 +99,7 @@ export async function handleCompleteSprint(
 	const done = cleanReport(report);
 	if (!isSprintId(sprintId) || !done) return { success: false, error: "invalid" };
 	if ("server" in target) return completeServerSprint(target.server, sprintId, done);
-	return local(target, (sprints) => completeSprint(sprints, sprintId, done, new Date().toISOString()));
+	return local(target.local, (sprints) => completeSprint(sprints, sprintId, done, new Date().toISOString()));
 }
 
 export async function handleDeleteSprint(projectId: unknown, sprintId: unknown): Promise<IPCResult<Sprint[]>> {
@@ -109,7 +107,7 @@ export async function handleDeleteSprint(projectId: unknown, sprintId: unknown):
 	if (typeof target === "string") return { success: false, error: target };
 	if (!isSprintId(sprintId)) return { success: false, error: "invalid" };
 	if ("server" in target) return deleteServerSprint(target.server, sprintId);
-	return local(target, (sprints) => deleteSprint(sprints, sprintId));
+	return local(target.local, (sprints) => deleteSprint(sprints, sprintId));
 }
 
 export function registerSprintHandlers(): void {

@@ -215,7 +215,7 @@ Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ress
 </tr>
 </table>
 
-**App mobile (iOS et Android)** : avec un serveur d'équipe, le tableau partagé dans votre poche : ouvrir une carte, approuver un plan, régler sa criticité ou prêter son approbation, lancer ou arrêter les agents, lire le tableau de bord, les Insights, la feuille de route et les idées ; se connecter par mot de passe, Microsoft Entra ou l'authentification unique du serveur. Chaque projet s'ouvre sur des onglets (tableau, Insights, forge, tableau de bord, plus), et les sept thèmes de couleur du bureau, en clair ou en sombre, suivent votre compte d'un appareil à l'autre. « Pour vous » rassemble ce qui vous attend dans tous vos projets, et le serveur peut aussi vous prévenir sur ntfy, Telegram ou Teams.
+**App mobile (iOS et Android)** : avec un serveur d'équipe, le tableau partagé dans votre poche : ouvrir une carte, approuver un plan, régler sa criticité ou prêter son approbation, lancer ou arrêter les agents, lire le tableau de bord, les Insights, la feuille de route et les idées ; se connecter par mot de passe, Microsoft Entra ou l'authentification unique du serveur. Chaque projet s'ouvre sur des onglets (tableau, Insights, forge, tableau de bord, plus), et les sept thèmes de couleur du bureau, en clair ou en sombre, suivent votre compte d'un appareil à l'autre. « Pour vous » rassemble ce qui vous attend dans tous vos projets, et le serveur peut aussi vous prévenir sur ntfy, Telegram ou Teams. Le chat d'équipe, le classement (seuls ceux qui l'acceptent y sont nommés) et vos liens de replay vous suivent aussi.
 
 ![App mobile : le tableau en Default clair, une carte en Default sombre, le tableau de bord en Ocean clair et les réglages d'apparence en Forest sombre](.github/assets/screenshots/mobile.png)
 
@@ -346,7 +346,7 @@ Référence complète : [docs/CLI-USAGE.md](docs/CLI-USAGE.md) (en anglais).
 
 ## Sécurité
 
-1. **Bac à sable du système** : les commandes des agents tournent sous bubblewrap (Linux) ou Seatbelt (macOS) ; Windows n'est pas encore couvert, et la carte indique quand une tâche tourne sans bac à sable.
+1. **Bac à sable du système** : les commandes des agents tournent sous bubblewrap (Linux) ou Seatbelt (macOS), et la carte indique quand une tâche tourne sans bac à sable. En option, coupée par défaut (Paramètres > Sandbox) : une **microVM Docker Sandboxes par tâche**, avec son noyau et son moteur Docker, seul le worktree monté et le réseau fermé hors de l'allowlist ; c'est aussi ce qui isole les commandes sous Windows 11.
 2. **Restrictions du système de fichiers** : les opérations restent dans le dossier du projet.
 3. **Liste blanche dynamique de commandes** : seules les commandes de la stack détectée sont autorisées.
 4. **Instantanés et score de confiance** : avant chaque session d'agent, le worktree de la tâche est enregistré comme un commit git caché ; chaque session démarre avec un score de confiance de 100 que les anomalies font baisser, et sous un seuil la tâche se met en pause, ou la session s'arrête et son instantané est restauré. Le mode restreint et les limites par session sont dans Paramètres > Sandbox ; un instantané se restaure depuis la carte.

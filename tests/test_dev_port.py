@@ -9,6 +9,7 @@ any other program is named with the command that shows it.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import socket
 import subprocess
@@ -237,3 +238,186 @@ def test_dev_server_reuses_a_running_backend_without_installing_anything() -> No
     assert "already answers on http://127.0.0.1:9000" in out.stdout
     assert "Creating Python venv" not in out.stdout
     assert "pip" not in out.stdout
+
+
+# --- A port of its own when another program holds the default one -----------
+
+DEV_RUN = REPO_ROOT / "scripts" / "dev.mjs"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("9001", 9001),
+        (" 1024 ", 1024),
+        ("65535", 65535),
+        ("", None),
+        ("80", None),
+        ("65536", None),
+        ("9000a", None),
+        ("9e3", None),
+    ],
+)
+def test_backend_port_accepts_only_a_user_port(raw: str, expected: int | None) -> None:
+    assert (
+        _node("console.log(JSON.stringify(dp.parsePort(process.argv[1])));", raw)
+        == expected
+    )
+
+
+def _choose(states: dict[int, str], chosen: int | None = None) -> dict:
+    return _node(
+        "const states = JSON.parse(process.argv[1]);"
+        "const asked = [];"
+        "const state = async (_h, p) => { asked.push(p); return states[p] ?? 'free'; };"
+        "const chosen = JSON.parse(process.argv[2]);"
+        "const r = await dp.chooseDevPort({ chosen, state });"
+        "console.log(JSON.stringify({ r, asked }));",
+        json.dumps({str(k): v for k, v in states.items()}),
+        json.dumps(chosen),
+    )
+
+
+def test_the_default_port_is_kept_when_free_or_a_workpilot_backend() -> None:
+    assert _choose({}) == {"r": {"port": 9000}, "asked": [9000]}
+    assert _choose({9000: "workpilot"})["r"] == {"port": 9000}
+
+
+def test_another_program_on_the_default_port_moves_the_backend_on() -> None:
+    result = _choose({9000: "other", 9001: "other"})
+    assert result == {
+        "r": {"port": 9002, "movedFrom": 9000},
+        "asked": [9000, 9001, 9002],
+    }
+    assert _choose({9000: "other", 9001: "workpilot"})["r"] == {
+        "port": 9001,
+        "movedFrom": 9000,
+    }
+
+
+def test_a_port_the_user_chose_is_kept_without_looking() -> None:
+    assert _choose({9100: "other"}, chosen=9100) == {"r": {"port": 9100}, "asked": []}
+
+
+def test_no_free_port_in_the_span_is_reported() -> None:
+    states = dict.fromkeys(range(9000, 9021), "other")
+    assert _choose(states)["r"] is None
+
+
+def test_the_messages_name_the_ports() -> None:
+    moved = _node("console.log(JSON.stringify(dp.movedPortMessage(9000, 9001)));")
+    assert "Port 9000" in moved
+    assert "port 9001" in moved
+    assert "BACKEND_PORT" in moved
+    assert "9000 to 9020" in _node(
+        "console.log(JSON.stringify(dp.noFreePortMessage()));"
+    )
+    assert '"abc"' in _node(
+        "console.log(JSON.stringify(dp.invalidPortMessage('abc')));"
+    )
+
+
+def test_dev_server_moves_off_a_default_port_another_program_holds() -> None:
+    """The launcher alone, on its real ports: 9000 taken, the next one serves."""
+    try:
+        foreign = _not_workpilot_on(9000)
+        foreign.__enter__()
+    except OSError:
+        pytest.skip("port 9000 is in use on this machine")
+    try:
+        try:
+            backend = _workpilot(9001)
+            backend.__enter__()
+        except OSError:
+            pytest.skip("port 9001 is in use on this machine")
+        try:
+            node = shutil.which("node")
+            assert node is not None
+            env = {k: v for k, v in os.environ.items() if k != "BACKEND_PORT"}
+            out = subprocess.run(
+                [node, str(DEV_SERVER)],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=90,
+                cwd=DEV_SERVER.parent,
+                env=env,
+            )
+        finally:
+            backend.__exit__(None, None, None)
+    finally:
+        foreign.__exit__(None, None, None)
+    assert out.returncode == 0, out.stderr
+    assert "this run uses port 9001" in out.stdout
+    assert "already answers on http://127.0.0.1:9001" in out.stdout
+
+
+def _not_workpilot_on(port: int):
+    return _http(404, b'{"detail": "Not Found"}', port)
+
+
+def _dev_run(body: str, *args: str) -> dict:
+    script = f"import * as dev from {json.dumps(DEV_RUN.as_uri())};\n{body}"
+    node = shutil.which("node")
+    assert node is not None
+    out = subprocess.run(
+        [node, "--input-type=module", "-e", script, *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+        timeout=60,
+        cwd=REPO_ROOT,
+    )
+    return json.loads(out.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("BACKEND_PORT=9100\n", "9100"),
+        ("# BACKEND_PORT=1\n BACKEND_PORT = 9 \nBACKEND_PORT='9200'\r\n", "9200"),
+        ('OTHER=1\nBACKEND_PORT="9300"', "9300"),
+        ("#BACKEND_PORT=9000\n", None),
+    ],
+)
+def test_the_dev_run_reads_backend_port_from_the_env_file(
+    text: str, expected: str | None
+) -> None:
+    assert (
+        _dev_run(
+            "console.log(JSON.stringify(dev.envFilePort(process.argv[1]) ?? null));",
+            text,
+        )
+        == expected
+    )
+
+
+def test_the_dev_run_says_why_it_moved_and_hands_the_port_on() -> None:
+    result = _dev_run(
+        "const choose = async () => ({ port: 9001, movedFrom: 9000 });"
+        "console.log(JSON.stringify(await dev.devRunPort({ raw: undefined, choose })));"
+    )
+    assert result["port"] == 9001
+    assert "this run uses port 9001" in result["lines"][0]
+
+
+def test_the_dev_run_ignores_a_bad_backend_port_and_says_so() -> None:
+    result = _dev_run(
+        "let seen;"
+        "const choose = async ({ chosen }) => { seen = chosen; return { port: 9000 }; };"
+        "const r = await dev.devRunPort({ raw: 'abc', choose });"
+        "console.log(JSON.stringify({ ...r, seen }));"
+    )
+    assert result["seen"] is None
+    assert result["port"] == 9000
+    assert "is not a port" in result["lines"][0]
+
+
+def test_the_dev_run_stops_when_no_port_is_left() -> None:
+    result = _dev_run(
+        "const choose = async () => null;"
+        "console.log(JSON.stringify(await dev.devRunPort({ raw: '9100', choose })));"
+    )
+    assert result["port"] is None
+    assert "are all used" in result["lines"][-1]

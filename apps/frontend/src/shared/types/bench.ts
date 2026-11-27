@@ -12,6 +12,8 @@ export interface BenchEngine {
 	effort: string;
 	/** A candidate rule the copy is built with: the arm measures the rule. */
 	rule?: string;
+	/** `on`: the arm that measures code mode (`run_script`), against its twin without. */
+	codeMode?: "on";
 }
 
 export interface BenchSuite {

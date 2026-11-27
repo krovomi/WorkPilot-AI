@@ -58,7 +58,7 @@ import {
 	world,
 } from "./usage-monitor-world";
 
-const BACKEND = "http://localhost:9000/providers/usage";
+const BACKEND = "http://127.0.0.1:9000/providers/usage";
 const CODEIUM = "https://server.codeium.com";
 const CREDITS = `${CODEIUM}/api/v1/GetTeamCreditBalance`;
 const GET_USER = `${CODEIUM}/exa.api_server_pb.ApiServerService/GetUser`;

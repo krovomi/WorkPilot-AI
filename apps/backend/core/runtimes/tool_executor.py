@@ -140,6 +140,16 @@ def executor_may_use(agent_type: str | None, tool_name: str) -> bool:
         return True
     from agents.tools_pkg.permissions import declared_servers, declared_tools
 
+    if tool_name == "run_script":
+        # A script only chains the type's own tools, each gated again when it
+        # runs; a type that declares none has nothing to chain. Whether the
+        # session is offered it at all is the code mode switch
+        # (`code_mode.offered`), which needs the task and is asked by
+        # `get_tool_definitions` and `_run_script`.
+        from agents.tools_pkg.permissions import declared_tools
+
+        declared = declared_tools(agent_type)
+        return declared is None or bool(declared)
     server = EXECUTOR_SERVER_GRANTS.get(tool_name)
     if server is not None:
         servers = declared_servers(agent_type)
@@ -398,6 +408,10 @@ class ToolExecutor:
             )
         elif tool_name == "create_directory":
             return await self._create_directory(_pick_arg(arguments, *dir_aliases))
+        elif tool_name == "run_script":
+            return await self._run_script(
+                _pick_arg(arguments, "code", "script", "source")
+            )
         elif _is_uiux_tool(tool_name):
             # ui-ux-pro-max: the same tools the Claude SDK reaches over MCP,
             # offered only on a task whose preflight said it is about the UI.
@@ -822,6 +836,9 @@ class ToolExecutor:
                 stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
             )
             if refused := sandbox.refused_hosts(started):
+                from os_sandbox.evidence import record_refused
+
+                record_refused(self.spec_dir, refused)  # for the PR's approval tier
                 # Said, not left to a timeout to guess from.
                 note = (
                     "[WorkPilot sandbox] network refused: "
@@ -856,6 +873,29 @@ class ToolExecutor:
             return self._fit_output(stdout)
         except Exception as e:
             raise RuntimeError(f"Error running command {command}: {e}")
+
+    async def _run_script(self, code: str | None) -> str:
+        """Code mode: the model's script, each of its calls run by `execute`.
+
+        Offered only when the switch, the task and the phase say so
+        (`code_mode.offered`); refused here too, since a model may name a tool
+        it was not offered. The record of the script's calls stays whole after
+        the fitted body: the safety watch reads it (`code_mode.protocol`).
+        """
+        from code_mode import offered
+        from code_mode.runner import ScriptError, run_script
+
+        if not offered(self.agent_type, self.spec_dir):
+            return (
+                "Tool 'run_script' is not available: code mode is off for this "
+                "session. Work with the tools you were given."
+            )
+        try:
+            result = await run_script(self, code or "")
+        except ScriptError as error:
+            raise RuntimeError(str(error)) from error
+        body = self._fit_output(result.body)
+        return "\n\n".join(part for part in (body, result.calls) if part)
 
     def _fit_output(self, output: Any) -> Any:
         """A command's or an in-process tool's output as the model reads it.
@@ -919,7 +959,9 @@ class ToolExecutor:
         if self._sandbox is None:
             from os_sandbox import session_sandbox
 
-            self._sandbox = session_sandbox(self.project_dir, self.spec_dir)
+            self._sandbox = session_sandbox(
+                self.project_dir, self.spec_dir, microvm=True
+            )
         return self._sandbox
 
     async def _stop_command(self, process) -> None:
@@ -1000,6 +1042,23 @@ def _brain_tool_definitions() -> list[dict[str, Any]]:
     from brain.runtime import tool_definitions
 
     return tool_definitions()
+
+
+def _run_command_description() -> str:
+    text = (
+        "Run a non-interactive shell command with a time limit. Quote paths "
+        "containing spaces. Use read_file to read files."
+    )
+    from security.agent_safety_settings import load_settings
+
+    if load_settings().sandbox.microvm.enabled:
+        # Said whatever the host is: on Windows, `cmd` syntax would fail there.
+        text += (
+            " Commands run with /bin/sh in the task's Linux microVM, whatever "
+            "the host system; the host's own services are reached as "
+            "host.docker.internal."
+        )
+    return text
 
 
 def get_tool_definitions(
@@ -1125,7 +1184,7 @@ def get_tool_definitions(
         },
         {
             "name": "run_command",
-            "description": "Run a non-interactive shell command with a time limit. Quote paths containing spaces. Use read_file to read files.",
+            "description": _run_command_description(),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1212,6 +1271,13 @@ def get_tool_definitions(
     # no `write_file` and no `run_command`, and `execute` refuses them too.
     # Sorted and serialized one way (`harness.domain.tools`): the definitions
     # sit in the cached prefix of every provider that caches one.
-    return canonical_tools(
+    offered_tools = [
         tool for tool in base_tools if executor_may_use(agent_type, tool["name"])
-    )
+    ]
+    # Code mode (`code_mode`): off unless the switch, the task or the phase
+    # turns it on; written for the tools this type was just given.
+    from code_mode import offered, tool_definition
+
+    if offered(agent_type, spec_dir) and executor_may_use(agent_type, "run_script"):
+        offered_tools.append(tool_definition(tool["name"] for tool in offered_tools))
+    return canonical_tools(offered_tools)

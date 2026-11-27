@@ -2,6 +2,10 @@ import { debugLog } from "../../shared/utils/debug-logger";
 import { parseJevSettings } from "../../shared/utils/jev-settings";
 import { parseSwarmSettings } from "../../shared/utils/swarm-settings";
 import { normalizeAgentSafety } from "../../shared/utils/agent-safety";
+import {
+	normalizeApprovalTierMode,
+	normalizeClaudeShipMode,
+} from "../../shared/utils/approval-tiers";
 import { execFileSync, spawn } from "node:child_process";
 import {
 	existsSync,
@@ -74,6 +78,7 @@ import {
 	writeSourceEnvFile,
 } from "../source-env";
 import { testGenerationService } from "../test-generation-service";
+import { getBackendUrl } from "./_backend-fetch";
 import { findEnvLineBreak, parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
 import { buildCmdConsoleArgs } from "./task/launch-args";
@@ -599,7 +604,7 @@ export function registerSettingsHandlers(
 				// Optionally notify the FastAPI backend (for LLM router feature).
 				// This is best-effort — the backend may not be running for non-router users.
 				makeBackendRequest<{ selected: string }>(
-					`http://127.0.0.1:9000/providers/select?provider=${encodeURIComponent(provider)}`,
+					`${getBackendUrl()}/providers/select?provider=${encodeURIComponent(provider)}`,
 					{ method: "POST", headers: { "Content-Type": "application/json" } },
 				);
 
@@ -622,7 +627,7 @@ export function registerSettingsHandlers(
 		async (): Promise<IPCResult<string | null>> => {
 			try {
 				const result = await makeBackendRequest<{ selected: string | null }>(
-					"http://127.0.0.1:9000/providers/selected",
+					`${getBackendUrl()}/providers/selected`,
 				);
 
 				if (result.success && result.data) {
@@ -768,6 +773,10 @@ export function registerSettingsHandlers(
 				// Sent to every agent process: bounded here, and again by the backend.
 				if (settings.agentSafety !== undefined)
 					newSettings.agentSafety = normalizeAgentSafety(settings.agentSafety);
+				if (settings.approvalTiers !== undefined)
+					newSettings.approvalTiers = normalizeApprovalTierMode(settings.approvalTiers);
+				if (settings.claudeShip !== undefined)
+					newSettings.claudeShip = normalizeClaudeShipMode(settings.claudeShip);
 
 				// Sync defaultModel when agent profile changes (#414)
 				if (settings.selectedAgentProfile) {

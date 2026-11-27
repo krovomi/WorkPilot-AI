@@ -217,6 +217,19 @@ describe("requests from the renderer", () => {
 		expect(sanitizeEngines([{ ...ENGINES[0], rule: "x".repeat(501) }])).toMatch(/500/);
 		expect(sanitizeEngines([{ ...ENGINES[0], rule: "a\u0000b" }])).toMatch(/rule/);
 		expect(sanitizeEngines([{ ...ENGINES[0], rule: 42 }])).toMatch(/rule/);
+		// Code mode makes another arm of the same engine; any other value is refused.
+		expect(sanitizeEngines([ENGINES[0], { ...ENGINES[0], codeMode: "on" }])).toEqual([
+			ENGINES[0],
+			{ ...ENGINES[0], codeMode: "on" },
+		]);
+		expect(sanitizeEngines([{ ...ENGINES[0], codeMode: "off" }])).toEqual([ENGINES[0]]);
+		expect(sanitizeEngines([{ ...ENGINES[0], codeMode: "always" }])).toMatch(/code mode/);
+		expect(
+			sanitizeEngines([
+				{ ...ENGINES[0], codeMode: "on" },
+				{ ...ENGINES[0], codeMode: "on" },
+			]),
+		).toMatch(/twice/);
 	});
 
 	it("takes only finished cards of the project", () => {

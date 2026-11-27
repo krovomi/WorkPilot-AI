@@ -213,7 +213,7 @@ The code is then rendered, compared with the mockup and corrected until it match
 </tr>
 </table>
 
-**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, set its criticality or lend your approval, start or stop the agents, read the dashboard, Insights, roadmap and ideas; sign in with a password, Microsoft Entra or the server's single sign-on. Each project opens on tabs (board, Insights, forge, dashboard, more), and the desktop's seven color themes, light or dark, follow your account from device to device. "For you" gathers what waits for you across all your projects, and the server can also tell you on ntfy, Telegram or Teams.
+**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, set its criticality or lend your approval, start or stop the agents, read the dashboard, Insights, roadmap and ideas; sign in with a password, Microsoft Entra or the server's single sign-on. Each project opens on tabs (board, Insights, forge, dashboard, more), and the desktop's seven color themes, light or dark, follow your account from device to device. "For you" gathers what waits for you across all your projects, and the server can also tell you on ntfy, Telegram or Teams. The team chat, the leaderboard (only those who agree are named) and your replay links come along.
 
 ![Mobile app: the board in Default light, a card in Default dark, the dashboard in Ocean light and the appearance settings in Forest dark](.github/assets/screenshots/mobile.png)
 
@@ -344,7 +344,7 @@ Full reference: [docs/CLI-USAGE.md](docs/CLI-USAGE.md).
 
 ## Security
 
-1. **OS sandbox**: agent commands run under bubblewrap (Linux) or Seatbelt (macOS); Windows is not covered yet, and the card says when a task runs without a sandbox.
+1. **OS sandbox**: agent commands run under bubblewrap (Linux) or Seatbelt (macOS), and the card says when a task runs without a sandbox. Optional, off by default (Settings > Sandbox): a **Docker Sandboxes microVM per task**, with its own kernel and Docker engine, only the worktree mounted and the network closed to the allowlist; it is also what isolates commands on Windows 11.
 2. **Filesystem restrictions**: operations stay inside the project directory.
 3. **Dynamic command allowlist**: only the commands of the detected stack are allowed.
 4. **Snapshots and trust score**: before each agent session the task's worktree is saved as a hidden git commit; each session starts with a trust score of 100 that anomalies lower, and below a threshold the task pauses, or the session stops and its snapshot is restored. Restricted mode and per-session limits are in Settings > Sandbox; restore a snapshot from the card.

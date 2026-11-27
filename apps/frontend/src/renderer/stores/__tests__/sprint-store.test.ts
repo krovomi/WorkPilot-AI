@@ -111,4 +111,65 @@ describe("sprint store", () => {
 		answer.mockResolvedValueOnce({ success: false, error: "another_active" } as never);
 		expect(await useSprintStore.getState().start(B)).toEqual({ ok: false, error: "another_active" });
 	});
+
+	it("answers without a project, without the bridge, or when the bridge throws", async () => {
+		useSprintStore.setState({ projectId: null });
+		expect(await useSprintStore.getState().save({ name: "S" })).toEqual({ ok: false, error: "no_project" });
+		useSprintStore.setState({ projectId: "p1" });
+		api.restore();
+		const before = globalThis.electronAPI;
+		(globalThis as { electronAPI?: unknown }).electronAPI = {};
+		expect(await useSprintStore.getState().save({ name: "S" })).toEqual({ ok: false, error: "unavailable" });
+		(globalThis as { electronAPI?: unknown }).electronAPI = before;
+		const failing = vi.fn(async (): Promise<unknown> => {
+			throw new Error("gone");
+		});
+		api = installRendererApi({ saveSprint: failing, listSprints: failing });
+		expect(await useSprintStore.getState().save({ name: "S" })).toEqual({ ok: false, error: "gone" });
+		failing.mockRejectedValueOnce("odd");
+		expect(await useSprintStore.getState().save({ name: "S" })).toEqual({ ok: false, error: "unknown" });
+		failing.mockResolvedValueOnce({ success: false });
+		expect(await useSprintStore.getState().save({ name: "S" })).toEqual({ ok: false, error: "unknown" });
+		// An unreadable list keeps the board going.
+		await useSprintStore.getState().load("p1");
+		expect(useSprintStore.getState().loading).toBe(false);
+	});
+
+	it("keeps an answer for the project it was asked for", async () => {
+		let finish: (value: unknown) => void = () => undefined;
+		api.restore();
+		api = installRendererApi({
+			listSprints: vi.fn(async () => ({ success: true, data: [] })),
+			saveSprint: vi.fn(() => new Promise((resolve) => (finish = resolve))),
+		});
+		const pending = useSprintStore.getState().save({ name: "S" });
+		await useSprintStore.getState().load("p2");
+		finish({ success: true, data: sprints });
+		expect(await pending).toEqual({ ok: true });
+		expect(useSprintStore.getState().sprints).toEqual([]);
+	});
+
+	it("keeps a deleted sprint when one of its cards could not go back to the backlog", async () => {
+		api.restore();
+		install(new Set(["other"]));
+		answer.mockClear();
+		expect(await useSprintStore.getState().remove(B)).toEqual({ ok: false, error: "cards_not_moved", failedCards: 1 });
+		expect(answer).not.toHaveBeenCalled();
+	});
+
+	it("leaves a newer project's state alone when an older read ends", async () => {
+		let finish: (value: unknown) => void = () => undefined;
+		api.restore();
+		api = installRendererApi({
+			listSprints: vi
+				.fn()
+				.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+				.mockResolvedValue({ success: true, data: [] }),
+		});
+		const older = useSprintStore.getState().load("p3");
+		await useSprintStore.getState().load("p4");
+		finish({ success: true, data: sprints });
+		await older;
+		expect(useSprintStore.getState()).toMatchObject({ projectId: "p4", sprints: [], loading: false });
+	});
 });

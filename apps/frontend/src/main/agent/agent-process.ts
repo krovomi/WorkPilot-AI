@@ -30,6 +30,7 @@ import {
 	taskPhaseProvider,
 } from "../provider-failover/task-phase-provider";
 import { agentSafetyEnv } from "./agent-safety-env";
+import { codeModeEnv } from "./code-mode-env";
 import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
 import {
@@ -545,6 +546,27 @@ export class AgentProcessManager {
 	}
 
 	/**
+	 * The active profile's refresh token is refused for good (invalid_grant):
+	 * the same prompt as a 401 in the run (AuthFailureModal, "Go to Settings"),
+	 * unless auto-switch on auth failure will move the run to another profile
+	 * when that 401 comes.
+	 */
+	private requestReauthBeforeSpawn(
+		taskId: string,
+		profileId: string,
+		error: string | undefined,
+	): void {
+		const settings = getClaudeProfileManager().getAutoSwitchSettings();
+		if (settings.enabled && settings.autoSwitchOnAuthFailure) return;
+		this.emitter.emit("auth-failure", taskId, {
+			profileId,
+			failureType: "expired",
+			message: "The refresh token expired: sign in again from Settings > Accounts.",
+			originalError: error,
+		});
+	}
+
+	/**
 	 * Attempt to auto-swap to another profile on authentication failure.
 	 * Only works when autoSwitchOnAuthFailure is enabled and an alternative
 	 * authenticated profile is available.
@@ -901,7 +923,14 @@ export class AgentProcessManager {
 							tokenResult.error,
 							"- the refresh token is revoked. User must re-authenticate from the Accounts page.",
 						);
-						// Still proceed — will fail with 401, but the error handling will surface the re-auth prompt
+						// Still proceed (another profile or an API key may serve the run),
+						// but ask for the sign-in now: the prompt used to wait for the run's
+						// 401, and never came when its output matched no auth pattern.
+						this.requestReauthBeforeSpawn(
+							taskId,
+							activeProfile.id,
+							tokenResult.error,
+						);
 					} else if (tokenResult.error) {
 						appLog.warn(
 							"[AgentProcess] Token refresh warning:",
@@ -980,6 +1009,7 @@ export class AgentProcessManager {
 						...providerSpecificEnv, // Include provider credentials (WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
 						...PERMISSION_CHANNEL_ENV, // An ACP agent's questions go to the card; answers come back on stdin
 						...agentSafetyEnv(), // Settings, Sandbox and Anomaly detection (agents/safety_watch.py)
+						...codeModeEnv(), // Settings, Code mode (apps/backend/code_mode)
 					},
 					processType === "task-execution" ? "feature-build" : undefined,
 				),

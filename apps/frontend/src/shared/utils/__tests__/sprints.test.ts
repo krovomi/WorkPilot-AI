@@ -93,3 +93,36 @@ describe("points and progress", () => {
 		expect(velocity([sprint({})])).toBeNull();
 	});
 });
+
+describe("edge cases of the stored sprints", () => {
+	it("reads a bare list, counts, commitments and a carry target", () => {
+		const read = readSprints([
+			sprint({
+				id: "sp-0000000d",
+				state: "active",
+				committed: { cards: "x" as never, points: 3.5 },
+				report: { done: 1, donePoints: 1, carried: 1, carriedPoints: 1, carriedTo: "sp-0000000e" },
+			}),
+			{ ...sprint({ id: "sp-0000000f" }), createdAt: 12 },
+		]);
+		expect(read).toHaveLength(1);
+		expect(read[0].committed).toEqual({ cards: 0, points: 0 });
+		expect(read[0].report?.carriedTo).toBe("sp-0000000e");
+		expect(cleanSprintDraft({ name: 3 })).toBeNull();
+		expect(cleanSprintDraft({ name: "S", goal: "   " })).toEqual({ name: "S" });
+	});
+
+	it("orders and averages sprints that lack their dates", () => {
+		const report = { done: 0, donePoints: 4, carried: 0, carriedPoints: 0, carriedTo: null };
+		const list = [
+			sprint({ id: "sp-c1", state: "closed", report }),
+			sprint({ id: "sp-c2", state: "closed", closedAt: "2026-11-01", report }),
+			sprint({ id: "sp-c3", state: "closed" }),
+			sprint({ id: "sp-c4", state: "closed", report }),
+			sprint({ id: "sp-p1", createdAt: "2026-11-02" }),
+			sprint({ id: "sp-p2", startDate: "2026-11-01" }),
+		];
+		expect(orderedSprints(list).map((s) => s.id)).toEqual(["sp-p2", "sp-p1", "sp-c2", "sp-c1", "sp-c3", "sp-c4"]);
+		expect(velocity(list)).toBe(4);
+	});
+});

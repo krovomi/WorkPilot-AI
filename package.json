@@ -15,7 +15,7 @@
 		"install:frontend": "cd apps/frontend && pnpm install",
 		"install:all": "pnpm run install:backend && pnpm run install:frontend",
 		"start": "cd apps/frontend && pnpm run build && pnpm run start",
-		"dev": "concurrently \"pnpm --filter ./apps/backend dev\" \"pnpm --filter ./apps/frontend dev\"",
+		"dev": "node scripts/dev.mjs",
 		"dev:debug": "cd apps/frontend && pnpm run dev:debug",
 		"dev:mcp": "cd apps/frontend && pnpm run dev:mcp",
 		"build": "cd apps/frontend && pnpm run build",
@@ -62,9 +62,11 @@
 	},
 	"dependencies": {
 		"@lydell/node-pty": "1.1.0",
-		"@lydell/node-pty-darwin-arm64": "1.2.0-beta.18",
 		"lucide-react": "^1.78.0",
 		"tar": "^7.5.23",
 		"unzipper": "^0.12.5"
+	},
+	"optionalDependencies": {
+		"@lydell/node-pty-darwin-arm64": "1.2.0-beta.18"
 	}
 }

@@ -4,7 +4,9 @@ PR follow-through runner — spawned by the Electron main process for one task.
 Reads the task's pull request, and while a check fails or a review thread
 waits, runs the QA fixer in the task's worktree and pushes the fix (never
 forced). Stops on green, merged, closed, a failure that is red on the base
-branch too, the round cap, or anything it cannot judge.
+branch too, the round cap, or anything it cannot judge. On green, the PR's
+approval tier (``pr_followup/approval.py``) is recorded, and the PR merged
+when the tier and the mode (``WORKPILOT_APPROVALS=enforce``) allow it.
 
 One JSON line per look at the PR on stdout:
 
@@ -34,6 +36,7 @@ from pathlib import Path
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
+from pr_followup import claude_ship  # noqa: E402
 from pr_followup.forge import forge_for_url  # noqa: E402
 from pr_followup.loop import RoundResult, run_round  # noqa: E402
 from pr_followup.policy import DEFAULT_MAX_ROUNDS, FollowupConfig  # noqa: E402
@@ -103,6 +106,36 @@ def _pusher(project: Path, spec_name: str):
     return push
 
 
+def _merger(forge):
+    merge = getattr(forge, "merge", None)
+
+    async def run(head_sha: str) -> tuple[bool, str]:
+        if merge is None:
+            return False, "this forge cannot merge a pull request"
+        return await merge(head_sha)
+
+    return run
+
+
+def _approver(project: Path, worktree: Path, spec: Path, forge, ship: bool = False):
+    async def approve(snap):
+        from pr_followup.approval import approve_green
+
+        runs = getattr(forge, "check_runs", None) if ship else None
+        return await approve_green(
+            project, worktree, spec, snap, _merger(forge), check_runs=runs
+        )
+
+    return approve
+
+
+def _stand_down(ship: bool):
+    """With Claude Ship on, a PR its Steward watches gets no fix round of ours."""
+    if not ship:
+        return None
+    return lambda snap: claude_ship.steward_watching(snap.labels)
+
+
 def _learn_from_review(project: Path, pr_url: str, result: RoundResult) -> None:
     """A review thread fixed and pushed becomes a rule candidate (IA1).
 
@@ -132,6 +165,7 @@ async def _run(args: argparse.Namespace) -> int:
         fix_review_threads=not args.no_review_threads,
     )
     interval = max(MIN_INTERVAL_SECONDS, args.interval)
+    ship = claude_ship.active()
     last: RoundResult | None = None
     for _poll in range(max(1, args.max_polls)):
         last = await run_round(
@@ -141,6 +175,8 @@ async def _run(args: argparse.Namespace) -> int:
             fixer=_qa_fixer,
             pusher=_pusher(project, args.spec_name),
             config=config,
+            approver=_approver(project, worktree, spec, forge, ship),
+            stand_down=_stand_down(ship),
         )
         _emit({"event": "round", "round": last.to_dict()})
         _learn_from_review(project, args.pr_url, last)

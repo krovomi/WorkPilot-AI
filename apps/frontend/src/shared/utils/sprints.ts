@@ -6,7 +6,7 @@
  *
  * Design: docs/architecture/kanban-sprints.md.
  */
-import type { Sprint, SprintDraft, SprintState } from "../types/sprint";
+import type { Sprint, SprintDraft, SprintReport, SprintState } from "../types/sprint";
 import type { Task } from "../types/task";
 
 export const SPRINT_ID_PATTERN = /^sp-[0-9a-f]{8}$/;
@@ -175,9 +175,9 @@ export function orderedSprints(sprints: readonly Sprint[]): Sprint[] {
 /** Average points done by the last closed sprints (up to three), or null without any. */
 export function velocity(sprints: readonly Sprint[]): number | null {
 	const closed = sprints
-		.filter((sprint) => sprint.state === "closed" && sprint.report)
+		.filter((sprint): sprint is Sprint & { report: SprintReport } => sprint.state === "closed" && !!sprint.report)
 		.sort((a, b) => (b.closedAt ?? "").localeCompare(a.closedAt ?? ""))
 		.slice(0, 3);
 	if (closed.length === 0) return null;
-	return Math.round(closed.reduce((sum, sprint) => sum + (sprint.report?.donePoints ?? 0), 0) / closed.length);
+	return Math.round(closed.reduce((sum, sprint) => sum + sprint.report.donePoints, 0) / closed.length);
 }

@@ -70,7 +70,8 @@ function npmEnv(env) {
 
 function shouldForwardEnv(key) {
 	if (FORWARD_ENV_EXCLUDE.has(key)) return false;
-	return /^(DEBUG|NODE_ENV|APP_LANGUAGE)$/.test(key) || /^(WORKPILOT_|WP_)/.test(key);
+	// BACKEND_PORT: the port `pnpm run dev` chose for the backend and the app.
+	return /^(DEBUG|NODE_ENV|APP_LANGUAGE|BACKEND_PORT)$/.test(key) || /^(WORKPILOT_|WP_)/.test(key);
 }
 
 /**

@@ -42,5 +42,21 @@ describe("sprint book", () => {
 		expect(cleanReport({ done: 1, donePoints: 1, carried: 0, carriedPoints: 0, carriedTo: "elsewhere" })).toBeNull();
 		expect(cleanReport({ done: 1, donePoints: 1e9, carried: 0, carriedPoints: 0 })).toBeNull();
 		expect(newSprintId()).toMatch(/^sp-[0-9a-f]{8}$/);
+		expect(cleanCommitment("3")).toBeNull();
+		expect(cleanReport(null)).toBeNull();
+	});
+
+	it("refuses a sprint that is not there or not in the right state", () => {
+		const planned: Sprint = { id: "sp-00000001", name: "P", state: "planned", createdAt: NOW };
+		const active: Sprint = { ...planned, id: "sp-00000002", state: "active" };
+		const report = { done: 0, donePoints: 0, carried: 0, carriedPoints: 0, carriedTo: null };
+		const full = Array.from({ length: 200 }, (_, i) => ({ ...planned, id: `sp-${i.toString(16).padStart(8, "0")}` }));
+		expect(saveSprint(full, { name: "one more" }, NOW)).toEqual({ error: "too_many" });
+		expect(startSprint([planned], "sp-0000ffff", { cards: 0, points: 0 }, NOW)).toEqual({ error: "not_found" });
+		expect(startSprint([active], active.id, { cards: 0, points: 0 }, NOW)).toEqual({ error: "not_planned" });
+		expect(completeSprint([active], active.id, { done: -1 }, NOW)).toEqual({ error: "invalid" });
+		expect(completeSprint([active], "sp-0000ffff", report, NOW)).toEqual({ error: "not_found" });
+		expect(completeSprint([planned], planned.id, report, NOW)).toEqual({ error: "not_active" });
+		expect(deleteSprint([planned], "sp-0000ffff")).toEqual({ error: "not_found" });
 	});
 });

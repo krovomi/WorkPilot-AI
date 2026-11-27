@@ -18,17 +18,20 @@ const { projects, serverProjects, server } = vi.hoisted(() => {
 	};
 });
 
-vi.mock("electron", () => ({ ipcMain: { handle: vi.fn() } }));
+const { handle } = vi.hoisted(() => ({ handle: vi.fn() }));
+vi.mock("electron", () => ({ ipcMain: { handle } }));
 vi.mock("../../project-store", () => ({ projectStore: { getProject: (id: string) => projects.get(id) } }));
 vi.mock("../../server-projects", () => ({ getServerProject: (id: string) => (serverProjects.has(id) ? { id } : undefined) }));
 vi.mock("../../sprints/server-sprints", () => server);
 
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import {
 	handleCompleteSprint,
 	handleDeleteSprint,
 	handleListSprints,
 	handleSaveSprint,
 	handleStartSprint,
+	registerSprintHandlers,
 } from "../sprint-handlers";
 
 let root: string;
@@ -72,11 +75,42 @@ describe("sprint handlers", () => {
 		expect(server.startServerSprint).toHaveBeenCalledWith("srv-1", "sp-0000000a", { cards: 1, points: 1 });
 		await handleListSprints("srv-1");
 		expect(server.listServerSprints).toHaveBeenCalledWith("srv-1");
+		const report = { done: 1, donePoints: 1, carried: 0, carriedPoints: 0, carriedTo: null };
+		await handleCompleteSprint("srv-1", "sp-0000000a", report);
+		expect(server.completeServerSprint).toHaveBeenCalledWith("srv-1", "sp-0000000a", report);
+		await handleDeleteSprint("srv-1", "sp-0000000a");
+		expect(server.deleteServerSprint).toHaveBeenCalledWith("srv-1", "sp-0000000a");
+	});
+
+	it("uses the project's own backend folder name when it has one", async () => {
+		projects.set("local-2", { id: "local-2", path: path.join(root, "project"), autoBuildPath: ".auto" });
+		expect((await handleSaveSprint("local-2", { name: "S" })).success).toBe(true);
+		expect(existsSync(path.join(root, "project", ".auto", "sprints.json"))).toBe(true);
+	});
+
+	it("registers one handler per channel, each passing its arguments on", async () => {
+		registerSprintHandlers();
+		const handlers = new Map(handle.mock.calls.map(([channel, fn]) => [channel, fn]));
+		const call = (channel: string, ...args: unknown[]) => handlers.get(channel)?.({}, ...args);
+		expect((await call(IPC_CHANNELS.SPRINTS_SAVE, "local-1", { name: "S" })).success).toBe(true);
+		const id = (await call(IPC_CHANNELS.SPRINTS_LIST, "local-1")).data[0].id;
+		expect((await call(IPC_CHANNELS.SPRINTS_START, "local-1", id, { cards: 0, points: 0 })).success).toBe(true);
+		const report = { done: 0, donePoints: 0, carried: 0, carriedPoints: 0, carriedTo: null };
+		expect((await call(IPC_CHANNELS.SPRINTS_COMPLETE, "local-1", id, report)).success).toBe(true);
+		expect(await call(IPC_CHANNELS.SPRINTS_DELETE, "local-1", id)).toEqual({ success: false, error: "not_planned" });
 	});
 
 	it("refuses an unknown project, a bad draft, id, commitment or report before anything is written", async () => {
 		expect(await handleListSprints(42)).toEqual({ success: false, error: "Invalid project id" });
-		expect(await handleListSprints("nope")).toEqual({ success: false, error: "Unknown project" });
+		for (const refused of [
+			handleListSprints("nope"),
+			handleSaveSprint("nope", { name: "S" }),
+			handleStartSprint("nope", "sp-0000000a", { cards: 0, points: 0 }),
+			handleCompleteSprint("nope", "sp-0000000a", {}),
+			handleDeleteSprint("nope", "sp-0000000a"),
+		]) {
+			expect(await refused).toEqual({ success: false, error: "Unknown project" });
+		}
 		expect(await handleSaveSprint("srv-1", { name: "two\nlines" })).toEqual({ success: false, error: "invalid" });
 		expect(await handleStartSprint("srv-1", "../x", { cards: 1, points: 1 })).toEqual({ success: false, error: "invalid" });
 		expect(await handleStartSprint("srv-1", "sp-0000000a", { cards: -1, points: 1 })).toEqual({ success: false, error: "invalid" });

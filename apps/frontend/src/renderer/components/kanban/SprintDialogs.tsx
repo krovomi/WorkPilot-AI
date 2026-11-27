@@ -28,7 +28,7 @@ export function useSprintFailure() {
 			variant: "destructive",
 			title:
 				outcome.error === "cards_not_moved"
-					? t("tasks:kanban.sprints.cardsNotMoved", { count: outcome.failedCards ?? 0 })
+					? t("tasks:kanban.sprints.cardsNotMoved", { count: outcome.failedCards })
 					: t("tasks:kanban.sprints.saveFailed"),
 		});
 		return false;
@@ -141,8 +141,8 @@ export function SprintCompleteDialog({ sprint, onOpenChange }: SprintCompleteDia
 	const [closing, setClosing] = useState(false);
 	const report = sprintReport(tasks, sprint.id, carryTo);
 
+	// The button is disabled while closing: one close at a time.
 	const submit = async () => {
-		if (closing) return;
 		setClosing(true);
 		const outcome = await complete(sprint.id, carryTo);
 		setClosing(false);
