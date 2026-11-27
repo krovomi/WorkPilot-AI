@@ -74,6 +74,7 @@ import {
 	writeSourceEnvFile,
 } from "../source-env";
 import { testGenerationService } from "../test-generation-service";
+import { getBackendUrl } from "./_backend-fetch";
 import { findEnvLineBreak, parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
 import { buildCmdConsoleArgs } from "./task/launch-args";
@@ -599,7 +600,7 @@ export function registerSettingsHandlers(
 				// Optionally notify the FastAPI backend (for LLM router feature).
 				// This is best-effort — the backend may not be running for non-router users.
 				makeBackendRequest<{ selected: string }>(
-					`http://127.0.0.1:9000/providers/select?provider=${encodeURIComponent(provider)}`,
+					`${getBackendUrl()}/providers/select?provider=${encodeURIComponent(provider)}`,
 					{ method: "POST", headers: { "Content-Type": "application/json" } },
 				);
 
@@ -622,7 +623,7 @@ export function registerSettingsHandlers(
 		async (): Promise<IPCResult<string | null>> => {
 			try {
 				const result = await makeBackendRequest<{ selected: string | null }>(
-					"http://127.0.0.1:9000/providers/selected",
+					`${getBackendUrl()}/providers/selected`,
 				);
 
 				if (result.success && result.data) {

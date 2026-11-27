@@ -131,6 +131,11 @@ import {
 	markLocalBackendStarting,
 } from "./local-backend-readiness";
 import { watchSpawnedBackend } from "./local-backend-launch";
+import {
+	localBackendPort,
+	localBackendUrl,
+	settleLocalBackendPort,
+} from "./local-backend-port";
 import { migrateSourceEnvSecrets } from "./source-env";
 import { TerminalManager } from "./terminal-manager";
 import { guardMainWindow } from "./window-recovery";
@@ -680,8 +685,10 @@ async function startBackend() {
 	// projets locaux et les outils propres à la machine (hooks, mémoire,
 	// notifications) parlent à ce backend local, le serveur ne les sert pas.
 	// Vérifie si le backend répond déjà
+	const port = localBackendPort();
+	const providersUrl = `${localBackendUrl()}/providers`;
 	try {
-		await waitForBackendReady("http://127.0.0.1:9000/providers", 1500);
+		await waitForBackendReady(providersUrl, 1500);
 		return;
 	} catch {
 		/* noop */
@@ -708,7 +715,7 @@ async function startBackend() {
 			"--host",
 			"127.0.0.1",
 			"--port",
-			"9000",
+			String(port),
 			...reloadArgs,
 		],
 		{
@@ -724,14 +731,14 @@ async function startBackend() {
 	});
 	// Attend qu'il soit prêt. S'il s'arrête avant, un autre backend a pu prendre
 	// le port entre-temps (celui de `pnpm run dev`) : local-backend-launch.ts.
-	const { exited } = watchSpawnedBackend(spawned, 9000, () =>
-		waitForBackendReady("http://127.0.0.1:9000/providers", 1500).then(
+	const { exited } = watchSpawnedBackend(spawned, port, () =>
+		waitForBackendReady(providersUrl, 1500).then(
 			() => true,
 			() => false,
 		),
 	);
 	await Promise.race([
-		waitForBackendReady("http://127.0.0.1:9000/providers", BACKEND_START_TIMEOUT_MS),
+		waitForBackendReady(providersUrl, BACKEND_START_TIMEOUT_MS),
 		exited,
 	]);
 }
@@ -1318,6 +1325,15 @@ async function main() {
 	initializeCredentialIntegration().catch((error) => {
 		console.warn("[main] Failed to initialize credential integration:", error);
 	});
+
+	// The backend's port, before anything calls it: 9000 unless BACKEND_PORT
+	// names another, or another program holds 9000 (local-backend-port.ts).
+	const portChoice = await settleLocalBackendPort();
+	if (portChoice?.movedFrom !== undefined) {
+		console.warn(
+			`[main] Port ${portChoice.movedFrom} is held by a program that is not a WorkPilot backend: the local backend uses port ${portChoice.port}.`,
+		);
+	}
 
 	// The window opens before the backend answers: views that ask it at mount
 	// wait for this launch instead of reporting it unreachable.

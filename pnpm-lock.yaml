@@ -222,9 +222,6 @@ importers:
       '@lydell/node-pty':
         specifier: 1.1.0
         version: 1.1.0
-      '@lydell/node-pty-darwin-arm64':
-        specifier: 1.2.0-beta.18
-        version: 1.2.0-beta.18
       lucide-react:
         specifier: ^1.78.0
         version: 1.78.0(@types/react@19.3.0)(react@19.3.1)
@@ -238,6 +235,10 @@ importers:
       concurrently:
         specifier: ^10.0.7
         version: 10.0.7
+    optionalDependencies:
+      '@lydell/node-pty-darwin-arm64':
+        specifier: 1.2.0-beta.18
+        version: 1.2.0-beta.18
 
   apps/backend: {}
 
@@ -453,7 +454,7 @@ importers:
         version: 10.4.2
       '@testing-library/jest-dom':
         specifier: ^8.0.0
-        version: 8.0.0(@testing-library/dom@10.4.2)(vitest@5.1.0)
+        version: 8.0.0(@testing-library/dom@10.4.2)(vitest@5.1.1)
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -6015,7 +6016,8 @@ snapshots:
   '@lydell/node-pty-darwin-arm64@1.1.0':
     optional: true
 
-  '@lydell/node-pty-darwin-arm64@1.2.0-beta.18': {}
+  '@lydell/node-pty-darwin-arm64@1.2.0-beta.18':
+    optional: true
 
   '@lydell/node-pty-darwin-x64@1.1.0':
     optional: true
@@ -7064,7 +7066,7 @@ snapshots:
       picocolors: 1.1.1
       pretty-format: 27.5.1
 
-  '@testing-library/jest-dom@8.0.0(@testing-library/dom@10.4.2)(vitest@5.1.0)':
+  '@testing-library/jest-dom@8.0.0(@testing-library/dom@10.4.2)(vitest@5.1.1)':
     dependencies:
       '@adobe/css-tools': 4.5.0
       '@testing-library/dom': 10.4.2
