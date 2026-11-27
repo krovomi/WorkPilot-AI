@@ -53,6 +53,8 @@ import {
 } from "./ColumnMenuItems";
 import { PointerMenu, useContextMenuAt } from "./PointerMenu";
 import type { SelectGesture } from "../../hooks/useBoardSelection";
+import { useLaneOverStore } from "../../hooks/useLaneDrag";
+import { parseLaneDropId } from "../../lib/kanban-lanes";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import {
@@ -139,6 +141,8 @@ export interface DroppableColumnProps {
 	isLocked?: boolean;
 	onToggleLocked?: () => void;
 	// Column drag handle props (for column reordering)
+	/** The drop target's id when the column sits in a lane (`laneDropId`); the status otherwise. */
+	droppableId?: string;
 	dragHandleProps?: {
 		listeners: SyntheticListenerMap | undefined;
 		attributes: DraggableAttributes;
@@ -178,6 +182,7 @@ export function droppableColumnPropsAreEqual(
 ): boolean {
 	// Quick checks first
 	if (prevProps.status !== nextProps.status) return false;
+	if (prevProps.droppableId !== nextProps.droppableId) return false;
 	if (prevProps.isOver !== nextProps.isOver) return false;
 	if (prevProps.isImportForbidden !== nextProps.isImportForbidden) return false;
 	if (prevProps.onTaskClick !== nextProps.onTaskClick) return false;
@@ -358,11 +363,12 @@ export const DroppableColumn = memo(function DroppableColumn({
 	onResizeEnd,
 	isLocked,
 	onToggleLocked,
+	droppableId,
 	dragHandleProps,
 }: DroppableColumnProps) {
 	const { t } = useTranslation(["tasks", "common"]);
 	const { setNodeRef } = useDroppable({
-		id: status,
+		id: droppableId ?? status,
 	});
 
 	// Calculate selection state for this column
@@ -999,7 +1005,8 @@ export const DroppableColumn = memo(function DroppableColumn({
 						)}
 					</div>
 				</div>
-				{(capacity || showPulse) && (
+				{/* In a lane (BoardLanes) the summary line would repeat lane after lane. */}
+				{(capacity || showPulse) && !droppableId && (
 					<div className="kanban-col-meta">
 						{showPulse && <ColumnPulse items={pulse} />}
 						{capacity && <ColumnGauge count={tasks.length} capacity={capacity} />}
@@ -1024,7 +1031,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 							strategy={verticalListSortingStrategy}
 						>
 							<div className="space-y-2 min-h-0">
-								{tasks.length === 0 && isQuickAdding ? null : tasks.length === 0 ? (
+								{tasks.length === 0 && (isQuickAdding || (droppableId && !isOver)) ? null : tasks.length === 0 ? (
 									<ColumnEmptyState status={status} isOver={isOver} />
 								) : (
 									taskCards
@@ -1106,7 +1113,29 @@ export interface SortableColumnWrapperProps
 	sortableId: string;
 }
 
-export function SortableColumnWrapper({
+/**
+ * A column of the board: sortable (dragged by its handle to reorder the
+ * columns), or, inside a lane (kanban/BoardLanes.tsx), a plain drop target
+ * that lights up only for its own lane.
+ */
+export function SortableColumnWrapper(props: SortableColumnWrapperProps) {
+	return props.droppableId ? <LaneColumn {...props} /> : <SortableColumn {...props} />;
+}
+
+function LaneColumn({ sortableId: _sortableId, ...columnProps }: SortableColumnWrapperProps) {
+	const overLane = useLaneOverStore((s) => s.lane);
+	const lane = columnProps.droppableId ? parseLaneDropId(columnProps.droppableId)?.lane : undefined;
+	const here = overLane !== null && overLane === lane;
+	return (
+		<DroppableColumn
+			{...columnProps}
+			isOver={columnProps.isOver && here}
+			isImportForbidden={columnProps.isImportForbidden && here}
+		/>
+	);
+}
+
+function SortableColumn({
 	sortableId,
 	...columnProps
 }: SortableColumnWrapperProps) {

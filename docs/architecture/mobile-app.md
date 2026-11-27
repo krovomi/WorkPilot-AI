@@ -416,6 +416,32 @@ sans moteur, et un retour manqué ne fait jamais échouer l'action.
 toutes ses colonnes côte à côte, comme le bureau (`src/board/WideBoard.tsx`), avec les mêmes
 recherche et filtres.
 
+## L'équipe : chat, classement et liens de replay
+
+Le chat d'équipe d'un projet (page « Chat d'équipe » de l'onglet Plus) passe par le même canal du
+flux que le tableau (`project:<id>`), ouvert par `src/project/useProjectSocket.ts`, que le tableau
+et le chat partagent. Le serveur (`streaming/project_room.py`) envoie qui est là (`presence`, par id
+et nom, jamais par e-mail), les 100 derniers messages à l'arrivée (`chat_history`), chaque nouveau
+(`chat_message`) et la raison d'un refus (`chat_rejected`) ; `src/team/room.ts` vérifie et borne
+tout avant l'écran. Le téléphone envoie `{"type": "chat_message", "message", "reply_to"?}` ; le
+serveur garde la conversation (`server/services/team_chat.py`) et le téléphone ne la garde qu'en
+mémoire, le temps de l'écran. Un message refusé (trop vite, indisponible) revient dans le champ.
+Un lecteur (rôle `viewer`) lit sans pouvoir écrire, comme le serveur l'exige (`can_interact`) : le
+téléphone ne lui propose pas d'écrire. Le navigateur ne peut pas mettre le jeton dans la poignée de
+main d'un WebSocket : la version web affiche la page, l'app native parle.
+
+Le classement (page « Classement », `analytics.read`) est celui de Pixel Office sur un serveur
+(`shared_features/pixel_office.py`) : les points de la saison, sur ce projet ou toute
+l'organisation, de qui a choisi de montrer son nom. Le choix est désactivé tant que la personne ne
+l'active pas, ne vaut que pour sa propre ligne et le serveur l'enregistre au journal d'audit ; sans
+lui, son score et ses badges ne sont montrés qu'à elle (RGPD : aucun nom sans consentement, aucun
+total des autres). Les points ne lisent ni jetons ni prix, donc chaque provider compte pareil.
+
+« Mes liens de replay » (Réglages, `lab.read`) liste les liens de replay que la personne a partagés
+depuis le bureau, sur chaque projet qu'elle atteint encore (`GET /api/features/replay-shares/mine`),
+avec leur état et leurs ouvertures, et arrête un lien (`DELETE /{id}?project_id=`, le serveur
+revérifie l'auteur).
+
 ## Ce qui vient
 
 - Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.

@@ -20,8 +20,8 @@ export function isLightCard(task: Task): boolean {
 	);
 }
 
-/** The metadata a quick edit changes: type (kind, category) and priority. */
-export type CardChoice = Pick<TaskMetadata, "kind" | "kindSource" | "category" | "priority">;
+/** The metadata a quick edit changes: type (kind, category), priority and sub-project (a lane move). */
+export type CardChoice = Pick<TaskMetadata, "kind" | "kindSource" | "category" | "priority" | "area">;
 
 function currentTask(id: string): Task | undefined {
 	return useTaskStore.getState().tasks.find((task) => task.id === id);
