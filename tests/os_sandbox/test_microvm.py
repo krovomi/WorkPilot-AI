@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import os_sandbox
 import pytest
@@ -431,4 +431,12 @@ def test_the_name_is_the_apps_for_the_same_path(monkeypatch):
     # The same vector as apps/frontend/src/main/microvm/__tests__/sbx.test.ts:
     # the app removes the VM it never created by this name.
     monkeypatch.setattr(microvm, "is_windows", lambda: False)
+
+    class _Resolved(PurePosixPath):
+        # The path as the app resolved it: /home is a link on macOS, and
+        # Windows would add a drive.
+        def resolve(self) -> _Resolved:
+            return self
+
+    monkeypatch.setattr(microvm, "Path", _Resolved)
     assert microvm.vm_name("/home/me/wt") == "workpilot-194449c0cfe5d0df"
