@@ -349,6 +349,11 @@ class ServerSettings:
     smtp_from: str
     smtp_use_tls: bool  # STARTTLS on a plaintext port (587)
     smtp_use_ssl: bool  # implicit TLS (465)
+    # The usage report's defaults (``services/report_settings.py``): the time
+    # zone its hour is read in, and its language, until an organization sets
+    # its own.
+    report_timezone: str = "Europe/Paris"
+    report_language: str = "fr"
 
     @property
     def entra_enabled(self) -> bool:
@@ -447,6 +452,9 @@ class ServerSettings:
             smtp_from=os.environ.get("WORKPILOT_SMTP_FROM", ""),
             smtp_use_tls=_env_bool("WORKPILOT_SMTP_USE_TLS", True),
             smtp_use_ssl=_env_bool("WORKPILOT_SMTP_USE_SSL", False),
+            report_timezone=os.environ.get("WORKPILOT_REPORT_TIMEZONE", "")
+            or "Europe/Paris",
+            report_language=os.environ.get("WORKPILOT_REPORT_LANGUAGE", "") or "fr",
         )
 
 
