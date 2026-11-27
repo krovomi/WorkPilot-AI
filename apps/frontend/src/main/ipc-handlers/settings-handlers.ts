@@ -777,6 +777,9 @@ export function registerSettingsHandlers(
 					newSettings.approvalTiers = normalizeApprovalTierMode(settings.approvalTiers);
 				if (settings.claudeShip !== undefined)
 					newSettings.claudeShip = normalizeClaudeShipMode(settings.claudeShip);
+				// Merges by itself: only a true boolean turns it on.
+				if (settings.expressLane !== undefined)
+					newSettings.expressLane = settings.expressLane === true;
 
 				// Sync defaultModel when agent profile changes (#414)
 				if (settings.selectedAgentProfile) {
