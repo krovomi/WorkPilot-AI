@@ -515,7 +515,8 @@ async def test_the_snapshot_sends_only_the_card_files_the_app_reads(tmp_path):
     (clone / ".workpilot/specs/not-a-card").mkdir()
 
     # A viewer reads the board too.
-    snapshot = await board_snapshot(_scope(pid, oid, clone, "viewer"))
+    async with await _db() as db:
+        snapshot = await board_snapshot(_scope(pid, oid, clone, "viewer"), db)
     assert len(snapshot["cards"]) == 2
     assert set(snapshot["cards"][card_id]) == {
         "requirements.json",
@@ -523,6 +524,8 @@ async def test_the_snapshot_sends_only_the_card_files_the_app_reads(tmp_path):
         "spec.md",
         # Written by the card's creation (server/services/status_history.py).
         "status_history.json",
+        # Who created it, from the database (shared_board/run_facts.py).
+        "task_people.json",
     }
     assert snapshot["worktrees"] == {}
 
@@ -537,7 +540,8 @@ async def test_the_snapshot_carries_the_build_workspace(tmp_path):
     (building / card_id / "implementation_plan.json").write_text(
         '{"phases": []}', encoding="utf-8"
     )
-    snapshot = await board_snapshot(_scope(pid, oid, clone, "member"))
+    async with await _db() as db:
+        snapshot = await board_snapshot(_scope(pid, oid, clone, "member"), db)
     assert snapshot["worktrees"] == {
         card_id: {"implementation_plan.json": '{"phases": []}'}
     }
@@ -559,7 +563,8 @@ async def test_the_snapshot_follows_no_link_out_of_the_checkout(tmp_path):
     tasks.mkdir(parents=True)
     _link(tasks / second, tmp_path / "elsewhere")
 
-    snapshot = await board_snapshot(_scope(pid, oid, clone, "member"))
+    async with await _db() as db:
+        snapshot = await board_snapshot(_scope(pid, oid, clone, "member"), db)
     assert set(snapshot["cards"]) == {first, second}
     assert "qa_report.md" not in snapshot["cards"][first]
     assert snapshot["worktrees"] == {}
