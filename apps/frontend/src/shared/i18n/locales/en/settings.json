@@ -444,7 +444,7 @@
 				"title": "Each call of a script is checked like a direct call",
 				"description": "The script itself reads no file, starts no process and reaches no network. Each of its calls goes through the agent's rights, the protected paths, the guardrails, the command allowlist and the OS sandbox, and the anomaly watch scores every one."
 			},
-			"providers": "Works with every provider whose tools WorkPilot runs: OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio and the compatible providers and gateways. A task can choose its own mode per phase."
+			"providers": "Works with every provider whose tools WorkPilot runs: OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio and the compatible providers and gateways. Claude tasks use Claude Code's own code mode in their worktree, on the Anthropic API with Opus or Sonnet 5.5 and later, and terminals get it too. A task can choose its own mode per phase."
 		},
 		"anomaly-detection": {
 			"title": "Anomaly Detection",

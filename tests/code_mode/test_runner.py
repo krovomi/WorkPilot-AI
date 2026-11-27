@@ -175,3 +175,36 @@ def test_without_node_the_script_is_refused_in_words(project: Path, monkeypatch)
         _run(executor, "return 1")
     with pytest.raises(RuntimeError, match="needs the script"):
         asyncio.run(executor.execute("run_script", {"code": "  "}))
+
+
+def test_in_a_microvm_the_script_runs_on_this_machine(project: Path, monkeypatch):
+    """Node stays on the host, in its OS sandbox; the script's commands go to the VM."""
+    import os_sandbox
+
+    in_vm = type("Session", (), {"vm": object(), "isolated": True})()
+    on_host = type("Session", (), {"vm": None, "isolated": False})()
+    asked: list[bool] = []
+
+    def session_sandbox(_project, _spec=None, *, microvm=False, **_kwargs):
+        asked.append(microvm)
+        return in_vm if microvm else on_host
+
+    monkeypatch.setattr(os_sandbox, "session_sandbox", session_sandbox)
+    executor = ToolExecutor(str(project), agent_type="coder")
+
+    assert executor.script_sandbox() is on_host
+    assert executor.script_sandbox() is on_host
+    assert executor.session_sandbox() is in_vm
+    assert asked == [True, False]
+
+
+def test_without_a_microvm_the_script_shares_the_session_sandbox(
+    project: Path, monkeypatch
+):
+    import os_sandbox
+
+    session = type("Session", (), {"vm": None, "isolated": True})()
+    monkeypatch.setattr(os_sandbox, "session_sandbox", lambda *_a, **_k: session)
+    executor = ToolExecutor(str(project), agent_type="coder")
+
+    assert executor.script_sandbox() is session

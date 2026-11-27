@@ -3,15 +3,16 @@ feature: Mode code
 summary: >-
   `run_script` pour les fournisseurs de la boucle WorkPilot : un script JavaScript lancé par Node
   (permissions, contexte sans `process`, `require`, `fetch` ni `eval`) dont chaque appel repasse par
-  `ToolExecutor.execute` ; arrêté par défaut, choisi par tâche ou phase, compté par la surveillance
-  des anomalies, mesuré par le banc ; spike S2 du code mode natif.
+  `ToolExecutor.execute` ; arrêté par défaut, choisi par tâche ou phase, mesuré par le banc ; le
+  `REPL` de Claude Code pour une tâche Claude dans son worktree et dans les terminaux.
 ---
 
 # Mode code
 
-> Code : `apps/backend/code_mode/`, `core/runtimes/tool_executor.py` (`_run_script`),
-> `agents/safety_watch.py`, `bench/lifecycle.py` ; Electron : `main/agent/code-mode-env.ts`,
-> `renderer/components/settings/CodeModeSettings.tsx`, `shared/utils/bench-code-mode.ts`.
+> Code : `apps/backend/code_mode/` (`native.py` pour Claude Code), `core/runtimes/tool_executor.py`
+> (`_run_script`, `script_sandbox`), `agents/safety_watch.py`, `bench/lifecycle.py` ; Electron :
+> `main/agent/code-mode-env.ts` (agents et terminaux), `renderer/components/settings/CodeModeSettings.tsx`,
+> `renderer/components/task-engine/PhaseCodeModePicker.tsx`, `shared/utils/bench-code-mode.ts`.
 > Règles : [`rules/security.md`](../rules/security.md) S3 et S4. Plan d'ensemble : lot B1 du plan
 > « Claude Ship, Code Mode et Docker Sandboxes » (27/11/2026).
 
@@ -89,7 +90,7 @@ une erreur, sans contrôle d'écriture : rien n'a été écrit.
 |---|---|---|
 | Paramètres, Mode code → `WORKPILOT_CODE_MODE` (`main/agent/code-mode-env.ts`) | `off` (défaut), `auto`, `on` | l'interrupteur : `off` coupe tout, quoi que dise la tâche |
 | `task_metadata.json` : `codeMode` | idem | le choix de la tâche (le banc l'écrit sur sa copie) |
-| `task_metadata.json` : `phaseCodeMode.{spec,planning,coding,qa}` | idem | le choix d'une phase, qui l'emporte |
+| `task_metadata.json` : `phaseCodeMode.{spec,planning,coding,qa}` | idem | le choix d'une phase, qui l'emporte ; posé dans le moteur de la tâche (« Avancé : un moteur par phase », création et édition), une phase laissée « Comme les Paramètres » n'est pas écrite |
 
 `auto` ne l'offre qu'où il rapporte (`AUTO_AGENT_TYPES`) : codeur (sauf tâche `simple`), QA,
 vérificateur, recherche de la spec, analyses du code. La rédaction de spec, la planification, les
@@ -129,10 +130,37 @@ Lu dans le binaire de Claude Code 2.1.332 (messages de refus de `REPL`), le 27/1
   s'y appliquent ; un hook `PreToolUse` sur `REPL` lit `tool_input.code`. Une session en code mode
   ne reprend qu'avec lui.
 
-`create_client` passe déjà un fichier `settings` : c'est là que le lot B2 posera la variable, pour
-une phase dont le réglage le demande et une tâche isolée, puisque le JavaScript de `REPL` tourne
-hors du bac à sable des commandes. Le gain n'a pas pu être mesuré dans le conteneur cloud (refus
-« entrypoint ») : il le sera par le banc, sur la machine de la personne.
+Le gain n'a pas pu être mesuré dans le conteneur cloud (refus « entrypoint ») : il le sera par le
+banc, sur la machine de la personne.
+
+## Le code mode natif dans les tâches Claude et les terminaux
+
+`create_client` appelle `code_mode.native.apply` une fois ses options construites. Quand la phase a
+le mode code (`offered`, les mêmes réglages que `run_script`) et que la CLI peut l'honorer, la
+variable entre dans le bloc `env` du fichier de réglages de la session (`.claude_settings.json`) et
+un hook `PreToolUse` sur `REPL` garde chaque script dans `code-mode-scripts.jsonl`, dans la spec.
+Les conditions reprennent les refus lus au spike : un modèle Opus ou Sonnet 5.5 et suivants (ou
+Fable), l'API Anthropic sans passerelle, fournisseur cloud, `ANTHROPIC_AUTH_TOKEN` ni en-têtes
+propres, `REPL` non retiré par `disallowed_tools`, et une session dans le worktree de sa tâche
+(`.workpilot/worktrees/tasks/<t>`), jamais sur le checkout. Une condition manquée qu'on ne voit pas
+d'ici (`apiKeyHelper` d'un réglage utilisateur, Windows sans Git Bash) fait refuser le mode par la
+CLI : la session garde ses outils habituels, rien ne casse.
+
+Une session en code mode ne reprend qu'avec lui : `.code-mode-native.json`, dans la spec, dit si
+la dernière l'avait. Si elle l'avait et que la suivante ne peut plus (réglage coupé, passerelle,
+autre modèle), la reprise est abandonnée et la session repart de zéro. Une session qui ne l'a
+jamais eu n'écrit rien.
+
+Un terminal reçoit `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1` quand l'interrupteur est sur `auto` ou
+`on` (`terminalCodeModeEnv`, posé par `pty-manager.ts`) : un Claude Code interactif le lit dans son
+environnement. Sur `off`, rien n'est ajouté et une valeur posée par la personne reste.
+
+## Avec la microVM d'une tâche
+
+Quand les commandes d'une session vont dans la microVM de la tâche (`os_sandbox`, `sandbox.vm`), le
+Node de `run_script` reste sur la machine, sous son modèle de permissions et dans le bac à sable de
+l'OS (`ToolExecutor.script_sandbox`, `session_sandbox(..., microvm=False)`) : l'image de la VM n'a
+pas forcément Node, et chaque `run` du script repasse par `execute`, donc va dans la VM.
 
 ## Ce qui ne change pas
 
@@ -140,5 +168,6 @@ hors du bac à sable des commandes. Le gain n'a pas pu être mesuré dans le con
   ses prompts identiques à octet près.
 - Changer de fournisseur ou de modèle : le jeu d'outils suit le client ; `run_script` ne dépend
   d'aucun LLM. Les CLI qui ont leurs propres outils (Claude Code, Codex, OpenCode, pi) ne le
-  reçoivent pas.
+  reçoivent pas ; Claude Code prend son propre `REPL` aux conditions ci-dessus, et un passage vers
+  un autre fournisseur repart d'une session neuve.
 - Pas de Node sur la machine : l'appel répond qu'il faut Node et que les autres outils restent.

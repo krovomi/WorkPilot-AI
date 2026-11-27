@@ -2250,7 +2250,14 @@
 		"onlyResumedPhase": "Seulement pour la phase reprise ({{phase}}) — les phases suivantes gardent leur moteur",
 		"effortNotApplied": "Ce modèle n'a pas de réglage d'effort que WorkPilot puisse atteindre : le niveau choisi n'a aucun effet sur lui.",
 		"effortSentAs": "Envoyé au fournisseur comme « {{value}} », le niveau le plus proche que ce modèle accepte.",
-		"effortRuntime": "Appliqué au lancement si le modèle l'accepte ; le journal de la tâche dit ce qui a été envoyé."
+		"effortRuntime": "Appliqué au lancement si le modèle l'accepte ; le journal de la tâche dit ce qui a été envoyé.",
+		"codeMode": {
+			"label": "Mode code",
+			"default": "Comme les Paramètres",
+			"off": "Arrêté",
+			"auto": "Auto",
+			"on": "Activé"
+		}
 	},
 	"redTeam": {
 		"title": "Red team",
