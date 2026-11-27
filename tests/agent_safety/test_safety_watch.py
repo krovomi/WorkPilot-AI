@@ -258,3 +258,50 @@ def test_the_pause_names_the_phase(task_project, phase, stored):
     watch = SafetyWatch(spec_dir, phase, settings=_settings(anomaly={"pauseBelow": 90}))
     _run(watch, "Bash", {"command": "sudo x"})
     assert read_pause_state(spec_dir)["paused_phase"] == stored
+
+
+# -- code mode: one call that made many -------------------------------------------
+
+
+def _script_result(*calls) -> str:
+    from code_mode.protocol import InnerCall, trailer
+
+    return "value\n\n" + trailer([InnerCall(*call) for call in calls])
+
+
+def test_the_writes_of_a_script_count_like_the_sessions_own(task_project):
+    _project, worktree, spec_dir = task_project
+    watch = SafetyWatch(
+        spec_dir, "coding", settings=_settings(sandbox={"maxFilesWritten": 2})
+    )
+    for i in range(3):
+        (worktree / "src" / f"s{i}.py").write_text("x\n", encoding="utf-8")
+    content = _script_result(
+        *(("write_file", {"path": f"src/s{i}.py"}) for i in range(3))
+    )
+    watch.call("run_script", {"code": "…"}, "c")
+    assert watch.result(content, False, "c") is True
+    assert read_pause_state(spec_dir)["sandbox"]["kind"] == "files_written"
+
+
+def test_a_script_write_outside_the_restricted_paths_stops_and_restores(task_project):
+    _project, worktree, spec_dir = task_project
+    settings = _settings(sandbox={"mode": "restricted", "allowedPaths": ["src"]})
+    watch = SafetyWatch(spec_dir, "coding", settings=settings)
+    (worktree / "README.md").write_text("# rewritten\n", encoding="utf-8")
+    watch.call("run_script", {"code": "…"}, "c")
+    assert watch.result(
+        _script_result(("write_file", {"path": "README.md"})), False, "c"
+    )
+    watch.close()
+    assert read_pause_state(spec_dir)["sandbox"]["kind"] == "restricted_path"
+    assert (worktree / "README.md").read_text(encoding="utf-8") == "# demo\n"
+
+
+def test_a_refused_script_write_is_not_a_violation(task_project):
+    _project, _worktree, spec_dir = task_project
+    settings = _settings(sandbox={"mode": "restricted", "allowedPaths": ["src"]})
+    watch = SafetyWatch(spec_dir, "coding", settings=settings)
+    refused = _script_result(("write_file", {"path": "README.md"}, False))
+    watch.call("run_script", {"code": "…"}, "c")
+    assert watch.result(refused, False, "c") is False

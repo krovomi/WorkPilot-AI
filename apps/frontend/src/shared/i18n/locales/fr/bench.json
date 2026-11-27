@@ -37,7 +37,15 @@
 			"placeholder": "Par exemple : écrire le test avant le code qu'il vérifie.",
 			"tooManyEngines": "Avec une règle, chaque moteur est rejoué deux fois : gardez au plus {{max}} moteurs."
 		},
-		"summaryRule": "{{cards}} carte(s) × {{engines}} moteur(s) × 2 (sans et avec la règle) = {{builds}} build(s) complet(s)"
+		"summaryRule": "{{cards}} carte(s) × {{engines}} moteur(s) × 2 (sans et avec la règle) = {{builds}} build(s) complet(s)",
+		"codeMode": {
+			"title": "Mode code (facultatif)",
+			"label": "Mesurer le mode code : rejouer chaque moteur sans lui et avec lui",
+			"help": "Chaque moteur est rejoué deux fois, sans le mode code puis avec lui sur toutes les phases : le run dit ce qu'il change en cartes résolues, en coût et en durée. Aucun réglage par défaut ne change d'après ce score.",
+			"switchOff": "Allumez le mode code dans Paramètres, Mode code, pour le mesurer.",
+			"notWithRule": "Mesurez une règle ou le mode code, pas les deux dans le même run."
+		},
+		"summaryCodeMode": "{{cards}} carte(s) × {{engines}} moteur(s) × 2 (sans et avec le mode code) = {{builds}} build(s) complet(s)"
 	},
 	"source": {
 		"merge": "son merge",
@@ -101,6 +109,17 @@
 			"worse": "Elle fait échouer une carte que le moteur réussissait sans elle : ne l'adoptez pas telle quelle.",
 			"same": "Aucune différence mesurée sur ces cartes.",
 			"unmeasured": "Pas encore mesurée : aucune carte n'a été jugée dans les deux variantes."
+		},
+		"withCodeMode": "mode code",
+		"codeMode": {
+			"title": "Mode code",
+			"summary": "Sans le mode code : {{without}}/{{pairs}} résolues. Avec : {{with}}/{{pairs}}. Régressions : {{regressions}}.",
+			"cost": "Coût moyen par build : {{without}} sans, {{with}} avec.",
+			"duration": "Durée moyenne par build : {{without}} sans, {{with}} avec.",
+			"better": "Meilleur sur ces cartes : autant de résolues ou plus, aucune régression, et moins cher ou plus de résolues.",
+			"worse": "Il résout moins de ces cartes que sans lui : laissez-le arrêté pour ce moteur.",
+			"same": "Aucune différence mesurée sur ces cartes.",
+			"unmeasured": "Pas encore mesuré : aucune carte jugée dans les deux bras."
 		}
 	},
 	"errors": {

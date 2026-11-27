@@ -204,6 +204,11 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/admin/platform/usage/delivery"): platform(),
     ("GET", "/admin/platform/usage/presence"): platform(),
     ("GET", "/admin/platform/usage/export"): platform(),
+    ("GET", "/users/me/usage"): signed_in(),
+    ("GET", "/users/me/usage/export"): signed_in(),
+    ("GET", "/users/me/usage-notice"): signed_in(),
+    ("POST", "/users/me/usage-notice"): signed_in(),
+    ("POST", "/admin/users/{user_id}/erase"): platform(),
     ("GET", "/admin/audit"): needs("audit.read"),
     # --- The shared board ------------------------------------------------------
     ("GET", "/api/board/stream"): needs("task.read"),

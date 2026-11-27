@@ -8,6 +8,7 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 
 | Script | Rôle | Appelé par |
 |---|---|---|
+| `dev.mjs` | `pnpm run dev` : lance le backend et l'app côte à côte, sur un même port choisi avant (`BACKEND_PORT`, sinon 9000 ou le suivant libre). | `pnpm run dev` |
 | `install-backend.js` | Crée le venv du backend et installe ses dépendances. | `pnpm run install:backend` |
 | `test-backend.js` | Lance pytest avec le Python du venv. | `pnpm run test:backend` |
 | `pre-push.js` | Rejoue les contrôles essentiels de la CI avant un push (lint par défaut, `--full` pour les tests). | `.husky/pre-push`, `pnpm run test:all` |

@@ -19,3 +19,23 @@ export function normalizeApprovalTierMode(value: unknown): ApprovalTierMode {
 		? (value as ApprovalTierMode)
 		: DEFAULT_APPROVAL_TIER_MODE;
 }
+
+/**
+ * The Claude Ship adapter (`apps/backend/pr_followup/claude_ship.py`): `auto`
+ * (the default) turns it on when a signed-in Claude account is on a Team or
+ * Enterprise organization; `on` and `off` force it.
+ */
+export const CLAUDE_SHIP_MODES = ["auto", "on", "off"] as const;
+
+export type ClaudeShipMode = (typeof CLAUDE_SHIP_MODES)[number];
+
+export function normalizeClaudeShipMode(value: unknown): ClaudeShipMode {
+	return typeof value === "string" && (CLAUDE_SHIP_MODES as readonly string[]).includes(value)
+		? (value as ClaudeShipMode)
+		: "auto";
+}
+
+/** Whether the adapter runs: forced, or `auto` and a Team or Enterprise account found. */
+export function claudeShipActive(mode: ClaudeShipMode, detected: boolean): boolean {
+	return mode === "on" || (mode === "auto" && detected);
+}

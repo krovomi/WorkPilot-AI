@@ -83,6 +83,8 @@ class Engine:
     effort: str
     rule: str = ""
     """A candidate rule the copy is built with, or "" (see ``write_rule``)."""
+    code_mode: str = ""
+    """``on``: the arm that measures code mode (``code_mode``), or ""."""
 
     def metadata(self) -> dict:
         """The keys ``buildEngineMetadata`` writes in the renderer."""
@@ -95,6 +97,10 @@ class Engine:
             "phaseProviders": dict.fromkeys(ENGINE_PHASES, self.provider),
             "phaseModels": dict.fromkeys(ENGINE_PHASES, self.model),
             "phaseThinking": dict.fromkeys(ENGINE_PHASES, self.effort),
+            # Explicit either way, so the arm without code mode is the product
+            # without it whatever the person's switch says, and the arm with it
+            # differs by code mode only (`code_mode.settings.effective_mode`).
+            "codeMode": self.code_mode or "off",
         }
 
 
@@ -131,7 +137,12 @@ def parse_engines(raw) -> list[Engine]:
             raise BenchError(
                 f"engine {index} has a rule over {MAX_RULE_CHARS} characters"
             )
-        engine = Engine(provider, model.strip(), effort, rule)
+        code_mode = item.get("codeMode") or ""
+        if code_mode == "off":
+            code_mode = ""
+        if code_mode not in ("", "on"):
+            raise BenchError(f"engine {index} has an invalid code mode")
+        engine = Engine(provider, model.strip(), effort, rule, code_mode)
         if engine in engines:
             raise BenchError(f"engine {index} is listed twice")
         engines.append(engine)
@@ -410,6 +421,7 @@ def prepare(
                 "model": e.model,
                 "effort": e.effort,
                 **({"rule": e.rule} if e.rule else {}),
+                **({"codeMode": e.code_mode} if e.code_mode else {}),
             }
             for i, e in enumerate(engines, start=1)
         ],
@@ -557,6 +569,7 @@ def judge_build(
                     "model": engine["model"],
                     "effort": engine["effort"],
                     "rule": engine.get("rule") or None,
+                    "codeMode": engine.get("codeMode") or None,
                     "resolved": build["resolved"],
                     "f2pPassed": build["f2pPassed"],
                     "f2pTotal": len(case["f2p"]),

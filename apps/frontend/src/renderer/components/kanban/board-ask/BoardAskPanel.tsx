@@ -78,7 +78,7 @@ function AnswerText({
 						onClick={() => onCite(index)}
 						title={match.title}
 						aria-label={t("kanban.ask.citation", { index: index + 1, title: match.title })}
-						className="mx-0.5 inline-flex h-4 min-w-4 -translate-y-1 items-center justify-center rounded bg-primary/15 px-1 align-baseline text-[10px] font-semibold text-primary hover:bg-primary/25"
+						className="mx-0.5 inline-flex h-4 min-w-4 -translate-y-1 items-center justify-center rounded bg-primary/15 px-1 align-baseline text-3xs font-semibold text-primary hover:bg-primary/25"
 					>
 						{index + 1}
 					</button>
@@ -93,7 +93,7 @@ function ModeLine({ result }: { readonly result: BoardAskResult }) {
 	const { t } = useTranslation(["tasks"]);
 	const semantic = result.semantic;
 	return (
-		<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+		<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-muted-foreground">
 			{result.mode === "ai" && (
 				<span className="inline-flex items-center gap-1 font-medium text-primary">
 					<Sparkles className="h-3 w-3" aria-hidden />
@@ -134,14 +134,14 @@ function SemanticModeSelect() {
 	const value = useSettingsStore((s) => s.settings.boardAskSemantic) ?? "auto";
 	const id = useId();
 	return (
-		<div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+		<div className="flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground">
 			<Languages className="h-3.5 w-3.5" aria-hidden />
 			<label htmlFor={id}>{t("kanban.ask.semanticMode.label")}</label>
 			<NativeSelect
 				id={id}
 				value={value}
 				onChange={(event) => void saveSettings({ boardAskSemantic: event.target.value as BoardAskSemanticMode })}
-				className="h-7 px-1.5 text-[11px]"
+				className="h-7 px-1.5 text-2xs"
 				title={t(`kanban.ask.semanticMode.hint.${value}`)}
 			>
 				{BOARD_ASK_SEMANTIC_MODES.map((mode) => (
@@ -184,7 +184,7 @@ function MatchRow({
 					highlighted && "border-primary/60 bg-primary/10",
 				)}
 			>
-				<span className="mt-0.5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold tabular-nums text-muted-foreground">
+				<span className="mt-0.5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-muted text-2xs font-semibold tabular-nums text-muted-foreground">
 					{index + 1}
 				</span>
 				<span className="min-w-0 flex-1 space-y-1">
@@ -200,13 +200,13 @@ function MatchRow({
 							{t(`kanban.ask.state.${match.state}`)}
 						</Chip>
 						{match.archived && (
-							<span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+							<span className="inline-flex items-center gap-1 text-2xs text-muted-foreground">
 								<Archive className="h-3 w-3" aria-hidden />
 								{t("kanban.ask.archived")}
 							</span>
 						)}
 						{match.updatedAt && (
-							<span className="text-[11px] text-muted-foreground tabular-nums">
+							<span className="text-2xs text-muted-foreground tabular-nums">
 								{formatAppDate(match.updatedAt)}
 							</span>
 						)}
@@ -389,7 +389,7 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 						</Button>
 					</div>
 					<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-						<p className="min-w-0 flex-1 basis-64 text-[11px] text-muted-foreground">{t("kanban.ask.privacy")}</p>
+						<p className="min-w-0 flex-1 basis-64 text-2xs text-muted-foreground">{t("kanban.ask.privacy")}</p>
 						<SemanticModeSelect />
 						{entries.length > 0 && (
 							<Button
