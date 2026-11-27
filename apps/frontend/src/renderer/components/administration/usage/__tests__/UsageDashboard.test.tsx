@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../../../shared/i18n";
 import { useAdminStore } from "@/stores/admin-store";
 import { usePermissionsStore } from "@/stores/permissions-store";
+import { PersonSheet } from "../PersonSheet";
 import { UsageDashboard } from "../UsageDashboard";
 import { UsageTab } from "../../UsageTab";
 
@@ -373,6 +374,37 @@ describe("UsageDashboard", () => {
 		const { unmount } = render(<UsageDashboard />);
 		unmount();
 		answer({ ok: true, data: SUMMARY });
+		await Promise.resolve();
+	});
+});
+
+describe("PersonSheet", () => {
+	it("waits without a bridge, and erases nothing once it is gone", async () => {
+		grant(["usage.read"], true);
+		const { unmount } = render(<PersonSheet personId="u1" query={{}} onBack={vi.fn()} />);
+		await screen.findByText("auth.login.local");
+		(globalThis as { electronAPI?: unknown }).electronAPI = undefined;
+		fireEvent.change(screen.getByLabelText("Type the account's email address"), {
+			target: { value: "ada@example.com" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Erase the account" }));
+		expect(serverUsage.eraseAccount).not.toHaveBeenCalled();
+		unmount();
+		render(<PersonSheet personId="u1" query={{}} onBack={vi.fn()} />);
+		expect(screen.getByText("Loading…")).toBeInTheDocument();
+	});
+
+	it("drops a sheet that arrives once it is closed", async () => {
+		let answer: (value: unknown) => void = () => undefined;
+		serverUsage.getUsagePerson.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					answer = resolve;
+				}),
+		);
+		const { unmount } = render(<PersonSheet personId="u1" query={{}} onBack={vi.fn()} />);
+		unmount();
+		answer({ ok: true, data: SHEET });
 		await Promise.resolve();
 	});
 });

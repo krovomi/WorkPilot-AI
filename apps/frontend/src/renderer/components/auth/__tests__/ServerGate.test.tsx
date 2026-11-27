@@ -62,6 +62,15 @@ describe("ServerGate", () => {
 		expect(serverUsage.markUsageNoticeSeen).toHaveBeenCalledOnce();
 	});
 
+	it("counts closing the notice with Escape as read", async () => {
+		signIn();
+		render(<ServerGate showLogin={false} />);
+		const title = await screen.findByText("What this server measures about you");
+		fireEvent.keyDown(title, { key: "Escape" });
+		await waitFor(() => expect(screen.queryByText("What this server measures about you")).toBeNull());
+		expect(serverUsage.markUsageNoticeSeen).toHaveBeenCalledOnce();
+	});
+
 	it("stays quiet when read already, refused, signed out or outside an organization", async () => {
 		serverUsage.getUsageNotice.mockResolvedValueOnce({ ok: true, data: { ...NOTICE, due: false } });
 		signIn();
