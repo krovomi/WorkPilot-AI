@@ -1,0 +1,9 @@
+# Policy of the WorkPilot AI repository itself (docs/architecture/approval-tiers.md).
+#
+# approvals: the tier N0-N3 the stack autopilot puts on each pull request
+# towards develop (scripts/stack_autopilot.py, repository variable
+# APPROVAL_TIERS). The pull requests of this repository have no cross-review
+# step, so N1 waits only for a green CI; N2 and N3 still wait for a person
+# (label `approuvé`) once the autopilot enforces.
+approvals:
+  require_review: false

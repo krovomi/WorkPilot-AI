@@ -85,6 +85,7 @@ DOMAINS: dict[str, str] = {
     "settings": "Provider credentials, models, MCP servers, agent tools",
     "marketplace": "MCP and plugin marketplaces",
     "lab": "Arena, playground, replay, parallel variations, pair programming",
+    "usage": "Who used the server and how much, per person; what is collected",
 }
 
 
@@ -153,6 +154,11 @@ _ALL: tuple[Permission, ...] = (
     # -- analytics ---------------------------------------------------------
     _p("analytics", "read"),
     _p("analytics", "write"),
+    # -- usage -------------------------------------------------------------
+    # Who used the server and how much, per person: privileged, so a viewer
+    # or an analyst does not read it unless a role grants it by name.
+    _p("usage", "read", privileged=True),
+    _p("usage", "write", privileged=True),
     # -- ops ---------------------------------------------------------------
     _p("ops", "read"),
     _p("ops", "write"),

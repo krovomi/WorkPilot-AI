@@ -125,14 +125,19 @@ def _parse(path: Path) -> tuple[dict[str, Any] | None, str | None]:
 
 
 _KNOWN_TOP_KEYS = frozenset({"version", "rules"})
+#: Repository sections another module reads and judges (``approvals.policy``):
+#: who merges a pull request, not what an agent may do, so a wrong one never
+#: stops the agents. Here they are only allowed, in the repository layer.
+_OTHER_SECTIONS = frozenset({"approvals"})
 
 
 def _top_level_errors(data: dict[str, Any], layer: str, name: str) -> list[str]:
     """Keys a layer may not hold: a typo in a key never turns a limit off in silence."""
     errors = []
-    allowed = _KNOWN_TOP_KEYS | (set(SECTIONS) if layer == "repository" else set())
+    repository_only = set(SECTIONS) | _OTHER_SECTIONS
+    allowed = _KNOWN_TOP_KEYS | (repository_only if layer == "repository" else set())
     for key in sorted(set(data) - allowed, key=str):
-        if key in SECTIONS:
+        if key in repository_only:
             errors.append(
                 f"{name}: '{key}' is only read from workpilot.policy.yaml, "
                 "the versioned policy of the repository"
