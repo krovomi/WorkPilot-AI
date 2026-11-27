@@ -3045,5 +3045,33 @@
 		"reasonPlaceholder": "Ce qui la bloque (facultatif), par ex. on attend la clé d'API du client",
 		"failedTitle": "Drapeau non enregistré",
 		"failedDescription": "Impossible d'enregistrer le drapeau. Réessayez."
+	},
+	"runFacts": {
+		"title": "Bilan",
+		"unknown": "inconnu",
+		"automation": "Automatisation",
+		"agentTime": "Temps de travail des agents",
+		"leadTime": "Du lancement à la fin",
+		"spendTitle": "Tokens et coût de toutes les sessions d'agents",
+		"tokens": "{{value}} tokens",
+		"tokensEstimated": "≈ {{value}} tokens",
+		"tokensUnknown": "Tokens inconnus",
+		"costShort": "· {{cost}}",
+		"tokensLabel": "Tokens",
+		"tokensDetail": "{{total}} (entrée {{input}}, sortie {{output}}, cache {{cache}})",
+		"costLabel": "Coût",
+		"estimatedNote_one": "{{count}} session sur {{total}} estimée : son fournisseur n'a donné aucun compte.",
+		"estimatedNote_other": "{{count}} sessions sur {{total}} estimées : leur fournisseur n'a donné aucun compte.",
+		"models": "Modèles",
+		"createdBy": "Créée par",
+		"startedBy": "Lancée par",
+		"peopleShort": "{{creator}} → {{launcher}}",
+		"peopleTitle": "Créée par {{creator}}, lancée par {{launcher}}",
+		"duration": {
+			"seconds": "{{seconds}} s",
+			"minutes": "{{minutes}} min",
+			"hours": "{{hours}} h {{minutes}} min",
+			"days": "{{days}} j {{hours}} h"
+		}
 	}
 }

@@ -9,6 +9,7 @@ pull request instead of pushing markers.
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -412,3 +413,220 @@ def test_workflow_waits_for_the_workflows_that_exist():
     data = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     waited = data.get("on", data.get(True))["workflow_run"]["workflows"]
     assert set(waited) <= names, set(waited) - names
+
+
+# -- approval tiers ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("value", "mode"),
+    [("", "observe"), ("enforce", "enforce"), (" OFF ", "off"), ("yes", "observe")],
+)
+def test_tiers_mode_never_enforces_by_mistake(value, mode):
+    assert sa.tiers_mode({"WORKPILOT_APPROVALS": value}) == mode
+    assert sa.tiers_mode({}) == "observe"
+
+
+def test_tier_labels_and_the_labels_the_tier_reads():
+    labels = {"niveau:N1", "niveau:N3", "autopilot", "autopilot:squash", "semver:major"}
+    assert sa.stale_tier_labels(labels, "N3") == ["niveau:N1"]
+    own = labels | {"approuvé", "autopilot/à-valider", "autopilot/rouge"}
+    assert sa.runner_labels(own) == ["semver:major"]
+
+
+def test_read_decision_keeps_a_decision_only():
+    good = json.dumps({"decision": {"tier": "N2", "action": "human"}})
+    assert sa.read_decision("noise\n" + good)["tier"] == "N2"
+    for bad in ("", "not json", '{"error": "x"}', '{"decision": {"tier": "N9"}}'):
+        assert sa.read_decision(bad) is None
+
+
+def _approved(login="krovomi", at="2026-11-27T10:00:00Z", kind="User"):
+    return {
+        "event": "labeled",
+        "label": {"name": "approuvé"},
+        "created_at": at,
+        "actor": {"login": login, "type": kind},
+    }
+
+
+def _commit_by(name, date):
+    return {"commit": {"author": {"name": name}, "committer": {"date": date}}}
+
+
+def test_an_approval_needs_a_person_with_write_access():
+    writer = {"krovomi": "admin", "guest": "read"}.get
+    assert sa.approval_holds([_approved()], [], writer) == (True, "krovomi")
+    assert not sa.approval_holds([], [], writer)[0]
+    assert not sa.approval_holds([_approved("guest")], [], writer)[0]
+    assert not sa.approval_holds([_approved("github-actions[bot]")], [], writer)[0]
+    assert not sa.approval_holds([_approved(kind="Bot")], [], writer)[0]
+
+
+def test_a_new_commit_asks_again_but_the_autopilots_own_do_not():
+    writer = {"krovomi": "write"}.get
+    before = _commit_by("Leub", "2026-11-27T09:00:00Z")
+    sync = _commit_by(sa.AUTOPILOT_NAME, "2026-11-27T11:00:00Z")
+    after = _commit_by("Leub", "2026-11-27T11:00:00Z")
+    assert sa.approval_holds([_approved()], [before, sync], writer)[0]
+    holds, why = sa.approval_holds([_approved()], [before, after], writer)
+    assert not holds and "commit" in why
+    # The last putting of the label is the one that counts.
+    again = _approved(at="2026-11-27T12:00:00Z")
+    assert sa.approval_holds([_approved(), again], [after], writer)[0]
+
+
+class _RecordingGitHub(sa.GitHub):
+    def __init__(self, events=(), commits=(), permission="admin"):
+        super().__init__("o/r", "", None, dry_run=True)
+        self.calls: list[str] = []
+        self.events, self.commits, self.permission = (
+            list(events),
+            list(commits),
+            permission,
+        )
+
+    def add_labels(self, number, labels):
+        self.calls.append(f"label #{number} {labels}")
+
+    def remove_label(self, number, label):
+        self.calls.append(f"unlabel #{number} {label}")
+
+    def comment(self, number, body):
+        self.calls.append(f"comment #{number}")
+
+    def pages(self, path, key=None):
+        return self.events if "/events" in path else self.commits
+
+    def get(self, path):
+        return {"permission": self.permission}
+
+
+def _pilot(monkeypatch, mode, decision, gh=None):
+    monkeypatch.setenv("WORKPILOT_APPROVALS", mode)
+    gh = gh or _RecordingGitHub()
+    pilot = sa.Autopilot(gh, "develop", can_push=True, claude=False)
+    asked = []
+
+    def fake(pr):
+        asked.append(pr.number)
+        return decision
+
+    monkeypatch.setattr(pilot, "tier_decision", fake)
+    return pilot, gh, asked
+
+
+def _decision(tier, action, mode):
+    return {
+        "tier": tier,
+        "action": action,
+        "mode": mode,
+        "reasons": [{"code": "sensitive_paths", "tier": tier, "detail": "auth"}],
+    }
+
+
+def test_off_merges_as_before_without_reading_a_tier(monkeypatch):
+    pilot, gh, asked = _pilot(monkeypatch, "off", None)
+    assert pilot.tier_allows(_pr(1))
+    assert asked == [] and gh.calls == []
+
+
+def test_observe_labels_the_tier_and_merges_as_before(monkeypatch):
+    decision = _decision("N3", "human", "observe")
+    pilot, gh, _ = _pilot(monkeypatch, "observe", decision)
+    pr = _pr(1, labels=["niveau:N1"])
+    assert pilot.tier_allows(pr)
+    assert gh.calls == ["unlabel #1 niveau:N1", "label #1 ['niveau:N3']"]
+    # An unreadable tier never stops a merge in observe.
+    pilot, gh, _ = _pilot(monkeypatch, "observe", None)
+    assert pilot.tier_allows(_pr(2))
+
+
+def test_the_policy_file_can_keep_enforce_in_observe(monkeypatch):
+    pilot, _, _ = _pilot(monkeypatch, "enforce", _decision("N3", "human", "observe"))
+    assert pilot.tier_allows(_pr(1))
+
+
+def test_enforce_merges_n0_and_n1_and_fails_closed(monkeypatch):
+    pilot, _, _ = _pilot(monkeypatch, "enforce", _decision("N1", "merge", "enforce"))
+    assert pilot.tier_allows(_pr(1, labels=["autopilot/à-valider"]))
+    pilot, gh, _ = _pilot(monkeypatch, "enforce", None)
+    assert not pilot.tier_allows(_pr(2))
+    assert gh.calls == []
+
+
+def test_enforce_holds_n2_and_n3_until_a_person_approves(monkeypatch):
+    decision = _decision("N3", "human", "enforce")
+    pilot, gh, _ = _pilot(monkeypatch, "enforce", decision)
+    pr = _pr(1)
+    assert not pilot.tier_allows(pr)
+    assert not pilot.tier_allows(pr)  # the second run does not comment again
+    assert gh.calls == [
+        "label #1 ['niveau:N3']",
+        "label #1 ['autopilot/à-valider']",
+        "comment #1",
+    ]
+    approved = _RecordingGitHub(events=[_approved()])
+    pilot, gh, _ = _pilot(monkeypatch, "enforce", decision, approved)
+    pr = _pr(1, labels=["niveau:N3", "autopilot/à-valider", "approuvé"])
+    assert pilot.tier_allows(pr)
+    assert gh.calls == ["unlabel #1 autopilot/à-valider"]
+
+
+def test_a_stale_approval_is_taken_off_and_asked_again(monkeypatch):
+    late = _commit_by("Leub", "2026-11-27T11:00:00Z")
+    stale = _RecordingGitHub(events=[_approved()], commits=[late])
+    decision = _decision("N2", "human", "enforce")
+    pilot, gh, _ = _pilot(monkeypatch, "enforce", decision, stale)
+    pr = _pr(1, labels=["niveau:N2", "autopilot/à-valider", "approuvé"])
+    assert not pilot.tier_allows(pr)
+    assert gh.calls == [
+        "unlabel #1 approuvé",
+        "unlabel #1 autopilot/à-valider",
+        "label #1 ['autopilot/à-valider']",
+        "comment #1",
+    ]
+
+
+def test_a_label_with_a_slash_or_an_accent_is_removed_by_its_encoded_name():
+    gh = sa.GitHub("o/r", "", None, dry_run=True)
+    seen = []
+    gh.write = lambda method, path, fields=None: seen.append(path)
+    gh.remove_label(3, "autopilot/à-valider")
+    assert seen == ["repos/o/r/issues/3/labels/autopilot%2F%C3%A0-valider"]
+
+
+def test_the_tier_is_read_by_the_real_engine(stack, monkeypatch):
+    _, pilot, pr, _ = stack
+    monkeypatch.setattr(
+        sa,
+        "APPROVALS_RUNNER",
+        ROOT / "apps" / "backend" / "runners" / "approvals_runner.py",
+    )
+    monkeypatch.setenv("WORKPILOT_APPROVALS", "enforce")
+    decision = pilot.tier_decision(pr)
+    assert decision is not None
+    assert (decision["tier"], decision["action"], decision["mode"]) == (
+        "N0",
+        "merge",
+        "enforce",
+    )
+    assert decision["facts"]["base"] == "develop"
+
+
+def test_workflow_lets_an_approval_start_a_run_and_passes_the_setting():
+    yaml = pytest.importorskip("yaml")
+    data = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    job = data["jobs"]["stack-autopilot"]
+    assert "github.event.label.name == 'approuvé'" in job["if"]
+    assert "'autopilot/à-valider'" not in job["if"]
+    run_env = job["steps"][-1]["env"]
+    assert run_env["WORKPILOT_APPROVALS"] == "${{ vars.APPROVAL_TIERS || 'observe' }}"
+    installs = [s.get("run", "") for s in job["steps"]]
+    assert any("PyYAML==" in run for run in installs)
+
+
+def test_this_repository_has_no_cross_review_step():
+    yaml = pytest.importorskip("yaml")
+    data = yaml.safe_load((ROOT / "workpilot.policy.yaml").read_text(encoding="utf-8"))
+    assert data["approvals"] == {"require_review": False}

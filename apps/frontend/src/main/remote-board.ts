@@ -26,6 +26,10 @@ export const SNAPSHOT_FILES: ReadonlyMap<string, number> = new Map([
 	["pause_state.json", 50_000],
 	["review_state.json", 50_000],
 	["status_history.json", 100_000],
+	// Who created and launched the card, and what it spent: computed by the
+	// server from its accounts and usage records (`shared_board/run_facts.py`).
+	["task_people.json", 10_000],
+	["usage_summary.json", 10_000],
 	["spec.md", 300_000],
 	["qa_report.md", 300_000],
 ]);

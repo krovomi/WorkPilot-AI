@@ -119,6 +119,8 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
   `autopilot/conflit` (retiré seul au commit suivant) et `autopilot/rouge`. Secrets : `PAT_TOKEN`
   (Contents, Pull requests, Workflows en écriture), `CLAUDE_CODE_OAUTH_TOKEN` ou `ANTHROPIC_API_KEY` ;
   sans eux, le résumé du run dit ce qui manque. `tests/test_stack_autopilot.py` le garde.
+  Il pose aussi le niveau `niveau:N0`–`N3` ; `APPROVAL_TIERS=enforce` fait attendre N2 et N3 le label
+  `approuvé`, posé par une personne, jamais par un agent ([approval-tiers.md](../architecture/approval-tiers.md)).
 - **Releases : le pilote de release** (`release-autopilot.yml`, `scripts/release_autopilot.py`,
   `scripts/release_docs.py`). Personne ne prépare plus une version à la main : quand `develop` n'a
   reçu aucune fusion depuis 2 h, que la version précédente a au moins 24 h et que les workflows de

@@ -7,6 +7,7 @@ import { getTaskSource } from "../../lib/kanban-filter";
 import { sanitizeMarkdownForDisplay } from "../../lib/utils";
 import { useKanbanBlockerStore } from "../../stores/kanban-blocker-store";
 import { CardTypeChip } from "./CardTypeChip";
+import { TaskRunFactsDetails } from "./TaskRunFacts";
 
 /** Room for a few sentences: the card itself clamps the description to two lines. */
 const PREVIEW_DESCRIPTION_CHARS = 320;
@@ -117,6 +118,7 @@ export function TaskCardPreview({
 					</span>
 				</div>
 			</div>
+			<TaskRunFactsDetails task={task} />
 		</div>
 	);
 }
