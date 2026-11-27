@@ -66,6 +66,12 @@ export default function Settings() {
 				{administers ? (
 					<ListRow icon="users" title={t("admin.title")} subtitle={t("admin.summary")} onPress={() => router.push("/admin")} />
 				) : null}
+				<ListRow
+					icon="bell"
+					title={t("needsYou.title")}
+					subtitle={t("needsYou.summary")}
+					onPress={() => router.push("/needs-you")}
+				/>
 				<ListRow icon="key" title={t("tokens.title")} subtitle={t("tokens.summary")} onPress={() => router.push("/tokens")} />
 			</View>
 			<LockSection />
