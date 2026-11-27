@@ -391,3 +391,11 @@ def test_the_model_is_told_its_commands_run_in_linux_only_when_on(monkeypatch):
     assert "microVM" not in description()
     monkeypatch.setenv("WORKPILOT_AGENT_SAFETY", SAFETY_ON)
     assert "Linux microVM" in description()
+
+
+def test_the_reported_reason_fits_what_the_app_keeps(tmp_path):
+    long = os_sandbox.SessionSandbox(
+        ISOLATED, "bubblewrap", None, None, fallback_reason="x" * 900
+    )
+    payload = os_sandbox.first_report(tmp_path / "long", "openai", long)
+    assert payload is not None and len(payload["reason"]) == 500

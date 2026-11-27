@@ -274,7 +274,8 @@ def first_report(
         "provider": provider,
         "state": sandbox.state,
         "backend": sandbox.backend,
-        "reason": sandbox.reason or sandbox.fallback_reason,
+        # The app keeps a reason of 500 characters at most (`main/task-sandbox.ts`).
+        "reason": (sandbox.reason or sandbox.fallback_reason or "")[:500] or None,
         "network": sandbox.policy.allowlist.describe() if sandbox.policy else [],
     }
 
