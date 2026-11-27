@@ -12,7 +12,7 @@ point back to the person:
   administrator's "added X to the group"), replaced by :data:`ERASED`;
 - the invitations sent to their address;
 - their address among the recipients an organization chose for its usage
-  report (``services/report_settings.py``).
+  report (``services/report_settings.py``), and the budgets set on them.
 
 Files a project's clone holds (cards, memories) are the team's work, not
 usage data: they stay as they are.
@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from server.db.models import AuditLog, Invitation, Organization, User
-from server.services import report_settings
+from server.services import report_settings, usage_budgets
 from sqlalchemy import String, cast, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,6 +68,7 @@ async def erase(db: AsyncSession, user: User) -> dict[str, int]:
         delete(Invitation).where(func.lower(Invitation.email) == user.email.lower())
     )
     recipients = await _drop_recipient(db, user.email.lower())
+    budgets = await usage_budgets.drop_person(db, user.id)
     await db.delete(user)
     await db.flush()
     return {
@@ -75,6 +76,7 @@ async def erase(db: AsyncSession, user: User) -> dict[str, int]:
         "audit_payloads_scrubbed": scrubbed,
         "invitations_deleted": invitations.rowcount or 0,
         "report_recipients_removed": recipients,
+        "budgets_removed": budgets,
     }
 
 

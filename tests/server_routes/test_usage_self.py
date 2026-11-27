@@ -324,6 +324,7 @@ async def test_the_platform_erases_an_account_and_keeps_the_totals(world, used):
         "audit_payloads_scrubbed": 2,
         "invitations_deleted": 1,
         "report_recipients_removed": 0,
+        "budgets_removed": 0,
     }
     async with get_session_factory()() as db:
         assert await db.get(User, who) is None

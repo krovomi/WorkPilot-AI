@@ -429,6 +429,7 @@ def mount_server_mode(app: FastAPI) -> bool:
         ("server.routers.usage_admin", "usage_admin"),
         ("server.routers.usage_self", "usage_self"),
         ("server.routers.usage_report", "usage_report"),
+        ("server.routers.usage_budgets", "usage_budgets"),
         ("server.routers.needs_you", "needs-you"),
         ("server.routers.access_tokens", "access-tokens"),
         ("server.routers.admin", "admin"),

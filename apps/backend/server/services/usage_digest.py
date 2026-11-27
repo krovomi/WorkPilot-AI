@@ -16,7 +16,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Literal
 
 from server.db.models import Organization, OrgMember, PresenceDay
-from server.services import usage_delivery, usage_report
+from server.services import usage_budgets, usage_delivery, usage_report
 from server.services.usage_report import Scope
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -148,6 +148,25 @@ def _alerts(budget: dict | None) -> list[dict]:
     return []
 
 
+def _budget_alerts(budgets: list[usage_budgets.Status], names: bool) -> list[dict]:
+    """The budgets of people, groups and projects past an alert threshold."""
+    found = []
+    for b in budgets:
+        threshold = next((t for t in BUDGET_ALERTS if b.percent >= t), None)
+        if b.scope == usage_budgets.ORG or threshold is None:
+            continue
+        found.append(
+            {
+                "kind": "budget_scope",
+                "scope": b.scope,
+                "name": b.name if names or b.scope != "person" else None,
+                "threshold": threshold,
+                "percent": b.percent,
+            }
+        )
+    return found
+
+
 async def digest(
     db: AsyncSession, org_id: str, period: Period, *, names: bool = True
 ) -> dict:
@@ -201,5 +220,6 @@ async def digest(
             for e in engines
         ],
         "failures": delivery["failures"],
-        "alerts": _alerts(summary["budget"]),
+        "alerts": _alerts(summary["budget"])
+        + _budget_alerts(await usage_budgets.statuses(db, org_id), names),
     }
