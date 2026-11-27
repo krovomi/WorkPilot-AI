@@ -2,6 +2,7 @@ import { debugLog } from "../../shared/utils/debug-logger";
 import { parseJevSettings } from "../../shared/utils/jev-settings";
 import { parseSwarmSettings } from "../../shared/utils/swarm-settings";
 import { normalizeAgentSafety } from "../../shared/utils/agent-safety";
+import { normalizeApprovalTierMode } from "../../shared/utils/approval-tiers";
 import { execFileSync, spawn } from "node:child_process";
 import {
 	existsSync,
@@ -769,6 +770,8 @@ export function registerSettingsHandlers(
 				// Sent to every agent process: bounded here, and again by the backend.
 				if (settings.agentSafety !== undefined)
 					newSettings.agentSafety = normalizeAgentSafety(settings.agentSafety);
+				if (settings.approvalTiers !== undefined)
+					newSettings.approvalTiers = normalizeApprovalTierMode(settings.approvalTiers);
 
 				// Sync defaultModel when agent profile changes (#414)
 				if (settings.selectedAgentProfile) {
