@@ -399,3 +399,21 @@ def test_the_reported_reason_fits_what_the_app_keeps(tmp_path):
     )
     payload = os_sandbox.first_report(tmp_path / "long", "openai", long)
     assert payload is not None and len(payload["reason"]) == 500
+
+
+def test_sbx_is_looked_for_where_its_windows_installers_put_it(monkeypatch, tmp_path):
+    monkeypatch.setattr(microvm, "is_windows", lambda: True)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    monkeypatch.setenv("ProgramFiles", str(tmp_path / "pf"))
+    dirs = microvm._install_dirs()
+    assert str(tmp_path / "local" / "DockerSandboxes" / "bin") in dirs
+    assert str(tmp_path / "pf" / "DockerSandboxes") in dirs
+    monkeypatch.setattr(microvm, "is_windows", lambda: False)
+    assert microvm._install_dirs() == []
+
+
+def test_the_name_is_the_apps_for_the_same_path(monkeypatch):
+    # The same vector as apps/frontend/src/main/microvm/__tests__/sbx.test.ts:
+    # the app removes the VM it never created by this name.
+    monkeypatch.setattr(microvm, "is_windows", lambda: False)
+    assert microvm.vm_name("/home/me/wt") == "workpilot-194449c0cfe5d0df"

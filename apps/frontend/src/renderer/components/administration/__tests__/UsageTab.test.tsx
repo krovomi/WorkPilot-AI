@@ -101,6 +101,15 @@ describe("UsageTab", () => {
 		expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
 	});
 
+	it("saves nothing once the bridge is gone", async () => {
+		render(<UsageTab />);
+		const save = await screen.findByRole("button", { name: "Save" });
+		(globalThis as { electronAPI?: unknown }).electronAPI = undefined;
+		fireEvent.click(save);
+		expect(serverUsage.setUsageSettings).not.toHaveBeenCalled();
+		expect(screen.queryByText("Saved.")).not.toBeInTheDocument();
+	});
+
 	it("drops an answer that arrives after it closed, and needs the bridge", async () => {
 		let reply: (value: unknown) => void = () => undefined;
 		serverUsage.getUsageSettings.mockReturnValue(new Promise((resolve) => (reply = resolve)));
