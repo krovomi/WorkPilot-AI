@@ -293,6 +293,8 @@ export interface AppSettings {
 	swarm?: import("./swarm").SwarmSettings;
 	/** Settings, Sandbox and Anomaly detection: sent to every agent process. */
 	agentSafety?: import("./agent-safety").AgentSafetySettings;
+	/** Settings, Code mode: agents chain their tools in a script (off when absent). */
+	codeMode?: import("../utils/code-mode").CodeModeSetting;
 	theme: "light" | "dark" | "system";
 	colorTheme?: ColorTheme;
 	defaultModel: string;

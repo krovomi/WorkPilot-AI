@@ -30,6 +30,7 @@ import {
 	taskPhaseProvider,
 } from "../provider-failover/task-phase-provider";
 import { agentSafetyEnv } from "./agent-safety-env";
+import { codeModeEnv } from "./code-mode-env";
 import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
 import {
@@ -980,6 +981,7 @@ export class AgentProcessManager {
 						...providerSpecificEnv, // Include provider credentials (WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
 						...PERMISSION_CHANNEL_ENV, // An ACP agent's questions go to the card; answers come back on stdin
 						...agentSafetyEnv(), // Settings, Sandbox and Anomaly detection (agents/safety_watch.py)
+						...codeModeEnv(), // Settings, Code mode (apps/backend/code_mode)
 					},
 					processType === "task-execution" ? "feature-build" : undefined,
 				),

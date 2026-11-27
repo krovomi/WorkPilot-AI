@@ -152,15 +152,21 @@ export function sanitizeEngines(raw: unknown): BenchEngine[] | string {
 		}
 		const rule = normalizeRule(rawRule);
 		if (rule.length > MAX_RULE_CHARS) return `A rule is over ${MAX_RULE_CHARS} characters`;
+		const rawCodeMode = (item as Record<string, unknown>).codeMode ?? "";
+		if (rawCodeMode !== "" && rawCodeMode !== "off" && rawCodeMode !== "on") {
+			return "An engine has an invalid code mode";
+		}
 		const engine: BenchEngine = { provider, model: model.trim(), effort };
 		if (rule) engine.rule = rule;
+		if (rawCodeMode === "on") engine.codeMode = "on";
 		if (
 			engines.some(
 				(e) =>
 					e.provider === engine.provider &&
 					e.model === engine.model &&
 					e.effort === engine.effort &&
-					(e.rule ?? "") === rule,
+					(e.rule ?? "") === rule &&
+					(e.codeMode ?? "") === (engine.codeMode ?? ""),
 			)
 		) {
 			return "The same engine is listed twice";

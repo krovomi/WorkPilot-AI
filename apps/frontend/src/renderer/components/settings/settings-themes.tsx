@@ -1,6 +1,7 @@
 import {
 	Bell,
 	Bot,
+	Braces,
 	Brain,
 	Bug,
 	CalendarClock,
@@ -160,6 +161,12 @@ export function createSettingsThemes(t: Translate): Record<SettingsTheme, Settin
 				{ id: "devtools", icon: Code, label: nav("devtools"), type: "app" },
 				{ id: "paths", icon: FolderOpen, label: t("settings:sections.paths.title"), type: "app" },
 				{ id: "agent", icon: Bot, label: nav("agent"), type: "app" },
+				{
+					id: "code-mode",
+					icon: Braces,
+					label: t("settings:sections.codeMode.title"),
+					type: "app",
+				},
 				{ id: "swarm-mode", icon: Zap, label: t("swarm:title", "Swarm Mode"), type: "app" },
 			],
 			priority: 4,

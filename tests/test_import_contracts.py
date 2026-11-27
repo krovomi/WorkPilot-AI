@@ -185,6 +185,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # clients) and by the provider registry: a leaf, or it joins the cycle.
     # The card and the feed are written by core (`_report_sandbox`).
     "os_sandbox": {"foundation", "security"},
+    # Code mode's tool: Node behind the session's executor, which it receives
+    # (`code_mode.runner.Executor`) rather than imports; a leaf on foundation.
+    "code_mode": {"foundation"},
     # The cross review's verdict, read by the pull request step in core: a
     # leaf, or it joins the cycle. Its session is `workflows/cross_review_phase.py`.
     "cross_review": {"foundation"},
