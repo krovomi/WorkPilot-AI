@@ -18,7 +18,8 @@ desktop; the run reads the targets (``run_manager``), the board the rest.
 ``abandoned`` and its companions (when, why, the resolution and the task it
 duplicates or that replaces it) set a card aside in the « Abandonnée » column
 of every member's board; nothing is deleted and resuming clears them
-(``shared/utils/task-lifecycle.ts`` on the desktop).
+(``shared/utils/task-lifecycle.ts`` on the desktop). ``flagged`` and its
+reason and date are the « Bloquée » flag (``shared/utils/task-flag.ts``).
 
 The engine names a provider of the capability matrix
 (``capabilities/providers.yaml``); its credentials are the deployment's, as
@@ -147,6 +148,9 @@ PLAIN_KEYS = (
     "abandonedReason",
     "abandonedResolution",
     "abandonedLink",
+    "flagged",
+    "flaggedReason",
+    "flaggedAt",
 )
 
 
@@ -182,6 +186,9 @@ class CardSettings(BaseModel):
     abandonedReason: str | None = Field(default=None, max_length=2000)
     abandonedResolution: AbandonResolution | None = None
     abandonedLink: TaskRef | None = None
+    flagged: bool | None = None
+    flaggedReason: str | None = Field(default=None, max_length=500)
+    flaggedAt: str | None = Field(default=None, pattern=INSTANT_PATTERN)
 
     def plain_value(self, key: str) -> Any:
         """The value written to ``task_metadata.json``; ``None`` removes the key."""
@@ -296,7 +303,11 @@ def read_settings(root: Path, directory: Path) -> dict[str, Any]:
         "mobileTargets": metadata.get("mobileTargets"),
         "blockedBy": metadata.get("blockedBy"),
         "mobileBootstrap": metadata.get("mobileBootstrap"),
-        **{key: metadata.get(key) for key in PLAIN_KEYS if key.startswith("abandoned")},
+        **{
+            key: metadata.get(key)
+            for key in PLAIN_KEYS
+            if key.startswith(("abandoned", "flagged"))
+        },
         "goal": None,
         "goalError": None,
     }

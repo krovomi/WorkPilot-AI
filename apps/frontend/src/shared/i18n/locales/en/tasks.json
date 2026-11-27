@@ -2991,5 +2991,19 @@
 		},
 		"mergeHeld": "The full suite is running on the CI for this commit. Merge becomes available once it is green.",
 		"mergeHeldLink": "Open the run"
+	},
+	"flag": {
+		"badge": "Blocked",
+		"flag": "Flag as blocked",
+		"flagMenu": "Flag as blocked…",
+		"unflag": "Remove flag",
+		"dialogTitle_one": "Flag the task as blocked",
+		"dialogTitle_other": "Flag {{count}} tasks as blocked",
+		"dialogDescription_one": "The task keeps its column; the flag tells everyone it cannot move on until the impediment is lifted.",
+		"dialogDescription_other": "The tasks keep their columns; the flag tells everyone they cannot move on until the impediment is lifted.",
+		"reasonLabel": "What blocks it",
+		"reasonPlaceholder": "What blocks it (optional), e.g. waiting for the API key from the client",
+		"failedTitle": "Flag not saved",
+		"failedDescription": "Could not save the flag. Please try again."
 	}
 }

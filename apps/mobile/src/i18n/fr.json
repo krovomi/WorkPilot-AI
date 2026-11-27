@@ -87,7 +87,8 @@
 		"groupFilter": "Groupe {{group}} · tout afficher",
 		"showAll": "Afficher toutes les cartes",
 		"sync": "Synchro",
-		"emptyHint": "Les cartes arrivent ici en avançant sur le tableau."
+		"emptyHint": "Les cartes arrivent ici en avançant sur le tableau.",
+		"flagged": "Bloquée"
 	},
 	"columns": {
 		"backlog": "Planification",

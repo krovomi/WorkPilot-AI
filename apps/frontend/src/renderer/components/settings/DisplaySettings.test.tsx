@@ -32,3 +32,13 @@ describe("Kanban column summary", () => {
 		expect(onSettingsChange).toHaveBeenCalledWith({ ...all, kanbanColumnSummary: true });
 	});
 });
+
+describe("Closed PRs set aside", () => {
+	it("is on by default and turns off", async () => {
+		const { onSettingsChange, all } = renderWith({ kanbanAbandonClosedPrs: undefined });
+		const toggle = screen.getByRole("switch", { name: "Set aside cards whose PR was closed" });
+		expect(toggle).toBeChecked();
+		await userEvent.click(toggle);
+		expect(onSettingsChange).toHaveBeenCalledWith({ ...all, kanbanAbandonClosedPrs: false });
+	});
+});

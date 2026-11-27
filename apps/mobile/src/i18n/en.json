@@ -87,7 +87,8 @@
 		"groupFilter": "Group {{group}} · show all",
 		"showAll": "Show every card",
 		"sync": "Sync",
-		"emptyHint": "Cards land here as they move along the board."
+		"emptyHint": "Cards land here as they move along the board.",
+		"flagged": "Blocked"
 	},
 	"columns": {
 		"backlog": "Planning",

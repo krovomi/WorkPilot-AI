@@ -101,6 +101,8 @@ export interface BoardCard {
 	claimedByName: string | null;
 	/** A run that failed or a card set aside (`board_mcp.server.outcome`); absent on an older server. */
 	outcome?: "failed" | "abandoned";
+	/** « Bloquée »: a person flagged the card as impeded (desktop `task-flag.ts`). */
+	flagged?: boolean;
 	/** A part of a task split into small PRs (`task_split`): its group. */
 	group?: { id: string; title: string; index: number; total: number };
 }

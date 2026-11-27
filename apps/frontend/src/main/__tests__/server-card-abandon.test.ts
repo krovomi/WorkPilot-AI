@@ -3,6 +3,7 @@
  * it in « Abandonnée »; resuming clears it there too.
  */
 import { describe, expect, it } from "vitest";
+import { buildFlagMetadata, buildUnflagMetadata } from "../../shared/utils/task-flag";
 import { buildAbandonMetadata, buildResumeMetadata } from "../../shared/utils/task-lifecycle";
 import { settingsFromMetadata } from "../server-card-settings";
 
@@ -30,5 +31,22 @@ describe("settingsFromMetadata, abandon", () => {
 			abandonedLink: null,
 		});
 		expect(settingsFromMetadata({ abandoned: undefined })).toEqual({ abandoned: null });
+	});
+});
+
+describe("settingsFromMetadata, flag", () => {
+	it("sends the « Bloquée » flag, and clears it when lifted", () => {
+		const now = new Date("2026-11-22T10:00:00.000Z");
+		expect(settingsFromMetadata(buildFlagMetadata("waiting", now))).toEqual({
+			flagged: true,
+			flaggedAt: "2026-11-22T10:00:00.000Z",
+			flaggedReason: "waiting",
+		});
+		expect(settingsFromMetadata(buildUnflagMetadata())).toEqual({
+			flagged: false,
+			flaggedReason: null,
+			flaggedAt: null,
+		});
+		expect(settingsFromMetadata({ flagged: undefined })).toEqual({ flagged: null });
 	});
 });
