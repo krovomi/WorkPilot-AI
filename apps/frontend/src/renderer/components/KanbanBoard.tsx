@@ -55,6 +55,7 @@ import { usePendingDeleteStore } from "../stores/pending-delete-store";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
 import { canMoveTaskTo, emptyColumnGroups, getBoardColumn, getVisualColumn, isQuickAddColumn } from "../lib/kanban-columns";
 import { useOutcomeDrop } from "../hooks/useOutcomeDrop";
+import { useLaneDrag } from "../hooks/useLaneDrag";
 import { BoardDialogs } from "./kanban/BoardDialogs";
 import { groupMoveTargets } from "../lib/group-move";
 import { DragOverlayCard } from "./kanban/DragOverlayCard";
@@ -135,6 +136,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { WorktreeCleanupDialog } from "./WorktreeCleanupDialog";
 import { SortableColumnWrapper } from "./kanban/KanbanColumn";
+import { BoardLanes } from "./kanban/BoardLanes";
 
 // Type guard for valid drop column targets - preserves literal type from TASK_STATUS_COLUMNS
 const VALID_DROP_COLUMNS = new Set<string>(TASK_STATUS_COLUMNS);
@@ -2178,7 +2180,7 @@ export function KanbanBoard({
 			kanbanSort, outcomeDrop,
 		],
 	);
-
+	const laneDrag = useLaneDrag(handleDragOver, handleDragEnd, selectedTasks);
 	return (
 		<div className="flex h-full flex-col" data-board-selecting={selectedTaskIds.size > 0 ? "" : undefined} data-board-group-drag={isDraggingBulkSelected ? "" : undefined}>
 			{/* Screen-reader live region for drag-and-drop announcements */}
@@ -2417,26 +2419,25 @@ export function KanbanBoard({
 					)}
 				</div>
 			</div>
-			{/* Kanban columns */}
 			<DndContext
 				sensors={sensors}
 				collisionDetection={closestCorners}
 				onDragStart={handleDragStart}
-				onDragOver={handleDragOver}
-				onDragEnd={handleDragEnd}
+				onDragOver={laneDrag.onDragOver}
+				onDragEnd={laneDrag.onDragEnd}
 			>
 				<BoardSelectionContext.Provider value={boardSelection}>
 				<SortableContext
 					items={columnOrder.map((s) => `col-${s}`)}
 					strategy={horizontalListSortingStrategy}
 				>
-					<div className="flex flex-1 gap-3 overflow-x-auto overflow-y-hidden min-h-0 p-2">
-						{columnOrder.map((status) => (
+					<BoardLanes projectId={projectId} columnOrder={columnOrder} tasksByStatus={tasksByStatus} renderColumn={(status, columnTasks, droppableId) => (
 							<SortableColumnWrapper
-								key={status}
+								key={droppableId ?? status}
 								sortableId={`col-${status}`}
+								droppableId={droppableId}
 								status={status}
-								tasks={tasksByStatus[status]}
+								tasks={columnTasks}
 								onTaskClick={onTaskClick}
 								onStatusChange={handleStatusChange}
 								isOver={
@@ -2501,8 +2502,7 @@ export function KanbanBoard({
 								isLocked={columnPreferences?.[status]?.isLocked}
 								onToggleLocked={() => handleToggleColumnLocked(status)}
 							/>
-						))}
-					</div>
+						)} />
 				</SortableContext>
 				</BoardSelectionContext.Provider>
 

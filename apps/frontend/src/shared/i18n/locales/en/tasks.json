@@ -579,6 +579,40 @@
 		"outcome": {
 			"failedDropRefused": "Only a failed run lands in Failed. Restart a task from its card or move it to the queue.",
 			"doneCannotBeAbandoned": "A completed task cannot be abandoned."
+		},
+		"lanes": {
+			"title": "Swimlanes",
+			"button": "Swimlanes",
+			"buttonActive": "Lanes: {{grouping}}",
+			"groupings": {
+				"none": "None",
+				"priority": "Priority",
+				"type": "Type",
+				"area": "Sub-project",
+				"source": "Origin",
+				"parent": "Split task"
+			},
+			"readOnly": "read only",
+			"pinFlagged": "Blocked cards in a lane of their own, first",
+			"flagged": "Blocked",
+			"noValue": {
+				"none": "Cards",
+				"priority": "No priority",
+				"type": "No type yet",
+				"area": "No sub-project",
+				"source": "No origin",
+				"parent": "Not split"
+			},
+			"expand": "Expand the lane",
+			"collapse": "Collapse the lane",
+			"addArea": "Add a sub-project",
+			"addAreaPlaceholder": "Sub-project name",
+			"addAreaHint": "An empty lane appears: drag cards into it.",
+			"addAreaRefused": "This sub-project is already there, or the name is not valid.",
+			"readOnlyDrop": "Cards cannot change lanes here: {{grouping}} is not set by moving a card.",
+			"undoLabel": "lane move",
+			"saveFailed_one": "{{count}} card could not be moved to this lane.",
+			"saveFailed_other": "{{count}} cards could not be moved to this lane."
 		}
 	},
 	"queue": {

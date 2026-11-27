@@ -579,6 +579,40 @@
 		"outcome": {
 			"failedDropRefused": "Seule une exécution en échec arrive dans Échec. Relancez la tâche depuis sa carte ou mettez-la en file d’attente.",
 			"doneCannotBeAbandoned": "Une tâche terminée ne peut pas être abandonnée."
+		},
+		"lanes": {
+			"title": "Couloirs",
+			"button": "Couloirs",
+			"buttonActive": "Couloirs : {{grouping}}",
+			"groupings": {
+				"none": "Aucun",
+				"priority": "Priorité",
+				"type": "Type",
+				"area": "Sous-projet",
+				"source": "Origine",
+				"parent": "Tâche découpée"
+			},
+			"readOnly": "lecture seule",
+			"pinFlagged": "Cartes bloquées dans un couloir à part, en premier",
+			"flagged": "Bloquées",
+			"noValue": {
+				"none": "Cartes",
+				"priority": "Sans priorité",
+				"type": "Pas encore de type",
+				"area": "Sans sous-projet",
+				"source": "Sans origine",
+				"parent": "Non découpées"
+			},
+			"expand": "Déplier le couloir",
+			"collapse": "Replier le couloir",
+			"addArea": "Ajouter un sous-projet",
+			"addAreaPlaceholder": "Nom du sous-projet",
+			"addAreaHint": "Un couloir vide apparaît : glissez-y des cartes.",
+			"addAreaRefused": "Ce sous-projet existe déjà, ou le nom n'est pas valable.",
+			"readOnlyDrop": "Les cartes ne changent pas de couloir ici : on ne choisit pas « {{grouping}} » en déplaçant une carte.",
+			"undoLabel": "changement de couloir",
+			"saveFailed_one": "{{count}} carte n'a pas pu passer dans ce couloir.",
+			"saveFailed_other": "{{count}} cartes n'ont pas pu passer dans ce couloir."
 		}
 	},
 	"queue": {

@@ -772,6 +772,8 @@ export interface TaskMetadata {
 	flagged?: boolean;
 	flaggedReason?: string;
 	flaggedAt?: string;
+	/** The sub-project the card belongs to (Kanban lanes, `renderer/lib/kanban-lanes.ts`). */
+	area?: string;
 
 	// Archive status
 	archivedAt?: string; // ISO date when task was archived

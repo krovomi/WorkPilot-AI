@@ -136,6 +136,8 @@ AbandonResolution = Literal[
 INSTANT_PATTERN = (
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$"
 )
+#: A sub-project name (Kanban lanes): one line of text, no control character.
+AREA_PATTERN = r"^[^\x00-\x1f\x7f]{1,80}$"
 #: Metadata keys this module writes as they are given (``None`` removes them).
 PLAIN_KEYS = (
     "priority",
@@ -151,6 +153,7 @@ PLAIN_KEYS = (
     "flagged",
     "flaggedReason",
     "flaggedAt",
+    "area",
 )
 
 
@@ -189,6 +192,7 @@ class CardSettings(BaseModel):
     flagged: bool | None = None
     flaggedReason: str | None = Field(default=None, max_length=500)
     flaggedAt: str | None = Field(default=None, pattern=INSTANT_PATTERN)
+    area: str | None = Field(default=None, max_length=80, pattern=AREA_PATTERN)
 
     def plain_value(self, key: str) -> Any:
         """The value written to ``task_metadata.json``; ``None`` removes the key."""
@@ -306,7 +310,7 @@ def read_settings(root: Path, directory: Path) -> dict[str, Any]:
         **{
             key: metadata.get(key)
             for key in PLAIN_KEYS
-            if key.startswith(("abandoned", "flagged"))
+            if key.startswith(("abandoned", "flagged")) or key == "area"
         },
         "goal": None,
         "goalError": None,
