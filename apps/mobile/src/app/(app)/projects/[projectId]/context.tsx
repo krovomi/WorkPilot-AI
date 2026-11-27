@@ -25,7 +25,7 @@ export default function Context() {
 						<Pressable
 							key={key}
 							accessibilityRole="tab"
-							accessibilityState={{ selected }}
+							aria-selected={selected}
 							onPress={() => setTab(key)}
 							style={[styles.tab, { borderColor: selected ? theme.accent : "transparent" }]}
 						>
