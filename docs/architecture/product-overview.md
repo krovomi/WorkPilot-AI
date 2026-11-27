@@ -20,7 +20,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 **Main features:**
 
 - **Autonomous Tasks** — Multi-agent pipeline (planner, coder, QA) that builds features end-to-end
-- **Kanban Board** — Visual task management from planning through completion with preview/emulator support
+- **Kanban Board** — Visual task management from planning through completion with preview/emulator support; « Ask the board » answers a question in any language with every related ticket ([board-ask.md](board-ask.md))
 - **Agent Terminals** — Up to 12 parallel AI-powered terminals with task context injection
 - **Insights** — AI chat interface for exploring and understanding your codebase
 - **Roadmap** — AI-assisted feature planning with strategic roadmap generation
