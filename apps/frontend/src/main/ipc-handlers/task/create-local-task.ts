@@ -17,6 +17,7 @@ import type {
 } from "../../../shared/types";
 import { slugifySpecTitle } from "../../../shared/utils/spec-slug";
 import { projectStore } from "../../project-store";
+import { recordTaskCreator } from "../../task-run-facts";
 import { recordStatusChange } from "../../task-status-history";
 
 export interface NewLocalTask {
@@ -178,6 +179,12 @@ export function createLocalTask(project: Project, input: NewLocalTask): Task {
 		actor: input.createdBy ?? "user",
 		previous: null,
 	});
+	// Who made it: this computer's person, or the automation that did.
+	recordTaskCreator(
+		specDir,
+		project.path,
+		input.createdBy === "system" ? "automation" : "person",
+	);
 
 	// Always written: it carries at least the source type.
 	writeFileSync(

@@ -828,8 +828,49 @@ export interface Task {
 	 * the board's reports (cycle time, flow); bounded, never a person's name.
 	 */
 	statusHistory?: TaskStatusTransition[];
+	/**
+	 * Who created and who launched the task, and what its agents spent
+	 * (`main/task-run-facts.ts`). The board shows them once the task is done;
+	 * a missing part is unknown, never zero.
+	 */
+	runFacts?: TaskRunFacts;
 	createdAt: Date;
 	updatedAt: Date;
+}
+
+/** Who did something to a task: a person by their display name, or an automation. */
+export interface TaskPerson {
+	kind: "person" | "automation";
+	/** The person's name (local git identity, or a server account's display name). */
+	name?: string;
+	/** ISO 8601 date, for a launch. */
+	at?: string;
+}
+
+/**
+ * What every agent session of a task used, added up across providers
+ * (`core/usage_tracker.py` on this computer, `usage_records` on a server).
+ */
+export interface TaskUsageTotals {
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
+	/** US dollars: the provider's price, or the catalog's; 0 when nobody priced it. */
+	costUsd: number;
+	sessions: number;
+	/** Sessions whose provider reported no count, counted from the text instead. */
+	estimatedSessions: number;
+	/** The models used, most used first (a handful at most). */
+	models: string[];
+}
+
+export interface TaskRunFacts {
+	createdBy?: TaskPerson;
+	/** The person who launched its last run. */
+	startedBy?: TaskPerson;
+	/** Absent when no session reported anything: the cost is unknown. */
+	usage?: TaskUsageTotals;
 }
 
 /** Who moved a task: its agents, a person, or the app on its own (a watcher). */

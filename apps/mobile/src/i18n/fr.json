@@ -771,6 +771,14 @@
 		"more": "Plus",
 		"moreEmpty": "Votre rôle n'ouvre aucune autre page de ce projet.",
 		"pages": {
+			"chat": {
+				"title": "Chat d'équipe",
+				"hint": "Parler en direct avec qui est sur le projet"
+			},
+			"leaderboard": {
+				"title": "Classement",
+				"hint": "Les points de la saison de qui montre son nom, et vos badges"
+			},
 			"roadmap": {
 				"title": "Roadmap",
 				"hint": "Les fonctionnalités prévues pour le projet, par phase et priorité"
@@ -900,5 +908,84 @@
 			"refused": "Non envoyé : {{channel}} a refusé le message. Vérifiez les réglages.",
 			"unreachable": "Non envoyé : {{channel}} est injoignable."
 		}
+	},
+	"chat": {
+		"title": "Chat d'équipe",
+		"here_one": "{{count}} ici",
+		"here_other": "{{count}} ici",
+		"you": "Vous",
+		"connecting": "Connexion…",
+		"empty": "Aucun message pour l'instant.",
+		"emptyHint": "Les messages sont gardés sur le serveur de l'équipe et lus par chaque membre du projet.",
+		"message": "Message",
+		"send": "Envoyer",
+		"reply": "Répondre",
+		"replyTo": "Répondre à {{name}}",
+		"replyingTo": "En réponse à {{name}} : {{message}}",
+		"cancelReply": "Annuler la réponse",
+		"inReplyTo": "{{name}} : {{message}}",
+		"readOnly": "Votre rôle sur ce projet vous permet de lire le chat, pas d'y écrire.",
+		"rejected": {
+			"invalid": "Ce message ne peut pas partir : il est vide ou dépasse 2 000 caractères.",
+			"too_fast": "Doucement : au plus 5 messages en 5 secondes. Votre message est revenu dans le champ.",
+			"unavailable": "Le serveur ne peut pas garder de message pour l'instant. Votre message est revenu dans le champ."
+		}
+	},
+	"leaderboard": {
+		"title": "Classement",
+		"where": "Où",
+		"when": "Quand",
+		"scope": {
+			"project": "Ce projet",
+			"org": "Toute l'organisation"
+		},
+		"period": {
+			"season": "Cette saison",
+			"all": "Depuis le début"
+		},
+		"season": "Saison du {{start}} au {{end}}",
+		"yours": "Votre score",
+		"points_one": "{{count}} point",
+		"points_other": "{{count}} points",
+		"tally": "{{delivered}} livrées · {{reviews}} revues",
+		"rank": "rang {{rank}}",
+		"unranked": "non classé",
+		"showMe": "Montrer mon nom au classement",
+		"showMeHint": "Désactivé tant que vous ne l'activez pas. Sans cela, votre travail ne compte que pour vous et personne d'autre ne le voit.",
+		"named": "Classement",
+		"empty": "Personne n'est nommé pour l'instant.",
+		"emptyHint": "Une personne apparaît ici dès qu'elle choisit de montrer son nom.",
+		"entry_one": "Rang {{rank}}, {{name}}, {{count}} point",
+		"entry_other": "Rang {{rank}}, {{name}}, {{count}} points",
+		"youName": "{{name}} (vous)",
+		"howItCounts": "Une tâche livrée compte de 1 à 3 points selon sa complexité évaluée, l'approbation de la tâche d'un collègue 2. Aucun nombre de jetons ni aucun prix n'est lu : chaque provider compte pareil.",
+		"badges": {
+			"first_delivery": "Première livraison",
+			"ten_deliveries": "Dix livraisons",
+			"complex_delivery": "Tâche complexe livrée",
+			"first_review": "Première revue",
+			"ten_reviews": "Dix revues"
+		}
+	},
+	"replays": {
+		"title": "Mes liens de replay",
+		"summary": "Les replays que vous avez partagés, et arrêter un lien",
+		"hint": "Les liens de replay que vous avez partagés depuis WorkPilot sur votre ordinateur, sur chaque projet que vous atteignez encore.",
+		"empty": "Vous n'avez partagé aucun replay.",
+		"emptyHint": "Partagez un replay depuis une tâche dans WorkPilot sur votre ordinateur : son lien s'affiche ici, pour l'arrêter depuis votre téléphone.",
+		"state": {
+			"active": "Ouvert",
+			"expired": "Expiré",
+			"revoked": "Arrêté"
+		},
+		"where_one": "{{project}} · {{count}} étape",
+		"where_other": "{{project}} · {{count}} étapes",
+		"opened_one": "Ouvert une fois, {{when}}",
+		"opened_other": "Ouvert {{count}} fois, la dernière {{when}}",
+		"neverOpened": "Pas encore ouvert",
+		"until": "S'ouvre jusqu'au {{date}}",
+		"revoke": "Arrêter le lien",
+		"revokeTitle": "Arrêter ce lien ?",
+		"revokeBody": "« {{title}} » ne s'ouvrira plus pour qui a le lien."
 	}
 }

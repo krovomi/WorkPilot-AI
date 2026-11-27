@@ -3079,5 +3079,33 @@
 		"reasonPlaceholder": "What blocks it (optional), e.g. waiting for the API key from the client",
 		"failedTitle": "Flag not saved",
 		"failedDescription": "Could not save the flag. Please try again."
+	},
+	"runFacts": {
+		"title": "How it went",
+		"unknown": "unknown",
+		"automation": "Automation",
+		"agentTime": "Agents' working time",
+		"leadTime": "From launch to finish",
+		"spendTitle": "Tokens and cost of every agent session",
+		"tokens": "{{value}} tokens",
+		"tokensEstimated": "≈ {{value}} tokens",
+		"tokensUnknown": "Tokens unknown",
+		"costShort": "· {{cost}}",
+		"tokensLabel": "Tokens",
+		"tokensDetail": "{{total}} (in {{input}}, out {{output}}, cache {{cache}})",
+		"costLabel": "Cost",
+		"estimatedNote_one": "{{count}} session of {{total}} estimated: its provider reported no count.",
+		"estimatedNote_other": "{{count}} sessions of {{total}} estimated: their provider reported no count.",
+		"models": "Models",
+		"createdBy": "Created by",
+		"startedBy": "Launched by",
+		"peopleShort": "{{creator}} → {{launcher}}",
+		"peopleTitle": "Created by {{creator}}, launched by {{launcher}}",
+		"duration": {
+			"seconds": "{{seconds}} s",
+			"minutes": "{{minutes}} min",
+			"hours": "{{hours}} h {{minutes}} min",
+			"days": "{{days}} d {{hours}} h"
+		}
 	}
 }
