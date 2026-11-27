@@ -4,7 +4,9 @@
 # `scripts/vendor_bmad.py --check` re-downloads the pinned release and compares
 # it byte for byte — so anything the formatter "improves" here is reported as
 # drift on the next check, on every machine. These files are evidence of what
-# upstream published, not code this repository maintains.
+# upstream published, not code this repository maintains. The same holds for
+# every pack skills-lock.json pins to an upstream tree (`scripts/vendor_*.py`),
+# and `.agents/` is the skills build's output, regenerated from `skills/`.
 # The floor of every supported interpreter: the bundled runtime and the CI
 # matrix's lowest leg are 3.12. Ruff reads the syntax and the rewrites it may
 # suggest from this, and reports syntax a 3.12 interpreter would refuse.
@@ -12,6 +14,12 @@ target-version = "py312"
 
 extend-exclude = [
     "skills/bmad",
+    "skills/hermes",
+    "skills/impeccable",
+    "skills/mattpocock",
+    "skills/superpowers",
+    "skills/ui-ux-pro-max",
+    ".agents",
     "apps/backend/vendor",
 ]
 

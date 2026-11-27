@@ -295,6 +295,29 @@ def test_json_reads_refuse_links_folders_and_oversized_files(tmp_path, monkeypat
     assert service.read_json(good) == {}
 
 
+def test_json_reads_refuse_links_without_o_nofollow(tmp_path, monkeypatch):
+    # Windows has no O_NOFOLLOW: the link is refused all the same.
+    good = tmp_path / "good.json"
+    good.write_text('{"a": 1}', encoding="utf-8")
+    os.symlink(good, tmp_path / "link.json")
+    monkeypatch.delattr(os, "O_NOFOLLOW", raising=False)
+    assert service.read_json(tmp_path / "link.json") == {}
+    assert service.read_json(good) == {"a": 1}
+
+
+def test_json_reads_refuse_a_file_swapped_after_the_check(tmp_path, monkeypatch):
+    good = tmp_path / "good.json"
+    good.write_text('{"a": 1}', encoding="utf-8")
+    real_fstat = os.fstat
+
+    def swapped(fd):
+        result = real_fstat(fd)
+        return os.stat_result((result.st_mode, result.st_ino + 1, *tuple(result)[2:]))
+
+    monkeypatch.setattr(service.os, "fstat", swapped)
+    assert service.read_json(good) == {}
+
+
 def test_subtask_files_prefer_what_was_changed():
     assert service.subtask_files(
         {"files_changed": ["a", "a"], "files_to_modify": ["b"]}
