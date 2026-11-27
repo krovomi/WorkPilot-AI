@@ -28,15 +28,12 @@ modules de handlers IPC. Ce fichier donne les points d'entrée.
 Chercher le symbole (`grep -n`), lire le voisinage, éditer : une discipline, pas un garde-fou.
 Un fichier de plus de 2 000 lignes ne grossit plus (`tests/baselines/file-size.json`) : une
 feature y ajoute un module voisin. Les handlers de worktree sont répartis par groupe :
-`task/worktree-handlers.ts` (état, liste, abandon, IDE, terminal, impact, synchronisation)
-enregistre `worktree-diff-handlers.ts`, `worktree-merge-handlers.ts`, `worktree-file-handlers.ts`,
-`worktree-create-pr-handlers.ts` et `worktree-visual-proof-handlers.ts` ; fonctions partagées
-dans `worktree-handler-utils.ts`. Ceux de l'exécution de même : `task/execution-handlers.ts`
-(démarrer, reprendre la session, arrêter, état, plan, pause) enregistre
-`execution-review-handlers.ts`, `execution-status-handlers.ts` (changement de statut à la main),
-`execution-resume-handlers.ts` (reprise, changement de provider, relance d'une phase, hot swap,
-remise à zéro de la conversation) et `execution-recovery-handlers.ts` (tâche bloquée) ;
-`execution-utils.ts` porte les fonctions partagées et `ExecutionHandlerContext`.
+`task/worktree-handlers.ts` enregistre `worktree-diff-handlers.ts`, `worktree-merge-handlers.ts`,
+`worktree-file-handlers.ts`, `worktree-create-pr-handlers.ts` et `worktree-visual-proof-handlers.ts`
+(partagé : `worktree-handler-utils.ts`). De même, `task/execution-handlers.ts` enregistre
+`execution-review-handlers.ts`, `execution-status-handlers.ts`, `execution-resume-handlers.ts`
+(reprise, changement de provider, relance d'une phase) et `execution-recovery-handlers.ts`
+(partagé : `execution-utils.ts`, `ExecutionHandlerContext`).
 
 ## Où ajouter quoi
 
@@ -93,7 +90,7 @@ remise à zéro de la conversation) et `execution-recovery-handlers.ts` (tâche 
 | Connexion OIDC (Entra compris) au serveur : PKCE `S256`, `state`, `nonce`, boucle locale sur `GET /callback` seul, session sans jeton ([spec-approval-sso.md](../../docs/architecture/spec-approval-sso.md)) | `src/main/oidc-pkce.ts`, `src/main/ipc-handlers/server-sso-handlers.ts` | `oidc-pkce.test.ts`, `server-sso-handlers.test.ts` |
 | Passthrough IPC générique : liste fermée de canaux | `src/preload/api/modules/generic-ipc-api.ts` | `generic-ipc-allowlist.test.ts` |
 | Aucune commande venue du renderer : la release passe ses notes à `gh` sur stdin, aucun canal n'ouvre un terminal sur une commande reçue, l'émulateur ne lance que la configuration détectée par le main | `src/main/ipc-handlers/github/release-handlers.ts`, `src/preload/api/modules/shell-api.ts`, `src/main/ipc-handlers/app-emulator-handlers.ts` | `release-handlers.test.ts`, `no-renderer-command.test.ts`, `app-emulator-detected-config.test.ts` |
-| Matrice d'appareils de l'émulateur : appareil, chemin et bridage en liste fermée ; capture cantonnée à l'origine du serveur lancé, dans une fenêtre cachée en bac à sable ([device-matrix.md](../../docs/architecture/device-matrix.md)) | `src/main/ipc-handlers/device-matrix-handlers.ts`, `src/main/device-matrix/` ([device-matrix.md](../../docs/architecture/device-matrix.md)) | `device-matrix-handlers.test.ts`, `device-capture.test.ts`, `responsive-probe.test.ts` |
+| Matrice d'appareils de l'émulateur : appareil, chemin et bridage en liste fermée ; capture cantonnée à l'origine du serveur lancé, dans une fenêtre cachée en bac à sable ([device-matrix.md](../../docs/architecture/device-matrix.md)) | `src/main/ipc-handlers/device-matrix-handlers.ts`, `src/main/device-matrix/` | `device-matrix-handlers.test.ts`, `device-capture.test.ts`, `responsive-probe.test.ts` |
 | Ouvrir un dossier dans l'IDE ou le terminal : dossier résolu et rattaché à un projet, lanceur lu dans les réglages, AppleScript par argv, `cmd.exe` cité | `src/main/ipc-handlers/task/worktree-ide-terminal.ts`, `src/main/ipc-handlers/task/launch-args.ts` | `worktree-open-launchers.test.ts` |
 | Détails de PR : numéro et id de tâche revérifiés ; Azure DevOps : script statique, URL validée en argv, PAT du `.workpilot/.env` | `src/main/ipc-handlers/pr-details-handlers.ts` | `pr-details-*.test.ts` |
 | Connecteur Azure DevOps : runner du backend (`runners/azure_devops/connector_call.py`), tout en argv, identifiants dans l'environnement seulement ; arguments du renderer revérifiés (ids entiers positifs, liste bornée), critères lus sur le seul work item d'origine | `src/main/ipc-handlers/azure-devops-connector.ts`, `src/main/ipc-handlers/azure-devops-ipc-guard.ts` | `azure-devops-connector.test.ts`, `azure-devops-handlers.test.ts`, `tests/runners/azure_devops/test_connector_call.py` |

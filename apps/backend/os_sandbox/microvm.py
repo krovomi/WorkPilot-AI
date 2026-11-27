@@ -92,8 +92,21 @@ class MicrovmError(RuntimeError):
     """``sbx`` could not prepare the task's VM; the message says why."""
 
 
+def _install_dirs() -> list[str]:
+    """Where the sbx installers put it, for an app started before its PATH
+    was updated (winget's per-user install, the machine-wide MSI)."""
+    if not is_windows():
+        return []
+    dirs: list[str] = []
+    for base in (os.environ.get("LOCALAPPDATA"), os.environ.get("ProgramFiles")):
+        if base:
+            root = Path(base) / "DockerSandboxes"
+            dirs += [str(root / "bin"), str(root)]
+    return dirs
+
+
 def sbx_executable() -> str | None:
-    return find_executable("sbx") or shutil.which("sbx")
+    return find_executable("sbx", _install_dirs()) or shutil.which("sbx")
 
 
 def sbx_env(base: dict[str, str] | None = None) -> dict[str, str]:
