@@ -41,6 +41,7 @@ _RECORD_KEYS = (
     "model",
     "effort",
     "rule",
+    "codeMode",
     "resolved",
     "f2pPassed",
     "f2pTotal",
@@ -89,8 +90,9 @@ def add_records(project_dir: Path, new: list[dict]) -> None:
 
 def _records_from(records: list[dict]) -> list[dict]:
     """The records that measure a model. A build made with a candidate rule
-    measures the rule: it stays in the file and never reaches the table, the
-    router, Formula Lab or the recommendations."""
+    measures the rule, and one made in code mode measures code mode: they stay
+    in the file and never reach the table, the router, Formula Lab or the
+    recommendations (the run's page compares each arm with its twin)."""
     return [
         r
         for r in records
@@ -98,6 +100,7 @@ def _records_from(records: list[dict]) -> list[dict]:
         and isinstance(r.get("model"), str)
         and isinstance(r.get("resolved"), bool)
         and not r.get("rule")
+        and not r.get("codeMode")
     ]
 
 

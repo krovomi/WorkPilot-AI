@@ -88,9 +88,18 @@ async def fetch_project(server_path: str) -> None:
     await _run_git(["fetch", "--all", "--prune"], cwd=Path(server_path), timeout=300)
 
 
-def _make_writable_and_retry(function, path: str, _error: BaseException) -> None:
+def _make_writable_and_retry(function, path: str, error: BaseException) -> None:
     # Git writes its objects read-only, and Windows refuses to delete a
-    # read-only file: lift the flag and try once more.
+    # read-only file: lift the flag and try the deletion once more. Any other
+    # step that failed (a scan of the folder whose entry could not go, for
+    # one) is raised as it is: retrying it would succeed and hide the entry
+    # that is still there.
+    if not isinstance(error, PermissionError) or function not in (
+        os.unlink,
+        os.remove,
+        os.rmdir,
+    ):
+        raise error
     os.chmod(path, stat.S_IWRITE)
     function(path)
 
