@@ -100,6 +100,26 @@ Le plus strict gagne (`off` < `observe` < `enforce`). `off` ramène exactement a
 d'avant : rien ne fusionne seul. `observe` décide et l'affiche, sans jamais fusionner.
 `Decision.merges` n'est vrai qu'en `enforce` avec l'action `merge`.
 
+## Sur les PR de ce dépôt (lot D1)
+
+Le pilote de pile (`scripts/stack_autopilot.py`) lit le niveau de chaque PR verte avant de la
+fusionner, avec le runner ci-dessous, depuis le checkout de `develop` (jamais celui de la PR). La
+variable de dépôt `APPROVAL_TIERS` joue le rôle du réglage de l'app (`observe` si elle est vide) :
+
+| Mode | Ce que fait le pilote |
+|---|---|
+| `off` | rien de nouveau : il fusionne tout ce qui est vert, comme avant |
+| `observe` | il pose `niveau:N0` à `niveau:N3` et fusionne comme avant ; c'est la semaine d'essai |
+| `enforce` | N0 et N1 fusionnent ; N2 et N3 attendent sous `autopilot/à-valider`, avec un commentaire qui donne les raisons, jusqu'au label `approuvé` |
+
+Ici, `off` ne veut pas dire « rien ne fusionne seul » : le pilote de ce dépôt fusionnait déjà tout,
+et le couper ramène à ce comportement. Le label `approuvé` ne vaut que posé par une personne qui a le
+droit d'écrire (un robot ne valide jamais), et tant qu'aucun commit n'est arrivé depuis, sauf les
+fusions de `develop` et les conflits résolus par le pilote lui-même. Un niveau illisible ne bloque
+rien en `observe` et bloque en `enforce`. Les PR de ce dépôt n'ont pas de revue croisée : le
+`workpilot.policy.yaml` de la racine pose `require_review: false`, sinon chaque N1 attendrait une
+personne.
+
 ## Le runner
 
 ```bash
@@ -107,6 +127,8 @@ python apps/backend/runners/approvals_runner.py --project-dir <racine> [--worktr
   --base-branch develop [--head HEAD] --title "fix(api): …" [--kind bug_fix] [--label x]… \
   [--ci green|pending|red|unknown] [--review agree|disagree|inconclusive|none] [--trust 90]
 ```
+
+`--base-branch origin/develop` compte comme `develop` pour le fait `pr/base`.
 
 Une ligne JSON : `{"decision": {...}}` (niveau, action, mode, `merges`, raisons triées du plus
 strict au moins strict avec un code anglais stable, faits, erreurs) ou `{"error": "..."}`. Il ne

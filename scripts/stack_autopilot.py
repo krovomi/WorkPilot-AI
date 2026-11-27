@@ -31,6 +31,16 @@ This script, run by ``.github/workflows/stack-autopilot.yml``, does it instead:
 A conflict that cannot be resolved, or a red CI, labels the pull request
 (``autopilot/conflit``, ``autopilot/rouge``) and stops that pile there.
 
+5. Approval tiers (``apps/backend/approvals``, the same engine the app runs on
+   a task's pull request): before merging, the tier N0 to N3 of the pull
+   request is read without a model and put on it as ``niveau:N…``. The
+   repository variable ``APPROVAL_TIERS`` (``off`` / ``observe``, the default /
+   ``enforce``) and the ``approvals.mode`` of develop's ``workpilot.policy.yaml``
+   say what it does, the stricter one winning: ``off`` and ``observe`` merge as
+   before; ``enforce`` merges N0 and N1, and leaves N2 and N3 (``autopilot/à-valider``)
+   until a person with write access puts ``approuvé`` on it, after the last
+   commit that is not the autopilot's own.
+
     python scripts/stack_autopilot.py            # act
     python scripts/stack_autopilot.py --dry-run  # say what it would do
 """
@@ -47,6 +57,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -56,6 +67,15 @@ OPT_OUT_LABEL = "autopilot/off"
 METHOD_PREFIX = "autopilot:"
 CONFLICT_LABEL = "autopilot/conflit"
 RED_LABEL = "autopilot/rouge"
+TIER_PREFIX = "niveau:"
+TIERS = ("N0", "N1", "N2", "N3")
+WAIT_LABEL = "autopilot/à-valider"
+APPROVED_LABEL = "approuvé"
+APPROVERS = frozenset({"admin", "maintain", "write"})
+TIERS_ENV = "WORKPILOT_APPROVALS"
+TIER_MODES = ("off", "observe", "enforce")
+APPROVALS_RUNNER = Path("apps") / "backend" / "runners" / "approvals_runner.py"
+AUTOPILOT_NAME = "WorkPilot Stack Autopilot"
 METHODS = ("squash", "merge", "rebase")
 #: Leub's rule for develop when nothing else was chosen.
 DEFAULT_METHOD = "squash"
@@ -89,6 +109,7 @@ class PullRequest:
     head_sha: str
     base_ref: str
     body: str = ""
+    title: str = ""
     draft: bool = False
     labels: set[str] = field(default_factory=set)
     auto_merge_method: str | None = None
@@ -134,6 +155,7 @@ def from_api(raw: dict) -> PullRequest:
         head_sha=raw["head"]["sha"],
         base_ref=raw["base"]["ref"],
         body=raw.get("body") or "",
+        title=raw.get("title") or "",
         draft=bool(raw.get("draft")),
         labels={label["name"] for label in raw.get("labels", [])},
         auto_merge_method=(auto.get("merge_method") or None) if auto else None,
@@ -292,6 +314,88 @@ def label_is_stale(label_events: list[dict], label: str, head_date: str | None) 
     return bool(put and head_date and head_date > max(put))
 
 
+# --------------------------------------------------------------------------
+# Approval tiers
+# --------------------------------------------------------------------------
+
+
+def tiers_mode(env: dict[str, str] | None = None) -> str:
+    """The repository's setting; unset or unknown is ``observe``, never ``enforce``."""
+    value = (env if env is not None else os.environ).get(TIERS_ENV, "")
+    value = value.strip().lower()
+    return value if value in TIER_MODES else "observe"
+
+
+def stale_tier_labels(labels: set[str], tier: str) -> list[str]:
+    """The ``niveau:`` labels to take off once the pull request is ``tier``."""
+    return sorted(
+        label
+        for label in labels
+        if label.startswith(TIER_PREFIX) and label != TIER_PREFIX + tier
+    )
+
+
+def runner_labels(labels: set[str]) -> list[str]:
+    """The labels the tier may read: the autopilot's own ones say nothing."""
+    own = (OPT_IN_LABEL, OPT_OUT_LABEL, CONFLICT_LABEL, RED_LABEL, WAIT_LABEL)
+    return sorted(
+        label
+        for label in labels
+        if label not in own
+        and not label.startswith((TIER_PREFIX, METHOD_PREFIX))
+        and label != APPROVED_LABEL
+    )
+
+
+def read_decision(stdout: str) -> dict | None:
+    """The runner's decision, or ``None`` when it said anything else."""
+    try:
+        line = json.loads((stdout or "").strip().splitlines()[-1])
+    except (IndexError, ValueError):
+        return None
+    decision = line.get("decision") if isinstance(line, dict) else None
+    if not isinstance(decision, dict) or decision.get("tier") not in TIERS:
+        return None
+    return decision
+
+
+def approval_holds(
+    label_events: list[dict],
+    commits: list[dict],
+    permission_of,
+    autopilot_name: str = AUTOPILOT_NAME,
+) -> tuple[bool, str]:
+    """Whether the ``approuvé`` label still approves the pull request, and why not.
+
+    It holds when its last putting came from a person with write access (a bot
+    never approves) and no commit but the autopilot's own (a merge of develop,
+    a resolved conflict) came after it: a new commit asks again.
+    """
+    put = [
+        e
+        for e in label_events
+        if e.get("event") == "labeled"
+        and (e.get("label") or {}).get("name") == APPROVED_LABEL
+    ]
+    if not put:
+        return False, "pas de label"
+    last = max(put, key=lambda e: e.get("created_at", ""))
+    actor = last.get("actor") or {}
+    login = actor.get("login") or ""
+    if not login or actor.get("type") == "Bot" or login.endswith("[bot]"):
+        return False, "label posé par un robot"
+    if permission_of(login) not in APPROVERS:
+        return False, f"`{login}` n'a pas le droit d'écrire"
+    when = last.get("created_at", "")
+    for commit in commits:
+        info = commit.get("commit") or {}
+        if (info.get("author") or {}).get("name") == autopilot_name:
+            continue
+        if ((info.get("committer") or {}).get("date") or "") > when:
+            return False, "un commit est arrivé après la validation"
+    return True, login
+
+
 RESOLVE_PROMPT = """\
 You are resolving a git merge conflict in the WorkPilot-AI repository, in CI.
 The branch `{branch}` (pull request #{number}) is merging `{ref}`. `git status`
@@ -391,7 +495,8 @@ class GitHub:
         )
 
     def remove_label(self, number: int, label: str) -> None:
-        self.write("DELETE", f"repos/{self.repo}/issues/{number}/labels/{label}")
+        name = quote(label, safe="")  # `autopilot/conflit`, `approuvé`
+        self.write("DELETE", f"repos/{self.repo}/issues/{number}/labels/{name}")
 
     def comment(self, number: int, body: str) -> None:
         self.write(
@@ -428,6 +533,7 @@ class Autopilot:
         self.can_push = can_push
         self.claude = claude
         self.remote_base = f"origin/{base}"
+        self.author = os.environ.get("GIT_USER_NAME", AUTOPILOT_NAME)
 
     # -- discovery ---------------------------------------------------------
 
@@ -698,6 +804,8 @@ class Autopilot:
                 f"- #{pr.number} : CI verte mais GitHub dit `{detail}`, rien fusionné."
             )
             return False
+        if not self.tier_allows(pr):
+            return False
         self.gh.write(
             "PUT",
             f"repos/{self.gh.repo}/pulls/{pr.number}/merge",
@@ -705,6 +813,123 @@ class Autopilot:
         )
         summary(f"- #{pr.number} fusionnée dans {self.base} ({pr.method}).")
         return True
+
+    # -- approval tiers ----------------------------------------------------
+
+    def tier_decision(self, pr: PullRequest) -> dict | None:
+        """The tier of the head commit, read by develop's own engine and policy."""
+        runner = ROOT / APPROVALS_RUNNER
+        if not runner.is_file():
+            return None
+        cmd = [
+            sys.executable,
+            str(runner),
+            "--project-dir",
+            str(ROOT),
+            "--base-branch",
+            self.remote_base,
+            "--head",
+            pr.head_sha,
+            f"--title={pr.title[:300]}",
+            "--ci=green",
+            "--review=none",
+            *(f"--label={label}" for label in runner_labels(pr.labels)),
+        ]
+        try:
+            done = subprocess.run(
+                cmd,
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=180,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return read_decision(done.stdout)
+
+    def mark_tier(self, pr: PullRequest, tier: str) -> None:
+        for label in stale_tier_labels(pr.labels, tier):
+            self.gh.remove_label(pr.number, label)
+            pr.labels.discard(label)
+        if TIER_PREFIX + tier not in pr.labels:
+            self.gh.add_labels(pr.number, [TIER_PREFIX + tier])
+            pr.labels.add(TIER_PREFIX + tier)
+
+    def permission_of(self, login: str) -> str:
+        raw = self.gh.get(f"repos/{self.gh.repo}/collaborators/{login}/permission")
+        return (raw.get("permission") or "none") if isinstance(raw, dict) else "none"
+
+    def approval(self, pr: PullRequest) -> tuple[bool, str]:
+        if APPROVED_LABEL not in pr.labels:
+            return False, "pas de label"
+        events = self.gh.pages(
+            f"repos/{self.gh.repo}/issues/{pr.number}/events?per_page=100"
+        )
+        commits = self.gh.pages(
+            f"repos/{self.gh.repo}/pulls/{pr.number}/commits?per_page=100"
+        )
+        return approval_holds(events, commits, self.permission_of, self.author)
+
+    def tier_allows(self, pr: PullRequest) -> bool:
+        """Whether the tier lets this green pull request merge now."""
+        mode = tiers_mode()
+        if mode == "off":
+            return True
+        decision = self.tier_decision(pr)
+        if decision is None:
+            summary(f"- #{pr.number} : niveau impossible à lire (mode `{mode}`).")
+            return mode != "enforce"
+        tier = decision["tier"]
+        self.mark_tier(pr, tier)
+        codes = ", ".join(str(r.get("code")) for r in decision.get("reasons", [])[:3])
+        if decision.get("mode") != "enforce":
+            summary(f"- #{pr.number} : niveau {tier} ({codes}), observé seulement.")
+            return True
+        if decision.get("action") == "merge":
+            return self._tier_clear(pr)
+        if decision.get("action") == "human":
+            holds, why = self.approval(pr)
+            if holds:
+                summary(f"- #{pr.number} : niveau {tier}, validée par `{why}`.")
+                return self._tier_clear(pr)
+            if APPROVED_LABEL in pr.labels:
+                self.gh.remove_label(pr.number, APPROVED_LABEL)
+                pr.labels.discard(APPROVED_LABEL)
+                if WAIT_LABEL in pr.labels:
+                    self.gh.remove_label(pr.number, WAIT_LABEL)
+                    pr.labels.discard(WAIT_LABEL)
+        self.wait_for_person(pr, decision)
+        return False
+
+    def _tier_clear(self, pr: PullRequest) -> bool:
+        if WAIT_LABEL in pr.labels:
+            self.gh.remove_label(pr.number, WAIT_LABEL)
+            pr.labels.discard(WAIT_LABEL)
+        return True
+
+    def wait_for_person(self, pr: PullRequest, decision: dict) -> None:
+        tier = decision["tier"]
+        summary(f"- #{pr.number} : niveau {tier}, attend `{APPROVED_LABEL}`.")
+        if WAIT_LABEL in pr.labels:
+            return
+        self.gh.add_labels(pr.number, [WAIT_LABEL])
+        pr.labels.add(WAIT_LABEL)
+        reasons = (
+            "\n".join(
+                f"- {r.get('tier')} `{r.get('code')}` : {r.get('detail')}"
+                for r in decision.get("reasons", [])
+                if r.get("tier") in ("N2", "N3")
+            )
+            or "-"
+        )
+        self.gh.comment(
+            pr.number,
+            f"Pilote de pile : niveau **{tier}**, une personne valide avant la fusion.\n\n"
+            f"{reasons}\n\nPour fusionner, ajoutez le label `{APPROVED_LABEL}` "
+            "(un nouveau commit demande une nouvelle validation).",
+        )
 
     def head_date(self, pr: PullRequest) -> str | None:
         commit = self.gh.get(f"repos/{self.gh.repo}/commits/{pr.head_sha}") or {}
@@ -778,7 +1003,7 @@ def main(argv: list[str] | None = None) -> int:
     git(
         "config",
         "user.name",
-        os.environ.get("GIT_USER_NAME", "WorkPilot Stack Autopilot"),
+        os.environ.get("GIT_USER_NAME", AUTOPILOT_NAME),
     )
     git(
         "config", "user.email", os.environ.get("GIT_USER_EMAIL", "noreply@workpilot.ai")
