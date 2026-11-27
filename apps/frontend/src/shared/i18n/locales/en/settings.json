@@ -527,7 +527,32 @@
 					"when": "Secrets, auth, personal data, payment, CI or policy files: a person approves, always."
 				}
 			},
-			"policyNote": "The tier is read without a model, from the files the pull request changes, its title and the facts the task measured. Rules in the approvals section of workpilot.policy.yaml can only raise it."
+			"policyNote": "The tier is read without a model, from the files the pull request changes, its title and the facts the task measured. Rules in the approvals section of workpilot.policy.yaml can only raise it.",
+			"claudeShip": {
+				"title": "Claude Ship",
+				"description": "Claude Code Review, Claude Approvals and PR Steward, for a Claude organization on a Team or Enterprise plan. On, their checks on a task's GitHub PR count: Code Review stands in for a missing cross-review, Approvals can only hold a merge, and WorkPilot stops its own fixes on a PR the Steward watches.",
+				"auto": {
+					"label": "Automatic",
+					"description": "On when a signed-in Claude account is on a Team or Enterprise plan."
+				},
+				"on": {
+					"label": "On",
+					"description": "Always read Claude Ship's checks."
+				},
+				"off": {
+					"label": "Off",
+					"description": "Never read them, whatever the plan."
+				},
+				"checking": "Looking at the Claude accounts…",
+				"detected": "Detected: {{accounts}}",
+				"notDetected": "No signed-in Claude account on a Team or Enterprise plan.",
+				"plan": {
+					"team": "Team",
+					"enterprise": "Enterprise"
+				},
+				"active": "Claude Ship is used for task PRs.",
+				"inactive": "Claude Ship is not used."
+			}
 		}
 	},
 	"tasks": {

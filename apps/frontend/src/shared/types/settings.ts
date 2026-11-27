@@ -297,6 +297,8 @@ export interface AppSettings {
 	codeMode?: import("../utils/code-mode").CodeModeSetting;
 	/** Settings, Approval tiers: sent to the PR follow-through as WORKPILOT_APPROVALS. */
 	approvalTiers?: import("../utils/approval-tiers").ApprovalTierMode;
+	/** Settings, Approval tiers, Claude Ship: auto (default), on or off. */
+	claudeShip?: import("../utils/approval-tiers").ClaudeShipMode;
 	theme: "light" | "dark" | "system";
 	colorTheme?: ColorTheme;
 	defaultModel: string;
