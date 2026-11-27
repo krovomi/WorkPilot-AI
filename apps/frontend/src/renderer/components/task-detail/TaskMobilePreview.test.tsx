@@ -3,6 +3,7 @@
  */
 
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../shared/i18n";
@@ -134,6 +135,11 @@ describe("TaskMobilePreview", () => {
 
 	it("offers the booted device by name", async () => {
 		render(<TaskMobilePreview taskId="task-1" project={project} />);
+		const picker = await screen.findByRole("combobox");
+		await waitFor(() => expect(picker).toBeEnabled());
+		const user = userEvent.setup();
+		picker.focus();
+		await user.keyboard("[ArrowDown]");
 		expect(await screen.findByRole("option", { name: /Pixel 8/ })).toBeInTheDocument();
 	});
 

@@ -5,6 +5,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../../shared/i18n";
 import type { Task } from "../../../../shared/types";
@@ -70,9 +71,13 @@ describe("TaskSteeringPanel", () => {
 		render(<TaskSteeringPanel task={task} />);
 		await screen.findByText("Use the existing repository");
 		const select = screen.getByRole("combobox", { name: "Who receives it" });
+		const user = userEvent.setup();
+		select.focus();
+		await user.keyboard("[ArrowDown]");
+		const subtask = await screen.findByRole("option", { name: "Write the tests" });
 		// A completed subtask is not offered.
 		expect(screen.queryByRole("option", { name: "Add the route" })).toBeNull();
-		fireEvent.change(select, { target: { value: "subtask-2" } });
+		await user.click(subtask);
 		fireEvent.change(screen.getByRole("textbox"), { target: { value: "Only here" } });
 		fireEvent.click(screen.getByRole("button", { name: /Send/ }));
 		await waitFor(() =>
