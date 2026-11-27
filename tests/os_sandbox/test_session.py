@@ -95,6 +95,10 @@ def test_the_launch_is_reported_once_per_build_provider_and_state(tmp_path, caps
         "reason": "bwrap is not installed",
         "network": [],
     }
+    # Kept for the approval tier of the task's PR (K1).
+    from os_sandbox.evidence import read_evidence
+
+    assert read_evidence(spec) == ("none", [])
 
 
 class _Client:

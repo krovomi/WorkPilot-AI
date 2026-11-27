@@ -2263,7 +2263,7 @@ def _sandbox_at_launch(
     else:
         # The WorkPilot loop: `run_command` in the tool executor decides the
         # same way on its first command.
-        sandbox = os_sandbox.session_sandbox(project_dir, spec_dir)
+        sandbox = os_sandbox.session_sandbox(project_dir, spec_dir, microvm=True)
     _report_sandbox(spec_dir, client.provider_name(), sandbox)
 
 

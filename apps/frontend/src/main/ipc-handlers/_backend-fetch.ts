@@ -13,16 +13,12 @@
  * forward the JSON response back. This module hides the boilerplate.
  */
 
+import { localBackendUrl } from "../local-backend-port";
 import { waitForLocalBackend } from "../local-backend-readiness";
 
-const DEFAULT_BACKEND_URL = "http://127.0.0.1:9000";
-
+/** The local backend, on the port this run chose (local-backend-port.ts). */
 export function getBackendUrl(): string {
-	return (
-		process.env.VITE_BACKEND_URL ||
-		process.env.BACKEND_URL ||
-		DEFAULT_BACKEND_URL
-	);
+	return localBackendUrl();
 }
 
 export interface BackendError {

@@ -176,6 +176,8 @@ class TestClientFactoryGuard:
         monkeypatch.setenv("OLLAMA_MODEL", "qwen2.5-coder:7b")
         monkeypatch.setattr(core.agent_client, "LocalAgentClient", factory)
         monkeypatch.setattr(core.client, "_log_llm_context_switch", Mock())
+        # The client is a stand-in: its sandbox report is not what is tested.
+        monkeypatch.setattr(core.client, "_sandbox_at_launch", Mock())
 
         core.client.create_agent_client(
             project_dir=tmp_path,
@@ -216,6 +218,8 @@ class TestClientFactoryGuard:
         monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
         monkeypatch.setattr(core.agent_client, "LocalAgentClient", factory)
         monkeypatch.setattr(core.client, "_log_llm_context_switch", Mock())
+        # The client is a stand-in: its sandbox report is not what is tested.
+        monkeypatch.setattr(core.client, "_sandbox_at_launch", Mock())
         monkeypatch.setattr(
             offline_policy.local_model_catalog,
             "detect_runtime",

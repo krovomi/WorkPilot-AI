@@ -11,6 +11,7 @@ import {
 	SwitchRow,
 	useAgentSafety,
 } from "./agent-safety-controls";
+import { MicrovmSettings } from "./MicrovmSettings";
 import { SettingsSection } from "./SettingsSection";
 
 const K = "sections.sandbox";
@@ -85,6 +86,11 @@ export function SandboxSettings(props: AgentSafetyPageProps) {
 						onChange={(keep) => update("snapshots", { keep })}
 					/>
 				</div>
+
+				<MicrovmSettings
+					microvm={sandbox.microvm}
+					onChange={(patch) => update("sandbox", { microvm: { ...sandbox.microvm, ...patch } })}
+				/>
 
 				<div>
 					<h4 className="text-sm font-semibold mb-1 flex items-center gap-2">

@@ -5,7 +5,8 @@ points d'entrée : cibler la ligne, lire 40 lignes autour, éditer.
 
 > Règles du frontend : [`docs/rules/frontend.md`](../../../../../../docs/rules/frontend.md) · Index frontend : [`apps/frontend/AGENTS.md`](../../../../AGENTS.md)
 
-Les numéros de ligne indiquent un voisinage : confirmer avec `grep -n "<nom>"` avant d'éditer.
+Les numéros de ligne dérivent à chaque modification. Ils indiquent un voisinage, pas une
+adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 
 ## Fichiers du domaine
 
@@ -13,9 +14,10 @@ Les numéros de ligne indiquent un voisinage : confirmer avec `grep -n "<nom>"` 
 |---|---|---|
 | `../KanbanBoard.tsx` | ~3 250 | le tableau : drag-and-drop, sélection en masse, file d'attente, dialogues |
 | `KanbanColumn.tsx` | ~1 140 | une colonne : `DroppableColumn`, `WipLimitPopover`, `SortableColumnWrapper`, comparateurs mémo, `COLUMN_RENDER_CAP` (lot L11) |
-| `ColumnBand.tsx` | ~200 | bandeau d'une colonne : icône, compteur, jauge de capacité, ligne de résumé (`lib/column-pulse.ts`), état vide ([kanban-columns.md](../../../../../../docs/architecture/kanban-columns.md)) |
+| `ColumnBand.tsx` | ~200 | bandeau d'une colonne : icône, compteur, jauge, résumé (`lib/column-pulse.ts`), état vide ([conception](../../../../../../docs/architecture/kanban-columns.md)) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
-| `board-ask/` | — | « Interroger le tableau » : bouton de la barre et panneau de conversation, réponse par `main/board-ask/` ([board-ask.md](../../../../../../docs/architecture/board-ask.md)) |
+| `BoardLanes.tsx` · `LaneGroupingMenu.tsx` | ~200 · ~140 | couloirs (swimlanes), logique dans `lib/kanban-lanes.ts` ([conception](../../../../../../docs/architecture/kanban-swimlanes.md)) |
+| `board-ask/` | — | « Interroger le tableau », réponse par `main/board-ask/` ([conception](../../../../../../docs/architecture/board-ask.md)) |
 | `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F182) |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |
 | `../task-detail/TaskMobilePreview.tsx` | ~430 | onglet *Mobile* : plateforme, appareil, run, capture, logs |
@@ -49,11 +51,16 @@ Un statut n'a pas de colonne à lui : `getVisualColumn()` projette `error → fa
 `getBoardColumn`, `getVisualColumn`, `VALID_BULK_TRANSITIONS` (déplacements en masse) et `manualMoveTargets`
 (menus « Déplacer vers ») vivent dans `../../lib/kanban-columns.ts`.
 
+`IMPORT_ALLOWED_COLUMNS` restreint les cibles d'import (Azure DevOps / Jira) à
+`backlog`, `queue`, `in_progress`.
+
 ## Carte de `KanbanBoard.tsx` et `KanbanColumn.tsx`
+
+Les composants de colonne vivent dans `kanban/KanbanColumn.tsx` depuis le lot L11.
 
 | Fichier · zone | Ligne ~ | Contenu |
 |---|---|---|
-| `KanbanBoard.tsx` · constantes et gardes | 130-160 | `VALID_DROP_COLUMNS`, `IMPORT_ALLOWED_COLUMNS` (import Azure DevOps / Jira : `backlog`, `queue`, `in_progress`) |
+| `KanbanBoard.tsx` · constantes et gardes | 130-160 | `VALID_DROP_COLUMNS`, `IMPORT_ALLOWED_COLUMNS` |
 | `KanbanColumn.tsx` · `COLUMN_RENDER_CAP` | 58 | 60 cartes rendues par colonne |
 | `KanbanColumn.tsx` · comparateurs mémo | 110-190 | `tasksAreEquivalent`, `droppableColumnPropsAreEqual` — **le rendu en dépend, y toucher se paie en perfs** |
 | `KanbanColumn.tsx` · `WipLimitPopover` | 254 | réglage de la limite WIP d'une colonne |

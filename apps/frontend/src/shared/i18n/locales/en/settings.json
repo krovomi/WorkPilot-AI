@@ -400,7 +400,26 @@
 				"maxSession": "Longest session",
 				"maxSessionHint": "Over it, the task is paused."
 			},
-			"always": "Always on, whatever these settings: the command allowlist, writes confined to the build's folders, protected security files, and the OS sandbox around commands where the system has one."
+			"always": "Always on, whatever these settings: the command allowlist, writes confined to the build's folders, protected security files, and the OS sandbox around commands where the system has one.",
+			"microvm": {
+				"title": "Docker microVM per task",
+				"description": "Each task's commands run in its own Docker Sandboxes microVM, with its own kernel and Docker engine: only the worktree and the task's files are mounted, the network is closed except for the package registries and the provider. Works on Windows 11, macOS (Apple silicon) and Linux with KVM.",
+				"enable": "Run each task in a Docker microVM",
+				"enableHint": "Off: commands run in the OS sandbox as before. On, without a working sbx, the OS sandbox takes over and the task says why.",
+				"memory": "Memory per task",
+				"memoryHint": "Auto: a share of the free memory, between 2 and 16 GiB.",
+				"cpus": "CPUs per task",
+				"cpusHint": "Auto: half the machine's cores.",
+				"auto": "auto",
+				"requirements": "Needs the sbx command (Windows: winget install -h Docker.sbx; macOS: brew install docker/tap/sbx) and a Docker account: run sbx login once. On Windows, enable Windows Hypervisor Platform. WorkPilot turns sbx telemetry off; no code or prompt leaves the machine. In this version, commands of the WorkPilot loop (OpenAI, Google, Mistral, Copilot, local models...) run in the VM; CLI agents keep the OS sandbox.",
+				"status": {
+					"unknown": "Not checked yet.",
+					"ready": "sbx {{version}} is ready · {{count}} task VM(s) now.",
+					"notReady": "sbx is installed but not ready: {{reason}}",
+					"missing": "sbx was not found on this machine.",
+					"check": "Check"
+				}
+			}
 		},
 		"anomaly-detection": {
 			"title": "Anomaly Detection",
@@ -444,6 +463,46 @@
 				"title": "Sensitive paths",
 				"description": "Reading or writing one of these lowers the score, once per file."
 			}
+		},
+		"approvals": {
+			"title": "Approval tiers",
+			"description": "The tier of each task's pull request, and whether it merges by itself once green",
+			"mode": {
+				"title": "Mode",
+				"description": "For every project and every provider. A project's workpilot.policy.yaml can only make it stricter.",
+				"off": {
+					"label": "Off",
+					"description": "No tier. A person merges every pull request, as before."
+				},
+				"observe": {
+					"label": "Observe",
+					"description": "The tier shows on the card. Nothing merges by itself."
+				},
+				"enforce": {
+					"label": "Enforce",
+					"description": "A green N0, or N1 agreed by the cross-review, merges by itself. N2 and N3 wait for a person."
+				}
+			},
+			"tiers": {
+				"title": "The four tiers",
+				"N0": {
+					"badge": "N0",
+					"when": "Dependency bump or documentation only: merges once CI is green."
+				},
+				"N1": {
+					"badge": "N1",
+					"when": "A change in one layer, under the limits: merges once CI is green and the cross-review agrees."
+				},
+				"N2": {
+					"badge": "N2",
+					"when": "A feature, several layers, a migration, a public contract, a major bump: a person approves."
+				},
+				"N3": {
+					"badge": "N3",
+					"when": "Secrets, auth, personal data, payment, CI or policy files: a person approves, always."
+				}
+			},
+			"policyNote": "The tier is read without a model, from the files the pull request changes, its title and the facts the task measured. Rules in the approvals section of workpilot.policy.yaml can only raise it."
 		}
 	},
 	"tasks": {

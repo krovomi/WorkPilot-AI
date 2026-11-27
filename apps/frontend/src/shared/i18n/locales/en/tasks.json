@@ -638,6 +638,40 @@
 					"off": "Keywords and the AI model only"
 				}
 			}
+		},
+		"lanes": {
+			"title": "Swimlanes",
+			"button": "Swimlanes",
+			"buttonActive": "Lanes: {{grouping}}",
+			"groupings": {
+				"none": "None",
+				"priority": "Priority",
+				"type": "Type",
+				"area": "Sub-project",
+				"source": "Origin",
+				"parent": "Split task"
+			},
+			"readOnly": "read only",
+			"pinFlagged": "Blocked cards in a lane of their own, first",
+			"flagged": "Blocked",
+			"noValue": {
+				"none": "Cards",
+				"priority": "No priority",
+				"type": "No type yet",
+				"area": "No sub-project",
+				"source": "No origin",
+				"parent": "Not split"
+			},
+			"expand": "Expand the lane",
+			"collapse": "Collapse the lane",
+			"addArea": "Add a sub-project",
+			"addAreaPlaceholder": "Sub-project name",
+			"addAreaHint": "An empty lane appears: drag cards into it.",
+			"addAreaRefused": "This sub-project is already there, or the name is not valid.",
+			"readOnlyDrop": "Cards cannot change lanes here: {{grouping}} is not set by moving a card.",
+			"undoLabel": "lane move",
+			"saveFailed_one": "{{count}} card could not be moved to this lane.",
+			"saveFailed_other": "{{count}} cards could not be moved to this lane."
 		}
 	},
 	"queue": {
@@ -3091,6 +3125,44 @@
 			"minutes": "{{minutes}} min",
 			"hours": "{{hours}} h {{minutes}} min",
 			"days": "{{days}} d {{hours}} h"
+		}
+	},
+	"approvalTier": {
+		"cardBadge": "{{tier}} · {{outcome}}",
+		"tooltip": "Approval tier: {{outcome}}. Why: {{reasons}}",
+		"outcome": {
+			"merged": "merged by itself",
+			"waiting": "waits for a person",
+			"observed": "observed",
+			"mergeFailed": "merge refused"
+		},
+		"reasons": {
+			"sensitive_paths": "sensitive paths",
+			"protected_files": "policy or agent files",
+			"requires_review": "files that need a review",
+			"ci_files": "CI files",
+			"ci_files_bump": "bump that touches CI",
+			"feature": "new feature",
+			"breaking": "breaking change",
+			"migration": "migration",
+			"contract": "public contract",
+			"layers": "several layers",
+			"size_files": "many files",
+			"size_lines": "many lines",
+			"trust": "low trust score",
+			"major_bump": "major bump",
+			"bump_with_code": "bump with code",
+			"bump_unknown": "bump of unknown level",
+			"dependency_bump": "dependency bump",
+			"docs_only": "documentation only",
+			"empty": "no change",
+			"code_change": "code change",
+			"review_missing": "no cross-review on this code",
+			"review_inconclusive": "cross-review without a verdict",
+			"policy_invalid": "invalid approvals section",
+			"rule": "project rule",
+			"unsandboxed": "ran without a sandbox",
+			"blocked_hosts": "tried a refused host"
 		}
 	}
 }

@@ -40,6 +40,14 @@ export class TaskSandboxRegistry {
 	list(): TaskSandboxStatus[] {
 		return [...this.byTask.values()].flatMap((statuses) => [...statuses.values()]);
 	}
+
+	/** Whether the task's commands ran in its Docker Sandboxes microVM (`os_sandbox/microvm.py`). */
+	runsInMicrovm(taskId: string): boolean {
+		const statuses = this.byTask.get(taskId);
+		return [...(statuses?.values() ?? [])].some(
+			(status) => status.state === "isolated" && status.backend === "microvm",
+		);
+	}
 }
 
 export const taskSandboxes = new TaskSandboxRegistry();
