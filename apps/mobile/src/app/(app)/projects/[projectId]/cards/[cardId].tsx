@@ -15,6 +15,7 @@ import {
 	startCard,
 	stopCard,
 } from "../../../../../board/actions";
+import { ACTION_ICONS } from "../../../../../board/actionIcons";
 import { ACTIVE_COLUMNS, boardColumn } from "../../../../../board/columns";
 import { ApprovalSection } from "../../../../../card/ApprovalSection";
 import { ChangesSection } from "../../../../../card/ChangesSection";
@@ -33,16 +34,6 @@ import { columnColor, RADIUS, SPACE, TYPE, useTheme } from "../../../../../ui/th
 
 const WORKING_POLL_MS = 5_000;
 
-const ACTION_ICONS: Record<CardAction, IconName> = {
-	start: "play",
-	approve: "check",
-	stop: "square",
-	retry: "rotate-ccw",
-	merge: "git-merge",
-	createPr: "git-pull-request",
-	requestChanges: "message-square",
-	delete: "trash-2",
-};
 
 export default function CardScreen() {
 	const { projectId, cardId } = useLocalSearchParams<{ projectId: string; cardId: string }>();
