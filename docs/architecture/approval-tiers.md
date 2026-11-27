@@ -127,6 +127,30 @@ demande le niveau quand la PR est verte, le montre sur la carte (`N1 · attend u
 `N0 · fusionnée seule`, raisons dans l'infobulle) et fusionne en `enforce` quand le niveau le
 permet. GitHub seulement, comme le suivi lui-même ; une autre forge garde le merge à une personne.
 
+## Claude Ship, en option (lot A3)
+
+Claude Ship (Claude Code Review, Claude Approvals, PR Steward) ne tourne que sur GitHub, pour une
+organisation Claude sur un plan Team ou Enterprise. WorkPilot ne dépend jamais de lui : c'est un
+adaptateur, `pr_followup/claude_ship.py`, que l'app allume par `WORKPILOT_CLAUDE_SHIP=1`.
+
+| Réglage (Paramètres → Sécurité → Validation par niveaux) | Effet |
+|---|---|
+| Automatique (défaut) | allumé dès qu'un compte Claude connecté est sur un plan Team ou Enterprise (`main/ai-accounts/account-plans.ts`, plan lu sur le profil OAuth) |
+| Activé / Désactivé | forcé, quel que soit le plan |
+
+Allumé, trois faits lus sur la PR, sans modèle, à la tête jugée :
+
+- **Claude Code Review** (check de l'app GitHub Claude, id 1236702) : son nombre de constats
+  « Important » (`bughunter-severity`) remplace la revue croisée quand celle de WorkPilot n'a pas vu
+  cet arbre : zéro vaut un accord, un ou plus un désaccord. Un résultat illisible ne vaut rien.
+- **Claude Approvals** (check) : le plus strict gagne. En cours, WorkPilot attend ; en échec, il
+  ne fusionne pas. Un résultat `(observe mode)` ou neutre ne change rien. Il ne peut que retenir.
+- **PR Steward** (label `claude-pr-steward-watching`) : un seul intendant par PR. Le suivi de
+  WorkPilot arrête ses tours de correction et continue seulement de regarder.
+
+L'export de la politique vers `.claude/approvals.yml` reste à faire : il écrirait dans le dépôt, donc
+par une carte et sa PR.
+
 ## Le runner
 
 ```bash

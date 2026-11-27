@@ -495,7 +495,32 @@
 					"when": "Secrets, authentification, données personnelles, paiement, CI ou fichiers de politique : une personne valide, toujours."
 				}
 			},
-			"policyNote": "Le niveau se lit sans modèle, à partir des fichiers modifiés par la pull request, de son titre et des faits mesurés par la tâche. Les règles de la section approvals de workpilot.policy.yaml ne peuvent que le relever."
+			"policyNote": "Le niveau se lit sans modèle, à partir des fichiers modifiés par la pull request, de son titre et des faits mesurés par la tâche. Les règles de la section approvals de workpilot.policy.yaml ne peuvent que le relever.",
+			"claudeShip": {
+				"title": "Claude Ship",
+				"description": "Claude Code Review, Claude Approvals et PR Steward, pour une organisation Claude sur un plan Team ou Enterprise. Activé, leurs checks sur la PR GitHub d'une tâche comptent : Code Review remplace une revue croisée absente, Approvals ne peut que retenir une fusion, et WorkPilot arrête ses propres correctifs sur une PR que le Steward suit.",
+				"auto": {
+					"label": "Automatique",
+					"description": "Activé dès qu'un compte Claude connecté est sur un plan Team ou Enterprise."
+				},
+				"on": {
+					"label": "Activé",
+					"description": "Toujours lire les checks de Claude Ship."
+				},
+				"off": {
+					"label": "Désactivé",
+					"description": "Ne jamais les lire, quel que soit le plan."
+				},
+				"checking": "Lecture des comptes Claude…",
+				"detected": "Détecté : {{accounts}}",
+				"notDetected": "Aucun compte Claude connecté sur un plan Team ou Enterprise.",
+				"plan": {
+					"team": "Team",
+					"enterprise": "Enterprise"
+				},
+				"active": "Claude Ship est utilisé pour les PR des tâches.",
+				"inactive": "Claude Ship n'est pas utilisé."
+			}
 		}
 	},
 	"tasks": {
