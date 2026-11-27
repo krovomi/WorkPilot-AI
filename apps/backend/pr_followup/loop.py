@@ -41,6 +41,9 @@ Fixer = Callable[[Path, Path, int], Awaitable[tuple[str, str]]]
 `qa.fixer.run_qa_fixer_session` returns it."""
 Pusher = Callable[[], tuple[bool, str]]
 """Push the worktree's branch, never forced. (ok, error)."""
+Approver = Callable[[PRSnapshot], Awaitable[dict[str, Any]]]
+"""A green PR -> the approval record (``approval.approve_green``): its tier,
+and whether it was merged because of it."""
 
 
 @dataclass
@@ -52,6 +55,8 @@ class RoundResult:
     pushed_sha: str = ""
     detail: str = ""
     violations: list[Violation] = field(default_factory=list)
+    approval: dict[str, Any] | None = None
+    """On green: the approval record (tier, action, mode, merged)."""
 
     @property
     def finished(self) -> bool:
@@ -75,6 +80,7 @@ class RoundResult:
             "base_failing": [c.name for c in self.decision.base_failing],
             "threads": [t.id for t in self.decision.threads],
             "violations": [v.describe() for v in self.violations],
+            "approval": self.approval,
             "finished": self.finished,
         }
 
@@ -87,6 +93,7 @@ async def run_round(
     fixer: Fixer,
     pusher: Pusher,
     config: FollowupConfig | None = None,
+    approver: Approver | None = None,
 ) -> RoundResult:
     cfg = config or FollowupConfig()
     state = load_state(spec_dir)
@@ -104,6 +111,15 @@ async def run_round(
         state.no_checks_polls = 0
     else:
         state.no_checks_polls += 1
+
+    if decision.kind == DecisionKind.GREEN and approver is not None:
+        record = await approver(snap)
+        tier = (record.get("decision") or {}).get("tier", "")
+        if record.get("merged"):
+            _remember(spec_dir, state, "merged_by_tier", snap.head_sha, tier)
+        else:
+            _remember(spec_dir, state, "green", snap.head_sha, decision.reason)
+        return RoundResult(decision, head_sha=snap.head_sha, approval=record)
 
     if decision.kind != DecisionKind.FIX:
         _remember(spec_dir, state, decision.kind.value, snap.head_sha, decision.reason)

@@ -40,6 +40,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
 import { BoardAskButton } from "./board-ask/BoardAskButton";
 import { KanbanMoreMenu } from "./KanbanMoreMenu";
+import { LaneGroupingMenu } from "./LaneGroupingMenu";
 import { QuickCommandBar } from "./QuickCommandBar";
 import { ServerBoardNotice, useSelectedServerProject } from "./ServerBoardNotice";
 
@@ -432,8 +433,9 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 				</PopoverContent>
 			</Popover>
 
-			<Separator orientation="vertical" className="h-5" />
+			<LaneGroupingMenu />
 
+			<Separator orientation="vertical" className="h-5" />
 
 			{/* Quick Commands run on this computer: a server board has its notice
 			    instead, until commands run on the server. */}

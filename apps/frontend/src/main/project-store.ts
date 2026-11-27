@@ -41,6 +41,7 @@ import { stripHtml } from "./ipc-handlers/shared/sanitize";
 import { getAutoBuildPath, isInitialized } from "./project-initializer";
 import { readCiSuite } from "./suite-placement/ci-suite";
 import { readSuitePlacement } from "./suite-placement/placement-file";
+import { attachRunFacts } from "./task-run-facts";
 import { readStatusHistory } from "./task-status-history";
 import { updateExistingFile } from "./utils/existing-file";
 import { ensureAbsolutePath } from "./utils/path-helpers";
@@ -423,7 +424,11 @@ export class ProjectStore {
 		}
 
 		const allTasks = this.loadAllTasks(project);
-		const deduplicatedTasks = this.deduplicateTasks(allTasks);
+		const deduplicatedTasks = this.withRunFacts(
+			project,
+			this.deduplicateTasks(allTasks),
+			true,
+		);
 
 		// Update cache
 		this.cacheTasks(projectId, deduplicatedTasks);
@@ -437,7 +442,20 @@ export class ProjectStore {
 	 * never cached, never registered, so no local handler finds it.
 	 */
 	getMirrorTasks(project: Project): Task[] {
-		return this.deduplicateTasks(this.loadAllTasks(project));
+		return this.withRunFacts(
+			project,
+			this.deduplicateTasks(this.loadAllTasks(project)),
+			false,
+		);
+	}
+
+	/** Who created and launched each task, and what it spent (`task-run-facts.ts`). */
+	private withRunFacts(project: Project, tasks: Task[], local: boolean): Task[] {
+		const specs = path.join(project.path, getSpecsDir(project.autoBuildPath));
+		return attachRunFacts(project.path, tasks, {
+			local,
+			specDirOf: (task) => path.join(specs, task.specId),
+		});
 	}
 
 	/**
@@ -834,6 +852,11 @@ export class ProjectStore {
 				...(plan?.crossReview &&
 					typeof plan.crossReview.verdict === "string" && {
 						crossReview: plan.crossReview,
+					}),
+				// The approval tier of the green PR, for the card.
+				...(plan?.approval &&
+					typeof plan.approval === "object" && {
+						approval: plan.approval,
 					}),
 				...(qaSignoff && { qaSignoff }),
 				// Where the full suite runs, and the suite sent to the CI.

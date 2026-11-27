@@ -11,7 +11,11 @@ import re
 from pathlib import Path
 
 from agent_snapshots.store import _SNAPSHOT_ID
-from security.agent_safety_settings import MAX_ALLOWED_PATHS
+from security.agent_safety_settings import (
+    MAX_ALLOWED_PATHS,
+    MAX_VM_CPUS,
+    MAX_VM_MEMORY_GB,
+)
 from security.anomaly_detector import ANOMALY_SCORE_IMPACT
 
 FRONTEND = Path(__file__).resolve().parents[2] / "apps" / "frontend" / "src"
@@ -37,3 +41,5 @@ def test_snapshot_id_and_path_cap_match() -> None:
     assert match is not None
     assert match.group(1) == _SNAPSHOT_ID.pattern
     assert f"export const MAX_ALLOWED_PATHS = {MAX_ALLOWED_PATHS};" in text
+    assert f"export const MAX_VM_MEMORY_GB = {MAX_VM_MEMORY_GB};" in text
+    assert f"export const MAX_VM_CPUS = {MAX_VM_CPUS};" in text

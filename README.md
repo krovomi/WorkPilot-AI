@@ -344,7 +344,7 @@ Full reference: [docs/CLI-USAGE.md](docs/CLI-USAGE.md).
 
 ## Security
 
-1. **OS sandbox**: agent commands run under bubblewrap (Linux) or Seatbelt (macOS); Windows is not covered yet, and the card says when a task runs without a sandbox.
+1. **OS sandbox**: agent commands run under bubblewrap (Linux) or Seatbelt (macOS), and the card says when a task runs without a sandbox. Optional, off by default (Settings > Sandbox): a **Docker Sandboxes microVM per task**, with its own kernel and Docker engine, only the worktree mounted and the network closed to the allowlist; it is also what isolates commands on Windows 11.
 2. **Filesystem restrictions**: operations stay inside the project directory.
 3. **Dynamic command allowlist**: only the commands of the detected stack are allowed.
 4. **Snapshots and trust score**: before each agent session the task's worktree is saved as a hidden git commit; each session starts with a trust score of 100 that anomalies lower, and below a threshold the task pauses, or the session stops and its snapshot is restored. Restricted mode and per-session limits are in Settings > Sandbox; restore a snapshot from the card.
