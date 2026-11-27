@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_AGENT_SAFETY,
 	MAX_ALLOWED_PATHS,
+	MAX_VM_MEMORY_GB,
 	normalizeAgentSafety,
 	normalizeAllowedPath,
 	SNAPSHOT_ID,
@@ -55,6 +56,17 @@ describe("normalizeAgentSafety", () => {
 			rapidChangeWindowS: 3600,
 		});
 		expect(normalizeAgentSafety({ sandbox: { mode: "docker" } }).sandbox.mode).toBe("normal");
+	});
+
+	it("keeps the microVM off unless turned on, and bounds its size", () => {
+		expect(normalizeAgentSafety({}).sandbox.microvm).toEqual({ enabled: false, memoryGb: 0, cpus: 0 });
+		expect(
+			normalizeAgentSafety({ sandbox: { microvm: { enabled: true, memoryGb: 1e6, cpus: -1 } } }).sandbox
+				.microvm,
+		).toEqual({ enabled: true, memoryGb: MAX_VM_MEMORY_GB, cpus: 0 });
+		expect(normalizeAgentSafety({ sandbox: { microvm: { enabled: "on" } } }).sandbox.microvm.enabled).toBe(
+			false,
+		);
 	});
 
 	it("dedupes and caps the allowed paths", () => {

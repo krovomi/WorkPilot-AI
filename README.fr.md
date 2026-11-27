@@ -346,7 +346,7 @@ Référence complète : [docs/CLI-USAGE.md](docs/CLI-USAGE.md) (en anglais).
 
 ## Sécurité
 
-1. **Bac à sable du système** : les commandes des agents tournent sous bubblewrap (Linux) ou Seatbelt (macOS) ; Windows n'est pas encore couvert, et la carte indique quand une tâche tourne sans bac à sable.
+1. **Bac à sable du système** : les commandes des agents tournent sous bubblewrap (Linux) ou Seatbelt (macOS), et la carte indique quand une tâche tourne sans bac à sable. En option, coupée par défaut (Paramètres > Sandbox) : une **microVM Docker Sandboxes par tâche**, avec son noyau et son moteur Docker, seul le worktree monté et le réseau fermé hors de l'allowlist ; c'est aussi ce qui isole les commandes sous Windows 11.
 2. **Restrictions du système de fichiers** : les opérations restent dans le dossier du projet.
 3. **Liste blanche dynamique de commandes** : seules les commandes de la stack détectée sont autorisées.
 4. **Instantanés et score de confiance** : avant chaque session d'agent, le worktree de la tâche est enregistré comme un commit git caché ; chaque session démarre avec un score de confiance de 100 que les anomalies font baisser, et sous un seuil la tâche se met en pause, ou la session s'arrête et son instantané est restauré. Le mode restreint et les limites par session sont dans Paramètres > Sandbox ; un instantané se restaure depuis la carte.

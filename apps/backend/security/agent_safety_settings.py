@@ -25,6 +25,11 @@ ENV_VAR = "WORKPILOT_AGENT_SAFETY"
 #: The longest list of writable paths read from the settings.
 MAX_ALLOWED_PATHS = 50
 
+#: Bounds of a task microVM, as Docker Sandboxes takes them (sbx caps CPUs at 16
+#: on some hosts and memory at the host's).
+MAX_VM_MEMORY_GB = 256
+MAX_VM_CPUS = 64
+
 
 @dataclass(frozen=True)
 class SnapshotSettings:
@@ -35,6 +40,20 @@ class SnapshotSettings:
     keep: int = 10
     #: Restore the session's snapshot when the watch stops the session.
     auto_rollback: bool = True
+
+
+@dataclass(frozen=True)
+class MicrovmSettings:
+    """Docker Sandboxes (``sbx``): a microVM per task (`os_sandbox.microvm`).
+
+    Off by default: off is exactly the OS sandbox of before.
+    """
+
+    enabled: bool = False
+    #: Memory of each task's VM, in GiB; ``0`` sizes it from the machine.
+    memory_gb: int = 0
+    #: CPUs of each task's VM; ``0`` sizes it from the machine.
+    cpus: int = 0
 
 
 @dataclass(frozen=True)
@@ -51,6 +70,7 @@ class SandboxSettings:
     max_file_size_mb: float = 10.0
     #: Longest session, in minutes; ``0`` is no limit.
     max_session_minutes: int = 0
+    microvm: MicrovmSettings = field(default_factory=MicrovmSettings)
 
 
 @dataclass(frozen=True)
@@ -157,12 +177,18 @@ def parse_settings(raw: Any) -> AgentSafetySettings:
 
     box = _section(raw, "sandbox")
     mode = box.get("mode")
+    vm = _section(box, "microvm")
     sandbox = SandboxSettings(
         mode=mode if mode in ("normal", "restricted") else "normal",
         allowed_paths=_allowed_paths(box.get("allowedPaths")),
         max_files_written=_int(box, "maxFilesWritten", 200, 0, 10_000),
         max_file_size_mb=_number(box, "maxFileSizeMb", 10.0, 0.0, 1024.0),
         max_session_minutes=_int(box, "maxSessionMinutes", 0, 0, 24 * 60),
+        microvm=MicrovmSettings(
+            enabled=_bool(vm, "enabled", False),
+            memory_gb=_int(vm, "memoryGb", 0, 0, MAX_VM_MEMORY_GB),
+            cpus=_int(vm, "cpus", 0, 0, MAX_VM_CPUS),
+        ),
     )
 
     watch = _section(raw, "anomaly")
@@ -196,6 +222,7 @@ __all__ = [
     "ENV_VAR",
     "AgentSafetySettings",
     "AnomalySettings",
+    "MicrovmSettings",
     "SandboxSettings",
     "SnapshotSettings",
     "load_settings",

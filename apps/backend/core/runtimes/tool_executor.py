@@ -919,7 +919,9 @@ class ToolExecutor:
         if self._sandbox is None:
             from os_sandbox import session_sandbox
 
-            self._sandbox = session_sandbox(self.project_dir, self.spec_dir)
+            self._sandbox = session_sandbox(
+                self.project_dir, self.spec_dir, microvm=True
+            )
         return self._sandbox
 
     async def _stop_command(self, process) -> None:
@@ -1000,6 +1002,23 @@ def _brain_tool_definitions() -> list[dict[str, Any]]:
     from brain.runtime import tool_definitions
 
     return tool_definitions()
+
+
+def _run_command_description() -> str:
+    text = (
+        "Run a non-interactive shell command with a time limit. Quote paths "
+        "containing spaces. Use read_file to read files."
+    )
+    from security.agent_safety_settings import load_settings
+
+    if load_settings().sandbox.microvm.enabled:
+        # Said whatever the host is: on Windows, `cmd` syntax would fail there.
+        text += (
+            " Commands run with /bin/sh in the task's Linux microVM, whatever "
+            "the host system; the host's own services are reached as "
+            "host.docker.internal."
+        )
+    return text
 
 
 def get_tool_definitions(
@@ -1125,7 +1144,7 @@ def get_tool_definitions(
         },
         {
             "name": "run_command",
-            "description": "Run a non-interactive shell command with a time limit. Quote paths containing spaces. Use read_file to read files.",
+            "description": _run_command_description(),
             "parameters": {
                 "type": "object",
                 "properties": {

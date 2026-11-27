@@ -43,6 +43,23 @@ describe("SandboxSettings", () => {
 		expect(saved(change).sandbox.maxSessionMinutes).toBe(30);
 	});
 
+	it("turns the Docker microVM on, then sizes it", () => {
+		const change = vi.fn();
+		const view = render(<SandboxSettings settings={base} onSettingsChange={change} />);
+		const toggle = screen.getByLabelText(`${K}.microvm.enable`);
+		expect(toggle).not.toBeChecked();
+		expect(screen.queryByLabelText(`${K}.microvm.memory`)).toBeNull();
+		fireEvent.click(toggle);
+		expect(saved(change).sandbox.microvm).toEqual({ enabled: true, memoryGb: 0, cpus: 0 });
+		view.rerender(<SandboxSettings settings={change.mock.calls.at(-1)?.[0]} onSettingsChange={change} />);
+		expect(screen.getAllByText(`${K}.microvm.auto`)).toHaveLength(2);
+		fireEvent.change(screen.getByLabelText(`${K}.microvm.memory`), { target: { value: "8" } });
+		expect(saved(change).sandbox.microvm).toEqual({ enabled: true, memoryGb: 8, cpus: 0 });
+		fireEvent.change(screen.getByLabelText(`${K}.microvm.cpus`), { target: { value: "4" } });
+		expect(saved(change).sandbox.microvm.cpus).toBe(4);
+		expect(screen.getByText(`${K}.microvm.requirements`)).toBeInTheDocument();
+	});
+
 	it("adds a valid path, refuses one outside the project, removes one", () => {
 		const change = vi.fn();
 		const settings = {
