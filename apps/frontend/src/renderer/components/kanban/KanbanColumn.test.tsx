@@ -14,6 +14,7 @@ import {
 } from "../../../__tests__/helpers/renderer-api";
 import type { Task } from "../../../shared/types";
 import type { TaskStatusColumn } from "../../../shared/constants/task";
+import { useLaneOverStore } from "../../hooks/useLaneDrag";
 import { useSettingsStore } from "../../stores/settings-store";
 import { TooltipProvider } from "../ui/tooltip";
 import {
@@ -22,6 +23,7 @@ import {
 	type DroppableColumnProps,
 	droppableColumnPropsAreEqual,
 	getEmptyStateContent,
+	SortableColumnWrapper,
 	tasksAreEquivalent,
 	WipLimitPopover,
 } from "./KanbanColumn";
@@ -338,6 +340,7 @@ describe("memo comparators", () => {
 
 		const changes: Partial<DroppableColumnProps>[] = [
 			{ status: "queue" },
+			{ droppableId: "lane::backlog::high" },
 			{ isOver: true },
 			{ isImportForbidden: true },
 			{ onTaskClick: vi.fn() },
@@ -377,5 +380,25 @@ describe("memo comparators", () => {
 				JSON.stringify(Object.keys(change)),
 			).toBe(false);
 		}
+	});
+});
+
+describe("a column in a lane", () => {
+	it("lights up for a drag over its own lane only", () => {
+		const view = (droppableId: string) => (
+			<DndContext>
+				<TooltipProvider>
+					<SortableColumnWrapper {...baseProps({ isOver: true })} sortableId="col-backlog" droppableId={droppableId} />
+				</TooltipProvider>
+			</DndContext>
+		);
+		useLaneOverStore.setState({ lane: "low" });
+		const { rerender } = render(view("lane::backlog::high"));
+		expect(screen.queryByText("Drop here")).toBeNull();
+		rerender(view("lane::backlog::low"));
+		expect(screen.getByText("Drop here")).toBeInTheDocument();
+		// Not sortable in a lane: no handle to reorder the columns.
+		expect(screen.queryByRole("button", { name: "Drag to reorder column" })).toBeNull();
+		useLaneOverStore.setState({ lane: null });
 	});
 });
