@@ -244,8 +244,27 @@ seul un administrateur de la plateforme peut inviter un administrateur du serveu
 (membres, projets atteints avec leur rôle, rôle donné dans l'organisation) et les rôles (un rôle
 intégré se lit, un rôle personnalisé se crée, se modifie permission par permission et se supprime).
 Chaque page n'apparaît qu'avec sa permission de lecture (`org.member.read`, `org.invitation.read`,
-`org.role.read`) et chaque action qu'avec celle d'écriture ; le serveur revérifie tout. Les
-organisations, quotas, sessions et journal d'audit restent sur le bureau.
+`org.role.read`) et chaque action qu'avec celle d'écriture ; le serveur revérifie tout.
+
+La console du bureau y est aussi (`src/admin/`, `src/app/(app)/admin/`) :
+
+- **Vue d'ensemble** (`GET /admin/overview`, `analytics.read`) : les agents en cours et en attente,
+  la semaine jour par jour, qui a lancé le plus, les derniers échecs et l'usage des quotas. Un
+  contributeur a aussi `analytics.read` : comme sur le bureau, les Réglages n'offrent
+  l'administration qu'à qui administre autre chose (`administers` dans `src/admin/pages.ts`).
+- **Quotas** (`/admin/quotas`, lecture `org.quota.read`, écriture `org.quota.write`) : chaque
+  plafond avec son usage ; un champ vide lève la limite. Le téléphone n'envoie que ce qui a changé,
+  et le serveur distingue une limite absente (gardée) d'une limite `null` (levée), et refuse un
+  nombre négatif.
+- **Journal d'audit** (`GET /admin/audit`, `audit.read`) : 50 lignes à la fois jusqu'aux 500 que
+  sert le serveur, le détail d'une ligne, et le filtre par son action. L'adresse IP que le serveur
+  garde pour chaque ligne n'est pas affichée sur le téléphone (RGPD : minimisation).
+- **Sessions** (`GET /admin/sessions`, `org.session.read`) : les connexions de chaque personne,
+  comment et jusqu'à quand ; `org.session.revoke` déconnecte une autre personne de tous ses
+  appareils (`DELETE /admin/sessions/{id}`), jamais soi-même depuis là. Les adresses IP ne sont
+  pas affichées non plus.
+
+Les organisations de la plateforme restent sur le bureau.
 
 ## Tableau de bord, sessions et analyses
 
@@ -469,5 +488,5 @@ la langue de l'app.
 ## Ce qui vient
 
 - Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.
-- Les organisations, les quotas, les sessions et le journal d'audit de l'administration.
+- Les organisations de la plateforme dans l'administration.
 - La publication sur l'App Store et Google Play (comptes Apple et Google, projet EAS).

@@ -591,7 +591,7 @@
 	},
 	"admin": {
 		"title": "Administration",
-		"summary": "Membres, invitations, groupes et rôles de cette organisation.",
+		"summary": "Vue d'ensemble, membres, invitations, groupes, rôles, sessions, quotas et journal d'audit de cette organisation.",
 		"of": "Organisation : {{org}}",
 		"remove": "Retirer",
 		"projectRole": {
@@ -680,6 +680,85 @@
 			"scope": {
 				"org": "Organisation",
 				"project": "Projet"
+			}
+		},
+		"overview": {
+			"title": "Vue d'ensemble",
+			"summary": "Ce que font les agents de l'organisation maintenant et sur la semaine, et ses quotas.",
+			"running": "Agents en cours",
+			"queued": "En attente",
+			"success": "Exécutions réussies, 7 jours",
+			"members": "Membres",
+			"activeOf": "{{active}} actifs sur {{total}}",
+			"projects": "Projets",
+			"cards": "Cartes",
+			"runs24h": "Exécutions des dernières 24 h",
+			"failed24h": "Échecs des dernières 24 h",
+			"week": "Les 7 derniers jours",
+			"dayRuns_one": "{{date}} : {{count}} exécution",
+			"dayRuns_other": "{{date}} : {{count}} exécutions",
+			"noRuns": "Aucune exécution cette semaine.",
+			"topUsers": "Qui a lancé le plus d'exécutions",
+			"runs_one": "{{count}} exécution",
+			"runs_other": "{{count}} exécutions",
+			"failures": "Derniers échecs",
+			"status": {
+				"queued": "En attente",
+				"running": "En cours",
+				"succeeded": "Réussie",
+				"failed": "Échouée",
+				"cancelled": "Annulée"
+			}
+		},
+		"sessions": {
+			"title": "Sessions",
+			"summary": "Qui est connecté, comment et jusqu'à quand, et déconnecter quelqu'un.",
+			"empty": "Personne n'est connecté.",
+			"since": "depuis le {{date}}",
+			"until": "jusqu'au {{date}}",
+			"revoke": "Déconnecter partout",
+			"revokeTitle": "Déconnecter {{name}} de tous ses appareils ?",
+			"revokeBody": "Cette personne devra se reconnecter sur chaque appareil. Son compte reste tel quel."
+		},
+		"quotas": {
+			"title": "Quotas",
+			"summary": "Places, projets, agents en même temps et jetons par mois, avec leur usage actuel.",
+			"use": "Usage actuel",
+			"limitsTitle": "Limites",
+			"limits": {
+				"max_users": "Places",
+				"max_projects": "Projets",
+				"max_concurrent_runs": "Agents en même temps",
+				"monthly_token_budget": "Jetons ce mois-ci"
+			},
+			"usedOf": "{{used}} sur {{limit}}",
+			"usedNoLimit": "{{used}}, sans limite",
+			"hint": "Un champ vide veut dire sans limite.",
+			"unlimited": "Sans limite",
+			"hardStop": "Arrêter les agents au budget de jetons",
+			"hardStopHint": "Sans cette option, le budget ne fait qu'avertir : les agents continuent au-delà.",
+			"invalid": "Une limite est un nombre entier, 0 ou plus.",
+			"save": "Enregistrer les limites",
+			"saved": "Enregistré.",
+			"readOnly": "Vous pouvez lire les quotas, pas les modifier.",
+			"meter": "{{name}} : usage"
+		},
+		"audit": {
+			"title": "Journal d'audit",
+			"summary": "Ce qui a été fait dans l'organisation, par qui et quand.",
+			"empty": "Rien d'enregistré pour l'instant.",
+			"system": "le serveur",
+			"openHint": "Affiche le détail de cette ligne",
+			"only": "Seulement {{action}}",
+			"all": "Tout afficher",
+			"filter": "Seulement cette action",
+			"more": "Afficher les lignes plus anciennes",
+			"methods": {
+				"local": "mot de passe",
+				"entra": "Microsoft Entra",
+				"oidc": "authentification unique",
+				"invite": "invitation",
+				"unknown": "autre connexion"
 			}
 		}
 	},
