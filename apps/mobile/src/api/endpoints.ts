@@ -29,6 +29,7 @@ import type {
 	WaveRunAnswer,
 } from "./types";
 import type { ThemePrefs } from "../ui/theme-ids";
+import type { Channel, ChannelSettings, Moment, NeedsYouOverview, TestResult } from "../needs-you/types";
 import type { Memory } from "../context/index-file";
 import type { EngineOption, SettingsPayload } from "../new-card/engine";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
@@ -247,6 +248,17 @@ export function api(client: ServerClient) {
 				theme: prefs.theme,
 				colorTheme: prefs.colorTheme,
 			}),
+		/** The person's own "needs you" channels and moments (`server/routers/needs_you.py`). */
+		needsYou: () => client.request<NeedsYouOverview>("GET", "/users/me/needs-you"),
+		saveNeedsYouChannel: (channel: Channel, settings: ChannelSettings) =>
+			client.request<{ saved: boolean }>("PUT", `/users/me/needs-you/channels/${enc(channel)}`, settings),
+		deleteNeedsYouChannel: (channel: Channel) =>
+			client.request<{ deleted: boolean }>("DELETE", `/users/me/needs-you/channels/${enc(channel)}`),
+		testNeedsYouChannel: async (channel: Channel) =>
+			(await client.request<{ result: TestResult }>("POST", `/users/me/needs-you/channels/${enc(channel)}/test`))
+				.result,
+		saveNeedsYouMoments: (events: Record<Moment, boolean>, locale: string) =>
+			client.request<{ saved: boolean }>("PUT", "/users/me/needs-you/preferences", { events, locale }),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
 		/** Whether the person's organization counts which screens they open. */
 		pageActivity: () => client.request<{ enabled: boolean }>("GET", "/users/me/page-activity"),

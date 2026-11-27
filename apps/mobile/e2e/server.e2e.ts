@@ -139,7 +139,7 @@ async function signIn(browser: Browser, world: World, who: Who, password = world
 	await page.goto(`http://localhost:${APP_PORT}/`);
 	await page.getByLabel("Server address").fill(world.serverUrl);
 	await page.getByLabel("Email").fill(world.emails[who]);
-	await page.getByLabel("Password").fill(password);
+	await page.getByRole("textbox", { name: "Password" }).fill(password);
 	if (who === "alice") await shot(page, "1-sign-in");
 	await page.getByRole("button", { name: "Sign in", exact: true }).click();
 	if (password === world.passwords[who]) signedIn.set(who, page);
@@ -183,7 +183,7 @@ function tokenTag(token: string): string {
 
 /** Back to the list of projects, from wherever a scenario left the page. */
 async function home(page: Page, project: string): Promise<void> {
-	const button = page.getByRole("button", { name: project });
+	const button = page.getByRole("button", { name: project, exact: true });
 	for (let i = 0; i < 10 && !(await button.isVisible()); i++) {
 		await page.goBack();
 		await page.waitForTimeout(300);
@@ -194,7 +194,7 @@ async function home(page: Page, project: string): Promise<void> {
 /** Opens a project from the list of projects, on its board. */
 async function openProject(page: Page, project: string): Promise<void> {
 	await home(page, project);
-	await page.getByRole("button", { name: project }).click();
+	await page.getByRole("button", { name: project, exact: true }).click();
 	await expect(page.getByRole("tab", { name: "More", exact: true })).toBeVisible({ timeout: 30_000 });
 }
 
@@ -533,4 +533,38 @@ test("Alice approves a card's spec from the phone, builds it, and sends it back"
 	await expect(requestChanges).toBeVisible({ timeout: 90_000 });
 	await expect(alice.getByText(/Failed/)).toHaveCount(0);
 	await shot(alice, "21-sent-back");
+});
+
+test("Alice finds what waits for her across projects, and has Telegram tell her", async () => {
+	const alice = signedInPage("alice");
+	// The card sent back in the previous scenario is in review again: hers to look at.
+	await home(alice, world.project);
+	await alice.getByRole("button", { name: "What waits for you" }).click();
+	await expect(alice.getByRole("button", { name: `Greet the team by name, ${world.project}` })).toBeVisible({
+		timeout: 30_000,
+	});
+	await shot(alice, "22-inbox");
+
+	await openSettings(alice, world.project);
+	await alice.getByRole("button", { name: "Notify me elsewhere" }).click();
+	// The test server keeps secrets but does not send: it says so, and offers no test.
+	await expect(alice.getByText(/does not send them yet/)).toBeVisible({ timeout: 30_000 });
+	await alice.getByRole("button", { name: "Set up" }).nth(1).click();
+	await alice.getByLabel("Bot token").fill(`123456:${randomBytes(16).toString("hex")}`);
+	await alice.getByLabel("Your user id").fill("42");
+	await alice.getByRole("button", { name: "Save", exact: true }).click();
+	// Read back from the server: set, never shown again.
+	await expect(alice.getByRole("switch", { name: "Send on Telegram" })).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText("On", { exact: true })).toBeVisible();
+	await expect(alice.getByRole("button", { name: "Send a test" })).toHaveCount(0);
+	const failed = alice.getByRole("switch", { name: "A task I started stopped on an error" });
+	await expect(failed).toBeChecked();
+	await failed.click();
+	await shot(alice, "23-needs-you");
+	// Kept by the server: read again on the way back in.
+	await alice.goBack();
+	await alice.getByRole("button", { name: "Notify me elsewhere" }).click();
+	await expect(alice.getByRole("switch", { name: "A task I started stopped on an error" })).not.toBeChecked({
+		timeout: 30_000,
+	});
 });

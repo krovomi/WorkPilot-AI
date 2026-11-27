@@ -121,6 +121,8 @@ DESKTOP_PAGES: frozenset[str] = frozenset(
 MOBILE_PAGES: frozenset[str] = frozenset(
     {
         "home",
+        "inbox",
+        "needs-you",
         "admin",
         "admin/groups",
         "admin/groups/detail",

@@ -10,6 +10,8 @@ import type { Task, TaskPriority, TaskStatus } from "../../../shared/types";
 import { toast } from "../../hooks/use-toast";
 import { canMoveTaskTo, manualMoveTargets } from "../../lib/kanban-columns";
 import { useAbandonRequestStore } from "../../stores/abandon-request-store";
+import { useFlagRequestStore } from "../../stores/flag-request-store";
+import { unflagTask } from "../../stores/task-flag-actions";
 import { extractTextFromHtml } from "../../lib/utils";
 import { openSmartEstimation } from "../../stores/smart-estimation-store";
 import { applyCardChoice, type CardChoice } from "../../lib/card-edits";
@@ -117,6 +119,11 @@ export function TaskCardMenus({
 			onPause: isRunning && !isPaused ? () => void pauseTask(task.id) : undefined,
 			onResume: isPaused ? () => void resumeTask(task.id) : undefined,
 			onSyncFromBranch: onSync,
+			onFlag:
+				task.metadata?.flagged === true || task.status === "done"
+					? undefined
+					: () => useFlagRequestStore.getState().request([task.id]),
+			onUnflag: task.metadata?.flagged === true ? () => void unflagTask(task.id) : undefined,
 			onAbandon: canMoveTaskTo(task, "abandoned")
 				? () => useAbandonRequestStore.getState().request([task.id])
 				: undefined,

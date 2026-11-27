@@ -41,16 +41,22 @@ export interface ServerCardSettings {
 	abandonedReason?: string | null;
 	abandonedResolution?: string | null;
 	abandonedLink?: string | null;
+	/** The « Bloquée » flag, why and since when (`shared/utils/task-flag.ts`). */
+	flagged?: boolean | null;
+	flaggedReason?: string | null;
+	flaggedAt?: string | null;
 }
 
 /** Metadata fields the server stores as they are given (`shared_board/settings.py`). */
 const LIST_KEYS = ["mobileTargets", "blockedBy"] as const;
-/** The abandon fields (`shared/utils/task-lifecycle.ts`); resuming clears them. */
-const ABANDON_KEYS = [
+/** The abandon and flag fields (`task-lifecycle.ts`, `task-flag.ts`); resuming or lifting clears them. */
+const OPTIONAL_TEXT_KEYS = [
 	"abandonedAt",
 	"abandonedReason",
 	"abandonedResolution",
 	"abandonedLink",
+	"flaggedReason",
+	"flaggedAt",
 ] as const;
 
 interface CardRef {
@@ -99,7 +105,8 @@ export function settingsFromMetadata(
 		settings.mobileBootstrap = metadata.mobileBootstrap ?? null;
 	}
 	if ("abandoned" in metadata) settings.abandoned = metadata.abandoned ?? null;
-	for (const key of ABANDON_KEYS) {
+	if ("flagged" in metadata) settings.flagged = metadata.flagged ?? null;
+	for (const key of OPTIONAL_TEXT_KEYS) {
 		if (key in metadata) settings[key] = metadata[key] || null;
 	}
 	return Object.keys(settings).length > 0 ? settings : null;

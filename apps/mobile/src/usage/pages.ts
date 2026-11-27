@@ -9,6 +9,8 @@
  */
 export const MOBILE_PAGES = [
 	"home",
+	"inbox",
+	"needs-you",
 	"admin",
 	"admin/groups",
 	"admin/groups/detail",

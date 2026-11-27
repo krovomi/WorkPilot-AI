@@ -310,5 +310,5 @@ def test_the_lists_are_the_apps_own_screens():
     assert set(re.findall(r'^\t"([a-z0-9-]+)",$', shared, re.M)) == views
     mobile = (ROOT / "apps/mobile/src/usage/pages.ts").read_text(encoding="utf-8")
     assert (
-        set(re.findall(r'^\t"([a-z/]+)",$', mobile, re.M)) == page_activity.MOBILE_PAGES
+        set(re.findall(r'^\t"([a-z/-]+)",$', mobile, re.M)) == page_activity.MOBILE_PAGES
     )
