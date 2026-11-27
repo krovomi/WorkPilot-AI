@@ -86,6 +86,25 @@ class TestReading:
         }
         assert [c["id"] for c in list_cards(tmp_path, "in_progress")] == ["002-second"]
 
+    def test_a_card_that_ended_badly_says_how(self, tmp_path):
+        """« Échec » and « Abandonnée » are outcomes over the plan's column."""
+        _card(tmp_path, "001-crashed", "error")
+        _card(tmp_path, "002-rejected", "human_review", reviewReason="qa_rejected")
+        _card(tmp_path, "003-reviewed", "human_review", reviewReason="completed")
+        aside = _card(tmp_path, "004-aside", "coding")
+        (aside / "task_metadata.json").write_text(
+            json.dumps({"abandoned": True}), encoding="utf-8"
+        )
+
+        outcomes = {c["id"]: c.get("outcome") for c in list_cards(tmp_path)}
+
+        assert outcomes == {
+            "001-crashed": "failed",
+            "002-rejected": "failed",
+            "003-reviewed": None,
+            "004-aside": "abandoned",
+        }
+
     def test_an_empty_project_has_no_cards(self, tmp_path):
         assert _call(tmp_path, "list_cards") == ([], False)
 

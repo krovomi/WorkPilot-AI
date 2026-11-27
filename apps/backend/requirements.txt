@@ -16,7 +16,7 @@ websockets>=17.4
 # scheduling/task_templates.py, and required outright by
 # skills_registry/frontmatter.py -- it was pulled in transitively and those
 # modules silently degraded whenever it was not. Declared so they don't.
-PyYAML>=6.0.3
+PyYAML>=6.0.4
 
 # Linux Secret Service support for credential storage
 # Provides access to the Freedesktop.org Secret Service API via DBus
@@ -29,7 +29,7 @@ pywin32>=312; sys_platform == "win32"
 
 # IANA time zone data (Europe/Paris...) for zoneinfo: Windows and the embedded
 # Python ship none, so a workpilot.policy.yaml naming a zone was refused there.
-tzdata>=2025.2
+tzdata>=2026.6
 
 # Pydantic for structured output schemas
 pydantic>=2.14.3
@@ -49,7 +49,7 @@ bandit>=1.9.4
 # pip-audit for dependency vulnerability scanning (optional but recommended)
 # Install separately: pip install pip-audit
 
-fastapi>=0.163.1
+fastapi>=0.165.0
 uvicorn[standard]>=0.54.0
 slowapi>=0.1.10
 
@@ -60,7 +60,7 @@ aiosqlite>=0.22.1        # SQLite async driver (dev/tests fallback)
 argon2-cffi>=25.1.0      # Password hashing for local accounts
 PyJWT[crypto]>=2.15.1     # JWT access/refresh tokens + Entra ID JWKS validation
 cryptography>=50.0.2     # Fernet encryption for per-user integration secrets
-email-validator>=2.3.0   # pydantic EmailStr support (auth schemas)
+email-validator>=2.4.0   # pydantic EmailStr support (auth schemas)
 requests>=2.34.2
 httpx[http2]>=0.28.1
 # Imported unconditionally by the Copilot / GitHub Models agent client
@@ -71,7 +71,7 @@ aiohttp>=3.14.5
 h2>=4.4.1  # HTTP/2 support for Windsurf gRPC proxy
 # [asyncio] brings greenlet, without which every async engine (the server
 # database, its Alembic migrations) fails at its first query.
-sqlalchemy[asyncio]>=2.1.8
+sqlalchemy[asyncio]>=2.1.9
 psutil>=7.2.2
 azure-devops>=7.1.0b4  # Azure DevOps SDK for src/connectors/azure_devops
 msrest>=0.7.1           # Required by azure-devops SDK

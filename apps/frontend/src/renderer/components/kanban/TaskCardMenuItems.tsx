@@ -1,5 +1,6 @@
 import {
 	ArrowRightLeft,
+	Ban,
 	Copy,
 	ExternalLink,
 	Flag,
@@ -10,12 +11,12 @@ import {
 	Play,
 	Shapes,
 	Trash2,
+	Undo2,
 	X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { CardType } from "../../../shared/constants/card-types";
 import { TASK_STATUS_LABELS } from "../../../shared/constants";
-import type { TaskStatusColumn } from "../../../shared/constants/task";
 import type { TaskPriority, TaskStatus } from "../../../shared/types";
 import {
 	DropdownMenuItem,
@@ -36,7 +37,7 @@ export interface TaskCardMenuActions {
 	onSetPriority?: (priority: TaskPriority) => void;
 	/** The columns the card can be moved to by hand, and the move. */
 	moves?: {
-		targets: readonly TaskStatusColumn[];
+		targets: readonly TaskStatus[];
 		onMove: (status: TaskStatus) => void;
 	};
 	onEstimate?: () => void;
@@ -44,6 +45,9 @@ export interface TaskCardMenuActions {
 	onPause?: () => void;
 	onResume?: () => void;
 	onSyncFromBranch?: () => void;
+	/** Sets the task aside (asks why) or, when it is abandoned, resumes it. */
+	onAbandon?: () => void;
+	onUnabandon?: () => void;
 	onDelete?: () => void;
 }
 
@@ -70,6 +74,8 @@ export function TaskCardMenuItems({
 	onPause,
 	onResume,
 	onSyncFromBranch,
+	onAbandon,
+	onUnabandon,
 	onDelete,
 	currentType,
 	currentPriority,
@@ -78,7 +84,9 @@ export function TaskCardMenuItems({
 	const { t } = useTranslation(["tasks"]);
 	const hasMoves = !!moves && moves.targets.length > 0;
 	const hasEditGroup = !!(onOpen || onEdit || onSetType || onSetPriority || hasMoves);
-	const hasWorkGroup = !!(onEstimate || onDuplicate || onPause || onResume || onSyncFromBranch);
+	const hasWorkGroup = !!(
+		onEstimate || onDuplicate || onPause || onResume || onSyncFromBranch || onAbandon || onUnabandon
+	);
 
 	return (
 		<>
@@ -172,6 +180,18 @@ export function TaskCardMenuItems({
 				<DropdownMenuItem onSelect={onSyncFromBranch}>
 					<GitMerge className="mr-2 h-4 w-4" />
 					{t("tasks:actions.syncFromBranch")}
+				</DropdownMenuItem>
+			)}
+			{onAbandon && (
+				<DropdownMenuItem onSelect={onAbandon}>
+					<Ban className="mr-2 h-4 w-4" />
+					{t("tasks:abandon.abandonMenu")}
+				</DropdownMenuItem>
+			)}
+			{onUnabandon && (
+				<DropdownMenuItem onSelect={onUnabandon}>
+					<Undo2 className="mr-2 h-4 w-4" />
+					{t("tasks:abandon.resume")}
 				</DropdownMenuItem>
 			)}
 			{onDelete && (

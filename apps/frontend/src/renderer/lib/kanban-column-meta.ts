@@ -18,9 +18,11 @@ export const COLUMN_ACCENTS: Record<TaskStatusColumn, ColumnAccent> = {
 	in_progress: { token: "--info" },
 	ai_review: { token: "--warning" },
 	human_review: { color: "#A855F7" },
+	failed: { color: "#F97316" },
 	build_failed: { token: "--destructive" },
 	pr_created: { color: "#818CF8" },
 	done: { token: "--success" },
+	abandoned: { color: "#94A3B8" },
 };
 
 /**

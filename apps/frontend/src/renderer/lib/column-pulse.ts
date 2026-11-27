@@ -6,7 +6,8 @@
  * Each item is an i18n key under `tasks:kanban.pulse` with its values; the
  * column renders them in order, and a `warn` item reads in the warning colour.
  */
-import type { Task, TaskStatus } from "../../shared/types";
+import type { TaskStatusColumn } from "../../shared/constants/task";
+import { ABANDON_RESOLUTIONS, type Task } from "../../shared/types";
 
 export interface PulseItem {
 	key: string;
@@ -74,8 +75,31 @@ function review(tasks: Task[]): PulseItem[] {
 	return items;
 }
 
+/** Why the runs of « Échec » failed. */
+function failures(tasks: Task[]): PulseItem[] {
+	const context = countIf(tasks, (t) => t.reviewReason === "prompt_too_long");
+	const qa = countIf(tasks, (t) => t.reviewReason === "qa_rejected");
+	const errors = tasks.length - context - qa;
+	const items: PulseItem[] = [];
+	if (errors) items.push({ key: "failedErrors", values: { count: errors } });
+	if (qa) items.push({ key: "failedQa", values: { count: qa } });
+	if (context) items.push({ key: "failedContext", values: { count: context } });
+	return items;
+}
+
+/** How the tasks of « Abandonnée » were closed, by resolution. */
+function resolutions(tasks: Task[]): PulseItem[] {
+	return ABANDON_RESOLUTIONS.flatMap((resolution) => {
+		const count = countIf(
+			tasks,
+			(t) => (t.metadata?.abandonedResolution ?? "other") === resolution,
+		);
+		return count ? [{ key: `resolution_${resolution}`, values: { count } }] : [];
+	});
+}
+
 export function columnPulse(
-	status: TaskStatus,
+	status: TaskStatusColumn,
 	tasks: Task[],
 	{ now = new Date() }: PulseContext = {},
 ): PulseItem[] {
@@ -89,6 +113,10 @@ export function columnPulse(
 			return inProgress(tasks);
 		case "human_review":
 			return review(tasks);
+		case "failed":
+			return failures(tasks);
+		case "abandoned":
+			return resolutions(tasks);
 		case "done": {
 			const since = startOfWeek(now).getTime();
 			const week = countIf(tasks, (t) => new Date(t.updatedAt).getTime() >= since);

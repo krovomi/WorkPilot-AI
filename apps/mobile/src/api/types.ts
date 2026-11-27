@@ -73,7 +73,10 @@ export type Column =
 	| "build_failed"
 	| "pr_created"
 	| "done"
-	| "error";
+	| "error"
+	/** Board columns of a card that ended badly (`BoardCard.outcome`), never a plan status. */
+	| "failed"
+	| "abandoned";
 
 export type CardKind =
 	| "feature"
@@ -96,6 +99,8 @@ export interface BoardCard {
 	specId: string | null;
 	claimedBy: string | null;
 	claimedByName: string | null;
+	/** A run that failed or a card set aside (`board_mcp.server.outcome`); absent on an older server. */
+	outcome?: "failed" | "abandoned";
 	/** A part of a task split into small PRs (`task_split`): its group. */
 	group?: { id: string; title: string; index: number; total: number };
 }

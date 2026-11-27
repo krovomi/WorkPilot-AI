@@ -278,7 +278,7 @@ describe("execution waves", () => {
 		expect(screen.queryByText(/^Plan:/)).toBeNull();
 	});
 
-	it("is a link of the board for someone who may read tasks", async () => {
+	it("is a row of the project's More tab for someone who may read tasks", async () => {
 		fakeServer(
 			{
 				"GET /api/board/cards": { cards: [] },
@@ -289,8 +289,8 @@ describe("execution waves", () => {
 			},
 			READER,
 		);
-		const app = await openApp("/projects/p1");
-		await fireEvent.press(await screen.findByText("Waves"));
+		const app = await openApp("/projects/p1/more");
+		await fireEvent.press(await screen.findByRole("button", { name: "Waves" }));
 		await waitFor(() => expect(app.getPathname()).toBe("/projects/p1/waves"));
 	});
 });

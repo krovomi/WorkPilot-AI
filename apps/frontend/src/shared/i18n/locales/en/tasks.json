@@ -202,17 +202,13 @@
 		"build_failed": "Red Build",
 		"done": "Done",
 		"pr_created": "Open PR",
-		"error": "Error"
+		"error": "Error",
+		"failed": "Failed",
+		"abandoned": "Abandoned"
 	},
 	"kanban": {
 		"more": {
 			"label": "More board actions"
-		},
-		"abandoned": {
-			"chip": "{{count}} abandoned",
-			"chip_other": "{{count}} abandoned",
-			"hideChip": "Hide abandoned tasks",
-			"showChip": "Show abandoned tasks"
 		},
 		"emptyBacklog": "No tasks planned",
 		"emptyBacklogHint": "Add a task to get started",
@@ -556,7 +552,33 @@
 			"qa_one": "{{count}} in QA",
 			"qa_other": "{{count}} in QA",
 			"paused_one": "{{count}} paused",
-			"paused_other": "{{count}} paused"
+			"paused_other": "{{count}} paused",
+			"failedErrors_one": "{{count}} run failed",
+			"failedErrors_other": "{{count}} runs failed",
+			"failedQa_one": "{{count}} rejected by QA",
+			"failedQa_other": "{{count}} rejected by QA",
+			"failedContext_one": "{{count}} context too long",
+			"failedContext_other": "{{count}} context too long",
+			"resolution_wont_do_one": "{{count}} won’t do",
+			"resolution_wont_do_other": "{{count}} won’t do",
+			"resolution_duplicate_one": "{{count}} duplicate",
+			"resolution_duplicate_other": "{{count}} duplicates",
+			"resolution_obsolete_one": "{{count}} obsolete",
+			"resolution_obsolete_other": "{{count}} obsolete",
+			"resolution_replaced_one": "{{count}} replaced",
+			"resolution_replaced_other": "{{count}} replaced",
+			"resolution_pr_closed_one": "{{count}} PR closed",
+			"resolution_pr_closed_other": "{{count}} PRs closed",
+			"resolution_other_one": "{{count}} other",
+			"resolution_other_other": "{{count}} other"
+		},
+		"emptyFailed": "No failed runs",
+		"emptyFailedHint": "A run that fails, or that QA could not get to pass, waits here to be restarted or abandoned",
+		"emptyAbandoned": "Nothing set aside",
+		"emptyAbandonedHint": "Drop a task here to abandon it: won’t do, duplicate, obsolete, replaced",
+		"outcome": {
+			"failedDropRefused": "Only a failed run lands in Failed. Restart a task from its card or move it to the queue.",
+			"doneCannotBeAbandoned": "A completed task cannot be abandoned."
 		}
 	},
 	"queue": {
@@ -965,7 +987,7 @@
 		"dialogTitle": "Abandon task",
 		"dialogPrefix": "Abandon",
 		"dialogSuffix": "? Development stops and the task is set aside.",
-		"dialogReversible": "Nothing is deleted: the task is greyed out on the board and you can resume it at any time.",
+		"dialogReversible": "Nothing is deleted: the task moves to the Abandoned column and you can resume it at any time.",
 		"reasonPlaceholder": "Reason (optional) — e.g. the product owner no longer wants it developed",
 		"abandoning": "Abandoning…",
 		"abandonedTitle": "Task abandoned",
@@ -973,7 +995,29 @@
 		"failedTitle": "Abandon failed",
 		"failedDescription": "Could not abandon the task. Please try again.",
 		"resumeFailedTitle": "Resume failed",
-		"resumeFailedDescription": "Could not resume the task. Please try again."
+		"resumeFailedDescription": "Could not resume the task. Please try again.",
+		"dialogTitleMany_one": "Abandon {{count}} task",
+		"dialogTitleMany_other": "Abandon {{count}} tasks",
+		"dialogMany_one": "Abandon {{count}} task? Development stops and it is set aside.",
+		"dialogMany_other": "Abandon {{count}} tasks? Development stops and they are set aside.",
+		"resolutionLabel": "Why",
+		"reasonLabel": "Note",
+		"linkNone": "Not on the board",
+		"linkLabel": {
+			"duplicate": "Duplicate of",
+			"replaced": "Replaced by"
+		},
+		"resolutions": {
+			"wont_do": "Won’t do",
+			"duplicate": "Duplicate",
+			"obsolete": "Obsolete",
+			"replaced": "Replaced by another task",
+			"pr_closed": "PR closed without merge",
+			"other": "Other"
+		},
+		"abandonedTitleMany_one": "Task abandoned",
+		"abandonedTitleMany_other": "{{count}} tasks abandoned",
+		"abandonMenu": "Abandon…"
 	},
 	"edit": {
 		"title": "Edit Task",

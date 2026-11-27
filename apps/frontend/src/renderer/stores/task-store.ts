@@ -11,6 +11,7 @@ import type {
 	Task,
 	TaskDraft,
 	TaskMetadata,
+	TaskOrderColumn,
 	TaskOrderState,
 	TaskPipelineStatus,
 	TaskStatus,
@@ -19,6 +20,7 @@ import { CARD_EDIT_CONFLICT } from "../../shared/types/team-room";
 import { isSubtaskDone } from "../../shared/progress";
 import { debugLog, debugWarn } from "../../shared/utils/debug-logger";
 import {
+	type AbandonChoice,
 	buildAbandonMetadata,
 	buildResumeMetadata,
 } from "../../shared/utils/task-lifecycle";
@@ -64,14 +66,14 @@ interface TaskState {
 	// Task order actions for kanban drag-and-drop reordering
 	setTaskOrder: (order: TaskOrderState) => void;
 	reorderTasksInColumn: (
-		status: TaskStatus,
+		status: TaskOrderColumn,
 		activeId: string,
 		overId: string,
 	) => void;
 	moveTaskToColumnTop: (
 		taskId: string,
-		targetStatus: TaskStatus,
-		sourceStatus?: TaskStatus,
+		targetStatus: TaskOrderColumn,
+		sourceStatus?: TaskOrderColumn,
 	) => void;
 	loadTaskOrder: (projectId: string) => void;
 	saveTaskOrder: (projectId: string) => boolean;
@@ -274,18 +276,15 @@ function getTaskOrderKey(projectId: string): string {
 /**
  * Create an empty task order state with all status columns
  */
+const TASK_ORDER_COLUMNS: readonly TaskOrderColumn[] = [
+	"backlog", "queue", "in_progress", "ai_review", "human_review", "failed",
+	"build_failed", "pr_created", "done", "abandoned", "error",
+];
+
 function createEmptyTaskOrder(): TaskOrderState {
-	return {
-		backlog: [],
-		queue: [],
-		in_progress: [],
-		ai_review: [],
-		human_review: [],
-		build_failed: [],
-		done: [],
-		pr_created: [],
-		error: [],
-	};
+	const order: Partial<Record<TaskOrderColumn, string[]>> = {};
+	for (const column of TASK_ORDER_COLUMNS) order[column] = [];
+	return order as TaskOrderState;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -852,35 +851,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 		const validateAndMergeOrder = (
 			parsed: Record<string, unknown>,
 		): TaskOrderState => {
-			const emptyOrder = createEmptyTaskOrder();
-
-			return {
-				backlog: isValidColumnArray(parsed.backlog)
-					? parsed.backlog
-					: emptyOrder.backlog,
-				queue: isValidColumnArray(parsed.queue)
-					? parsed.queue
-					: emptyOrder.queue,
-				in_progress: isValidColumnArray(parsed.in_progress)
-					? parsed.in_progress
-					: emptyOrder.in_progress,
-				ai_review: isValidColumnArray(parsed.ai_review)
-					? parsed.ai_review
-					: emptyOrder.ai_review,
-				human_review: isValidColumnArray(parsed.human_review)
-					? parsed.human_review
-					: emptyOrder.human_review,
-				build_failed: isValidColumnArray(parsed.build_failed)
-					? parsed.build_failed
-					: emptyOrder.build_failed,
-				done: isValidColumnArray(parsed.done) ? parsed.done : emptyOrder.done,
-				pr_created: isValidColumnArray(parsed.pr_created)
-					? parsed.pr_created
-					: emptyOrder.pr_created,
-				error: isValidColumnArray(parsed.error)
-					? parsed.error
-					: emptyOrder.error,
-			};
+			const order: Partial<Record<TaskOrderColumn, string[]>> = {};
+			for (const c of TASK_ORDER_COLUMNS) {
+				const value = parsed[c];
+				order[c] = isValidColumnArray(value) ? value : [];
+			}
+			return order as TaskOrderState;
 		};
 
 		// Helper function to handle parsed data
@@ -1354,7 +1330,7 @@ export async function deleteTask(
  */
 export async function abandonTask(
 	taskId: string,
-	reason?: string,
+	choice?: AbandonChoice | string,
 ): Promise<{ success: boolean; error?: string }> {
 	const store = useTaskStore.getState();
 	const task = store.tasks.find((t) => t.id === taskId || t.specId === taskId);
@@ -1370,7 +1346,7 @@ export async function abandonTask(
 	}
 
 	try {
-		const patch = buildAbandonMetadata(reason);
+		const patch = buildAbandonMetadata(choice);
 		const result = await globalThis.electronAPI.updateTask(taskId, {
 			metadata: patch,
 		});

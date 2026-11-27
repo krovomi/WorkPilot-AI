@@ -76,8 +76,15 @@ export type TaskStatus =
 	| "pr_created"
 	| "error";
 
+/**
+ * A list of the Kanban's manual order: one per status, plus the two outcome
+ * columns (« Échec », « Abandonnée », renderer/lib/kanban-columns.ts).
+ */
+export type TaskOrderColumn = TaskStatus | "failed" | "abandoned";
+
 // Maps task status columns to ordered task IDs for kanban board reordering
-export type TaskOrderState = Record<TaskStatus, string[]>;
+export type TaskOrderState = Record<TaskStatus, string[]> &
+	Partial<Record<Exclude<TaskOrderColumn, TaskStatus>, string[]>>;
 
 // Reason why a task is in human_review status
 // - 'completed': All subtasks done and QA passed, ready for final approval/merge
@@ -475,6 +482,21 @@ export interface TaskSplitCheck {
 	checkedAt?: string;
 }
 
+/**
+ * Why a task was set aside (« Abandonnée » column), like Jira's resolution or
+ * Linear's Canceled / Duplicate. `pr_closed` is written when the task's pull
+ * request was closed without a merge.
+ */
+export const ABANDON_RESOLUTIONS = [
+	"wont_do",
+	"duplicate",
+	"obsolete",
+	"replaced",
+	"pr_closed",
+	"other",
+] as const;
+export type AbandonResolution = (typeof ABANDON_RESOLUTIONS)[number];
+
 export interface TaskMetadata {
 	// Origin tracking
 	sourceType?:
@@ -739,6 +761,10 @@ export interface TaskMetadata {
 	abandoned?: boolean; // True while the task is abandoned
 	abandonedAt?: string; // ISO date when the task was abandoned
 	abandonedReason?: string; // Optional free-text reason (e.g. "PO deprioritized")
+	/** Why it was set aside, as a closed list (Jira's resolution). Absent on older tasks. */
+	abandonedResolution?: AbandonResolution;
+	/** The task this one duplicates or is replaced by (`duplicate`, `replaced`). */
+	abandonedLink?: string;
 
 	// Archive status
 	archivedAt?: string; // ISO date when task was archived

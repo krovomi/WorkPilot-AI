@@ -1,14 +1,17 @@
 /** Rows of a label and its value: the phone's small table. */
 
 import { StyleSheet, Text, View } from "react-native";
-import { SPACE, useTheme } from "../ui/theme";
+import { elevation, RADIUS, SPACE, TYPE, useTheme } from "../ui/theme";
 
 export function Figures({ rows }: { rows: { label: string; value: string; color?: string }[] }) {
 	const theme = useTheme();
 	return (
-		<View style={{ gap: SPACE.xs }}>
-			{rows.map((row) => (
-				<View key={row.label} style={styles.row}>
+		<View>
+			{rows.map((row, index) => (
+				<View
+					key={row.label}
+					style={[styles.row, index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderColor: theme.border } : null]}
+				>
 					<Text style={{ color: theme.textMuted, flex: 1 }}>{row.label}</Text>
 					<Text style={{ color: row.color ?? theme.text, fontWeight: "600" }} selectable>
 						{row.value}
@@ -19,7 +22,25 @@ export function Figures({ rows }: { rows: { label: string; value: string; color?
 	);
 }
 
-const styles = StyleSheet.create({ row: { flexDirection: "row", gap: SPACE.md, alignItems: "baseline" } });
+/** A big figure with its label, three to a row at the top of a page. */
+export function StatTile({ label, value, color }: { label: string; value: string; color?: string }) {
+	const theme = useTheme();
+	return (
+		<View style={[styles.tile, { backgroundColor: theme.surface }, elevation(theme)]}>
+			<Text style={[TYPE.title, { color: color ?? theme.text, fontSize: 22 }]} numberOfLines={1} adjustsFontSizeToFit selectable>
+				{value}
+			</Text>
+			<Text style={[TYPE.caption, { color: theme.textMuted }]} numberOfLines={2}>
+				{label}
+			</Text>
+		</View>
+	);
+}
+
+const styles = StyleSheet.create({
+	row: { flexDirection: "row", gap: SPACE.md, alignItems: "baseline", paddingVertical: SPACE.sm },
+	tile: { flex: 1, borderRadius: RADIUS.lg, padding: SPACE.md, gap: 2 },
+});
 
 export function money(value: number | null | undefined): string {
 	return typeof value === "number" && Number.isFinite(value) ? `$${value.toFixed(2)}` : "—";

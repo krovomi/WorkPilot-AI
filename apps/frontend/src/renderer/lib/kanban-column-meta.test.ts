@@ -39,6 +39,8 @@ describe("column accents", () => {
 			build_failed: "build-failed",
 			pr_created: "pr-open",
 			done: "done",
+			failed: "failed",
+			abandoned: "abandoned",
 		};
 		for (const status of TASK_STATUS_COLUMNS) {
 			const rule = new RegExp(`\\.column-${cls[status]}\\s*\\{[^}]*--col-accent:\\s*([^;]+);`).exec(CSS);
