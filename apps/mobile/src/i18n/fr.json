@@ -84,7 +84,8 @@
 		"groupMark": "Partie {{index}}/{{total}} · {{title}}",
 		"groupHint": "N'affiche que les cartes de ce groupe",
 		"groupFilter": "Groupe {{group}} · tout afficher",
-		"showAll": "Afficher toutes les cartes"
+		"showAll": "Afficher toutes les cartes",
+		"flagged": "Bloquée"
 	},
 	"columns": {
 		"backlog": "Planification",

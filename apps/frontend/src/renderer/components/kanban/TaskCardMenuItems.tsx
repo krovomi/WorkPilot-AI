@@ -4,6 +4,7 @@ import {
 	Copy,
 	ExternalLink,
 	Flag,
+	FlagOff,
 	Gauge,
 	GitMerge,
 	Pause,
@@ -45,6 +46,9 @@ export interface TaskCardMenuActions {
 	onPause?: () => void;
 	onResume?: () => void;
 	onSyncFromBranch?: () => void;
+	/** Flags the task « Bloquée » (asks why), or lifts the flag. */
+	onFlag?: () => void;
+	onUnflag?: () => void;
 	/** Sets the task aside (asks why) or, when it is abandoned, resumes it. */
 	onAbandon?: () => void;
 	onUnabandon?: () => void;
@@ -74,6 +78,8 @@ export function TaskCardMenuItems({
 	onPause,
 	onResume,
 	onSyncFromBranch,
+	onFlag,
+	onUnflag,
 	onAbandon,
 	onUnabandon,
 	onDelete,
@@ -85,7 +91,7 @@ export function TaskCardMenuItems({
 	const hasMoves = !!moves && moves.targets.length > 0;
 	const hasEditGroup = !!(onOpen || onEdit || onSetType || onSetPriority || hasMoves);
 	const hasWorkGroup = !!(
-		onEstimate || onDuplicate || onPause || onResume || onSyncFromBranch || onAbandon || onUnabandon
+		onEstimate || onDuplicate || onPause || onResume || onSyncFromBranch || onFlag || onUnflag || onAbandon || onUnabandon
 	);
 
 	return (
@@ -180,6 +186,18 @@ export function TaskCardMenuItems({
 				<DropdownMenuItem onSelect={onSyncFromBranch}>
 					<GitMerge className="mr-2 h-4 w-4" />
 					{t("tasks:actions.syncFromBranch")}
+				</DropdownMenuItem>
+			)}
+			{onFlag && (
+				<DropdownMenuItem onSelect={onFlag}>
+					<Flag className="mr-2 h-4 w-4 text-destructive" />
+					{t("tasks:flag.flagMenu")}
+				</DropdownMenuItem>
+			)}
+			{onUnflag && (
+				<DropdownMenuItem onSelect={onUnflag}>
+					<FlagOff className="mr-2 h-4 w-4" />
+					{t("tasks:flag.unflag")}
 				</DropdownMenuItem>
 			)}
 			{onAbandon && (

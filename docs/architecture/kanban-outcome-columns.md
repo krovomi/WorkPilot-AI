@@ -4,7 +4,8 @@ summary: >-
   Deux colonnes calculées, pas deux statuts : « Échec » tient les runs finis en erreur, refusés
   par la QA ou à court de contexte, « Abandonnée » les tâches mises de côté avec une résolution à
   la Jira (ne sera pas fait, doublon, obsolète, remplacée, autre) et la tâche liée. Pipeline,
-  XState et backend inchangés ; le mode serveur et l'app mobile les montrent aussi.
+  XState et backend inchangés. Plus le drapeau « Bloquée » et l'abandon d'une carte dont la PR est
+  fermée sans fusion.
 ---
 
 # Colonnes « Échec » et « Abandonnée »
@@ -55,7 +56,7 @@ Les dépôts sont traités avant ceux des statuts par `hooks/useOutcomeDrop.ts` 
 `AbandonDialog` (`task-detail/`) demande une **résolution** (`ABANDON_RESOLUTIONS`,
 `shared/types/task.ts`), la tâche liée pour `duplicate` et `replaced` (200 tâches au plus,
 non archivées, hors celles qu'on abandonne) et une note. `pr_closed` (« PR fermée sans fusion »)
-est réservée à l'app (lot 1b). `buildAbandonMetadata` (`shared/utils/task-lifecycle.ts`) écrit
+est réservée à l'app (voir « PR fermée sans fusion »). `buildAbandonMetadata` (`shared/utils/task-lifecycle.ts`) écrit
 `abandoned`, `abandonedAt`, `abandonedReason`, `abandonedResolution`, `abandonedLink` ;
 `buildResumeMetadata` les efface. Rien n'est supprimé.
 
@@ -73,3 +74,27 @@ abandons par résolution.
   `column` reste la colonne du plan, pour les clients qui la lisent déjà.
 - L'app mobile range la carte par `boardColumn` (`apps/mobile/src/board/columns.ts`) : `outcome`,
   sinon `error` → `failed`. Une carte abandonnée n'offre aucune action sur le téléphone.
+
+## « Bloquée » : le drapeau
+
+Comme le drapeau de Jira, « Bloquée » n'est pas une colonne : la carte reste où elle est, avec un
+bandeau rouge (`kanban/FlagBanner.tsx`) qui montre la raison et un bouton « Retirer le drapeau ».
+« Marquer comme bloquée… » du menu de la carte ouvre `kanban/FlagRequestDialog.tsx` (raison
+facultative, 500 caractères au plus, `MAX_FLAG_REASON`), ouvert par `stores/flag-request-store.ts`.
+`buildFlagMetadata` / `buildUnflagMetadata` (`shared/utils/task-flag.ts`) écrivent ou effacent
+`flagged`, `flaggedReason`, `flaggedAt` ; `stores/task-flag-actions.ts` les enregistre et avance
+`updatedAt`, que lisent les comparateurs de `KanbanColumn` pour redessiner la carte. Une tâche
+terminée ne se marque pas.
+
+Le drapeau suit le même chemin que l'abandon en mode serveur (`PLAIN_KEYS` : booléen, raison de
+500 caractères, date ISO) ; `board_mcp` ajoute `flagged: true` au résumé de la carte et l'app
+mobile affiche « Bloquée » sur la carte.
+
+## PR fermée sans fusion
+
+Le suivi des PR (`main/worktree-purge/merged-watch.ts`, `followMergedPrs`) lit déjà l'état de la
+PR de chaque carte. Quand elle est **fermée sans fusion**, la carte est abandonnée avec la
+résolution `pr_closed` et `prClosedAt` est noté : une seule fois, pour qu'une carte reprise à la
+main ne soit pas remise de côté au passage suivant. Une PR rouverte efface `prClosedAt` ; une PR
+fusionnée reprend une carte abandonnée. Le réglage « Mettre de côté les cartes dont la PR est
+fermée » (`kanbanAbandonClosedPrs`, Affichage, activé par défaut) coupe ce comportement.

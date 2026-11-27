@@ -185,6 +185,11 @@ function CardRow({
 						{t(`kinds.${card.kind}`)}
 					</Text>
 				) : null}
+				{card.flagged ? (
+					<Text style={[styles.kind, { color: theme.danger, backgroundColor: theme.elevated }]}>
+						{t("board.flagged")}
+					</Text>
+				) : null}
 			</View>
 			{group ? <GroupMark group={group} onPress={() => onGroup(group.id)} /> : null}
 			<Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>{card.title}</Text>

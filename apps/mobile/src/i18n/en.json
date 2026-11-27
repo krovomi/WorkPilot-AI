@@ -84,7 +84,8 @@
 		"groupMark": "Part {{index}}/{{total}} · {{title}}",
 		"groupHint": "Shows only this group's cards",
 		"groupFilter": "Group {{group}} · show all",
-		"showAll": "Show every card"
+		"showAll": "Show every card",
+		"flagged": "Blocked"
 	},
 	"columns": {
 		"backlog": "Planning",
