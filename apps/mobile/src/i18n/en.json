@@ -3,7 +3,8 @@
 		"cancel": "Cancel",
 		"retry": "Try again",
 		"loading": "Loading…",
-		"back": "Back"
+		"back": "Back",
+		"close": "Close"
 	},
 	"errors": {
 		"network": "The server can't be reached. Check your connection.",
@@ -88,6 +89,18 @@
 		"showAll": "Show every card",
 		"sync": "Sync",
 		"emptyHint": "Cards land here as they move along the board.",
+		"quickHint": "Long press for quick actions",
+		"quickActions": "Quick actions",
+		"openCard": "Open the card",
+		"search": "Search the board",
+		"clearSearch": "Clear the search",
+		"filters": "Filters",
+		"filtersOn_one": "Filters, {{count}} on",
+		"filtersOn_other": "Filters, {{count}} on",
+		"mine": "Mine",
+		"clearFilters": "Clear the filters",
+		"noMatch": "No card matches.",
+		"noMatchHint": "Other words or fewer filters may find it.",
 		"flagged": "Blocked"
 	},
 	"columns": {

@@ -19,7 +19,7 @@ import {
 	TASK_PRIORITY_COLORS,
 	TASK_PRIORITY_LABELS,
 } from "../../../shared/constants";
-import type { TaskCategory, TaskPriority } from "../../../shared/types";
+import type { Task, TaskCategory, TaskPriority } from "../../../shared/types";
 import {
 	activeFilterCount,
 	hasActiveFilters,
@@ -38,6 +38,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
+import { BoardAskButton } from "./board-ask/BoardAskButton";
 import { KanbanMoreMenu } from "./KanbanMoreMenu";
 import { QuickCommandBar } from "./QuickCommandBar";
 import { ServerBoardNotice, useSelectedServerProject } from "./ServerBoardNotice";
@@ -113,6 +114,8 @@ function FilterSection({ title, activeCount, children }: FilterSectionProps) {
 
 interface KanbanToolbarProps {
 	projectPath?: string;
+	/** Opens a card's details (a ticket found by « Interroger le tableau »). */
+	onOpenTask?: (task: Task) => void;
 }
 
 /**
@@ -121,7 +124,7 @@ interface KanbanToolbarProps {
  * reads as its own zone rather than a flat row of mystery buttons. Occasional
  * actions sit in the "⋯" menu at the end, so the toolbar keeps to one line.
  */
-export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
+export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 	const { t } = useTranslation(["tasks", "common"]);
 	const filters = useKanbanFilterStore((s) => s.filters);
 	const sort = useKanbanFilterStore((s) => s.sort);
@@ -179,6 +182,12 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 					</button>
 				)}
 			</div>
+
+			{/* A question about the board, answered with its related tickets. A
+			    server board is asked on the server, in a later lot. */}
+			{!serverProject && projectId && (
+				<BoardAskButton projectId={projectId} onOpenTask={onOpenTask} />
+			)}
 
 			{/* One split group shown alone (a click on a part's badge) */}
 			{filters.group && (

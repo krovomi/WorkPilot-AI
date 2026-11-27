@@ -76,6 +76,7 @@ import { registerCostHandlers } from "./cost-handlers";
 import { registerCostPredictorHandlers } from "./cost-predictor-handlers";
 import { registerFormulaMatrixHandlers } from "./formula-matrix-handlers";
 import { registerBenchHandlers } from "./bench-handlers";
+import { registerBoardAskHandlers } from "./board-ask-handlers";
 import { registerBoardMcpHandlers } from "./board-mcp-handlers";
 import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
@@ -682,6 +683,9 @@ export function setupIpcHandlers(
 
 	// workpilot-board MCP server: registered with Claude Code, Codex, Cursor...
 	registerBoardMcpHandlers();
+
+	// « Interroger le tableau »: a question answered with the related tickets
+	registerBoardAskHandlers();
 
 	// Agent Debugger handlers (Feature 1)
 	registerAgentDebuggerHandlers();

@@ -2222,7 +2222,7 @@ export function KanbanBoard({
 						</Button>
 					)}
 					{/* Unified toolbar: search, filters, sort, and quick commands */}
-					<KanbanToolbar projectPath={project?.path} />
+					<KanbanToolbar projectPath={project?.path} onOpenTask={onTaskClick} />
 					{/* Flow signal: a clickable list of cards that have idled too long.
 					    Plain label + concrete task list so the value is obvious. */}
 					{agingList.length > 0 && (
