@@ -115,12 +115,21 @@ class Card:
 
 def read_json(path: Path) -> dict[str, Any]:
     """A JSON object from a regular file (not a link) under its size; {} otherwise."""
+    # Windows has no O_NOFOLLOW: the link is refused on lstat, and the file
+    # opened must be the one checked, so a link swapped in between is not read.
     try:
+        before = os.lstat(path)
+        if stat.S_ISLNK(before.st_mode):
+            return {}
         fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     except OSError:
         return {}
     try:
-        if not stat.S_ISREG(os.fstat(fd).st_mode):
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode) or (opened.st_ino, opened.st_dev) != (
+            before.st_ino,
+            before.st_dev,
+        ):
             return {}
         raw = os.read(fd, MAX_JSON_BYTES + 1)
     finally:
