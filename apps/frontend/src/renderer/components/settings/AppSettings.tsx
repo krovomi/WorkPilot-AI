@@ -53,6 +53,7 @@ import { LanguageSettings } from "./LanguageSettings";
 import { VoiceAssistantSettings } from "./VoiceAssistantSettings";
 import { ProjectSettingsContent } from "./ProjectSettingsContent";
 import { GuardrailsSettings } from "./GuardrailsSettings";
+import { CodeModeSettings } from "./CodeModeSettings";
 import { SandboxSettings } from "./SandboxSettings";
 import { SchedulerSettings } from "./SchedulerSettings";
 import { ForgeAccountsSettings } from "./ForgeAccountsSettings";
@@ -94,6 +95,7 @@ export type AppSection =
 	| "devtools"
 	| "paths"
 	| "agent"
+	| "code-mode"
 	// Sécurité & Performance
 	| "sandbox"
 	| "guardrails"
@@ -446,6 +448,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return <DebugSettings />;
 			case "sandbox":
 				return <SandboxSettings settings={settings} onSettingsChange={setSettings} />;
+			case "code-mode":
+				return <CodeModeSettings settings={settings} onSettingsChange={setSettings} />;
 			case "guardrails":
 				return <GuardrailsSettings />;
 			case "anomaly-detection":

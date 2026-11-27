@@ -79,7 +79,8 @@ dossiers), relatifs au dépôt, `!` pour exclure.
 
 **`if`** est une petite grammaire fermée (`approvals/conditions.py`), jamais `eval` : faits
 `pr/type`, `pr/breaking`, `pr/bump`, `pr/files_changed`, `pr/diff_lines`, `pr/layers`,
-`pr/layer_names`, `pr/base`, `pr/labels`, `ci`, `review`, `trust`, `rule/files_changed` ;
+`pr/layer_names`, `pr/base`, `pr/labels`, `ci`, `review`, `trust`, `rule/files_changed`,
+`task/sandbox`, `task/blocked_hosts` ;
 opérateurs `= != < <= > >=`, `HAS` pour une liste, `AND OR NOT`, parenthèses (8 niveaux),
 1 024 caractères.
 
@@ -126,6 +127,40 @@ Le suivi de la PR d'une tâche ([pr-followup.md](pr-followup.md#le-niveau-de-val
 demande le niveau quand la PR est verte, le montre sur la carte (`N1 · attend une personne`,
 `N0 · fusionnée seule`, raisons dans l'infobulle) et fusionne en `enforce` quand le niveau le
 permet. GitHub seulement, comme le suivi lui-même ; une autre forge garde le merge à une personne.
+
+## Claude Ship, en option (lot A3)
+
+Claude Ship (Claude Code Review, Claude Approvals, PR Steward) ne tourne que sur GitHub, pour une
+organisation Claude sur un plan Team ou Enterprise. WorkPilot ne dépend jamais de lui : c'est un
+adaptateur, `pr_followup/claude_ship.py`, que l'app allume par `WORKPILOT_CLAUDE_SHIP=1`.
+
+| Réglage (Paramètres → Sécurité → Validation par niveaux) | Effet |
+|---|---|
+| Automatique (défaut) | allumé dès qu'un compte Claude connecté est sur un plan Team ou Enterprise (`main/ai-accounts/account-plans.ts`, plan lu sur le profil OAuth) |
+| Activé / Désactivé | forcé, quel que soit le plan |
+
+Allumé, trois faits lus sur la PR, sans modèle, à la tête jugée :
+
+- **Claude Code Review** (check de l'app GitHub Claude, id 1236702) : son nombre de constats
+  « Important » (`bughunter-severity`) remplace la revue croisée quand celle de WorkPilot n'a pas vu
+  cet arbre : zéro vaut un accord, un ou plus un désaccord. Un résultat illisible ne vaut rien.
+- **Claude Approvals** (check) : le plus strict gagne. En cours, WorkPilot attend ; en échec, il
+  ne fusionne pas. Un résultat `(observe mode)` ou neutre ne change rien. Il ne peut que retenir.
+- **PR Steward** (label `claude-pr-steward-watching`) : un seul intendant par PR. Le suivi de
+  WorkPilot arrête ses tours de correction et continue seulement de regarder.
+
+L'export de la politique vers `.claude/approvals.yml` reste à faire : il écrirait dans le dépôt, donc
+par une carte et sa PR.
+
+## Le bac à sable de la tâche comme fait (lot K1)
+
+Le moment où `os_sandbox` annonce le bac à sable d'une session (`SANDBOX_STATUS`) et chaque hôte
+qu'il refuse à une commande sont gardés dans `sandbox_evidence.json`, dans chaque copie du dossier
+de spec (`os_sandbox/evidence.py`). Le niveau en tire deux faits : `task/sandbox` (`microvm`, `os`
+pour le bac à sable de l'OS ou celui du provider, `none`, le plus faible des sessions) et
+`task/blocked_hosts` (liste, `HAS`). Une tâche lancée sans bac à sable (`unsandboxed`) ou qui a
+tenté un hôte refusé (`blocked_hosts`) passe N2. Rien d'enregistré reste inconnu et ne change rien ;
+une règle peut l'exiger : `if: "NOT task/sandbox = microvm"`, `tier: human`.
 
 ## Le runner
 

@@ -286,6 +286,25 @@ class GitHubForge:
                 break
         return False, error
 
+    async def check_runs(self, head_sha: str) -> list[Any] | None:
+        """The check runs of ``head_sha`` (name, app, status, conclusion, output)."""
+        if not _SHA.match(head_sha or ""):
+            return None
+        code, out, _err = await self._gh(
+            [
+                "api",
+                f"repos/{self.pr.slug}/commits/{head_sha}/check-runs?per_page=100",
+            ]
+        )
+        if code != 0:
+            return None
+        try:
+            data = json.loads(out)
+        except ValueError:
+            return None
+        runs = data.get("check_runs") if isinstance(data, dict) else None
+        return runs if isinstance(runs, list) else None
+
     async def failed_log(self, check: Check) -> str:
         """The tail of the failed steps' log, or a line saying why there is none."""
         if not (check.run_id and check.job_id):

@@ -501,6 +501,43 @@ def test_a_candidate_rule_is_measured_beside_its_engine(project):
     ]
 
 
+def test_code_mode_is_measured_beside_its_engine(project):
+    """The arm in code mode differs by code mode only, and measures code mode."""
+    from code_mode.settings import effective_mode
+
+    manifest = _prepare(project, [ENGINE_A, {**ENGINE_A, "codeMode": "on"}])
+    assert [e.get("codeMode") for e in manifest["engines"]] == [None, "on"]
+    plain, coded = (Path(b["copy"]) for b in manifest["builds"])
+    specs = [next((copy / ".workpilot" / "specs").iterdir()) for copy in (plain, coded)]
+    modes = [
+        json.loads((spec / "task_metadata.json").read_text(encoding="utf-8"))[
+            "codeMode"
+        ]
+        for spec in specs
+    ]
+    # Explicit either way: the person's switch decides neither arm.
+    assert modes == ["off", "on"]
+    env = {"WORKPILOT_CODE_MODE": "auto"}
+    assert effective_mode("qa_fixer", specs[0], env) == "off"
+    assert effective_mode("planner", specs[1], env) == "on"
+
+    _agent_writes(manifest, "b1", CALC_TARGET)
+    _agent_writes(manifest, "b2", CALC_TARGET)
+    judge_build(project, manifest["runId"], "b1", "ended", 0)
+    judge_build(project, manifest["runId"], "b2", "ended", 0)
+    # Like a rule's, the code mode build reaches neither the table nor the router.
+    (row,) = table(project)
+    assert row["judged"] == 1
+    assert len(history_samples(project)) == 1
+    stored = json.loads(results_path(project).read_text(encoding="utf-8"))
+    assert [r["codeMode"] for r in stored["records"]] == [None, "on"]
+    with pytest.raises(BenchError):
+        parse_engines([{**ENGINE_A, "codeMode": "always"}])
+    with pytest.raises(BenchError):
+        parse_engines([{**ENGINE_A, "codeMode": "on"}, {**ENGINE_A, "codeMode": "on"}])
+    assert parse_engines([{**ENGINE_A, "codeMode": "off"}])[0].code_mode == ""
+
+
 def test_a_rule_through_a_link_is_refused(tmp_path):
     from bench.lifecycle import write_rule
 

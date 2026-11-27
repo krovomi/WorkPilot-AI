@@ -8,7 +8,8 @@ what that PR's tier lets happen. The facts are the ones the task produced:
 - the PR title and labels, the card's kind (``task_metadata.json``);
 - the cross-review verdict, only when it was given on this very tree (a
   verdict about an older tree, before a fix round, says nothing of this one);
-- the lowest trust score of the task's agent sessions (``agent_safety.json``).
+- the lowest trust score of the task's agent sessions (``agent_safety.json``);
+- the task's sandbox and the hosts it refused (``sandbox_evidence.json``).
 
 The decision is kept in ``approval_decision.json`` and summarised as
 ``approval`` in ``implementation_plan.json`` for the card's badge. The PR is
@@ -28,6 +29,7 @@ from typing import Any
 
 from foundation.git_executable import run_git
 
+from .claude_ship import ShipFacts, hold, read_checks
 from .model import PRSnapshot
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,8 @@ _BRANCH = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$")
 
 Merger = Callable[[str], Awaitable[tuple[bool, str]]]
 """(head_sha) -> (merged, error): merge the PR at exactly this head."""
+CheckRuns = Callable[[str], Awaitable[list[Any] | None]]
+"""(head_sha) -> the head's check runs as the forge serves them, None if unreadable."""
 
 
 def review_state(spec_dir: Path, worktree: Path, head_sha: str) -> str:
@@ -76,9 +80,18 @@ def trust_score(spec_dir: Path) -> int | None:
 
 
 def judge(
-    project_dir: Path, worktree: Path, spec_dir: Path, snap: PRSnapshot
+    project_dir: Path,
+    worktree: Path,
+    spec_dir: Path,
+    snap: PRSnapshot,
+    ship: ShipFacts | None = None,
 ) -> dict[str, Any]:
-    """The decision for a green PR, as ``Decision.to_dict()``, or an ``error``."""
+    """The decision for a green PR, as ``Decision.to_dict()``, or an ``error``.
+
+    ``ship``: what Claude Ship said on the head (``claude_ship.read_checks``),
+    when the app turned the adapter on. Its Code Review stands in for a
+    cross-review that did not see this tree; its Approvals can only hold.
+    """
     from approvals import (
         build_facts,
         changed_files,
@@ -86,6 +99,7 @@ def judge(
         decide,
         load_approval_policy,
     )
+    from os_sandbox.evidence import read_evidence
     from security.guardrail_policy import main_project
     from tasks.metadata import read_task_metadata
 
@@ -100,6 +114,10 @@ def judge(
         return {"error": "git could not list the change set of the pull request"}
     project = main_project(project_dir)
     kind = read_task_metadata(spec_dir).get("kind")
+    review = review_state(spec_dir, worktree, snap.head_sha)
+    if review == "none" and ship is not None and ship.code_review:
+        review = ship.code_review
+    sandbox, blocked = read_evidence(spec_dir)
     facts = build_facts(
         files,
         title=snap.title,
@@ -107,11 +125,14 @@ def judge(
         base=snap.base_branch,
         labels=list(snap.labels),
         ci="green",
-        review=review_state(spec_dir, worktree, snap.head_sha),
+        review=review,
         trust=trust_score(spec_dir),
         layers=clean_layers_touched(project, [f.path for f in files]),
+        sandbox=sandbox,
+        blocked_hosts=blocked,
     )
-    return decide(facts, load_approval_policy(project)).to_dict()
+    decision = decide(facts, load_approval_policy(project)).to_dict()
+    return hold(decision, ship) if ship is not None else decision
 
 
 def _branch_ok(name: str) -> bool:
@@ -124,10 +145,16 @@ async def approve_green(
     spec_dir: Path,
     snap: PRSnapshot,
     merge: Merger,
+    check_runs: CheckRuns | None = None,
 ) -> dict[str, Any]:
-    """Judge the green PR, merge it when the decision says so, keep the record."""
+    """Judge the green PR, merge it when the decision says so, keep the record.
+
+    ``check_runs`` is given only when Claude Ship is on: its checks on the
+    head are read as facts (``claude_ship.py``).
+    """
     try:
-        decision = judge(project_dir, worktree, spec_dir, snap)
+        ship = read_checks(await check_runs(snap.head_sha)) if check_runs else None
+        decision = judge(project_dir, worktree, spec_dir, snap, ship)
     except (OSError, ValueError) as exc:
         decision = {"error": str(exc)[:300]}
     merged, error = False, ""
@@ -202,6 +229,7 @@ def _plan_summary(spec_dir: Path, record: dict[str, Any]) -> None:
 
 __all__ = [
     "DECISION_FILE",
+    "CheckRuns",
     "Merger",
     "approve_green",
     "judge",

@@ -127,6 +127,11 @@ tâche (`agent_safety.json`). La décision est gardée dans `approval_decision.j
 jamais une tête arrivée après le jugement. Le main passe le réglage par `WORKPILOT_APPROVALS`
 (`main/agent/approvals-env.ts`) ; `off` et `observe` ne fusionnent rien.
 
+Avec Claude Ship allumé (`WORKPILOT_CLAUDE_SHIP=1`, voir [approval-tiers.md](approval-tiers.md#claude-ship-en-option-lot-a3)),
+les checks Claude Code Review et Claude Approvals de la tête entrent dans ce jugement, et une PR que
+PR Steward suit (label `claude-pr-steward-watching`) ne reçoit plus de tour de correction de
+WorkPilot (`steward` dans l'historique, aucun tour dépensé).
+
 ## Limites connues
 
 - **GitHub seulement.** Une URL GitLab ou Azure DevOps est refusée par le

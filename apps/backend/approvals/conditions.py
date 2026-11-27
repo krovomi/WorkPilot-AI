@@ -13,8 +13,8 @@ here, never handed to ``eval``. The grammar:
     op      := "=" | "!=" | "<" | "<=" | ">" | ">="
 
 ``fact`` is one of ``FACTS``; ``value`` a whole number, a quoted string or a
-bare word. ``HAS`` asks whether a list fact (``pr/labels``, ``pr/layers``)
-holds the value. Keywords are case-insensitive, string comparisons too.
+bare word. ``HAS`` asks whether a list fact (``pr/labels``, ``pr/layer_names``,
+``task/blocked_hosts``) holds the value. Keywords are case-insensitive, string comparisons too.
 
 A fact that is not known (a trust score never measured) makes its comparison
 false. A rule that should fire on an unknown says so with ``NOT``, which the
@@ -49,6 +49,10 @@ FACTS: dict[str, Callable[[PRFacts, int], Any]] = {
     "review": lambda f, _n: f.review,
     "trust": lambda f, _n: f.trust,
     "rule/files_changed": lambda _f, n: n,
+    "task/sandbox": lambda f, _n: f.sandbox,
+    "task/blocked_hosts": lambda f, _n: (
+        list(f.blocked_hosts) if f.blocked_hosts is not None else None
+    ),
 }
 
 _TOKEN = re.compile(

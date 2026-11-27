@@ -12,6 +12,7 @@ Every router here mounts under ``/admin`` and every mutation writes an
 from __future__ import annotations
 
 from fastapi import APIRouter
+from server.routers.admin.erasure import router as erasure_router
 from server.routers.admin.groups import router as groups_router
 from server.routers.admin.orgs import router as orgs_router
 from server.routers.admin.overview import router as overview_router
@@ -19,7 +20,14 @@ from server.routers.admin.roles import router as roles_router
 from server.routers.admin.users import router as users_router
 
 router = APIRouter()
-for _sub in (orgs_router, roles_router, users_router, groups_router, overview_router):
+for _sub in (
+    orgs_router,
+    roles_router,
+    users_router,
+    erasure_router,
+    groups_router,
+    overview_router,
+):
     router.include_router(_sub)
 
 __all__ = ["router"]

@@ -1304,3 +1304,56 @@ describe("AgentProcessManager - cross-provider failover requests", () => {
 		expect(requests).toHaveLength(0);
 	});
 });
+
+describe("AgentProcessManager - an expired refresh token asks for the sign-in before the run", () => {
+	type Prompter = {
+		requestReauthBeforeSpawn: (taskId: string, profileId: string, error: string | undefined) => void;
+	};
+	let manager: Prompter;
+	let failures: unknown[][];
+
+	function withAutoSwitch(enabled: boolean, onAuthFailure: boolean): void {
+		vi.mocked(getClaudeProfileManager).mockReturnValue({
+			getAutoSwitchSettings: () => ({
+				enabled,
+				autoSwitchOnRateLimit: false,
+				autoSwitchOnAuthFailure: onAuthFailure,
+			}),
+		} as never);
+	}
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		const emitter = new EventEmitter();
+		failures = [];
+		emitter.on("auth-failure", (...args: unknown[]) => failures.push(args));
+		manager = new AgentProcessManager(new AgentState(), new AgentEvents(), emitter) as unknown as Prompter;
+	});
+
+	it("shows the re-authentication prompt for the profile at once", () => {
+		withAutoSwitch(false, false);
+		manager.requestReauthBeforeSpawn("task-1", "primary", "Refresh token expired");
+		expect(failures).toEqual([
+			[
+				"task-1",
+				expect.objectContaining({
+					profileId: "primary",
+					failureType: "expired",
+					originalError: "Refresh token expired",
+				}),
+			],
+		]);
+	});
+
+	it("still prompts when auto-switch is on but not for auth failures", () => {
+		withAutoSwitch(true, false);
+		manager.requestReauthBeforeSpawn("task-1", "primary", undefined);
+		expect(failures).toHaveLength(1);
+	});
+
+	it("leaves the run's 401 to auto-switch when it moves auth failures to another profile", () => {
+		withAutoSwitch(true, true);
+		manager.requestReauthBeforeSpawn("task-1", "primary", "Refresh token expired");
+		expect(failures).toEqual([]);
+	});
+});
