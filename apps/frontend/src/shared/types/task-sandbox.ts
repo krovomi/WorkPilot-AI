@@ -18,3 +18,16 @@ export interface TaskSandboxStatus {
 	reason: string | null;
 	network: string[];
 }
+
+/** Docker Sandboxes on this machine, for Settings > Sandbox (`main/microvm/sbx.ts`). */
+export interface MicrovmStatus {
+	/** The `sbx` command was found. */
+	installed: boolean;
+	/** It answered `sbx ls` (daemon up, signed in). */
+	ready: boolean;
+	version: string | null;
+	/** WorkPilot's task VMs that exist now. */
+	vms: number;
+	/** sbx's own words when it is not ready. */
+	reason: string | null;
+}
