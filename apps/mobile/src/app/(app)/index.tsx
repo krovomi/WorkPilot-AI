@@ -5,10 +5,12 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "rea
 import type { ServerProject } from "../../api/types";
 import { useApi, useSession } from "../../auth/session";
 import { useLoad } from "../../hooks/useLoad";
+import { inboxSummary } from "../../inbox/forMe";
+import { useInbox } from "../../inbox/useInbox";
 import { ErrorBanner, Loading, rowOpacity } from "../../ui/components";
 import { repoLabel } from "../../ui/format";
 import { Icon, type IconName } from "../../ui/Icon";
-import { Avatar, Chip, EmptyState, IconButton } from "../../ui/kit";
+import { Avatar, Chip, EmptyState, IconButton, ListRow } from "../../ui/kit";
 import { elevation, RADIUS, SPACE, TYPE, useTheme } from "../../ui/theme";
 import { projectRoleLabel } from "../../i18n/labels";
 
@@ -21,15 +23,20 @@ export default function Projects() {
 	const load = useCallback(() => api.projects(), [api]);
 	const { data, error, loading, refreshing, reload } = useLoad(load);
 	const org = permissions?.organizations.find((o) => o.id === permissions.org_id);
+	const inbox = useInbox(data);
+	const waiting = inbox.data?.items ?? [];
 
-	const settings = () => (
-		<IconButton icon="settings" label={t("projects.settings")} onPress={() => router.push("/settings")} />
+	const actions = () => (
+		<View style={styles.actions}>
+			<IconButton icon="inbox" label={t("inbox.open")} badge={waiting.length > 0} onPress={() => router.push("/inbox")} />
+			<IconButton icon="settings" label={t("projects.settings")} onPress={() => router.push("/settings")} />
+		</View>
 	);
 
 	if (loading && !data) return <Loading />;
 	return (
 		<>
-			<Stack.Screen options={{ headerRight: settings, headerTitle: org?.name ?? t("projects.title") }} />
+			<Stack.Screen options={{ headerRight: actions, headerTitle: org?.name ?? t("projects.title") }} />
 			<FlatList<ServerProject>
 				data={data ?? []}
 				keyExtractor={(p) => p.id}
@@ -41,6 +48,14 @@ export default function Projects() {
 							{t("projects.count", { count: data?.length ?? 0 })}
 						</Text>
 						<ErrorBanner error={error} />
+						{waiting.length > 0 ? (
+							<ListRow
+								icon="bell"
+								title={t("inbox.waiting", { count: waiting.length })}
+								subtitle={inboxSummary(waiting, t)}
+								onPress={() => router.push("/inbox")}
+							/>
+						) : null}
 					</View>
 				}
 				ListEmptyComponent={
@@ -99,4 +114,5 @@ const styles = StyleSheet.create({
 		padding: SPACE.lg,
 	},
 	meta: { flexDirection: "row", alignItems: "center", gap: 4 },
+	actions: { flexDirection: "row", alignItems: "center" },
 });
