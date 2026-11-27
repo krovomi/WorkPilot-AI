@@ -38,12 +38,13 @@ from pathlib import Path
 from typing import Any
 
 from agent_snapshots import SnapshotError, create_snapshot, rollback, task_worktree
+from code_mode.protocol import inner_calls
 from foundation.pause_state import pause_task, task_spec_dirs
 from security.agent_safety_settings import AgentSafetySettings, load_settings
 from security.anomaly_detector import AnomalyDetector
 from security.sandbox import SandboxPolicy, path_allowed, project_relative
 
-from .safety_events import call_events, written_path
+from .safety_events import bare_tool_name, call_events, written_path
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,15 @@ class SafetyWatch:
         self._score(name, arguments, bool(is_error))
         if not self.tripped and not is_error:
             self._check_write(name, arguments)
+        # A code mode script is one call that made many (`code_mode.protocol`):
+        # each is scored and checked as if the session had made it.
+        if bare_tool_name(name) == "run_script":
+            for inner_name, inner_arguments, ok in inner_calls(content):
+                if self.tripped:
+                    break
+                self._score(inner_name, inner_arguments, not ok)
+                if not self.tripped and ok:
+                    self._check_write(inner_name, inner_arguments)
         if not self.tripped:
             self._check_time()
         return self.tripped

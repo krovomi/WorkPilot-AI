@@ -616,6 +616,8 @@ export const IPC_CHANNELS = {
 	AI_ACCOUNTS_DELETE: "aiAccounts:delete",
 	AI_ACCOUNTS_TEST: "aiAccounts:test",
 	AI_ACCOUNTS_SET_DEFAULT: "aiAccounts:setDefault",
+	// Approval tiers: whether Claude Ship was detected (main/agent/approvals-env.ts)
+	APPROVALS_CLAUDE_SHIP_STATUS: "approvals:claudeShipStatus",
 	GIT_INITIALIZE: "git:initialize",
 	GIT_SET_REMOTE: "git:setRemote",
 	GIT_CHECKOUT_BRANCH: "git:checkoutBranch",

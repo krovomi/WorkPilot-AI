@@ -2,7 +2,10 @@ import { debugLog } from "../../shared/utils/debug-logger";
 import { parseJevSettings } from "../../shared/utils/jev-settings";
 import { parseSwarmSettings } from "../../shared/utils/swarm-settings";
 import { normalizeAgentSafety } from "../../shared/utils/agent-safety";
-import { normalizeApprovalTierMode } from "../../shared/utils/approval-tiers";
+import {
+	normalizeApprovalTierMode,
+	normalizeClaudeShipMode,
+} from "../../shared/utils/approval-tiers";
 import { execFileSync, spawn } from "node:child_process";
 import {
 	existsSync,
@@ -772,6 +775,8 @@ export function registerSettingsHandlers(
 					newSettings.agentSafety = normalizeAgentSafety(settings.agentSafety);
 				if (settings.approvalTiers !== undefined)
 					newSettings.approvalTiers = normalizeApprovalTierMode(settings.approvalTiers);
+				if (settings.claudeShip !== undefined)
+					newSettings.claudeShip = normalizeClaudeShipMode(settings.claudeShip);
 
 				// Sync defaultModel when agent profile changes (#414)
 				if (settings.selectedAgentProfile) {

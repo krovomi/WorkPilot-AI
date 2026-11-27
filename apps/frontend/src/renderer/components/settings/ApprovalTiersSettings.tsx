@@ -1,9 +1,14 @@
-import { GitMerge, Info, Layers } from "lucide-react";
+import { GitMerge, Info, Layers, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSettings } from "../../../shared/types";
+import type { ClaudeShipStatus } from "../../../shared/types/approvals";
 import {
 	APPROVAL_TIER_MODES,
+	CLAUDE_SHIP_MODES,
+	claudeShipActive,
 	normalizeApprovalTierMode,
+	normalizeClaudeShipMode,
 } from "../../../shared/utils/approval-tiers";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./SettingsSection";
@@ -26,6 +31,24 @@ interface ApprovalTiersSettingsProps {
 export function ApprovalTiersSettings({ settings, onSettingsChange }: ApprovalTiersSettingsProps) {
 	const { t } = useTranslation("settings");
 	const mode = normalizeApprovalTierMode(settings.approvalTiers);
+	const ship = normalizeClaudeShipMode(settings.claudeShip);
+	const [status, setStatus] = useState<ClaudeShipStatus | null>(null);
+
+	useEffect(() => {
+		let live = true;
+		window.electronAPI
+			?.getClaudeShipStatus?.()
+			.then((result) => {
+				if (live && result?.success && result.data) setStatus(result.data);
+			})
+			.catch(() => undefined);
+		return () => {
+			live = false;
+		};
+	}, []);
+
+	const detected = status?.detected ?? false;
+	const shipOn = claudeShipActive(ship, detected);
 
 	return (
 		<SettingsSection title={t(`${K}.title`)} description={t(`${K}.description`)}>
@@ -75,6 +98,54 @@ export function ApprovalTiersSettings({ settings, onSettingsChange }: ApprovalTi
 							</li>
 						))}
 					</ul>
+				</div>
+
+				<div>
+					<h4 className="text-sm font-semibold mb-1 flex items-center gap-2">
+						<Sparkles className="h-4 w-4 text-primary" />
+						{t(`${K}.claudeShip.title`)}
+					</h4>
+					<p className="text-xs text-muted-foreground mb-3">
+						{t(`${K}.claudeShip.description`)}
+					</p>
+					<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+						{CLAUDE_SHIP_MODES.map((id) => (
+							<button
+								type="button"
+								key={id}
+								data-testid={`claude-ship-${id}`}
+								onClick={() => onSettingsChange({ ...settings, claudeShip: id })}
+								aria-pressed={ship === id}
+								className={cn(
+									"flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors",
+									ship === id
+										? "border-primary bg-primary/5 ring-1 ring-primary"
+										: "border-border hover:bg-accent/50",
+								)}
+							>
+								<span className="text-sm font-medium">
+									{t(`${K}.claudeShip.${id}.label`)}
+								</span>
+								<span className="text-xs text-muted-foreground">
+									{t(`${K}.claudeShip.${id}.description`)}
+								</span>
+							</button>
+						))}
+					</div>
+					<p className="mt-3 text-xs" data-testid="claude-ship-status">
+						{status === null
+							? t(`${K}.claudeShip.checking`)
+							: detected
+								? t(`${K}.claudeShip.detected`, {
+										accounts: status.accounts
+											.map((a) => `${a.name} (${t(`${K}.claudeShip.plan.${a.plan}`)})`)
+											.join(", "),
+									})
+								: t(`${K}.claudeShip.notDetected`)}
+					</p>
+					<p className="mt-1 text-xs font-medium" data-testid="claude-ship-active">
+						{shipOn ? t(`${K}.claudeShip.active`) : t(`${K}.claudeShip.inactive`)}
+					</p>
 				</div>
 
 				<p className="flex items-start gap-2 text-xs text-muted-foreground">

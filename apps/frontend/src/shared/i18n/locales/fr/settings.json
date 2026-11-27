@@ -319,6 +319,31 @@
 			"description": "Modèle par défaut et framework",
 			"title": "Paramètres d'agent"
 		},
+		"codeMode": {
+			"title": "Mode code",
+			"description": "Les agents enchaînent leurs outils dans un court script au lieu d'un tour de modèle par appel",
+			"mode": {
+				"title": "Quand les agents peuvent écrire un script",
+				"description": "Un script cherche, lit, modifie et lance des commandes en une étape, plusieurs à la fois, et ne rend que ce dont l'agent a besoin. Arrêté, chaque agent travaille comme aujourd'hui.",
+				"off": {
+					"label": "Arrêté",
+					"description": "Aucun agent n'écrit de script. Le réglage par défaut."
+				},
+				"auto": {
+					"label": "Auto",
+					"description": "Seulement là où il fait gagner : le codage, la QA et les analyses du code. La rédaction de spec, les revues et l'idéation restent telles quelles."
+				},
+				"on": {
+					"label": "Activé",
+					"description": "Tout agent qui a des outils peut écrire un script."
+				}
+			},
+			"safety": {
+				"title": "Chaque appel d'un script est contrôlé comme un appel direct",
+				"description": "Le script lui-même ne lit aucun fichier, ne lance aucun processus et n'atteint aucun réseau. Chacun de ses appels passe par les droits de l'agent, les chemins protégés, les garde-fous, la liste des commandes permises et le bac à sable de l'OS, et la surveillance des anomalies note chacun d'eux."
+			},
+			"providers": "Marche avec tout fournisseur dont WorkPilot exécute les outils : OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio, les fournisseurs compatibles et les passerelles. Une tâche peut choisir son propre mode par phase."
+		},
 		"anomaly-detection": {
 			"description": "Le score de confiance de chaque session d'agent, et ce qui la met en pause ou l'arrête",
 			"title": "Détection d'anomalies",
@@ -502,7 +527,32 @@
 					"when": "Secrets, authentification, données personnelles, paiement, CI ou fichiers de politique : une personne valide, toujours."
 				}
 			},
-			"policyNote": "Le niveau se lit sans modèle, à partir des fichiers modifiés par la pull request, de son titre et des faits mesurés par la tâche. Les règles de la section approvals de workpilot.policy.yaml ne peuvent que le relever."
+			"policyNote": "Le niveau se lit sans modèle, à partir des fichiers modifiés par la pull request, de son titre et des faits mesurés par la tâche. Les règles de la section approvals de workpilot.policy.yaml ne peuvent que le relever.",
+			"claudeShip": {
+				"title": "Claude Ship",
+				"description": "Claude Code Review, Claude Approvals et PR Steward, pour une organisation Claude sur un plan Team ou Enterprise. Activé, leurs checks sur la PR GitHub d'une tâche comptent : Code Review remplace une revue croisée absente, Approvals ne peut que retenir une fusion, et WorkPilot arrête ses propres correctifs sur une PR que le Steward suit.",
+				"auto": {
+					"label": "Automatique",
+					"description": "Activé dès qu'un compte Claude connecté est sur un plan Team ou Enterprise."
+				},
+				"on": {
+					"label": "Activé",
+					"description": "Toujours lire les checks de Claude Ship."
+				},
+				"off": {
+					"label": "Désactivé",
+					"description": "Ne jamais les lire, quel que soit le plan."
+				},
+				"checking": "Lecture des comptes Claude…",
+				"detected": "Détecté : {{accounts}}",
+				"notDetected": "Aucun compte Claude connecté sur un plan Team ou Enterprise.",
+				"plan": {
+					"team": "Team",
+					"enterprise": "Enterprise"
+				},
+				"active": "Claude Ship est utilisé pour les PR des tâches.",
+				"inactive": "Claude Ship n'est pas utilisé."
+			}
 		}
 	},
 	"tasks": {
