@@ -165,6 +165,7 @@ function CardRow({
 			<View style={styles.cardTop}>
 				<Text style={[TYPE.caption, { color: theme.textFaint, fontWeight: "600" }]}>#{card.id.split("-")[0]}</Text>
 				{card.kind ? <Chip label={t(`kinds.${card.kind}`)} icon={KIND_ICONS[card.kind]} /> : null}
+				{card.flagged ? <Chip label={t("board.flagged")} icon="flag" color={theme.danger} /> : null}
 				<View style={{ flex: 1 }} />
 				{when ? <Text style={[TYPE.caption, { color: theme.textFaint }]}>{when}</Text> : null}
 			</View>

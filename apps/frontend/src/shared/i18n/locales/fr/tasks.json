@@ -3031,5 +3031,19 @@
 		},
 		"mergeHeld": "La suite complète tourne sur la CI pour ce commit. La fusion sera possible dès qu'elle sera verte.",
 		"mergeHeldLink": "Ouvrir le run"
+	},
+	"flag": {
+		"badge": "Bloquée",
+		"flag": "Signaler bloquée",
+		"flagMenu": "Signaler bloquée…",
+		"unflag": "Lever le blocage",
+		"dialogTitle_one": "Signaler la tâche bloquée",
+		"dialogTitle_other": "Signaler {{count}} tâches bloquées",
+		"dialogDescription_one": "La tâche garde sa colonne ; le drapeau dit à tous qu'elle ne peut pas avancer tant que l'obstacle n'est pas levé.",
+		"dialogDescription_other": "Les tâches gardent leur colonne ; le drapeau dit à tous qu'elles ne peuvent pas avancer tant que l'obstacle n'est pas levé.",
+		"reasonLabel": "Ce qui la bloque",
+		"reasonPlaceholder": "Ce qui la bloque (facultatif), par ex. on attend la clé d'API du client",
+		"failedTitle": "Drapeau non enregistré",
+		"failedDescription": "Impossible d'enregistrer le drapeau. Réessayez."
 	}
 }

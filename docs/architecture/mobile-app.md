@@ -369,6 +369,27 @@ La capture du README (`scripts/readme-screenshots/capture-mobile.cjs`) prend qua
 390 × 844 points, chacun dans un autre thème venu des préférences du compte, et les pose dans des
 cadres aux mêmes proportions : rien n'est étiré.
 
+## Pour vous, et me prévenir ailleurs
+
+La liste des projets dit combien de cartes attendent la personne, et le bouton « Ce qui vous
+attend » ouvre `src/app/(app)/inbox.tsx` : les cartes de tous ses projets qui sont en revue
+humaine et sur lesquelles elle peut agir, rangées par ce qu'il y a à faire (un plan à approuver,
+un run arrêté à regarder, un travail terminé à relire). Une carte réservée par une autre personne
+reste à celle-ci ; une carte qu'aucune de ses permissions ne laisserait toucher n'y est pas, comme
+l'écran de la carte n'en montrerait aucun bouton (`src/inbox/forMe.ts`). Aucune route nouvelle :
+l'app lit le tableau de chaque projet par `GET /api/board/cards`, au plus 30 projets, donc le
+serveur vérifie chaque projet comme pour son tableau ; un tableau illisible est nommé, les autres
+s'affichent.
+
+« Me prévenir ailleurs », dans les réglages (`src/app/(app)/needs-you.tsx`), règle les canaux
+propres à la personne sur le serveur (`server/routers/needs_you.py`) : ntfy, Telegram, Teams, les
+moments dont elle est prévenue et la langue des messages. Un secret se tape à l'aveugle et ne
+revient jamais : le serveur répond `********`, et un champ laissé vide garde celui qu'il a. Un
+interrupteur qui met un canal en pause renvoie ce qui n'est pas secret (le serveur ntfy, l'identifiant
+Telegram), pour que le serveur ne retombe pas sur ses valeurs par défaut. Enregistrer ou tester
+demande `agent.execute` ; sans lui, sans clé de secrets sur le serveur, ou tant que l'opérateur n'a
+pas activé l'envoi, l'écran le dit au lieu de proposer un bouton qui serait refusé.
+
 ## Ce qui vient
 
 - Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.
