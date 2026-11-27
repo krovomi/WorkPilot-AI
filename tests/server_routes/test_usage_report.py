@@ -416,3 +416,29 @@ async def test_a_message_without_smtp_is_refused():
 
     with pytest.raises(email.EmailError):
         await email.send_message(EmailMessage())
+
+
+async def test_an_erased_account_leaves_the_report_s_recipients(world):
+    from server.db.engine import get_session_factory
+    from server.db.models import Organization
+    from server.services import report_settings
+
+    await _org_settings(
+        world,
+        "a",
+        recipients=["contributor_a@example.com", "boss@corp.example"],
+    )
+    await _org_settings(world, "b", recipients=["boss@corp.example"])
+    who = world.users["contributor_a"]
+    done = await world.ok(
+        "platform",
+        "POST",
+        f"/admin/users/{who}/erase",
+        json={"confirm_email": "contributor_a@example.com"},
+    )
+    assert done["report_recipients_removed"] == 1
+    async with get_session_factory()() as db:
+        a = await db.get(Organization, world.orgs["a"])
+        b = await db.get(Organization, world.orgs["b"])
+        assert report_settings.of(a.settings).recipients == ("boss@corp.example",)
+        assert report_settings.of(b.settings).recipients == ("boss@corp.example",)
