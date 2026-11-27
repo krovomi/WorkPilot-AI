@@ -79,12 +79,17 @@ function AnswerText({
 	);
 }
 
+/** The element id of a ticket row, unique across the conversation. */
+const matchElementId = (entryId: number, index: number) => `board-ask-match-${entryId}-${index}`;
+
 function MatchRow({
+	entryId,
 	match,
 	index,
 	highlighted,
 	onOpen,
 }: {
+	readonly entryId: number;
 	readonly match: BoardAskMatch;
 	readonly index: number;
 	readonly highlighted: boolean;
@@ -92,11 +97,12 @@ function MatchRow({
 }) {
 	const { t } = useTranslation(["tasks"]);
 	return (
-		<li id={`board-ask-match-${index}`}>
+		<li id={matchElementId(entryId, index)}>
 			<button
 				type="button"
 				onClick={onOpen}
 				disabled={!onOpen}
+				aria-current={highlighted ? "true" : undefined}
 				className={cn(
 					"group flex w-full items-start gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5 text-left transition-colors",
 					onOpen && "hover:border-primary/40 hover:bg-primary/5",
@@ -115,7 +121,7 @@ function MatchRow({
 						{match.coverage && (
 							<Chip tone={COVERAGE_TONE[match.coverage]}>{t(`kanban.ask.coverage.${match.coverage}`)}</Chip>
 						)}
-						<Chip tone={STATE_TONE[match.state]} dot={false}>
+						<Chip tone={STATE_TONE[match.state]}>
 							{t(`kanban.ask.state.${match.state}`)}
 						</Chip>
 						{match.archived && (
@@ -148,10 +154,10 @@ function EntryView({
 	const result = entry.result;
 	const cite = (index: number) => {
 		setHighlighted(index);
-		document.getElementById(`board-ask-match-${index}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+		document.getElementById(matchElementId(entry.id, index))?.scrollIntoView({ block: "nearest", behavior: "smooth" });
 	};
 	return (
-		<div className="space-y-3">
+		<div className="scroll-mt-4 space-y-3" data-board-ask-entry={entry.id}>
 			<div className="flex justify-end">
 				<p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-sm text-primary-foreground">
 					{entry.question}
@@ -192,10 +198,11 @@ function EntryView({
 						<p className="text-sm text-muted-foreground">{t("kanban.ask.noMatch")}</p>
 					)}
 					{result.matches.length > 0 && (
-						<ul className="space-y-2">
+						<ul className="wp-scope space-y-2">
 							{result.matches.map((match, index) => (
 								<MatchRow
 									key={match.taskId}
+									entryId={entry.id}
 									match={match}
 									index={index}
 									highlighted={highlighted === index}
@@ -224,11 +231,16 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 	const clear = useBoardAskStore((s) => s.clear);
 	const tasks = useTaskStore((s) => s.tasks);
 	const [draft, setDraft] = useState("");
-	const endRef = useRef<HTMLDivElement>(null);
+	const listRef = useRef<HTMLDivElement>(null);
 	const pending = entries.some((e) => e.status === "pending");
 
 	useEffect(() => {
-		if (entries.length > 0) endRef.current?.scrollIntoView({ block: "end" });
+		// The latest question at the top: its answer reads from the start.
+		const last = entries.at(-1);
+		if (!last) return;
+		listRef.current
+			?.querySelector(`[data-board-ask-entry="${last.id}"]`)
+			?.scrollIntoView({ block: "start" });
 	}, [entries]);
 
 	const submit = (text: string) => {
@@ -255,7 +267,7 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
-			<DialogContent className="flex h-[min(85vh,820px)] max-w-3xl flex-col p-0">
+			<DialogContent className="relative flex h-[min(85vh,820px)] max-w-3xl flex-col p-0">
 				<DialogHeader className="shrink-0 pr-16">
 					<DialogTitle className="flex items-center gap-2">
 						<MessageSquareText className="h-5 w-5 text-primary" aria-hidden />
@@ -264,7 +276,7 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 					<DialogDescription>{t("kanban.ask.description")}</DialogDescription>
 				</DialogHeader>
 
-				<div className="-mx-6 min-h-0 flex-1 space-y-5 overflow-y-auto border-y border-border/60 px-6 py-4">
+				<div ref={listRef} className="-mx-6 min-h-0 flex-1 space-y-5 overflow-y-auto border-y border-border/60 px-6 py-4">
 					{entries.length === 0 ? (
 						<div className="flex h-full flex-col items-center justify-center gap-4 text-center">
 							<span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -287,7 +299,6 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 					) : (
 						entries.map((entry) => <EntryView key={entry.id} entry={entry} onOpenTask={openTask} />)
 					)}
-					<div ref={endRef} />
 				</div>
 
 				<div className="shrink-0 space-y-2 pt-3">
