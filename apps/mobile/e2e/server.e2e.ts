@@ -139,7 +139,7 @@ async function signIn(browser: Browser, world: World, who: Who, password = world
 	await page.goto(`http://localhost:${APP_PORT}/`);
 	await page.getByLabel("Server address").fill(world.serverUrl);
 	await page.getByLabel("Email").fill(world.emails[who]);
-	await page.getByLabel("Password").fill(password);
+	await page.getByRole("textbox", { name: "Password" }).fill(password);
 	if (who === "alice") await shot(page, "1-sign-in");
 	await page.getByRole("button", { name: "Sign in", exact: true }).click();
 	if (password === world.passwords[who]) signedIn.set(who, page);
@@ -183,7 +183,7 @@ function tokenTag(token: string): string {
 
 /** Back to the list of projects, from wherever a scenario left the page. */
 async function home(page: Page, project: string): Promise<void> {
-	const button = page.getByRole("button", { name: project });
+	const button = page.getByRole("button", { name: project, exact: true });
 	for (let i = 0; i < 10 && !(await button.isVisible()); i++) {
 		await page.goBack();
 		await page.waitForTimeout(300);
@@ -194,7 +194,7 @@ async function home(page: Page, project: string): Promise<void> {
 /** Opens a project from the list of projects, on its board. */
 async function openProject(page: Page, project: string): Promise<void> {
 	await home(page, project);
-	await page.getByRole("button", { name: project }).click();
+	await page.getByRole("button", { name: project, exact: true }).click();
 	await expect(page.getByRole("tab", { name: "More", exact: true })).toBeVisible({ timeout: 30_000 });
 }
 
