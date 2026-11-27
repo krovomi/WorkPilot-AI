@@ -159,7 +159,7 @@ describe("BoardLanes as a list", () => {
 			smartEstimate: { complexityScore: 3 },
 		} as Task["metadata"];
 		const onOpenTask = list(
-			[{ ...card("b", metadata), title: "Beta", updatedAt: "2026-11-02T10:00:00Z" } as Task],
+			[{ ...card("b", metadata), title: "Beta", updatedAt: "2026-11-02T10:00:00Z" } as unknown as Task],
 			[{ ...card("a", { sprintId: "sp-0000000f" }), title: "Alpha" } as Task],
 		);
 		expect(screen.queryByTestId("kanban-lanes")).toBeNull();

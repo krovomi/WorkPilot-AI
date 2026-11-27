@@ -6,8 +6,9 @@ import { describe, expect, it } from "vitest";
 import type { Sprint, Task } from "../../shared/types";
 import { type ListRow, nextListSort, readListSort, rowsOf, sortRows } from "./kanban-list";
 
-const card = (id: string, extra: Partial<Task> = {}, metadata: Task["metadata"] = {}) =>
-	({ id, specId: id, title: `Card ${id}`, status: "backlog", updatedAt: "2026-11-01", metadata, ...extra }) as Task;
+/** A card; dates as strings, as a card read back from JSON holds them. */
+const card = (id: string, extra: Record<string, unknown> = {}, metadata: Task["metadata"] = {}) =>
+	({ id, specId: id, title: `Card ${id}`, status: "backlog", updatedAt: "2026-11-01", metadata, ...extra }) as unknown as Task;
 
 const sprints = [
 	{ id: "sp-0000000a", name: "Sprint 12", state: "active", createdAt: "t" },
