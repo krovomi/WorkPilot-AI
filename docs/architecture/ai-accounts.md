@@ -64,6 +64,16 @@ Les alias (`gemini` → `google`) passent par `accountProviderOf` (`shared/types
 une fois, masque compris (`unmaskSecret`), n'est jamais renvoyée ; le test répond `ok`, un nombre
 de modèles ou une raison courte (200 caractères), jamais le corps de la réponse.
 
+## Le plan de chaque compte
+
+`accountsWithPlan(provider)` (`main/ai-accounts/account-plans.ts`) liste les comptes d'un
+provider avec leur plan, jamais une clé ni un jeton : `team`, `enterprise`, `max`, `pro` pour un
+profil Claude (le `subscriptionType` que `claude-account-plan.ts` demande à Anthropic puis garde
+dans le profil), `api` pour un compte à clé, `unknown` sinon ; plus `isDefault` et `signedIn`.
+`hasClaudeOrganizationPlan()` dit si un compte Claude connecté est sur une organisation Team ou
+Enterprise : une feature réservée à ces plans s'allume d'elle-même dessus. Le renderer lit le même
+`subscriptionType` dans `getClaudeProfiles`.
+
 ## Pas encore
 
 Les providers qui se connectent par leur propre outil gardent un compte : Copilot (`gh`), Codex
