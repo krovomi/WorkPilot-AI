@@ -18,6 +18,7 @@ import type {
 	ExecutionWavePlan,
 	GovernanceReport,
 	MyPermissions,
+	PageVisitCount,
 	ProjectMember,
 	RunPhase,
 	ServerProject,
@@ -259,6 +260,14 @@ export function api(client: ServerClient) {
 		saveNeedsYouMoments: (events: Record<Moment, boolean>, locale: string) =>
 			client.request<{ saved: boolean }>("PUT", "/users/me/needs-you/preferences", { events, locale }),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
+		/** Whether the person's organization counts which screens they open. */
+		pageActivity: () => client.request<{ enabled: boolean }>("GET", "/users/me/page-activity"),
+		/** Today's opens per screen (`usage/pages.ts` names only). */
+		sendPageActivity: (visits: PageVisitCount[]) =>
+			client.request<{ enabled: boolean; recorded: number }>("POST", "/users/me/page-activity", {
+				client: "mobile",
+				visits,
+			}),
 	};
 }
 

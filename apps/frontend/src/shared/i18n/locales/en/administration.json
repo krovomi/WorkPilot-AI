@@ -10,7 +10,8 @@
 		"organizations": "Organizations",
 		"invitations": "Invitations",
 		"audit": "Audit",
-		"quotas": "Quotas"
+		"quotas": "Quotas",
+		"usage": "Usage"
 	},
 	"common": {
 		"loading": "Loading…",
@@ -164,5 +165,26 @@
 		"usedThisMonth": "{{count}} used this month",
 		"enforceHardStop": "Block new runs once the token budget is spent",
 		"hardStopHint": "When unchecked, exceeding the budget is reported but runs still start."
+	},
+	"usage": {
+		"description": "What the server collects about this organization's members, and how long it keeps it. Never a prompt, code, typed text or file name.",
+		"failed": "The server refused: {{error}}",
+		"saved": "Saved.",
+		"pageActivity": {
+			"title": "Page activity",
+			"what": "When on, each member's desktop and phone send how many times they opened each page per day (the page's name only: no project, card or text).",
+			"toggle": "Count which pages members open",
+			"inform": "Off. Tell the members what is measured and why before turning it on: the change is recorded in the audit log.",
+			"since": "On since {{date}}. Each change is recorded in the audit log.",
+			"erase": "Turning it off erases the page counts kept so far when you save."
+		},
+		"retention": {
+			"title": "How long data is kept",
+			"usage": "Token use and presence (days)",
+			"pages": "Page activity (days)",
+			"serverDefault": "Server default: {{count}} days",
+			"hint": "Empty keeps the server's default. From {{min}} to {{max}} days; older data is erased every hour.",
+			"invalid": "Enter a whole number of days from {{min}} to {{max}}, or leave it empty."
+		}
 	}
 }

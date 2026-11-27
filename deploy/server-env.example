@@ -46,6 +46,8 @@ WORKPILOT_PASSWORD_RESET_TTL_MINUTES=60
 # How many days token use and presence days are kept before they are erased
 # (30 to 3650). What is recorded: docs/server-usage-data.md.
 WORKPILOT_USAGE_RETENTION_DAYS=365
+# How many days page activity is kept (off unless an organization turns it on).
+WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS=183
 
 # SMTP for invitation and forgotten-password emails (leave WORKPILOT_SMTP_HOST
 # empty to disable; the admin UI then shows a copyable link instead).
