@@ -54,6 +54,7 @@ MODES = (MODE_OFF, MODE_OBSERVE, MODE_ENFORCE)
 
 #: The CI and review states the facts take.
 CI_STATES = ("green", "pending", "red", "unknown")
+SANDBOX_KINDS = ("microvm", "os", "none")
 REVIEW_STATES = ("agree", "disagree", "inconclusive", "none")
 
 
@@ -91,6 +92,11 @@ class PRFacts:
     review: str = "none"
     #: Trust score of the agent session (agent_safety), when one is known.
     trust: int | None = None
+    #: The task's sandbox (``os_sandbox/evidence.py``): ``microvm``, ``os``
+    #: or ``none``, the weakest of its sessions; None when not recorded.
+    sandbox: str | None = None
+    #: Hosts the sandbox refused to the task's commands; None when unknown.
+    blocked_hosts: tuple[str, ...] | None = None
 
     @property
     def files_changed(self) -> int:
@@ -118,6 +124,10 @@ class PRFacts:
             "ci": self.ci,
             "review": self.review,
             "trust": self.trust,
+            "sandbox": self.sandbox,
+            "blockedHosts": (
+                list(self.blocked_hosts) if self.blocked_hosts is not None else None
+            ),
         }
 
 

@@ -3143,7 +3143,9 @@
 			"policy_invalid": "invalid approvals section",
 			"rule": "project rule",
 			"claude_approvals_pending": "Claude Approvals still running",
-			"claude_approvals_failed": "Claude Approvals did not pass"
+			"claude_approvals_failed": "Claude Approvals did not pass",
+			"unsandboxed": "ran without a sandbox",
+			"blocked_hosts": "tried a refused host"
 		}
 	}
 }

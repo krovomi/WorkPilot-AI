@@ -446,7 +446,14 @@
 				"cpus": "Processeurs par tâche",
 				"cpusHint": "Auto : la moitié des cœurs de la machine.",
 				"auto": "auto",
-				"requirements": "Demande la commande sbx (Windows : winget install -h Docker.sbx ; macOS : brew install docker/tap/sbx) et un compte Docker : lance sbx login une fois. Sous Windows, active la plateforme d'hyperviseur Windows. WorkPilot coupe la télémétrie de sbx ; aucun code ni prompt ne quitte la machine. Dans cette version, les commandes de la boucle WorkPilot (OpenAI, Google, Mistral, Copilot, modèles locaux…) tournent dans la VM ; les agents en CLI gardent le bac à sable de l'OS."
+				"requirements": "Demande la commande sbx (Windows : winget install -h Docker.sbx ; macOS : brew install docker/tap/sbx) et un compte Docker : lance sbx login une fois. Sous Windows, active la plateforme d'hyperviseur Windows. WorkPilot coupe la télémétrie de sbx ; aucun code ni prompt ne quitte la machine. Dans cette version, les commandes de la boucle WorkPilot (OpenAI, Google, Mistral, Copilot, modèles locaux…) tournent dans la VM ; les agents en CLI gardent le bac à sable de l'OS.",
+				"status": {
+					"unknown": "Pas encore vérifié.",
+					"ready": "sbx {{version}} est prêt · {{count}} VM de tâche en ce moment.",
+					"notReady": "sbx est installé mais pas prêt : {{reason}}",
+					"missing": "sbx est introuvable sur cette machine.",
+					"check": "Vérifier"
+				}
 			}
 		},
 		"terminal-fonts": {

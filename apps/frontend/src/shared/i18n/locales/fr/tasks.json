@@ -3143,7 +3143,9 @@
 			"policy_invalid": "section approvals invalide",
 			"rule": "règle du projet",
 			"claude_approvals_pending": "Claude Approvals encore en cours",
-			"claude_approvals_failed": "Claude Approvals n'est pas passé"
+			"claude_approvals_failed": "Claude Approvals n'est pas passé",
+			"unsandboxed": "lancée sans bac à sable",
+			"blocked_hosts": "a tenté un hôte refusé"
 		}
 	}
 }

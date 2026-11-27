@@ -142,7 +142,8 @@ export default defineConfig({
 		server: {
 			proxy: {
 				"/analytics": {
-					target: "http://localhost:9000",
+					// The port `pnpm run dev` chose (scripts/dev.mjs).
+					target: `http://127.0.0.1:${process.env.BACKEND_PORT || "9000"}`,
 					changeOrigin: true,
 				},
 			},

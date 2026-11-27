@@ -8,7 +8,8 @@ what that PR's tier lets happen. The facts are the ones the task produced:
 - the PR title and labels, the card's kind (``task_metadata.json``);
 - the cross-review verdict, only when it was given on this very tree (a
   verdict about an older tree, before a fix round, says nothing of this one);
-- the lowest trust score of the task's agent sessions (``agent_safety.json``).
+- the lowest trust score of the task's agent sessions (``agent_safety.json``);
+- the task's sandbox and the hosts it refused (``sandbox_evidence.json``).
 
 The decision is kept in ``approval_decision.json`` and summarised as
 ``approval`` in ``implementation_plan.json`` for the card's badge. The PR is
@@ -98,6 +99,7 @@ def judge(
         decide,
         load_approval_policy,
     )
+    from os_sandbox.evidence import read_evidence
     from security.guardrail_policy import main_project
     from tasks.metadata import read_task_metadata
 
@@ -115,6 +117,7 @@ def judge(
     review = review_state(spec_dir, worktree, snap.head_sha)
     if review == "none" and ship is not None and ship.code_review:
         review = ship.code_review
+    sandbox, blocked = read_evidence(spec_dir)
     facts = build_facts(
         files,
         title=snap.title,
@@ -125,6 +128,8 @@ def judge(
         review=review,
         trust=trust_score(spec_dir),
         layers=clean_layers_touched(project, [f.path for f in files]),
+        sandbox=sandbox,
+        blocked_hosts=blocked,
     )
     decision = decide(facts, load_approval_policy(project)).to_dict()
     return hold(decision, ship) if ship is not None else decision
