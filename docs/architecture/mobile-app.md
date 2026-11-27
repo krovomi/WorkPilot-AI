@@ -390,6 +390,32 @@ Telegram), pour que le serveur ne retombe pas sur ses valeurs par défaut. Enreg
 demande `agent.execute` ; sans lui, sans clé de secrets sur le serveur, ou tant que l'opérateur n'a
 pas activé l'envoi, l'écran le dit au lieu de proposer un bouton qui serait refusé.
 
+## Trouver et agir vite sur le tableau
+
+Au-dessus des colonnes, un champ cherche dans le titre, le numéro et le nom de qui a pris la
+carte, sans tenir compte des accents ni de la casse ; les filtres gardent les cartes de la
+personne ou les types choisis (`src/board/filter.ts`, `src/board/FilterBar.tsx`). Les comptes des
+colonnes suivent la recherche, et la colonne ouverte suit les résultats tant que la personne n'en a
+pas choisi une.
+
+Un appui long sur une carte (ou l'action du lecteur d'écran) ouvre ses actions rapides
+(`src/board/QuickActions.tsx`) : la carte est relue (spec, approbation, runs) pour proposer ce que
+son écran proposerait, mais seulement ce qu'il lance sans redemander (démarrer, approuver la spec,
+arrêter, relancer le build). Fusionner, ouvrir la pull request, renvoyer avec des remarques et
+supprimer restent sur l'écran de la carte, derrière sa confirmation et le verrouillage de l'app ;
+« Ouvrir la carte » est toujours là. Le serveur n'a pas de route pour déplacer une carte d'une
+colonne à l'autre : une carte change de colonne par ces actions, comme sur le bureau en mode
+serveur. Un glisser-déposer libre aurait demandé au serveur d'écrire un statut de plan à la main,
+hors des runs qui le tiennent.
+
+Un retour haptique léger (`src/ui/haptics.ts`, `expo-haptics`) marque un changement de colonne,
+un filtre, l'ouverture des actions rapides, et leur réussite ou leur échec ; rien sur le web ou
+sans moteur, et un retour manqué ne fait jamais échouer l'action.
+
+À partir de 900 points de large (une tablette, un téléphone à l'horizontale), le tableau montre
+toutes ses colonnes côte à côte, comme le bureau (`src/board/WideBoard.tsx`), avec les mêmes
+recherche et filtres.
+
 ## Ce qui vient
 
 - Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.

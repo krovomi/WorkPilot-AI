@@ -2,14 +2,14 @@
 
 import { useCallback } from "react";
 import type { ServerProject } from "../api/types";
-import { useApi, useSession } from "../auth/session";
+import { useApi, useSession, useUserId } from "../auth/session";
 import { type Loaded, useLoad } from "../hooks/useLoad";
 import { type Inbox, loadInbox } from "./forMe";
 
 export function useInbox(projects: readonly ServerProject[] | null): Loaded<Inbox | null> {
 	const api = useApi();
-	const { permissions, user, can } = useSession();
-	const userId = permissions?.user_id ?? user?.id ?? null;
+	const { can } = useSession();
+	const userId = useUserId();
 	const load = useCallback(
 		async () => (projects ? loadInbox(projects, api.cards, userId, can) : null),
 		[projects, api, userId, can],
