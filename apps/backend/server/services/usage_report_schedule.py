@@ -49,8 +49,6 @@ async def readers(db: AsyncSession, org_id: str) -> list[str]:
         select(Role).where(or_(Role.org_id.is_(None), Role.org_id == org_id))
     )
     reading = [r.id for r in roles if "usage.read" in (r.permissions or [])]
-    if not reading:
-        return []
     emails = await db.scalars(
         select(User.email)
         .join(OrgMember, OrgMember.user_id == User.id)

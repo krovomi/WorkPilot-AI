@@ -391,3 +391,28 @@ async def test_an_organization_gone_answers_404(world, monkeypatch):
     with pytest.raises(HTTPException) as refused:
         await routes._org(Nothing(), "gone")  # type: ignore[arg-type]
     assert refused.value.status_code == 404
+
+
+async def test_the_server_sends_reports_for_its_lifetime(world, monkeypatch):
+    started: list[object] = []
+    real_start = usage_report_schedule.start
+
+    def spy(ready=None, interval=usage_report_schedule.INTERVAL_SECONDS):
+        started.append(ready)
+        return real_start(ready=ready, interval=3600)
+
+    monkeypatch.setattr(usage_report_schedule, "start", spy)
+    async with world.app.router.lifespan_context(world.app):
+        assert usage_report_schedule._task is not None
+        assert not usage_report_schedule._task.done()
+    assert usage_report_schedule._task is None
+    assert len(started) == 1 and started[0] is not None
+
+
+async def test_a_message_without_smtp_is_refused():
+    from email.message import EmailMessage
+
+    from server.services import email
+
+    with pytest.raises(email.EmailError):
+        await email.send_message(EmailMessage())
