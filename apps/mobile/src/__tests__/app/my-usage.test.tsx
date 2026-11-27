@@ -80,7 +80,7 @@ describe("my usage", () => {
 	});
 
 	it("shares everything kept, or says why not", async () => {
-		const share = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" });
+		const share = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction", activityType: undefined });
 		const exports = [{ account: { id: "u1" } }, reply(404, { detail: "Account not found" })];
 		fakeServer({ "GET /users/me/usage": MINE, "GET /users/me/usage/export": () => exports.shift() });
 		await openApp("/my-usage");
