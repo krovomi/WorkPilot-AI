@@ -108,6 +108,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # MCP 2026-07-28 and its Tasks extension, for WorkPilot's own servers:
     # the standard library only (docs/architecture/mcp-2026.md).
     "mcp_tasks": set(),
+    # « Interroger le tableau », ranking by meaning (docs/architecture/board-ask.md):
+    # the brain's local embeddings model, secret masking and atomic writes
+    # through foundation, the strict offline policy. A leaf its runner calls.
+    "board_ask": {"brain", "foundation", "offline_policy"},
     # The board as an MCP server: the spec numbering lock and the MCP layer,
     # nothing that runs an agent (docs/architecture/board-mcp.md).
     "board_mcp": {"core", "mcp_tasks"},
