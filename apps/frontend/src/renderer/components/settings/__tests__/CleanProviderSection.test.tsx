@@ -13,6 +13,7 @@ import { installRendererApi, type RendererApi } from "../../../../__tests__/help
 import { callStub, resetStubs, stubModule, stubProps } from "../../../../__tests__/helpers/stub-component";
 import i18n from "../../../../shared/i18n";
 import type { AppSettings } from "../../../../shared/types/settings";
+import { useAiAccountsStore } from "../../../stores/ai-accounts-store";
 import { useClaudeProfileStore } from "../../../stores/claude-profile-store";
 import { useSettingsStore } from "../../../stores/settings-store";
 import type { ProviderCardData } from "../CleanProviderCard";
@@ -50,6 +51,7 @@ const STATUS = { anthropic: true, openai: true, copilot: true, mistral: false, w
 
 const initialSettings = useSettingsStore.getState();
 const initialClaude = useClaudeProfileStore.getState();
+const initialAccounts = useAiAccountsStore.getState();
 let api: RendererApi;
 let invoke: ReturnType<typeof vi.fn>;
 
@@ -113,6 +115,7 @@ afterEach(async () => {
 	vi.clearAllMocks();
 	useSettingsStore.setState(initialSettings, true);
 	useClaudeProfileStore.setState(initialClaude, true);
+	useAiAccountsStore.setState(initialAccounts, true);
 	localStorage.clear();
 	if (i18n.language !== "en") await i18n.changeLanguage("en");
 });
@@ -319,6 +322,47 @@ describe("CleanProviderSection", () => {
 			});
 		});
 		expect(api.fn("saveSettings")).toHaveBeenCalled();
+	});
+
+	it("counts each provider's accounts, names the one it runs on and opens them", async () => {
+		const snapshot = {
+			accounts: [{ id: "m1", provider: "mistral", name: "Client", hasKey: true, createdAt: "" }],
+			defaults: { mistral: "m1" },
+			mainKeys: ["openai", "mistral"],
+		};
+		useApi({ listAiAccounts: vi.fn(async () => ({ success: true, data: snapshot })) });
+		renderSection();
+		// Mistral, connected by its account, is tested once too.
+		await waitFor(() => expect(tests()).toHaveLength(3));
+		await waitFor(() => expect(card("mistral").accounts).toEqual({ count: 2, defaultName: "Client" }));
+		// A default account connects a provider whose own page holds no key.
+		expect(card("mistral").isConfigured).toBe(true);
+		expect(card("openai").accounts).toEqual({ count: 1, defaultName: undefined });
+		expect(card("anthropic").accounts).toEqual({ count: 2, defaultName: "Me" });
+		expect(card("copilot").accounts).toBeUndefined();
+
+		act(() => {
+			callStub("CleanProviderGrid", "onManageAccounts", "nope");
+		});
+		expect(screen.queryByRole("dialog")).toBeNull();
+		act(() => {
+			callStub("CleanProviderGrid", "onManageAccounts", "mistral");
+		});
+		expect(await screen.findByRole("dialog", { name: "Mistral accounts" })).toBeInTheDocument();
+		await userEvent.keyboard("{Escape}");
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+	});
+
+	it("names the main key when it runs beside other accounts", async () => {
+		const snapshot = {
+			accounts: [{ id: "o1", provider: "openai", name: "Work", hasKey: true, createdAt: "" }],
+			defaults: {},
+			mainKeys: ["openai"],
+		};
+		useApi({ listAiAccounts: vi.fn(async () => ({ success: true, data: snapshot })) });
+		renderSection();
+		await settle();
+		await waitFor(() => expect(card("openai").accounts).toEqual({ count: 2, defaultName: "Main key" }));
 	});
 
 	it("starts a sign-in asked from the re-auth toast, on the providers tab", async () => {

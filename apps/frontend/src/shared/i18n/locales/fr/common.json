@@ -713,7 +713,9 @@
 		"needsReauthTitle": "Nouvelle authentification nécessaire",
 		"sessionUsage": "Utilisation de la session",
 		"weeklyUsage": "Utilisation hebdomadaire",
-		"inOut": "{{model}} : {{input}} en entrée, {{output}} en sortie"
+		"inOut": "{{model}} : {{input}} en entrée, {{output}} en sortie",
+		"providerAccounts": "Comptes de ce provider",
+		"accountSwitchFailed": "Bascule impossible : {{error}}"
 	},
 	"oauth": {
 		"enterCode": "Saisie de code manuelle (Fallback)",

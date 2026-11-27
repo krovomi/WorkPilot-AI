@@ -609,6 +609,12 @@ export const IPC_CHANNELS = {
 	FORGE_ACCOUNTS_SAVE: "forgeAccounts:save",
 	FORGE_ACCOUNTS_DELETE: "forgeAccounts:delete",
 	FORGE_ACCOUNTS_TEST: "forgeAccounts:test",
+	// AI accounts: several API-key accounts per provider (main/ai-accounts/ai-accounts.ts)
+	AI_ACCOUNTS_LIST: "aiAccounts:list",
+	AI_ACCOUNTS_SAVE: "aiAccounts:save",
+	AI_ACCOUNTS_DELETE: "aiAccounts:delete",
+	AI_ACCOUNTS_TEST: "aiAccounts:test",
+	AI_ACCOUNTS_SET_DEFAULT: "aiAccounts:setDefault",
 	GIT_INITIALIZE: "git:initialize",
 	GIT_SET_REMOTE: "git:setRemote",
 	GIT_CHECKOUT_BRANCH: "git:checkoutBranch",

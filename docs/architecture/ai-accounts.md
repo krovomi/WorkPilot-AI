@@ -1,0 +1,84 @@
+---
+feature: Plusieurs comptes par provider IA
+summary: >-
+  Plusieurs comptes par provider à clé API (OpenAI, Google, Mistral, DeepSeek, Grok, Meta,
+  OpenRouter, Hugging Face), clés chiffrées dans le main, un compte par défaut par provider que le
+  gestionnaire d'identifiants donne aux tâches, aux tests et aux vues ; les comptes Claude sont ses
+  profils OAuth ; bascule en un clic depuis la popin d'utilisation.
+---
+
+# Plusieurs comptes par provider IA
+
+Une personne a souvent plusieurs comptes chez un même provider : sa clé personnelle, celle de son
+employeur, celle d'un client, un deuxième abonnement Claude. Jusqu'ici, un provider à clé API
+n'avait qu'une clé (le champ `global<X>ApiKey` de sa page) et seul Claude savait garder plusieurs
+comptes (ses profils OAuth).
+
+## Où vit quoi
+
+| Donnée | Où | Qui la lit |
+|---|---|---|
+| Les comptes (provider, nom, clé, dates) et le compte par défaut de chaque provider | `<userData>/config/ai-accounts.json`, écrit en entier (fichier temporaire puis renommage), `0600`, clé `enc:` via `secret-storage.ts` | le main seulement (`main/ai-accounts/ai-accounts.ts`) |
+| La « clé principale » d'un provider | le champ de sa page dans `settings.json` (`globalMistralApiKey`…), inchangé | `settings-utils.ts` |
+| Les comptes Claude | les profils OAuth de `ClaudeProfileManager` (un dossier de connexion chacun) | inchangé |
+| Ce que voit le renderer | `AiAccountView` : id, provider, nom, `hasKey`, dates ; les ids par défaut ; les providers qui ont une clé principale | Réglages → Comptes IA, popin d'utilisation |
+
+Un défaut ne nomme qu'un compte de son propre provider : un fichier modifié à la main qui en
+nommerait un autre est ignoré à la lecture. Supprimer le compte par défaut rend le provider à sa
+clé principale.
+
+## Le compte que reçoit une tâche
+
+`credential-manager.ts` construit l'environnement de chaque tâche, test et vue
+(`getEnvironmentVariables`, `testProvider`). Pour un provider à clé API, l'ordre est :
+
+1. le compte par défaut (`defaultAccountKey`, `main/ai-accounts/ai-account-key.ts`), sur
+   l'adresse officielle du provider ;
+2. un profil API de `profiles.json` qui correspond au provider (point d'accès personnalisé) ;
+3. la clé principale de la page du provider (`settingsApiKey`).
+
+La clé d'un compte ne va jamais à une adresse que le renderer ou un profil nomme (règle S6) : un
+compte n'a pas d'URL, le test et l'environnement utilisent celle du provider. Le défaut est relu à
+chaque appel : une bascule depuis la popin vaut pour la tâche suivante, sans redémarrage. Une tâche
+déjà lancée garde le compte de son lancement.
+
+Les alias (`gemini` → `google`) passent par `accountProviderOf` (`shared/types/ai-accounts.ts`).
+
+## L'interface
+
+- **Carte du provider** : « Compte : X » quand un compte est nommé, bouton « Comptes · n ».
+  Un provider sans clé principale mais avec un compte par défaut compte comme connecté.
+- **Dialogue des comptes** (`settings/ai-accounts/`) : `ApiKeyAccounts` (ajout avec test
+  immédiat, le seul compte d'un provider sans clé devient le défaut ; modification sans retaper la
+  clé ; suppression confirmée) ou `ClaudeAccounts` (ajout puis connexion dans le terminal intégré,
+  défaut = profil actif, renommage, suppression sauf le profil par défaut).
+- **Popin d'utilisation** (`usage/ProviderAccountSwitcher.tsx`) : pour le provider affiché, les
+  comptes qui ont une clé, l'actif marqué, un clic pour en faire le défaut. Claude garde sa liste
+  de profils avec leur usage.
+
+## IPC
+
+`aiAccounts:list`, `aiAccounts:save`, `aiAccounts:delete`, `aiAccounts:test`,
+`aiAccounts:setDefault` (`main/ipc-handlers/ai-accounts-handlers.ts`). Le handler revalide l'id
+(chaîne bornée), le provider (liste fermée `AI_ACCOUNT_PROVIDERS`) et le compte ; une clé arrive
+une fois, masque compris (`unmaskSecret`), n'est jamais renvoyée ; le test répond `ok`, un nombre
+de modèles ou une raison courte (200 caractères), jamais le corps de la réponse.
+
+## Pas encore
+
+Les providers qui se connectent par leur propre outil gardent un compte : Copilot (`gh`), Codex
+(ChatGPT), Gemini CLI, Windsurf, Cursor, AWS (paire de clés et région), Ollama (local). Il leur faut
+un dossier de connexion par compte, comme Claude (`CLAUDE_CONFIG_DIR`).
+
+## Fichiers
+
+- `apps/frontend/src/shared/types/ai-accounts.ts` : types et providers.
+- `apps/frontend/src/main/ai-accounts/ai-accounts.ts` : le stockage.
+- `apps/frontend/src/main/ai-accounts/ai-account-key.ts` : la clé que reçoit un provider.
+- `apps/frontend/src/main/ipc-handlers/ai-accounts-handlers.ts` : l'IPC.
+- `apps/frontend/src/renderer/stores/ai-accounts-store.ts` : le store du renderer.
+- `apps/frontend/src/renderer/components/settings/ai-accounts/` : le dialogue des comptes.
+- `apps/frontend/src/renderer/components/usage/ProviderAccountSwitcher.tsx` : la bascule de la popin.
+
+Voir aussi [forge-accounts.md](forge-accounts.md) (même modèle pour les forges) et
+[provider-failover.md](provider-failover.md) (basculement auto entre comptes).
