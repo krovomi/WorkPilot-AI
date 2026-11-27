@@ -188,6 +188,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # Code mode's tool: Node behind the session's executor, which it receives
     # (`code_mode.runner.Executor`) rather than imports; a leaf on foundation.
     "code_mode": {"foundation"},
+    # Approval tiers (docs/architecture/approval-tiers.md): pure facts and
+    # decision; git and the text-only list through foundation, path globs and
+    # the main checkout's policy file through security, the Clean Architecture
+    # layers of the project through architecture. No model, no forge.
+    "approvals": {"architecture", "foundation", "security"},
     # The cross review's verdict, read by the pull request step in core: a
     # leaf, or it joins the cycle. Its session is `workflows/cross_review_phase.py`.
     "cross_review": {"foundation"},

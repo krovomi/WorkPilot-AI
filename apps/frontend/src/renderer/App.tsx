@@ -415,7 +415,7 @@ import { useNeedsYou } from "./hooks/useNeedsYou";
 import { useTaskNotifications } from "./hooks/useTaskNotifications";
 import type { Activity } from "./stores/activity-store";
 import { setActivityActiveView } from "./stores/activity-store";
-import { recordViewVisit } from "./stores/view-usage-store";
+import { noteViewOpened } from "./lib/view-opened";
 import { useCommandPaletteStore } from "./stores/command-palette-store";
 import { setupGlobalListeners } from "./stores/global-listeners";
 import {
@@ -701,7 +701,7 @@ export function App() {
 	// Which page is on screen decides whether a result needs a badge at all.
 	useEffect(() => {
 		setActivityActiveView(activeView);
-		recordViewVisit(activeView);
+		noteViewOpened(activeView);
 	}, [activeView]);
 
 	// Programmatic main-view navigation (e.g. the visual canvas jumps to the

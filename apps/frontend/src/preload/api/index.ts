@@ -35,6 +35,7 @@ import {
 	createForgeAccountsAPI,
 	type ForgeAccountsAPI,
 } from "./modules/forge-accounts-api";
+import { type AiAccountsAPI, createAiAccountsAPI } from "./modules/ai-accounts-api";
 import {
 	type BlastRadiusAPI,
 	createBlastRadiusAPI,
@@ -192,6 +193,7 @@ import {
 	type FormulaMatrixAPI,
 } from "./modules/formula-matrix-api";
 import { type BenchAPI, createBenchAPI } from "./modules/bench-api";
+import { type BoardAskAPI, createBoardAskAPI } from "./modules/board-ask-api";
 import { type BoardMcpAPI, createBoardMcpAPI } from "./modules/board-mcp-api";
 import {
 	createServerApprovalAPI,
@@ -282,6 +284,10 @@ import {
 	createServerAuthAPI,
 	type ServerAuthAPI,
 } from "./modules/server-auth-api";
+import {
+	createServerUsageAPI,
+	type ServerUsageAPI,
+} from "./modules/server-usage-api";
 import { createJevAPI, type JevAPI } from "./jev-api";
 import {
 	createSecureStorageAPI,
@@ -348,6 +354,7 @@ export interface ElectronAPI
 		FormulaMatrixAPI,
 		BenchAPI,
 		BoardMcpAPI,
+		BoardAskAPI,
 		ServerApprovalAPI,
 		CicdTriggersAPI,
 		AccessibilityAPI,
@@ -375,6 +382,7 @@ export interface ElectronAPI
 		AgentDebuggerAPI,
 		LocalBackendAPI,
 		ForgeAccountsAPI,
+		AiAccountsAPI,
 		ReplayAPI,
 		BlastRadiusAPI,
 		Phase35FeaturesAPI,
@@ -403,6 +411,8 @@ export interface ElectronAPI
 	/** Multi-user server mode: connection + login (local / Entra ID) */
 	serverAuth: ServerAuthAPI;
 	serverAdmin: ServerAdminAPI;
+	/** Server mode: page activity and the organization's usage settings */
+	serverUsage: ServerUsageAPI;
 	/** Queue routing API for rate limit recovery */
 	queue: QueueAPI;
 	/** Code quality analysis API */
@@ -507,6 +517,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createFormulaMatrixAPI(),
 		...createBenchAPI(),
 		...createBoardMcpAPI(),
+		...createBoardAskAPI(),
 		...createServerApprovalAPI(),
 		...createCicdTriggersAPI(),
 		...createAccessibilityAPI(),
@@ -534,6 +545,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createAgentDebuggerAPI(),
 		...createLocalBackendAPI(),
 		...createForgeAccountsAPI(),
+		...createAiAccountsAPI(),
 		...createReplayAPI(),
 		...createBlastRadiusAPI(),
 		...createPhase35FeaturesAPI(),
@@ -560,6 +572,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		bitbucket: createBitbucketAPI(),
 		serverAuth: createServerAuthAPI(), // Multi-user server mode
 		serverAdmin: createServerAdminAPI(), // Multi-tenant administration
+		serverUsage: createServerUsageAPI(), // Page activity, usage settings
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
 		quality: createQualityAPI(), // Code quality analysis
 		selfHealing: createSelfHealingAPI(),

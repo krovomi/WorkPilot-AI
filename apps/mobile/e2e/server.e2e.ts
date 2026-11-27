@@ -283,6 +283,24 @@ test("a person of another organization never sees the project", async ({ browser
 	await expect(carol.getByRole("button", { name: world.project })).toHaveCount(0);
 });
 
+test("the board finds a card by its words, and keeps the person's own", async () => {
+	const alice = signedInPage("alice");
+	await openProject(alice, world.project);
+	const search = alice.getByLabel("Search the board");
+	await search.fill("DARK mode");
+	await expect(alice.getByRole("button", { name: "Add a dark mode toggle" })).toBeVisible({ timeout: 30_000 });
+	await search.fill("no card is called like this");
+	await expect(alice.getByText("No card matches.")).toBeVisible();
+	await alice.getByRole("button", { name: "Clear the filters" }).click();
+	// The card Alice started is hers: it stays with "Mine" on.
+	await alice.getByRole("button", { name: "Filters" }).click();
+	await alice.getByRole("checkbox", { name: "Mine" }).click();
+	await expect(alice.getByRole("button", { name: "Filters, 1 on" })).toBeVisible();
+	await expect(alice.getByText("No card matches.")).toHaveCount(0);
+	await shot(alice, "6b-board-filters");
+	await alice.getByRole("checkbox", { name: "Clear the filters" }).click();
+});
+
 test("the project's Insights, roadmap and ideas open from the board", async ({ browser }) => {
 	const alice = await signIn(browser, world, "alice");
 	await alice.getByRole("button", { name: world.project }).click({ timeout: 30_000 });

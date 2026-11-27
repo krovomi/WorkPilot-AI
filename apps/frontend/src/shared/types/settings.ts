@@ -417,6 +417,8 @@ export interface AppSettings {
 	seenVersionWarnings?: string[];
 	// One-line summary under each Kanban column title (default on)
 	kanbanColumnSummary?: boolean;
+	// A card whose PR was closed without a merge goes to « Abandonnée » (default on)
+	kanbanAbandonClosedPrs?: boolean;
 	// Sidebar collapsed state (icons only when true)
 	sidebarCollapsed?: boolean;
 	// Sidebar width in pixels when expanded (default 256)

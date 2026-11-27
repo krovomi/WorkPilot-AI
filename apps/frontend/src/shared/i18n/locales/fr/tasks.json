@@ -579,6 +579,46 @@
 		"outcome": {
 			"failedDropRefused": "Seule une exécution en échec arrive dans Échec. Relancez la tâche depuis sa carte ou mettez-la en file d’attente.",
 			"doneCannotBeAbandoned": "Une tâche terminée ne peut pas être abandonnée."
+		},
+		"ask": {
+			"button": "Interroger",
+			"open": "Poser une question sur les tickets du tableau",
+			"title": "Interroger le tableau",
+			"description": "Posez votre question dans n'importe quelle langue : tous les tickets liés ressortent, terminés et archivés compris, même rédigés dans une autre langue.",
+			"emptyHint": "Par exemple, avant de planifier une fonctionnalité, demandez si elle a déjà été développée, même en partie.",
+			"examples": {
+				"adminPage": "Comment a été revue la page d'admin ?",
+				"export": "Peut-on déjà exporter les données en CSV ?",
+				"login": "Qu'a-t-on fait sur les erreurs de connexion ?"
+			},
+			"placeholder": "Posez une question sur les tickets…",
+			"send": "Envoyer",
+			"searching": "Lecture des tickets…",
+			"failed": "La question n'a pas pu aboutir. Réessayez dans un instant.",
+			"serverProject": "Un tableau du serveur ne peut pas encore être interrogé.",
+			"modeAi": "Réponse de l'IA",
+			"modeKeywords": "Recherche par mots-clés",
+			"keywordsHint": "Pas de réponse de l'IA (aucun provider, ou il n'a pas répondu) : ces tickets partagent des mots avec la question.",
+			"searched_one": "{{count}} ticket parcouru",
+			"searched_other": "{{count}} tickets parcourus",
+			"noMatch": "Aucun ticket ne correspond à cette question.",
+			"citation": "Ticket {{index}} : {{title}}",
+			"archived": "Archivé",
+			"coverage": {
+				"full": "Déjà couvert",
+				"partial": "En partie",
+				"related": "Lié"
+			},
+			"state": {
+				"done": "Terminé",
+				"in_review": "En revue",
+				"in_progress": "En cours",
+				"planned": "Prévu",
+				"failed": "Échec",
+				"abandoned": "Abandonné"
+			},
+			"privacy": "La question et les tickets vont au provider IA choisi dans les réglages. Rien n'est enregistré.",
+			"newConversation": "Nouvelle conversation"
 		}
 	},
 	"queue": {
@@ -2991,5 +3031,19 @@
 		},
 		"mergeHeld": "La suite complète tourne sur la CI pour ce commit. La fusion sera possible dès qu'elle sera verte.",
 		"mergeHeldLink": "Ouvrir le run"
+	},
+	"flag": {
+		"badge": "Bloquée",
+		"flag": "Signaler bloquée",
+		"flagMenu": "Signaler bloquée…",
+		"unflag": "Lever le blocage",
+		"dialogTitle_one": "Signaler la tâche bloquée",
+		"dialogTitle_other": "Signaler {{count}} tâches bloquées",
+		"dialogDescription_one": "La tâche garde sa colonne ; le drapeau dit à tous qu'elle ne peut pas avancer tant que l'obstacle n'est pas levé.",
+		"dialogDescription_other": "Les tâches gardent leur colonne ; le drapeau dit à tous qu'elles ne peuvent pas avancer tant que l'obstacle n'est pas levé.",
+		"reasonLabel": "Ce qui la bloque",
+		"reasonPlaceholder": "Ce qui la bloque (facultatif), par ex. on attend la clé d'API du client",
+		"failedTitle": "Drapeau non enregistré",
+		"failedDescription": "Impossible d'enregistrer le drapeau. Réessayez."
 	}
 }

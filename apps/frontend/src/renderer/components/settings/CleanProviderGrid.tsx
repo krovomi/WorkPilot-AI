@@ -26,6 +26,7 @@ interface CleanProviderGridProps {
 	readonly onConfigure: (providerId: string, options?: { startOAuth?: boolean }) => void;
 	readonly onTest?: (providerId: string) => void;
 	readonly onSetDefault?: (providerId: string) => void;
+	readonly onManageAccounts?: (providerId: string) => void;
 }
 
 /**
@@ -39,6 +40,7 @@ export function CleanProviderGrid({
 	onConfigure,
 	onTest,
 	onSetDefault,
+	onManageAccounts,
 }: CleanProviderGridProps) {
 	const { t } = useTranslation("settings");
 	const [query, setQuery] = useState("");
@@ -115,6 +117,7 @@ export function CleanProviderGrid({
 									onConfigure={onConfigure}
 									onTest={onTest}
 									onSetDefault={onSetDefault}
+									onManageAccounts={onManageAccounts}
 								/>
 							))}
 						</div>

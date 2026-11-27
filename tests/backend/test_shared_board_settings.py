@@ -349,3 +349,38 @@ def test_a_strange_abandon_is_refused():
         CardSettings(abandonedAt="yesterday")
     with pytest.raises(ValidationError):
         CardSettings(abandonedReason="x" * 2001)
+
+
+@pytest.mark.asyncio
+async def test_a_card_is_flagged_blocked_for_every_member(tmp_path):
+    """« Bloquée »: the flag and what blocks the card reach every member."""
+    from shared_board.api import update_card_settings
+    from shared_board.settings import CardSettings
+
+    member, clone, card_id = await _create(tmp_path)
+    flag = CardSettings(
+        flagged=True,
+        flaggedReason="Waiting for the client's API key",
+        flaggedAt="2026-11-22T10:00:00.000Z",
+    )
+    async with await _db() as db:
+        shown = await update_card_settings(card_id, flag, _request(), member, db)
+    assert shown["flagged"] is True
+    assert shown["flaggedReason"] == "Waiting for the client's API key"
+
+    lift = CardSettings(flagged=False, flaggedReason=None, flaggedAt=None)
+    async with await _db() as db:
+        await update_card_settings(card_id, lift, _request(), member, db)
+    metadata = _metadata(clone, card_id)
+    assert metadata["flagged"] is False
+    assert "flaggedReason" not in metadata and "flaggedAt" not in metadata
+
+
+def test_a_strange_flag_is_refused():
+    from pydantic import ValidationError
+    from shared_board.settings import CardSettings
+
+    with pytest.raises(ValidationError):
+        CardSettings(flaggedReason="x" * 501)
+    with pytest.raises(ValidationError):
+        CardSettings(flaggedAt="soon")
