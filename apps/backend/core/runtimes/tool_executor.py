@@ -822,6 +822,9 @@ class ToolExecutor:
                 stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
             )
             if refused := sandbox.refused_hosts(started):
+                from os_sandbox.evidence import record_refused
+
+                record_refused(self.spec_dir, refused)  # for the PR's approval tier
                 # Said, not left to a timeout to guess from.
                 note = (
                     "[WorkPilot sandbox] network refused: "

@@ -1,5 +1,5 @@
 /** Settings, Sandbox and Anomaly detection: every control saves a normalized `agentSafety`. */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AppSettings } from "@shared/types";
 import { DEFAULT_AGENT_SAFETY } from "../../../../shared/utils/agent-safety";
@@ -58,6 +58,30 @@ describe("SandboxSettings", () => {
 		fireEvent.change(screen.getByLabelText(`${K}.microvm.cpus`), { target: { value: "4" } });
 		expect(saved(change).sandbox.microvm.cpus).toBe(4);
 		expect(screen.getByText(`${K}.microvm.requirements`)).toBeInTheDocument();
+		expect(screen.getByTestId("microvm-status")).toHaveTextContent(`${K}.microvm.status.unknown`);
+	});
+
+	it("shows what sbx says once the microVM is on", async () => {
+		const getMicrovmStatus = vi.fn(async () => ({
+			installed: true,
+			ready: false,
+			version: "sbx 0.54.1",
+			vms: 0,
+			reason: "not signed in",
+		}));
+		Object.assign(window, { electronAPI: { getMicrovmStatus } });
+		const settings = {
+			...base,
+			agentSafety: {
+				...DEFAULT_AGENT_SAFETY,
+				sandbox: { ...DEFAULT_AGENT_SAFETY.sandbox, microvm: { enabled: true, memoryGb: 0, cpus: 0 } },
+			},
+		} as AppSettings;
+		render(<SandboxSettings settings={settings} onSettingsChange={vi.fn()} />);
+		expect(await screen.findByText(`${K}.microvm.status.notReady`)).toBeInTheDocument();
+		fireEvent.click(screen.getByText(`${K}.microvm.status.check`));
+		await waitFor(() => expect(getMicrovmStatus).toHaveBeenCalledTimes(2));
+		Object.assign(window, { electronAPI: undefined });
 	});
 
 	it("adds a valid path, refuses one outside the project, removes one", () => {

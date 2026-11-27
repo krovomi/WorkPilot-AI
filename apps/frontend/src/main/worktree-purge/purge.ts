@@ -23,6 +23,7 @@ import type { Project, Task } from "../../shared/types";
 import type { PurgeCandidate, PurgeOutcome, PurgeReason } from "../../shared/types/worktree-purge";
 import { isServerTask } from "../../shared/utils/task-split";
 import { getToolPath } from "../cli-tool-manager";
+import { removeTaskMicrovm } from "../microvm/sbx";
 import { getIsolatedGitEnv } from "../utils/git-isolation";
 import { cleanupWorktree } from "../utils/worktree-cleanup";
 import { getTaskWorktreePath } from "../worktree-paths";
@@ -111,6 +112,10 @@ const defaultDeps: PurgeDeps = {
 			deleteBranch: true,
 			logPrefix: "[WorktreePurge]",
 		});
+		if (result.success) {
+			// Its Docker microVM, if it ran in one: the VM's disk goes with the folder.
+			await removeTaskMicrovm(worktree);
+		}
 		return { success: result.success, error: result.warnings.join(" ") || undefined };
 	},
 };

@@ -37,6 +37,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from .evidence import record_session
 from .launch import ISOLATED, UNAVAILABLE, SandboxStatus, install_hint, probe, sandboxed
 from .microvm import (
     BACKEND,
@@ -270,6 +271,8 @@ def first_report(
         if key in _reported:
             return None
         _reported.add(key)
+    # Kept for the approval tier of the task's PR (`os_sandbox/evidence.py`).
+    record_session(spec_dir, provider, sandbox.state, sandbox.backend)
     return {
         "provider": provider,
         "state": sandbox.state,

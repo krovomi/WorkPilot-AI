@@ -14,10 +14,10 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 |---|---|---|
 | `../KanbanBoard.tsx` | ~3 250 | le tableau : drag-and-drop, sélection en masse, file d'attente, dialogues |
 | `KanbanColumn.tsx` | ~1 140 | une colonne : `DroppableColumn`, `WipLimitPopover`, `SortableColumnWrapper`, comparateurs mémo, `COLUMN_RENDER_CAP` (lot L11) |
-| `ColumnBand.tsx` | ~200 | bandeau d'une colonne : icône, compteur, jauge de capacité, ligne de résumé (`lib/column-pulse.ts`), état vide ([kanban-columns.md](../../../../../../docs/architecture/kanban-columns.md)) |
+| `ColumnBand.tsx` | ~200 | bandeau d'une colonne : icône, compteur, jauge, résumé (`lib/column-pulse.ts`), état vide ([conception](../../../../../../docs/architecture/kanban-columns.md)) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
-| `BoardLanes.tsx` · `LaneGroupingMenu.tsx` | ~200 · ~140 | couloirs (swimlanes) : la rangée de colonnes ou un couloir par valeur ; glisser entre couloirs par `../../hooks/useLaneDrag.ts`, logique dans `../../lib/kanban-lanes.ts` ([kanban-swimlanes.md](../../../../../../docs/architecture/kanban-swimlanes.md)) |
-| `board-ask/` | — | « Interroger le tableau » : bouton de la barre et panneau de conversation, réponse par `main/board-ask/` ([board-ask.md](../../../../../../docs/architecture/board-ask.md)) |
+| `BoardLanes.tsx` · `LaneGroupingMenu.tsx` | ~200 · ~140 | couloirs (swimlanes), logique dans `lib/kanban-lanes.ts` ([conception](../../../../../../docs/architecture/kanban-swimlanes.md)) |
+| `board-ask/` | — | « Interroger le tableau », réponse par `main/board-ask/` ([conception](../../../../../../docs/architecture/board-ask.md)) |
 | `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F182) |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |
 | `../task-detail/TaskMobilePreview.tsx` | ~430 | onglet *Mobile* : plateforme, appareil, run, capture, logs |
@@ -56,8 +56,7 @@ Un statut n'a pas de colonne à lui : `getVisualColumn()` projette `error → fa
 
 ## Carte de `KanbanBoard.tsx` et `KanbanColumn.tsx`
 
-Les composants de colonne ont quitté `KanbanBoard.tsx` au lot L11 (audit F36), à
-l'identique ; le tableau les importe depuis `kanban/KanbanColumn.tsx`.
+Les composants de colonne vivent dans `kanban/KanbanColumn.tsx` depuis le lot L11.
 
 | Fichier · zone | Ligne ~ | Contenu |
 |---|---|---|

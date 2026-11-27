@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 from foundation.change_scope import is_text_only_path
 from security.guardrails import glob_to_regex
 
-from .model import CI_STATES, REVIEW_STATES, ChangedFile, PRFacts
+from .model import CI_STATES, REVIEW_STATES, SANDBOX_KINDS, ChangedFile, PRFacts
 
 #: ``feat(api)!: …``, ``fix: …``, ``chore(deps): …``, ``build(deps-dev): …``.
 _CONVENTIONAL = re.compile(
@@ -250,6 +250,8 @@ def build_facts(
     review: str = "none",
     trust: int | None = None,
     layers: dict[str, str] | None = None,
+    sandbox: str | None = None,
+    blocked_hosts: Sequence[str] | None = None,
 ) -> PRFacts:
     """``PRFacts`` from what the caller measured.
 
@@ -288,6 +290,12 @@ def build_facts(
         ci=ci if ci in CI_STATES else "unknown",
         review=review if review in REVIEW_STATES else "none",
         trust=trust if isinstance(trust, int) and 0 <= trust <= 100 else None,
+        sandbox=sandbox if sandbox in SANDBOX_KINDS else None,
+        blocked_hosts=(
+            tuple(str(h)[:260] for h in blocked_hosts[:50])
+            if blocked_hosts is not None
+            else None
+        ),
     )
 
 

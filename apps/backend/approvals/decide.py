@@ -205,6 +205,15 @@ def _built_in(facts: PRFacts, policy: ApprovalPolicy, out: _Collector) -> None:
         out.add(
             "trust", Tier.HUMAN, f"trust score {facts.trust} (limit {policy.min_trust})"
         )
+    if facts.sandbox == "none":
+        out.add("unsandboxed", Tier.HUMAN, "the task's commands ran without a sandbox")
+    if facts.blocked_hosts:
+        out.add(
+            "blocked_hosts",
+            Tier.HUMAN,
+            "the sandbox refused hosts to the task: "
+            + ", ".join(facts.blocked_hosts[:6]),
+        )
 
     if deps:
         only_deps = all(
