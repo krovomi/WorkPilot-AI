@@ -257,7 +257,9 @@ describe("AdministrationView", () => {
 		const tabs = within(screen.getByRole("navigation")).getAllByRole("button");
 		expect(tabs).toHaveLength(8);
 		expect(screen.queryByRole("button", { name: "Organizations" })).toBeNull();
-		expect(screen.getByRole("button", { name: "Usage" })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "Usage" }));
+		// No usage bridge in this world: the tab stays on its loading line.
+		expect(screen.getByText("Loading…")).toBeInTheDocument();
 	});
 
 	it("shows a store error and lets it be dismissed", async () => {
