@@ -33,6 +33,8 @@ import {
 import type { Task, TaskStatus } from "../../../shared/types";
 import i18n from "../../../shared/i18n";
 import { consumePendingTaskDetailTab } from "../../lib/task-detail-nav";
+import { useAbandonRequestStore } from "../../stores/abandon-request-store";
+import { useFlagRequestStore } from "../../stores/flag-request-store";
 import { useKanbanBlockerStore } from "../../stores/kanban-blocker-store";
 import { useKanbanConflictStore } from "../../stores/kanban-conflict-store";
 import { useProjectStore } from "../../stores/project-store";
@@ -766,6 +768,44 @@ describe("TaskCard — options menu", () => {
 			await screen.findByRole("menuitem", { name: "Sync from branch" }),
 		);
 		expect(await screen.findByRole("dialog")).toBeInTheDocument();
+	});
+
+	it("flags, lifts, abandons and resumes from its menu", async () => {
+		const user = userEvent.setup();
+		const openMenu = async () =>
+			user.click(screen.getByRole("button", { name: "Task actions" }));
+		const { unmount } = renderCard({ task: makeTask({ status: "in_progress" }) });
+		await openMenu();
+		await user.click(await screen.findByRole("menuitem", { name: "Flag as blocked…" }));
+		expect(useFlagRequestStore.getState().ids).toEqual(["task-1"]);
+		await openMenu();
+		await user.click(await screen.findByRole("menuitem", { name: "Abandon…" }));
+		expect(useAbandonRequestStore.getState().ids).toEqual(["task-1"]);
+		unmount();
+		useFlagRequestStore.getState().close();
+		useAbandonRequestStore.getState().close();
+
+		renderCard({
+			task: makeTask({
+				metadata: { flagged: true, flaggedReason: "waiting for QA", abandoned: true } as never,
+			}),
+		});
+		expect(screen.getByText("waiting for QA")).toBeInTheDocument();
+		await openMenu();
+		expect(screen.queryByRole("menuitem", { name: "Flag as blocked…" })).toBeNull();
+		await user.click(await screen.findByRole("menuitem", { name: "Remove flag" }));
+		await waitFor(() =>
+			expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", {
+				metadata: expect.objectContaining({ flagged: false }),
+			}),
+		);
+		await openMenu();
+		await user.click(await screen.findByRole("menuitem", { name: "Resume" }));
+		await waitFor(() =>
+			expect(api.fn("updateTask")).toHaveBeenCalledWith("task-1", {
+				metadata: expect.objectContaining({ abandoned: false }),
+			}),
+		);
 	});
 
 	it("pauses a running task from its menu", async () => {

@@ -765,6 +765,13 @@ export interface TaskMetadata {
 	abandonedResolution?: AbandonResolution;
 	/** The task this one duplicates or is replaced by (`duplicate`, `replaced`). */
 	abandonedLink?: string;
+	/** When the watch set it aside because its PR was closed without a merge (`merged-watch.ts`). */
+	prClosedAt?: string;
+
+	// « Bloquée » (Jira's flag): an impediment a person raised, with why.
+	flagged?: boolean;
+	flaggedReason?: string;
+	flaggedAt?: string;
 
 	// Archive status
 	archivedAt?: string; // ISO date when task was archived

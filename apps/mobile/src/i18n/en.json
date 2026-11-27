@@ -3,7 +3,8 @@
 		"cancel": "Cancel",
 		"retry": "Try again",
 		"loading": "Loading…",
-		"back": "Back"
+		"back": "Back",
+		"close": "Close"
 	},
 	"errors": {
 		"network": "The server can't be reached. Check your connection.",
@@ -87,7 +88,20 @@
 		"groupFilter": "Group {{group}} · show all",
 		"showAll": "Show every card",
 		"sync": "Sync",
-		"emptyHint": "Cards land here as they move along the board."
+		"emptyHint": "Cards land here as they move along the board.",
+		"quickHint": "Long press for quick actions",
+		"quickActions": "Quick actions",
+		"openCard": "Open the card",
+		"search": "Search the board",
+		"clearSearch": "Clear the search",
+		"filters": "Filters",
+		"filtersOn_one": "Filters, {{count}} on",
+		"filtersOn_other": "Filters, {{count}} on",
+		"mine": "Mine",
+		"clearFilters": "Clear the filters",
+		"noMatch": "No card matches.",
+		"noMatchHint": "Other words or fewer filters may find it.",
+		"flagged": "Blocked"
 	},
 	"columns": {
 		"backlog": "Planning",
@@ -799,5 +813,92 @@
 		"hours_other": "{{count}} h ago",
 		"days_one": "{{count}} d ago",
 		"days_other": "{{count}} d ago"
+	},
+	"inbox": {
+		"title": "For you",
+		"open": "What waits for you",
+		"waiting_one": "{{count}} card waits for you",
+		"waiting_other": "{{count}} cards wait for you",
+		"parts": {
+			"plan_one": "{{count}} plan to approve",
+			"plan_other": "{{count}} plans to approve",
+			"attention": "{{count}} to look at",
+			"review": "{{count}} to review"
+		},
+		"reasons": {
+			"plan": "Plans to approve",
+			"attention": "Stopped, to look at",
+			"review": "Done, to review"
+		},
+		"chips": {
+			"plan": "Plan",
+			"attention": "Stopped",
+			"review": "Review"
+		},
+		"empty": "Nothing waits for you.",
+		"emptyHint": "Cards you can approve, review or restart land here, from every project.",
+		"unreachable": "Could not read: {{names}}. Pull to try again.",
+		"intro": "From every project you are in: the cards in Human Review that you can act on, unless someone else claimed them."
+	},
+	"needsYou": {
+		"title": "Notify me elsewhere",
+		"summary": "ntfy, Telegram or Teams, when a card waits for you",
+		"intro": "When a card waits for you, the server also tells you on the service you pick. The project's name and the card's number go to that service, nothing else of the card.",
+		"off": "This server does not send them yet: an administrator turns them on. You can still set them up.",
+		"noVault": "This server has no secrets key, so it cannot store a channel. Ask an administrator.",
+		"readOnly": "Your role cannot set a channel: only someone who can start agents can.",
+		"moments": "When",
+		"language": "Language of the messages",
+		"languages": {
+			"en": "English",
+			"fr": "Français"
+		},
+		"events": {
+			"plan_review": "A plan waits for my approval",
+			"review_ready": "A card is ready for my review",
+			"failed": "A task I started stopped on an error",
+			"approval_escalated": "A plan has waited too long for an approver",
+			"review_feedback_held": "A review rejection waits for a maintainer"
+		},
+		"channels": {
+			"ntfy": "ntfy",
+			"telegram": "Telegram",
+			"teams": "Microsoft Teams"
+		},
+		"hints": {
+			"ntfy": "Push notifications through an ntfy topic, on ntfy.sh or your own server. Subscribe to the topic in the ntfy app.",
+			"telegram": "Messages from your own bot (create one with @BotFather), to your numeric user id.",
+			"teams": "A Teams incoming webhook or a Workflows URL of your channel."
+		},
+		"fields": {
+			"server": "Server (https)",
+			"topic": "Topic",
+			"access_token": "Access token (optional)",
+			"bot_token": "Bot token",
+			"chat_id": "Your user id",
+			"webhook_url": "Webhook URL"
+		},
+		"keep": "Set: leave empty to keep it",
+		"generate": "Generate a topic",
+		"state": {
+			"notSet": "Not set",
+			"on": "On",
+			"paused": "Paused",
+			"unreadable": "Set again"
+		},
+		"enabled": "Send on {{channel}}",
+		"set": "Set up",
+		"change": "Change",
+		"save": "Save",
+		"test": "Send a test",
+		"remove": "Remove",
+		"removeTitle": "Remove {{channel}}?",
+		"removeBody": "The server forgets this channel and its secrets.",
+		"result": {
+			"sent": "Test sent. Check {{channel}}.",
+			"blocked": "Not sent: the server refused the destination.",
+			"refused": "Not sent: {{channel}} refused the message. Check the settings.",
+			"unreachable": "Not sent: {{channel}} could not be reached."
+		}
 	}
 }

@@ -69,6 +69,19 @@ describe("board", () => {
 		expect(screen.queryByRole("tab", { name: /Red Build/ })).toBeNull();
 	});
 
+	it("marks a flagged card, and draws a card set aside in Abandoned", async () => {
+		const cards = [
+			card("001-blocked", "Payment form", { column: "in_progress", flagged: true }),
+			card("002-aside", "Old banner", { column: "backlog", outcome: "abandoned" }),
+		];
+		fakeServer({ "GET /api/board/cards": { cards }, "GET /projects/p1": PROJECT });
+		await openApp("/projects/p1");
+		expect(await screen.findByText("Payment form")).toBeTruthy();
+		expect(screen.getByText("Blocked")).toBeTruthy();
+		await fireEvent.press(screen.getByRole("tab", { name: /Abandoned/ }));
+		expect(await screen.findByText("Old banner")).toBeTruthy();
+	});
+
 	it("shows only a split group's cards from a tap on its mark, then every card again", async () => {
 		fakeServer({ "GET /api/board/cards": { cards: CARDS }, "GET /projects/p1": PROJECT });
 		await openApp("/projects/p1");

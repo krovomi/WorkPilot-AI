@@ -190,6 +190,10 @@ def summary(directory: Path) -> dict[str, Any]:
     ended = outcome(card["column"], plan.get("reviewReason"), meta)
     if ended:
         card["outcome"] = ended
+    if meta.get("flagged") is True:
+        # « Bloquée »: a person said the card cannot move on (no reason here,
+        # it is a person's free text; get_card does not carry it either).
+        card["flagged"] = True
     group = _split_group(meta.get("splitGroup"))
     if group:
         card["group"] = group
