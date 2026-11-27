@@ -3,7 +3,8 @@
 		"cancel": "Annuler",
 		"retry": "Réessayer",
 		"loading": "Chargement…",
-		"back": "Retour"
+		"back": "Retour",
+		"close": "Fermer"
 	},
 	"errors": {
 		"network": "Le serveur est injoignable. Vérifiez votre connexion.",
@@ -87,7 +88,19 @@
 		"groupFilter": "Groupe {{group}} · tout afficher",
 		"showAll": "Afficher toutes les cartes",
 		"sync": "Synchro",
-		"emptyHint": "Les cartes arrivent ici en avançant sur le tableau."
+		"emptyHint": "Les cartes arrivent ici en avançant sur le tableau.",
+		"quickHint": "Appui long pour les actions rapides",
+		"quickActions": "Actions rapides",
+		"openCard": "Ouvrir la carte",
+		"search": "Chercher dans le tableau",
+		"clearSearch": "Effacer la recherche",
+		"filters": "Filtres",
+		"filtersOn_one": "Filtres, {{count}} actif",
+		"filtersOn_other": "Filtres, {{count}} actifs",
+		"mine": "Les miennes",
+		"clearFilters": "Effacer les filtres",
+		"noMatch": "Aucune carte ne correspond.",
+		"noMatchHint": "D'autres mots ou moins de filtres la trouveront peut-être."
 	},
 	"columns": {
 		"backlog": "Planification",
