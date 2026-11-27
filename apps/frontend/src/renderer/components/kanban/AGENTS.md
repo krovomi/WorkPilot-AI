@@ -5,8 +5,7 @@ points d'entrée : cibler la ligne, lire 40 lignes autour, éditer.
 
 > Règles du frontend : [`docs/rules/frontend.md`](../../../../../../docs/rules/frontend.md) · Index frontend : [`apps/frontend/AGENTS.md`](../../../../AGENTS.md)
 
-Les numéros de ligne dérivent à chaque modification. Ils indiquent un voisinage, pas une
-adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
+Les numéros de ligne indiquent un voisinage : confirmer avec `grep -n "<nom>"` avant d'éditer.
 
 ## Fichiers du domaine
 
@@ -50,17 +49,11 @@ Un statut n'a pas de colonne à lui : `getVisualColumn()` projette `error → fa
 `getBoardColumn`, `getVisualColumn`, `VALID_BULK_TRANSITIONS` (déplacements en masse) et `manualMoveTargets`
 (menus « Déplacer vers ») vivent dans `../../lib/kanban-columns.ts`.
 
-`IMPORT_ALLOWED_COLUMNS` restreint les cibles d'import (Azure DevOps / Jira) à
-`backlog`, `queue`, `in_progress`.
-
 ## Carte de `KanbanBoard.tsx` et `KanbanColumn.tsx`
-
-Les composants de colonne ont quitté `KanbanBoard.tsx` au lot L11 (audit F36), à
-l'identique ; le tableau les importe depuis `kanban/KanbanColumn.tsx`.
 
 | Fichier · zone | Ligne ~ | Contenu |
 |---|---|---|
-| `KanbanBoard.tsx` · constantes et gardes | 130-160 | `VALID_DROP_COLUMNS`, `IMPORT_ALLOWED_COLUMNS` |
+| `KanbanBoard.tsx` · constantes et gardes | 130-160 | `VALID_DROP_COLUMNS`, `IMPORT_ALLOWED_COLUMNS` (import Azure DevOps / Jira : `backlog`, `queue`, `in_progress`) |
 | `KanbanColumn.tsx` · `COLUMN_RENDER_CAP` | 58 | 60 cartes rendues par colonne |
 | `KanbanColumn.tsx` · comparateurs mémo | 110-190 | `tasksAreEquivalent`, `droppableColumnPropsAreEqual` — **le rendu en dépend, y toucher se paie en perfs** |
 | `KanbanColumn.tsx` · `WipLimitPopover` | 254 | réglage de la limite WIP d'une colonne |
