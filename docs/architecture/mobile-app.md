@@ -442,6 +442,30 @@ depuis le bureau, sur chaque projet qu'elle atteint encore (`GET /api/features/r
 avec leur état et leurs ouvertures, et arrête un lien (`DELETE /{id}?project_id=`, le serveur
 revérifie l'auteur).
 
+## La carte en profondeur : journal, fichiers, revue et mémoire
+
+« Voir tout le journal » ouvre le journal d'une carte en plein écran
+(`cards/[cardId]/logs.tsx`) : une phase à la fois, filtré aux erreurs ou sans les appels d'outils,
+avec une recherche par mots. Tant qu'une phase tourne, l'écran relit `GET .../logs` toutes les
+3 secondes et suit la fin, sauf si la personne coupe « Suivre la fin » ; il ne dessine que les
+2 000 dernières lignes d'une phase. Un fichier modifié s'ouvre lui aussi en plein écran
+(`cards/[cardId]/files.tsx`) avec les numéros de ligne avant et après, lus des en-têtes `@@`
+(`src/card/patch.ts`), et le fichier précédent ou suivant. Le fichier est désigné par sa place dans
+la liste des changements (`?file=`), jamais par un chemin que le serveur aurait à croire.
+
+Sur une PR GitHub, chaque constat de la revue IA reçoit l'avis de l'équipe
+(`server/routes/forge_review_feedback.py`) : utile ou pas, et pourquoi (`src/forge/ReviewFeedback.tsx`).
+Il faut le droit d'écrire (`task.write`, le serveur revérifie le rôle d'auteur du projet). Un rejet
+que le serveur met de côté attend un mainteneur, qui l'approuve ou l'écarte depuis la même PR. GitLab
+n'a pas encore cette route : l'app n'affiche pas les boutons.
+
+La mémoire du projet (Contexte) se gère du téléphone avec le cycle de vie du serveur
+(`shared_features/context_lifecycle.py`, `src/context/MemoryViews.tsx`) : épingler un souvenir
+(dans la limite du serveur), l'oublier (il part à la corbeille, jamais effacé tout de suite) et le
+remettre tant que la durée de rétention court. Lire demande `insight.read`, changer
+`insight.write` ; un refus du serveur (limite atteinte, souvenir épinglé, délai passé) est dit dans
+la langue de l'app.
+
 ## Ce qui vient
 
 - Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.
