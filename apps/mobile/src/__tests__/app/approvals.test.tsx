@@ -166,10 +166,8 @@ describe("lent approvals", () => {
 			},
 			["board.read", "review.approve"],
 		);
-		const app = await openApp("/projects/p1");
-		const link = await screen.findByRole("link");
-		expect(within(link).getByText("Lent approvals")).toBeTruthy();
-		await fireEvent.press(link);
+		const app = await openApp("/projects/p1/more");
+		await fireEvent.press(await screen.findByRole("button", { name: "Lent approvals" }));
 		await waitFor(() => expect(app.getPathname()).toBe("/projects/p1/delegations"));
 	});
 

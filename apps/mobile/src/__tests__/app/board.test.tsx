@@ -31,6 +31,11 @@ const CARDS = [
 	}),
 ];
 
+/** A button of the project's tab bar (a tab on Android, a button on iOS, as Jest runs). */
+function tabButton(name: string) {
+	return screen.getByRole("button", { name: new RegExp(`^${name}`) });
+}
+
 const PROJECT = { id: "p1", name: "Shop", repo_url: "https://github.com/acme/shop", default_branch: "main", forge: "github" };
 
 beforeEach(() => {
@@ -53,7 +58,8 @@ describe("board", () => {
 		expect(screen.getByText("1/4 subtasks")).toBeTruthy();
 		expect(screen.getByText("Claimed by Bob")).toBeTruthy();
 		// The stream is down in this test: the board polls.
-		expect(screen.getByText("Refreshing every few seconds")).toBeTruthy();
+		expect(screen.getByLabelText("Refreshing every few seconds")).toBeTruthy();
+		expect(screen.getByText("Sync")).toBeTruthy();
 		// Planning's card is behind its tab.
 		expect(screen.queryByText("Login page")).toBeNull();
 		await fireEvent.press(screen.getByRole("tab", { name: /Planning/ }));
@@ -94,7 +100,7 @@ describe("board", () => {
 		expect(await screen.findByText("Fix the API")).toBeTruthy();
 	});
 
-	it("offers the project's pages the person may read, and opens a card", async () => {
+	it("offers the project's pages the person may read as tabs and rows of More, and opens a card", async () => {
 		fakeServer(
 			{
 				"GET /api/board/cards": { cards: CARDS },
@@ -106,10 +112,57 @@ describe("board", () => {
 		const app = await openApp("/projects/p1");
 		await fireEvent.press(await screen.findByRole("tab", { name: /In Progress/ }));
 		await screen.findByText("Fix the API");
-		const links = screen.getAllByRole("link").map((l) => within(l).getByText(/./).props.children);
-		expect(links).toEqual(["Insights", "Roadmap", "Ideas", "Context", "GitHub", "Dashboard"]);
+		for (const tab of ["Board", "Insights", "GitHub", "Dashboard", "More"]) {
+			expect(tabButton(tab)).toBeTruthy();
+		}
 		await fireEvent.press(screen.getByRole("button", { name: "Fix the API" }));
 		await waitFor(() => expect(app.getPathname()).toBe("/projects/p1/cards/002-api"));
+	});
+
+	it("lists the other pages under More with what each is for, and hides those a role would refuse", async () => {
+		fakeServer(
+			{ "GET /api/board/cards": { cards: CARDS }, "GET /projects/p1": PROJECT },
+			["board.read", "insight.read", "analytics.read"],
+		);
+		await openApp("/projects/p1/more");
+		const rows = (await screen.findAllByRole("button")).map((b) => b.props.accessibilityLabel).filter(Boolean);
+		expect(rows).toEqual(expect.arrayContaining(["Roadmap", "Ideas", "Context", "Sessions", "Analyses"]));
+		expect(rows).not.toContain("Governance");
+		expect(screen.getByText("Every agent session of the project, with its tokens and cost")).toBeTruthy();
+	});
+
+	it("says More has nothing for a role that opens no other page", async () => {
+		fakeServer({ "GET /api/board/cards": { cards: [] }, "GET /projects/p1": PROJECT }, ["board.read"]);
+		await openApp("/projects/p1/more");
+		expect(await screen.findByText("Your role opens no other page of this project.")).toBeTruthy();
+	});
+
+	it("says how long ago a card moved", async () => {
+		const moved = new Date(Date.now() - 5 * 60_000).toISOString();
+		fakeServer({
+			"GET /api/board/cards": { cards: [card("006-x", "Tidy up", { kind: "docs", updatedAt: moved })] },
+			"GET /projects/p1": PROJECT,
+		});
+		await openApp("/projects/p1");
+		expect(await screen.findByText("Tidy up")).toBeTruthy();
+		expect(screen.getByText("5 min ago")).toBeTruthy();
+		expect(screen.getByText("Docs")).toBeTruthy();
+	});
+
+	it("goes back to the projects it was opened from", async () => {
+		fakeServer({ "GET /api/board/cards": { cards: [] }, "GET /projects/p1": PROJECT, "GET /projects": [PROJECT] });
+		const app = await openApp("/");
+		await fireEvent.press(await screen.findByRole("button", { name: "Shop" }));
+		await waitFor(() => expect(app.getPathname()).toBe("/projects/p1"));
+		await fireEvent.press(await screen.findByRole("button", { name: "Projects" }));
+		await waitFor(() => expect(app.getPathname()).toBe("/"));
+	});
+
+	it("goes back to the projects from a board opened by a link", async () => {
+		fakeServer({ "GET /api/board/cards": { cards: [] }, "GET /projects/p1": PROJECT, "GET /projects": [PROJECT] });
+		const app = await openApp("/projects/p1");
+		await fireEvent.press(await screen.findByRole("button", { name: "Projects" }));
+		await waitFor(() => expect(app.getPathname()).toBe("/"));
 	});
 
 	it("hides the forge link for a project without a known forge, and opens the roadmap", async () => {
@@ -123,8 +176,9 @@ describe("board", () => {
 		);
 		const app = await openApp("/projects/p1");
 		expect(await screen.findAllByText("No card here.")).toBeTruthy();
-		expect(screen.queryByText("GitHub")).toBeNull();
-		await fireEvent.press(screen.getByText("Roadmap"));
+		expect(screen.queryByRole("button", { name: /^GitHub/ })).toBeNull();
+		await fireEvent.press(tabButton("More"));
+		await fireEvent.press(await screen.findByRole("button", { name: "Roadmap" }));
 		await waitFor(() => expect(app.getPathname()).toBe("/projects/p1/roadmap"));
 	});
 

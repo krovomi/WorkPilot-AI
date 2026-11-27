@@ -1,6 +1,6 @@
 /** The few building blocks every screen uses, themed. */
 
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import {
 	ActivityIndicator,
 	KeyboardAvoidingView,
@@ -15,13 +15,29 @@ import {
 	type ViewStyle,
 } from "react-native";
 import { describeError } from "../i18n";
-import { RADIUS, SPACE, useTheme } from "./theme";
+import { Icon, type IconName } from "./Icon";
+import { elevation, RADIUS, SPACE, TYPE, useTheme } from "./theme";
 
-type Variant = "primary" | "secondary" | "danger";
+type Variant = "primary" | "secondary" | "danger" | "ghost";
+
+/** A button's fill and ink in a variant. */
+function buttonColors(variant: Variant, theme: ReturnType<typeof useTheme>) {
+	switch (variant) {
+		case "primary":
+			return { background: theme.accent, color: theme.onAccent };
+		case "danger":
+			return { background: theme.dangerSoft, color: theme.danger };
+		case "ghost":
+			return { background: "transparent", color: theme.accent };
+		default:
+			return { background: theme.elevated, color: theme.text };
+	}
+}
 
 export function Button({
 	label,
 	variant = "primary",
+	icon,
 	busy = false,
 	disabled,
 	style,
@@ -29,14 +45,14 @@ export function Button({
 }: Omit<PressableProps, "children" | "style"> & {
 	label: string;
 	variant?: Variant;
+	/** An icon before the label. */
+	icon?: IconName;
 	busy?: boolean;
 	style?: ViewStyle;
 }) {
 	const theme = useTheme();
 	const off = disabled || busy;
-	const background =
-		variant === "primary" ? theme.accent : variant === "danger" ? theme.dangerSoft : theme.elevated;
-	const color = variant === "primary" ? theme.onAccent : variant === "danger" ? theme.danger : theme.text;
+	const { background, color } = buttonColors(variant, theme);
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -50,13 +66,22 @@ export function Button({
 			]}
 			{...rest}
 		>
-			{busy ? <ActivityIndicator color={color} /> : <Text style={[styles.buttonText, { color }]}>{label}</Text>}
+			{busy ? (
+				<ActivityIndicator color={color} />
+			) : (
+				<>
+					{icon ? <Icon name={icon} size={18} color={color} /> : null}
+					<Text style={[styles.buttonText, { color }]}>{label}</Text>
+				</>
+			)}
 		</Pressable>
 	);
 }
 
-export function Field({ label, ...input }: TextInputProps & { label: string }) {
+export function Field({ label, onFocus, onBlur, ...input }: TextInputProps & { label: string }) {
 	const theme = useTheme();
+	// The field being typed in shows it: its border takes the accent.
+	const [focused, setFocused] = useState(false);
 	return (
 		<View style={styles.field}>
 			<Text style={[styles.label, { color: theme.textMuted }]}>{label}</Text>
@@ -65,9 +90,17 @@ export function Field({ label, ...input }: TextInputProps & { label: string }) {
 				placeholderTextColor={theme.textFaint}
 				style={[
 					styles.input,
-					{ color: theme.text, backgroundColor: theme.surface, borderColor: theme.border },
+					{ color: theme.text, backgroundColor: theme.surface, borderColor: focused ? theme.accent : theme.border },
 					input.multiline ? styles.multiline : null,
 				]}
+				onFocus={(event) => {
+					setFocused(true);
+					onFocus?.(event);
+				}}
+				onBlur={(event) => {
+					setFocused(false);
+					onBlur?.(event);
+				}}
 				{...input}
 			/>
 		</View>
@@ -81,7 +114,8 @@ export function ErrorBanner({ message = null, error = null }: { message?: string
 	if (!text) return null;
 	return (
 		<View accessibilityRole="alert" style={[styles.banner, { backgroundColor: theme.dangerSoft }]}>
-			<Text style={{ color: theme.danger }}>{text}</Text>
+			<Icon name="alert-circle" size={18} color={theme.danger} />
+			<Text style={{ color: theme.danger, flex: 1 }}>{text}</Text>
 		</View>
 	);
 }
@@ -100,13 +134,29 @@ export function rowOpacity(pressed: boolean): number {
 	return pressed ? 0.85 : 1;
 }
 
-export function Section({ title, children }: { title: string; children: ReactNode }) {
+export function Section({
+	title,
+	icon,
+	action,
+	children,
+}: {
+	title: string;
+	/** An icon before the title. */
+	icon?: IconName;
+	/** A control at the right of the title (a link, a small button). */
+	action?: ReactNode;
+	children: ReactNode;
+}) {
 	const theme = useTheme();
 	return (
-		<View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-			<Text accessibilityRole="header" style={[styles.sectionTitle, { color: theme.textMuted }]}>
-				{title}
-			</Text>
+		<View style={[styles.section, { backgroundColor: theme.surface }, elevation(theme)]}>
+			<View style={styles.sectionHead}>
+				{icon ? <Icon name={icon} size={15} color={theme.textMuted} /> : null}
+				<Text accessibilityRole="header" style={[TYPE.overline, styles.sectionTitle, { color: theme.textMuted }]}>
+					{title}
+				</Text>
+				{action}
+			</View>
 			{children}
 		</View>
 	);
@@ -131,6 +181,8 @@ const styles = StyleSheet.create({
 		minHeight: 48,
 		borderRadius: RADIUS.md,
 		paddingHorizontal: SPACE.lg,
+		flexDirection: "row",
+		gap: SPACE.sm,
 		alignItems: "center",
 		justifyContent: "center",
 	},
@@ -145,8 +197,9 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 	},
 	multiline: { minHeight: 120, paddingTop: SPACE.md, textAlignVertical: "top" },
-	banner: { borderRadius: RADIUS.md, padding: SPACE.md },
-	section: { borderWidth: 1, borderRadius: RADIUS.lg, padding: SPACE.lg, gap: SPACE.sm },
-	sectionTitle: { fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6 },
+	banner: { flexDirection: "row", alignItems: "flex-start", gap: SPACE.sm, borderRadius: RADIUS.md, padding: SPACE.md },
+	section: { borderRadius: RADIUS.lg, padding: SPACE.lg, gap: SPACE.md },
+	sectionHead: { flexDirection: "row", alignItems: "center", gap: SPACE.sm, minHeight: 20 },
+	sectionTitle: { flex: 1 },
 	centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: SPACE.xl, gap: SPACE.md },
 });

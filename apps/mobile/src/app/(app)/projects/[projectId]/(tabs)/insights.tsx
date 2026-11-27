@@ -1,17 +1,19 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { useProjectId } from "../../../../../project/ProjectId";
 import { useApi, useSession } from "../../../../../auth/session";
 import type { InsightSummary } from "../../../../../features/types";
 import { useLoad } from "../../../../../hooks/useLoad";
 import { describeError } from "../../../../../i18n";
 import { Button, ErrorBanner, Loading } from "../../../../../ui/components";
 import { formatDate } from "../../../../../ui/format";
-import { RADIUS, SPACE, useTheme } from "../../../../../ui/theme";
+import { EmptyState, ListRow } from "../../../../../ui/kit";
+import { SPACE, useTheme } from "../../../../../ui/theme";
 
 export default function Insights() {
-	const { projectId } = useLocalSearchParams<{ projectId: string }>();
+	const projectId = useProjectId();
 	const { t, i18n } = useTranslation();
 	const theme = useTheme();
 	const api = useApi();
@@ -49,28 +51,22 @@ export default function Insights() {
 					<Text style={{ color: theme.textMuted }}>{t("insights.intro")}</Text>
 					<ErrorBanner message={actionError} error={error} />
 					{can("insight.write") ? (
-						<Button label={t("insights.new")} busy={busy} onPress={() => void create()} />
+						<Button label={t("insights.new")} icon="plus" busy={busy} onPress={() => void create()} />
 					) : null}
 				</View>
 			}
-			ListEmptyComponent={<Text style={{ color: theme.textMuted }}>{t("insights.empty")}</Text>}
+			ListEmptyComponent={<EmptyState icon="message-circle" title={t("insights.empty")} />}
 			renderItem={({ item }) => (
-				<Pressable
-					accessibilityRole="button"
+				<ListRow
+					icon="message-circle"
+					title={item.title}
+					subtitle={t("insights.meta", {
+						owner: item.mine ? t("insights.you") : (item.ownerName ?? "?"),
+						count: item.messageCount,
+						date: formatDate(item.updatedAt, i18n.language),
+					})}
 					onPress={() => open(item.id)}
-					style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
-				>
-					<Text style={{ color: theme.text, fontWeight: "600" }} numberOfLines={2}>
-						{item.title}
-					</Text>
-					<Text style={{ color: theme.textFaint, fontSize: 12 }}>
-						{t("insights.meta", {
-							owner: item.mine ? t("insights.you") : (item.ownerName ?? "?"),
-							count: item.messageCount,
-							date: formatDate(item.updatedAt, i18n.language),
-						})}
-					</Text>
-				</Pressable>
+				/>
 			)}
 		/>
 	);
@@ -78,5 +74,4 @@ export default function Insights() {
 
 const styles = StyleSheet.create({
 	content: { padding: SPACE.lg, gap: SPACE.sm, paddingBottom: SPACE.xl * 2 },
-	row: { borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.md, padding: SPACE.md, gap: SPACE.xs },
 });

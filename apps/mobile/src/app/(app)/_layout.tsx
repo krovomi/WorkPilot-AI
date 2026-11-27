@@ -15,19 +15,20 @@ export default function SignedInLayout() {
 					headerStyle: { backgroundColor: theme.surface },
 					headerTintColor: theme.text,
 					headerShadowVisible: false,
+					headerTitleStyle: { fontWeight: "700" },
+					headerBackButtonDisplayMode: "minimal",
 					contentStyle: { backgroundColor: theme.background },
 				}}
 			>
 				<Stack.Screen name="index" options={{ title: t("projects.title") }} />
 				<Stack.Screen name="settings" options={{ title: t("settings.title") }} />
 				<Stack.Screen name="share" options={{ title: t("share.title") }} />
-				<Stack.Screen name="projects/[projectId]/index" options={{ title: "" }} />
+				<Stack.Screen name="projects/[projectId]/(tabs)" options={{ headerShown: false }} />
 				<Stack.Screen
 					name="projects/[projectId]/new"
 					options={{ title: t("newCard.title"), presentation: "modal" }}
 				/>
 				<Stack.Screen name="projects/[projectId]/cards/[cardId]" options={{ title: "" }} />
-				<Stack.Screen name="projects/[projectId]/insights/index" options={{ title: t("features.insights") }} />
 				<Stack.Screen name="projects/[projectId]/insights/[sessionId]" options={{ title: "" }} />
 				<Stack.Screen name="projects/[projectId]/roadmap" options={{ title: t("features.roadmap") }} />
 				<Stack.Screen name="projects/[projectId]/ideas" options={{ title: t("features.ideas") }} />
@@ -40,8 +41,6 @@ export default function SignedInLayout() {
 				<Stack.Screen name="admin/groups/[groupId]" options={{ title: "" }} />
 				<Stack.Screen name="admin/roles/index" options={{ title: t("admin.roles.title") }} />
 				<Stack.Screen name="admin/roles/[roleId]" options={{ title: "" }} />
-				<Stack.Screen name="projects/[projectId]/forge/index" options={{ title: "" }} />
-				<Stack.Screen name="projects/[projectId]/dashboard" options={{ title: t("dashboard.title") }} />
 				<Stack.Screen name="projects/[projectId]/governance" options={{ title: t("features.governance") }} />
 				<Stack.Screen name="projects/[projectId]/waves" options={{ title: t("features.waves") }} />
 				<Stack.Screen name="projects/[projectId]/sessions" options={{ title: t("dashboard.sessions") }} />

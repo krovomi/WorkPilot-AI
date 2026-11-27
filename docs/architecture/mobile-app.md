@@ -347,6 +347,28 @@ sien quand la personne change de thème (`SETTINGS_SAVE`). Les captures de l'e2e
 (`WORKPILOT_E2E_SCREENSHOTS`) sont prises en clair puis en sombre sur la même page, sans nouvelle
 connexion.
 
+## L'interface
+
+Un projet s'ouvre sur une barre d'onglets (`src/app/(app)/projects/[projectId]/(tabs)/`) : le
+tableau, Insights, la forge, le tableau de bord, puis « Plus », qui liste les autres pages en lignes
+avec ce à quoi chacune sert (`src/project/pages.ts`). Un onglet que les permissions refuseraient
+est caché (`href: null`), celui de la forge seulement une fois le projet lu sans forge ; une carte,
+une session ou une pull request s'ouvre au-dessus des onglets, dans la pile de l'app. Le routeur ne
+donne pas le segment `[projectId]` à un onglet atteint par un tap : la mise en page des onglets le
+passe par un contexte (`src/project/ProjectId.tsx`).
+
+Les écrans partagent leurs pièces : `src/ui/components.tsx` (bouton avec icône, champ qui montre le
+focus, section avec icône), `src/ui/kit.tsx` (bouton d'en-tête, puce, initiales, ligne de liste, état
+vide, bouton flottant) et `src/ui/theme.ts` (échelle de texte `TYPE`, `elevation` : une ombre
+douce en clair, la bordure seule en sombre). Les icônes sont celles de Feather
+(`@expo/vector-icons`), dont viennent les icônes Lucide du bureau ; une icône est décorative,
+le contrôle qui la porte a le libellé. Sous Jest, `jest.setup.js` remplace la police par une vue
+qui garde le nom de l'icône (`icon-<nom>`).
+
+La capture du README (`scripts/readme-screenshots/capture-mobile.cjs`) prend quatre écrans à
+390 × 844 points, chacun dans un autre thème venu des préférences du compte, et les pose dans des
+cadres aux mêmes proportions : rien n'est étiré.
+
 ## Ce qui vient
 
 - Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.

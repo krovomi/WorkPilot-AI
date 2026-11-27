@@ -184,11 +184,35 @@ function tokenTag(token: string): string {
 /** Back to the list of projects, from wherever a scenario left the page. */
 async function home(page: Page, project: string): Promise<void> {
 	const button = page.getByRole("button", { name: project });
-	for (let i = 0; i < 6 && !(await button.isVisible()); i++) {
+	for (let i = 0; i < 10 && !(await button.isVisible()); i++) {
 		await page.goBack();
 		await page.waitForTimeout(300);
 	}
 	await expect(button).toBeVisible({ timeout: 30_000 });
+}
+
+/** Opens a project from the list of projects, on its board. */
+async function openProject(page: Page, project: string): Promise<void> {
+	await home(page, project);
+	await page.getByRole("button", { name: project }).click();
+	await expect(page.getByRole("tab", { name: "More", exact: true })).toBeVisible({ timeout: 30_000 });
+}
+
+/** A tab of the project's tab bar (Board, Insights, the forge, Dashboard, More). */
+async function projectTab(page: Page, name: string): Promise<void> {
+	await page.getByRole("tab", { name, exact: true }).click();
+}
+
+/** A page of the project's More tab (Roadmap, Ideas, Context, Sessions…). */
+async function morePage(page: Page, name: string): Promise<void> {
+	await projectTab(page, "More");
+	await page.getByRole("button", { name, exact: true }).click();
+}
+
+/** The settings, from the list of projects. */
+async function openSettings(page: Page, project: string): Promise<void> {
+	await home(page, project);
+	await page.getByRole("button", { name: "Settings", exact: true }).click();
 }
 
 let world: World;
@@ -264,26 +288,25 @@ test("the project's Insights, roadmap and ideas open from the board", async ({ b
 	await alice.getByRole("button", { name: world.project }).click({ timeout: 30_000 });
 
 	// Insights: a conversation, then the teammate sees it but cannot ask in it.
-	await alice.getByRole("link", { name: "Insights" }).click();
+	await projectTab(alice, "Insights");
 	await alice.getByRole("button", { name: "New conversation" }).click();
 	await expect(alice.getByText("Ask your first question below.")).toBeVisible({ timeout: 30_000 });
 	await expect(alice.getByLabel("Your question")).toBeVisible();
 	await shot(alice, "7-insights");
-	await alice.goBack();
-	await alice.goBack();
 
-	await alice.getByRole("link", { name: "Roadmap" }).click();
+	await openProject(alice, world.project);
+	await morePage(alice, "Roadmap");
 	await expect(alice.getByText(/No roadmap yet/)).toBeVisible({ timeout: 30_000 });
 	await expect(alice.getByRole("button", { name: "Generate" })).toBeVisible();
 	await shot(alice, "8-roadmap");
-	await alice.goBack();
 
-	await alice.getByRole("link", { name: "Ideas" }).click();
+	await openProject(alice, world.project);
+	await morePage(alice, "Ideas");
 	await expect(alice.getByText(/No ideas yet/)).toBeVisible({ timeout: 30_000 });
 
 	const bob = await signIn(browser, world, "bob");
 	await bob.getByRole("button", { name: world.project }).click({ timeout: 30_000 });
-	await bob.getByRole("link", { name: "Insights" }).click();
+	await projectTab(bob, "Insights");
 	await bob.getByRole("button", { name: /New Conversation/ }).first().click({ timeout: 30_000 });
 	await expect(bob.getByText("Ask your first question below.")).toBeVisible();
 	await expect(bob.getByLabel("Your question")).toHaveCount(0);
@@ -292,10 +315,10 @@ test("the project's Insights, roadmap and ideas open from the board", async ({ b
 test("the dashboard, the sessions and the analyses open from the board", async () => {
 	// Alice is still on the ideas, where the previous scenario left her.
 	const alice = signedInPage("alice");
-	await alice.goBack();
-	await alice.getByRole("link", { name: "Dashboard" }).click();
+	await openProject(alice, world.project);
+	await projectTab(alice, "Dashboard");
 	await expect(alice.getByText("Quality")).toBeVisible({ timeout: 30_000 });
-	await expect(alice.getByText(/Spending, last \d+ days/)).toBeVisible();
+	await expect(alice.getByText(/^Spending, last \d+ days$/)).toBeVisible();
 	await shot(alice, "9-dashboard");
 
 	// The card started in an earlier scenario is in the history.
@@ -312,10 +335,8 @@ test("the dashboard, the sessions and the analyses open from the board", async (
 test("the project's context, and a personal token kept on the server", async () => {
 	// Alice is still on the analyses, where the previous scenario left her.
 	const alice = signedInPage("alice");
-	await alice.goBack();
-	await alice.goBack();
-	await alice.goBack();
-	await alice.getByRole("link", { name: "Context" }).click();
+	await openProject(alice, world.project);
+	await morePage(alice, "Context");
 	await expect(alice.getByText(/hasn't been indexed yet/)).toBeVisible({ timeout: 30_000 });
 	await expect(alice.getByRole("button", { name: "Generate" })).toBeVisible();
 	await alice.getByRole("tab", { name: "Memories" }).click();
@@ -325,13 +346,10 @@ test("the project's context, and a personal token kept on the server", async () 
 	// Bob saves a GitHub token: the server says it is set, and never shows it back.
 	// Bob is on the Insights conversation where an earlier scenario left him.
 	const bob = signedInPage("bob");
-	await bob.goBack();
-	await bob.goBack();
-	await bob.goBack();
-	await bob.getByText("Settings", { exact: true }).click();
+	await openSettings(bob, world.project);
 	// His session, as the server tells it: opened with his password.
 	await expect(bob.getByText("Password", { exact: true })).toBeVisible({ timeout: 30_000 });
-	await bob.getByRole("button", { name: "Manage my tokens" }).click();
+	await bob.getByRole("button", { name: "My tokens on the server" }).click();
 	await bob.getByRole("button", { name: "Add" }).first().click({ timeout: 30_000 });
 	const token = bobGitHub;
 	await bob.getByLabel("GitHub token").fill(token);
@@ -345,10 +363,8 @@ test("the project's context, and a personal token kept on the server", async () 
 test("an organization admin runs members, invitations and groups from the phone", async () => {
 	// Alice, an admin of the team's organization, is still on the context.
 	const alice = signedInPage("alice");
-	await alice.goBack();
-	await alice.goBack();
-	await alice.getByText("Settings", { exact: true }).click();
-	await alice.getByRole("button", { name: "Open the administration" }).click();
+	await openSettings(alice, world.project);
+	await alice.getByRole("button", { name: "Administration", exact: true }).click();
 
 	await alice.getByRole("link", { name: /^Members/ }).click();
 	await expect(alice.getByText(world.emails.bob, { exact: false })).toBeVisible({ timeout: 30_000 });
@@ -417,9 +433,8 @@ test("the theme chosen on the phone follows the person to another device", async
 test("Bob reads the team's GitHub from the phone, and comments with his own token", async () => {
 	// Bob saved his GitHub token on the server in an earlier scenario.
 	const bob = signedInPage("bob");
-	await home(bob, world.githubProject);
-	await bob.getByRole("button", { name: world.githubProject }).click();
-	await bob.getByRole("link", { name: "GitHub" }).click({ timeout: 30_000 });
+	await openProject(bob, world.githubProject);
+	await projectTab(bob, "GitHub");
 
 	// Pull requests first, with the files of the one opened.
 	await bob.getByText("#12 Add a welcome banner").click({ timeout: 30_000 });
@@ -451,9 +466,8 @@ test("Bob reads the team's GitHub from the phone, and comments with his own toke
 
 test("Alice adds her GitLab token and reads the team's merge requests", async () => {
 	const alice = signedInPage("alice");
-	await home(alice, world.gitlabProject);
-	await alice.getByText("Settings", { exact: true }).click();
-	await alice.getByRole("button", { name: "Manage my tokens" }).click();
+	await openSettings(alice, world.gitlabProject);
+	await alice.getByRole("button", { name: "My tokens on the server" }).click();
 	const token = `glpat-${randomBytes(12).toString("hex")}`;
 	const field = alice.getByLabel("GitLab token");
 	if (!(await field.isVisible())) {
@@ -463,9 +477,8 @@ test("Alice adds her GitLab token and reads the team's merge requests", async ()
 	await alice.getByRole("button", { name: "Save" }).click();
 	await expect(alice.getByText("Saved")).toBeVisible({ timeout: 30_000 });
 
-	await home(alice, world.gitlabProject);
-	await alice.getByRole("button", { name: world.gitlabProject }).click();
-	await alice.getByRole("link", { name: "GitLab" }).click({ timeout: 30_000 });
+	await openProject(alice, world.gitlabProject);
+	await projectTab(alice, "GitLab");
 	await expect(alice.getByRole("tab", { name: "Merge requests" })).toBeVisible({ timeout: 30_000 });
 	await expect(alice.getByText("#5 Document the deploy steps")).toBeVisible({ timeout: 30_000 });
 	await alice.getByRole("tab", { name: "Issues" }).click();

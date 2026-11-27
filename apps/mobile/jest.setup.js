@@ -41,3 +41,13 @@ jest.mock("expo-local-authentication", () => ({
 	getEnrolledLevelAsync: jest.fn(async () => 3),
 	authenticateAsync: jest.fn(async () => ({ success: true })),
 }));
+
+// Icons: a font that Jest cannot load. A glyph is drawn as nothing, its name kept for a test.
+jest.mock("@expo/vector-icons/Feather", () => {
+	const { View } = require("react-native");
+	const React = require("react");
+	return {
+		__esModule: true,
+		default: ({ name }) => React.createElement(View, { testID: `icon-${name}` }),
+	};
+});

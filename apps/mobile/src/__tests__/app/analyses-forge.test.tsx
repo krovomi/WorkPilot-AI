@@ -185,15 +185,22 @@ describe("forge", () => {
 		expect(await screen.findByText("No description.")).toBeTruthy();
 	});
 
-	it("says nothing is open, and that a project off any forge has no forge page", async () => {
+	it("says nothing is open, and that a project off any forge has no forge tab", async () => {
 		github({}, VCS, { "POST /api/features/forge/github/pulls": relayed(200, { data: {} }) });
 		await openApp("/projects/p1/forge");
 		expect(await screen.findByText("Nothing open.")).toBeTruthy();
 		restoreFetch();
 
-		fakeServer({ "GET /projects/p1": { id: "p1", name: "Shop", repo_url: "x", default_branch: "main", forge: null } }, VCS);
-		await openApp("/projects/p1/forge");
-		expect(await screen.findByText("This project's repository is not on a forge the server serves.")).toBeTruthy();
+		fakeServer(
+			{
+				"GET /projects/p1": { id: "p1", name: "Shop", repo_url: "x", default_branch: "main", forge: null },
+			},
+			VCS,
+		);
+		await openApp("/projects/p1");
+		// The tab bar, once the project is read, has no forge tab.
+		expect(await screen.findByText("More")).toBeTruthy();
+		expect(screen.queryByRole("button", { name: /^(GitHub|GitLab)/ })).toBeNull();
 	});
 
 	it("shows the forge's refusal of the list", async () => {

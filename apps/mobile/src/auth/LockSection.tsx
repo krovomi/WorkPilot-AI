@@ -34,7 +34,7 @@ export function LockSection() {
 	};
 
 	return (
-		<Section title={t("lock.section")}>
+		<Section title={t("lock.section")} icon="lock">
 			{available ? null : <Text style={{ color: theme.textMuted }}>{t("lock.unavailable")}</Text>}
 			<View style={styles.row}>
 				<View style={styles.label}>

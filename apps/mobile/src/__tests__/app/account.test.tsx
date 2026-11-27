@@ -22,13 +22,27 @@ afterEach(() => {
 
 describe("projects", () => {
 	it("lists the organization's projects with their repository, branch and the person's role", async () => {
-		fakeServer({ "GET /projects": [SHOP, { ...SHOP, id: "p2", name: "Blog", my_role: null }] });
+		fakeServer({
+			"GET /projects": [
+				{ ...SHOP, forge: "github" },
+				{ ...SHOP, id: "p2", name: "Blog", my_role: null, forge: "gitlab" },
+				{ ...SHOP, id: "p3", name: "Docs", my_role: null, forge: null },
+			],
+		});
 		const app = await openApp("/");
 		expect(await screen.findByText("Shop")).toBeTruthy();
 		expect(screen.getByText("Blog")).toBeTruthy();
-		expect(screen.getAllByText(/acme\/shop · main/)).toHaveLength(2);
-		expect(screen.getByText("Role: Owner")).toBeTruthy();
+		expect(screen.getAllByText("acme/shop")).toHaveLength(3);
+		expect(screen.getAllByText("main")).toHaveLength(3);
+		expect(screen.getByText("Owner")).toBeTruthy();
+		expect(screen.getByText("3 projects")).toBeTruthy();
+		// Each repository with its forge's mark.
+		for (const mark of ["github", "gitlab", "folder"]) {
+			expect(screen.getByTestId(`icon-${mark}`, { includeHiddenElements: true })).toBeTruthy();
+		}
 		expect(app.getPathname()).toBe("/");
+		await fireEvent.press(screen.getByRole("button", { name: "Settings" }));
+		await waitFor(() => expect(app.getPathname()).toBe("/settings"));
 	});
 
 	it("says there is no project yet", async () => {
@@ -72,7 +86,7 @@ describe("settings", () => {
 		expect(screen.getByText("ada@x.io")).toBeTruthy();
 		expect(screen.getByText("https://wp.example.com")).toBeTruthy();
 		// Members cannot administer: no administration entry.
-		expect(screen.queryByText("Open the administration")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Administration" })).toBeNull();
 
 		// The organization already in use changes nothing.
 		await fireEvent.press(screen.getByRole("radio", { name: /Acme/ }));
@@ -81,7 +95,7 @@ describe("settings", () => {
 		await waitFor(() => expect(server.called("POST /auth/switch-org")).toHaveLength(1));
 		expect(server.called("POST /auth/switch-org")[0].body).toEqual({ org_id: "org-b" });
 
-		await fireEvent.press(screen.getByRole("button", { name: "Manage my tokens" }));
+		await fireEvent.press(screen.getByRole("button", { name: "My tokens on the server" }));
 		await waitFor(() => expect(app.getPathname()).toBe("/tokens"));
 	});
 
@@ -150,7 +164,7 @@ describe("settings", () => {
 	it("offers the administration to an organization admin", async () => {
 		fakeServer({ "GET /admin/members": [] }, ["org.member.read"]);
 		const app = await openApp("/settings");
-		await fireEvent.press(await screen.findByRole("button", { name: "Open the administration" }));
+		await fireEvent.press(await screen.findByRole("button", { name: "Administration" }));
 		await waitFor(() => expect(app.getPathname()).toBe("/admin"));
 	});
 
