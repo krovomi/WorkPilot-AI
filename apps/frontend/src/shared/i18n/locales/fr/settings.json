@@ -3462,5 +3462,32 @@
 	"kanbanAbandonClosedPrs": {
 		"label": "Mettre de côté les cartes dont la PR est fermée",
 		"description": "Une carte dont la pull request a été fermée sans fusion passe dans « Abandonnée », avec la raison « PR fermée sans fusion ». La reprendre la remet au travail."
+	},
+	"myUsage": {
+		"navLabel": "Mon usage",
+		"title": "Mon usage",
+		"description": "Ce que les administrateurs de cette organisation voient de vous sur les 30 derniers jours : totaux, noms d'actions, runs et jobs. Jamais un prompt, du code, un texte saisi ou un nom de fichier.",
+		"export": "Télécharger tout ce qui est conservé sur moi (JSON)",
+		"notice": "Relire ce qui est mesuré",
+		"failed": "Le serveur a refusé : {{error}}",
+		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur."
+	},
+	"usageNotice": {
+		"title": "Ce que ce serveur mesure de vous",
+		"intro": "Le serveur de cette organisation conserve quelques chiffres sur chaque membre, pour suivre son usage et ses coûts.",
+		"measured": {
+			"tokens": "Les jetons et le coût des agents que vous lancez, par fournisseur et modèle",
+			"runs": "Vos runs : phase, statut, début et fin",
+			"jobs": "Vos jobs de projet : fonctionnalité, statut, début et fin",
+			"sign_ins": "Vos connexions : heure, méthode, adresse et application",
+			"presence": "Les jours où vous étiez connecté, et votre dernière présence",
+			"pages": "Combien de fois par jour vous ouvrez chaque page de l'app (son nom seulement)"
+		},
+		"never": "Jamais un prompt, du code, un texte saisi ou un nom de fichier.",
+		"retention": "Ces chiffres sont conservés {{days}} jours.",
+		"pageRetention": "Les comptes de pages sont conservés {{days}} jours.",
+		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur.",
+		"rights": "Vous pouvez les consulter et télécharger tout ce qui est conservé sur vous dans Paramètres, Mon usage. Pour faire effacer votre compte, demandez à un administrateur de la plateforme.",
+		"understood": "J'ai compris"
 	}
 }
