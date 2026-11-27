@@ -3299,5 +3299,9 @@
 		"refresh": "Actualiser",
 		"empty": "Vous n'avez encore créé aucun lien d'équipe.",
 		"project": "Projet : {{project}}"
+	},
+	"kanbanAbandonClosedPrs": {
+		"label": "Mettre de côté les cartes dont la PR est fermée",
+		"description": "Une carte dont la pull request a été fermée sans fusion passe dans « Abandonnée », avec la raison « PR fermée sans fusion ». La reprendre la remet au travail."
 	}
 }

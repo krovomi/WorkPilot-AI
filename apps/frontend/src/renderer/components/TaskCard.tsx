@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { FlagBanner } from "./kanban/FlagBanner";
 import { AutomationBadge } from "./kanban/AutomationBadge";
 import { ReviewLoadBadge, SplitPartBadge } from "./kanban/SplitPartBadge";
 import { SuitePlacementBadge, shownSuiteState } from "./suite-placement/SuitePlacementBadge";
@@ -1159,6 +1160,11 @@ function taskCardPropsAreEqual(
 		prevTask.metadata?.complexity === nextTask.metadata?.complexity &&
 		prevTask.metadata?.archivedAt === nextTask.metadata?.archivedAt &&
 		prevTask.metadata?.prUrl === nextTask.metadata?.prUrl &&
+		// The abandon and « Bloquée » banners.
+		prevTask.metadata?.abandoned === nextTask.metadata?.abandoned &&
+		prevTask.metadata?.abandonedResolution === nextTask.metadata?.abandonedResolution &&
+		prevTask.metadata?.flagged === nextTask.metadata?.flagged &&
+		prevTask.metadata?.flaggedReason === nextTask.metadata?.flaggedReason &&
 		// Pause / Reprendre on the card and in its menu.
 		prevTask.metadata?.paused?.enabled === nextTask.metadata?.paused?.enabled &&
 		// The engine chip: a resume on another LLM changes only these.
@@ -1521,6 +1527,7 @@ export const TaskCard = memo(function TaskCard({
 						</button>
 					</div>
 				)}
+				{task.metadata?.flagged === true && <FlagBanner task={task} />}
 				{/* Delete button - positioned at the top right, outside the content flow */}
 				{onDelete && (
 					<Button

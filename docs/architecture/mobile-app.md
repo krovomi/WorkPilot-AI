@@ -369,6 +369,53 @@ La capture du README (`scripts/readme-screenshots/capture-mobile.cjs`) prend qua
 390 × 844 points, chacun dans un autre thème venu des préférences du compte, et les pose dans des
 cadres aux mêmes proportions : rien n'est étiré.
 
+## Pour vous, et me prévenir ailleurs
+
+La liste des projets dit combien de cartes attendent la personne, et le bouton « Ce qui vous
+attend » ouvre `src/app/(app)/inbox.tsx` : les cartes de tous ses projets qui sont en revue
+humaine et sur lesquelles elle peut agir, rangées par ce qu'il y a à faire (un plan à approuver,
+un run arrêté à regarder, un travail terminé à relire). Une carte réservée par une autre personne
+reste à celle-ci ; une carte qu'aucune de ses permissions ne laisserait toucher n'y est pas, comme
+l'écran de la carte n'en montrerait aucun bouton (`src/inbox/forMe.ts`). Aucune route nouvelle :
+l'app lit le tableau de chaque projet par `GET /api/board/cards`, au plus 30 projets, donc le
+serveur vérifie chaque projet comme pour son tableau ; un tableau illisible est nommé, les autres
+s'affichent.
+
+« Me prévenir ailleurs », dans les réglages (`src/app/(app)/needs-you.tsx`), règle les canaux
+propres à la personne sur le serveur (`server/routers/needs_you.py`) : ntfy, Telegram, Teams, les
+moments dont elle est prévenue et la langue des messages. Un secret se tape à l'aveugle et ne
+revient jamais : le serveur répond `********`, et un champ laissé vide garde celui qu'il a. Un
+interrupteur qui met un canal en pause renvoie ce qui n'est pas secret (le serveur ntfy, l'identifiant
+Telegram), pour que le serveur ne retombe pas sur ses valeurs par défaut. Enregistrer ou tester
+demande `agent.execute` ; sans lui, sans clé de secrets sur le serveur, ou tant que l'opérateur n'a
+pas activé l'envoi, l'écran le dit au lieu de proposer un bouton qui serait refusé.
+
+## Trouver et agir vite sur le tableau
+
+Au-dessus des colonnes, un champ cherche dans le titre, le numéro et le nom de qui a pris la
+carte, sans tenir compte des accents ni de la casse ; les filtres gardent les cartes de la
+personne ou les types choisis (`src/board/filter.ts`, `src/board/FilterBar.tsx`). Les comptes des
+colonnes suivent la recherche, et la colonne ouverte suit les résultats tant que la personne n'en a
+pas choisi une.
+
+Un appui long sur une carte (ou l'action du lecteur d'écran) ouvre ses actions rapides
+(`src/board/QuickActions.tsx`) : la carte est relue (spec, approbation, runs) pour proposer ce que
+son écran proposerait, mais seulement ce qu'il lance sans redemander (démarrer, approuver la spec,
+arrêter, relancer le build). Fusionner, ouvrir la pull request, renvoyer avec des remarques et
+supprimer restent sur l'écran de la carte, derrière sa confirmation et le verrouillage de l'app ;
+« Ouvrir la carte » est toujours là. Le serveur n'a pas de route pour déplacer une carte d'une
+colonne à l'autre : une carte change de colonne par ces actions, comme sur le bureau en mode
+serveur. Un glisser-déposer libre aurait demandé au serveur d'écrire un statut de plan à la main,
+hors des runs qui le tiennent.
+
+Un retour haptique léger (`src/ui/haptics.ts`, `expo-haptics`) marque un changement de colonne,
+un filtre, l'ouverture des actions rapides, et leur réussite ou leur échec ; rien sur le web ou
+sans moteur, et un retour manqué ne fait jamais échouer l'action.
+
+À partir de 900 points de large (une tablette, un téléphone à l'horizontale), le tableau montre
+toutes ses colonnes côte à côte, comme le bureau (`src/board/WideBoard.tsx`), avec les mêmes
+recherche et filtres.
+
 ## Ce qui vient
 
 - Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.

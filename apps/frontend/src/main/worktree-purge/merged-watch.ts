@@ -3,9 +3,12 @@
  *
  * Every few minutes, the PR of each local card waiting for review is read on
  * its forge (`pr-state.ts`). A merged one closes its card (`done`, with
- * `prMergedAt`); then every card whose PR is merged loses its worktree and
- * local branch (`purge.ts`), unless changes there are not committed. A PR
- * closed without a merge, or a forge that does not answer, changes nothing.
+ * `prMergedAt`, and resumed if it was set aside); then every card whose PR is
+ * merged loses its worktree and local branch (`purge.ts`), unless changes there
+ * are not committed. A PR closed without a merge sets its card aside once
+ * (« Abandonnée », resolution `pr_closed`, `prClosedAt`) unless the setting
+ * `kanbanAbandonClosedPrs` is off; resuming the card keeps it out of that until
+ * its PR changes. A forge that does not answer changes nothing.
  * The parts of a split are followed by `split-merge-watch.ts`, which also
  * moves the parts stacked on them; their worktree is purged here once they
  * are done. A project under the strict offline mode is never looked at.
@@ -20,6 +23,8 @@ import { autoTriggerForTask } from "../ipc-handlers/cicd-triggers-handlers";
 import { offlineStrict } from "../ipc-handlers/task/split-merge-watch";
 import { writeMetadata } from "../ipc-handlers/task/stack-handlers";
 import { safeSendToRenderer } from "../ipc-handlers/utils";
+import { readSettingsFile } from "../settings-utils";
+import { buildAbandonMetadata, buildResumeMetadata } from "../../shared/utils/task-lifecycle";
 import { type PrState, readPrState } from "../pr-state";
 import { projectStore } from "../project-store";
 import { taskStateManager } from "../task-state-manager";
@@ -36,6 +41,8 @@ export interface MergedWatchDeps {
 	reload: (project: Project) => void;
 	/** After a card is closed for its merged PR: CI/CD Triggers' "on merge". */
 	onMerged?: (task: Task, project: Project) => Promise<void>;
+	/** Whether a PR closed without a merge sets its card aside (`kanbanAbandonClosedPrs`). */
+	abandonClosed?: () => boolean;
 	now?: () => Date;
 }
 
@@ -56,20 +63,39 @@ export function cardsAwaitingMerge(tasks: readonly Task[]): Task[] {
 export async function followMergedPrs(
 	project: Project,
 	deps: MergedWatchDeps,
-): Promise<{ closed: number; purged: number; freed: number }> {
+): Promise<{ closed: number; abandoned: number; purged: number; freed: number }> {
 	let closed = 0;
+	let abandoned = 0;
 	for (const task of cardsAwaitingMerge(projectStore.getTasks(project.id))) {
 		const url = prUrlOf(task);
 		if (!url) continue;
-		if ((await deps.readState(url, project)) !== "merged") continue;
+		const state = await deps.readState(url, project);
 		const at = (deps.now?.() ?? new Date()).toISOString();
-		deps.writeMetadata(task, project, { prMergedAt: at });
+		if (state === "closed") {
+			// Once per closing: a person who resumes the card keeps it.
+			if (task.metadata?.prClosedAt || task.metadata?.abandoned || !deps.abandonClosed?.()) continue;
+			const patch = { ...buildAbandonMetadata({ resolution: "pr_closed" }, new Date(at)), prClosedAt: at };
+			deps.writeMetadata(task, project, patch);
+			appLog.info(`[MERGED] ${task.specId}: its PR was closed without a merge, the card is set aside`);
+			abandoned += 1;
+			continue;
+		}
+		// Reopened: a later closing sets it aside again.
+		if (state === "open" && task.metadata?.prClosedAt) {
+			deps.writeMetadata(task, project, { prClosedAt: undefined });
+			continue;
+		}
+		if (state !== "merged") continue;
+		deps.writeMetadata(task, project, {
+			prMergedAt: at,
+			...(task.metadata?.abandoned ? buildResumeMetadata() : {}),
+		});
 		deps.markDone(task, project);
 		appLog.info(`[MERGED] ${task.specId}: its PR was merged, the card is done`);
 		await deps.onMerged?.(task, project);
 		closed += 1;
 	}
-	if (closed > 0) projectStore.invalidateTasksCache(project.id);
+	if (closed > 0 || abandoned > 0) projectStore.invalidateTasksCache(project.id);
 
 	const tasks = projectStore.getTasks(project.id);
 	const outcomes = await deps.purge(project, tasks, mergedSpecIds(project, tasks));
@@ -83,13 +109,18 @@ export async function followMergedPrs(
 	if (purged.length > 0) {
 		appLog.info(`[MERGED] ${purged.length} merged worktree(s) purged, ${freed} bytes freed`);
 	}
-	if (closed > 0 || purged.length > 0) deps.reload(project);
-	return { closed, purged: purged.length, freed };
+	if (closed > 0 || abandoned > 0 || purged.length > 0) deps.reload(project);
+	return { closed, abandoned, purged: purged.length, freed };
 }
 
 /** Close a card whose PR was merged: the app's doing, in its status history. */
 export function closeMergedCard(task: Task, project: Project): void {
 	taskStateManager.handleManualStatusChange(task.id, "done", task, project, "system");
+}
+
+/** The setting `kanbanAbandonClosedPrs`, on unless the person turned it off. */
+export function abandonClosedPrs(): boolean {
+	return readSettingsFile()?.kanbanAbandonClosedPrs !== false;
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -102,6 +133,7 @@ export function startMergedWatch(getMainWindow: () => BrowserWindow | null): voi
 		readState: readPrState,
 		markDone: closeMergedCard,
 		writeMetadata,
+		abandonClosed: abandonClosedPrs,
 		purge: (project, tasks, specIds) => purgeWorktrees(project, tasks, specIds),
 		onMerged: async (task, project) => {
 			const url = prUrlOf(task);

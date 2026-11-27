@@ -43,6 +43,12 @@ export function useSession(): Session {
 }
 
 /** The api of a signed-in session; screens under the signed-in stack only. */
+/** The signed-in person's id: the server's answer, else the one the sign-in gave. */
+export function useUserId(): string | null {
+	const { permissions, user } = useSession();
+	return permissions?.user_id ?? user?.id ?? null;
+}
+
 export function useApi(): Api {
 	const { api: current } = useSession();
 	if (!current) throw new Error("useApi without a session");

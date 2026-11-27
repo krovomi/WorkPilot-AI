@@ -331,6 +331,28 @@ export function DisplaySettings({
 						}
 					/>
 				</div>
+
+				{/* A PR closed without a merge sets its card aside (kanban-outcome-columns.md) */}
+				<div className="flex items-center justify-between max-w-md">
+					<div className="space-y-1">
+						<Label
+							htmlFor="kanbanAbandonClosedPrs"
+							className="text-sm font-medium text-foreground"
+						>
+							{t("kanbanAbandonClosedPrs.label")}
+						</Label>
+						<p className="text-sm text-muted-foreground">
+							{t("kanbanAbandonClosedPrs.description")}
+						</p>
+					</div>
+					<Switch
+						id="kanbanAbandonClosedPrs"
+						checked={settings.kanbanAbandonClosedPrs !== false}
+						onCheckedChange={(checked) =>
+							onSettingsChange({ ...settings, kanbanAbandonClosedPrs: checked })
+						}
+					/>
+				</div>
 			</div>
 		</SettingsSection>
 	);

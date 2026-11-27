@@ -579,6 +579,46 @@
 		"outcome": {
 			"failedDropRefused": "Only a failed run lands in Failed. Restart a task from its card or move it to the queue.",
 			"doneCannotBeAbandoned": "A completed task cannot be abandoned."
+		},
+		"ask": {
+			"button": "Ask",
+			"open": "Ask a question about the board's tickets",
+			"title": "Ask the board",
+			"description": "Ask in any language: every related ticket comes up, finished and archived ones included, even when written in another language.",
+			"emptyHint": "For instance, before planning a feature, ask whether it was already built, even partly.",
+			"examples": {
+				"adminPage": "How was the admin page reworked?",
+				"export": "Can we already export data to CSV?",
+				"login": "What was done about sign-in errors?"
+			},
+			"placeholder": "Ask a question about the tickets…",
+			"send": "Ask",
+			"searching": "Reading the tickets…",
+			"failed": "The question could not be answered. Try again in a moment.",
+			"serverProject": "A server board cannot be asked yet.",
+			"modeAi": "Answered by AI",
+			"modeKeywords": "Keyword search",
+			"keywordsHint": "No AI answer (no provider, or it did not reply): these tickets share words with the question.",
+			"searched_one": "{{count}} ticket searched",
+			"searched_other": "{{count}} tickets searched",
+			"noMatch": "No ticket relates to this question.",
+			"citation": "Ticket {{index}}: {{title}}",
+			"archived": "Archived",
+			"coverage": {
+				"full": "Already covered",
+				"partial": "Partly covered",
+				"related": "Related"
+			},
+			"state": {
+				"done": "Done",
+				"in_review": "In review",
+				"in_progress": "In progress",
+				"planned": "Planned",
+				"failed": "Failed",
+				"abandoned": "Abandoned"
+			},
+			"privacy": "The question and the tickets go to the AI provider chosen in Settings. Nothing is saved.",
+			"newConversation": "New conversation"
 		}
 	},
 	"queue": {
@@ -2991,6 +3031,20 @@
 		},
 		"mergeHeld": "The full suite is running on the CI for this commit. Merge becomes available once it is green.",
 		"mergeHeldLink": "Open the run"
+	},
+	"flag": {
+		"badge": "Blocked",
+		"flag": "Flag as blocked",
+		"flagMenu": "Flag as blocked…",
+		"unflag": "Remove flag",
+		"dialogTitle_one": "Flag the task as blocked",
+		"dialogTitle_other": "Flag {{count}} tasks as blocked",
+		"dialogDescription_one": "The task keeps its column; the flag tells everyone it cannot move on until the impediment is lifted.",
+		"dialogDescription_other": "The tasks keep their columns; the flag tells everyone they cannot move on until the impediment is lifted.",
+		"reasonLabel": "What blocks it",
+		"reasonPlaceholder": "What blocks it (optional), e.g. waiting for the API key from the client",
+		"failedTitle": "Flag not saved",
+		"failedDescription": "Could not save the flag. Please try again."
 	},
 	"runFacts": {
 		"title": "How it went",
