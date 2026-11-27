@@ -17,6 +17,7 @@ import type {
 import type { AgentManager } from "../../agent";
 import { appLog } from "../../app-logger";
 import { fileWatcher } from "../../file-watcher";
+import { recordTaskLauncher } from "../../task-run-facts";
 import { taskStateManager } from "../../task-state-manager";
 import { parsePlanEdit } from "./plan-edit";
 import { getPlanPath, updatePlanSubtasks } from "./plan-file-utils";
@@ -244,6 +245,12 @@ export function registerTaskExecutionHandlers(
 			needsSpecCreation,
 			"needsImplementation:",
 			needsImplementation,
+		);
+
+		// Who launched this run, beside the spec of the project's copy.
+		recordTaskLauncher(
+			path.join(project.path, getSpecsDir(project.autoBuildPath), task.specId),
+			project.path,
 		);
 
 		// The task runs on its own engine, never the default provider's.

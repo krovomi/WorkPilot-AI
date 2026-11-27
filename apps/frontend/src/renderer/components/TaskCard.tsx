@@ -78,6 +78,7 @@ import { SessionCompactionBadge } from "./SessionCompactionBadge";
 import { StreamingSessionButton } from "./streaming/StreamingSessionButton";
 import { CardTypeChip } from "./kanban/CardTypeChip";
 import { TaskCardPreview } from "./kanban/TaskCardPreview";
+import { sameRunFacts, TaskRunFactsRow } from "./kanban/TaskRunFacts";
 import {
 	contextMenuPoint,
 	isFromPortal,
@@ -1178,6 +1179,8 @@ function taskCardPropsAreEqual(
 		prevTask.crossReview?.at === nextTask.crossReview?.at &&
 		prevTask.approval?.at === nextTask.approval?.at &&
 		prevTask.verification?.score === nextTask.verification?.score &&
+		// The finished card's run facts (time, spend, people).
+		sameRunFacts(prevTask, nextTask) &&
 		// Check if any subtask statuses changed (compare all subtasks)
 		prevTask.subtasks.every(
 			(s, i) => s.status === nextTask.subtasks[i]?.status,
@@ -1612,6 +1615,9 @@ export const TaskCard = memo(function TaskCard({
 							reviewReasonInfo={reviewReasonInfo}
 							t={t}
 						/>
+
+						{/* Once done: agents' time, tokens and cost, creator and launcher */}
+						<TaskRunFactsRow task={task} />
 
 						{/* Azure DevOps pipeline badge (CI/CD loop) */}
 						<PipelineBadge task={task} t={t} />

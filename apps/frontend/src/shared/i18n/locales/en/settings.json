@@ -400,7 +400,19 @@
 				"maxSession": "Longest session",
 				"maxSessionHint": "Over it, the task is paused."
 			},
-			"always": "Always on, whatever these settings: the command allowlist, writes confined to the build's folders, protected security files, and the OS sandbox around commands where the system has one."
+			"always": "Always on, whatever these settings: the command allowlist, writes confined to the build's folders, protected security files, and the OS sandbox around commands where the system has one.",
+			"microvm": {
+				"title": "Docker microVM per task",
+				"description": "Each task's commands run in its own Docker Sandboxes microVM, with its own kernel and Docker engine: only the worktree and the task's files are mounted, the network is closed except for the package registries and the provider. Works on Windows 11, macOS (Apple silicon) and Linux with KVM.",
+				"enable": "Run each task in a Docker microVM",
+				"enableHint": "Off: commands run in the OS sandbox as before. On, without a working sbx, the OS sandbox takes over and the task says why.",
+				"memory": "Memory per task",
+				"memoryHint": "Auto: a share of the free memory, between 2 and 16 GiB.",
+				"cpus": "CPUs per task",
+				"cpusHint": "Auto: half the machine's cores.",
+				"auto": "auto",
+				"requirements": "Needs the sbx command (Windows: winget install -h Docker.sbx; macOS: brew install docker/tap/sbx) and a Docker account: run sbx login once. On Windows, enable Windows Hypervisor Platform. WorkPilot turns sbx telemetry off; no code or prompt leaves the machine. In this version, commands of the WorkPilot loop (OpenAI, Google, Mistral, Copilot, local models...) run in the VM; CLI agents keep the OS sandbox."
+			}
 		},
 		"anomaly-detection": {
 			"title": "Anomaly Detection",
