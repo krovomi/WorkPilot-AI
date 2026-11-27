@@ -28,6 +28,14 @@ export interface AgentSafetySettings {
 		maxFileSizeMb: number;
 		/** Longest session, in minutes; 0 is no limit. */
 		maxSessionMinutes: number;
+		/** Docker Sandboxes: a microVM per task (`apps/backend/os_sandbox/microvm.py`). Off by default. */
+		microvm: {
+			enabled: boolean;
+			/** Memory of each task's VM, in GiB; 0 sizes it from the machine. */
+			memoryGb: number;
+			/** CPUs of each task's VM; 0 sizes it from the machine. */
+			cpus: number;
+		};
 	};
 	anomaly: {
 		enabled: boolean;

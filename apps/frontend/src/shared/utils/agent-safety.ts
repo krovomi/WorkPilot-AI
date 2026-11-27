@@ -7,6 +7,9 @@
 import type { AgentSafetySettings, SandboxMode } from "../types/agent-safety";
 
 export const MAX_ALLOWED_PATHS = 50;
+/** Bounds of a task microVM, the backend's (`MAX_VM_MEMORY_GB`, `MAX_VM_CPUS`). */
+export const MAX_VM_MEMORY_GB = 256;
+export const MAX_VM_CPUS = 64;
 
 export const DEFAULT_AGENT_SAFETY: AgentSafetySettings = {
 	snapshots: { enabled: true, keep: 10, autoRollback: true },
@@ -16,6 +19,7 @@ export const DEFAULT_AGENT_SAFETY: AgentSafetySettings = {
 		maxFilesWritten: 200,
 		maxFileSizeMb: 10,
 		maxSessionMinutes: 0,
+		microvm: { enabled: false, memoryGb: 0, cpus: 0 },
 	},
 	anomaly: {
 		enabled: true,
@@ -72,6 +76,7 @@ export function normalizeAgentSafety(raw: unknown): AgentSafetySettings {
 	const snap = section(raw, "snapshots");
 	const box = section(raw, "sandbox");
 	const watch = section(raw, "anomaly");
+	const vm = section(box, "microvm");
 	const mode: SandboxMode = box.mode === "restricted" ? "restricted" : "normal";
 	const paths: string[] = [];
 	if (Array.isArray(box.allowedPaths)) {
@@ -93,6 +98,11 @@ export function normalizeAgentSafety(raw: unknown): AgentSafetySettings {
 			maxFilesWritten: num(box, "maxFilesWritten", d.sandbox.maxFilesWritten, 0, 10_000),
 			maxFileSizeMb: num(box, "maxFileSizeMb", d.sandbox.maxFileSizeMb, 0, 1024, false),
 			maxSessionMinutes: num(box, "maxSessionMinutes", d.sandbox.maxSessionMinutes, 0, 1440),
+			microvm: {
+				enabled: bool(vm, "enabled", d.sandbox.microvm.enabled),
+				memoryGb: num(vm, "memoryGb", d.sandbox.microvm.memoryGb, 0, MAX_VM_MEMORY_GB),
+				cpus: num(vm, "cpus", d.sandbox.microvm.cpus, 0, MAX_VM_CPUS),
+			},
 		},
 		anomaly: {
 			enabled: bool(watch, "enabled", d.anomaly.enabled),

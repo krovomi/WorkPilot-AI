@@ -435,7 +435,19 @@
 				"maxSession": "Plus longue session",
 				"maxSessionHint": "Au-delà, la tâche est mise en pause."
 			},
-			"always": "Toujours actifs, quels que soient ces réglages : la liste des commandes autorisées, les écritures confinées aux dossiers du build, les fichiers de sécurité protégés, et le bac à sable de l'OS autour des commandes quand le système en a un."
+			"always": "Toujours actifs, quels que soient ces réglages : la liste des commandes autorisées, les écritures confinées aux dossiers du build, les fichiers de sécurité protégés, et le bac à sable de l'OS autour des commandes quand le système en a un.",
+			"microvm": {
+				"title": "MicroVM Docker par tâche",
+				"description": "Les commandes de chaque tâche tournent dans sa propre microVM Docker Sandboxes, avec son noyau et son moteur Docker : seuls le worktree et les fichiers de la tâche y sont montés, et le réseau est fermé sauf aux registres de paquets et au fournisseur. Marche sous Windows 11, macOS (Apple silicon) et Linux avec KVM.",
+				"enable": "Lancer chaque tâche dans une microVM Docker",
+				"enableHint": "Coupé : les commandes tournent dans le bac à sable de l'OS, comme avant. Activé sans sbx fonctionnel, le bac à sable de l'OS prend le relais et la tâche dit pourquoi.",
+				"memory": "Mémoire par tâche",
+				"memoryHint": "Auto : une part de la mémoire libre, entre 2 et 16 Gio.",
+				"cpus": "Processeurs par tâche",
+				"cpusHint": "Auto : la moitié des cœurs de la machine.",
+				"auto": "auto",
+				"requirements": "Demande la commande sbx (Windows : winget install -h Docker.sbx ; macOS : brew install docker/tap/sbx) et un compte Docker : lance sbx login une fois. Sous Windows, active la plateforme d'hyperviseur Windows. WorkPilot coupe la télémétrie de sbx ; aucun code ni prompt ne quitte la machine. Dans cette version, les commandes de la boucle WorkPilot (OpenAI, Google, Mistral, Copilot, modèles locaux…) tournent dans la VM ; les agents en CLI gardent le bac à sable de l'OS."
+			}
 		},
 		"terminal-fonts": {
 			"description": "Personnaliser l'apparence des polices du terminal",
