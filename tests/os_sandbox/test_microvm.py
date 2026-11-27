@@ -102,9 +102,15 @@ def test_a_posix_path_is_the_same_inside():
     assert microvm.vm_path("/home/me/app", windows=False) == "/home/me/app"
 
 
-def test_a_windows_path_goes_under_mnt():
-    assert microvm.vm_path(r"C:\Repos\My App", windows=True) == "/mnt/c/Repos/My App"
-    assert microvm.vm_path(r"\\srv\share\a", windows=True) == "/mnt/unc/srv/share/a"
+def test_a_windows_path_goes_where_sbx_mounts_a_workspace_without_target():
+    # Seen on Windows 11 with sbx 0.54.1: C:\Users\… is /c/Users/… in the VM.
+    assert microvm.vm_path(r"C:\Repos\My App", windows=True) == "/c/Repos/My App"
+    assert microvm.vm_path(r"D:\x", windows=True) == "/d/x"
+
+
+def test_a_network_path_is_refused_its_place_in_the_vm_is_unknown():
+    with pytest.raises(microvm.MicrovmError):
+        microvm.vm_path(r"\\srv\share\a", windows=True)
 
 
 @pytest.mark.parametrize("path", ["/a:b", "/"])
@@ -141,11 +147,14 @@ def test_the_worktree_its_git_and_the_spec_are_mounted_nothing_else(
     git_dir = (tmp_path / "repo" / ".git").resolve()
     assert writable[0] == worktree
     assert set(writable) == {worktree, spec.resolve(), git_dir}
+    # sbx refuses a target for the first (primary) workspace.
+    assert mounts[0].target is None and mounts[0].spec() == str(worktree)
+    assert all(m.target is not None for m in mounts[1:])
     read_only = {m.target for m in mounts if m.read_only}
     assert microvm.vm_path(git_dir / "hooks") in read_only
     assert microvm.vm_path(git_dir / "config") in read_only
     # The task's own .env is covered by an empty file, read-only.
-    env_mount = next(m for m in mounts if m.target.endswith("/.workpilot/.env"))
+    env_mount = next(m for m in mounts if m.vm_target.endswith("/.workpilot/.env"))
     assert env_mount.read_only and env_mount.host.read_text(encoding="utf-8") == ""
     # Never the home directory or its caches.
     assert not any(str(Path.home()) == str(m.host) for m in mounts)
@@ -211,7 +220,7 @@ def test_a_missing_vm_is_created_closed_then_opened_to_the_allowlist(sbx, worktr
     assert microvm.ensure_vm(vm) is True
     create = next(c for c in sbx.calls if c[0] == "create")
     assert create[1] == "shell"
-    assert create[2] == f"{worktree}:{microvm.vm_path(worktree)}"
+    assert create[2] == str(worktree)
     for flag, value in (("--name", vm.name), ("--memory", "4g"), ("--cpus", "2")):
         assert create[create.index(flag) + 1] == value
     assert "--deny-network" in create
@@ -265,6 +274,12 @@ def test_a_command_runs_in_the_vm_without_the_hosts_secrets(sbx, worktree):
     assert argv[-4:] == [vm.name, "/bin/sh", "-c", "npm test"]
     outside = vm.exec_argv(["true"], {}, Path("/etc"))
     assert outside[4] == microvm.vm_path(worktree)
+    assert "-i" not in argv
+
+
+def test_a_command_that_reads_stdin_gets_it_forwarded(sbx, worktree):
+    argv = _vm(worktree).exec_argv(["cat"], {}, None, stdin=True)
+    assert argv[:4] == ["/opt/sbx", "--no-input", "exec", "-i"]
 
 
 def test_blocked_hosts_are_counted(sbx):
