@@ -16,6 +16,7 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `KanbanColumn.tsx` | ~1 140 | une colonne : `DroppableColumn`, `WipLimitPopover`, `SortableColumnWrapper`, comparateurs mémo, `COLUMN_RENDER_CAP` (lot L11) |
 | `ColumnBand.tsx` | ~200 | bandeau d'une colonne : icône, compteur, jauge de capacité, ligne de résumé (`lib/column-pulse.ts`), état vide ([kanban-columns.md](../../../../../../docs/architecture/kanban-columns.md)) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
+| `board-ask/` | — | « Interroger le tableau » : bouton de la barre et panneau de conversation, réponse par `main/board-ask/` ([board-ask.md](../../../../../../docs/architecture/board-ask.md)) |
 | `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F182) |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |
 | `../task-detail/TaskMobilePreview.tsx` | ~430 | onglet *Mobile* : plateforme, appareil, run, capture, logs |

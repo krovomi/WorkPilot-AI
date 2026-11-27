@@ -212,6 +212,11 @@ describe("local and server boards", () => {
 		).toBeInTheDocument();
 	});
 
+	it("a local board can be asked a question about its tickets", () => {
+		renderToolbar();
+		expect(screen.getByRole("button", { name: "Ask" })).toBeInTheDocument();
+	});
+
 	it("a server board shows its notice instead of the local tools", () => {
 		useProjectStore.setState({
 			projects: [project({ remote: { serverUrl: "https://srv", projectId: "r1" } } as never)],
@@ -219,6 +224,7 @@ describe("local and server boards", () => {
 		renderToolbar();
 		expect(screen.queryByRole("textbox", { name: /Quick command/ })).toBeNull();
 		expect(screen.queryByRole("button", { name: "More board actions" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
 	});
 
 	it("a local board keeps its occasional actions in the more menu", async () => {
