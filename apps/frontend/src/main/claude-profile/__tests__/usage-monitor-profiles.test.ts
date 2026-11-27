@@ -70,7 +70,7 @@ import {
 } from "./usage-monitor-world";
 
 const OAUTH_USAGE = "https://api.anthropic.com/api/oauth/usage";
-const BACKEND = "http://localhost:9000/providers/usage";
+const BACKEND = "http://127.0.0.1:9000/providers/usage";
 
 const newMonitor = () =>
 	new (UsageMonitor as unknown as new () => UsageMonitor)();
