@@ -456,6 +456,46 @@
 				"title": "Sensitive paths",
 				"description": "Reading or writing one of these lowers the score, once per file."
 			}
+		},
+		"approvals": {
+			"title": "Approval tiers",
+			"description": "The tier of each task's pull request, and whether it merges by itself once green",
+			"mode": {
+				"title": "Mode",
+				"description": "For every project and every provider. A project's workpilot.policy.yaml can only make it stricter.",
+				"off": {
+					"label": "Off",
+					"description": "No tier. A person merges every pull request, as before."
+				},
+				"observe": {
+					"label": "Observe",
+					"description": "The tier shows on the card. Nothing merges by itself."
+				},
+				"enforce": {
+					"label": "Enforce",
+					"description": "A green N0, or N1 agreed by the cross-review, merges by itself. N2 and N3 wait for a person."
+				}
+			},
+			"tiers": {
+				"title": "The four tiers",
+				"N0": {
+					"badge": "N0",
+					"when": "Dependency bump or documentation only: merges once CI is green."
+				},
+				"N1": {
+					"badge": "N1",
+					"when": "A change in one layer, under the limits: merges once CI is green and the cross-review agrees."
+				},
+				"N2": {
+					"badge": "N2",
+					"when": "A feature, several layers, a migration, a public contract, a major bump: a person approves."
+				},
+				"N3": {
+					"badge": "N3",
+					"when": "Secrets, auth, personal data, payment, CI or policy files: a person approves, always."
+				}
+			},
+			"policyNote": "The tier is read without a model, from the files the pull request changes, its title and the facts the task measured. Rules in the approvals section of workpilot.policy.yaml can only raise it."
 		}
 	},
 	"tasks": {

@@ -456,6 +456,46 @@
 		"updates": {
 			"description": "Mises à jour de WorkPilot AI",
 			"title": "Mises à jour"
+		},
+		"approvals": {
+			"title": "Validation par niveaux",
+			"description": "Le niveau de la pull request de chaque tâche, et si elle fusionne seule une fois verte",
+			"mode": {
+				"title": "Mode",
+				"description": "Pour tous les projets et tous les providers. Le workpilot.policy.yaml d'un projet ne peut que le durcir.",
+				"off": {
+					"label": "Arrêtée",
+					"description": "Pas de niveau. Une personne fusionne chaque pull request, comme avant."
+				},
+				"observe": {
+					"label": "Observer",
+					"description": "Le niveau s'affiche sur la carte. Rien ne fusionne seul."
+				},
+				"enforce": {
+					"label": "Appliquer",
+					"description": "Une N0 verte, ou une N1 approuvée par la revue croisée, fusionne seule. N2 et N3 attendent une personne."
+				}
+			},
+			"tiers": {
+				"title": "Les quatre niveaux",
+				"N0": {
+					"badge": "N0",
+					"when": "Montée de version ou documentation seule : fusion dès que la CI est verte."
+				},
+				"N1": {
+					"badge": "N1",
+					"when": "Un changement dans une seule couche, sous les limites : fusion quand la CI est verte et que la revue croisée est d'accord."
+				},
+				"N2": {
+					"badge": "N2",
+					"when": "Une feature, plusieurs couches, une migration, un contrat public, une montée majeure : une personne valide."
+				},
+				"N3": {
+					"badge": "N3",
+					"when": "Secrets, authentification, données personnelles, paiement, CI ou fichiers de politique : une personne valide, toujours."
+				}
+			},
+			"policyNote": "Le niveau se lit sans modèle, à partir des fichiers modifiés par la pull request, de son titre et des faits mesurés par la tâche. Les règles de la section approvals de workpilot.policy.yaml ne peuvent que le relever."
 		}
 	},
 	"tasks": {

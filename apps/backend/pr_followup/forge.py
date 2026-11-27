@@ -29,6 +29,7 @@ _GITHUB_PR = re.compile(
     r"(?P<repo>[A-Za-z0-9._-]{1,100})/pull/(?P<number>[0-9]{1,9})/?(?:[#?].*)?$"
 )
 _JOB_LINK = re.compile(r"/actions/runs/(?P<run>[0-9]+)/job/(?P<job>[0-9]+)")
+_SHA = re.compile(r"^[0-9a-f]{40}$")
 _GH_TIMEOUT_SECONDS = 60
 LOG_TAIL_CHARS = 8_000
 
@@ -127,7 +128,7 @@ class GitHubForge:
                 "-R",
                 pr.slug,
                 "--json",
-                "number,state,headRefOid,headRefName,baseRefName",
+                "number,state,headRefOid,headRefName,baseRefName,title,labels",
             ]
         )
         if code != 0:
@@ -177,6 +178,8 @@ class GitHubForge:
             head_sha=str(view.get("headRefOid") or ""),
             head_branch=str(view.get("headRefName") or ""),
             base_branch=str(view.get("baseRefName") or ""),
+            title=str(view.get("title") or "")[:300],
+            labels=_labels(view.get("labels")),
             checks=tuple(checks),
             threads=tuple(threads),
         )
@@ -256,6 +259,33 @@ class GitHubForge:
             if isinstance(r, dict) and r.get("conclusion") in _BASE_FAILED_CONCLUSIONS
         )
 
+    async def merge(self, head_sha: str) -> tuple[bool, str]:
+        """Merge the PR at exactly ``head_sha``, with the first method the
+        repository allows (squash, then merge commit, then rebase). A head that
+        moved since it was judged is refused by GitHub (``--match-head-commit``)."""
+        if not _SHA.match(head_sha or ""):
+            return False, "not a commit id"
+        error = ""
+        for method in ("--squash", "--merge", "--rebase"):
+            code, _out, err = await self._gh(
+                [
+                    "pr",
+                    "merge",
+                    str(self.pr.number),
+                    "-R",
+                    self.pr.slug,
+                    method,
+                    "--match-head-commit",
+                    head_sha,
+                ]
+            )
+            if code == 0:
+                return True, ""
+            error = _first_line(err, "gh pr merge failed")
+            if "not allowed" not in error.lower():
+                break
+        return False, error
+
     async def failed_log(self, check: Check) -> str:
         """The tail of the failed steps' log, or a line saying why there is none."""
         if not (check.run_id and check.job_id):
@@ -277,6 +307,13 @@ class GitHubForge:
         if code != 0:
             return f"(no log: {_first_line(err, 'gh run view failed')})"
         return out[-LOG_TAIL_CHARS:]
+
+
+def _labels(raw: Any) -> tuple[str, ...]:
+    if not isinstance(raw, list):
+        return ()
+    names = (str(item.get("name") or "") for item in raw if isinstance(item, dict))
+    return tuple(name[:100] for name in names if name)[:50]
 
 
 def forge_for_url(url: str, cwd: Path, gh: GhRun | None = None) -> GitHubForge | None:

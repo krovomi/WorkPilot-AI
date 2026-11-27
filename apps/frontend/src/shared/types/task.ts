@@ -805,6 +805,8 @@ export interface Task {
 	goal?: TaskGoalSummary;
 	/** The second engine's verdict (`apps/backend/cross_review/`), from the plan. */
 	crossReview?: TaskCrossReviewSummary;
+	/** The approval tier of the green PR (`apps/backend/pr_followup/approval.py`). */
+	approval?: TaskApprovalSummary;
 	/** Where the backend decided the full suite runs (`test_placement.json`). */
 	suitePlacement?: SuitePlacement;
 	/** The full suite sent to the forge's CI from the pushed branch (`plan.ciSuite`). */
@@ -898,6 +900,22 @@ export interface TaskStatusTransition {
  * `disagree` names at least one blocking problem and holds the pull request
  * back; `inconclusive` is everything unclear and never reads as `agree`.
  */
+/**
+ * The approval tier of the task's green pull request
+ * (`pr_followup/approval.py::plan_summary`): read from the plan, never trusted
+ * as typed (the badge shows only a known tier).
+ */
+export interface TaskApprovalSummary {
+	tier?: string;
+	action?: string;
+	mode?: string;
+	merged?: boolean;
+	mergeError?: string;
+	reasons?: { code: string; tier: string }[];
+	error?: string;
+	at?: string;
+}
+
 export interface TaskCrossReviewSummary {
 	verdict: "agree" | "disagree" | "inconclusive";
 	provider: string;
@@ -948,6 +966,8 @@ export interface ImplementationPlan {
 	goal?: TaskGoalSummary;
 	/** Written by the cross review (`cross_review/review.py::write_verdict`). */
 	crossReview?: TaskCrossReviewSummary;
+	/** Written by the PR follow-through (`pr_followup/approval.py`). */
+	approval?: TaskApprovalSummary;
 	/** Written by the QA reviewer (`qa/reviewer.py`); read, never trusted as typed. */
 	qa_signoff?: { status?: unknown; qa_session?: unknown };
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
