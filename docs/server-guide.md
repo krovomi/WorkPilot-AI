@@ -158,6 +158,7 @@ Les plus utilisées :
 | `WORKPILOT_INVITATION_TTL_HOURS` | `72` | un lien d'invitation doit durer plus ou moins longtemps |
 | `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | `60` | un lien de mot de passe oublié doit durer plus ou moins longtemps (de 5 à 1440 minutes) |
 | `WORKPILOT_USAGE_RETENTION_DAYS` | `365` | votre registre RGPD fixe une autre durée pour la consommation et la présence (de 30 à 3650 jours) ; ce qui est gardé : [server-usage-data.md](server-usage-data.md) |
+| `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS` | `183` | une autre durée pour l'activité par page (de 30 à 3650 jours) ; chaque organisation peut aussi régler les siennes dans **Administration → Usage** |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | `12` | une politique de mot de passe plus stricte (jamais moins de 12) |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | refuser les mots de passe connus des fuites |
 | `WORKPILOT_ACCESS_TOKEN_TTL_MINUTES` | `15` | rarement |
@@ -304,6 +305,10 @@ Huit rôles intégrés, dans chaque organisation :
 **Rôles et permissions** montre les permissions de chacun et crée des rôles propres à
 l'organisation (un slug en minuscules, par exemple `tech-lead`), utilisables partout où un slug
 est attendu, y compris dans `WORKPILOT_APPROVAL_ROLES`.
+
+L'usage par personne (consommation, présence, activité par page, onglet **Usage**) demande
+`usage.read`, et ses réglages `usage.write` : seuls Owner et Administrator les ont. Un Analyst
+ne lit l'usage par personne que si un rôle propre à l'organisation lui ajoute `usage.read`.
 
 Deux autres niveaux existent, à ne pas confondre :
 

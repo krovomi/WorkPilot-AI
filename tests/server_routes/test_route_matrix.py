@@ -110,6 +110,8 @@ RULES: dict[tuple[str, str], Rule] = {
     ("PUT", "/users/me/preferences"): signed_in(),
     ("GET", "/users/me/preferences/menu"): signed_in(),
     ("PUT", "/users/me/preferences/menu"): signed_in(),
+    ("GET", "/users/me/page-activity"): signed_in(),
+    ("POST", "/users/me/page-activity"): signed_in(),
     ("GET", "/users/me/access-tokens"): signed_in(),
     ("POST", "/users/me/access-tokens"): signed_in(),
     ("DELETE", "/users/me/access-tokens/{token_id}"): signed_in(),
@@ -180,6 +182,8 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/admin/overview"): needs("analytics.read"),
     ("GET", "/admin/quotas"): needs("org.quota.read"),
     ("PUT", "/admin/quotas"): needs("org.quota.write"),
+    ("GET", "/admin/usage/settings"): needs("usage.read"),
+    ("PUT", "/admin/usage/settings"): needs("usage.write"),
     ("GET", "/admin/audit"): needs("audit.read"),
     # --- The shared board ------------------------------------------------------
     ("GET", "/api/board/stream"): needs("task.read"),

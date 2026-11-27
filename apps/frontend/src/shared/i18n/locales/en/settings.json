@@ -3311,5 +3311,9 @@
 		"refresh": "Refresh",
 		"empty": "You have not made any team link yet.",
 		"project": "Project: {{project}}"
+	},
+	"kanbanAbandonClosedPrs": {
+		"label": "Set aside cards whose PR was closed",
+		"description": "A card whose pull request was closed without a merge moves to Abandoned, with the reason « PR closed without merge ». Resume it to work on it again."
 	}
 }

@@ -417,6 +417,7 @@ def mount_server_mode(app: FastAPI) -> bool:
         ("server.routers.users", "users"),
         ("server.routers.devices", "devices"),
         ("server.routers.preferences", "preferences"),
+        ("server.routers.usage", "usage"),
         ("server.routers.needs_you", "needs-you"),
         ("server.routers.access_tokens", "access-tokens"),
         ("server.routers.admin", "admin"),

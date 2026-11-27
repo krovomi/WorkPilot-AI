@@ -55,7 +55,7 @@ import { usePendingDeleteStore } from "../stores/pending-delete-store";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
 import { canMoveTaskTo, emptyColumnGroups, getBoardColumn, getVisualColumn, isQuickAddColumn } from "../lib/kanban-columns";
 import { useOutcomeDrop } from "../hooks/useOutcomeDrop";
-import { AbandonRequestDialog } from "./kanban/AbandonRequestDialog";
+import { BoardDialogs } from "./kanban/BoardDialogs";
 import { groupMoveTargets } from "../lib/group-move";
 import { DragOverlayCard } from "./kanban/DragOverlayCard";
 import { computeBoardCostForecast } from "../lib/kanban-cost";
@@ -2222,7 +2222,7 @@ export function KanbanBoard({
 						</Button>
 					)}
 					{/* Unified toolbar: search, filters, sort, and quick commands */}
-					<KanbanToolbar projectPath={project?.path} />
+					<KanbanToolbar projectPath={project?.path} onOpenTask={onTaskClick} />
 					{/* Flow signal: a clickable list of cards that have idled too long.
 					    Plain label + concrete task list so the value is obvious. */}
 					{agingList.length > 0 && (
@@ -2534,7 +2534,7 @@ export function KanbanBoard({
 					onClear={deselectAllTasks}
 				/>
 			)}
-			<AbandonRequestDialog />
+			<BoardDialogs />
 
 			{/* Bulk "mark as done" confirmation dialog (human_review → done + PR creation) */}
 			<AlertDialog

@@ -76,6 +76,7 @@ import { registerCostHandlers } from "./cost-handlers";
 import { registerCostPredictorHandlers } from "./cost-predictor-handlers";
 import { registerFormulaMatrixHandlers } from "./formula-matrix-handlers";
 import { registerBenchHandlers } from "./bench-handlers";
+import { registerBoardAskHandlers } from "./board-ask-handlers";
 import { registerBoardMcpHandlers } from "./board-mcp-handlers";
 import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
@@ -138,6 +139,7 @@ import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerApprovalHandlers } from "./server-approval-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
 import { registerServerSsoHandlers } from "./server-sso-handlers";
+import { registerServerUsageHandlers } from "./server-usage-handlers";
 import { registerServerProjectHandlers } from "./server-project-handlers";
 import { registerServerWorkspaceHandlers } from "./server-workspace-handlers";
 import { registerBuildCompareHandlers } from "./build-compare-handlers";
@@ -367,6 +369,7 @@ export function setupIpcHandlers(
 	registerServerSsoHandlers(getMainWindow);
 	// Multi-tenant administration console (orgs, roles, members, quotas, audit)
 	registerServerAdminHandlers();
+	registerServerUsageHandlers();
 	registerServerProjectHandlers();
 	registerServerWorkspaceHandlers();
 	// Spec Approval of a server card: criticality, approvals, lent approvals
@@ -680,6 +683,9 @@ export function setupIpcHandlers(
 
 	// workpilot-board MCP server: registered with Claude Code, Codex, Cursor...
 	registerBoardMcpHandlers();
+
+	// « Interroger le tableau »: a question answered with the related tickets
+	registerBoardAskHandlers();
 
 	// Agent Debugger handlers (Feature 1)
 	registerAgentDebuggerHandlers();

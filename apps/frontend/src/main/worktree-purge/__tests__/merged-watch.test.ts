@@ -1,7 +1,7 @@
 /**
- * A merged PR closes its card and frees its worktree; anything else, a PR
- * open or closed without a merge, a forge that does not answer, changes
- * nothing.
+ * A merged PR closes its card and frees its worktree; a PR closed without a
+ * merge sets its card aside once (when the setting is on); a PR still open or
+ * a forge that does not answer changes nothing.
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { Project, Task } from "../../../shared/types";
@@ -17,6 +17,8 @@ vi.mock("../../ipc-handlers/task/stack-handlers", () => ({ writeMetadata: vi.fn(
 vi.mock("../../ipc-handlers/task/split-merge-watch", () => ({ offlineStrict: () => false }));
 vi.mock("../../ipc-handlers/utils", () => ({ safeSendToRenderer: vi.fn() }));
 vi.mock("../../pr-state", () => ({ readPrState: vi.fn() }));
+const { settings } = vi.hoisted(() => ({ settings: { current: undefined as Record<string, unknown> | undefined } }));
+vi.mock("../../settings-utils", () => ({ readSettingsFile: () => settings.current }));
 vi.mock("../../ipc-handlers/cicd-triggers-handlers", () => ({ autoTriggerForTask: vi.fn() }));
 vi.mock("../../ci-pipeline-service", () => ({ ciPipelineService: { refreshAfterMerge: vi.fn() } }));
 vi.mock("../purge", () => ({
@@ -27,6 +29,7 @@ vi.mock("../purge", () => ({
 
 import { taskStateManager } from "../../task-state-manager";
 import {
+	abandonClosedPrs,
 	cardsAwaitingMerge,
 	closeMergedCard,
 	followMergedPrs,
@@ -96,7 +99,7 @@ describe("followMergedPrs", () => {
 		expect(deps.writeMetadata).toHaveBeenCalledWith(tasks[0], project, { prMergedAt: "2026-11-09T12:00:00.000Z" });
 		expect(deps.markDone).toHaveBeenCalledWith(tasks[0], project);
 		expect(deps.purge).toHaveBeenCalledWith(project, tasks, ["001-pr"]);
-		expect(result).toEqual({ closed: 1, purged: 1, freed: 2048 });
+		expect(result).toEqual({ closed: 1, abandoned: 0, purged: 1, freed: 2048 });
 		expect(deps.reload).toHaveBeenCalled();
 	});
 
@@ -124,8 +127,56 @@ describe("followMergedPrs", () => {
 		const result = await followMergedPrs(project, deps);
 
 		expect(deps.markDone).not.toHaveBeenCalled();
-		expect(result).toEqual({ closed: 0, purged: 0, freed: 0 });
+		expect(result).toEqual({ closed: 0, abandoned: 0, purged: 0, freed: 0 });
 		expect(deps.reload).not.toHaveBeenCalled();
+	});
+
+	it("sets aside, once, the card of a PR closed without a merge", async () => {
+		tasks.push(card("001-pr"), card("002-pr", { metadata: { prClosedAt: "earlier" } }));
+		deps.readState.mockResolvedValue("closed");
+
+		const result = await followMergedPrs(project, { ...deps, abandonClosed: () => true });
+
+		expect(deps.writeMetadata).toHaveBeenCalledTimes(1);
+		expect(tasks[0].metadata).toMatchObject({
+			abandoned: true,
+			abandonedResolution: "pr_closed",
+			abandonedAt: "2026-11-09T12:00:00.000Z",
+			prClosedAt: "2026-11-09T12:00:00.000Z",
+		});
+		expect(deps.markDone).not.toHaveBeenCalled();
+		expect(result.abandoned).toBe(1);
+		expect(deps.reload).toHaveBeenCalled();
+
+		// Resumed by a person: the next look leaves it alone.
+		tasks[0].metadata = { ...tasks[0].metadata, abandoned: false };
+		deps.writeMetadata.mockClear();
+		await followMergedPrs(project, { ...deps, abandonClosed: () => true });
+		expect(deps.writeMetadata).not.toHaveBeenCalled();
+	});
+
+	it("leaves a closed PR's card in place when the setting is off", async () => {
+		tasks.push(card("001-pr"));
+		deps.readState.mockResolvedValue("closed");
+		const result = await followMergedPrs(project, { ...deps, abandonClosed: () => false });
+		expect(deps.writeMetadata).not.toHaveBeenCalled();
+		expect(result.abandoned).toBe(0);
+	});
+
+	it("forgets the closing of a reopened PR, and resumes a set-aside card once merged", async () => {
+		tasks.push(card("001-pr", { metadata: { prClosedAt: "x", abandoned: true } }));
+		deps.readState.mockResolvedValueOnce("open");
+		await followMergedPrs(project, deps);
+		expect(deps.writeMetadata).toHaveBeenCalledWith(tasks[0], project, { prClosedAt: undefined });
+
+		deps.readState.mockResolvedValueOnce("merged");
+		await followMergedPrs(project, deps);
+		expect(deps.writeMetadata).toHaveBeenLastCalledWith(
+			tasks[0],
+			project,
+			expect.objectContaining({ prMergedAt: "2026-11-09T12:00:00.000Z", abandoned: false }),
+		);
+		expect(deps.markDone).toHaveBeenCalled();
 	});
 
 	it("purges a split part the split watch closed", async () => {
@@ -133,6 +184,15 @@ describe("followMergedPrs", () => {
 		const result = await followMergedPrs(project, deps);
 		expect(deps.readState).not.toHaveBeenCalled();
 		expect(result.purged).toBe(1);
+	});
+});
+
+describe("abandonClosedPrs", () => {
+	it("is on unless the person turned it off", () => {
+		settings.current = undefined;
+		expect(abandonClosedPrs()).toBe(true);
+		settings.current = { kanbanAbandonClosedPrs: false };
+		expect(abandonClosedPrs()).toBe(false);
 	});
 });
 

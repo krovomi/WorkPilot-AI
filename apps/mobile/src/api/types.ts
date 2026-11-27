@@ -101,6 +101,8 @@ export interface BoardCard {
 	claimedByName: string | null;
 	/** A run that failed or a card set aside (`board_mcp.server.outcome`); absent on an older server. */
 	outcome?: "failed" | "abandoned";
+	/** « Bloquée »: a person flagged the card as impeded (desktop `task-flag.ts`). */
+	flagged?: boolean;
 	/** A part of a task split into small PRs (`task_split`): its group. */
 	group?: { id: string; title: string; index: number; total: number };
 }
@@ -246,6 +248,14 @@ export interface TaskLogs {
 export interface UiPreferences {
 	theme: ThemeMode | null;
 	colorTheme: ColorThemeId | null;
+}
+
+/** One screen's opens on one day, sent for the server's page activity. */
+export interface PageVisitCount {
+	/** YYYY-MM-DD, in UTC as the server counts days. */
+	day: string;
+	page: string;
+	count: number;
 }
 
 /** A decision of the policy audit trail (`security/policy_audit.py`). */

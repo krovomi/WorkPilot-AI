@@ -331,6 +331,7 @@ Le bloc `environment:` du compose l'emporte sur `.env.server` pour `WORKPILOT_SE
 | `WORKPILOT_INVITATION_TTL_HOURS` | `72` | Durée de validité d'un lien d'invitation. |
 | `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | `60` | Durée de validité d'un lien de mot de passe oublié, ramenée entre 5 et 1440 minutes. |
 | `WORKPILOT_USAGE_RETENTION_DAYS` | `365` | Combien de jours le serveur garde la consommation par run et par job et les jours de présence de chacun, ramené entre 30 et 3650 ; il efface chaque heure ce qui est plus vieux. Ce qui est enregistré : [server-usage-data.md](server-usage-data.md). |
+| `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS` | `183` | Combien de jours le serveur garde l'activité par page (désactivée par défaut, activée par chaque organisation dans **Administration → Usage**), ramené entre 30 et 3650. Une organisation peut régler ses propres durées au même endroit ; ces deux variables sont celles des organisations qui n'en ont pas réglé. |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | `12` | Longueur minimale d'un mot de passe local ; ne fait que monter le plancher de 12. |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | Refuse un nouveau mot de passe connu de Have I Been Pwned (seuls cinq caractères de son empreinte SHA-1 sortent ; service injoignable, le mot de passe est accepté). |
 | `WORKPILOT_SMTP_*` | — | E-mail des invitations et des liens de mot de passe oublié (sans SMTP, l'écran renvoie vers un administrateur) ; détail dans [CONFIGURATION.md](CONFIGURATION.md#invitation-email-smtp). Gardez STARTTLS ou TLS actif. |

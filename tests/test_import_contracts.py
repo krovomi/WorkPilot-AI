@@ -187,6 +187,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # microVM is sized by the suite placement's machine sampler, itself a
     # leaf on foundation (`os_sandbox.microvm.vm_resources`).
     "os_sandbox": {"foundation", "security", "test_placement"},
+    # Approval tiers (docs/architecture/approval-tiers.md): pure facts and
+    # decision; git and the text-only list through foundation, path globs and
+    # the main checkout's policy file through security, the Clean Architecture
+    # layers of the project through architecture. No model, no forge.
+    "approvals": {"architecture", "foundation", "security"},
     # The cross review's verdict, read by the pull request step in core: a
     # leaf, or it joins the cycle. Its session is `workflows/cross_review_phase.py`.
     "cross_review": {"foundation"},
