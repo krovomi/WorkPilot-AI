@@ -14,6 +14,7 @@ import os
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from foundation.platform import is_windows
 from shared_features.waves import execution, run_store
 from shared_features.waves.execution import CardState
 
@@ -101,7 +102,8 @@ def test_save_load_and_end_a_run(tmp_path):
     saved = run_store.save_run(clone, state(avoided={"conflicts": 2, "risk": 5}), NOW)
     assert saved["savedAt"] == NOW.isoformat()
     path = clone / ".workpilot" / run_store.RUN_FILE
-    assert oct(path.stat().st_mode & 0o777) == "0o600"
+    # Windows keeps no owner-only bits: a file there reads 0o666 whatever the mode.
+    assert oct(path.stat().st_mode & 0o777) == ("0o666" if is_windows() else "0o600")
     loaded, ignored = run_store.load_run(clone, "p1", known)
     assert not ignored and loaded["waves"] == saved["waves"]
     # A run naming a card the clone no longer has is ignored, and left alone.
