@@ -523,7 +523,7 @@ def real_runs(monkeypatch):
     """Runs that start a real process standing for the agent, unconfined."""
     from server.services import run_manager as rm
 
-    async def env(self, user_id, run_id):
+    async def env(self, user_id, run_id, project_id=None):
         return {"PATH": rm.os.environ.get("PATH", "")}
 
     monkeypatch.setattr(
