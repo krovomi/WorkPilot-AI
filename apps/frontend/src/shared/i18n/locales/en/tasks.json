@@ -327,10 +327,11 @@
 		"views": {
 			"button": "Views",
 			"title": "Saved views",
-			"empty": "No saved views yet. Set your filters, then save them here.",
+			"empty": "No saved views yet. Set your filters, layout and lanes, then save them here.",
 			"namePlaceholder": "View name…",
 			"save": "Save current view",
-			"delete": "Delete view"
+			"delete": "Delete view",
+			"summary": "{{layout}} · lanes by {{lanes}}"
 		},
 		"wipLimit": {
 			"label": "WIP limit",
@@ -704,6 +705,24 @@
 			"cardMenu": "Sprint",
 			"noneToJoin": "No open sprint",
 			"undoLabel": "sprint change"
+		},
+		"layout": {
+			"label": "Layout",
+			"board": "Board",
+			"list": "List"
+		},
+		"list": {
+			"caption": "The board's cards as a list",
+			"empty": "No card matches the filters.",
+			"columns": {
+				"title": "Card",
+				"status": "Status",
+				"priority": "Priority",
+				"sprint": "Sprint",
+				"area": "Sub-project",
+				"points": "Points",
+				"updated": "Updated"
+			}
 		}
 	},
 	"queue": {

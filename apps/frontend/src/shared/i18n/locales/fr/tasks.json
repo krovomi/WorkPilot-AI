@@ -327,10 +327,11 @@
 		"views": {
 			"button": "Vues",
 			"title": "Vues sauvegardées",
-			"empty": "Aucune vue sauvegardée. Configure tes filtres puis enregistre-les ici.",
+			"empty": "Aucune vue sauvegardée. Choisis tes filtres, l'affichage et les couloirs, puis enregistre-les ici.",
 			"namePlaceholder": "Nom de la vue…",
 			"save": "Enregistrer la vue actuelle",
-			"delete": "Supprimer la vue"
+			"delete": "Supprimer la vue",
+			"summary": "{{layout}} · couloirs par {{lanes}}"
 		},
 		"wipLimit": {
 			"label": "Limite WIP",
@@ -704,6 +705,24 @@
 			"cardMenu": "Sprint",
 			"noneToJoin": "Aucun sprint ouvert",
 			"undoLabel": "changement de sprint"
+		},
+		"layout": {
+			"label": "Affichage",
+			"board": "Tableau",
+			"list": "Liste"
+		},
+		"list": {
+			"caption": "Les cartes du tableau, en liste",
+			"empty": "Aucune carte ne correspond aux filtres.",
+			"columns": {
+				"title": "Carte",
+				"status": "Statut",
+				"priority": "Priorité",
+				"sprint": "Sprint",
+				"area": "Sous-projet",
+				"points": "Points",
+				"updated": "Modifiée"
+			}
 		}
 	},
 	"queue": {

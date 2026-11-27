@@ -8,6 +8,7 @@
  */
 import { create } from "zustand";
 import { cleanArea, LANE_GROUPINGS, type LaneGrouping } from "../lib/kanban-lanes";
+import { BOARD_LAYOUTS, type BoardLayout, type ListSort, readListSort } from "../lib/kanban-list";
 
 const KEY_PREFIX = "kanban-lanes";
 /** Sub-projects added by hand, at most. */
@@ -20,6 +21,10 @@ export interface LanePreferences {
 	collapsed: Partial<Record<LaneGrouping, string[]>>;
 	/** Sub-projects added by hand (an empty lane to drag cards into). */
 	areas: string[];
+	/** Columns, or a list of the cards (`lib/kanban-list.ts`). */
+	layout: BoardLayout;
+	/** The list's sort; null keeps the board's order. */
+	listSort: ListSort | null;
 }
 
 export const DEFAULT_LANE_PREFERENCES: LanePreferences = {
@@ -27,6 +32,8 @@ export const DEFAULT_LANE_PREFERENCES: LanePreferences = {
 	pinFlagged: true,
 	collapsed: {},
 	areas: [],
+	layout: "board",
+	listSort: null,
 };
 
 function strings(value: unknown, limit: number): string[] {
@@ -57,6 +64,10 @@ export function readLanePreferences(raw: unknown): LanePreferences {
 		pinFlagged: typeof value.pinFlagged === "boolean" ? value.pinFlagged : DEFAULT_LANE_PREFERENCES.pinFlagged,
 		collapsed,
 		areas,
+		layout: BOARD_LAYOUTS.includes(value.layout as BoardLayout)
+			? (value.layout as BoardLayout)
+			: DEFAULT_LANE_PREFERENCES.layout,
+		listSort: readListSort(value.listSort),
 	};
 }
 
@@ -86,6 +97,10 @@ interface KanbanLanesState extends LanePreferences {
 	toggleCollapsed: (laneKey: string) => void;
 	/** Adds a sub-project lane; false when the name is not one or is already there. */
 	addArea: (name: string) => boolean;
+	setLayout: (layout: BoardLayout) => void;
+	setListSort: (sort: ListSort | null) => void;
+	/** What a saved view brings back, each part checked as if read from storage. */
+	applyView: (view: { layout?: unknown; grouping?: unknown; listSort?: unknown }) => void;
 }
 
 function preferencesOf(state: LanePreferences): LanePreferences {
@@ -94,6 +109,8 @@ function preferencesOf(state: LanePreferences): LanePreferences {
 		pinFlagged: state.pinFlagged,
 		collapsed: state.collapsed,
 		areas: state.areas,
+		layout: state.layout,
+		listSort: state.listSort,
 	};
 }
 
@@ -124,6 +141,17 @@ export const useKanbanLanesStore = create<KanbanLanesState>((set, get) => {
 			if (!area || areas.includes(area) || areas.length >= MAX_EXTRA_AREAS) return false;
 			update({ areas: [...areas, area] });
 			return true;
+		},
+		setLayout: (layout) => update({ layout }),
+		setListSort: (listSort) => update({ listSort }),
+		applyView: (view) => {
+			const read = readLanePreferences(view);
+			// A view saved before layouts existed brings back its filters only.
+			const patch: Partial<LanePreferences> = {};
+			if (view.layout !== undefined) patch.layout = read.layout;
+			if (view.listSort !== undefined) patch.listSort = read.listSort;
+			if (view.grouping !== undefined) patch.grouping = read.grouping;
+			update(patch);
 		},
 	};
 });

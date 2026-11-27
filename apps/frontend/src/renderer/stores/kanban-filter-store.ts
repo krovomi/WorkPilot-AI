@@ -9,6 +9,9 @@ import {
 	type TaskSortField,
 	type TaskSource,
 } from "../lib/kanban-filter";
+import type { LaneGrouping } from "../lib/kanban-lanes";
+import type { BoardLayout, ListSort } from "../lib/kanban-list";
+import { useKanbanLanesStore } from "./kanban-lanes-store";
 
 // ============================================
 // Persistence (per-project localStorage)
@@ -34,6 +37,10 @@ export interface SavedView {
 	name: string;
 	filters: KanbanFilters;
 	sort: KanbanSort;
+	/** Columns or list, the lanes and the list's sort; absent on a view saved before them. */
+	layout?: BoardLayout;
+	grouping?: LaneGrouping;
+	listSort?: ListSort | null;
 }
 
 interface PersistedState {
@@ -165,6 +172,12 @@ interface KanbanFilterState {
 	applyView: (id: string) => void;
 	/** Delete a saved view. */
 	deleteView: (id: string) => void;
+}
+
+/** How the board is shown now, kept with a saved view. */
+function viewLayout(): Pick<SavedView, "layout" | "grouping" | "listSort"> {
+	const { layout, grouping, listSort } = useKanbanLanesStore.getState();
+	return { layout, grouping, listSort: listSort ? { ...listSort } : null };
 }
 
 /** Toggle a value's presence in an array (immutably). */
@@ -335,6 +348,7 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 					priorities: [...filters.priorities],
 				},
 				sort: { ...sort },
+				...viewLayout(),
 			};
 			const nextViews = [...savedViews, view];
 			set({ savedViews: nextViews });
@@ -355,6 +369,7 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 				sort: { ...view.sort },
 			});
 			persist();
+			useKanbanLanesStore.getState().applyView(view);
 		},
 
 		deleteView: (id) => {

@@ -14,6 +14,7 @@ import {
 import i18n from "../../../shared/i18n";
 import type { Project } from "../../../shared/types";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
+import { DEFAULT_LANE_PREFERENCES, useKanbanLanesStore } from "../../stores/kanban-lanes-store";
 import { useMultiRepoStore } from "../../stores/multi-repo-store";
 import { useProjectStore } from "../../stores/project-store";
 import { useShortcutsHelpStore } from "../../stores/shortcuts-help-store";
@@ -69,6 +70,7 @@ beforeEach(() => {
 		selectedProjectId: "p1",
 		activeProjectId: "p1",
 	});
+	useKanbanLanesStore.setState({ ...DEFAULT_LANE_PREFERENCES, projectId: null });
 	useKanbanFilterStore.setState({ projectId: null });
 	useKanbanFilterStore.getState().loadForProject("p1");
 });
@@ -176,7 +178,7 @@ describe("saved views", () => {
 		expect(screen.getByRole("button", { name: /^Views/ })).toHaveTextContent("1");
 
 		useKanbanFilterStore.getState().clearFilters();
-		await userEvent.click(within(panel).getByRole("button", { name: "Hot" }));
+		await userEvent.click(within(panel).getByRole("button", { name: /^Hot/ }));
 		expect(filters().priorities).toEqual(["high"]);
 
 		await userEvent.click(within(panel).getByRole("button", { name: "Delete view" }));
@@ -191,6 +193,26 @@ describe("saved views", () => {
 		expect(useKanbanFilterStore.getState().savedViews.map((v) => v.name)).toEqual([
 			"Second",
 		]);
+	});
+
+	it("shows how a view lays out the board", async () => {
+		useKanbanLanesStore.getState().loadForProject("p1");
+		useKanbanLanesStore.getState().setLayout("list");
+		useKanbanLanesStore.getState().setGrouping("priority");
+		useKanbanFilterStore.getState().saveCurrentView("Plan");
+		useKanbanLanesStore.getState().setLayout("board");
+		useKanbanLanesStore.getState().setGrouping("none");
+		useKanbanFilterStore.getState().saveCurrentView("Plain");
+		useKanbanFilterStore.setState({
+			savedViews: [...useKanbanFilterStore.getState().savedViews, { ...useKanbanFilterStore.getState().savedViews[1], id: "old", name: "Old", layout: undefined }],
+		});
+		renderToolbar();
+		const panel = await openViews();
+		expect(within(panel).getByRole("button", { name: /^Plan/ })).toHaveTextContent("List · lanes by Priority");
+		expect(within(panel).getByRole("button", { name: /^Plain/ })).toHaveTextContent(/^PlainBoard$/);
+		expect(within(panel).getByRole("button", { name: /^Old/ })).toHaveTextContent(/^Old$/);
+		await userEvent.click(within(panel).getByRole("button", { name: /^Plan/ }));
+		expect(useKanbanLanesStore.getState()).toMatchObject({ layout: "list", grouping: "priority" });
 	});
 
 	it("a blank name saves nothing", async () => {
@@ -255,6 +277,21 @@ describe("local and server boards", () => {
 		expect(api.fn("listPurgeableWorktrees")).toHaveBeenCalledWith("p1");
 		await userEvent.keyboard("{Escape}");
 		expect(screen.queryByRole("dialog", { name: "Purge finished worktrees" })).toBeNull();
+	});
+});
+
+describe("layout", () => {
+	it("switches between the board's columns and the list", async () => {
+		useKanbanLanesStore.getState().loadForProject("p1");
+		renderToolbar();
+		const board = screen.getByRole("button", { name: "Board" });
+		const listButton = screen.getByRole("button", { name: "List" });
+		expect(board).toHaveAttribute("aria-pressed", "true");
+		await userEvent.click(listButton);
+		expect(listButton).toHaveAttribute("aria-pressed", "true");
+		expect(useKanbanLanesStore.getState().layout).toBe("list");
+		await userEvent.click(board);
+		expect(useKanbanLanesStore.getState().layout).toBe("board");
 	});
 });
 
