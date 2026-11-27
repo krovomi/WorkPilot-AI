@@ -28,6 +28,8 @@ suivi d'usage la met à jour dans la même PR.
 | Connexions refusées | `audit_log`, action `auth.login_failed` | méthode, raison (`bad_password`, `disabled`, `unknown_account`, `provider_refused`), IP, navigateur, date ; la personne seulement si le compte existe | historique de l'audit |
 | Jobs lancés | `audit_log`, action `project.job.started` | personne, projet, feature, identifiant du job | historique de l'audit |
 | Exports de l'onglet Usage | `audit_log`, action `usage.exported` | qui a exporté quelle table, sur quelle période, combien de lignes | historique de l'audit |
+| Message d'information lu | `audit_log`, action `usage.notice.seen` | qui l'a lu, quand, et si l'activité par page était mesurée | historique de l'audit |
+| Compte effacé | `audit_log`, action `user.erased` | qui a effacé un compte, quand, combien de lignes ont été changées ; jamais quel compte | historique de l'audit |
 
 ### Ce que le tableau en montre
 
@@ -88,14 +90,31 @@ serveur efface chaque heure ce qui est plus vieux. La présence s'écrit au plus
 5 minutes par personne : on sait qu'une personne a utilisé le serveur tel jour, et jusqu'à quelle
 heure, pas ce qu'elle y a fait.
 
+## L'information des membres
+
+À sa première connexion dans une organisation, chaque membre voit un message qui dit ce qui est
+mesuré (tokens, runs, jobs, connexions, présence, et l'activité par page si elle est activée),
+combien de temps c'est gardé et quels rôles le lisent (`GET /users/me/usage-notice`). Le lire
+inscrit `usage.notice.seen` au journal d'audit, avec ce qui était mesuré à ce moment : c'est la
+preuve que la personne a été informée. Le message revient une fois quand l'organisation active
+l'activité par page.
+
 ## Les droits des personnes
 
-- **Accès** : un administrateur de l'organisation lit l'historique d'audit d'une personne
-  (**Administration → Audit**, filtre par personne).
-- **Effacement** : un compte se désactive, il ne se supprime pas encore depuis l'app. Une ligne
-  `users` supprimée laisse ses lignes de consommation et de présence sans personne (`SET NULL`) :
-  les totaux de l'organisation restent justes sans la nommer. Une route d'effacement qui
-  anonymise aussi l'audit arrive avec la vue Usage.
+- **Accès** : chacun voit dans **Mon usage** exactement ce que les administrateurs voient de lui
+  dans l'onglet Usage (`GET /users/me/usage`), et quels rôles de l'organisation le lisent.
+- **Portabilité** : **Mon usage** exporte en un fichier JSON tout ce que le serveur garde de son
+  usage, dans toutes ses organisations (`GET /users/me/usage/export`) : compte, consommation,
+  présence, pages, entrées d'audit qui le concernent (avec IP et navigateur), runs et jobs.
+- **Effacement** : un administrateur de la plateforme efface un compte
+  (`POST /admin/users/{id}/erase`, en retapant son adresse). Partent avec lui ses sessions,
+  appareils, secrets, préférences et appartenances ; ses lignes de consommation, de présence et
+  de pages, ses runs, ses jobs et ses entrées d'audit restent **sans personne** (`SET NULL`), donc
+  les totaux de l'organisation restent justes sans le nommer. Avant cela, le serveur efface l'IP
+  et le navigateur de ses entrées d'audit, remplace son identifiant et son adresse par `erased`
+  dans les entrées des autres qui le nommaient, et supprime les invitations à son adresse.
+  L'audit garde qu'un compte a été effacé, par qui et quand, jamais lequel (`user.erased`). Les
+  fichiers d'un projet (cartes, mémoires) sont le travail de l'équipe et restent tels quels.
 - **Opposition** : l'activité par page reste désactivée, ou se désactive (ses comptes sont alors
   effacés) ; pour la consommation et la présence, qui servent aussi aux quotas et aux budgets,
   l'organisation abaisse la durée jusqu'à 30 jours.

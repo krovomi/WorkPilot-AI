@@ -618,6 +618,14 @@ curl -sS "$WP/admin/usage/summary?start=2026-11-01&end=2026-11-30&provider=anthr
 curl -sS "$WP/admin/usage/export?view=people" -H "Authorization: Bearer $TOKEN" -o usage-people.csv
 # Les mêmes vues pour toute la plateforme (administrateur de la plateforme) : /admin/platform/usage/…
 
+# Mon usage : ce que les administrateurs voient de moi, et l'export de toutes mes données d'usage
+curl -sS $WP/users/me/usage -H "Authorization: Bearer $TOKEN"
+curl -sS $WP/users/me/usage/export -H "Authorization: Bearer $TOKEN" -o mon-usage.json
+
+# Effacer un compte (administrateur de la plateforme ; sans retour) : son usage reste, sans nom
+curl -sS -X POST $WP/admin/users/<user_id>/erase -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"confirm_email": "bob@example.com"}'
+
 # Enregistrer mon jeton GitHub pour mes runs ; kind : github_token, gitlab_token,
 # jira_token, linear_api_key, azure_pat ou sentry_token
 curl -sS -X PUT $WP/users/me/secrets -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
