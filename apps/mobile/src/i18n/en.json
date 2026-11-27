@@ -771,6 +771,14 @@
 		"more": "More",
 		"moreEmpty": "Your role opens no other page of this project.",
 		"pages": {
+			"chat": {
+				"title": "Team chat",
+				"hint": "Talk with whoever is on the project, live"
+			},
+			"leaderboard": {
+				"title": "Leaderboard",
+				"hint": "The season's points of those who show their name, and your badges"
+			},
 			"roadmap": {
 				"title": "Roadmap",
 				"hint": "The features planned for the project, by phase and priority"
@@ -900,5 +908,84 @@
 			"refused": "Not sent: {{channel}} refused the message. Check the settings.",
 			"unreachable": "Not sent: {{channel}} could not be reached."
 		}
+	},
+	"chat": {
+		"title": "Team chat",
+		"here_one": "{{count}} here",
+		"here_other": "{{count}} here",
+		"you": "You",
+		"connecting": "Connecting…",
+		"empty": "No message yet.",
+		"emptyHint": "Messages are kept on the team's server and seen by every member of the project.",
+		"message": "Message",
+		"send": "Send",
+		"reply": "Reply",
+		"replyTo": "Reply to {{name}}",
+		"replyingTo": "Replying to {{name}}: {{message}}",
+		"cancelReply": "Cancel the reply",
+		"inReplyTo": "{{name}}: {{message}}",
+		"readOnly": "Your role on this project lets you read the chat, not write in it.",
+		"rejected": {
+			"invalid": "This message cannot be sent: it is empty or longer than 2,000 characters.",
+			"too_fast": "Slow down: at most 5 messages in 5 seconds. Your message is back in the field.",
+			"unavailable": "The server cannot keep messages right now. Your message is back in the field."
+		}
+	},
+	"leaderboard": {
+		"title": "Leaderboard",
+		"where": "Where",
+		"when": "When",
+		"scope": {
+			"project": "This project",
+			"org": "Whole organization"
+		},
+		"period": {
+			"season": "This season",
+			"all": "Since the start"
+		},
+		"season": "Season from {{start}} to {{end}}",
+		"yours": "Your score",
+		"points_one": "{{count}} point",
+		"points_other": "{{count}} points",
+		"tally": "{{delivered}} delivered · {{reviews}} reviews",
+		"rank": "rank {{rank}}",
+		"unranked": "not ranked",
+		"showMe": "Show my name on the leaderboard",
+		"showMeHint": "Off until you turn it on. Without it, your work counts for you alone and nobody else sees it.",
+		"named": "Ranking",
+		"empty": "Nobody is named yet.",
+		"emptyHint": "People appear here once they choose to show their name.",
+		"entry_one": "Rank {{rank}}, {{name}}, {{count}} point",
+		"entry_other": "Rank {{rank}}, {{name}}, {{count}} points",
+		"youName": "{{name}} (you)",
+		"howItCounts": "A delivered card counts 1 to 3 points by its assessed complexity, an approval of a teammate's card 2. No token count or price is read, so every provider counts the same.",
+		"badges": {
+			"first_delivery": "First delivery",
+			"ten_deliveries": "Ten deliveries",
+			"complex_delivery": "Complex card delivered",
+			"first_review": "First review",
+			"ten_reviews": "Ten reviews"
+		}
+	},
+	"replays": {
+		"title": "My replay links",
+		"summary": "The replays you shared, and ending a link",
+		"hint": "The replay links you shared from WorkPilot on your computer, on every project you still reach.",
+		"empty": "You have shared no replay.",
+		"emptyHint": "Share a replay from a card in WorkPilot on your computer: its link shows here, so you can end it from your phone.",
+		"state": {
+			"active": "Open",
+			"expired": "Expired",
+			"revoked": "Ended"
+		},
+		"where_one": "{{project}} · {{count}} step",
+		"where_other": "{{project}} · {{count}} steps",
+		"opened_one": "Opened once, {{when}}",
+		"opened_other": "Opened {{count}} times, last {{when}}",
+		"neverOpened": "Not opened yet",
+		"until": "Opens until {{date}}",
+		"revoke": "End the link",
+		"revokeTitle": "End this link?",
+		"revokeBody": "“{{title}}” will no longer open for anyone who has the link."
 	}
 }

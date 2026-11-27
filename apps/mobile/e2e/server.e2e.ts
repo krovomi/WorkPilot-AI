@@ -19,7 +19,8 @@
  * token, which the fake forge saw and the page never shows; a card's spec
  * approved from the phone, built (the fake agent checks the approval as a
  * build does and commits in the card's workspace), reviewed with its changes
- * and sent back to a build that runs. The browser cannot set headers on a WebSocket, so on the web the
+ * and sent back to a build that runs; a person shows their name on the
+ * team's leaderboard, a choice the server keeps, and finds their replay links. The browser cannot set headers on a WebSocket, so on the web the
  * board follows by its periodic read; the header handshake is the native
  * app's (unit-tested in `src/__tests__`).
  *
@@ -585,4 +586,34 @@ test("Alice finds what waits for her across projects, and has Telegram tell her"
 	await expect(alice.getByRole("switch", { name: "A task I started stopped on an error" })).not.toBeChecked({
 		timeout: 30_000,
 	});
+});
+
+test("Alice shows her name on the team's leaderboard, and finds her replay links", async () => {
+	const alice = signedInPage("alice");
+	await openProject(alice, world.project);
+	// The browser cannot put the token in the stream's handshake: the chat page opens, the native app talks.
+	await morePage(alice, "Team chat");
+	await expect(alice.getByText("Connecting…")).toBeVisible({ timeout: 30_000 });
+	await alice.goBack();
+
+	await morePage(alice, "Leaderboard");
+	await expect(alice.getByText("Your score")).toBeVisible({ timeout: 30_000 });
+	const showMe = alice.getByRole("switch", { name: "Show my name on the leaderboard" });
+	// Nobody is named until they say so.
+	await expect(showMe).not.toBeChecked();
+	await showMe.click();
+	await expect(showMe).toBeChecked({ timeout: 30_000 });
+	await alice.getByRole("radio", { name: "Whole organization" }).click();
+	await expect(alice.getByRole("switch", { name: "Show my name on the leaderboard" })).toBeChecked({ timeout: 30_000 });
+	await shot(alice, "24-leaderboard");
+	// Kept by the server: read again on the way back in.
+	await alice.goBack();
+	await morePage(alice, "Leaderboard");
+	await expect(alice.getByRole("switch", { name: "Show my name on the leaderboard" })).toBeChecked({
+		timeout: 30_000,
+	});
+
+	await openSettings(alice, world.project);
+	await alice.getByRole("button", { name: "My replay links" }).click();
+	await expect(alice.getByText("You have shared no replay.")).toBeVisible({ timeout: 30_000 });
 });

@@ -28,6 +28,7 @@ import type {
 	WaveRunAnswer,
 } from "./types";
 import type { ThemePrefs } from "../ui/theme-ids";
+import type { Leaderboard, LeaderboardPeriod, LeaderboardScope, ReplayShare } from "../team/types";
 import type { Channel, ChannelSettings, Moment, NeedsYouOverview, TestResult } from "../needs-you/types";
 import type { Memory } from "../context/index-file";
 import type { EngineOption, SettingsPayload } from "../new-card/engine";
@@ -258,6 +259,17 @@ export function api(client: ServerClient) {
 				.result,
 		saveNeedsYouMoments: (events: Record<Moment, boolean>, locale: string) =>
 			client.request<{ saved: boolean }>("PUT", "/users/me/needs-you/preferences", { events, locale }),
+		/** The team's leaderboard: only those who agreed are named (`shared_features/pixel_office.py`). */
+		leaderboard: (projectId: string, scope: LeaderboardScope, period: LeaderboardPeriod) =>
+			client.request<Leaderboard>("GET", featurePath("pixel-office", "/leaderboard", projectId, `&scope=${scope}&period=${period}`)),
+		/** Shows, or stops showing, the person's own name on the organization's leaderboards. */
+		setLeaderboardConsent: (projectId: string, visible: boolean) =>
+			client.request<{ visible: boolean }>("PUT", featurePath("pixel-office", "/consent", projectId), { visible }),
+		/** The replay links the person made, on every project they still reach. */
+		myReplayShares: async () =>
+			(await client.request<{ shares: ReplayShare[] }>("GET", "/api/features/replay-shares/mine")).shares,
+		revokeReplayShare: (projectId: string, shareId: string) =>
+			client.request<{ revoked: boolean }>("DELETE", featurePath("replay-shares", `/${enc(shareId)}`, projectId)),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
 	};
 }
