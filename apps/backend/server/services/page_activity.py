@@ -130,6 +130,7 @@ MOBILE_PAGES: frozenset[str] = frozenset(
         "admin/members",
         "admin/roles",
         "admin/roles/detail",
+        "my-usage",
         "projects",
         "projects/analyses",
         "projects/analyses/detail",

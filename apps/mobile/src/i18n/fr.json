@@ -987,5 +987,51 @@
 		"revoke": "Arrêter le lien",
 		"revokeTitle": "Arrêter ce lien ?",
 		"revokeBody": "« {{title}} » ne s'ouvrira plus pour qui a le lien."
+	},
+	"myUsage": {
+		"title": "Mon usage",
+		"summary": "Ce que les administrateurs voient de vous, et vos données à télécharger.",
+		"intro": "Ce que les administrateurs de cette organisation voient de vous sur les 30 derniers jours : totaux, noms d'actions, runs et jobs. Jamais un prompt, du code, un texte saisi ou un nom de fichier.",
+		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur.",
+		"period": "30 derniers jours",
+		"tokens_one": "{{value}} jeton",
+		"tokens_other": "{{value}} jetons",
+		"cost": "Coût : {{cost}}",
+		"costEstimated": "Coût : {{cost}} (en partie estimé)",
+		"runs": "Runs : {{total}}, dont {{succeeded}} réussis",
+		"jobs": "Jobs : {{total}}, dont {{succeeded}} réussis",
+		"daily": "Jetons par jour",
+		"timeline": "Ce que vous avez fait",
+		"pages": "Pages ouvertes",
+		"empty": "Rien sur cette période.",
+		"event": "{{kind}} : {{what}}",
+		"kinds": {
+			"sign_in": "Connexion",
+			"audit": "Action",
+			"run": "Run",
+			"job": "Job"
+		},
+		"export": "Partager tout ce qui est conservé sur moi (JSON)",
+		"exportTitle": "Mon usage de WorkPilot",
+		"notice": "Relire ce qui est mesuré"
+	},
+	"usageNotice": {
+		"title": "Ce que ce serveur mesure de vous",
+		"intro": "Le serveur de cette organisation conserve quelques chiffres sur chaque membre, pour suivre son usage et ses coûts.",
+		"bullet": "• {{text}}",
+		"measured": {
+			"tokens": "Les jetons et le coût des agents que vous lancez, par fournisseur et modèle",
+			"runs": "Vos runs : phase, statut, début et fin",
+			"jobs": "Vos jobs de projet : fonctionnalité, statut, début et fin",
+			"sign_ins": "Vos connexions : heure, méthode, adresse et application",
+			"presence": "Les jours où vous étiez connecté, et votre dernière présence",
+			"pages": "Combien de fois par jour vous ouvrez chaque écran de l'app (son nom seulement)"
+		},
+		"never": "Jamais un prompt, du code, un texte saisi ou un nom de fichier.",
+		"retention": "Ces chiffres sont conservés {{days}} jours.",
+		"pageRetention": "Les comptes d'écrans sont conservés {{days}} jours.",
+		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur.",
+		"rights": "Vous pouvez les consulter et partager tout ce qui est conservé sur vous dans Réglages, Mon usage. Pour faire effacer votre compte, demandez à un administrateur de la plateforme.",
+		"understood": "J'ai compris"
 	}
 }

@@ -32,6 +32,7 @@ import type { ThemePrefs } from "../ui/theme-ids";
 import type { Leaderboard, LeaderboardPeriod, LeaderboardScope, ReplayShare } from "../team/types";
 import type { Channel, ChannelSettings, Moment, NeedsYouOverview, TestResult } from "../needs-you/types";
 import type { Memory } from "../context/index-file";
+import type { MyUsage, UsageNotice } from "../usage/types";
 import type { EngineOption, SettingsPayload } from "../new-card/engine";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
 import type {
@@ -272,6 +273,16 @@ export function api(client: ServerClient) {
 		revokeReplayShare: (projectId: string, shareId: string) =>
 			client.request<{ revoked: boolean }>("DELETE", featurePath("replay-shares", `/${enc(shareId)}`, projectId)),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
+		/** What the organization's administrators see of the person, for these UTC days. */
+		myUsage: (start: string, end: string) =>
+			client.request<MyUsage>("GET", `/users/me/usage?start=${enc(start)}&end=${enc(end)}`),
+		/** Everything the server keeps about the person's usage, as JSON text. */
+		exportMyUsage: async () =>
+			JSON.stringify(await client.request<unknown>("GET", "/users/me/usage/export"), null, 2),
+		/** What is measured, and whether the person still has to be told. */
+		usageNotice: () => client.request<UsageNotice>("GET", "/users/me/usage-notice"),
+		/** The person read the notice; the server records it. */
+		markUsageNoticeSeen: () => client.request<UsageNotice>("POST", "/users/me/usage-notice"),
 		/** Whether the person's organization counts which screens they open. */
 		pageActivity: () => client.request<{ enabled: boolean }>("GET", "/users/me/page-activity"),
 		/** Today's opens per screen (`usage/pages.ts` names only). */
