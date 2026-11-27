@@ -1191,6 +1191,7 @@ export const IPC_CHANNELS = {
 	BITBUCKET_GET_PULL_REQUESTS: "bitbucket:getPullRequests",
 	BITBUCKET_IMPORT_ISSUES: "bitbucket:importIssues",
 	BLAST_RADIUS_ANALYZE: "blastRadius:analyze",
+	BOARD_ASK: "boardAsk:ask", // « Interroger le tableau »: a question answered with the related tickets
 	BOARD_MCP_APPLY: "boardMcp:apply",
 	BOARD_MCP_STATUS: "boardMcp:status",
 	BOUNTY_BOARD_LIST_ARCHIVES: "bountyBoard:listArchives",
