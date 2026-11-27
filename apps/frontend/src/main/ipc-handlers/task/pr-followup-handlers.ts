@@ -39,6 +39,7 @@ import { appLog } from "../../app-logger";
 import { parsePythonCommand } from "../../python-detector";
 import { readyPythonPath } from "../../utils/ensure-python";
 import { pythonRunnerEnv } from "../../utils/python-runner-env";
+import { approvalsEnv } from "../../agent/approvals-env";
 import { findTaskWorktree } from "../../worktree-paths";
 import { findTaskAndProject } from "./shared";
 
@@ -180,6 +181,8 @@ export function registerPrFollowupHandlers(
 			const backend = backendPath();
 			const env = await pythonRunnerEnv(backend, {
 				taskProviders: planTaskProviders(engine, "qa"),
+				// The approval tier of the green PR, and whether it merges by itself.
+				extra: approvalsEnv(),
 			});
 			const [command, baseArgs] = parsePythonCommand(pythonPath);
 			const args = buildFollowupArgs({

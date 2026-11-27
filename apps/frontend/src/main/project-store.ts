@@ -835,6 +835,11 @@ export class ProjectStore {
 					typeof plan.crossReview.verdict === "string" && {
 						crossReview: plan.crossReview,
 					}),
+				// The approval tier of the green PR, for the card.
+				...(plan?.approval &&
+					typeof plan.approval === "object" && {
+						approval: plan.approval,
+					}),
 				...(qaSignoff && { qaSignoff }),
 				// Where the full suite runs, and the suite sent to the CI.
 				...(suitePlacement && { suitePlacement }),

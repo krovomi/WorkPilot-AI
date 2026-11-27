@@ -93,12 +93,19 @@ acceptent donc la clé dans la couche du dépôt sans la juger, et la refusent d
 
 | Réglage | Où | Valeurs |
 |---|---|---|
-| l'app | Paramètres → Agent (lot A2), passé au runner par `WORKPILOT_APPROVALS` | `off`, `observe` (défaut), `enforce` |
+| l'app | Paramètres → Sécurité → Validation par niveaux, passé au suivi de la PR par `WORKPILOT_APPROVALS` | `off`, `observe` (défaut), `enforce` |
 | le projet | `approvals.mode` | ne peut que restreindre le réglage de l'app |
 
 Le plus strict gagne (`off` < `observe` < `enforce`). `off` ramène exactement au comportement
 d'avant : rien ne fusionne seul. `observe` décide et l'affiche, sans jamais fusionner.
 `Decision.merges` n'est vrai qu'en `enforce` avec l'action `merge`.
+
+## Sur les cartes du Kanban (lot A2)
+
+Le suivi de la PR d'une tâche ([pr-followup.md](pr-followup.md#le-niveau-de-validation-dune-pr-verte))
+demande le niveau quand la PR est verte, le montre sur la carte (`N1 · attend une personne`,
+`N0 · fusionnée seule`, raisons dans l'infobulle) et fusionne en `enforce` quand le niveau le
+permet. GitHub seulement, comme le suivi lui-même ; une autre forge garde le merge à une personne.
 
 ## Le runner
 

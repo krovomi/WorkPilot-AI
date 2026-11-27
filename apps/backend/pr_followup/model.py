@@ -66,6 +66,8 @@ class PRSnapshot:
     head_sha: str = ""
     head_branch: str = ""
     base_branch: str = ""
+    title: str = ""
+    labels: tuple[str, ...] = field(default_factory=tuple)
     checks: tuple[Check, ...] = field(default_factory=tuple)
     threads: tuple[ReviewThread, ...] = field(default_factory=tuple)
     error: str = ""

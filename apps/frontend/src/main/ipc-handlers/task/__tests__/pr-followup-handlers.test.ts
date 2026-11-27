@@ -69,6 +69,9 @@ vi.mock("../../../agent/task-provider-env", () => ({
 		usesClaude: false,
 	}),
 }));
+vi.mock("../../../agent/approvals-env", () => ({
+	approvalsEnv: () => ({ WORKPILOT_APPROVALS: "enforce" }),
+}));
 vi.mock("../../../app-logger", () => ({ appLog: { debug: vi.fn() } }));
 
 import {
@@ -147,6 +150,8 @@ describe("PR follow-through handlers", () => {
 		expect(args).toContain("--no-review-threads");
 		expect(state.runnerEnvOptions[0]).toEqual({
 			taskProviders: { providers: ["openai"], startProvider: "openai", usesClaude: false },
+			// The app's approval tier switch, for the green PR.
+			extra: { WORKPILOT_APPROVALS: "enforce" },
 		});
 	});
 

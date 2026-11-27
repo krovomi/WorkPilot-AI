@@ -3045,5 +3045,41 @@
 		"reasonPlaceholder": "What blocks it (optional), e.g. waiting for the API key from the client",
 		"failedTitle": "Flag not saved",
 		"failedDescription": "Could not save the flag. Please try again."
+	},
+	"approvalTier": {
+		"cardBadge": "{{tier}} · {{outcome}}",
+		"tooltip": "Approval tier: {{outcome}}. Why: {{reasons}}",
+		"outcome": {
+			"merged": "merged by itself",
+			"waiting": "waits for a person",
+			"observed": "observed",
+			"mergeFailed": "merge refused"
+		},
+		"reasons": {
+			"sensitive_paths": "sensitive paths",
+			"protected_files": "policy or agent files",
+			"requires_review": "files that need a review",
+			"ci_files": "CI files",
+			"ci_files_bump": "bump that touches CI",
+			"feature": "new feature",
+			"breaking": "breaking change",
+			"migration": "migration",
+			"contract": "public contract",
+			"layers": "several layers",
+			"size_files": "many files",
+			"size_lines": "many lines",
+			"trust": "low trust score",
+			"major_bump": "major bump",
+			"bump_with_code": "bump with code",
+			"bump_unknown": "bump of unknown level",
+			"dependency_bump": "dependency bump",
+			"docs_only": "documentation only",
+			"empty": "no change",
+			"code_change": "code change",
+			"review_missing": "no cross-review on this code",
+			"review_inconclusive": "cross-review without a verdict",
+			"policy_invalid": "invalid approvals section",
+			"rule": "project rule"
+		}
 	}
 }
