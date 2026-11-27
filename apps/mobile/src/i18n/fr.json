@@ -100,7 +100,7 @@
 		"mine": "Les miennes",
 		"clearFilters": "Effacer les filtres",
 		"noMatch": "Aucune carte ne correspond.",
-		"noMatchHint": "D'autres mots ou moins de filtres la trouveront peut-être."
+		"noMatchHint": "D'autres mots ou moins de filtres la trouveront peut-être.",
 		"flagged": "Bloquée"
 	},
 	"columns": {
