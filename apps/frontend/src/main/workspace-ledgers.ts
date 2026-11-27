@@ -88,7 +88,7 @@ export function ledgerDirs(projectPath: string): string[] {
  * file. Opened without following a link and checked on the open descriptor,
  * so a file swapped in after the check is never the one read.
  */
-function readLedger(dir: string, name: string): unknown {
+export function readLedger(dir: string, name: string): unknown {
 	const limit = MAX_FILE_BYTES[name];
 	let fd: number | null = null;
 	try {
