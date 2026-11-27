@@ -93,7 +93,7 @@ class TestReading:
         _card(tmp_path, "003-reviewed", "human_review", reviewReason="completed")
         aside = _card(tmp_path, "004-aside", "coding")
         (aside / "task_metadata.json").write_text(
-            json.dumps({"abandoned": True}), encoding="utf-8"
+            json.dumps({"abandoned": True, "flagged": True}), encoding="utf-8"
         )
 
         outcomes = {c["id"]: c.get("outcome") for c in list_cards(tmp_path)}
@@ -104,6 +104,8 @@ class TestReading:
             "003-reviewed": None,
             "004-aside": "abandoned",
         }
+        flagged = {c["id"] for c in list_cards(tmp_path) if c.get("flagged")}
+        assert flagged == {"004-aside"}
 
     def test_an_empty_project_has_no_cards(self, tmp_path):
         assert _call(tmp_path, "list_cards") == ([], False)

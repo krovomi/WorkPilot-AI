@@ -175,6 +175,88 @@ export default function Board() {
 	);
 }
 
+function CardRow({
+	card,
+	onPress,
+	onGroup,
+}: {
+	card: BoardCard;
+	onPress: () => void;
+	onGroup: (group: string) => void;
+}) {
+	const { t, i18n } = useTranslation();
+	const theme = useTheme();
+	const { completed, total } = card.subtasks;
+	const { group } = card;
+	const when = timeAgo(card.updatedAt, t, i18n.language);
+	return (
+		<Pressable
+			accessibilityRole="button"
+			accessibilityLabel={card.title}
+			onPress={onPress}
+			style={({ pressed }) => [
+				styles.card,
+				{ backgroundColor: theme.surface, opacity: rowOpacity(pressed) },
+				elevation(theme),
+			]}
+		>
+			<View style={[styles.stripe, { backgroundColor: columnColor(theme, card.column) }]} />
+			<View style={styles.cardTop}>
+				<Text style={[TYPE.caption, { color: theme.textFaint, fontWeight: "600" }]}>#{card.id.split("-")[0]}</Text>
+				{card.kind ? <Chip label={t(`kinds.${card.kind}`)} icon={KIND_ICONS[card.kind]} /> : null}
+				{card.flagged ? <Chip label={t("board.flagged")} icon="flag" color={theme.danger} /> : null}
+				<View style={{ flex: 1 }} />
+				{when ? <Text style={[TYPE.caption, { color: theme.textFaint }]}>{when}</Text> : null}
+			</View>
+			{group ? <GroupMark group={group} onPress={() => onGroup(group.id)} /> : null}
+			<Text style={[TYPE.body, { color: theme.text, fontWeight: "600" }]} numberOfLines={3}>
+				{card.title}
+			</Text>
+			{total > 0 ? (
+				<View style={styles.progress}>
+					<View style={[styles.track, { backgroundColor: theme.elevated }]}>
+						<View
+							style={[styles.fill, { backgroundColor: theme.accent, width: `${Math.round((completed / total) * 100)}%` }]}
+						/>
+					</View>
+					<Text style={[TYPE.caption, { color: theme.textMuted }]}>{t("board.subtasks", { completed, total })}</Text>
+				</View>
+			) : null}
+			{card.claimedByName ? (
+				<View style={styles.owner}>
+					<Avatar name={card.claimedByName} size={22} />
+					<Text style={[TYPE.small, { color: theme.textMuted }]} numberOfLines={1}>
+						{t("board.claimedBy", { name: card.claimedByName })}
+					</Text>
+				</View>
+			) : null}
+		</Pressable>
+	);
+}
+
+/** « Partie 2/4 · OAuth » in the group's colour: written, so colour is never the only sign. */
+function GroupMark({ group, onPress }: { group: NonNullable<BoardCard["group"]>; onPress: () => void }) {
+	const { t } = useTranslation();
+	const theme = useTheme();
+	const color = groupColor(group.id, theme.dark);
+	const label = t("board.groupMark", { index: group.index, total: group.total, title: group.title });
+	return (
+		<Pressable
+			accessibilityRole="button"
+			accessibilityLabel={label}
+			accessibilityHint={t("board.groupHint")}
+			hitSlop={8}
+			onPress={onPress}
+			style={[styles.groupMark, { borderColor: color }]}
+		>
+			<View style={[styles.dot, { backgroundColor: color }]} />
+			<Text style={{ color, fontSize: 12, fontWeight: "600", flexShrink: 1 }} numberOfLines={1}>
+				{label}
+			</Text>
+		</Pressable>
+	);
+}
+
 const styles = StyleSheet.create({
 	live: {
 		flexDirection: "row",

@@ -35,6 +35,19 @@ function renderItems(props: ComponentProps<typeof TaskCardMenuItems>) {
 const separators = () => document.querySelectorAll('[role="separator"]').length;
 
 describe("TaskCardMenuItems", () => {
+	it("flags a task as blocked, or lifts the flag", async () => {
+		const user = userEvent.setup();
+		const onFlag = vi.fn();
+		const { unmount } = renderItems({ onFlag });
+		await user.click(screen.getByRole("menuitem", { name: "Flag as blocked…" }));
+		expect(onFlag).toHaveBeenCalled();
+		unmount();
+		const onUnflag = vi.fn();
+		renderItems({ onUnflag });
+		await user.click(screen.getByRole("menuitem", { name: "Remove flag" }));
+		expect(onUnflag).toHaveBeenCalled();
+	});
+
 	it("sets a task aside, or resumes it, from the work group", async () => {
 		const user = userEvent.setup();
 		const onAbandon = vi.fn();

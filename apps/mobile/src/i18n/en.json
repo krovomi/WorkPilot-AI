@@ -101,6 +101,7 @@
 		"clearFilters": "Clear the filters",
 		"noMatch": "No card matches.",
 		"noMatchHint": "Other words or fewer filters may find it."
+		"flagged": "Blocked"
 	},
 	"columns": {
 		"backlog": "Planning",

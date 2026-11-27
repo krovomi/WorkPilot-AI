@@ -101,6 +101,7 @@
 		"clearFilters": "Effacer les filtres",
 		"noMatch": "Aucune carte ne correspond.",
 		"noMatchHint": "D'autres mots ou moins de filtres la trouveront peut-être."
+		"flagged": "Bloquée"
 	},
 	"columns": {
 		"backlog": "Planification",

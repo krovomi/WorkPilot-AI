@@ -70,6 +70,7 @@ export const DEFAULT_APP_SETTINGS = {
 	autoNameClaudeTerminals: true,
 	// One-line summary under each Kanban column title
 	kanbanColumnSummary: true,
+	kanbanAbandonClosedPrs: true,
 };
 
 // ============================================
