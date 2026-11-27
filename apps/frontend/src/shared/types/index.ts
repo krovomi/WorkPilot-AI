@@ -11,6 +11,8 @@ export * from "./bench";
 export * from "./bitbucket";
 // workpilot-board MCP server registered with other AI apps
 export * from "./board-mcp";
+// « Interroger le tableau »: a question answered with the related tickets
+export * from "./board-ask";
 export * from "./changelog";
 export * from "./cli";
 // Common types
