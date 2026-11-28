@@ -19,7 +19,8 @@ const DAY = 86_400_000;
 /** The longest span a chart draws, in days. */
 export const MAX_REPORT_DAYS = 90;
 
-function time(value: unknown): number | null {
+/** A date as milliseconds, or null when it is missing or not a date. */
+export function time(value: unknown): number | null {
 	if (value === undefined || value === null || value === "") return null;
 	const parsed = new Date(value as string | Date).getTime();
 	return Number.isNaN(parsed) ? null : parsed;

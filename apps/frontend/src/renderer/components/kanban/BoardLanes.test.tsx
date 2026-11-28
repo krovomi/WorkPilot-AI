@@ -216,6 +216,48 @@ describe("BoardLanes as a list", () => {
 		expect(screen.queryByText("No card matches the filters.")).toBeNull();
 	});
 
+	it("draws a timeline: a bar per card, the sprints above, a section per lane", async () => {
+		const user = userEvent.setup();
+		const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString();
+		useSprintStore.setState({
+			sprints: [
+				{ id: "sp-0000000a", name: "Sprint 12", state: "active", createdAt: "t", startedAt: day(-3), closedAt: day(4) },
+				{ id: "sp-0000000b", name: "Sprint 13", state: "planned", createdAt: "t", startDate: day(5).slice(0, 10), endDate: day(12).slice(0, 10) },
+			],
+		});
+		localStorage.setItem("kanban-lanes-p", JSON.stringify({ layout: "timeline", grouping: "priority" }));
+		const finished = {
+			...card("d", { priority: "high" }),
+			status: "done",
+			createdAt: day(-6),
+			statusHistory: [
+				{ from: null, to: "in_progress", at: day(-5), actor: "agent" },
+				{ from: "in_progress", to: "done", at: day(-2), actor: "agent" },
+			],
+		} as unknown as Task;
+		const onOpenTask = list(
+			[{ ...card("a", { priority: "high" }), createdAt: day(-4) } as unknown as Task],
+			[finished, { ...card("x"), metadata: { abandoned: true, abandonedAt: day(-1) } } as unknown as Task],
+		);
+		expect(screen.getByTestId("kanban-timeline")).toBeInTheDocument();
+		expect(screen.getByText("Sprint 12")).toBeInTheDocument();
+		expect(screen.getByText("Sprint 13")).toBeInTheDocument();
+		const high = screen.getByRole("region", { name: "High" });
+		expect(within(high).getByRole("img", { name: /^Planning: since .+, still running$/ })).toBeInTheDocument();
+		expect(within(high).getByRole("img", { name: /^Done: .+ to .+$/ })).toBeInTheDocument();
+		await user.click(within(high).getByRole("button", { name: "Card a" }));
+		expect(onOpenTask).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
+		const fold = within(high).getByRole("button", { name: /High/ });
+		await user.click(fold);
+		expect(within(high).queryByRole("button", { name: "Card a" })).toBeNull();
+	});
+
+	it("draws an empty timeline without lanes", () => {
+		localStorage.setItem("kanban-lanes-p", JSON.stringify({ layout: "timeline" }));
+		list([]);
+		expect(screen.getByText("No card matches the filters.")).toBeInTheDocument();
+	});
+
 	it("says when no card matches", () => {
 		localStorage.setItem("kanban-lanes-p", JSON.stringify({ layout: "list" }));
 		list([]);
