@@ -34,11 +34,13 @@ from typing import Any
 import httpx
 
 try:
+    from . import cli_models as _cli_models
     from . import gateway_providers, public_model_registry
     from .models_registry import provider_catalog
 except ImportError:
     # Module is imported as a top-level "provider_models_catalog" (no package
     # context), e.g. by provider_api.py when apps/backend is on sys.path.
+    import cli_models as _cli_models  # type: ignore[no-redef]
     import gateway_providers  # type: ignore[no-redef]
     import public_model_registry  # type: ignore[no-redef]
     from models_registry import provider_catalog  # type: ignore[no-redef]
@@ -750,6 +752,36 @@ def _fetch_registry(
     return _with_static(provider, out), fetched_at
 
 
+def _list_cli_models(provider: str, *, force_refresh: bool) -> dict[str, Any]:
+    """A coding-agent CLI's own model list, else the static one."""
+    try:
+        models = _cli_models.list_cli_models(
+            provider,
+            tier_for=_tier_for_label,
+            google_models=lambda: list_models("google", force_refresh=force_refresh)[
+                "models"
+            ],
+        )
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        logger.warning("CLI model listing failed for %s: %s", provider, e)
+        models = []
+    if models:
+        return {
+            "provider": provider,
+            "models": models,
+            "source": "live",
+            "fetchedAt": time.time(),
+            "error": None,
+        }
+    return {
+        "provider": provider,
+        "models": STATIC_FALLBACK.get(provider, []),
+        "source": "static",
+        "fetchedAt": None,
+        "error": None,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -800,6 +832,13 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
         "lmstudio": "lm-studio",
         "llamacpp": "llama-cpp",
     }.get(provider, provider)
+
+    # Coding-agent CLIs (OpenCode, pi, Antigravity, Gemini CLI) choose among
+    # the providers signed in inside the CLI: only the CLI can list them. Read
+    # every time (the person may have just run `opencode auth login`); the
+    # dropdown keeps its own short cache.
+    if provider in _cli_models.CLI_PROVIDERS:
+        return _list_cli_models(provider, force_refresh=force_refresh)
 
     # Local servers (Ollama / LM Studio / …) change their installed-model list
     # frequently and answer instantly, so a 24h-cached list goes stale and shows

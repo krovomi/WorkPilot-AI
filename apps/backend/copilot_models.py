@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 TOKEN_EXCHANGE_URL = "https://api.github.com/copilot_internal/v2/token"
 MODELS_URL = "https://api.githubcopilot.com/models"
+CHAT_COMPLETIONS_ENDPOINT = "/chat/completions"
+#: Error codes with which Copilot refuses the model of a chat request: retried
+#: on a model this account's ``/models`` serves.
+MODEL_REFUSED_CODES = ("model_not_supported", "model_not_available_for_integrator")
 # Statuses with which the internal exchange refuses a GitHub token that
 # api.githubcopilot.com still accepts directly (see
 # `CopilotAgentClient._get_copilot_token`).
@@ -44,7 +48,7 @@ def usable_chat_models(entries: Any) -> list[dict[str, Any]]:
     """The entries of a ``/models`` answer a chat completion can use.
 
     Kept: chat models offered in the model picker whose policy is not
-    ``disabled``. The list also holds embedding models, and internal or
+    ``disabled`` and that ``/chat/completions`` serves. The list also holds embedding models, and internal or
     superseded ids GitHub keeps routable but hides from every picker.
     """
     if not isinstance(entries, list):
@@ -61,6 +65,13 @@ def usable_chat_models(entries: Any) -> list[dict[str, Any]]:
         policy = entry.get("policy")
         if isinstance(policy, dict) and policy.get("state") == "disabled":
             continue
+        # WorkPilot posts to /chat/completions: a model GitHub serves only on
+        # other endpoints (/responses, /v1/messages) is refused there with
+        # "model_not_available_for_integrator". No list means no restriction.
+        endpoints = entry.get("supported_endpoints")
+        if isinstance(endpoints, list) and endpoints:
+            if CHAT_COMPLETIONS_ENDPOINT not in endpoints:
+                continue
         usable.append(entry)
     return usable
 
