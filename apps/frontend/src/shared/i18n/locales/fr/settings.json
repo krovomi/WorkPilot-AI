@@ -508,6 +508,13 @@
 					"description": "Une N0 verte, ou une N1 approuvée par la revue croisée, fusionne seule. N2 et N3 attendent une personne."
 				}
 			},
+			"express": {
+				"title": "Voie express des PR de dépendances",
+				"description": "Les pull requests Dependabot et Renovate de vos projets fusionnent seules quand leur niveau est N0 et que tous les checks sont passés. Seulement quand les niveaux sont appliqués.",
+				"toggle": "Fusionner les pull requests N0 vertes des bots",
+				"toggleDescription": "Environ toutes les demi-heures, pour chaque projet local sur GitHub. Une montée majeure, un changement de code ou de fichiers de CI, un check rouge ou en cours, un brouillon ou un fork reste à une personne.",
+				"needsEnforce": "Inactive tant que le mode n'est pas Appliquer."
+			},
 			"tiers": {
 				"title": "Les quatre niveaux",
 				"N0": {
