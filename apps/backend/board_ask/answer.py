@@ -208,21 +208,25 @@ def parse_judgement(
     return parsed["answer"].strip()[:MAX_ANSWER_CHARS], matches
 
 
-_CITATION = re.compile(r"\[(T\d+)(?:\s*,\s*(T\d+))*\]")
+_CITATION = re.compile(r"([ \t]*)\[(T\d+)(?:\s*,\s*(T\d+))*\]")
 
 
 def cite_matches(answer: str, order: Sequence[str]) -> str:
     """``[T7]`` turned into ``[n]``, the position of that ticket in the matches;
-    a reference to a ticket not kept is dropped."""
+    a reference to a ticket not kept is dropped with the blanks before it, and
+    no blank is left before a comma or a full stop. A blank before ``:``,
+    ``;``, ``!`` or ``?`` stays: French writes one."""
 
     def replace(match: re.Match[str]) -> str:
         cited = [
             order.index(r) for r in re.findall(r"T\d+", match.group(0)) if r in order
         ]
-        return "".join(f"[{i + 1}]" for i in cited)
+        if not cited:
+            return ""
+        return match.group(1) + "".join(f"[{i + 1}]" for i in cited)
 
     text = _CITATION.sub(replace, answer)
-    text = re.sub(r"[ \t]+([.,;:!?])", r"\1", text)
+    text = re.sub(r"[ \t]+([.,])", r"\1", text)
     return re.sub(r"[ \t]{2,}", " ", text).strip()
 
 

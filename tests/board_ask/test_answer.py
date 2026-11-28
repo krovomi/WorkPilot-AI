@@ -180,6 +180,12 @@ def test_an_unknown_language_falls_back_to_english_and_dates_may_be_odd():
 def test_citations_of_tickets_not_kept_are_dropped():
     assert aw.cite_matches("See [T2] and [T5] .", ["T2"]) == "See [1] and."
     assert aw.cite_matches("[T1,T2]", ["T2", "T1"]) == "[2][1]"
+    # The answer's own spacing is kept: French puts a space before : ; ! ?
+    assert (
+        aw.cite_matches("Oui : refait [T1] ; prévu [T9] ? Voir [T9] [T1] !", ["T1"])
+        == "Oui : refait [1] ; prévu ? Voir [1] !"
+    )
+    assert aw.cite_matches("[T9] Rien [T9]", []) == "Rien"
 
 
 def test_only_a_json_object_is_read():

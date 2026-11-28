@@ -283,6 +283,11 @@ describe("parsers", () => {
 
 	it("turns references into positions and drops the ones not kept", () => {
 		expect(citeMatches("Done [T4] and [T2, T4] but not [T9] .", ["T4", "T2"])).toBe("Done [1] and [2][1] but not.");
+		// The answer's own spacing is kept: French puts a space before « : ; ! ? ».
+		expect(citeMatches("Oui : refait [T1] ; prévu [T9] ? Voir [T9] [T1] !", ["T1"])).toBe(
+			"Oui : refait [1] ; prévu ? Voir [1] !",
+		);
+		expect(citeMatches("[T9] Rien [T9]", [])).toBe("Rien");
 	});
 
 	it("names the fallback language for the answer", () => {
