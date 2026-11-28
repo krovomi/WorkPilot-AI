@@ -79,10 +79,12 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 
 ## Fonctionnement
 
+<a href=".github/assets/showcase/how-it-works.fr-light.png">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/showcase/how-it-works.fr-dark.png">
   <img alt="Fonctionnement : planifier (vous décrivez une tâche, spec, planificateur, vous validez), construire et contrôler (codeur, relecteur et correcteur QA jusqu'à l'accord de la QA), prouver et livrer (vérification, vous relisez le diff, fusion ou pull request)" src=".github/assets/showcase/how-it-works.fr-light.png" width="100%">
 </picture>
+</a>
 
 - **Isolé** : chaque tâche tourne dans son propre worktree git, votre branche reste intacte jusqu'au merge ; le worktree est supprimé une fois la pull request de la tâche fusionnée.
 - **Toujours relu** : les pages qui écrivent du code (studio de tests, Import Design, journal des modifications, pair programming, commandes rapides du Kanban) le déposent sur la branche d'une carte « Code généré » en Révision humaine ; il n'atteint votre projet que par une pull request que vous relisez ([code généré](docs/architecture/generated-review.md)).
@@ -101,22 +103,28 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 
 **Reprendre ce qu'une fermeture ou un plantage a interrompu** ([pause et reprise](docs/architecture/pause-resume.md)) : fermer WorkPilot met en pause les tâches qui tournent, et le démarrage suivant demande lesquelles reprendre. Chacune montre son projet, son provider et son modèle, la façon dont elle s'est arrêtée (fermeture, plantage, ou « Arrêter tous les agents ») et où elle repartira : la phase, et pendant le code la prochaine sous-tâche. Ce que l'app a interrompu est coché, ce que vous avez arrêté ne l'est pas, et une tâche dont la reprise échouerait tout de suite (connexion Claude expirée pour une tâche sur Claude, dossier de spec disparu) est décochée avec la raison. Les reprises respectent la limite « En cours » de chaque projet, les autres partent quand une place se libère. « Plus tard » les laisse en pause : leur carte affiche **Interrompue**, jamais « Bloqué », avec un bouton Reprendre, et « N tâches interrompues · Reprendre… » dans la barre du Kanban rouvre la liste. Paramètres > Paramètres d'agent : Me demander (par défaut), Tout reprendre ou Ne rien reprendre.
 
+**Avec un serveur d'équipe.** Un run qui tournait quand le serveur d'équipe a redémarré s'affiche **Interrompu**, pas échoué, et la même invite le liste : dans l'app de bureau au démarrage ou à la connexion, et dans l'app mobile une fois connecté. Vos runs sont cochés ; un propriétaire du projet voit aussi ceux de l'équipe, décochés, avec qui les a lancés. Reprendre relance la même phase avec le même modèle et les mêmes droits que Démarrer (un build parti approuvé garde son approbation) ; Plus tard les met de côté sur le serveur, donc aucun autre appareil ne les repropose.
+
 <table>
 <tr>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/interrupted-tasks.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/interrupted-tasks-light.png">
   <img alt="Au démarrage : les tâches interrompues, chacune avec son moteur, sa façon de s'arrêter et l'étape où elle repart, cochées par défaut" src=".github/assets/showcase/interrupted-tasks.png">
 </picture>
+</a>
 
 </td>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/interrupted-cards.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/interrupted-cards-light.png">
   <img alt="Le tableau : cartes Interrompue avec Reprendre, « 2 interrompues » sur le bandeau En cours et « 3 tâches interrompues · Reprendre… » dans la barre" src=".github/assets/showcase/interrupted-cards.png">
 </picture>
+</a>
 
 </td>
 </tr>
@@ -130,18 +138,22 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 <tr>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/sprint-planning.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-planning-light.png">
   <img alt="Planifier un sprint : la jauge de capacité face à la vélocité des 3 derniers sprints, le backlog et le sprint côte à côte" src=".github/assets/showcase/sprint-planning.png">
 </picture>
+</a>
 
 </td>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/sprint-proposal.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-proposal-light.png">
   <img alt="Proposer le sprint : les tâches proposées en pointillés violets avec leur raison, la ligne de capacité et ce qui passe dessous" src=".github/assets/showcase/sprint-proposal.png">
 </picture>
+</a>
 
 </td>
 </tr>
@@ -391,10 +403,12 @@ Plusieurs comptes peuvent être enregistrés par provider : plusieurs clés pour
 
 Comment les pièces communiquent :
 
+<a href=".github/assets/showcase/architecture.fr-light.png">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/showcase/architecture.fr-dark.png">
   <img alt="Architecture : sur votre machine, l'application de bureau et le moteur Python travaillent sur votre dépôt git, un worktree par tâche ; le moteur parle aux fournisseurs d'IA, aux forges et outils de suivi et aux autres clients IA ; un serveur d'équipe optionnel partage le tableau avec l'application mobile" src=".github/assets/showcase/architecture.fr-light.png" width="100%">
 </picture>
+</a>
 
 Où elles vivent dans le dépôt :
 

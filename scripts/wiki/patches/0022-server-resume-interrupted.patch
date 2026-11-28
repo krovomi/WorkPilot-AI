@@ -1,0 +1,39 @@
+From ea172fecdf0f5827a9a28f8796a44908d6b26ef9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 28 Nov 2026 19:16:26 +0000
+Subject: [PATCH] docs(wiki): resume the runs a team server restart interrupted
+
+---
+ User-Interface.fr.md | 2 ++
+ User-Interface.md    | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/User-Interface.fr.md b/User-Interface.fr.md
+index 8e3573e..6ccccea 100644
+--- a/User-Interface.fr.md
++++ b/User-Interface.fr.md
+@@ -127,6 +127,8 @@ Fermer WorkPilot met en pause les tâches qui tournent (la même pause que le bo
+ 
+ Chaque reprise suit le chemin du bouton Reprendre : le backend reprend la phase depuis le dossier de la spec, continue la sous-tâche en cours et rouvre la session Claude quand il y en a une, sur tous les providers. Conception : [pause-resume.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/pause-resume.md).
+ 
++**Avec un serveur d'équipe.** Un run qui tournait quand le serveur d'équipe a redémarré s'affiche **Interrompu**, pas échoué, et la même invite le liste : dans l'app de bureau au démarrage ou à la connexion, et dans l'app mobile une fois connecté. Vos runs sont cochés ; un propriétaire du projet voit aussi ceux de l'équipe, décochés, avec qui les a lancés. Reprendre relance la même phase avec le même modèle et les mêmes droits que Démarrer (un build parti approuvé garde son approbation) ; Plus tard les met de côté sur le serveur, donc aucun autre appareil ne les repropose.
++
+ ![Au démarrage : les tâches interrompues, chacune avec son moteur, sa façon de s'arrêter et l'étape où elle repart](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/interrupted-tasks.png)
+ 
+ ### Actions disponibles sur une carte
+diff --git a/User-Interface.md b/User-Interface.md
+index 45035ef..2dca0d7 100644
+--- a/User-Interface.md
++++ b/User-Interface.md
+@@ -122,6 +122,8 @@ Closing WorkPilot pauses the builds that run (the Pause button's own pause, in e
+ 
+ Every resume takes the Resume button's path: the backend re-enters the phase from the spec folder, continues the subtask the build was on and reopens the Claude session when there is one, on every provider. Design: [pause-resume.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/pause-resume.md).
+ 
++**With a team server.** A run that was going when the team server restarted reads **Interrupted**, not failed, and the same prompt lists it: in the desktop app at launch or at sign-in, and in the mobile app once signed in. Your own runs are ticked; a project owner also sees the team's, unticked, with who started them. Resume starts the same phase with the same model and the same rights as Start (a build that started approved keeps its approval); Later sets them aside on the server, so no other device offers them again.
++
+ ![At launch: the interrupted tasks, each with its engine, how it stopped and the step it resumes at](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/interrupted-tasks.png)
+ 
+ ### Actions available on a card
+-- 
+2.43.0
+

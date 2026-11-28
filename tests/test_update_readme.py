@@ -223,6 +223,23 @@ class TestTheTwoReadmesStayTwins:
         for text in (en, fr):
             assert "─▶" not in text
 
+    def test_every_picture_opens_full_size(self):
+        """GitHub links a Markdown image to its file, never a raw <picture>:
+        each one sits inside <a href> naming the file of its <img src>."""
+        for path in (self.EN, self.FR):
+            text = path.read_text(encoding="utf-8")
+            pictures = re.findall(r"<picture>.*?</picture>", text, flags=re.S)
+            wrapped = re.findall(
+                r'<a href="([^"]+)">\s*(<picture>.*?</picture>)\s*</a>',
+                text,
+                flags=re.S,
+            )
+            assert pictures and len(wrapped) == len(pictures), path.name
+            for href, picture in wrapped:
+                src = re.search(r'<img[^>]*\ssrc="([^"]+)"', picture)
+                assert src and src.group(1) == href, (path.name, href)
+                assert (REPO_ROOT / href).is_file(), (path.name, href)
+
     def test_same_release_markers(self, ur):
         markers = [
             ur.STABLE_BADGE_START,
