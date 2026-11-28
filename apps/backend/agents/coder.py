@@ -1563,11 +1563,14 @@ def _on_invalid_plan(
     errors: list[str],
     task_logger,
     status_manager,
+    response: str | None = None,
 ) -> str:
     """Count the failure; halt past the cap, else tell the planner what to fix.
 
     Returns what the next planning session is told.
     """
+    from spec.plan_recovery import invalid_plan_message
+
     planning_validation_failures = _bump_planning_failures(spec_dir)
     # The plan WorkPilot reads lives in the spec dir; a model that
     # wrote ./implementation_plan.json to the worktree root leaves a
@@ -1588,11 +1591,7 @@ def _on_invalid_plan(
         provider_hint = ""
 
     if planning_validation_failures >= MAX_PLANNING_VALIDATION_RETRIES:
-        fail_msg = (
-            "Planning failed: the model did not produce a valid "
-            "implementation_plan.json (unparseable or missing "
-            "`phases`)." + provider_hint
-        )
+        fail_msg = invalid_plan_message(provider_hint, response)
         print_status(fail_msg, "error")
         for err in errors:
             print(f"  - {err}")
@@ -2596,6 +2595,7 @@ async def run_autonomous_agent(
                     errors=errors,
                     task_logger=task_logger,
                     status_manager=status_manager,
+                    response=response,
                 )
                 # Stay in planning mode for the next iteration
                 first_run = True

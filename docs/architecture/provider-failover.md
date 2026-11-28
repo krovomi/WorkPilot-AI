@@ -93,6 +93,15 @@ Les mêmes signaux pour tous les providers, avec leurs propres mots :
 | Quota ou crédit épuisé | `insufficient_quota`, « exceeded your current quota », `RESOURCE_EXHAUSTED`, « Insufficient Balance », 402… (pas un quota « per minute », qui se lève seul) | `insufficient_quota`, `RESOURCE_EXHAUSTED` ; 402 et solde épuisé par `detectBillingFailure` |
 | Clé refusée (401) | `401`, « invalid api key », « incorrect api key », « API key not valid »… | « Error code: 401 », « Incorrect API key provided », `invalid_api_key`… |
 
+Un refus de connexion n'arrive pas toujours en erreur : le CLI Claude répond à un jeton OAuth
+expiré ou révoqué par un message (« Failed to authenticate. API Error: 401 … »), et le tour se
+termine comme un autre. `agents/session_signals.py` (`auth_failure_in_turn`) le reconnaît dans
+les deux boucles de session : une réponse courte qui commence comme un refus, ou, pour un tour
+sans réponse, une ligne d'état d'erreur que `is_authentication_error` reconnaît. La session rend
+alors l'erreur `authentication`, d'où la pause `auth_failure_paused` et le basculement. Lu comme
+une réponse, il faisait échouer la planification sur « missing `phases` » et devenait le rapport
+de la phase `brainstorm`.
+
 Un quota épuisé ne donne pas d'heure de remise à zéro, et réessayer sur le même compte ne
 passera pas : le coder et la QA (`services/rate_limit_shield.py`) mettent alors la tâche en
 pause une heure (`quota_pause`, `agents/rate_limit_time.py`). La pause du coder émet
