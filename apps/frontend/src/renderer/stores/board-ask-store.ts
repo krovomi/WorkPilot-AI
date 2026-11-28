@@ -1,11 +1,12 @@
 /**
  * « Interroger le tableau » (docs/architecture/board-ask.md): the panel and
- * one conversation per project. Kept in memory only: a question and its
- * answer are never written to disk, and closing the app forgets them.
+ * one conversation per project, and the last idea checked per project
+ * (« Vérifier une idée »). Kept in memory only: a question, an idea and their
+ * answers are never written to disk, and closing the app forgets them.
  */
 
 import { create } from "zustand";
-import type { BoardAskResult, BoardAskTurn } from "../../shared/types";
+import type { BoardAskResult, BoardAskTurn, BoardIdeaResult } from "../../shared/types";
 import { BOARD_ASK_LIMITS } from "../../shared/types/board-ask";
 
 export interface BoardAskEntry {
@@ -17,12 +18,30 @@ export interface BoardAskEntry {
 	error?: string;
 }
 
+export type BoardAskTab = "ask" | "idea";
+
+export interface BoardIdeaCheck {
+	idea: string;
+	status: "pending" | "done" | "error";
+	result?: BoardIdeaResult;
+	/** `server_project`, or the error the main process gave. */
+	error?: string;
+	/** The card created with what is missing, once it is. */
+	createdTaskId?: string;
+}
+
 interface BoardAskState {
 	open: boolean;
+	tab: BoardAskTab;
 	conversations: Record<string, BoardAskEntry[]>;
+	ideas: Record<string, BoardIdeaCheck>;
 	setOpen: (open: boolean) => void;
+	setTab: (tab: BoardAskTab) => void;
 	ask: (projectId: string, question: string) => Promise<void>;
 	clear: (projectId: string) => void;
+	checkIdea: (projectId: string, idea: string) => Promise<void>;
+	markIdeaCard: (projectId: string, taskId: string) => void;
+	clearIdea: (projectId: string) => void;
 }
 
 let nextId = 1;
@@ -54,10 +73,17 @@ function update(
 	return { ...conversations, [projectId]: entries.map((e) => (e.id === id ? { ...e, ...patch } : e)) };
 }
 
+function errorText(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
 export const useBoardAskStore = create<BoardAskState>((set, get) => ({
 	open: false,
+	tab: "ask",
 	conversations: {},
+	ideas: {},
 	setOpen: (open) => set({ open }),
+	setTab: (tab) => set({ tab }),
 	ask: async (projectId, raw) => {
 		const question = raw.trim().slice(0, BOARD_ASK_LIMITS.question);
 		const entries = get().conversations[projectId] ?? [];
@@ -86,7 +112,7 @@ export const useBoardAskStore = create<BoardAskState>((set, get) => ({
 			set((state) => ({
 				conversations: update(state.conversations, projectId, id, {
 					status: "error",
-					error: error instanceof Error ? error.message : String(error),
+					error: errorText(error),
 				}),
 			}));
 		}
@@ -95,5 +121,38 @@ export const useBoardAskStore = create<BoardAskState>((set, get) => ({
 		set((state) => {
 			const { [projectId]: _dropped, ...rest } = state.conversations;
 			return { conversations: rest };
+		}),
+	checkIdea: async (projectId, raw) => {
+		const idea = raw.trim().slice(0, BOARD_ASK_LIMITS.idea);
+		if (!idea || get().ideas[projectId]?.status === "pending") return;
+		const settle = (patch: Partial<BoardIdeaCheck>) =>
+			set((state) => {
+				const current = state.ideas[projectId];
+				// A check cleared or replaced while it ran is not overwritten.
+				if (current?.idea !== idea || current.status !== "pending") return state;
+				return { ideas: { ...state.ideas, [projectId]: { ...current, ...patch } } };
+			});
+		set((state) => ({ ideas: { ...state.ideas, [projectId]: { idea, status: "pending" } } }));
+		try {
+			const response = await globalThis.electronAPI.checkBoardIdea({ projectId, idea });
+			settle(
+				response.success && response.data
+					? { status: "done", result: response.data }
+					: { status: "error", error: response.error ?? "unknown" },
+			);
+		} catch (error) {
+			settle({ status: "error", error: errorText(error) });
+		}
+	},
+	markIdeaCard: (projectId, taskId) =>
+		set((state) => {
+			const current = state.ideas[projectId];
+			if (!current) return state;
+			return { ideas: { ...state.ideas, [projectId]: { ...current, createdTaskId: taskId } } };
+		}),
+	clearIdea: (projectId) =>
+		set((state) => {
+			const { [projectId]: _dropped, ...rest } = state.ideas;
+			return { ideas: rest };
 		}),
 }));

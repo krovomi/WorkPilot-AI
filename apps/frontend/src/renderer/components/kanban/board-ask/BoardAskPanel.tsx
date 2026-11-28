@@ -2,49 +2,26 @@
  * « Interroger le tableau » (docs/architecture/board-ask.md): a question in
  * any language, answered with every ticket of the board that relates to it,
  * whatever language the tickets were written in. Helps a product owner see
- * whether a feature was already built, even partly.
+ * whether a feature was already built, even partly; its second tab checks a
+ * planned feature requirement by requirement (`IdeaCheckView.tsx`).
  */
 
-import { Archive, ArrowUp, Languages, Loader2, MessageSquareText, RotateCcw, Search, Sparkles } from "lucide-react";
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
+import { ArrowUp, Lightbulb, Loader2, MessageSquareText, RotateCcw, Sparkles } from "lucide-react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type {
-	BoardAskCoverage,
-	BoardAskMatch,
-	BoardAskResult,
-	BoardAskSemanticMode,
-	BoardAskState,
-	Task,
-} from "../../../../shared/types";
-import { BOARD_ASK_LIMITS, BOARD_ASK_SEMANTIC_MODES } from "../../../../shared/types/board-ask";
-import { formatAppDate } from "../../../lib/date-format";
+import type { BoardAskMatch, Task } from "../../../../shared/types";
+import { BOARD_ASK_LIMITS } from "../../../../shared/types/board-ask";
+import { type BoardAskEntry, type BoardAskTab, useBoardAskStore } from "../../../stores/board-ask-store";
 import { cn } from "../../../lib/utils";
-import { type BoardAskEntry, useBoardAskStore } from "../../../stores/board-ask-store";
-import { saveSettings, useSettingsStore } from "../../../stores/settings-store";
 import { useTaskStore } from "../../../stores/task-store";
-import { Chip, type Tone } from "../../charter";
 import { Button } from "../../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../ui/dialog";
-import { NativeSelect } from "../../ui/native-select";
 import { Textarea } from "../../ui/textarea";
+import { MatchRow, ModeLine, matchElementId, SemanticModeSelect } from "./board-ask-parts";
+import { IdeaCheckView } from "./IdeaCheckView";
 
 const EMPTY: BoardAskEntry[] = [];
 const EXAMPLES = ["adminPage", "export", "login"] as const;
-
-const COVERAGE_TONE: Readonly<Record<BoardAskCoverage, Tone>> = {
-	full: "green",
-	partial: "amber",
-	related: "muted",
-};
-
-const STATE_TONE: Readonly<Record<BoardAskState, Tone>> = {
-	done: "green",
-	in_review: "violet",
-	in_progress: "blue",
-	planned: "muted",
-	failed: "red",
-	abandoned: "muted",
-};
 
 /** The answer's text with its `[n]` citations as buttons to the n-th ticket. */
 function AnswerText({
@@ -85,135 +62,6 @@ function AnswerText({
 				);
 			})}
 		</p>
-	);
-}
-
-/** How the tickets were found: the model's answer, by meaning, or by keywords. */
-function ModeLine({ result }: { readonly result: BoardAskResult }) {
-	const { t } = useTranslation(["tasks"]);
-	const semantic = result.semantic;
-	return (
-		<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-muted-foreground">
-			{result.mode === "ai" && (
-				<span className="inline-flex items-center gap-1 font-medium text-primary">
-					<Sparkles className="h-3 w-3" aria-hidden />
-					{t("kanban.ask.modeAi")}
-				</span>
-			)}
-			{result.mode === "semantic" && (
-				<span className="inline-flex items-center gap-1 font-medium">
-					<Languages className="h-3 w-3" aria-hidden />
-					{t("kanban.ask.modeSemantic")}
-				</span>
-			)}
-			{result.mode === "keywords" && (
-				<span className="inline-flex items-center gap-1 font-medium">
-					<Search className="h-3 w-3" aria-hidden />
-					{t("kanban.ask.modeKeywords")}
-				</span>
-			)}
-			<span>{t("kanban.ask.searched", { count: result.searched })}</span>
-			{semantic && (
-				<span title={t("kanban.ask.semanticTitle")}>
-					{t(`kanban.ask.semanticSource.${semantic.kind}`, {
-						model: semantic.model,
-						provider: semantic.provider,
-					})}
-				</span>
-			)}
-			{semantic && semantic.indexed < semantic.total && (
-				<span>{t("kanban.ask.semanticPartial", { indexed: semantic.indexed, total: semantic.total })}</span>
-			)}
-		</div>
-	);
-}
-
-/** Whether the tickets are also ranked by meaning, saved in the settings. */
-function SemanticModeSelect() {
-	const { t } = useTranslation(["tasks"]);
-	const value = useSettingsStore((s) => s.settings.boardAskSemantic) ?? "auto";
-	const id = useId();
-	return (
-		<div className="flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground">
-			<Languages className="h-3.5 w-3.5" aria-hidden />
-			<label htmlFor={id}>{t("kanban.ask.semanticMode.label")}</label>
-			<NativeSelect
-				id={id}
-				value={value}
-				onChange={(event) => void saveSettings({ boardAskSemantic: event.target.value as BoardAskSemanticMode })}
-				className="h-7 px-1.5 text-2xs"
-				title={t(`kanban.ask.semanticMode.hint.${value}`)}
-			>
-				{BOARD_ASK_SEMANTIC_MODES.map((mode) => (
-					<option key={mode} value={mode}>
-						{t(`kanban.ask.semanticMode.${mode}`)}
-					</option>
-				))}
-			</NativeSelect>
-		</div>
-	);
-}
-
-/** The element id of a ticket row, unique across the conversation. */
-const matchElementId = (entryId: number, index: number) => `board-ask-match-${entryId}-${index}`;
-
-function MatchRow({
-	entryId,
-	match,
-	index,
-	highlighted,
-	onOpen,
-}: {
-	readonly entryId: number;
-	readonly match: BoardAskMatch;
-	readonly index: number;
-	readonly highlighted: boolean;
-	readonly onOpen?: () => void;
-}) {
-	const { t } = useTranslation(["tasks"]);
-	return (
-		<li id={matchElementId(entryId, index)}>
-			<button
-				type="button"
-				onClick={onOpen}
-				disabled={!onOpen}
-				aria-current={highlighted ? "true" : undefined}
-				className={cn(
-					"group flex w-full items-start gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5 text-left transition-colors",
-					onOpen && "hover:border-primary/40 hover:bg-primary/5",
-					highlighted && "border-primary/60 bg-primary/10",
-				)}
-			>
-				<span className="mt-0.5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-muted text-2xs font-semibold tabular-nums text-muted-foreground">
-					{index + 1}
-				</span>
-				<span className="min-w-0 flex-1 space-y-1">
-					<span className="block truncate text-sm font-medium text-foreground group-hover:text-primary">
-						{match.title}
-					</span>
-					{match.reason && <span className="block text-xs text-muted-foreground">{match.reason}</span>}
-					<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
-						{match.coverage && (
-							<Chip tone={COVERAGE_TONE[match.coverage]}>{t(`kanban.ask.coverage.${match.coverage}`)}</Chip>
-						)}
-						<Chip tone={STATE_TONE[match.state]}>
-							{t(`kanban.ask.state.${match.state}`)}
-						</Chip>
-						{match.archived && (
-							<span className="inline-flex items-center gap-1 text-2xs text-muted-foreground">
-								<Archive className="h-3 w-3" aria-hidden />
-								{t("kanban.ask.archived")}
-							</span>
-						)}
-						{match.updatedAt && (
-							<span className="text-2xs text-muted-foreground tabular-nums">
-								{formatAppDate(match.updatedAt)}
-							</span>
-						)}
-					</span>
-				</span>
-			</button>
-		</li>
 	);
 }
 
@@ -281,6 +129,36 @@ function EntryView({
 	);
 }
 
+const TABS: readonly { id: BoardAskTab; icon: typeof MessageSquareText }[] = [
+	{ id: "ask", icon: MessageSquareText },
+	{ id: "idea", icon: Lightbulb },
+];
+
+/** Ask a question, or check an idea. */
+function TabSwitch({ tab, onChange }: { readonly tab: BoardAskTab; readonly onChange: (tab: BoardAskTab) => void }) {
+	const { t } = useTranslation(["tasks"]);
+	return (
+		<div role="tablist" aria-label={t("kanban.ask.tabs.label")} className="flex shrink-0 gap-1 rounded-xl bg-muted/60 p-1">
+			{TABS.map(({ id, icon: Icon }) => (
+				<button
+					key={id}
+					type="button"
+					role="tab"
+					aria-selected={tab === id}
+					onClick={() => onChange(id)}
+					className={cn(
+						"flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+						tab === id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+					)}
+				>
+					<Icon className="h-3.5 w-3.5" aria-hidden />
+					{t(`kanban.ask.tabs.${id}`)}
+				</button>
+			))}
+		</div>
+	);
+}
+
 export interface BoardAskPanelProps {
 	readonly projectId: string;
 	readonly onOpenTask?: (task: Task) => void;
@@ -290,6 +168,8 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 	const { t } = useTranslation(["tasks", "common"]);
 	const open = useBoardAskStore((s) => s.open);
 	const setOpen = useBoardAskStore((s) => s.setOpen);
+	const tab = useBoardAskStore((s) => s.tab);
+	const setTab = useBoardAskStore((s) => s.setTab);
 	const entries = useBoardAskStore((s) => s.conversations[projectId] ?? EMPTY);
 	const ask = useBoardAskStore((s) => s.ask);
 	const clear = useBoardAskStore((s) => s.clear);
@@ -337,9 +217,15 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 						<MessageSquareText className="h-5 w-5 text-primary" aria-hidden />
 						{t("kanban.ask.title")}
 					</DialogTitle>
-					<DialogDescription>{t("kanban.ask.description")}</DialogDescription>
+					<DialogDescription>{t(tab === "idea" ? "kanban.ask.idea.description" : "kanban.ask.description")}</DialogDescription>
 				</DialogHeader>
 
+				<TabSwitch tab={tab} onChange={setTab} />
+
+				{tab === "idea" ? (
+					<IdeaCheckView projectId={projectId} onOpenTask={openTask} />
+				) : (
+				<>
 				<div ref={listRef} className="-mx-6 min-h-0 flex-1 space-y-5 overflow-y-auto border-y border-border/60 px-6 py-4">
 					{entries.length === 0 ? (
 						<div className="flex h-full flex-col items-center justify-center gap-4 text-center">
@@ -405,6 +291,8 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 						)}
 					</div>
 				</div>
+				</>
+				)}
 			</DialogContent>
 		</Dialog>
 	);

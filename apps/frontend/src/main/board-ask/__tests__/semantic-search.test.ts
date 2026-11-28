@@ -52,9 +52,12 @@ vi.mock("node:child_process", () => ({
 }));
 
 import {
+	createSemanticRankings,
 	createSemanticSearch,
 	EMBED_RUNNER,
+	MAX_SEMANTIC_QUERIES,
 	parseSemanticOutput,
+	parseSemanticRankings,
 	readSemanticMode,
 	runEmbedRunner,
 	SEMANTIC_MARKER,
@@ -120,6 +123,42 @@ describe("parseSemanticOutput", () => {
 	});
 });
 
+describe("parseSemanticRankings", () => {
+	const many = {
+		source: ranking.source,
+		rankings: [{ scores: ranking.scores }, null, { scores: [{ id: "x", score: 1 }] }],
+		indexed: 9,
+		total: 9,
+	};
+
+	it("reads one ranking per query, best first, kept to the ids asked", () => {
+		const parsed = parseSemanticRankings(line(many), ids, 3);
+		expect(parsed).toEqual([
+			{
+				source: ranking.source,
+				scores: [
+					{ id: "t1", score: 0.9 },
+					{ id: "t2", score: 0.4 },
+				],
+				indexed: 2,
+				total: 2,
+			},
+			null,
+			null,
+		]);
+	});
+
+	it.each([
+		["", 3, "no marker"],
+		[line({ ...many, source: null }), 3, "no model"],
+		[line(many), 2, "not one ranking per query"],
+		[line({ ...many, rankings: [null, null, { scores: [{ id: "other", score: 1 }] }] }), 3, "no id it asked"],
+		[line({ ...many, indexed: "all" }), 3, "a count that is not a number"],
+	])("gives nothing for %j (%s)", (stdout, queries) => {
+		expect(parseSemanticRankings(stdout as string, ids, queries as number)).toBeNull();
+	});
+});
+
 describe("semanticMode", () => {
 	it("reads a mode of the closed list, auto otherwise", () => {
 		expect(semanticMode({ boardAskSemantic: "local" })).toBe("local");
@@ -167,6 +206,45 @@ describe("createSemanticSearch", () => {
 	});
 });
 
+describe("createSemanticRankings", () => {
+	const output = line({ source: ranking.source, rankings: [{ scores: ranking.scores }, null], indexed: 2, total: 2 });
+
+	it("is nothing when turned off", () => {
+		expect(createSemanticRankings({ projectDir: "/p", mode: "off" })).toBeUndefined();
+	});
+
+	it("sends every query in one run, with the tickets bounded", async () => {
+		const run = vi.fn(async () => output);
+		const rankings = createSemanticRankings({ projectDir: "/p", mode: "auto", run });
+		const docs = Array.from({ length: 1600 }, (_, i) => ({ id: i < 2 ? `t${i + 1}` : `d${i}`, text: "x" }));
+		const result = await rankings?.([" export ", "email"], docs);
+		expect(run).toHaveBeenCalledTimes(1);
+		const input = (run.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+		expect(input).toMatchObject({ mode: "auto", project_dir: "/p", queries: ["export", "email"] });
+		expect(input).not.toHaveProperty("query");
+		expect(String(input.cache_dir)).toMatch(/user-data[\\/]board-ask$/);
+		expect((input.documents as unknown[]).length).toBe(1500);
+		expect(result?.[0]?.scores[0]?.id).toBe("t1");
+		expect(result?.[1]).toBeNull();
+	});
+
+	it("asks nothing for an empty query, too many queries or an empty board, and survives a failing runner", async () => {
+		const run = vi.fn(async (): Promise<string | null> => {
+			throw new Error("boom");
+		});
+		const rankings = createSemanticRankings({ projectDir: "/p", mode: "local", cacheDir: "/c", run });
+		const docs = [{ id: "t1", text: "x" }];
+		expect(await rankings?.([], docs)).toBeNull();
+		expect(await rankings?.(["a", " "], docs)).toBeNull();
+		expect(await rankings?.(Array.from({ length: MAX_SEMANTIC_QUERIES + 1 }, (_, i) => `q${i}`), docs)).toBeNull();
+		expect(await rankings?.(["a"], [])).toBeNull();
+		expect(run).not.toHaveBeenCalled();
+		expect(await rankings?.(["a"], docs)).toBeNull();
+		run.mockResolvedValueOnce(null);
+		expect(await rankings?.(["a"], docs)).toBeNull();
+	});
+});
+
 describe("runEmbedRunner", () => {
 	it("starts the runner by its path, without a shell, and gives back its output", async () => {
 		const pending = runEmbedRunner({ query: "q" });
@@ -198,10 +276,12 @@ describe("runEmbedRunner", () => {
 		expect((await pending)?.endsWith("dropped")).toBe(false);
 	});
 
-	it("is what a search runs by default", async () => {
+	it("is what a search and an idea check run by default", async () => {
 		state.python = null;
 		const search = createSemanticSearch({ projectDir: "/p", mode: "auto" });
 		expect(await search?.("q", [{ id: "t1", text: "x" }])).toBeNull();
+		const rankings = createSemanticRankings({ projectDir: "/p", mode: "auto" });
+		expect(await rankings?.(["q"], [{ id: "t1", text: "x" }])).toBeNull();
 	});
 
 	it("gives nothing without Python, or when it cannot start or errors", async () => {

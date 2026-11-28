@@ -644,6 +644,57 @@
 					"local": "Only an embeddings model on this computer: tickets never leave it for this step",
 					"off": "Keywords and the AI model only"
 				}
+			},
+			"tabs": {
+				"label": "Ask the board or check an idea",
+				"ask": "Ask a question",
+				"idea": "Check an idea"
+			},
+			"idea": {
+				"description": "Paste a feature you plan, in any language: each of its requirements comes back done, partly done or missing, with the tickets that hold it.",
+				"label": "The feature to check",
+				"placeholder": "Describe the feature: a sentence, a list of needs or a pasted spec. For example: \"Admins can export the user list to CSV, filtered by role, and get an email when it is ready.\"",
+				"check": "Check",
+				"length": "{{count}} / {{max}}",
+				"emptyHint": "The board splits the idea into requirements and looks for each one in every ticket, whatever language it was written in. Ctrl + Enter checks it.",
+				"checking": "Reading the board for each requirement…",
+				"failed": "The idea could not be checked. Try again.",
+				"noRequirement": "No requirement could be read from this idea.",
+				"unjudgedHint": "No model judged these requirements: the closest tickets are listed, check them before deciding.",
+				"verdict": {
+					"done": "Already done",
+					"partial": "Partly done",
+					"missing": "Missing",
+					"unknown": "To check"
+				},
+				"tally": {
+					"done_one": "{{count}} done",
+					"done_other": "{{count}} done",
+					"partial_one": "{{count}} partly done",
+					"partial_other": "{{count}} partly done",
+					"missing_one": "{{count}} missing",
+					"missing_other": "{{count}} missing",
+					"unknown_one": "{{count}} to check",
+					"unknown_other": "{{count}} to check"
+				},
+				"createCard": "Create a card with what is missing",
+				"createHint": "The card lists only the requirements not done yet, with the tickets they build on. It lands in the backlog.",
+				"createFailed": "The card could not be created.",
+				"created": "Card created in the backlog.",
+				"openCard": "Open the card",
+				"allDone": "Every requirement is already done: nothing to create.",
+				"another": "Check another idea",
+				"card": {
+					"untitled": "Feature to build",
+					"section": {
+						"missing": "To build",
+						"partial": "To finish",
+						"unknown": "To check",
+						"done": "Already done"
+					},
+					"buildsOn": "Builds on: {{tickets}}",
+					"original": "Original idea"
+				}
 			}
 		},
 		"lanes": {

@@ -59,7 +59,7 @@ const RRF_K = 60;
  * listed: those within this much of the closest one's cosine.
  */
 export const SEMANTIC_BAND = 0.12;
-const LANGUAGE_NAMES: Readonly<Record<string, string>> = {
+export const LANGUAGE_NAMES: Readonly<Record<string, string>> = {
 	en: "English",
 	fr: "French",
 	es: "Spanish",
@@ -69,7 +69,7 @@ const LANGUAGE_NAMES: Readonly<Record<string, string>> = {
 	nl: "Dutch",
 };
 
-const SYSTEM_PROMPT = "You output ONLY valid JSON. No prose, no markdown fences.";
+export const SYSTEM_PROMPT = "You output ONLY valid JSON. No prose, no markdown fences.";
 
 /** One completion: the prompt in, the model's text out, null when it failed. */
 export type CompletionFn = (prompt: string, systemPrompt: string, label: string) => Promise<string | null>;
@@ -96,7 +96,7 @@ interface Judged {
 	matches: { ref: string; coverage: BoardAskCoverage; reason: string }[];
 }
 
-function jsonObject(raw: string): Record<string, unknown> | null {
+export function jsonObject(raw: string): Record<string, unknown> | null {
 	const start = raw.indexOf("{");
 	const end = raw.lastIndexOf("}");
 	if (start === -1 || end <= start) return null;
@@ -110,7 +110,7 @@ function jsonObject(raw: string): Record<string, unknown> | null {
 	}
 }
 
-function oneLine(value: unknown, max: number): string {
+export function oneLine(value: unknown, max: number): string {
 	return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "";
 }
 
@@ -215,7 +215,7 @@ export function parseJudgement(raw: string | null, refs: ReadonlySet<string>): J
 
 const COVERAGE_ORDER: Readonly<Record<BoardAskCoverage, number>> = { full: 0, partial: 1, related: 2 };
 
-function toMatch(ticket: BoardTicket, extra: Partial<BoardAskMatch> = {}): BoardAskMatch {
+export function toMatch(ticket: BoardTicket, extra: Partial<BoardAskMatch> = {}): BoardAskMatch {
 	return {
 		taskId: ticket.id,
 		title: ticket.title,
@@ -259,7 +259,7 @@ export function fuseRanks(rankings: readonly (readonly string[])[], k = RRF_K): 
 }
 
 /** The closest tickets of a ranking by meaning: `top` of them, or those within the band. */
-function closest(meaning: SemanticRanking | null, top: number, band?: number): string[] {
+export function closest(meaning: SemanticRanking | null, top: number, band?: number): string[] {
 	if (!meaning || meaning.scores.length === 0) return [];
 	const best = meaning.scores[0].score;
 	return meaning.scores
@@ -268,7 +268,7 @@ function closest(meaning: SemanticRanking | null, top: number, band?: number): s
 		.map((s) => s.id);
 }
 
-function semanticInfo(meaning: SemanticRanking): BoardAskSemantic {
+export function semanticInfo(meaning: SemanticRanking): BoardAskSemantic {
 	return { ...meaning.source, indexed: meaning.indexed, total: meaning.total };
 }
 

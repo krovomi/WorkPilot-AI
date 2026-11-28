@@ -68,6 +68,7 @@ __all__ = [
     "Ranking",
     "Source",
     "rank",
+    "rank_many",
     "resolve",
 ]
 
@@ -75,6 +76,7 @@ MODES = ("auto", "local", "off")
 MAX_DOCUMENTS = 1500
 MAX_TEXT_CHARS = 2000
 MAX_QUERY_CHARS = 1000
+MAX_QUERIES = 16
 MAX_ID_CHARS = 200
 MAX_CACHED = 4000
 MAX_DIM = 8192
@@ -434,27 +436,27 @@ def _role(model: str, role: str, text: str) -> str:
     return f"{role}: {text}" if "e5" in model.lower() else text
 
 
-def rank(
+def rank_many(
     source: Source,
     embedder: VectorSource,
-    query: str,
+    queries: list[str],
     documents: list[dict[str, str]],
     *,
     budget_s: float = TIME_BUDGET_S,
     clock: Any = time.monotonic,
-) -> Ranking | None:
-    """The documents by closeness to *query*, best first, or ``None`` when the
-    model gave no vector for the question.
+) -> list[Ranking | None] | None:
+    """A ranking of the documents per query, best first, or ``None`` when the
+    model gave no vector for any query (a query without one gets ``None``).
 
-    The documents are asked by chunks until *budget_s* has passed: those not
-    read yet (nor cached) are left out of the scores, and `Ranking.indexed`
-    says how many were.
+    The documents are read once, by chunks, until *budget_s* has passed:
+    those not read yet (nor cached) are left out of the scores, and
+    `Ranking.indexed` says how many were.
     """
     deadline = clock() + budget_s
-    question = embedder.vectors(
-        [_role(source.model, "query", query[:MAX_QUERY_CHARS])]
-    )[0]
-    if question is None:
+    asked = embedder.vectors(
+        [_role(source.model, "query", q[:MAX_QUERY_CHARS]) for q in queries]
+    )
+    if all(v is None for v in asked):
         return None
     docs = documents[:MAX_DOCUMENTS]
     texts = [_role(source.model, "passage", d["text"][:MAX_TEXT_CHARS]) for d in docs]
@@ -465,13 +467,39 @@ def rank(
             break
         vectors.extend(embedder.vectors(texts[start : start + LOCAL_CHUNK]))
     embedder.save()
-    scores = [
-        {"id": doc["id"], "score": round(similarity(question, vector), 4)}
+    read = [
+        (doc, vector)
         for doc, vector in zip(docs, vectors, strict=True)
         if vector is not None
     ]
-    scores.sort(key=lambda s: -s["score"])
-    return Ranking(source, scores, indexed=len(scores), total=len(docs))
+    rankings: list[Ranking | None] = []
+    for question in asked:
+        if question is None:
+            rankings.append(None)
+            continue
+        scores = [
+            {"id": doc["id"], "score": round(similarity(question, vector), 4)}
+            for doc, vector in read
+        ]
+        scores.sort(key=lambda s: -s["score"])
+        rankings.append(Ranking(source, scores, indexed=len(read), total=len(docs)))
+    return rankings
+
+
+def rank(
+    source: Source,
+    embedder: VectorSource,
+    query: str,
+    documents: list[dict[str, str]],
+    *,
+    budget_s: float = TIME_BUDGET_S,
+    clock: Any = time.monotonic,
+) -> Ranking | None:
+    """The documents by closeness to *query*, best first (`rank_many` of one)."""
+    rankings = rank_many(
+        source, embedder, [query], documents, budget_s=budget_s, clock=clock
+    )
+    return rankings[0] if rankings else None
 
 
 def parse_request(raw: Any) -> dict[str, Any]:
@@ -489,8 +517,11 @@ def parse_request(raw: Any) -> dict[str, Any]:
         not isinstance(project_dir, str) or not Path(project_dir).is_absolute()
     ):
         raise ValueError("project_dir must be an absolute path")
-    query = raw.get("query")
-    if not isinstance(query, str) or not query.strip():
+    many = "queries" in raw
+    asked = raw.get("queries") if many else [raw.get("query")]
+    if not isinstance(asked, list) or not 0 < len(asked) <= MAX_QUERIES:
+        raise ValueError("queries must be a bounded list")
+    if not all(isinstance(q, str) and q.strip() for q in asked):
         raise ValueError("query must be text")
     documents = raw.get("documents")
     if not isinstance(documents, list) or len(documents) > MAX_DOCUMENTS:
@@ -509,6 +540,7 @@ def parse_request(raw: Any) -> dict[str, Any]:
         "mode": mode,
         "cache_dir": Path(cache_dir).resolve(),
         "project_dir": Path(project_dir).resolve() if project_dir else None,
-        "query": query.strip()[:MAX_QUERY_CHARS],
+        "queries": [q.strip()[:MAX_QUERY_CHARS] for q in asked],
+        "many": many,
         "documents": docs,
     }

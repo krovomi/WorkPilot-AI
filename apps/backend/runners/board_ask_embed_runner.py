@@ -10,10 +10,16 @@ Input: a JSON file passed via ``--input <path>``::
    "project_dir": "<project>", "query": "...",
    "documents": [{"id": "...", "text": "..."}]}
 
+or ``"queries": ["...", ...]`` (at most 16) in place of ``"query"``, to rank
+the same tickets for each (« Vérifier une idée », one per requirement).
+
 Output, one line on stdout (exit 0)::
 
   __BOARD_ASK_SEMANTIC__:{"source": {"kind", "provider", "model"},
                           "scores": [{"id", "score"}], "indexed", "total"}
+
+With ``"queries"``: ``{"source", "rankings": [{"scores"} | null, ...],
+"indexed", "total"}``, one ranking per query, in their order.
 
 ``"source": null`` when no embeddings model can be asked (none on the machine,
 a provider without embeddings, the strict offline policy, ``off``): the panel
@@ -31,7 +37,7 @@ from pathlib import Path
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-from board_ask.semantic import parse_request, rank, resolve  # noqa: E402
+from board_ask.semantic import parse_request, rank_many, resolve  # noqa: E402
 
 MARKER = "__BOARD_ASK_SEMANTIC__:"
 MAX_INPUT_BYTES = 8 * 1024 * 1024
@@ -58,9 +64,26 @@ def main(argv: list[str] | None = None) -> int:
         _emit({"source": None, "scores": []})
         return 0
     source, embedder = found
-    ranking = rank(source, embedder, request["query"], request["documents"])
-    _emit(ranking.to_dict() if ranking else {"source": None, "scores": []})
+    rankings = rank_many(source, embedder, request["queries"], request["documents"])
+    if not rankings:
+        _emit({"source": None, "scores": []})
+    elif request["many"]:
+        _emit(_many(rankings))
+    else:
+        first = rankings[0]
+        _emit(first.to_dict() if first else {"source": None, "scores": []})
     return 0
+
+
+def _many(rankings: list) -> dict:
+    """One answer for several queries: the source and counts once."""
+    known = next(r for r in rankings if r is not None)
+    return {
+        "source": known.source.to_dict(),
+        "rankings": [{"scores": r.scores} if r else None for r in rankings],
+        "indexed": known.indexed,
+        "total": known.total,
+    }
 
 
 if __name__ == "__main__":

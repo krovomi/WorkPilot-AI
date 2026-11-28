@@ -3,7 +3,7 @@
  * conversation so far, shows the answer with its cited tickets, opens a ticket,
  * and says when only the keyword search answered.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installRendererApi, type RendererApi } from "../../../../__tests__/helpers/renderer-api";
@@ -29,7 +29,7 @@ let askBoard: ReturnType<typeof vi.fn>;
 beforeEach(() => {
 	askBoard = vi.fn(async () => ({ success: true, data: aiResult }));
 	api = installRendererApi({ askBoard });
-	useBoardAskStore.setState({ open: false, conversations: {} });
+	useBoardAskStore.setState({ open: false, tab: "ask", conversations: {}, ideas: {} });
 	useTaskStore.setState({ tasks: [{ id: "t1", title: "Refonte de la page d'administration" } as Task] });
 });
 afterEach(() => api.restore());
@@ -155,6 +155,25 @@ describe("BoardAskPanel", () => {
 		render(<BoardAskButton projectId="p1" />);
 		await userEvent.click(screen.getByRole("button", { name: "How was the admin page reworked?" }));
 		await waitFor(() => expect(askBoard).toHaveBeenCalled());
+	});
+
+	it("waits for the answer before the next question, and keeps each tab's work", async () => {
+		let answer: (value: unknown) => void = () => undefined;
+		askBoard.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="p1" />);
+		await userEvent.type(screen.getByRole("textbox", { name: /Ask a question/ }), "Admin page?{Enter}Exports");
+		expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Ask" })).toBeDisabled();
+
+		await userEvent.click(screen.getByRole("tab", { name: "Check an idea" }));
+		expect(screen.getByRole("tab", { name: "Check an idea" })).toHaveAttribute("aria-selected", "true");
+		expect(screen.getByText(/Paste a feature you plan/)).toBeInTheDocument();
+		await userEvent.click(screen.getByRole("tab", { name: "Ask a question" }));
+		await act(async () => answer({ success: true, data: aiResult }));
+		expect(await screen.findByText("Answered by AI")).toBeInTheDocument();
+		await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Ask" }));
+		await waitFor(() => expect(askBoard).toHaveBeenCalledTimes(2));
+		expect(askBoard.mock.calls[1]?.[0]).toMatchObject({ question: "Exports" });
 	});
 });
 

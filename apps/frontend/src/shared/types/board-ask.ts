@@ -76,9 +76,46 @@ export interface BoardAskResult {
 	semantic?: BoardAskSemantic;
 }
 
+/**
+ * « Vérifier une idée »: how much of one requirement of the idea the board
+ * already holds, per the model; `unknown` when no model judged it.
+ */
+export type BoardIdeaVerdict = "done" | "partial" | "missing" | "unknown";
+
+export const BOARD_IDEA_VERDICTS: readonly BoardIdeaVerdict[] = ["done", "partial", "missing", "unknown"];
+
+export interface BoardIdeaRequest {
+	projectId: string;
+	/** The feature as the person describes it: a sentence, a list, a pasted spec. */
+	idea: string;
+}
+
+export interface BoardIdeaRequirement {
+	/** One verifiable part of the idea, in its language. */
+	text: string;
+	verdict: BoardIdeaVerdict;
+	/** One line on what the tickets already do for it, or what is missing. */
+	reason?: string;
+	/** The tickets that cover it or relate to it, best first. */
+	matches: BoardAskMatch[];
+}
+
+export interface BoardIdeaResult {
+	/** A short title for a card holding the idea. */
+	title: string;
+	/** The model's overall verdict, in the idea's language; empty without a model. */
+	summary: string;
+	requirements: BoardIdeaRequirement[];
+	mode: "ai" | "semantic" | "keywords";
+	searched: number;
+	semantic?: BoardAskSemantic;
+}
+
 /** Bounds the main process holds the renderer to. */
 export const BOARD_ASK_LIMITS = {
 	question: 1000,
 	historyTurns: 4,
 	turnText: 4000,
+	idea: 6000,
+	requirements: 12,
 } as const;
