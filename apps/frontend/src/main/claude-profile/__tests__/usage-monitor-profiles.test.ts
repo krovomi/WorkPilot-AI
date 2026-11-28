@@ -624,8 +624,9 @@ describe("the `claude usage` fallback", () => {
 		world.cli = { stdout: "usage: 12% now", stderr: "", code: 0 };
 		expect(await cli()).toMatchObject({ sessionPercent: 12, weeklyPercent: 0 });
 
+		// An answer without any usage (an error, a prompt) is unread, not 0 %
 		world.cli = { stdout: "no numbers here", stderr: "", code: 0 };
-		expect(await cli()).toMatchObject({ sessionPercent: 0, weeklyPercent: 0 });
+		expect(await cli()).toBeNull();
 	});
 
 	it("gives nothing for a failed command, an empty output or a missing claude", async () => {

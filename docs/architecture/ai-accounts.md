@@ -94,7 +94,11 @@ id court et imprimable) et le main cherche le compte dans son propre magasin.
   comptes qui ont une clé, l'actif marqué, un clic pour en faire le défaut. Claude garde sa liste
   de profils avec leur usage. Les pourcentages de Claude sont ceux du profil actif
   (`claude-profile/usage-profile.ts`), jamais du moins utilisé : un compte tout juste ajouté, sans
-  usage, trierait devant. Une connexion expirée y donne « reconnecter », pas « non mesuré ».
+  usage, trierait devant. Une connexion perdue y donne « reconnecter », pas « non mesuré », dans
+  tous les cas (`readClaudeUsage`) : plus de jeton, rafraîchissement refusé (le jeton expiré du
+  trousseau n'est alors pas renvoyé), ou jeton refusé par l'API d'usage (401/403). Le repli
+  `claude usage` tourne dans le dossier du compte (`CLAUDE_CONFIG_DIR`), sinon il lirait le compte
+  par défaut ; une sortie sans chiffre ne vaut pas 0 %.
 
 ## IPC
 

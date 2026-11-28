@@ -98,7 +98,7 @@ function freshWorld() {
 			stderr: string;
 			code: number | null;
 		} | null,
-		spawns: [] as Array<{ command: string; args: string[] }>,
+		spawns: [] as Array<{ command: string; args: string[]; configDir?: string }>,
 		codex: null as unknown,
 		codexError: null as Error | null,
 		windsurfPlan: { success: false, error: "no cached plan" } as unknown,
@@ -316,8 +316,9 @@ export const envUtilsModule = {
 
 /** `claude usage` as the world says it behaves, answered on the next tick. */
 export const childProcessModule = {
-	spawn: (command: string, args: string[]) => {
-		world.spawns.push({ command, args });
+	spawn: (command: string, args: string[], options?: { env?: Record<string, string> }) => {
+		const configDir = options?.env?.CLAUDE_CONFIG_DIR;
+		world.spawns.push({ command, args, ...(configDir && { configDir }) });
 		const child = Object.assign(new EventEmitter(), {
 			stdout: new EventEmitter(),
 			stderr: new EventEmitter(),
