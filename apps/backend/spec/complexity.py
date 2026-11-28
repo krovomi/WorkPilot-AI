@@ -96,6 +96,27 @@ def needs_ai_assessment(
     return heuristic.confidence < threshold
 
 
+#: The longest card read as a short question (characters, title and body).
+SHORT_QUESTION_MAX_CHARS = 160
+
+#: Question marks: Latin, full-width (CJK) and Arabic.
+_QUESTION_MARKS = ("?", "？", "؟")
+
+
+def is_short_question(text: str) -> bool:
+    """A card of one short question: few characters, ending with a question mark.
+
+    Language-free on purpose: the keyword lists below are English, and a
+    question asked in French matched none of them.
+    """
+    stripped = (text or "").strip()
+    if not stripped or len(stripped) > SHORT_QUESTION_MAX_CHARS:
+        return False
+    if stripped.count("\n") > 1:
+        return False
+    return stripped.endswith(_QUESTION_MARKS)
+
+
 class ComplexityAnalyzer:
     """Analyzes task description and context to determine complexity."""
 
@@ -190,6 +211,7 @@ class ComplexityAnalyzer:
         signals["simple_keywords"] = simple_matches
         signals["complex_keywords"] = complex_matches
         signals["multi_service_keywords"] = multi_service_matches
+        signals["short_question"] = is_short_question(task_description)
 
         # 2. External integrations detection
         integrations = self._detect_integrations(task_lower)
@@ -337,6 +359,19 @@ class ComplexityAnalyzer:
                 f"Single service, {estimated_files} file(s), no integrations"
             )
             return Complexity.SIMPLE, 0.9, "; ".join(reasons)
+
+        # A short question ("do you see this ticket?", "why does X fail?") asks
+        # for an answer, not a change: in any language, a card of a few words
+        # ending with a question mark. It used to fall through to STANDARD at
+        # 0.75 and open the complexity_assessor session to be told "simple".
+        if (
+            signals.get("short_question")
+            and len(integrations) == 0
+            and not infra_changes
+            and signals["complex_keywords"] == 0
+        ):
+            reasons.append("a short question, no change named")
+            return Complexity.SIMPLE, 0.85, "; ".join(reasons)
 
         # Strong indicators for COMPLEX
         if (

@@ -146,6 +146,13 @@ off, because a proxy that does not forward `tool_reference` blocks would lose
 every deferred tool. If your proxy forwards them, export `ENABLE_TOOL_SEARCH`
 (`true`, `auto` or `auto:N`); a value you export is never overridden.
 
+Each Claude session is also given only the built-in tools its agent type
+declares (the CLI's `--tools`): a summarizer gets none, a reviewer its readers
+and its declared writers, the coder its tools plus `Agent` and `Skill`. MCP
+tools are not affected. `WORKPILOT_CLI_TOOL_BASE=0` restores the CLI's whole
+default set (Agent, Workflow, Monitor, Cron, worktree tools…), about 20 k tokens
+re-read on every turn ([trivial-task-tokens.md](architecture/trivial-task-tokens.md)).
+
 ### Deliberately **not** supported
 
 - **`ANTHROPIC_API_KEY`** is intentionally excluded. Supporting it could

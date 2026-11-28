@@ -215,8 +215,31 @@ class PlanningPhaseMixin:
 
         return PhaseResult("planning", False, [], errors, MAX_RETRIES)
 
+    def _repair_without_model(self) -> None:
+        """What the validator asks for and needs no model to write.
+
+        A missing `context.json` (the quick spec never writes one) and a plan
+        without `feature` or `workflow_type` used to cost a whole
+        `validation_fixer` session: nine turns and 473 k tokens on a card that
+        only asked a question (2026-11-28). The same stand-ins the context and
+        planning phases write themselves.
+        """
+        from .. import context, requirements
+        from ..validate_pkg import auto_fix_plan
+
+        if not (self.spec_dir / "context.json").exists():
+            req = requirements.load_requirements(self.spec_dir) or {}
+            context.create_minimal_context(
+                self.spec_dir,
+                req.get("task_description") or self.task_description or "",
+                req.get("services_involved") or [],
+            )
+        if (self.spec_dir / "implementation_plan.json").exists():
+            auto_fix_plan(self.spec_dir)
+
     async def phase_validation(self) -> PhaseResult:
         """Final validation of all spec files with auto-fix retry."""
+        self._repair_without_model()
         for attempt in range(MAX_RETRIES):
             results = self.spec_validator.validate_all()
             all_valid = all(r.valid for r in results)

@@ -18,6 +18,7 @@ import { findTaskWorktree } from "../../worktree-paths";
 import { persistPlanStatus } from "./plan-file-utils";
 import { clearPauseState } from "./pause-state-utils";
 import { resumeTaskWithProvider } from "./resume-with-provider";
+import { hotSwapMarkerBody } from "./hot-swap-marker";
 import { findTaskAndProject } from "./shared";
 import {
 	allSpecDirs,
@@ -295,17 +296,13 @@ export function registerTaskResumeHandlers(ctx: ExecutionHandlerContext): void {
 					(d, i, arr): d is string =>
 						!!d && existsSync(d) && arr.indexOf(d) === i,
 				);
-				const payload = JSON.stringify({
-					phase: configPhase,
-					provider: change.provider ?? null,
-					model: change.model ?? null,
-					effort: change.effort ?? null,
-					requested_at: new Date().toISOString(),
-				});
 				let wrote = false;
 				for (const dir of specDirs) {
 					try {
-						atomicWriteFileSync(path.join(dir, "HOT_SWAP.json"), payload);
+						const marker = path.join(dir, "HOT_SWAP.json");
+						// A pending request of the same phase keeps the fields this one leaves out.
+						const payload = hotSwapMarkerBody(configPhase, change, safeReadFileSync(marker));
+						atomicWriteFileSync(marker, payload);
 						wrote = true;
 					} catch (err) {
 						appLog.warn(

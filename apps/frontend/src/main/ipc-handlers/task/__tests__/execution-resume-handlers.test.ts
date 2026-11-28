@@ -477,6 +477,20 @@ describe("TASK_HOT_SWAP", () => {
 		}
 	});
 
+	it("keeps the model of a pending request when only the effort follows", async () => {
+		setTask();
+		expect(await swap("planning", { model: "claude-haiku-5-5" })).toEqual({ success: true });
+		expect(await swap("planning", { effort: "none" })).toEqual({ success: true });
+		expect(read(path.join(specDir, "HOT_SWAP.json"))).toMatchObject({
+			phase: "planning",
+			model: "claude-haiku-5-5",
+			effort: "none",
+		});
+		// A request for another phase does not inherit it.
+		expect(await swap("qa", { effort: "low" })).toEqual({ success: true });
+		expect(read(path.join(specDir, "HOT_SWAP.json"))).toMatchObject({ phase: "qa", model: null, effort: "low" });
+	});
+
 	it("fails when no marker could be written", async () => {
 		setTask();
 		mkdirSync(path.join(specDir, `HOT_SWAP.json.${process.pid}.tmp`));

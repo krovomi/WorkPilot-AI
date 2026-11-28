@@ -27,6 +27,7 @@ Usage:
     client = create_client(project_dir, spec_dir, model, agent_type="coder")
 """
 
+from .builtin_base import restrict_builtin_tools
 from .models import (
     # Agent configuration registry
     AGENT_CONFIGS,
@@ -71,6 +72,7 @@ __all__ = [
     "declared_servers",
     "declared_tools",
     "undeclared_builtin_tools",
+    "restrict_builtin_tools",
     "hooked_grants",
     "mcp_tools_for_servers",
     "setting_sources_for",
