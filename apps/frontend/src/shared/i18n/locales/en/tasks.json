@@ -378,7 +378,8 @@
 			"labelsLabel": "Labels",
 			"quick": {
 				"flagged": "Blocked",
-				"recent": "Changed this week"
+				"recent": "Changed this week",
+				"mine": "My tasks"
 			}
 		},
 		"sort": {

@@ -3462,5 +3462,12 @@
 	"kanbanAbandonClosedPrs": {
 		"label": "Mettre de côté les cartes dont la PR est fermée",
 		"description": "Une carte dont la pull request a été fermée sans fusion passe dans « Abandonnée », avec la raison « PR fermée sans fusion ». La reprendre la remet au travail."
+	},
+	"kanbanAutoArchive": {
+		"label": "Archiver les tâches terminées",
+		"description": "Une tâche terminée depuis plus longtemps est archivée. « Afficher les archivées » dans la colonne Terminée la fait revenir. Projets locaux seulement.",
+		"off": "Jamais",
+		"after_one": "Après {{count}} jour",
+		"after_other": "Après {{count}} jours"
 	}
 }

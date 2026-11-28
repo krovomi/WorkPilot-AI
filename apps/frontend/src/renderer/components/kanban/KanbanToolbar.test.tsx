@@ -4,7 +4,7 @@
  * real filter store, so each test reads the filters the board would apply.
  */
 
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -16,6 +16,7 @@ import type { Project } from "../../../shared/types";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
 import { DEFAULT_LANE_PREFERENCES, useKanbanLanesStore } from "../../stores/kanban-lanes-store";
 import { useMultiRepoStore } from "../../stores/multi-repo-store";
+import { useCollaborationStore } from "../../stores/collaboration-store";
 import { useProjectStore } from "../../stores/project-store";
 import { useShortcutsHelpStore } from "../../stores/shortcuts-help-store";
 import { useTaskStore } from "../../stores/task-store";
@@ -266,6 +267,23 @@ describe("local and server boards", () => {
 		expect(screen.queryByRole("textbox", { name: /Quick command/ })).toBeNull();
 		expect(screen.queryByRole("button", { name: "More board actions" })).toBeNull();
 		expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
+	});
+
+	it("a server board offers « My tasks » once its team room says who I am", async () => {
+		useProjectStore.setState({
+			projects: [project({ remote: { serverUrl: "https://srv", projectId: "r1" } } as never)],
+		});
+		const { unmount } = renderToolbar();
+		let panel = await openFilters();
+		expect(within(panel).queryByRole("button", { name: "My tasks" })).toBeNull();
+		unmount();
+		renderToolbar();
+		// The team room answers after the toolbar joined it.
+		act(() => useCollaborationStore.setState({ me: { id: "u1", name: "Ana" } as never }));
+		panel = await openFilters();
+		await userEvent.click(within(panel).getByRole("button", { name: "My tasks" }));
+		expect(filters().quick).toEqual(["mine"]);
+		useCollaborationStore.setState({ me: null });
 	});
 
 	it("a local board keeps its occasional actions in the more menu", async () => {

@@ -1,11 +1,15 @@
 /**
+ * @vitest-environment jsdom
+ *
  * The Kanban filter store: the filters, sort and saved views of each project,
  * cached in localStorage, mirrored to the main process (shared across
  * machines in server mode), and the main copy winning when it answers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SORT, EMPTY_FILTERS } from "../../lib/kanban-filter";
-import { type SavedView, useKanbanFilterStore } from "../kanban-filter-store";
+import { act, renderHook } from "@testing-library/react";
+import { useCollaborationStore } from "../collaboration-store";
+import { type SavedView, useBoardFilters, useKanbanFilterStore } from "../kanban-filter-store";
 import { DEFAULT_LANE_PREFERENCES, useKanbanLanesStore } from "../kanban-lanes-store";
 
 const api = { getKanbanBoardState: vi.fn(), saveKanbanBoardState: vi.fn() };
@@ -328,4 +332,26 @@ it("persists nothing before a project is loaded", () => {
 	store().saveCurrentView("v");
 	expect(api.saveKanbanBoardState).not.toHaveBeenCalled();
 	expect(localStorage.getItem("kanban-filters-null")).toBeNull();
+});
+
+describe("useBoardFilters", () => {
+	beforeEach(() => open("p1"));
+
+	it("adds the cards my claim holds when « My tasks » is on, and keeps the object otherwise", () => {
+		useCollaborationStore.setState({
+			me: { id: "u1", name: "Ana" } as never,
+			locks: {
+				"server:r:1": { taskId: "server:r:1", cardId: "1", userId: "u1", userName: "Ana" },
+				"server:r:2": { taskId: "server:r:2", cardId: "2", userId: "u2", userName: "Bo" },
+			},
+		});
+		const { result, rerender } = renderHook(() => useBoardFilters());
+		expect(result.current).toBe(store().filters);
+		const first = result.current;
+		rerender();
+		expect(result.current).toBe(first);
+		act(() => store().toggleQuick("mine"));
+		expect([...(result.current.claimedByMe ?? [])]).toEqual(["server:r:1"]);
+		useCollaborationStore.setState({ me: null, locks: {} });
+	});
 });

@@ -423,6 +423,8 @@ export interface AppSettings {
 	kanbanColumnSummary?: boolean;
 	// A card whose PR was closed without a merge goes to « Abandonnée » (default on)
 	kanbanAbandonClosedPrs?: boolean;
+	// Done cards archived after this many days: 0 (off, default), 7, 14 or 30
+	kanbanAutoArchiveDays?: number;
 	// Sidebar collapsed state (icons only when true)
 	sidebarCollapsed?: boolean;
 	// Sidebar width in pixels when expanded (default 256)
