@@ -2320,7 +2320,14 @@
 		"onlyResumedPhase": "Only for the resumed phase ({{phase}}) — the following phases keep their engine",
 		"effortNotApplied": "This model has no effort setting WorkPilot can reach: the level you pick has no effect on it.",
 		"effortSentAs": "Sent to the provider as “{{value}}”, the closest level this model takes.",
-		"effortRuntime": "Applied at launch if the model takes it; the task log says what was sent."
+		"effortRuntime": "Applied at launch if the model takes it; the task log says what was sent.",
+		"codeMode": {
+			"label": "Code mode",
+			"default": "As in Settings",
+			"off": "Off",
+			"auto": "Auto",
+			"on": "On"
+		}
 	},
 	"redTeam": {
 		"title": "Red team",
@@ -3175,7 +3182,9 @@
 			"seconds": "{{seconds}} s",
 			"minutes": "{{minutes}} min",
 			"hours": "{{hours}} h {{minutes}} min",
-			"days": "{{days}} d {{hours}} h"
+			"days": "{{days}} d {{hours}} h",
+			"hoursOnly": "{{hours}} h",
+			"daysOnly": "{{days}} d"
 		}
 	},
 	"approvalTier": {

@@ -191,6 +191,9 @@ cas), sans autre détail en mode serveur. Il ne consulte pas PostgreSQL : la pre
 reçoit l'API initialise la base et échoue si elle ne répond pas ; ensuite `/health` ne la regarde
 plus. `alembic current` doit finir par `(head)`, comme le vérifie la CI.
 
+Le détail est dans **la page de santé**, `GET /admin/platform/health`, réservée aux
+administrateurs de la plateforme (voir [Surveiller le serveur](#surveiller-le-serveur)).
+
 ### 5. Premier administrateur, première organisation
 
 ```bash
@@ -287,7 +290,9 @@ passer l'upgrade WebSocket sur `/stream/` et pose `X-Forwarded-For`.
   vers le proxy. Caddy ne journalise pas les requêtes par défaut ; si vous activez `log`, un lien
   d'invitation ouvert dans un navigateur y laisserait son jeton.
 - **Les routes publiques.** `/health`, `/docs` et `/openapi.json` (la description de l'API, aucune
-  donnée) répondent sans jeton, comme la connexion et l'acceptation d'une invitation.
+  donnée) répondent sans jeton, comme la connexion et l'acceptation d'une invitation. `/metrics`
+  ne demande pas de compte mais son propre jeton (`WORKPILOT_METRICS_TOKEN`) et répond 404 sans
+  lui : ne l'exposez au proxy que si le collecteur est dehors.
 - **Les redémarrages.** Le proxy vit dans l'espace réseau d'`api` : si `api` redémarre seul et que
   le site ne répond plus, `docker compose --env-file .env.server restart proxy`.
 
@@ -332,6 +337,9 @@ Le bloc `environment:` du compose l'emporte sur `.env.server` pour `WORKPILOT_SE
 | `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | `60` | Durée de validité d'un lien de mot de passe oublié, ramenée entre 5 et 1440 minutes. |
 | `WORKPILOT_USAGE_RETENTION_DAYS` | `365` | Combien de jours le serveur garde la consommation par run et par job et les jours de présence de chacun, ramené entre 30 et 3650 ; il efface chaque heure ce qui est plus vieux. Ce qui est enregistré : [server-usage-data.md](server-usage-data.md). |
 | `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS` | `183` | Combien de jours le serveur garde l'activité par page (désactivée par défaut, activée par chaque organisation dans **Administration → Usage**), ramené entre 30 et 3650. Une organisation peut régler ses propres durées au même endroit ; ces deux variables sont celles des organisations qui n'en ont pas réglé. |
+| `WORKPILOT_METRICS_TOKEN` | — | Le jeton qu'un collecteur Prometheus envoie à `/metrics` (`Authorization: Bearer …`), 32 caractères au moins. Sans lui, `/metrics` répond 404. C'est un secret : il va dans `.env.server`, jamais dans un fichier suivi. |
+| `WORKPILOT_REPORT_TIMEZONE` | `Europe/Paris` | Le fuseau (nom IANA) du rapport d'usage quotidien des organisations qui n'ont pas réglé le leur ; un nom inconnu vaut `UTC`. |
+| `WORKPILOT_REPORT_LANGUAGE` | `fr` | La langue (`fr` ou `en`) du rapport d'usage des organisations qui n'ont pas réglé la leur. |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | `12` | Longueur minimale d'un mot de passe local ; ne fait que monter le plancher de 12. |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | Refuse un nouveau mot de passe connu de Have I Been Pwned (seuls cinq caractères de son empreinte SHA-1 sortent ; service injoignable, le mot de passe est accepté). |
 | `WORKPILOT_SMTP_*` | — | E-mail des invitations et des liens de mot de passe oublié (sans SMTP, l'écran renvoie vers un administrateur) ; détail dans [CONFIGURATION.md](CONFIGURATION.md#invitation-email-smtp). Gardez STARTTLS ou TLS actif. |
@@ -555,6 +563,64 @@ activer : la route passe par le proxy comme le reste de l'API.
 - **Tous les runs échouent aussitôt** : lisez l'erreur d'un run. Quand l'isolation ne peut pas
   s'appliquer, elle y donne la raison ; corrigez l'hôte (voir [Prérequis](#prérequis)) plutôt que
   de passer `WORKPILOT_RUN_ISOLATION=off`.
+
+### Surveiller le serveur
+
+**La page de santé** (`GET /admin/platform/health`, administrateur de la plateforme) dit pourquoi
+le serveur va bien ou non, chaque contrôle avec son état (`ok`, `degraded` ou `error`), l'état
+de la page étant le pire des contrôles :
+
+| Contrôle | Ce qu'il regarde | `degraded` / `error` |
+|---|---|---|
+| `database` | un `SELECT 1`, sa durée, la révision du schéma (`alembic_version`) | la base ne répond pas |
+| `disk` | l'espace libre des volumes des clones (`repositories`) et de la base SQLite (`database`) | moins de 10 % / moins de 2 % libres |
+| `queue` | runs et jobs en file et en cours, le plafond `WORKPILOT_MAX_CONCURRENT_RUNS` | — |
+| `version` | la version du serveur et de Python | — |
+| `isolation` | le mode `WORKPILOT_RUN_ISOLATION` et la version de Landlock du noyau | isolation coupée / Landlock absent |
+| `jobs` | les tâches périodiques : effacement après la durée de conservation, relance des approbations | une tâche arrêtée |
+
+```bash
+curl -sS https://workpilot.example.com/admin/platform/health -H "Authorization: Bearer $TOKEN"
+# → { "status": "ok", "checks": { "database": { "status": "ok", "latency_ms": 1.2,
+#     "revision": "0046_page_visits" }, "disk": { "status": "ok", "volumes": [ … ] }, … } }
+```
+
+**Les métriques Prometheus** : `GET /metrics`, au format texte, pour un collecteur qui envoie
+`Authorization: Bearer <WORKPILOT_METRICS_TOKEN>` (32 caractères au moins, par exemple
+`openssl rand -hex 32` ; sans lui, 404 ; un mauvais jeton, 401). Aucune ne nomme une personne,
+un projet ni un chemin :
+
+| Métrique | Contenu |
+|---|---|
+| `workpilot_info{version}` | la version |
+| `workpilot_health_status{check}` | 0 `ok`, 1 `degraded`, 2 `error`, par contrôle de la page de santé |
+| `workpilot_database_latency_milliseconds` | la durée du `SELECT 1` |
+| `workpilot_disk_free_bytes{volume}`, `workpilot_disk_total_bytes{volume}` | l'espace des volumes |
+| `workpilot_landlock_abi` | la version de Landlock, -1 sans |
+| `workpilot_runs{status}`, `workpilot_jobs{status}` | runs et jobs en base, par état |
+| `workpilot_max_concurrent_runs` | le plafond du serveur |
+| `workpilot_tokens_this_month{org,provider}` | les tokens depuis le 1er du mois (UTC), par organisation (son slug) et fournisseur |
+| `workpilot_active_people_today{org}` | combien de personnes ont utilisé le serveur aujourd'hui |
+| `workpilot_organizations`, `workpilot_accounts` | organisations et comptes actifs |
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: workpilot
+    metrics_path: /metrics
+    scheme: https
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/workpilot-token
+    static_configs:
+      - targets: ["workpilot.example.com"]
+```
+
+**Les traces OpenTelemetry** : avec `AUTO_CLAUDE_OTEL_ENDPOINT` (un collecteur OTLP que vous
+gérez, `http://otel-collector:4318`), chaque requête devient un span `SERVER` nommé d'après sa
+route (`GET /projects/{project_id}`), avec sa méthode, sa route et son code, dans le service
+`workpilot` à côté des spans des agents. Un span ne porte ni chemin réel, ni paramètre, ni
+en-tête, ni corps, ni personne. Sans la variable, rien n'est tracé.
 
 ### Disque
 

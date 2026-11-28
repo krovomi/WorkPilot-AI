@@ -8,6 +8,10 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
+	normalizeCodeMode,
+	type PhaseCodeMode,
+} from "../../../shared/utils/code-mode";
+import {
 	ENGINE_PHASES,
 	type EnginePhase,
 	type EngineTrio,
@@ -18,6 +22,7 @@ import {
 import { useConfiguredProviders } from "../../hooks/useConfiguredProviders";
 import { useSettingsStore } from "../../stores/settings-store";
 import { EngineTrioPicker } from "./EngineTrioPicker";
+import { PhaseCodeModePicker } from "./PhaseCodeModePicker";
 
 interface TaskEngineEditorProps {
 	engine: TaskEngine;
@@ -28,6 +33,12 @@ interface TaskEngineEditorProps {
 	onChange: Dispatch<SetStateAction<TaskEngine>>;
 	idPrefix: string;
 	disabled?: boolean;
+	/**
+	 * This task's code mode per phase (`phaseCodeMode`). Given with its
+	 * setter, each phase offers its own mode while Settings' switch is not off.
+	 */
+	phaseCodeMode?: PhaseCodeMode;
+	onPhaseCodeModeChange?: (next: PhaseCodeMode) => void;
 }
 
 /**
@@ -48,11 +59,17 @@ export function TaskEngineEditor({
 	onChange,
 	idPrefix,
 	disabled = false,
+	phaseCodeMode,
+	onPhaseCodeModeChange,
 }: TaskEngineEditorProps) {
 	const { t } = useTranslation(["tasks", "settings"]);
 	const settings = useSettingsStore((s) => s.settings);
 	const { providers, loading } = useConfiguredProviders();
 	const uniform = isUniformEngine(engine);
+	const codeModeOffered =
+		phaseCodeMode !== undefined &&
+		onPhaseCodeModeChange !== undefined &&
+		normalizeCodeMode(settings?.codeMode) !== "off";
 	const [advanced, setAdvanced] = useState(!uniform);
 
 	// A task whose phases were already set apart opens on them.
@@ -158,6 +175,15 @@ export function TaskEngineEditor({
 								idPrefix={`${idPrefix}-${phase}`}
 								disabled={disabled}
 							/>
+							{codeModeOffered && (
+								<PhaseCodeModePicker
+									phase={phase}
+									value={phaseCodeMode}
+									onChange={onPhaseCodeModeChange}
+									idPrefix={`${idPrefix}-${phase}`}
+									disabled={disabled}
+								/>
+							)}
 						</div>
 					))}
 				</div>

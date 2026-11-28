@@ -54,7 +54,9 @@ Les alias (`gemini` → `google`) passent par `accountProviderOf` (`shared/types
   défaut = profil actif, renommage, suppression sauf le profil par défaut).
 - **Popin d'utilisation** (`usage/ProviderAccountSwitcher.tsx`) : pour le provider affiché, les
   comptes qui ont une clé, l'actif marqué, un clic pour en faire le défaut. Claude garde sa liste
-  de profils avec leur usage.
+  de profils avec leur usage. Les pourcentages de Claude sont ceux du profil actif
+  (`claude-profile/usage-profile.ts`), jamais du moins utilisé : un compte tout juste ajouté, sans
+  usage, trierait devant. Une connexion expirée y donne « reconnecter », pas « non mesuré ».
 
 ## IPC
 

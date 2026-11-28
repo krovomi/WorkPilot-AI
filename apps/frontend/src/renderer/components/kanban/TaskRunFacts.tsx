@@ -43,6 +43,13 @@ export function sameRunFacts(prev: Task, next: Task): boolean {
 
 export function formatDuration(ms: number, t: TFunction): string {
 	const parts = durationParts(ms);
+	// « 1 h », not « 1 h 0 min ».
+	if (parts.unit === "hours" && parts.minutes === 0) {
+		return t("tasks:runFacts.duration.hoursOnly", parts);
+	}
+	if (parts.unit === "days" && parts.hours === 0) {
+		return t("tasks:runFacts.duration.daysOnly", parts);
+	}
 	return t(`tasks:runFacts.duration.${parts.unit}`, parts);
 }
 

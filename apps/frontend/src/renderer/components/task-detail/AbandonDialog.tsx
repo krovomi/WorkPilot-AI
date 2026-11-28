@@ -19,12 +19,20 @@ import {
 	AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Label } from "../ui/label";
-import { NativeSelect } from "../ui/native-select";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "../ui/select";
 import { Textarea } from "../ui/textarea";
 
 /** The resolutions a person picks; « PR fermée sans fusion » is written by the app. */
 const PICKABLE = ABANDON_RESOLUTIONS.filter((r) => r !== "pr_closed");
 const LINKED: ReadonlySet<AbandonResolution> = new Set(["duplicate", "replaced"]);
+/** Radix refuses an empty item value: "no linked task" is this sentinel. */
+const NO_LINK = "__none__";
 /** At most this many tasks are offered as the duplicate or the replacement. */
 const MAX_LINK_CHOICES = 200;
 /** The server keeps a note of this many characters at most (`shared_board/settings.py`). */
@@ -105,37 +113,45 @@ export function AbandonDialog({
 								<Label htmlFor="abandon-resolution" className="text-foreground">
 									{t("tasks:abandon.resolutionLabel")}
 								</Label>
-								<NativeSelect
-									id="abandon-resolution"
+								<Select
 									value={resolution}
-									onChange={(e) => setResolution(e.target.value as AbandonResolution)}
+									onValueChange={(next) => setResolution(next as AbandonResolution)}
 									disabled={isAbandoning}
 								>
-									{PICKABLE.map((r) => (
-										<option key={r} value={r}>
-											{t(`tasks:abandon.resolutions.${r}`)}
-										</option>
-									))}
-								</NativeSelect>
+									<SelectTrigger id="abandon-resolution">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{PICKABLE.map((r) => (
+											<SelectItem key={r} value={r}>
+												{t(`tasks:abandon.resolutions.${r}`)}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 							</div>
 							{linked && (
 								<div className="grid gap-1.5">
 									<Label htmlFor="abandon-link" className="text-foreground">
 										{t(`tasks:abandon.linkLabel.${resolution}`)}
 									</Label>
-									<NativeSelect
-										id="abandon-link"
-										value={link}
-										onChange={(e) => setLink(e.target.value)}
+									<Select
+										value={link || NO_LINK}
+										onValueChange={(next) => setLink(next === NO_LINK ? "" : next)}
 										disabled={isAbandoning}
 									>
-										<option value="">{t("tasks:abandon.linkNone")}</option>
-										{linkChoices.map((task) => (
-											<option key={task.id} value={task.id}>
-												{task.title}
-											</option>
-										))}
-									</NativeSelect>
+										<SelectTrigger id="abandon-link">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value={NO_LINK}>{t("tasks:abandon.linkNone")}</SelectItem>
+											{linkChoices.map((task) => (
+												<SelectItem key={task.id} value={task.id} textValue={task.title}>
+													{task.title}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
 								</div>
 							)}
 							<Textarea
