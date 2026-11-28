@@ -309,6 +309,10 @@ est attendu, y compris dans `WORKPILOT_APPROVAL_ROLES`.
 L'usage par personne (consommation, présence, activité par page, onglet **Usage**) demande
 `usage.read`, et ses réglages `usage.write` : seuls Owner et Administrator les ont. Un Analyst
 ne lit l'usage par personne que si un rôle propre à l'organisation lui ajoute `usage.read`.
+L'onglet a deux volets : **Chiffres** (tokens, coûts, budget, personnes, modèles, projets,
+livraison, présence et pages, sur une période et des filtres, chaque table exportable en CSV) et
+**Collecte et conservation**. Chaque membre retrouve dans **Paramètres → Mon usage** ce que ces
+rôles voient de lui, et peut tout exporter en JSON.
 
 Deux autres niveaux existent, à ne pas confondre :
 
