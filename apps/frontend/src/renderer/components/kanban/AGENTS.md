@@ -21,7 +21,7 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `BoardTimeline.tsx` | ~160 | frise ; barres : `lib/kanban-timeline.ts` |
 | `labels/` | — | étiquettes ; `shared/utils/task-labels.ts`, filtres : `lib/kanban-filter.ts` |
 | `../../../main/kanban-auto-archive.ts` | ~80 | archivage auto ; « Mes tâches » : `useBoardFilters` |
-| `SprintMenu.tsx` · `SprintDialogs.tsx` | ~250 · ~200 | sprints ; `stores/sprint-store.ts`, `shared/utils/sprints.ts` |
+| `SprintMenu.tsx` · `SprintBanner.tsx` | — | sprints ; `SprintPlanningDialog.tsx`, `stores/sprint-store.ts` |
 | `reports/` | — | rapports (burndown, vélocité…) ; `lib/kanban-reports.ts` |
 | `board-ask/` | — | « Interroger le tableau », réponse par `main/board-ask/` ([conception](../../../../../../docs/architecture/board-ask.md)) |
 | `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F182) |
