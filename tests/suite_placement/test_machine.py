@@ -47,7 +47,9 @@ def test_another_build_is_counted_but_not_this_one(monkeypatch, tmp_path):
             subprocess.run(
                 [sys.executable, "-c", "import time; time.sleep(0.05)"], check=True
             )
-        assert machine_module.count_builds() == before + 1, _seen(child.pid)
+        assert machine_module.count_builds() == before + 1, (
+            f"{_seen(child.pid)}\n{_what_runs(entry)}"
+        )
     finally:
         child.kill()
         child.wait()
@@ -78,6 +80,18 @@ def _seen(pid: int) -> str:
         build = machine_module._is_build(cmdline)
         lines.append(f"{process.pid}: {cmdline} -> {resolved}, build={build}")
     return "\n".join(lines)
+
+
+def _what_runs(entry: Path) -> str:
+    """The command lines that name the entry point, to say why none was counted."""
+    import psutil
+
+    seen = []
+    for process in psutil.process_iter(["pid", "ppid", "cmdline"]):
+        cmdline = process.info.get("cmdline") or []
+        if any(entry.name in str(arg) for arg in cmdline):
+            seen.append(f"{process.info['pid']}<{process.info['ppid']}: {cmdline}")
+    return f"backend dir {machine_module._BACKEND_DIR}; seen: {seen}"
 
 
 def _smi(monkeypatch, stdout: str, returncode: int = 0) -> None:
