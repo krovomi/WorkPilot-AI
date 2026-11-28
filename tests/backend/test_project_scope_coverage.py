@@ -86,6 +86,17 @@ def _bearer() -> dict[str, str]:
 
 
 @pytest.fixture
+def _stale_engine(monkeypatch, tmp_path):
+    """The engine an earlier test of the run created and never disposed."""
+    from server.db import engine as db_engine
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    stale = create_async_engine("sqlite+aiosqlite:///" + str(tmp_path / "old.db"))
+    monkeypatch.setattr(db_engine, "_engine", stale)
+    monkeypatch.setattr(db_engine, "_session_factory", None)
+
+
+@pytest.fixture
 def server_app(monkeypatch, tmp_path):
     """A server-mode app with one route per way a body can carry a path.
 
@@ -99,6 +110,13 @@ def server_app(monkeypatch, tmp_path):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
     from server import integration
+    from server.db import engine as db_engine
+
+    # The app's periodic jobs open the database as soon as it starts. An engine
+    # an earlier test left behind belongs to that test's event loop and file:
+    # this app gets its own, on the database `_clean_settings` names.
+    monkeypatch.setattr(db_engine, "_engine", None)
+    monkeypatch.setattr(db_engine, "_session_factory", None)
 
     async def _no_principal(request, claims):
         request.state.principal = None
@@ -211,6 +229,14 @@ class TestMiddlewareRejectsClientSuppliedPaths:
         with TestClient(app) as client:
             # Unauthenticated first: the 401 must still come first.
             assert client.get("/api/timeline/x?project_dir=/etc").status_code == 401
+
+    @pytest.mark.usefixtures("_stale_engine")
+    def test_the_app_opens_its_own_database(self, server_app, tmp_path):
+        """Not an engine an earlier test left behind, bound to its event loop."""
+        from server.db import engine as db_engine
+
+        url = db_engine.get_engine().url
+        assert url.database == str(tmp_path / "scope.sqlite3").replace("\\", "/")
 
     def test_every_known_alias_is_listed(self):
         """The camelCase spellings matter: the Electron client uses them."""
