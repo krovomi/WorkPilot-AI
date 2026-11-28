@@ -816,6 +816,33 @@ class UserSecret(Base):
     )
 
 
+class UserAiAccount(Base):
+    """One of a person's AI accounts (an API key of a provider), Fernet-encrypted.
+
+    A person may keep several per provider (their own key, their employer's,
+    a client's); the one marked ``is_default`` is the key their runs get
+    (``server/services/ai_accounts.py``). The key is never read back by a
+    route: only whether it is set.
+    """
+
+    __tablename__ = "user_ai_accounts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(80))
+    encrypted_key: Mapped[str] = mapped_column(Text)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    key_set_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class Invitation(Base):
     """A single-use, expiring invitation to create a local account.
 

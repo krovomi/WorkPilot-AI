@@ -116,6 +116,13 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/users/me/access-tokens"): signed_in(),
     ("POST", "/users/me/access-tokens"): signed_in(),
     ("DELETE", "/users/me/access-tokens/{token_id}"): signed_in(),
+    ("GET", "/users/me/ai-accounts"): needs("settings.account.read"),
+    ("POST", "/users/me/ai-accounts"): needs("settings.account.write"),
+    ("PATCH", "/users/me/ai-accounts/{account_id}"): needs("settings.account.write"),
+    ("DELETE", "/users/me/ai-accounts/{account_id}"): needs("settings.account.write"),
+    ("PUT", "/users/me/ai-accounts/defaults/{provider}"): needs(
+        "settings.account.write"
+    ),
     ("GET", "/users/me/needs-you"): needs("task.read"),
     ("PUT", "/users/me/needs-you/channels/{channel}"): needs("agent.execute"),
     ("DELETE", "/users/me/needs-you/channels/{channel}"): needs("task.read"),
