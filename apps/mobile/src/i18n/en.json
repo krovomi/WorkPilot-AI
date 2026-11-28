@@ -1158,6 +1158,7 @@
 		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators.",
 		"rights": "You can see them and share everything kept about you in Settings, My usage. To have your account erased, ask a platform administrator.",
 		"understood": "I understand"
+	},
 	"cardLog": {
 		"title": "Log of #{{id}}",
 		"open": "See the whole log",

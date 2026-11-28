@@ -1158,6 +1158,7 @@
 		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur.",
 		"rights": "Vous pouvez les consulter et partager tout ce qui est conservé sur vous dans Réglages, Mon usage. Pour faire effacer votre compte, demandez à un administrateur de la plateforme.",
 		"understood": "J'ai compris"
+	},
 	"cardLog": {
 		"title": "Journal de #{{id}}",
 		"open": "Voir tout le journal",
