@@ -7,9 +7,9 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import "../../../../shared/i18n";
+import "../../../../../shared/i18n";
 import { usePermissionsStore } from "@/stores/permissions-store";
-import { UsageTab } from "../UsageTab";
+import { UsageSettings } from "../UsageSettings";
 
 const SETTINGS = {
 	page_activity: false,
@@ -43,13 +43,13 @@ afterEach(() => {
 	(globalThis as { electronAPI?: unknown }).electronAPI = undefined;
 });
 
-describe("UsageTab", () => {
+describe("UsageSettings", () => {
 	it("turns page activity on with a retention, and says when", async () => {
 		serverUsage.setUsageSettings.mockResolvedValue({
 			ok: true,
 			data: { ...SETTINGS, page_activity: true, page_activity_since: "2026-11-27T10:00:00Z", page_activity_retention_days: 90 },
 		});
-		render(<UsageTab />);
+		render(<UsageSettings />);
 		const toggle = await screen.findByRole("checkbox");
 		expect(toggle).not.toBeChecked();
 		expect(screen.getByText(/Tell the members what is measured/)).toBeInTheDocument();
@@ -72,7 +72,7 @@ describe("UsageTab", () => {
 			data: { ...SETTINGS, page_activity: true, page_activity_since: "2026-11-27T10:00:00Z", usage_retention_days: 400 },
 		});
 		serverUsage.setUsageSettings.mockResolvedValue({ ok: false, error: "Missing permission: usage.write" });
-		render(<UsageTab />);
+		render(<UsageSettings />);
 		fireEvent.click(await screen.findByRole("checkbox"));
 		expect(screen.getByText(/erases the page counts/)).toBeInTheDocument();
 		expect(screen.getByLabelText("Token use and presence (days)")).toHaveValue(400);
@@ -81,7 +81,7 @@ describe("UsageTab", () => {
 	});
 
 	it("refuses a retention outside the bounds before saving", async () => {
-		render(<UsageTab />);
+		render(<UsageSettings />);
 		const field = await screen.findByLabelText("Token use and presence (days)");
 		for (const value of ["7", "4000", "40.5"]) {
 			fireEvent.change(field, { target: { value } });
@@ -95,14 +95,14 @@ describe("UsageTab", () => {
 	it("is read-only without usage.write, and says why it could not load", async () => {
 		grant("usage.read");
 		serverUsage.getUsageSettings.mockResolvedValue({ ok: false, error: "offline" });
-		render(<UsageTab />);
+		render(<UsageSettings />);
 		expect(await screen.findByRole("alert")).toHaveTextContent("offline");
 		expect(screen.getByRole("checkbox")).toBeDisabled();
 		expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
 	});
 
 	it("saves nothing once the bridge is gone", async () => {
-		render(<UsageTab />);
+		render(<UsageSettings />);
 		const save = await screen.findByRole("button", { name: "Save" });
 		(globalThis as { electronAPI?: unknown }).electronAPI = undefined;
 		fireEvent.click(save);
@@ -113,12 +113,12 @@ describe("UsageTab", () => {
 	it("drops an answer that arrives after it closed, and needs the bridge", async () => {
 		let reply: (value: unknown) => void = () => undefined;
 		serverUsage.getUsageSettings.mockReturnValue(new Promise((resolve) => (reply = resolve)));
-		const { unmount } = render(<UsageTab />);
+		const { unmount } = render(<UsageSettings />);
 		unmount();
 		reply({ ok: true, data: SETTINGS });
 		await waitFor(() => expect(serverUsage.getUsageSettings).toHaveBeenCalled());
 		(globalThis as { electronAPI?: unknown }).electronAPI = undefined;
-		render(<UsageTab />);
+		render(<UsageSettings />);
 		expect(screen.getByText("Loading…")).toBeInTheDocument();
 	});
 });

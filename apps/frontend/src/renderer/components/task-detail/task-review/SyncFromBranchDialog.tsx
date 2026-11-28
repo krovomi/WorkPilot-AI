@@ -19,6 +19,15 @@ import {
 	DialogTitle,
 } from "../../ui/dialog";
 import { Label } from "../../ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+	SelectGroup,
+	SelectLabel,
+} from "../../ui/select";
 
 type Strategy = "merge" | "rebase";
 
@@ -155,48 +164,48 @@ export function SyncFromBranchDialog({
 				</DialogHeader>
 
 				<div className="space-y-4 py-2">
-					{/* Source branch selector — native <select> to avoid Popover/Dialog focus-trap conflicts */}
+					{/* Source branch selector: the app's Select (a native list ignores the theme) */}
 					<div className="space-y-2">
 						<Label htmlFor="sync-source-branch">
 							{t("taskReview:syncBranch.sourceBranchLabel")}
 						</Label>
-						<select
-							id="sync-source-branch"
-							value={sourceBranch}
-							onChange={(e) => setSourceBranch(e.target.value)}
+						<Select
+							value={sourceBranch || undefined}
+							onValueChange={setSourceBranch}
 							disabled={isLoadingBranches || isSyncing}
-							className={cn(
-								"flex h-10 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground",
-								"focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary",
-								"disabled:cursor-not-allowed disabled:opacity-50",
-								"transition-colors duration-200",
-								!sourceBranch && "text-muted-foreground",
-							)}
 						>
-							<option value="" disabled>
-								{isLoadingBranches
-									? t("taskReview:syncBranch.loadingBranches")
-									: t("taskReview:syncBranch.selectBranch")}
-							</option>
-							{localBranches.length > 0 && (
-								<optgroup label={t("taskReview:syncBranch.local")}>
-									{localBranches.map((b) => (
-										<option key={b} value={b}>
-											{b}
-										</option>
-									))}
-								</optgroup>
-							)}
-							{remoteBranches.length > 0 && (
-								<optgroup label={t("taskReview:syncBranch.remote")}>
-									{remoteBranches.map((b) => (
-										<option key={b} value={b}>
-											{b}
-										</option>
-									))}
-								</optgroup>
-							)}
-						</select>
+							<SelectTrigger id="sync-source-branch">
+								<SelectValue
+									placeholder={
+										isLoadingBranches
+											? t("taskReview:syncBranch.loadingBranches")
+											: t("taskReview:syncBranch.selectBranch")
+									}
+								/>
+							</SelectTrigger>
+							<SelectContent>
+								{localBranches.length > 0 && (
+									<SelectGroup>
+										<SelectLabel>{t("taskReview:syncBranch.local")}</SelectLabel>
+										{localBranches.map((b) => (
+											<SelectItem key={b} value={b}>
+												{b}
+											</SelectItem>
+										))}
+									</SelectGroup>
+								)}
+								{remoteBranches.length > 0 && (
+									<SelectGroup>
+										<SelectLabel>{t("taskReview:syncBranch.remote")}</SelectLabel>
+										{remoteBranches.map((b) => (
+											<SelectItem key={b} value={b}>
+												{b}
+											</SelectItem>
+										))}
+									</SelectGroup>
+								)}
+							</SelectContent>
+						</Select>
 						{branchLoadError && (
 							<p className="text-xs text-destructive flex items-center gap-1">
 								<AlertTriangle className="h-3 w-3 shrink-0" />

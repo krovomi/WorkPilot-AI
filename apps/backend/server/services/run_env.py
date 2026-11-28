@@ -38,6 +38,11 @@ SERVER_ONLY_ENV: frozenset[str] = frozenset(
         "WORKPILOT_PASSWORD_RESET_TTL_MINUTES",
         "WORKPILOT_USAGE_RETENTION_DAYS",
         "WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS",
+        # The Prometheus scraper's token (routers/operations.py).
+        "WORKPILOT_METRICS_TOKEN",
+        # The usage report's defaults (services/report_settings.py).
+        "WORKPILOT_REPORT_TIMEZONE",
+        "WORKPILOT_REPORT_LANGUAGE",
         "WORKPILOT_PASSWORD_MIN_LENGTH",
         "WORKPILOT_PASSWORD_HIBP_CHECK",
         "WORKPILOT_PUBLIC_BASE_URL",
