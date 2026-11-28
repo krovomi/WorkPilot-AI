@@ -560,7 +560,7 @@
 			"addStarted": "Ajouter et démarrer",
 			"addTooltip": "Ajouter une tâche (N)",
 			"ariaLabel": "Décrire la nouvelle tâche",
-			"placeholder": "Décrivez la tâche… Collez une liste pour créer une tâche par ligne.",
+			"placeholder": "Titre de la tâche, puis Maj+Entrée pour sa description. Collez une liste pour créer une tâche par ligne.",
 			"type": "Type",
 			"noType": "Sans type (déduit automatiquement)",
 			"priority": "Priorité",

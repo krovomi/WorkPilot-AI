@@ -11,6 +11,18 @@ describe("cardBody", () => {
 		expect(cardBody({ title: "Fix login" } as Task)).toBe("");
 		expect(cardBody(card("Fix login", " The admin page only "))).toBe("The admin page only");
 	});
+
+	it("reads rich text without its tags", () => {
+		expect(cardBody(card("Fix login", "<p>Fix login</p>"))).toBe("");
+		expect(cardBody(card("Fix login", "<p>Only&nbsp;the  <b>admin</b></p><ul><li>page</li></ul><br>"))).toBe(
+			"Only the admin\npage",
+		);
+	});
+
+	it("does not take a long rich-text card for a short one, nor markup for words", () => {
+		expect(isShortCard(card("Fix login", `<p>${"<b>x</b>".repeat(40)}</p>`))).toBe(true);
+		expect(isShortCard(card("Fix login", `<p>${"x".repeat(SHORT_CARD_CHARS)}</p>`))).toBe(false);
+	});
 });
 
 describe("isShortCard", () => {

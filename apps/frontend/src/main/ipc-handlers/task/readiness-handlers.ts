@@ -7,7 +7,7 @@
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { IPCResult, TaskReadiness } from "../../../shared/types";
-import { isFirstStart, isShortCard } from "../../../shared/utils/task-readiness";
+import { cardBody, isFirstStart, isShortCard } from "../../../shared/utils/task-readiness";
 import { getAppLanguage } from "../../app-language";
 import { checkGitStatus } from "../../project-initializer";
 import { readinessReviewService } from "../../readiness-review-service";
@@ -39,7 +39,8 @@ export async function checkTaskReadiness(taskId: string): Promise<TaskReadiness>
 	const text = `${task.title}\n${task.description ?? ""}`;
 	const known = reviewed.get(taskId);
 	if (known?.text === text) return known.readiness;
-	const verdict = await readinessReviewService.review(task.title, task.description ?? "", getAppLanguage());
+	// What the card says as text: a rich-text description reaches the model without its tags.
+	const verdict = await readinessReviewService.review(task.title, cardBody(task), getAppLanguage());
 	// No verdict (no provider, timeout): the review is a help, never a wall.
 	if (!verdict) return READY;
 	const readiness: TaskReadiness = verdict.ready ? READY : { ready: false, questions: verdict.questions };

@@ -58,11 +58,15 @@ glisser-déposer y tombe souvent.
 `renderer/lib/quick-add.ts`, fonctions pures :
 
 - une ligne courte (≤ `QUICK_ADD_TITLE_MAX` = 120 caractères) devient le titre et la description ;
-- un texte plus long ou sur plusieurs lignes devient la description, le titre est laissé vide et
-  le main le génère comme pour l'assistant (`TASK_CREATE`, `titleGenerator`) ;
-- une liste collée (au moins deux lignes, toutes courtes) donne **une carte par ligne**, puces et
-  numéros retirés, au plus `QUICK_ADD_MAX_CARDS` = 50. Le bouton « Une carte par ligne (N) »
-  bascule ce choix ; une description sur plusieurs lignes longues reste une seule carte par défaut.
+- un texte sur plusieurs lignes donne une carte : sa première ligne, si elle est courte, en est le
+  titre, et tout le texte (titre compris) la description, pour que l'agent lise les deux ; une
+  première ligne trop longue laisse le titre vide, que le main génère comme pour l'assistant
+  (`TASK_CREATE`, `titleGenerator`) ;
+- une liste **collée** (au moins deux lignes, toutes courtes) donne **une carte par ligne**, puces
+  et numéros retirés, au plus `QUICK_ADD_MAX_CARDS` = 50. Des lignes tapées (Maj+Entrée) ne sont
+  jamais une liste : c'est un titre et sa description. Le bouton « Une carte par ligne (N) »
+  bascule ce choix dans les deux sens. Avant le 28 novembre 2026, deux lignes courtes tapées
+  faisaient deux cartes : la description écrite sous le titre devenait une carte à part.
 
 Si une création échoue au milieu d'une liste, les lignes déjà créées sont retirées de la boîte et
 le reste y reste, pour qu'un nouvel essai ne crée pas de doublon.
