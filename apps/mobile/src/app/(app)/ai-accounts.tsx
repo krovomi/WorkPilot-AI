@@ -192,14 +192,18 @@ function AccountActions({ account, onChanged }: { account: AiAccount; onChanged:
 				<View style={styles.line}>
 					<View style={{ flex: 1 }}>
 						<Button
-							label={t("aiAccounts.edit", { name: account.name })}
+							label={t("aiAccounts.editShort")}
+							accessibilityLabel={t("aiAccounts.edit", { name: account.name })}
+							icon="edit-2"
 							variant="secondary"
 							onPress={() => setEditing(true)}
 						/>
 					</View>
 					<View style={{ flex: 1 }}>
 						<Button
-							label={t("aiAccounts.removeOne", { name: account.name })}
+							label={t("aiAccounts.remove")}
+							accessibilityLabel={t("aiAccounts.removeOne", { name: account.name })}
+							icon="trash-2"
 							variant="danger"
 							busy={busy}
 							onPress={remove}
