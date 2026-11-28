@@ -190,7 +190,7 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 <tr>
 <td width="50%" valign="top">
 
-**Task detail**: the plan split into subtasks with the files each touches, logs, changed files, visual proofs and the emulator.
+**Task detail**: the plan split into subtasks with the files each touches, the « Guide the agent » box to steer the running agent, logs, changed files, the change graph, the before/after captures and the emulator.
 
 ![Task detail with its subtasks](.github/assets/showcase/task-detail.png)
 
@@ -278,9 +278,9 @@ The code is then rendered, compared with the mockup and corrected until it match
 </td>
 <td valign="top">
 
-**Sandbox**: a snapshot of the task's worktree before each agent session, restored when the anomaly watch stops a session; restricted write mode and limits per session.
+**Sandbox**: a snapshot of the task's worktree before each agent session, restored when the anomaly watch stops a session; an optional Docker microVM per task; restricted write mode and limits per session.
 
-![Sandbox settings: snapshots and rollback, write mode, limits per session](.github/assets/showcase/sandbox.png)
+![Sandbox settings: snapshots and rollback, Docker microVM per task, write mode](.github/assets/showcase/sandbox.png)
 
 </td>
 </tr>

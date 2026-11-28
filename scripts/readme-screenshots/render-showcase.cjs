@@ -167,11 +167,11 @@ const COPY = {
 		ext: "What the engine talks to",
 		providers: [
 			"AI providers",
-			"Claude, OpenAI, Gemini, Copilot, Mistral, Grok, DeepSeek, local models, agent CLIs",
+			"Claude, OpenAI, Gemini, Copilot, Mistral, Grok, DeepSeek, Windsurf, OpenRouter, Hugging Face, local models, agent CLIs",
 		],
 		forges: [
 			"Forges and trackers",
-			"GitHub, GitLab, Azure DevOps, Jira, Linear",
+			"GitHub, GitLab, Azure DevOps, Bitbucket, Jira, Linear",
 		],
 		clients: [
 			"Other AI clients",
@@ -179,7 +179,7 @@ const COPY = {
 		],
 		team: "Team mode",
 		optional: "OPTIONAL",
-		server: ["Team server", "shared board, roles, organisations"],
+		server: ["Team server", "shared board, roles, organisations, each member's AI accounts"],
 		mobile: ["Mobile app", "iOS and Android"],
 	},
 	fr: {
@@ -215,16 +215,16 @@ const COPY = {
 		ext: "Ce à quoi parle le moteur",
 		providers: [
 			"Fournisseurs d'IA",
-			"Claude, OpenAI, Gemini, Copilot, Mistral, Grok, DeepSeek, modèles locaux, CLI d'agents",
+			"Claude, OpenAI, Gemini, Copilot, Mistral, Grok, DeepSeek, Windsurf, OpenRouter, Hugging Face, modèles locaux, CLI d'agents",
 		],
-		forges: ["Forges et suivi", "GitHub, GitLab, Azure DevOps, Jira, Linear"],
+		forges: ["Forges et suivi", "GitHub, GitLab, Azure DevOps, Bitbucket, Jira, Linear"],
 		clients: [
 			"Autres clients IA",
 			"Claude Code, Codex, Cursor… via le serveur MCP workpilot-board",
 		],
 		team: "Mode équipe",
 		optional: "OPTIONNEL",
-		server: ["Serveur d'équipe", "tableau partagé, rôles, organisations"],
+		server: ["Serveur d'équipe", "tableau partagé, rôles, organisations, comptes IA de chaque membre"],
 		mobile: ["Application mobile", "iOS et Android"],
 	},
 };

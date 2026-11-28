@@ -15,7 +15,8 @@ The spec phase (`runners/spec_runner.py`):
   PLANNING_COMPLETE, then the build when `--auto-approve` says so.
 
 The build (`run.py --spec`):
-  creates the task worktree, CODING_STARTED, waits until the test drops
+  creates the task worktree, CODING_STARTED, writes down the AI account it
+  was given and may stop there on a fake 429 (`fake_accounts.py`), waits until the test drops
   `e2e-release` in the spec folder (so the card can be seen running), writes
   the file the task asks for and commits it on the task branch, marks the
   subtask done, ALL_SUBTASKS_DONE, QA_STARTED, signs QA off, QA_PASSED.
@@ -45,6 +46,7 @@ sys.path.insert(0, str(REAL_BACKEND))
 
 from core.task_event import TaskEventEmitter  # noqa: E402
 from core.worktree import WorktreeManager  # noqa: E402
+from fake_accounts import start_session  # noqa: E402
 from foundation.file_utils import write_json_atomic  # noqa: E402
 from foundation.phase_event import ExecutionPhase, emit_phase  # noqa: E402
 from init import init_workpilot_dir  # noqa: E402
@@ -172,6 +174,10 @@ def build_main(argv: list[str]) -> int:
 
     emit_phase(ExecutionPhase.CODING, "Writing the file", subtask="subtask-1")
     events.emit("CODING_STARTED", {"subtaskId": "subtask-1"})
+    # The account the app gave this run (e2e/ai-accounts-settings.e2e.ts).
+    stopped = start_session(spec_dir, project)
+    if stopped is not None:
+        return stopped
     _write_json(
         spec_dir / "implementation_plan.json",
         _plan(spec_dir, args.spec, "in_progress"),
