@@ -11,6 +11,17 @@ export type BoardAskCoverage = "full" | "partial" | "related";
 
 export const BOARD_ASK_COVERAGES: readonly BoardAskCoverage[] = ["full", "partial", "related"];
 
+/**
+ * What else the board reads besides its cards: the roadmap's features, the
+ * ideas of Ideation, and the changes merged into the project's branch.
+ */
+export type BoardAskSource = "roadmap" | "ideas" | "history";
+
+export const BOARD_ASK_SOURCES: readonly BoardAskSource[] = ["roadmap", "ideas", "history"];
+
+/** What a ticket is: a card of the board, or one of the other sources. */
+export type BoardAskKind = "card" | "roadmap" | "idea" | "change";
+
 /** An earlier question of the same conversation and the answer it got. */
 export interface BoardAskTurn {
 	question: string;
@@ -35,6 +46,10 @@ export interface BoardAskMatch {
 	/** ISO date of the ticket's last change. */
 	updatedAt?: string;
 	archived?: boolean;
+	/** Absent for a card of the board. */
+	kind?: Exclude<BoardAskKind, "card">;
+	/** A change's pull request (`#123`) or short commit id. */
+	ref?: string;
 }
 
 /**

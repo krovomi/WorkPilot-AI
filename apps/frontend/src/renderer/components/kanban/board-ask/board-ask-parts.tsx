@@ -3,7 +3,7 @@
  * were found, whether they are ranked by meaning, and one ticket row.
  */
 
-import { Archive, Languages, Search, Sparkles } from "lucide-react";
+import { Archive, Layers, Languages, Search, Sparkles } from "lucide-react";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -11,13 +11,22 @@ import type {
 	BoardAskMatch,
 	BoardAskResult,
 	BoardAskSemanticMode,
+	BoardAskSource,
 	BoardAskState,
 } from "../../../../shared/types";
-import { BOARD_ASK_SEMANTIC_MODES } from "../../../../shared/types/board-ask";
+import { BOARD_ASK_SEMANTIC_MODES, BOARD_ASK_SOURCES } from "../../../../shared/types/board-ask";
 import { formatAppDate } from "../../../lib/date-format";
 import { cn } from "../../../lib/utils";
 import { saveSettings, useSettingsStore } from "../../../stores/settings-store";
 import { Chip, type Tone } from "../../charter";
+import { Button } from "../../ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from "../../ui/dropdown-menu";
 import { NativeSelect } from "../../ui/native-select";
 
 export const COVERAGE_TONE: Readonly<Record<BoardAskCoverage, Tone>> = {
@@ -124,6 +133,8 @@ export function MatchRow({
 						<Chip tone={STATE_TONE[match.state]}>
 							{t(`kanban.ask.state.${match.state}`)}
 						</Chip>
+						{match.kind && <Chip tone="accent">{t(`kanban.ask.kind.${match.kind}`)}</Chip>}
+						{match.ref && <span className="text-2xs tabular-nums text-muted-foreground">{match.ref}</span>}
 						{match.archived && (
 							<span className="inline-flex items-center gap-1 text-2xs text-muted-foreground">
 								<Archive className="h-3 w-3" aria-hidden />
@@ -165,5 +176,44 @@ export function SemanticModeSelect() {
 				))}
 			</NativeSelect>
 		</div>
+	);
+}
+
+/** What the board reads besides its cards, saved in the settings. */
+export function SourcesMenu() {
+	const { t } = useTranslation(["tasks"]);
+	const saved = useSettingsStore((s) => s.settings.boardAskSources);
+	const chosen: readonly BoardAskSource[] = saved ?? BOARD_ASK_SOURCES;
+	const toggle = (source: BoardAskSource, on: boolean) => {
+		const next = BOARD_ASK_SOURCES.filter((s) => (s === source ? on : chosen.includes(s)));
+		void saveSettings({ boardAskSources: next });
+	};
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1.5 text-2xs text-muted-foreground">
+					<Layers className="h-3.5 w-3.5" aria-hidden />
+					{t("kanban.ask.sources.button", { count: chosen.length + 1 })}
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="w-64">
+				<DropdownMenuLabel className="text-2xs font-normal text-muted-foreground">
+					{t("kanban.ask.sources.hint")}
+				</DropdownMenuLabel>
+				<DropdownMenuCheckboxItem checked disabled>
+					{t("kanban.ask.sources.cards")}
+				</DropdownMenuCheckboxItem>
+				{BOARD_ASK_SOURCES.map((source) => (
+					<DropdownMenuCheckboxItem
+						key={source}
+						checked={chosen.includes(source)}
+						onCheckedChange={(on) => toggle(source, on === true)}
+						onSelect={(event) => event.preventDefault()}
+					>
+						{t(`kanban.ask.sources.${source}`)}
+					</DropdownMenuCheckboxItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

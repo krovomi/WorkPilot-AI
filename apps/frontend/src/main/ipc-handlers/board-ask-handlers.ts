@@ -3,7 +3,8 @@
  * renderer sends a project id, a question and the conversation so far; the
  * tickets are read here, from the project's own cards, never from the
  * renderer. « Vérifier une idée » (lot 3) sends a project id and the feature
- * planned, and gets what the board already holds of it.
+ * planned, and gets what the board already holds of it. Both read the other
+ * sources of the project too (roadmap, ideas, merged changes: `sources.ts`).
  */
 
 import { ipcMain } from "electron";
@@ -20,6 +21,7 @@ import { BOARD_ASK_LIMITS } from "../../shared/types/board-ask";
 import { getAppLanguage } from "../app-language";
 import { askBoard, type CompletionFn } from "../board-ask/board-ask-service";
 import { checkIdea } from "../board-ask/idea-check";
+import { readBoardSources, readBoardSourcesSetting } from "../board-ask/sources";
 import {
 	createSemanticRankings,
 	createSemanticSearch,
@@ -106,8 +108,10 @@ export async function handleBoardAsk(
 	if (typeof project === "string") return { success: false, error: project };
 
 	const run = complete ?? completionIn(project.path);
+	const tasks = projectStore.getTasks(project.id);
 	const data = await askBoard({
-		tasks: projectStore.getTasks(project.id),
+		tasks,
+		sources: await readBoardSources(project.path, tasks, readBoardSourcesSetting()),
 		question: request.question,
 		history: request.history,
 		appLanguage: getAppLanguage(),
@@ -130,8 +134,10 @@ export async function handleBoardIdea(
 	const project = localProject(request.projectId);
 	if (typeof project === "string") return { success: false, error: project };
 
+	const tasks = projectStore.getTasks(project.id);
 	const data = await checkIdea({
-		tasks: projectStore.getTasks(project.id),
+		tasks,
+		sources: await readBoardSources(project.path, tasks, readBoardSourcesSetting()),
 		idea: request.idea,
 		appLanguage: getAppLanguage(),
 		complete: complete ?? completionIn(project.path),

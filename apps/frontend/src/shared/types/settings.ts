@@ -425,6 +425,8 @@ export interface AppSettings {
 	kanbanAbandonClosedPrs?: boolean;
 	// « Interroger le tableau »: rank the tickets by meaning too (default auto)
 	boardAskSemantic?: "auto" | "local" | "off";
+	// « Interroger le tableau »: the sources read besides the cards (default all)
+	boardAskSources?: ("roadmap" | "ideas" | "history")[];
 	// Sidebar collapsed state (icons only when true)
 	sidebarCollapsed?: boolean;
 	// Sidebar width in pixels when expanded (default 256)

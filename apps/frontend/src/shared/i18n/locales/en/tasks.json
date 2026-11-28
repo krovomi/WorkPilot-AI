@@ -688,6 +688,20 @@
 					"buildsOn": "Builds on: {{tickets}}",
 					"original": "Original idea"
 				}
+			},
+			"kind": {
+				"roadmap": "Roadmap",
+				"idea": "Idea",
+				"change": "Merged change"
+			},
+			"sources": {
+				"button_one": "{{count}} source",
+				"button_other": "{{count}} sources",
+				"hint": "Besides the cards, the board also reads:",
+				"cards": "Board cards",
+				"roadmap": "Roadmap features",
+				"ideas": "Ideation ideas",
+				"history": "Changes merged into the branch (git history)"
 			}
 		},
 		"lanes": {
