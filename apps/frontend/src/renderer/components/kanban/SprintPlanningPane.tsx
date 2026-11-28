@@ -56,6 +56,8 @@ export interface PlanningPaneProps {
 	/** Shown in place of the points of a card without any (« Estimate »). */
 	renderUnestimated?: (task: Task) => ReactNode;
 	header?: ReactNode;
+	/** List items after the cards (the proposal's rows, « Proposer le sprint »). */
+	after?: ReactNode;
 	footer: ReactNode;
 }
 
@@ -77,6 +79,7 @@ export function PlanningPane({
 	renderChips,
 	renderUnestimated,
 	header,
+	after,
 	footer,
 }: PlanningPaneProps) {
 	const { t } = useTranslation(["tasks"]);
@@ -139,7 +142,7 @@ export function PlanningPane({
 			</div>
 			{header}
 			<ul className="min-h-[14rem] flex-1 space-y-1 overflow-y-auto p-1.5">
-				{tasks.length === 0 && <li className="px-2 py-6 text-center text-xs text-muted-foreground">{empty}</li>}
+				{tasks.length === 0 && !after && <li className="px-2 py-6 text-center text-xs text-muted-foreground">{empty}</li>}
 				{tasks.map((task) => {
 					const points = taskPoints(task);
 					const priority = task.metadata?.priority;
@@ -222,6 +225,7 @@ export function PlanningPane({
 						</li>
 					);
 				})}
+				{after}
 			</ul>
 			<div className="border-t border-border/50 p-2">{footer}</div>
 		</section>

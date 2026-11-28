@@ -9,7 +9,9 @@
  * The backlog has quick filters (urgent, bugs, not estimated) and a card
  * without points offers « Estimate ». The sprint side marks a card carried
  * over from the last sprint and one waiting on a card left out, with « Add
- * these too ». A planned sprint starts from here.
+ * these too ». A planned sprint starts from here. « Proposer le sprint »
+ * (SprintProposalPanel) offers the cards that fill it, in dashed violet,
+ * until the person adds them.
  *
  * Opened from the board's sprint banner, the « Sprints » menu, and right
  * after a sprint is created; one is open at a time (`planningId` of the
@@ -43,6 +45,7 @@ import { useSelectedServerProject } from "./ServerBoardNotice";
 import { SprintCapacity } from "./SprintCapacity";
 import { useSprintFailure } from "./SprintDialogs";
 import { PlanningPane } from "./SprintPlanningPane";
+import { offeredPoints, ProposalFooter, ProposalHeader, ProposalRows, useSprintProposal } from "./SprintProposalPanel";
 
 const NO_IDS: ReadonlySet<string> = new Set();
 
@@ -121,11 +124,16 @@ function PlanningView({ sprint }: { sprint: Sprint }) {
 	const [lastMove, setLastMove] = useState<LastMove | null>(null);
 	const pools = useMemo(() => planningPools(tasks, sprint.id), [tasks, sprint.id]);
 
-	const searched = pools.backlog.filter((task) => matchesSearch(task, search));
+	const { offered, phase } = useSprintProposal(sprint);
+	// A card the proposal offers shows on the sprint side, in dashed violet, not in the backlog too.
+	const offeredSet = useMemo(() => new Set(offered), [offered]);
+	const searched = pools.backlog.filter((task) => !offeredSet.has(task.id) && matchesSearch(task, search));
 	const backlog = searched.filter((task) => matchesQuick(task, quick));
 	const backlogPoints = backlog.reduce((sum, task) => sum + taskPoints(task), 0);
 	const missing = useMemo(() => missingBlockers(pools.sprint, tasks), [pools.sprint, tasks]);
 	const otherActive = sprint.state === "planned" && !!activeSprint(sprints);
+	const proposed = useMemo(() => offeredPoints(offered, tasks, sprint.id), [offered, tasks, sprint.id]);
+	const proposing = canEdit && (phase === "thinking" || phase === "ready");
 
 	const move = useCallback(
 		async (ids: readonly string[], to: string | null, remember = true) => {
@@ -210,8 +218,8 @@ function PlanningView({ sprint }: { sprint: Sprint }) {
 					</DialogDescription>
 				</DialogHeader>
 				<SprintPicker current={sprint} onPick={openPlanning} />
-				<SprintCapacity sprint={sprint} points={pools.points} canEdit={canEdit} />
-				<div className="grid max-h-[56vh] min-h-0 gap-3 md:grid-cols-2">
+				<SprintCapacity sprint={sprint} points={pools.points} proposed={proposed} canEdit={canEdit} />
+				<div className="grid max-h-[56vh] min-h-0 gap-3 md:h-[56vh] md:grid-cols-2 md:grid-rows-[minmax(0,1fr)]">
 					<PlanningPane
 						testId="sprint-planning-backlog"
 						title={t("tasks:kanban.sprints.backlog")}
@@ -299,9 +307,12 @@ function PlanningView({ sprint }: { sprint: Sprint }) {
 						canEdit={canEdit}
 						renderChips={chips}
 						renderUnestimated={estimate}
+						header={<ProposalHeader sprint={sprint} canEdit={canEdit} />}
+						after={proposing ? <ProposalRows sprint={sprint} tasks={tasks} busy={busy} /> : undefined}
 						footer={
 							canEdit ? (
 								<div className="grid gap-2">
+									<ProposalFooter sprint={sprint} busy={busy} onAccept={(ids) => move(ids, sprint.id)} />
 									{missing.length > 0 && (
 										<div
 											data-testid="sprint-planning-missing"

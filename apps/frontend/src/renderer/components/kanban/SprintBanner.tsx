@@ -2,12 +2,13 @@
  * The band above the board that names the sprint it is about: the one the
  * « Sprints » filter shows, else the active one. It gives the sprint's days
  * (and the calendar days left), what it holds and what is done, and the
- * next step: show only its cards, plan it (the planning view), start it or
- * complete it. Nothing shows while the board has no sprint to talk about.
+ * next step: show only its cards, plan it (the planning view), have it
+ * proposed (« Proposer le sprint », the planning view on its settings),
+ * start it or complete it. Nothing shows while the board has no sprint to talk about.
  *
  * Design: docs/architecture/kanban-sprints.md.
  */
-import { CalendarRange, Filter, IterationCw, ListPlus, Play, Square } from "lucide-react";
+import { CalendarRange, Filter, IterationCw, ListPlus, Play, Sparkles, Square } from "lucide-react";
 import { useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -17,6 +18,7 @@ import { formatAppDate } from "../../lib/date-format";
 import { daysLeft, focusedSprint } from "../../lib/sprint-planning";
 import { cn } from "../../lib/utils";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
+import { useSprintProposalStore } from "../../stores/sprint-proposal-store";
 import { useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
@@ -45,6 +47,7 @@ export function SprintBanner() {
 	const sprints = useSprintStore((s) => s.sprints);
 	const openPlanning = useSprintStore((s) => s.openPlanning);
 	const start = useSprintStore((s) => s.start);
+	const openSettings = useSprintProposalStore((s) => s.openSettings);
 	const tasks = useTaskStore((s) => s.tasks);
 	const filter = useKanbanFilterStore((s) => s.filters.sprint);
 	const setSprint = useKanbanFilterStore((s) => s.setSprint);
@@ -141,6 +144,21 @@ export function SprintBanner() {
 					>
 						<ListPlus className="h-3.5 w-3.5" />
 						{t("tasks:kanban.sprints.planning.open")}
+					</Button>
+				)}
+				{canEdit && sprint.state !== "closed" && (
+					<Button
+						size="sm"
+						variant="outline"
+						className="h-7 gap-1.5 border-violet-500/40 px-2 text-xs text-[color-mix(in_oklab,var(--color-violet-500)_70%,var(--color-foreground))] hover:bg-violet-500/10"
+						onClick={() => {
+							openSettings(sprint.id);
+							openPlanning(sprint.id);
+						}}
+						data-testid="kanban-sprint-propose"
+					>
+						<Sparkles className="h-3.5 w-3.5" />
+						{t("tasks:kanban.sprints.proposal.open")}
 					</Button>
 				)}
 				{canEdit && sprint.state === "planned" && (

@@ -80,3 +80,24 @@ de 60 s dépassé, JSON illisible, aucune tâche qui tienne), la proposition des
   balises), la priorité, le type, les points, les étiquettes et les dépendances. Jamais qui
   travaille sur la tâche, ni un autre champ.
 - Aucune durée n'est estimée : la proposition ne parle qu'en points.
+
+## Dans la vue Planifier
+
+`renderer/components/kanban/SprintProposalPanel.tsx`, état dans `renderer/stores/sprint-proposal-store.ts`.
+
+- **Entrées** : le bouton « Proposer le sprint » du bandeau du sprint, celui du côté sprint de la
+  vue Planifier, et la création d'un sprint, qui ouvre la vue sur les réglages.
+- **Réglages** : l'objectif (celui du sprint par défaut), la capacité de 50 % à 150 % de celle
+  du sprint, l'intention (les quatre variantes), et ce qui part vers le fournisseur. Un objectif
+  ou une capacité laissés tels quels ne sont pas envoyés : le main relit ceux du sprint.
+- **Attente** : trois places en pointillés et les trois étapes. La vue peut se fermer : la
+  réponse attend dans le store, pour ce sprint et ce projet. Une demande plus récente remplace
+  une réponse plus ancienne.
+- **Proposition** : les tâches en pointillés violets après celles du sprint, chacune avec sa
+  raison (celle du modèle, sinon celle des règles), la ligne de capacité, puis les meilleures
+  qui n'y tiennent pas avec le total qu'elles donneraient. La jauge dessine les points proposés.
+  On retire une tâche (avec celles proposées seulement pour elle), on en ajoute une d'en dessous,
+  on relance une autre variante, on prend l'objectif proposé (« Utiliser »).
+- **Ajouter N tâches** passe par le déplacement de la vue : un seul déplacement, que
+  « Annuler » (ou Ctrl+Z) défait. Rien ne bouge avant.
+- Un lecteur d'un projet du serveur ne voit ni le bouton ni la proposition.
