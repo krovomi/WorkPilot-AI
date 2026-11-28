@@ -105,7 +105,7 @@ crash, a forced kill or an OS shutdown that never delivered `before-quit` leaves
 so the card reads paused and the stuck recovery never resets its subtask), and
 the pauses of "Stop all agents" (`kill_switch`, [agent-kill-switch.md](agent-kill-switch.md))
 or of « stop » to the voice assistant (`voice_stop`), the person's own stop.
-Settings › Agents (`interruptedTasksOnLaunch`) decides what happens:
+Settings > Agent Settings (`interruptedTasksOnLaunch`) decides what happens:
 
 - `ask` (default): the renderer's `InterruptedTasksDialog` shows each build with
   its project, engine, how it stopped, the phase steps and where it resumes
