@@ -225,6 +225,8 @@ class CliSubprocessAgentClient(AgentClient):
         self.context_window_tokens: int | None = None
         self.context_usage_source: str = "reported"
         self._sandbox: Any = None
+        #: How this CLI runs in the task's microVM, when it does (`cli_microvm`).
+        self._cli_vm: Any = None
 
     def session_sandbox(self, spec_dir: Path | str | None = None) -> Any:
         """The OS sandbox this CLI's process runs in, decided once.
@@ -236,11 +238,14 @@ class CliSubprocessAgentClient(AgentClient):
         `os_sandbox.SandboxRequiredError` under ``WORKPILOT_SANDBOX=required``.
         """
         if self._sandbox is None:
+            import functools
             import shutil
 
             from os_sandbox import session_sandbox
             from os_sandbox.policy import install_dir
             from skills_registry.providers import get_provider_capabilities
+
+            from .cli_microvm import open_session
 
             name = self.sandbox_provider or self.provider_name()
             spec = get_provider_capabilities(name).sandbox
@@ -249,7 +254,8 @@ class CliSubprocessAgentClient(AgentClient):
                 for path in (self._resolve_executable(), shutil.which("node"))
                 if path
             ]
-            self._sandbox = session_sandbox(
+            open_sandbox = functools.partial(
+                session_sandbox,
                 self._project_dir,
                 spec_dir or getattr(self, "_spec_dir", None),
                 state_dirs=spec.state if spec else (),
@@ -260,10 +266,23 @@ class CliSubprocessAgentClient(AgentClient):
                 else f"{self.cli_label} has no sandbox profile in capabilities/providers.yaml",
                 readable=readable,
             )
+            # In the task's microVM when the person asked for it and sbx
+            # holds a key for this CLI (`cli_microvm`); else as before.
+            self._sandbox, self._cli_vm = open_session(
+                open_sandbox, spec, self.cli_label, self.model
+            )
         return self._sandbox
 
     def _resolve_executable(self) -> str | None:
         return self._executable
+
+    def runs_in_microvm(self) -> bool:
+        """Whether this CLI's process runs in the task's microVM (`cli_microvm`)."""
+        try:
+            self.session_sandbox()
+        except RuntimeError:  # SandboxRequiredError: the launch says it
+            return False
+        return self._cli_vm is not None
 
     async def custom_mcp_servers(self) -> list[dict[str, Any]]:
         """The approved custom MCP servers for this agent type, looked up once.
@@ -285,7 +304,17 @@ class CliSubprocessAgentClient(AgentClient):
                 isolated = bool(self.session_sandbox().isolated)
             except RuntimeError:  # SandboxRequiredError: the launch says it
                 isolated = False
-            if isolated:
+            if self._cli_vm is not None:
+                # The VM has none of the host's programs or ports.
+                for server in servers:
+                    logger.warning(
+                        "[cli-mcp] MCP server '%s' not started in %s: the CLI runs "
+                        "in the task's microVM",
+                        server.get("id"),
+                        self.cli_label,
+                    )
+                servers = []
+            elif isolated:
                 for server in servers:
                     if server.get("type") == "http":
                         logger.warning(
@@ -300,7 +329,12 @@ class CliSubprocessAgentClient(AgentClient):
 
     def _launch(self, command: list[str]) -> tuple[list[str], dict[str, str]]:
         """The command and environment as started: under the sandbox if on."""
-        return self.session_sandbox().wrap(command, self._subprocess_env())
+        sandbox = self.session_sandbox()
+        if self._cli_vm is not None:
+            return self._cli_vm.launch(
+                sandbox, command, self._subprocess_env(), self._project_dir
+            )
+        return sandbox.wrap(command, self._subprocess_env())
 
     async def __aenter__(self) -> CliSubprocessAgentClient:
         return self
