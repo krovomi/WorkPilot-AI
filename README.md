@@ -99,6 +99,27 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 
 **Resume what a close or a crash interrupted** ([pause and resume](docs/architecture/pause-resume.md)): closing WorkPilot pauses the builds that run, and the next launch asks which to resume. Each one shows its project, its provider and model, how it stopped (closed, crashed, or stopped by you with « Stop all agents ») and where it picks up: the phase, and while coding the next subtask. What the app interrupted is ticked; what you stopped is not; a build whose resume would fail at once (Claude sign-in expired for a Claude build, spec folder gone) is unticked with the reason. Resumes keep each project's In Progress limit, the others start when a slot frees up. « Later » leaves them paused: their card reads **Interrupted**, never « Stuck », with a Resume button, and the toolbar's « N interrupted tasks · Resume… » brings the list back. Settings > Agent Settings chooses Ask me (default), Resume all or Resume none.
 
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/interrupted-tasks-light.png">
+  <img alt="At launch: the interrupted tasks, each with its engine, how it stopped and the step it resumes at, ticked by default" src=".github/assets/showcase/interrupted-tasks.png">
+</picture>
+
+</td>
+<td width="50%" valign="top">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/interrupted-cards-light.png">
+  <img alt="The board: Interrupted cards with Resume, « 2 interrupted » on the In Progress band and the toolbar's « 3 interrupted tasks · Resume… »" src=".github/assets/showcase/interrupted-cards.png">
+</picture>
+
+</td>
+</tr>
+</table>
+
 **Agile board, as in Jira** ([sprints](docs/architecture/kanban-sprints.md), [swimlanes](docs/architecture/kanban-swimlanes.md), [list](docs/architecture/kanban-list-view.md), [timeline](docs/architecture/kanban-timeline.md), [reports](docs/architecture/kanban-reports.md)): tasks that end without success get their own columns, **Failed** and **Abandoned** (with why: duplicate, won't do, PR closed…), and a task can be flagged **Blocked** with its reason. Plan in **sprints** (start, close with carry-over, points from Smart Estimation, never a duration), cut the board into **swimlanes** by sprint, sub-project, priority, type, source or parent, and switch between **Board**, **List** (sortable columns) and **Timeline** (each task from its start to its end, the sprints along the top). **Reports** draw the burndown, velocity, cumulative flow, cycle time, throughput and unsuccessful ends. **Labels**, quick filters (Blocked, Changed this week, My tasks on a team server) and saved views keep a board readable; finished tasks can archive themselves after 7, 14 or 30 days.
 
 **Plan and propose a sprint** ([planning](docs/architecture/kanban-sprints.md), [proposal](docs/architecture/sprint-proposal.md)): « Plan » puts the backlog and the sprint side by side, with a capacity gauge in points against the velocity of the last 3 sprints (team availability in %, a 20-point target for a first sprint). Drag tasks across or press → / ←, undo the last move, filter the backlog (urgent, bugs, not estimated) and « Estimate » a task without points; carried-over tasks and tasks waiting on one left in the backlog are marked. **Propose the sprint** fills it up to its capacity: the rules rank the backlog and add a task's blockers first, the selected provider's model composes the sprint and gives a reason per task, and the best tasks that don't fit stay below the line. Variants: Balanced, More careful (80 %), Bugs first, Around the goal; a goal is suggested when the sprint has none. Nothing moves until you add the tasks, and it works without a model too. The model only reads a task's title, the start of its description, priority, type, points, labels and dependencies, never who works on it.

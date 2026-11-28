@@ -101,6 +101,27 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 
 **Reprendre ce qu'une fermeture ou un plantage a interrompu** ([pause et reprise](docs/architecture/pause-resume.md)) : fermer WorkPilot met en pause les tâches qui tournent, et le démarrage suivant demande lesquelles reprendre. Chacune montre son projet, son provider et son modèle, la façon dont elle s'est arrêtée (fermeture, plantage, ou « Arrêter tous les agents ») et où elle repartira : la phase, et pendant le code la prochaine sous-tâche. Ce que l'app a interrompu est coché, ce que vous avez arrêté ne l'est pas, et une tâche dont la reprise échouerait tout de suite (connexion Claude expirée pour une tâche sur Claude, dossier de spec disparu) est décochée avec la raison. Les reprises respectent la limite « En cours » de chaque projet, les autres partent quand une place se libère. « Plus tard » les laisse en pause : leur carte affiche **Interrompue**, jamais « Bloqué », avec un bouton Reprendre, et « N tâches interrompues · Reprendre… » dans la barre du Kanban rouvre la liste. Paramètres > Paramètres d'agent : Me demander (par défaut), Tout reprendre ou Ne rien reprendre.
 
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/interrupted-tasks-light.png">
+  <img alt="Au démarrage : les tâches interrompues, chacune avec son moteur, sa façon de s'arrêter et l'étape où elle repart, cochées par défaut" src=".github/assets/showcase/interrupted-tasks.png">
+</picture>
+
+</td>
+<td width="50%" valign="top">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/interrupted-cards-light.png">
+  <img alt="Le tableau : cartes Interrompue avec Reprendre, « 2 interrompues » sur le bandeau En cours et « 3 tâches interrompues · Reprendre… » dans la barre" src=".github/assets/showcase/interrupted-cards.png">
+</picture>
+
+</td>
+</tr>
+</table>
+
 **Tableau agile, comme Jira** ([sprints](docs/architecture/kanban-sprints.md), [couloirs](docs/architecture/kanban-swimlanes.md), [liste](docs/architecture/kanban-list-view.md), [frise](docs/architecture/kanban-timeline.md), [rapports](docs/architecture/kanban-reports.md)) : les tâches qui finissent sans succès ont leurs colonnes, **Échec** et **Abandonnée** (avec la raison : doublon, ne sera pas fait, PR fermée…), et une tâche peut être marquée **Bloquée** avec ce qui la bloque. Planifiez en **sprints** (démarrage, clôture avec report, points issus de Smart Estimation, jamais une durée), coupez le tableau en **couloirs** par sprint, sous-projet, priorité, type, source ou tâche parente, et passez de **Tableau** à **Liste** (colonnes triables) ou **Frise** (chaque tâche de son début à sa fin, les sprints en tête). Les **Rapports** tracent le burndown, la vélocité, le flux cumulé, le temps de cycle, le débit et les fins non abouties. **Étiquettes**, filtres rapides (Bloquées, Modifiées cette semaine, Mes tâches sur un serveur d'équipe) et vues enregistrées gardent le tableau lisible ; les tâches terminées peuvent s'archiver d'elles-mêmes après 7, 14 ou 30 jours.
 
 **Planifier et proposer un sprint** ([planification](docs/architecture/kanban-sprints.md), [proposition](docs/architecture/sprint-proposal.md)) : « Planifier » met le backlog et le sprint côte à côte, avec une jauge de capacité en points face à la vélocité des 3 derniers sprints (disponibilité de l'équipe en %, une cible de 20 points pour un premier sprint). Glissez les tâches d'un côté à l'autre ou appuyez sur → / ←, annulez le dernier déplacement, filtrez le backlog (urgentes, bugs, non estimées) et « Estimez » une tâche sans points ; les tâches reportées et celles qui attendent une tâche restée au backlog sont signalées. **Proposer le sprint** le remplit jusqu'à sa capacité : les règles classent le backlog et ajoutent d'abord ce qu'une tâche attend, le modèle du provider choisi compose le sprint et donne une raison par tâche, et les meilleures tâches qui ne tiennent pas restent sous la ligne. Variantes : Équilibré, Plus prudent (80 %), Bugs d'abord, Autour du but ; un but est suggéré quand le sprint n'en a pas. Rien ne bouge avant que vous ajoutiez les tâches, et cela marche aussi sans modèle. Le modèle ne lit que le titre d'une tâche, le début de sa description, sa priorité, son type, ses points, ses étiquettes et ses dépendances, jamais qui travaille dessus.
