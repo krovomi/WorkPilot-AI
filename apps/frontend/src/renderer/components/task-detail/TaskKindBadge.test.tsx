@@ -79,6 +79,16 @@ describe("TaskKindBadge", () => {
 		expect(screen.getByText("(kind.chosen)")).toBeInTheDocument();
 	});
 
+	it("says on the editable pill when the kind is only a proposal", () => {
+		render(
+			<TaskKindBadge
+				task={task({ kind: "feature", kindConfidence: 0.3, kindSource: "default" })}
+				editable
+			/>,
+		);
+		expect(screen.getByRole("combobox")).toHaveTextContent("(kind.proposed)");
+	});
+
 	it("lists every kind in the themed Select, not a native <select>", async () => {
 		const { container } = render(
 			<TaskKindBadge task={task({ kind: "docs", kindSource: "user" })} editable />,
