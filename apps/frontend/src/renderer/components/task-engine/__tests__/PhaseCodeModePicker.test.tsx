@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
 	normalizePhaseCodeMode,
+	phaseCodeModeMetadata,
 	phaseCodeModeToSave,
 } from "../../../../shared/utils/code-mode";
 import { PhaseCodeModePicker } from "../PhaseCodeModePicker";
@@ -54,5 +55,7 @@ describe("phase code mode values", () => {
 	it("saves nothing when no phase has its own mode", () => {
 		expect(phaseCodeModeToSave({})).toBeUndefined();
 		expect(phaseCodeModeToSave({ planning: "off" })).toEqual({ planning: "off" });
+		expect(phaseCodeModeMetadata({})).toEqual({});
+		expect(phaseCodeModeMetadata({ qa: "on" })).toEqual({ phaseCodeMode: { qa: "on" } });
 	});
 });

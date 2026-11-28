@@ -29,7 +29,7 @@ import {
 	type TaskEngine,
 } from "../../shared/utils/task-engine";
 import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
-import { type PhaseCodeMode, phaseCodeModeToSave } from "../../shared/utils/code-mode";
+import { type PhaseCodeMode, phaseCodeModeMetadata } from "../../shared/utils/code-mode";
 import {
 	DEFAULT_AGENT_PROFILES,
 	DEFAULT_PHASE_MODELS,
@@ -672,8 +672,7 @@ export function TaskCreationWizard({
 			// The task owns its engine from the start: every phase's provider,
 			// model and effort, locked so nothing global replaces them later.
 			Object.assign(metadata, buildEngineMetadata(engine));
-			const ownCodeMode = phaseCodeModeToSave(phaseCodeMode);
-			if (ownCodeMode) metadata.phaseCodeMode = ownCodeMode;
+			Object.assign(metadata, phaseCodeModeMetadata(phaseCodeMode));
 			if (images.length > 0) metadata.attachedImages = images;
 			if (allReferencedFiles.length > 0)
 				metadata.referencedFiles = allReferencedFiles;

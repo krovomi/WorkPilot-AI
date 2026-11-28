@@ -45,3 +45,9 @@ export function phaseCodeModeToSave(value: PhaseCodeMode): PhaseCodeMode | undef
 	const chosen = normalizePhaseCodeMode(value);
 	return Object.keys(chosen).length > 0 ? chosen : undefined;
 }
+
+/** What a new task's metadata gets: `{ phaseCodeMode }`, or nothing. */
+export function phaseCodeModeMetadata(value: PhaseCodeMode): { phaseCodeMode?: PhaseCodeMode } {
+	const chosen = phaseCodeModeToSave(value);
+	return chosen ? { phaseCodeMode: chosen } : {};
+}
