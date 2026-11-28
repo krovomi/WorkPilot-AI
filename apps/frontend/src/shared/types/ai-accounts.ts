@@ -12,8 +12,9 @@ import { GATEWAY_PROVIDERS } from "../constants/gateway-providers";
 
 /**
  * Providers whose accounts are API keys on the provider's own endpoint. AWS
- * (a key pair and a region), Windsurf, Cursor and the CLI providers sign in
- * another way and keep one account until they get their own store.
+ * Bedrock's is a key pair and a region (`KEY_PAIR_PROVIDERS`); Windsurf and
+ * Cursor take one key. The coding-agent CLIs have sign-in accounts instead
+ * (`AI_LOGIN_PROVIDERS`).
  */
 export const AI_ACCOUNT_PROVIDERS: readonly string[] = [
 	"openai",
@@ -22,8 +23,22 @@ export const AI_ACCOUNT_PROVIDERS: readonly string[] = [
 	"deepseek",
 	"grok",
 	"meta",
+	"aws",
+	"cursor",
+	"windsurf",
 	...GATEWAY_PROVIDERS.map((gateway) => gateway.id),
 ];
+
+/** Providers whose account is a key pair (access key id and secret) and a region. */
+export const KEY_PAIR_PROVIDERS: readonly string[] = ["aws"];
+
+/** The region an AWS account gets when none is typed. */
+export const DEFAULT_AWS_REGION = "us-east-1";
+
+/** An AWS region name (`eu-west-3`, `us-gov-west-1`). */
+export function isAwsRegion(value: unknown): value is string {
+	return typeof value === "string" && /^[a-z]{2}(-[a-z]+)+-\d{1,2}$/.test(value);
+}
 
 /**
  * Coding-agent CLIs whose accounts are sign-ins, each in a folder of its own
@@ -88,6 +103,10 @@ export interface AiAccountView {
 	kind?: "key" | "login";
 	/** A sign-in account: whether its CLI has signed in there. */
 	signedIn?: boolean;
+	/** A key-pair account (AWS): whether its secret is set, never the secret. */
+	hasSecret?: boolean;
+	/** A key-pair account (AWS): its region. */
+	region?: string;
 	createdAt: string;
 	/** When the key got its current value. */
 	keySetAt?: string;
@@ -121,6 +140,10 @@ export interface AiAccountInput {
 	name: string;
 	/** A new key; the mask or nothing keeps the saved one. */
 	apiKey?: string;
+	/** A key-pair account (AWS): a new secret; the mask or nothing keeps the saved one. */
+	secretKey?: string;
+	/** A key-pair account (AWS): its region. */
+	region?: string;
 }
 
 export interface AiAccountTestResult {
@@ -129,4 +152,6 @@ export interface AiAccountTestResult {
 	modelCount?: number;
 	/** A short reason when `ok` is false (never the key, never the provider's raw body). */
 	error?: string;
+	/** The provider has no check the app can run: the key is saved, not tried. */
+	unchecked?: boolean;
 }

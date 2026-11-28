@@ -56,7 +56,7 @@ describe("providers", () => {
 		expect(isAiAccountProvider("anthropic")).toBe(false);
 		expect(isAiAccountProvider(42)).toBe(false);
 		expect(accountProviderOf(" Gemini ")).toBe("google");
-		expect(accountProviderOf("windsurf")).toBeUndefined();
+		expect(accountProviderOf("ollama")).toBeUndefined();
 		expect(accountProviderOf(undefined)).toBeUndefined();
 	});
 });
@@ -152,6 +152,80 @@ describe("AiAccountStore", () => {
 		expect(() => store.save({ provider: "openai", name: "one more", apiKey: KEY })).toThrow(
 			"Too many accounts",
 		);
+	});
+});
+
+describe("an AWS account (key pair and region)", () => {
+	const ID = "AKIATEST0000";
+	const SECRET = "secret-test-0000";
+
+	it("needs its secret, stores it encrypted and never shows it", () => {
+		expect(() => store.save({ provider: "aws", name: "x", apiKey: ID })).toThrow("A secret key is required");
+		const view = store.save({ provider: "aws", name: "Prod", apiKey: ID, secretKey: SECRET });
+		expect(view).toMatchObject({ provider: "aws", hasKey: true, hasSecret: true, region: "us-east-1" });
+		expect(view).not.toHaveProperty("secretKey");
+		expect(JSON.stringify(store.list())).not.toContain(SECRET);
+		expect(readFileSync(file, "utf-8")).not.toContain(SECRET);
+		expect(store.pairOf(view.id)).toEqual({ secretKey: SECRET, region: "us-east-1" });
+		expect(store.pairOf("nope")).toBeUndefined();
+	});
+
+	it("keeps the secret and region behind the mask, and replaces them when typed", () => {
+		const created = store.save({
+			provider: "aws",
+			name: "Prod",
+			apiKey: ID,
+			secretKey: SECRET,
+			region: " EU-West-3 ",
+		});
+		expect(created.region).toBe("eu-west-3");
+		store.save({ id: created.id, provider: "aws", name: "Prod", apiKey: MASKED_SECRET, secretKey: MASKED_SECRET });
+		expect(store.pairOf(created.id)).toEqual({ secretKey: SECRET, region: "eu-west-3" });
+		store.save({ id: created.id, provider: "aws", name: "Prod", secretKey: "secret-1111", region: "us-west-2" });
+		expect(store.pairOf(created.id)).toEqual({ secretKey: "secret-1111", region: "us-west-2" });
+		expect(store.keyOf(created.id)).toBe(ID);
+	});
+
+	it("refuses a region that is not one", () => {
+		expect(() =>
+			store.save({ provider: "aws", name: "x", apiKey: ID, secretKey: SECRET, region: "eu west" }),
+		).toThrow("Invalid region");
+		expect(() => store.save({ provider: "aws", name: "x", apiKey: ID, secretKey: "a b" })).toThrow("Invalid key");
+	});
+
+	it("is not a default until both halves are set, and reads an account without a secret as keyless", () => {
+		const created = store.save({ provider: "aws", name: "Prod", apiKey: ID, secretKey: SECRET });
+		const content = JSON.parse(readFileSync(file, "utf-8"));
+		delete content.accounts[0].secretKey;
+		writeFileSync(file, JSON.stringify(content));
+		expect(store.get(created.id)).toMatchObject({ hasKey: false, hasSecret: false });
+		expect(store.pairOf(created.id)).toBeUndefined();
+		expect(() => store.setDefault("aws", created.id)).toThrow();
+	});
+
+	it("ignores a secret or region sent for a single-key provider", () => {
+		const view = store.save({ provider: "cursor", name: "C", apiKey: KEY, secretKey: SECRET, region: "eu-west-3" });
+		expect(view).not.toHaveProperty("region");
+		expect(view).not.toHaveProperty("hasSecret");
+		expect(readFileSync(file, "utf-8")).not.toContain("eu-west-3");
+		expect(store.pairOf(view.id)).toBeUndefined();
+	});
+
+	it("reads a stored pair without a region as us-east-1", () => {
+		const created = store.save({ provider: "aws", name: "Prod", apiKey: ID, secretKey: SECRET });
+		const content = JSON.parse(readFileSync(file, "utf-8"));
+		delete content.accounts[0].region;
+		writeFileSync(file, JSON.stringify(content));
+		expect(store.get(created.id)?.region).toBe("us-east-1");
+		expect(store.pairOf(created.id)).toEqual({ secretKey: SECRET, region: "us-east-1" });
+	});
+
+	it("reads a stored account with a broken region as no account", () => {
+		store.save({ provider: "aws", name: "Prod", apiKey: ID, secretKey: SECRET });
+		const content = JSON.parse(readFileSync(file, "utf-8"));
+		content.accounts[0].region = "nowhere";
+		writeFileSync(file, JSON.stringify(content));
+		expect(store.list()).toEqual([]);
 	});
 });
 

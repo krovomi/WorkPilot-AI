@@ -2,9 +2,9 @@
 feature: Plusieurs comptes par provider IA
 summary: >-
   Plusieurs comptes par provider à clé API (OpenAI, Google, Mistral, DeepSeek, Grok, Meta,
-  OpenRouter, Hugging Face), clés chiffrées dans le main, un compte par défaut par provider donné
-  aux tâches ; Claude : ses profils OAuth ; Copilot, Codex CLI, Gemini CLI : un dossier par compte ;
-  bascule depuis la popin ; dépense et budget par compte ; en mode serveur, chacun les siens.
+  OpenRouter, Hugging Face, Cursor, Windsurf ; AWS : paire et région), clés chiffrées dans le main,
+  un défaut par provider donné aux tâches ; Claude : ses profils OAuth ; Copilot, Codex CLI,
+  Gemini CLI : un dossier par compte ; dépense et budget par compte ; en serveur, chacun les siens.
 ---
 
 # Plusieurs comptes par provider IA
@@ -221,15 +221,37 @@ première d'un provider devient son défaut, une par défaut au plus.
 - **RGPD** : supprimer le compte de la personne supprime ses comptes IA (`CASCADE`,
   `account_erasure.py`).
 
+## AWS, Cursor et Windsurf
+
+Leur clé ne passe pas par `defaultAccountKey` : `credential-manager.ts` ne leur connaît pas de
+branche dans sa recherche de clé. `main/ai-accounts/account-env.ts` (`defaultAccountEnv`) ajoute
+donc lui-même, après le reste de l'environnement, ce que donne leur compte par défaut :
+
+| Provider | Variables | Lues par |
+|---|---|---|
+| AWS (Bedrock) | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` | `provider_api.py`, le SDK AWS |
+| Cursor | `CURSOR_API_KEY` | `provider_api.py` |
+| Windsurf | `WINDSURF_API_KEY` | `provider_api.py` |
+
+Un compte AWS est une paire (`KEY_PAIR_PROVIDERS`) : l'identifiant de clé dans `apiKey`, le secret
+dans `secretKey`, chiffré pareil, et une région vérifiée (`isAwsRegion`, `us-east-1` par défaut).
+La vue n'en montre que `hasSecret` et la région ; `hasKey` n'est vrai qu'avec les deux moitiés, et
+un compte sans secret ne devient pas le défaut. Le handler chiffre d'avance les deux valeurs
+tapées (`prepareSecrets`). Le test d'un de ces comptes répond `unchecked` sans rien appeler : AWS
+signe ses requêtes et Cursor ou Windsurf n'ont pas de point d'accès que la clé seule permet
+d'interroger ; l'interface dit que la première tâche le dira. Le mode serveur garde sa propre liste
+de providers (`server/services/ai_accounts.py`), sans ces trois-là pour l'instant.
+
 ## Pas encore
 
-Windsurf, Cursor, AWS (paire de clés et région) et Ollama (local) gardent un compte.
+Ollama (local) n'a pas de compte : il n'a pas de clé.
 
 ## Fichiers
 
 - `apps/frontend/src/shared/types/ai-accounts.ts` : types et providers.
 - `apps/frontend/src/main/ai-accounts/ai-accounts.ts` : le stockage.
 - `apps/frontend/src/main/ai-accounts/ai-account-key.ts` : la clé que reçoit un provider.
+- `apps/frontend/src/main/ai-accounts/account-env.ts` : les variables d'AWS, Cursor et Windsurf.
 - `apps/frontend/src/main/ai-accounts/login-specs.ts`, `login-accounts.ts` : les comptes des outils CLI.
 - `apps/backend/foundation/copilot_gh_env.py` : le dossier GitHub CLI du jeton de Copilot.
 - `apps/frontend/src/main/ipc-handlers/ai-accounts-handlers.ts` : l'IPC.

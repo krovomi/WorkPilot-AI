@@ -27,6 +27,7 @@ vi.mock("../../services/credential-manager", () => ({
 }));
 
 import { ipcMain } from "electron";
+import { prepareSecrets } from "../../secret-storage";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import {
 	AccountBudgetStore,
@@ -138,6 +139,45 @@ describe("AI accounts IPC", () => {
 			success: false,
 			error: "Invalid account",
 		});
+	});
+
+	it("encrypts an AWS secret ahead with its key, and saves the pair without a test it cannot run", async () => {
+		vi.mocked(prepareSecrets).mockClear();
+		const saved = await saveAiAccount({
+			provider: "aws",
+			name: "Prod",
+			apiKey: "AKIATEST0000",
+			secretKey: "secret-test-0000",
+			region: "eu-west-3",
+		});
+		expect(prepareSecrets).toHaveBeenCalledWith(["AKIATEST0000", "secret-test-0000"]);
+		expect(JSON.stringify(saved)).not.toContain("secret-test-0000");
+		expect(saved.data).toMatchObject({ hasKey: true, hasSecret: true, region: "eu-west-3" });
+		const test = vi.fn();
+		expect(await testSavedAiAccount(saved.data?.id, test)).toEqual({
+			success: true,
+			data: { ok: true, unchecked: true },
+		});
+		const cursor = await saveAiAccount({ provider: "cursor", name: "C", apiKey: KEY });
+		expect(await testSavedAiAccount(cursor.data?.id, test)).toEqual({
+			success: true,
+			data: { ok: true, unchecked: true },
+		});
+		expect(test).not.toHaveBeenCalled();
+	});
+
+	it("answers no key for a pair missing its secret, and asks nothing when nothing is typed", async () => {
+		const store = new AiAccountStore(path.join(dir, "pair.json"));
+		setAiAccountStoreForTests(store);
+		const saved = store.save({ provider: "aws", name: "Prod", apiKey: "AKIATEST0000", secretKey: "s-0" });
+		vi.spyOn(store, "get").mockReturnValue({ ...saved, hasKey: false });
+		expect(await testSavedAiAccount(saved.id, vi.fn())).toEqual({
+			success: true,
+			data: { ok: false, error: "No key" },
+		});
+		vi.mocked(prepareSecrets).mockClear();
+		await saveAiAccount({ id: saved.id, provider: "aws", name: "Prod 2" });
+		expect(prepareSecrets).not.toHaveBeenCalled();
 	});
 
 	it("deletes an account, and its budget with it", async () => {

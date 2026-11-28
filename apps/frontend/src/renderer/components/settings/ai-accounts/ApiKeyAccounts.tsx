@@ -4,10 +4,16 @@
  * here, one of them the default that tasks, tests and views run on. A key is
  * typed once and sent to the main process, which keeps it encrypted and only
  * says whether one is set (`main/ai-accounts/ai-accounts.ts`); the
- * connection test runs there too, on the provider's own endpoint.
+ * connection test runs there too, on the provider's own endpoint. An AWS
+ * account is a key pair and a region (`KEY_PAIR_PROVIDERS`).
  */
 
-import type { AiAccountTestResult, AiAccountView } from "@shared/types/ai-accounts";
+import {
+	type AiAccountTestResult,
+	type AiAccountView,
+	DEFAULT_AWS_REGION,
+	KEY_PAIR_PROVIDERS,
+} from "@shared/types/ai-accounts";
 import { KeyRound, Loader2, Pencil, Plug, Plus, Star, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -24,9 +30,13 @@ interface Draft {
 	name: string;
 	apiKey: string;
 	hasKey: boolean;
+	/** A key-pair account (AWS): the secret typed, whether one is saved, the region. */
+	secretKey: string;
+	hasSecret: boolean;
+	region: string;
 }
 
-const EMPTY: Draft = { name: "", apiKey: "", hasKey: false };
+const EMPTY: Draft = { name: "", apiKey: "", hasKey: false, secretKey: "", hasSecret: false, region: "" };
 
 interface ApiKeyAccountsProps {
 	readonly provider: string;
@@ -35,12 +45,15 @@ interface ApiKeyAccountsProps {
 
 function AccountForm({
 	draft,
+	pair,
 	busy,
 	onChange,
 	onSubmit,
 	onCancel,
 }: {
 	readonly draft: Draft;
+	/** A key-pair provider (AWS): access key id, secret and region. */
+	readonly pair: boolean;
 	readonly busy: boolean;
 	readonly onChange: (draft: Draft) => void;
 	readonly onSubmit: () => void;
@@ -48,6 +61,7 @@ function AccountForm({
 }) {
 	const { t } = useTranslation("settings");
 	const creating = draft.id === undefined;
+	const missing = creating && (!draft.apiKey.trim() || (pair && !draft.secretKey.trim()));
 	return (
 		<form
 			className="space-y-3 rounded-lg border border-border p-4"
@@ -68,7 +82,9 @@ function AccountForm({
 					/>
 				</div>
 				<div className="space-y-2">
-					<Label htmlFor="ai-account-key">{t("aiAccounts.accounts.key")}</Label>
+					<Label htmlFor="ai-account-key">
+						{pair ? t("aiAccounts.accounts.keyId") : t("aiAccounts.accounts.key")}
+					</Label>
 					<Input
 						id="ai-account-key"
 						type="password"
@@ -80,6 +96,35 @@ function AccountForm({
 						onChange={(event) => onChange({ ...draft, apiKey: event.target.value })}
 					/>
 				</div>
+				{pair && (
+					<>
+						<div className="space-y-2">
+							<Label htmlFor="ai-account-secret">{t("aiAccounts.accounts.secretKey")}</Label>
+							<Input
+								id="ai-account-secret"
+								type="password"
+								autoComplete="off"
+								value={draft.secretKey}
+								placeholder={
+									draft.hasSecret
+										? t("aiAccounts.accounts.secretKeep")
+										: t("aiAccounts.accounts.secretPlaceholder")
+								}
+								onChange={(event) => onChange({ ...draft, secretKey: event.target.value })}
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="ai-account-region">{t("aiAccounts.accounts.region")}</Label>
+							<Input
+								id="ai-account-region"
+								value={draft.region}
+								maxLength={40}
+								placeholder={DEFAULT_AWS_REGION}
+								onChange={(event) => onChange({ ...draft, region: event.target.value })}
+							/>
+						</div>
+					</>
+				)}
 			</div>
 			<div className="flex justify-end gap-2">
 				<Button type="button" variant="outline" onClick={onCancel} disabled={busy}>
@@ -87,7 +132,7 @@ function AccountForm({
 				</Button>
 				<Button
 					type="submit"
-					disabled={busy || !draft.name.trim() || (creating && !draft.apiKey.trim())}
+					disabled={busy || !draft.name.trim() || missing}
 				>
 					{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
 					{creating ? t("aiAccounts.accounts.addAndTest") : t("aiAccounts.accounts.save")}
@@ -97,12 +142,20 @@ function AccountForm({
 	);
 }
 
-function TestLine({ result }: { readonly result: AiAccountTestResult }) {
+function TestLine({
+	result,
+	providerName,
+}: {
+	readonly result: AiAccountTestResult;
+	readonly providerName: string;
+}) {
 	const { t } = useTranslation("settings");
 	return (
 		<p role="status" className={result.ok ? "text-xs text-success" : "text-xs text-destructive"}>
 			{result.ok
-				? result.modelCount
+				? result.unchecked
+					? t("aiAccounts.accounts.testUnchecked", { provider: providerName })
+					: result.modelCount
 					? t("aiAccounts.accounts.testOkModels", { count: result.modelCount })
 					: t("aiAccounts.accounts.testOk")
 				: t("aiAccounts.accounts.testFailed", { error: result.error ?? "" })}
@@ -133,6 +186,7 @@ export function ApiKeyAccounts({ provider, providerName }: ApiKeyAccountsProps) 
 
 	const accounts = useMemo(() => aiAccountsOf(allAccounts, provider), [allAccounts, provider]);
 	const hasMainKey = mainKeys.includes(provider);
+	const pair = KEY_PAIR_PROVIDERS.includes(provider);
 	const defaultId = defaults[provider];
 
 	const runTest = async (id: string) => {
@@ -153,6 +207,7 @@ export function ApiKeyAccounts({ provider, providerName }: ApiKeyAccountsProps) 
 			name: draft.name,
 			// Nothing typed keeps the saved key.
 			apiKey: draft.apiKey ? draft.apiKey : undefined,
+			...(pair ? { secretKey: draft.secretKey || undefined, region: draft.region.trim() || undefined } : {}),
 		});
 		setBusy(null);
 		if (result.error || !result.account) {
@@ -252,9 +307,10 @@ export function ApiKeyAccounts({ provider, providerName }: ApiKeyAccountsProps) 
 										? t("aiAccounts.accounts.keySetOn", { date: formatAppDateTime(account.keySetAt) })
 										: t("aiAccounts.accounts.keySet")
 									: t("aiAccounts.accounts.noKey")}
+								{account.region && ` · ${account.region}`}
 							</p>
 							<AccountSpend accountKey={account.id} />
-							{result && <TestLine result={result} />}
+							{result && <TestLine result={result} providerName={providerName} />}
 						</div>
 						<div className="flex flex-wrap gap-2">
 							{!isDefault && account.hasKey && (
@@ -287,7 +343,14 @@ export function ApiKeyAccounts({ provider, providerName }: ApiKeyAccountsProps) 
 								disabled={busy !== null}
 								aria-label={t("aiAccounts.accounts.edit", { name: account.name })}
 								onClick={() =>
-									setDraft({ id: account.id, name: account.name, apiKey: "", hasKey: account.hasKey })
+									setDraft({
+										...EMPTY,
+										id: account.id,
+										name: account.name,
+										hasKey: account.hasKey,
+										hasSecret: account.hasSecret === true,
+										region: account.region ?? "",
+									})
 								}
 							>
 								<Pencil className="h-4 w-4" />
@@ -309,6 +372,7 @@ export function ApiKeyAccounts({ provider, providerName }: ApiKeyAccountsProps) 
 			{draft ? (
 				<AccountForm
 					draft={draft}
+					pair={pair}
 					busy={busy === "form"}
 					onChange={setDraft}
 					onSubmit={() => void submit()}
