@@ -1964,6 +1964,7 @@
 			"toolChanged": "description modifiée",
 			"noDescription": "(aucune description)",
 			"removed": "Plus proposés : {{tools}}",
+			"loginChoice": "{{name}} (connexion {{cli}})",
 			"finding": {
 				"invisible": "caractères invisibles",
 				"private-use": "caractères à usage privé",

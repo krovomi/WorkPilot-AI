@@ -15,8 +15,10 @@ import { useClaudeProfileStore } from "../../../stores/claude-profile-store";
 import { AiAccountPinsEditor, accountPinRows } from "../AiAccountPinsEditor";
 
 vi.mock("react-i18next", () => {
-	const t = (key: string, options?: { name?: string }) =>
-		options?.name !== undefined ? `${key}:${options.name}` : key;
+	const t = (key: string, options?: { name?: string; cli?: string }) =>
+		options?.name !== undefined
+			? `${key}:${options.name}${options.cli ? `/${options.cli}` : ""}`
+			: key;
 	return { useTranslation: () => ({ t }) };
 });
 
@@ -59,6 +61,13 @@ const account = (id: string, name: string, provider: string, hasKey = true): AiA
 	name,
 	hasKey,
 	createdAt: "2026-11-27T10:00:00.000Z",
+});
+
+/** A CLI sign-in account (Copilot, Codex CLI, Gemini CLI). */
+const signIn = (id: string, name: string, provider: string, signedIn = true): AiAccountView => ({
+	...account(id, name, provider, false),
+	kind: "login",
+	signedIn,
 });
 
 const bridge = {
@@ -150,6 +159,47 @@ describe("AiAccountPinsEditor", () => {
 		expect(onChange).toHaveBeenLastCalledWith({ google: "g1" });
 	});
 
+	it("lists OpenAI's Codex sign-ins after its keys, and pins one in place of a key", () => {
+		useAiAccountsStore.setState({
+			accounts: [
+				account("o1", "Perso", "openai"),
+				signIn("c1", "Plan", "codex"),
+				signIn("c2", "Out", "codex", false),
+				signIn("gh1", "Work", "copilot"),
+			],
+			defaults: {},
+		});
+		const onChange = vi.fn();
+		render(
+			<AiAccountPinsEditor
+				providers={["openai", "codex", "copilot"]}
+				value={{ openai: "o1" }}
+				onChange={onChange}
+				scope="card"
+				idPrefix="c"
+			/>,
+		);
+		const openai = within(row("OpenAI (ChatGPT)"));
+		expect(openai.queryByText(/Out/)).not.toBeInTheDocument();
+		fireEvent.click(openai.getByRole("button", { name: "settings:aiAccounts.pins.loginChoice:Plan/Codex CLI" }));
+		expect(onChange).toHaveBeenLastCalledWith({ codex: "c1" });
+		// Without a default, a CLI runs on the sign-in of this computer.
+		const copilot = within(screen.getByTestId("c-account-pins"));
+		expect(
+			copilot.getByText("settings:aiAccounts.pins.inheritDefault:settings:aiAccounts.accounts.login.system"),
+		).toBeInTheDocument();
+		fireEvent.click(copilot.getByRole("button", { name: "Work" }));
+		expect(onChange).toHaveBeenLastCalledWith({ openai: "o1", copilot: "gh1" });
+	});
+
+	it("titles a row of Codex sign-ins on their own with the CLI's name", () => {
+		useAiAccountsStore.setState({ accounts: [signIn("c1", "Plan", "codex")], defaults: {} });
+		render(
+			<AiAccountPinsEditor providers={["codex"]} value={undefined} onChange={vi.fn()} scope="project" idPrefix="p" />,
+		);
+		expect(within(row("Codex CLI")).getByText("Plan")).toBeInTheDocument();
+	});
+
 	it("names the project's account as what a card inherits", () => {
 		render(
 			<AiAccountPinsEditor
@@ -198,24 +248,61 @@ describe("accountPinRows", () => {
 		claudeProfiles: [{ id: "only", name: "Only" }],
 		activeClaudeProfileId: "only",
 	};
-	const labels = { mainKey: "Main key", removed: "Deleted" };
+	const labels = {
+		mainKey: "Main key",
+		removed: "Deleted",
+		system: "This computer",
+		loginChoice: (name: string, cli: string) => `${name} · ${cli}`,
+	};
 
 	it("keeps a pin to a deleted account so it can be removed", () => {
 		expect(
 			accountPinRows(["mistral", "deepseek"], snapshot, labels, undefined, { deepseek: "gone" }),
 		).toEqual([
-			{ provider: "mistral", choices: [{ id: "m1", name: "Client" }], inheritedName: "Main key" },
-			{ provider: "deepseek", choices: [{ id: "gone", name: "Deleted" }], inheritedName: "Main key" },
+			{
+				provider: "mistral",
+				keys: ["mistral"],
+				choices: [{ id: "m1", name: "Client", kind: "key" }],
+				pinned: undefined,
+				inheritedName: "Main key",
+			},
+			{
+				provider: "deepseek",
+				keys: ["deepseek"],
+				choices: [{ id: "gone", name: "Deleted", kind: "key" }],
+				pinned: "gone",
+				inheritedName: "Main key",
+			},
 		]);
 	});
 
 	it("leaves out Claude with a single profile, unless it is pinned", () => {
 		expect(accountPinRows(["claude"], snapshot, labels)).toEqual([]);
 		expect(accountPinRows(["claude"], { ...snapshot, claudeProfiles: [] }, labels, undefined, { claude: "x" })).toEqual([
-			{ provider: "claude", choices: [{ id: "x", name: "Deleted" }], inheritedName: "Deleted" },
+			{
+				provider: "claude",
+				keys: ["claude"],
+				choices: [{ id: "x", name: "Deleted", kind: "key" }],
+				pinned: "x",
+				inheritedName: "Deleted",
+			},
 		]);
 		expect(
 			accountPinRows(["claude"], { ...snapshot, claudeProfiles: [] }, labels, { claude: "y" }, {}),
 		).toEqual([]);
+	});
+
+	it("keeps a pin to a deleted CLI sign-in as a sign-in, and names a CLI's default", () => {
+		const withCli = {
+			...snapshot,
+			accounts: [signIn("gh1", "Work", "copilot"), signIn("g1", "Google", "gemini-cli")],
+			defaults: { "gemini-cli": "g1" },
+		};
+		const rows = accountPinRows(["openai", "copilot", "gemini-cli"], withCli, labels, undefined, { codex: "gone" });
+		expect(rows.map(({ provider, choices, inheritedName }) => ({ provider, choices, inheritedName }))).toEqual([
+			{ provider: "openai", choices: [{ id: "gone", name: "Deleted", kind: "login" }], inheritedName: "Main key" },
+			{ provider: "copilot", choices: [{ id: "gh1", name: "Work", kind: "login" }], inheritedName: "This computer" },
+			{ provider: "gemini-cli", choices: [{ id: "g1", name: "Google", kind: "login" }], inheritedName: "Google" },
+		]);
 	});
 });
