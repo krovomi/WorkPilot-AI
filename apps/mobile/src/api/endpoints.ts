@@ -34,6 +34,7 @@ import type { Channel, ChannelSettings, Moment, NeedsYouOverview, TestResult } f
 import type { Memory } from "../context/index-file";
 import type { AskAnswer } from "../board-ask/types";
 import type { MyUsage, UsageNotice } from "../usage/types";
+import type { AiAccount, AiAccounts } from "../ai-accounts/types";
 import { decided, type MemoryDecision, type MemoryLifecycle } from "../context/lifecycle";
 import type { EngineOption, SettingsPayload } from "../new-card/engine";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
@@ -272,6 +273,22 @@ export function api(client: ServerClient) {
 			client.request<{ saved: boolean }>("PUT", "/users/me/secrets", { kind, value }),
 		deleteSecret: (kind: SecretKind) =>
 			client.request<{ deleted: boolean }>("DELETE", `/users/me/secrets/${enc(kind)}`),
+		/** The person's AI accounts on the server; never a key. */
+		aiAccounts: () => client.request<AiAccounts>("GET", "/users/me/ai-accounts"),
+		addAiAccount: (provider: string, name: string, key: string) =>
+			client.request<AiAccount>("POST", "/users/me/ai-accounts", { provider, name, key }),
+		/** Rename an account, replace its key, or both. */
+		updateAiAccount: (accountId: string, change: { name?: string; key?: string }) =>
+			client.request<AiAccount>("PATCH", `/users/me/ai-accounts/${enc(accountId)}`, change),
+		deleteAiAccount: (accountId: string) =>
+			client.request<{ deleted: boolean; was_default: boolean }>("DELETE", `/users/me/ai-accounts/${enc(accountId)}`),
+		/** The account whose key the person's runs get for `provider`; null: the server's own. */
+		setDefaultAiAccount: (provider: string, accountId: string | null) =>
+			client.request<{ provider: string; account_id: string | null }>(
+				"PUT",
+				`/users/me/ai-accounts/defaults/${enc(provider)}`,
+				{ account_id: accountId },
+			),
 		preferences: () => client.request<UiPreferences>("GET", "/users/me/preferences"),
 		setPreferences: (prefs: ThemePrefs) =>
 			client.request<UiPreferences>("PUT", "/users/me/preferences", {
