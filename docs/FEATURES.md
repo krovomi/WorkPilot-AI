@@ -217,7 +217,7 @@ Meta, AWS and Cursor can be configured, but they have no agent client of their o
 |---------|-------------|
 | **7 Color Themes** | Default, Dusk, Lime, Ocean, Retro, Neo, Forest — each with light and dark variants |
 | **Custom Theme Editor** | Color picker with live preview, export, and import |
-| **Bilingual UI** | Full French and English interface |
+| **Bilingual UI** | Full French and English interface; dates, times and date pickers follow the app's language (28/11/2026 and 14:30 in French, 11/28/2026 and 02:30 PM in English) on the desktop and the phone, not the system region |
 | **Command Palette** | Keyboard-driven access to all features with fuzzy search |
 | **A Menu Arranged by Each Person** | Drag a page onto another space of the rail, reorder « My menu » pins, or use « Customize the menu » (up, down, move to a space, move the space) with the mouse or the keyboard; « Restore the original order » keeps pins and hidden pages. The left menu is resizable (240 to 480 px, double-click resets it). On a server, the arranged menu follows the signed-in person on every computer |
 | **Kanban Toolbar on One Line** | Search, filters, views and the quick command fit on one line from 1,280 px; « Multi-repo » and « Purge » sit in the « ⋯ » menu with a sentence each |
