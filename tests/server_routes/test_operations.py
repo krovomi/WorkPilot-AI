@@ -237,6 +237,16 @@ def test_only_a_sqlite_file_is_a_volume(url, file):
     assert (str(found) if found else None) == file
 
 
+def test_a_server_database_is_no_volume(monkeypatch, tmp_path):
+    class Settings:
+        repos_root = str(tmp_path)
+        database_url = "postgresql+asyncpg://db/wp"
+
+    monkeypatch.setattr(server_health, "get_settings", lambda: Settings())
+    found = server_health.disk()
+    assert [v["name"] for v in found["volumes"]] == ["repositories"]
+
+
 async def test_a_database_that_does_not_answer():
     class Down:
         async def execute(self, *_args):
