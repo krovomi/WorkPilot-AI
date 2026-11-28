@@ -1639,6 +1639,7 @@
 			"toolChanged": "description changed",
 			"noDescription": "(no description)",
 			"removed": "No longer listed: {{tools}}",
+			"loginChoice": "{{name}} ({{cli}} sign-in)",
 			"finding": {
 				"invisible": "invisible characters",
 				"private-use": "private-use characters",

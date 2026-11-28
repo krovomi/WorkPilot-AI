@@ -48,6 +48,13 @@ export function isAwsRegion(value: unknown): value is string {
  */
 export const AI_LOGIN_PROVIDERS: readonly string[] = ["copilot", "codex", "gemini-cli"];
 
+/** The tool each sign-in provider signs in with (product names, never translated). */
+export const LOGIN_CLI_NAMES: Readonly<Record<string, string>> = {
+	copilot: "GitHub CLI",
+	codex: "Codex CLI",
+	"gemini-cli": "Gemini CLI",
+};
+
 /** The sign-in accounts a provider card offers: OpenAI's are Codex CLI's. */
 const LOGIN_PROVIDER_OF_CARD: Readonly<Record<string, string>> = {
 	copilot: "copilot",
