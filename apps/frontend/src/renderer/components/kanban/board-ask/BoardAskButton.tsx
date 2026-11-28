@@ -13,9 +13,11 @@ import { BoardAskPanel } from "./BoardAskPanel";
 export interface BoardAskButtonProps {
 	readonly projectId: string;
 	readonly onOpenTask?: (task: Task) => void;
+	/** A board of the server: its cards only, read from the server. */
+	readonly serverBoard?: boolean;
 }
 
-export function BoardAskButton({ projectId, onOpenTask }: BoardAskButtonProps) {
+export function BoardAskButton({ projectId, onOpenTask, serverBoard = false }: BoardAskButtonProps) {
 	const { t } = useTranslation(["tasks"]);
 	const setOpen = useBoardAskStore((s) => s.setOpen);
 	return (
@@ -30,7 +32,7 @@ export function BoardAskButton({ projectId, onOpenTask }: BoardAskButtonProps) {
 				<MessageSquareText className="h-4 w-4" aria-hidden />
 				<span className="text-xs font-medium">{t("kanban.ask.button")}</span>
 			</Button>
-			<BoardAskPanel projectId={projectId} onOpenTask={onOpenTask} />
+			<BoardAskPanel projectId={projectId} onOpenTask={onOpenTask} serverBoard={serverBoard} />
 		</>
 	);
 }

@@ -603,7 +603,7 @@
 			"send": "Ask",
 			"searching": "Reading the tickets…",
 			"failed": "The question could not be answered. Try again in a moment.",
-			"serverProject": "A server board cannot be asked yet.",
+			"serverUnreachable": "The server's cards could not be read. Check the connection to the server and try again.",
 			"modeAi": "Answered by AI",
 			"modeKeywords": "Keyword search",
 			"keywordsHint": "No AI answer (no provider, or it did not reply): these tickets share words with the question.",
@@ -625,8 +625,93 @@
 				"failed": "Failed",
 				"abandoned": "Abandoned"
 			},
-			"privacy": "The question and the tickets go to the AI provider chosen in Settings. Nothing is saved.",
-			"newConversation": "New conversation"
+			"privacy": "The question and the tickets go to the AI provider chosen in Settings, and to an embeddings model (this computer's first). Vectors are kept on this computer only.",
+			"newConversation": "New conversation",
+			"modeSemantic": "Ranked by meaning",
+			"semanticHint": "No answer from the AI (no provider, or it did not answer): these tickets are the closest to the question in meaning and words, whatever their language.",
+			"semanticTitle": "An embeddings model compared the meaning of the question with each ticket's",
+			"semanticSource": {
+				"local": "Meaning: {{model}}, on this computer",
+				"cloud": "Meaning: {{model}} ({{provider}} API)"
+			},
+			"semanticPartial": "{{indexed}} of {{total}} tickets read by meaning so far; the rest follow with the next questions",
+			"semanticMode": {
+				"label": "By meaning",
+				"auto": "Auto",
+				"local": "This computer only",
+				"off": "Off",
+				"hint": {
+					"auto": "An embeddings model on this computer (Ollama, LM Studio), else your provider's embeddings API (OpenAI, Mistral, Google, Hugging Face)",
+					"local": "Only an embeddings model on this computer: tickets never leave it for this step",
+					"off": "Keywords and the AI model only"
+				}
+			},
+			"tabs": {
+				"label": "Ask the board or check an idea",
+				"ask": "Ask a question",
+				"idea": "Check an idea"
+			},
+			"idea": {
+				"description": "Paste a feature you plan, in any language: each of its requirements comes back done, partly done or missing, with the tickets that hold it.",
+				"label": "The feature to check",
+				"placeholder": "Describe the feature: a sentence, a list of needs or a pasted spec. For example: \"Admins can export the user list to CSV, filtered by role, and get an email when it is ready.\"",
+				"check": "Check",
+				"length": "{{count}} / {{max}}",
+				"emptyHint": "The board splits the idea into requirements and looks for each one in every ticket, whatever language it was written in. Ctrl + Enter checks it.",
+				"checking": "Reading the board for each requirement…",
+				"failed": "The idea could not be checked. Try again.",
+				"noRequirement": "No requirement could be read from this idea.",
+				"unjudgedHint": "No model judged these requirements: the closest tickets are listed, check them before deciding.",
+				"verdict": {
+					"done": "Already done",
+					"partial": "Partly done",
+					"missing": "Missing",
+					"unknown": "To check"
+				},
+				"tally": {
+					"done_one": "{{count}} done",
+					"done_other": "{{count}} done",
+					"partial_one": "{{count}} partly done",
+					"partial_other": "{{count}} partly done",
+					"missing_one": "{{count}} missing",
+					"missing_other": "{{count}} missing",
+					"unknown_one": "{{count}} to check",
+					"unknown_other": "{{count}} to check"
+				},
+				"createCard": "Create a card with what is missing",
+				"createHint": "The card lists only the requirements not done yet, with the tickets they build on. It lands in the backlog.",
+				"createFailed": "The card could not be created.",
+				"created": "Card created in the backlog.",
+				"openCard": "Open the card",
+				"allDone": "Every requirement is already done: nothing to create.",
+				"another": "Check another idea",
+				"card": {
+					"untitled": "Feature to build",
+					"section": {
+						"missing": "To build",
+						"partial": "To finish",
+						"unknown": "To check",
+						"done": "Already done"
+					},
+					"buildsOn": "Builds on: {{tickets}}",
+					"original": "Original idea"
+				}
+			},
+			"kind": {
+				"roadmap": "Roadmap",
+				"idea": "Idea",
+				"change": "Merged change"
+			},
+			"sources": {
+				"button_one": "{{count}} source",
+				"button_other": "{{count}} sources",
+				"hint": "Besides the cards, the board also reads:",
+				"cards": "Board cards",
+				"roadmap": "Roadmap features",
+				"ideas": "Ideation ideas",
+				"history": "Changes merged into the branch (git history)",
+				"serverBoard": "The server's cards, with your rights"
+			}
 		},
 		"lanes": {
 			"title": "Swimlanes",

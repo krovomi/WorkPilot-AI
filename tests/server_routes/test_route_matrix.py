@@ -254,6 +254,10 @@ RULES: dict[tuple[str, str], Rule] = {
     ("POST", "/api/board/automations/rules"): scoped("task.write"),
     ("DELETE", "/api/board/automations/rules/{rule_id}"): scoped("task.write"),
     ("POST", "/api/board/automations/run"): scoped("task.write"),
+    # Asking the board reads it: the question, its answer and its stop.
+    ("POST", "/api/board/ask"): scoped("task.read"),
+    ("GET", "/api/board/ask/jobs/{job_id}"): scoped("task.read"),
+    ("POST", "/api/board/ask/jobs/{job_id}/cancel"): scoped("task.read"),
     ("GET", "/mcp"): Rule("personal_token"),
     ("POST", "/mcp"): Rule("personal_token"),
     ("DELETE", "/mcp"): Rule("personal_token"),
