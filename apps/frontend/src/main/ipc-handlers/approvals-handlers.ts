@@ -10,6 +10,7 @@ import type { IPCResult } from "../../shared/types";
 import type { ClaudeShipStatus } from "../../shared/types/approvals";
 import { claudeShipStatus } from "../agent/approvals-env";
 import { appLog } from "../app-logger";
+import { startExpressLane } from "../express-lane";
 
 export function getClaudeShipStatus(
 	read: () => ClaudeShipStatus = () => claudeShipStatus(),
@@ -22,6 +23,8 @@ export function getClaudeShipStatus(
 	}
 }
 
+/** The page's one channel, and the express lane's timer (it stops itself at quit). */
 export function registerApprovalsHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.APPROVALS_CLAUDE_SHIP_STATUS, () => getClaudeShipStatus());
+	startExpressLane();
 }

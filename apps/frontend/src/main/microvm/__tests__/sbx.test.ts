@@ -4,7 +4,9 @@ import { microvmName, microvmStatus, removeTaskMicrovm } from "../sbx";
 
 describe("microvmName", () => {
 	it("is the backend's name for the same path (tests/os_sandbox/test_microvm.py)", () => {
-		expect(microvmName("/home/me/wt", false)).toBe("workpilot-194449c0cfe5d0df");
+		// The path as resolved: /home is a link on macOS, and Windows would add a drive.
+		const asIs = (worktree: string) => worktree;
+		expect(microvmName("/home/me/wt", false, asIs)).toBe("workpilot-194449c0cfe5d0df");
 	});
 });
 
@@ -50,7 +52,7 @@ describe("removeTaskMicrovm", () => {
 	it("removes the worktree's VM by its name, and is quiet when there is none", async () => {
 		const exec = vi.fn(async () => ({ stdout: "", stderr: "" }));
 		expect(await removeTaskMicrovm("/home/me/wt", exec, "/opt/sbx")).toBe(true);
-		expect(exec).toHaveBeenCalledWith("/opt/sbx", ["rm", "--force", "workpilot-194449c0cfe5d0df"]);
+		expect(exec).toHaveBeenCalledWith("/opt/sbx", ["rm", "--force", microvmName("/home/me/wt")]);
 		const missing = vi.fn(async () => {
 			throw new Error("no such sandbox");
 		});

@@ -359,6 +359,29 @@
 			"merge_with_changes": "Mergeable after small changes",
 			"needs_revision": "Needs revision",
 			"blocked": "Blocked"
+		},
+		"feedback": {
+			"useful": "Useful",
+			"notUseful": "Not useful",
+			"why": "Why is it not useful?",
+			"notApplicable": "Does not apply here",
+			"held": "Waiting for a maintainer",
+			"heldTitle": "Rejections waiting for you",
+			"heldHint": "The reviewer learns from them once you approve: it will raise such remarks less on this project.",
+			"approve": "Approve",
+			"discard": "Discard",
+			"verdict": {
+				"accepted": "Useful",
+				"rejected": "Not useful",
+				"not_applicable": "Does not apply"
+			},
+			"reason": {
+				"false_positive": "It is wrong",
+				"too_pedantic": "Too pedantic",
+				"project_convention": "Our convention",
+				"legacy_exception": "Legacy code, on purpose",
+				"other": "Another reason"
+			}
 		}
 	},
 	"dashboard": {
@@ -519,6 +542,29 @@
 			"codebase_discovery": "Discovery",
 			"task_outcome": "Outcome",
 			"session_insight": "Session"
+		},
+		"trash": "Trash",
+		"pinned": "Pinned",
+		"pin": "Pin",
+		"unpin": "Unpin",
+		"forget": "Forget",
+		"forgetTitle": "Forget this memory?",
+		"forgetBody": "The agents stop reading it. It stays in the trash, where anyone who may write the project's insights can put it back.",
+		"restore": "Put back",
+		"trashHint": "A forgotten memory stays {{days}} days in the trash. {{pinned}} of {{limit}} memories are pinned.",
+		"trashEmpty": "Nothing in the trash.",
+		"forgottenBy": "Forgotten by {{name}}, {{date}}",
+		"forgottenOn": "Forgotten {{date}}",
+		"restorableUntil": "Can be put back until {{date}}",
+		"refused": {
+			"pin-limit": "At most {{limit}} memories can be pinned: unpin one first.",
+			"pinned": "A pinned memory cannot be forgotten: unpin it first.",
+			"not-found": "This memory is no longer there: the list is read again.",
+			"exists": "A memory of the same name is back already.",
+			"expired": "It stayed too long in the trash to be put back.",
+			"no-brain": "The project has no memory yet.",
+			"invalid": "The server did not recognize this memory.",
+			"failed": "The server did not take this decision."
 		}
 	},
 	"tokens": {
@@ -987,5 +1033,31 @@
 		"revoke": "End the link",
 		"revokeTitle": "End this link?",
 		"revokeBody": "“{{title}}” will no longer open for anyone who has the link."
+	},
+	"cardLog": {
+		"title": "Log of #{{id}}",
+		"open": "See the whole log",
+		"phase": "Phase",
+		"show": "Show",
+		"all": "Everything",
+		"errors": "Errors",
+		"noTools": "Without the tools",
+		"find": "Find in the log",
+		"live": "An agent works: the log is read again every 3 seconds.",
+		"still": "No agent works on this card now.",
+		"follow": "Follow the end",
+		"empty": "No line to show."
+	},
+	"cardFiles": {
+		"open": "See the file full screen",
+		"previous": "Previous",
+		"next": "Next",
+		"position": "File {{index}} of {{count}}",
+		"status": {
+			"added": "Added",
+			"modified": "Modified",
+			"deleted": "Deleted",
+			"renamed": "Renamed"
+		}
 	}
 }

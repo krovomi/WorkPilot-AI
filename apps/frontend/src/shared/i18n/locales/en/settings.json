@@ -508,6 +508,13 @@
 					"description": "A green N0, or N1 agreed by the cross-review, merges by itself. N2 and N3 wait for a person."
 				}
 			},
+			"express": {
+				"title": "Express lane for dependency PRs",
+				"description": "The Dependabot and Renovate pull requests of your projects merge by themselves when their tier is N0 and every check passed. Only when the tiers enforce.",
+				"toggle": "Merge the bots' green N0 pull requests",
+				"toggleDescription": "About every half hour, for each local project on GitHub. A major bump, a change to code or CI files, a red or running check, a draft or a fork is left to a person.",
+				"needsEnforce": "Off while the mode is not Enforce."
+			},
 			"tiers": {
 				"title": "The four tiers",
 				"N0": {

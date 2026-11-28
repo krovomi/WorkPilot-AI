@@ -3112,7 +3112,9 @@
 			"seconds": "{{seconds}} s",
 			"minutes": "{{minutes}} min",
 			"hours": "{{hours}} h {{minutes}} min",
-			"days": "{{days}} j {{hours}} h"
+			"days": "{{days}} j {{hours}} h",
+			"hoursOnly": "{{hours}} h",
+			"daysOnly": "{{days}} j"
 		}
 	},
 	"approvalTier": {
