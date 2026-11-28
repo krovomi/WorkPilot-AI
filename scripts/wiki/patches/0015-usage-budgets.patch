@@ -1,0 +1,44 @@
+From 516085260975841625112cee3e98cab082196748 Mon Sep 17 00:00:00 2001
+From: WorkPilot Wiki Bot <noreply@workpilot.ai>
+Date: Sat, 28 Nov 2026 00:00:34 +0000
+Subject: [PATCH] docs(wiki): token budgets per person, group and project
+
+---
+ Team-Server.fr.md | 5 +++++
+ Team-Server.md    | 4 ++++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/Team-Server.fr.md b/Team-Server.fr.md
+index 6b62d5b..3d851b8 100644
+--- a/Team-Server.fr.md
++++ b/Team-Server.fr.md
+@@ -125,6 +125,11 @@ fournisseurs et modèles, les causes des échecs et les alertes de budget à 80
+ rapports hebdomadaire ou mensuel ; chaque changement est audité. Un rapport ne part qu'une fois,
+ même après un redémarrage, et demande le SMTP du serveur ; sans lui, il se lit dans l'app.
+ 
++**Usage → Budgets** ajoute un budget mensuel de tokens à une personne, un groupe ou un projet,
++qui bloque ses nouveaux runs une fois épuisé ou alerte seulement ; chaque budget, celui de
++l'organisation compris, alerte une fois par mois à 80 % et une fois à 100 %, aux destinataires
++du rapport.
++
+ ## Dépannage rapide
+ 
+ | Symptôme | Que faire |
+diff --git a/Team-Server.md b/Team-Server.md
+index 1b75c9c..f98dde6 100644
+--- a/Team-Server.md
++++ b/Team-Server.md
+@@ -120,6 +120,10 @@ time zone, the days, up to 20 addresses (one outside the organization is flagged
+ names or not, and weekly or monthly reports; each change is audited. A report goes once, even
+ across a restart, and needs the server's SMTP; without it, the report is read in the app.
+ 
++**Usage → Budgets** adds a monthly token budget to a person, a group or a project, blocking
++their new runs once spent or only alerting; each budget, the organization's included, alerts
++once a month at 80 % and once at 100 %, to the report's recipients.
++
+ ## Quick troubleshooting
+ 
+ | Symptom | What to do |
+-- 
+2.43.0
+

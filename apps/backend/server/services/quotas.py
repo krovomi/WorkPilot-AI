@@ -24,6 +24,7 @@ from server.db.models import (
     ProjectJob,
     SpecIndex,
 )
+from server.services.usage_budgets import refuse_spent
 from server.services.usage_records import tokens_since
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -104,8 +105,16 @@ async def enforce_seat_quota(db: AsyncSession, org_id: str) -> None:
         )
 
 
-async def enforce_run_quota(db: AsyncSession, org_id: str) -> None:
-    """Refuse to start a run past the tenant's concurrency or token ceiling."""
+async def enforce_run_quota(
+    db: AsyncSession,
+    org_id: str,
+    user_id: str | None = None,
+    project_id: str | None = None,
+) -> None:
+    """Refuse to start a run past the tenant's concurrency or token ceiling,
+    or past a blocking budget of its person, one of their groups or its
+    project (``services/usage_budgets.py``)."""
+    await refuse_spent(db, org_id, user_id, project_id)
     quota = await get_quota(db, org_id)
     if quota is None:
         return

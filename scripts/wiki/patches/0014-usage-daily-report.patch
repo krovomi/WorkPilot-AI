@@ -1,0 +1,60 @@
+From 436d33584326c9a6e3c8c8dbd308d19550a8be0f Mon Sep 17 00:00:00 2001
+From: WorkPilot Wiki Bot <noreply@workpilot.ai>
+Date: Fri, 27 Nov 2026 23:49:05 +0000
+Subject: [PATCH] docs(wiki): the daily usage report
+
+---
+ Team-Server.fr.md | 13 +++++++++++++
+ Team-Server.md    | 12 ++++++++++++
+ 2 files changed, 25 insertions(+)
+
+diff --git a/Team-Server.fr.md b/Team-Server.fr.md
+index f9ed716..6b62d5b 100644
+--- a/Team-Server.fr.md
++++ b/Team-Server.fr.md
+@@ -112,6 +112,19 @@ de ce qui est mesuré, et retrouve dans **Paramètres → Mon usage** ce que les
+ voient de lui, avec un export JSON de tout ce qui est gardé. Un administrateur de la plateforme
+ peut effacer un compte : ses totaux restent, sans nom.
+ 
++## Le rapport d'usage quotidien
++
++Chaque organisation reçoit par e-mail le rapport de la veille à 9 h (heure de Paris par défaut,
++`WORKPILOT_REPORT_TIMEZONE`), en français (`WORKPILOT_REPORT_LANGUAGE`), adressé à ses
++propriétaires et administrateurs : consommation et coût, part du budget mensuel, personnes
++actives, nouvelles et sans activité, runs, échecs, tâches fusionnées et coût par tâche livrée,
++chacun face à la veille et à la moyenne des 7 jours, puis les plus gros consommateurs,
++fournisseurs et modèles, les causes des échecs et les alertes de budget à 80 % et 100 %.
++**Administration → Usage → Rapport** règle l'heure à la minute, le fuseau, les jours, jusqu'à
++20 adresses (une adresse hors de l'organisation est signalée), la langue, les noms ou non, et les
++rapports hebdomadaire ou mensuel ; chaque changement est audité. Un rapport ne part qu'une fois,
++même après un redémarrage, et demande le SMTP du serveur ; sans lui, il se lit dans l'app.
++
+ ## Dépannage rapide
+ 
+ | Symptôme | Que faire |
+diff --git a/Team-Server.md b/Team-Server.md
+index ac7b2ca..1b75c9c 100644
+--- a/Team-Server.md
++++ b/Team-Server.md
+@@ -108,6 +108,18 @@ and a name opens that person's sheet. Each member is told once what is measured,
+ **Settings → My usage** what administrators see of them, with a JSON export of everything kept.
+ A platform administrator can erase an account: its totals stay, without a name.
+ 
++## The daily usage report
++
++Each organization gets yesterday's report by email at 9:00 (Paris time by default,
++`WORKPILOT_REPORT_TIMEZONE`), in French (`WORKPILOT_REPORT_LANGUAGE`), sent to its owners and
++administrators: token use and cost, the share of the monthly budget, active, new and dormant
++people, runs, failures, merged tasks and cost per delivered task, each beside the day before and
++the 7-day average, then the top consumers, providers and models, why runs failed and the budget
++alerts at 80 % and 100 %. **Administration → Usage → Report** sets the time to the minute, the
++time zone, the days, up to 20 addresses (one outside the organization is flagged), the language,
++names or not, and weekly or monthly reports; each change is audited. A report goes once, even
++across a restart, and needs the server's SMTP; without it, the report is read in the app.
++
+ ## Quick troubleshooting
+ 
+ | Symptom | What to do |
+-- 
+2.43.0
+
