@@ -13,6 +13,7 @@ import {
 	pinProviderOf,
 	pinsForProviders,
 	sanitizeAccountPins,
+	siblingPinKeys,
 	withAccountPin,
 } from "../ai-account-pins";
 
@@ -146,5 +147,14 @@ describe("pinsForProviders", () => {
 		expect(pinsForProviders({ openai: "o" }, ["mistral"])).toBeUndefined();
 		expect(pinsForProviders({ codex: "c", copilot: "g" }, ["openai"])).toEqual({ codex: "c" });
 		expect(pinsForProviders(undefined, ["openai"])).toBeUndefined();
+	});
+});
+
+describe("siblingPinKeys", () => {
+	it("names the other key of the same engine, none for a provider alone", () => {
+		expect(siblingPinKeys("codex")).toEqual(["openai"]);
+		expect(siblingPinKeys("openai")).toEqual(["codex"]);
+		expect(siblingPinKeys("copilot")).toEqual([]);
+		expect(siblingPinKeys("claude")).toEqual([]);
 	});
 });

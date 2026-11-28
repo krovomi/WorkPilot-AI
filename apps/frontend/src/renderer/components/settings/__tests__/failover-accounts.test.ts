@@ -86,6 +86,28 @@ describe("buildFailoverAccounts with several accounts per provider", () => {
 			["provider-mistral", "provider", "mistral", "Mistral", false],
 		]);
 	});
+
+	it("lists the CLI sign-in accounts that are signed in, a Codex one under OpenAI", () => {
+		const login = (id: string, provider: string, signedIn = true) => ({
+			...view(id, provider, false),
+			kind: "login" as const,
+			signedIn,
+		});
+		const accounts = buildFailoverAccounts({
+			claudeProfiles: [],
+			apiProfiles: [],
+			providers: PROVIDERS,
+			connected: { openai: true, copilot: true },
+			aiAccounts: [login("g1", "copilot"), login("g2", "copilot", false), login("c1", "codex")],
+			aiAccountDefaults: { copilot: "g1", codex: "c1" },
+		});
+		expect(accounts.map((a) => [a.id, a.provider, a.isActive])).toEqual([
+			["account-g1", "copilot", true],
+			["account-c1", "openai", true],
+			// The OpenAI key stays an entry of its own; Copilot's is its default sign-in.
+			["provider-openai", "openai", false],
+		]);
+	});
 });
 
 describe("orderFailoverAccounts", () => {

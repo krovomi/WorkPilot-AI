@@ -267,9 +267,10 @@ Ollama (local) n'a pas de compte : il n'a pas de clé.
 
 ## Quand un compte s'arrête
 
-Chaque compte est une entrée `account-<id>` de la chaîne de basculement. Une tâche arrêtée par
-une limite, un quota épuisé ou une clé refusée passe au compte suivant de son provider, épinglé
-sur elle seule ; le compte par défaut ne bouge pas. Détail : [provider-failover.md](provider-failover.md).
+Chaque compte est une entrée `account-<id>` de la chaîne de basculement, ceux des outils CLI
+compris dès qu'ils sont connectés (un compte Codex CLI sert OpenAI). Une tâche arrêtée par une
+limite, un quota épuisé ou une clé refusée passe au compte suivant de son provider, épinglé sur
+elle seule ; le compte par défaut ne bouge pas. Détail : [provider-failover.md](provider-failover.md).
 
 Voir aussi [forge-accounts.md](forge-accounts.md) (même modèle pour les forges) et
 [provider-failover.md](provider-failover.md) (basculement auto entre comptes).

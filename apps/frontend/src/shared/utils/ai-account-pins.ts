@@ -17,6 +17,7 @@ import {
 	type AiAccountPins,
 	accountProviderOf,
 	CLAUDE_ACCOUNT_PROVIDER,
+	engineProviderOfAccount,
 	loginProviderOf,
 } from "../types/ai-accounts";
 import { isClaudeProvider } from "./task-engine";
@@ -43,13 +44,20 @@ export function pinKeysOf(provider: string | undefined | null): string[] {
 	return [...new Set(keys.filter((key): key is string => !!key))];
 }
 
-/** A CLI pin that shares its card provider with an API-key pin: Codex is OpenAI's. */
-const OWNER_OF_LOGIN_PIN: Readonly<Record<string, string>> = { codex: "openai" };
-
-/** The keys that replace one another: a pin of one drops the others (`openai`, `codex`). */
+/**
+ * The keys that replace one another: a pin of one drops the others (`openai`,
+ * `codex`: a Codex CLI sign-in runs OpenAI).
+ */
 function pinGroupOf(provider: string): string[] {
-	const id = provider.trim().toLowerCase();
-	return pinKeysOf(OWNER_OF_LOGIN_PIN[id] ?? id);
+	return pinKeysOf(engineProviderOfAccount(provider.trim().toLowerCase()));
+}
+
+/**
+ * The other keys that run the same engine as an account of `key`: `codex`
+ * for `openai` and back, none for the others. A pin under `key` drops them.
+ */
+export function siblingPinKeys(key: string): string[] {
+	return pinGroupOf(key).filter((other) => other !== key);
 }
 
 /** The key a stored pin is read under: an API-key, Claude or CLI provider. */

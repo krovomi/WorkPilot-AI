@@ -243,6 +243,16 @@ describe("TASK_RESUME_WITH_PROVIDER", () => {
 		expect((task.metadata as { aiAccounts?: unknown }).aiAccounts).toEqual({ openai: "o2" });
 	});
 
+	it("drops the task's OpenAI key pin when the failover moves it to a Codex sign-in", async () => {
+		setTask({ metadata: { provider: "openai", paused: { enabled: true, paused_phase: "coding" } } as Task["metadata"] });
+		write(path.join(specDir, "task_metadata.json"), { aiAccounts: { openai: "o1", copilot: "g1" } });
+		await resumeTaskWithProvider(agent as never, "t1", "openai", {
+			keepClaudeSession: false,
+			accountPin: { key: "codex", id: "c1" },
+		});
+		expect(read(path.join(specDir, "task_metadata.json")).aiAccounts).toEqual({ copilot: "g1", codex: "c1" });
+	});
+
 	it("never pins an account from the renderer's « Reprendre avec… »", async () => {
 		setTask();
 		expect((await resume("openai", "", "", "remaining", { key: "openai", id: "x" })).success).toBe(true);

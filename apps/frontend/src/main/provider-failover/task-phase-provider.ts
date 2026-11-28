@@ -5,7 +5,8 @@
  * the resume machinery it is itself started by.
  */
 import { getProvider as getRegistryProvider } from "../../shared/services/providerRegistry";
-import { accountProviderOf } from "../../shared/types/ai-accounts";
+import type { AiAccountPins } from "../../shared/types/ai-accounts";
+import { mergeAccountPins, pinKeysOf } from "../../shared/utils/ai-account-pins";
 import {
 	isFailoverEntryExcluded,
 	normalizeFailoverOrder,
@@ -38,49 +39,51 @@ export interface StoppedTask {
 	readonly provider: string;
 	readonly projectId: string;
 	readonly specDirs: string[];
+	/** The task's account pins: the card's, then its project's (`aiAccounts`). */
+	readonly pins?: AiAccountPins;
 	/**
-	 * The key of the task's account pins for its provider: the provider whose
-	 * AI accounts it uses (`google` for gemini), `claude` for a Claude profile,
-	 * or undefined when the provider has no accounts here.
+	 * The pin keys whose accounts run the provider, in the order the task's
+	 * environment applies them (`task-provider-env.ts`): API key first, then a
+	 * CLI sign-in (`openai`, then `codex`); `claude` for Claude.
 	 */
-	readonly pinKey?: string;
-	/** The account pinned for that key, on the task first, then its project. */
-	readonly pinnedAccount?: string;
+	readonly pinKeys: readonly string[];
+	/**
+	 * The key whose default account the task runs on when none is pinned:
+	 * `codex` for OpenAI in its Codex mode, else the first of `pinKeys`.
+	 */
+	readonly defaultKey?: string;
 }
 
-/** The key of the account pins (`aiAccounts`) a provider reads. */
-export function accountPinKey(provider: string): string | undefined {
-	return isClaudeProvider(provider) ? "claude" : accountProviderOf(provider);
-}
-
-/** The account id `pins[key]`, when `pins` is an object holding text there. */
-export function pinnedAccountOf(pins: unknown, key: string): string | undefined {
-	if (!pins || typeof pins !== "object" || Array.isArray(pins)) return undefined;
-	const value = (pins as Record<string, unknown>)[key];
-	return typeof value === "string" && value ? value : undefined;
+/** The key whose default account runs `provider` when the task pins none. */
+export function defaultPinKey(
+	pinKeys: readonly string[],
+	settings: { globalOpenAIAuthMode?: unknown } | undefined,
+): string | undefined {
+	if (pinKeys.includes("codex") && settings?.globalOpenAIAuthMode === "codex-cli") return "codex";
+	return pinKeys[0];
 }
 
 export function stoppedTask(taskId: string, projectId?: string): StoppedTask | null {
 	const { task, project } = findTaskAndProject(taskId, projectId);
 	if (!task || !project) return null;
 	const specPaths = getSpecPaths(task, project);
-	const settings = readSettingsFile() as EngineSeedSettings | undefined;
+	const settings = readSettingsFile() as (EngineSeedSettings & { globalOpenAIAuthMode?: unknown }) | undefined;
 	const engine = taskEngineFromMetadata(task.metadata, settings, project.settings?.provider);
 	const phase = enginePhaseForPause(
 		task.metadata?.paused?.paused_phase ?? currentPausePhase(task, specPaths),
 	);
 	const provider = engine[phase].provider.trim().toLowerCase();
-	const pinKey = accountPinKey(provider);
-	const pinnedAccount = pinKey
-		? (pinnedAccountOf((task.metadata as { aiAccounts?: unknown } | undefined)?.aiAccounts, pinKey) ??
-			pinnedAccountOf((project.settings as { aiAccounts?: unknown } | undefined)?.aiAccounts, pinKey))
-		: undefined;
+	const pinKeys = pinKeysOf(provider);
 	return {
 		provider,
 		projectId: project.id,
 		specDirs: allSpecDirs(specPaths),
-		pinKey,
-		pinnedAccount,
+		pins: mergeAccountPins(
+			(task.metadata as { aiAccounts?: unknown } | undefined)?.aiAccounts,
+			(project.settings as { aiAccounts?: unknown } | undefined)?.aiAccounts,
+		),
+		pinKeys,
+		defaultKey: defaultPinKey(pinKeys, settings),
 	};
 }
 
