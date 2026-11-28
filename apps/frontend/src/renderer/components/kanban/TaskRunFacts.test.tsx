@@ -7,7 +7,12 @@ import "@testing-library/jest-dom";
 import { beforeAll, describe, expect, it } from "vitest";
 import i18n from "../../../shared/i18n";
 import type { Task, TaskRunFacts, TaskStatusTransition } from "../../../shared/types";
-import { sameRunFacts, TaskRunFactsDetails, TaskRunFactsRow } from "./TaskRunFacts";
+import {
+	formatDuration,
+	sameRunFacts,
+	TaskRunFactsDetails,
+	TaskRunFactsRow,
+} from "./TaskRunFacts";
 
 const history: TaskStatusTransition[] = [
 	{ from: null, to: "backlog", at: "2026-11-27T09:00:00Z", actor: "user" },
@@ -141,6 +146,15 @@ describe("TaskRunFactsDetails", () => {
 			<TaskRunFactsDetails task={task(undefined, { status: "backlog" })} />,
 		);
 		expect(container).toBeEmptyDOMElement();
+	});
+});
+
+describe("formatDuration", () => {
+	it("leaves out a zero last unit", () => {
+		const t = i18n.getFixedT("en");
+		expect(formatDuration(60 * 60_000, t)).toBe("1 h");
+		expect(formatDuration(48 * 60 * 60_000, t)).toBe("2 d");
+		expect(formatDuration(61 * 60_000, t)).toBe("1 h 1 min");
 	});
 });
 

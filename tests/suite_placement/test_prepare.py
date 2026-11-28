@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 
 import pytest
 from test_placement import prepare as prepare_module
@@ -175,7 +176,9 @@ async def test_a_session_run_here_is_recorded_in_the_history(dirs, monkeypatch):
         project, spec, has_pr=False, env={}, sampler=lambda _s: ROOMY
     )
     with placement.measure():
-        pass
+        # Long enough for Windows' clock (15.6 ms ticks): an empty block can
+        # last 0 s there, and a session of 0 s is not recorded.
+        time.sleep(0.05)
     usage = placement.close()
     assert usage is not None
     history = project / ".workpilot" / "test-placement" / "history.json"

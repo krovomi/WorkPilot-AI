@@ -198,9 +198,11 @@ def vm_path(path: Path | str, *, windows: bool | None = None) -> str:
     """Where a host path is mounted inside the VM.
 
     The same path on macOS and Linux. A Windows path becomes
-    ``/mnt/<drive>/…`` (``C:\\Repos\\app`` → ``/mnt/c/Repos/app``) and a UNC
-    path ``/mnt/unc/<server>/<share>/…``. A path sbx cannot take as a mount
-    target (a ``:``) raises `MicrovmError`.
+    ``/<drive>/…`` (``C:\\Repos\\app`` → ``/c/Repos/app``): where sbx 0.54
+    mounts a workspace given without a target, and the task's worktree can
+    have none ("primary workspace is mounted at its host path"). A UNC path,
+    whose place sbx does not document, and a path sbx cannot take as a mount
+    target (a ``:``) raise `MicrovmError`.
     """
     windows = is_windows() if windows is None else windows
     if not windows:
@@ -210,10 +212,11 @@ def vm_path(path: Path | str, *, windows: bool | None = None) -> str:
         rest = [part for part in win.parts[1:] if part not in ("\\", "/")]
         drive = win.drive
         if drive.startswith(("\\\\", "//")):
-            unc = [part for part in drive.replace("\\", "/").split("/") if part]
-            text = "/".join(["", "mnt", "unc", *unc, *rest])
-        elif drive.endswith(":") and len(drive) == 2:
-            text = "/".join(["", "mnt", drive[0].lower(), *rest])
+            raise MicrovmError(
+                f"a network path cannot be mounted in a Docker sandbox: {path}"
+            )
+        if drive.endswith(":") and len(drive) == 2:
+            text = "/".join(["", drive[0].lower(), *rest])
         else:
             raise MicrovmError(f"not an absolute Windows path: {path}")
     if ":" in text or "\0" in text or not text.startswith("/") or text == "/":
@@ -231,12 +234,21 @@ def vm_name(worktree: Path | str) -> str:
 
 @dataclass(frozen=True)
 class Mount:
+    """A workspace of ``sbx create``; no `target`: at its host path (`vm_path`)."""
+
     host: Path
-    target: str
+    target: str | None = None
     read_only: bool = False
 
+    @property
+    def vm_target(self) -> str:
+        return self.target if self.target is not None else vm_path(self.host)
+
     def spec(self) -> str:
-        """``PATH:TARGET[:ro]``, as ``sbx create`` takes a workspace."""
+        """``PATH[:TARGET][:ro]``, as ``sbx create`` takes a workspace."""
+        if self.target is None:
+            # sbx 0.54 refuses a target for the first (primary) workspace.
+            return str(self.host)
         return f"{self.host}:{self.target}" + (":ro" if self.read_only else "")
 
 
@@ -302,7 +314,12 @@ def vm_mounts(
             roots = [r for r in roots if not r.is_relative_to(path)] + [path]
     # The worktree leads: `sbx exec` starts in the first workspace.
     roots.sort(key=lambda r: r != worktree)
-    mounts = [Mount(root, vm_path(root)) for root in roots]
+    # The worktree without a target (sbx refuses one for it), the others
+    # with an explicit one at the same place, so a Windows path is not read
+    # as `PATH:TARGET` on its drive's colon.
+    mounts = [
+        Mount(root, None if root == worktree else vm_path(root)) for root in roots
+    ]
 
     for path in policy.read_only:
         if _inside(path, roots) and path.exists():
@@ -414,9 +431,21 @@ class TaskVm:
         return vm_path(self.worktree)
 
     def exec_argv(
-        self, command: list[str], env: dict[str, str], cwd: Path | str | None
+        self,
+        command: list[str],
+        env: dict[str, str],
+        cwd: Path | str | None,
+        *,
+        stdin: bool = False,
     ) -> list[str]:
+        """``sbx exec`` of `command`; `stdin` for a command that reads it.
+
+        Without `stdin`, the caller gives the process no stdin (DEVNULL): sbx
+        waits on an open pipe that the command never reads.
+        """
         argv = [sbx_executable() or "sbx", "--no-input", "exec"]
+        if stdin:
+            argv.append("-i")
         argv += ["-w", self.target_of(cwd or self.worktree)]
         for name in FORWARDED_ENV:
             if env.get(name):

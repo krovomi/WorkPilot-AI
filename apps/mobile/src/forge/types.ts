@@ -57,6 +57,45 @@ export interface ReviewFinding {
 	line: number | null;
 }
 
+export type FeedbackVerdict = "accepted" | "rejected" | "not_applicable";
+export const FEEDBACK_REASONS = [
+	"false_positive",
+	"too_pedantic",
+	"project_convention",
+	"legacy_exception",
+	"other",
+] as const;
+export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
+
+/** The latest verdict per finding of a pull, and the rejections waiting for a maintainer. */
+export interface FeedbackView {
+	feedback: Record<string, FeedbackVerdict>;
+	held: string[];
+}
+
+/** A rejection by a newcomer, held until a maintainer approves or discards it. */
+export interface HeldFeedback {
+	pr: number;
+	finding_id: string;
+	verdict: FeedbackVerdict;
+	reason: FeedbackReason | null;
+	title: string;
+	severity: string;
+}
+
+/**
+ * The feedback on the findings of the AI reviews (#361), GitHub only
+ * (`shared_features/forge_review_feedback.py`): the reviewer of the project
+ * learns from it, so a newcomer's rejection waits for a maintainer.
+ */
+export interface ReviewFeedbackApi {
+	forPull(n: number): Promise<FeedbackView>;
+	send(n: number, findingId: string, verdict: FeedbackVerdict, reason: FeedbackReason | null): Promise<FeedbackView>;
+	/** The held rejections, and whether the person may approve or discard them. */
+	held(): Promise<{ held: HeldFeedback[]; maintainer: boolean }>;
+	decideHeld(pr: number, findingId: string, approve: boolean): Promise<void>;
+}
+
 /** An AI review the runner saved (`review_<n>.json`). */
 export interface ForgeReview {
 	summary: string;

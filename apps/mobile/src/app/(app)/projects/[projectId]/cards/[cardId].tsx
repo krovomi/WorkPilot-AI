@@ -269,7 +269,15 @@ export default function CardScreen() {
 				</Section>
 			) : null}
 
-			<ChangesSection changes={changes} />
+			<ChangesSection
+				changes={changes}
+				onOpenFile={(file) =>
+					router.push({
+						pathname: "/projects/[projectId]/cards/[cardId]/files",
+						params: { projectId, cardId, file: String(file) },
+					})
+				}
+			/>
 
 			{data.card.column !== "done" ? (
 				<SteeringSection
@@ -280,7 +288,10 @@ export default function CardScreen() {
 				/>
 			) : null}
 
-			<LogsSection logs={logs} />
+			<LogsSection
+				logs={logs}
+				onOpen={() => router.push({ pathname: "/projects/[projectId]/cards/[cardId]/logs", params: { projectId, cardId } })}
+			/>
 
 			<Section title={t("card.runs")} icon="play-circle">
 				{runs.length === 0 ? (

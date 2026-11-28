@@ -178,3 +178,17 @@ async def send_password_reset_email(
         logger.warning("[Email] password reset to %s failed: %s", to_email, exc)
         raise EmailError(str(exc)) from exc
     logger.info("[Email] password reset sent to %s", to_email)
+
+
+async def send_message(msg: EmailMessage) -> None:
+    """Send a message built elsewhere (the usage report). Raises
+    :class:`EmailError` when SMTP is off or the send fails; the log names
+    neither the recipients nor the body."""
+    settings = get_settings()
+    if not settings.email_enabled:
+        raise EmailError("SMTP is not configured")
+    try:
+        await asyncio.to_thread(_send_sync, settings, msg)
+    except (OSError, smtplib.SMTPException) as exc:
+        logger.warning("[Email] message failed: %s", type(exc).__name__)
+        raise EmailError(type(exc).__name__) from exc

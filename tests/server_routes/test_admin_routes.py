@@ -625,6 +625,29 @@ class TestQuotasOverviewAudit:
         assert updated["enforce_hard_stop"] is True
         assert (await world.ok("admin_b", "GET", "/admin/quotas"))["max_users"] is None
 
+    async def test_a_limit_sent_as_null_is_lifted_and_one_left_out_is_kept(self, world):
+        await world.ok(
+            "admin_a",
+            "PUT",
+            "/admin/quotas",
+            json={"max_users": 50, "max_projects": 4, "enforce_hard_stop": True},
+        )
+        updated = await world.ok(
+            "admin_a", "PUT", "/admin/quotas", json={"max_users": None}
+        )
+        assert updated["max_users"] is None
+        assert updated["max_projects"] == 4
+        assert updated["enforce_hard_stop"] is True
+
+    async def test_a_negative_limit_is_refused(self, world):
+        resp = await world.call(
+            "admin_a", "PUT", "/admin/quotas", json={"max_projects": -1}
+        )
+        assert resp.status_code == 422
+        assert (await world.ok("admin_a", "GET", "/admin/quotas"))[
+            "max_projects"
+        ] is None
+
     async def test_the_overview_counts_the_organization_s_runs(self, world):
         from datetime import UTC, datetime, timedelta
 

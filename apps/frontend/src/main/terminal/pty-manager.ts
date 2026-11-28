@@ -9,6 +9,7 @@ import * as pty from "@lydell/node-pty";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { SupportedTerminal } from "../../shared/types/settings";
 import { debugError, debugLog } from "../../shared/utils/debug-logger";
+import { terminalCodeModeEnv } from "../agent/code-mode-env";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import { safeSendToRenderer } from "../ipc-handlers/utils";
 import { getWindowsShellPaths, isWindows } from "../platform";
@@ -218,6 +219,7 @@ export function spawnPtyProcess(
 		env: {
 			...cleanEnv,
 			...profileEnv,
+			...terminalCodeModeEnv(settings),
 			TERM: "xterm-256color",
 			COLORTERM: "truecolor",
 			// Suppress zsh's partial line indicator (%) that appears when output

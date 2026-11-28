@@ -7,14 +7,29 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { CardChanges, ChangedFile } from "../api/types";
-import { Section } from "../ui/components";
+import { Button, Section } from "../ui/components";
+import { Icon, type IconName } from "../ui/Icon";
 import { RADIUS, SPACE, type Theme, useTheme } from "../ui/theme";
 import { mono } from "./LongText";
 import { type PatchLineKind, patchLines } from "./patch";
 
 const MAX_FILES = 50;
 
-export function ChangesSection({ changes }: { changes: CardChanges | null }) {
+export const FILE_ICONS: Record<ChangedFile["status"], IconName> = {
+	added: "file-plus",
+	modified: "file-text",
+	deleted: "file-minus",
+	renamed: "corner-down-right",
+};
+
+export function ChangesSection({
+	changes,
+	onOpenFile,
+}: {
+	changes: CardChanges | null;
+	/** Opens a file's full-screen diff, by its place in the list (a card's changes; a pull's stay inline). */
+	onOpenFile?: (index: number) => void;
+}) {
 	const { t } = useTranslation();
 	const theme = useTheme();
 	const [open, setOpen] = useState<string | null>(null);
@@ -33,12 +48,13 @@ export function ChangesSection({ changes }: { changes: CardChanges | null }) {
 							commits: changes.commitCount ?? 0,
 						})}
 					</Text>
-					{changes.files.slice(0, MAX_FILES).map((file) => (
+					{changes.files.slice(0, MAX_FILES).map((file, index) => (
 						<FileRow
 							key={file.path}
 							file={file}
 							open={open === file.path}
 							onToggle={() => setOpen((current) => (current === file.path ? null : file.path))}
+							onOpen={onOpenFile ? () => onOpenFile(index) : undefined}
 						/>
 					))}
 				</>
@@ -47,7 +63,17 @@ export function ChangesSection({ changes }: { changes: CardChanges | null }) {
 	);
 }
 
-function FileRow({ file, open, onToggle }: { file: ChangedFile; open: boolean; onToggle: () => void }) {
+function FileRow({
+	file,
+	open,
+	onToggle,
+	onOpen,
+}: {
+	file: ChangedFile;
+	open: boolean;
+	onToggle: () => void;
+	onOpen?: () => void;
+}) {
 	const { t } = useTranslation();
 	const theme = useTheme();
 	return (
@@ -59,13 +85,19 @@ function FileRow({ file, open, onToggle }: { file: ChangedFile; open: boolean; o
 				onPress={onToggle}
 				style={styles.file}
 			>
+				<Icon name={FILE_ICONS[file.status]} size={14} color={theme.textMuted} />
 				<Text style={[mono.text, { color: theme.text, flex: 1 }]} numberOfLines={1} ellipsizeMode="head">
 					{file.path}
 				</Text>
 				<Text style={{ color: theme.success }}>+{file.additions}</Text>
 				<Text style={{ color: theme.danger }}>−{file.deletions}</Text>
 			</Pressable>
-			{open ? <Patch patch={file.patch} /> : null}
+			{open ? (
+				<>
+					<Patch patch={file.patch} />
+					{onOpen ? <Button label={t("cardFiles.open")} icon="maximize-2" variant="ghost" onPress={onOpen} /> : null}
+				</>
+			) : null}
 		</View>
 	);
 }
@@ -95,7 +127,7 @@ function Patch({ patch }: { patch: string | null }) {
 	);
 }
 
-function lineStyle(theme: Theme, kind: PatchLineKind) {
+export function lineStyle(theme: Theme, kind: PatchLineKind) {
 	switch (kind) {
 		case "added":
 			return { color: theme.success };
