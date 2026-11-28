@@ -78,6 +78,17 @@ describe("ReadinessDialog", () => {
 		expect(useTaskReadinessStore.getState().held).toEqual([]);
 	});
 
+	it("reads a rich-text description as text, and answers it in HTML", async () => {
+		show({ ready: false, questions }, [card({ description: "<p>On the <b>admin</b> page</p>" })]);
+		expect(screen.getByRole("region", { name: "What the agent will read" })).toHaveTextContent("On the admin page");
+		await userEvent.type(screen.getByRole("textbox", { name: "Which browser?" }), "Firefox");
+		await userEvent.click(screen.getByRole("button", { name: "Add details and start" }));
+		await waitFor(() => expect(api.fn("updateTask")).toHaveBeenCalledTimes(1));
+		expect(api.fn("updateTask").mock.calls[0][1].description).toBe(
+			"<p>On the <b>admin</b> page</p><h2>Clarifications before the start</h2><p><strong>Which browser?</strong></p><p>Firefox</p>",
+		);
+	});
+
 	it("leaves out a suggestion nobody took, and saves with Ctrl+Enter", async () => {
 		show({ ready: false, questions });
 		// Nothing answered: the shortcut does nothing.
@@ -147,5 +158,11 @@ describe("ReadinessDialog", () => {
 describe("clarificationsSection", () => {
 	it("leaves out the questions left blank", () => {
 		expect(clarificationsSection("T", questions, { q1: " ", q2: "Yes" })).toBe("\n\n## T\n\n**Which browser?**\n\nYes\n");
+	});
+
+	it("writes HTML after a rich-text description, escaped", () => {
+		expect(clarificationsSection("T & co", questions, { q1: "<b>admin</b>", q2: " " }, true)).toBe(
+			"<h2>T &amp; co</h2><p><strong>Which page?</strong></p><p>&lt;b&gt;admin&lt;/b&gt;</p>",
+		);
 	});
 });

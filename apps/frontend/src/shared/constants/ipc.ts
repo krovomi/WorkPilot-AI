@@ -94,6 +94,7 @@ export const IPC_CHANNELS = {
 	TASK_SPLIT_EVENT: "task:split", // Event (main -> renderer): a task too big for one PR became its parts, or a part's PR was merged (task_split); reload the board and start the queue
 	TASK_INTERRUPTED_OFFER: "task:interruptedOffer", // Event (main -> renderer): the builds the last exit interrupted, at launch (ask, or resumed by the « Tout reprendre » setting)
 	TASK_INTERRUPTED_GET: "task:interruptedGet", // The offer still unanswered, for a renderer that loaded after it was sent
+	TASK_INTERRUPTED_LIST: "task:interruptedList", // One project's interrupted builds, put off ones included, offered again from the board
 	TASK_INTERRUPTED_RESOLVE: "task:interruptedResolve", // The ids the person ticked: resumed (within « En cours »), the rest deferred
 	TASK_CHECK_READINESS: "task:checkReadiness", // Pre-analysis before a card starts: machine checks, AI review of a short card
 	TASK_SPEC_INTERVIEW: "task:specInterview", // Generate 3-5 clarifying questions about the spec before planning (answers are appended to the description)

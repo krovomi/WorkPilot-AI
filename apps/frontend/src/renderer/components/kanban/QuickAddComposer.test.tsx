@@ -186,9 +186,38 @@ describe("quick add in a column", () => {
 		await userEvent.click(screen.getByRole("button", { name: "Create" }));
 		await waitFor(() => expect(api.fn("createTask")).toHaveBeenCalledTimes(1));
 		expect(api.fn("createTask").mock.calls[0].slice(1, 3)).toEqual([
-			"",
+			"Context line",
 			"Context line\nSecond line",
 		]);
+	});
+
+	it("makes typed lines a title and its description, one card", async () => {
+		// Report of 28 November: the line typed under the title became a card of its own.
+		renderColumn();
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
+		box().focus();
+		// A single pasted line is no list.
+		await userEvent.paste("Just tell me if you see this ticket?");
+		await userEvent.type(box(), "{Shift>}{Enter}{/Shift}It is #1405");
+		const toggle = screen.getByRole("button", { name: "One task per line (2)" });
+		expect(toggle).toHaveAttribute("aria-pressed", "false");
+		await userEvent.click(screen.getByRole("button", { name: "Create" }));
+		await waitFor(() => expect(api.fn("createTask")).toHaveBeenCalledTimes(1));
+		expect(api.fn("createTask").mock.calls[0].slice(1, 3)).toEqual([
+			"Just tell me if you see this ticket?",
+			"Just tell me if you see this ticket?\nIt is #1405",
+		]);
+	});
+
+	it("forgets a pasted list once the box is cleared", async () => {
+		renderColumn();
+		await userEvent.click(screen.getByRole("button", { name: "Add a task" }));
+		box().focus();
+		await userEvent.paste("Fix the login\nFix the logout");
+		expect(screen.getByRole("button", { name: "One task per line (2)" })).toHaveAttribute("aria-pressed", "true");
+		await userEvent.clear(box());
+		await userEvent.type(box(), "Title{Shift>}{Enter}{/Shift}Details");
+		expect(screen.getByRole("button", { name: "One task per line (2)" })).toHaveAttribute("aria-pressed", "false");
 	});
 
 	it("records the type and priority picked in the box", async () => {
