@@ -32,6 +32,10 @@ export const SNAPSHOT_FILES: ReadonlyMap<string, number> = new Map([
 	["usage_summary.json", 10_000],
 	["spec.md", 300_000],
 	["qa_report.md", 300_000],
+	// The captures the card prepared for its PR, for the board's badge (no
+	// image: the server sends them on demand, `shared_board/captures.py`).
+	["captures/publication.json", 200_000],
+	["captures/pr-sync.json", 20_000],
 ]);
 
 /** Same pattern as the board's (`board_mcp/server.py`, `CARD_ID`). */
@@ -105,7 +109,10 @@ export function parseSnapshot(raw: unknown): BoardSnapshot | null {
 function writeCard(directory: string, files: CardFiles): void {
 	mkdirSync(directory, { recursive: true });
 	for (const [name, content] of Object.entries(files)) {
-		writeFileSync(path.join(directory, name), content, "utf-8");
+		// A name of the closed list above, some of them in a subfolder.
+		const target = path.join(directory, name);
+		mkdirSync(path.dirname(target), { recursive: true });
+		writeFileSync(target, content, "utf-8");
 	}
 }
 

@@ -1,4 +1,5 @@
 import type { MobilePlatform } from "../../shared/types/mobile";
+import type { TaskCapturesChoice } from "../../shared/types/task-captures";
 import type { ChildProcess } from "node:child_process";
 import type {
 	CompletablePhase,
@@ -80,6 +81,9 @@ export interface TaskExecutionOptions {
 	// Per-task verification loop override (`apps/backend/verify/`). Injected
 	// as WORKPILOT_VERIFY_LOOP; undefined inherits the project default.
 	verifyLoop?: boolean;
+	// Per-task captures choice (`apps/backend/pr_captures/`). Injected as
+	// WORKPILOT_CAPTURES; undefined follows the project's CAPTURES_MODE.
+	captures?: TaskCapturesChoice;
 	// Which smartphone platforms this task targets ("android", "ios"). Injected
 	// as WORKPILOT_MOBILE_TARGETS at spawn time, which is what narrows the
 	// planner's, the coder's and QA's platform rules to the ones asked for.
@@ -102,6 +106,9 @@ export interface SpecCreationMetadata {
 	// Per-task verification loop override (`apps/backend/verify/`). Injected
 	// as WORKPILOT_VERIFY_LOOP; undefined inherits the project default.
 	verifyLoop?: boolean;
+	// Per-task captures choice (`apps/backend/pr_captures/`). Injected as
+	// WORKPILOT_CAPTURES; undefined follows the project's CAPTURES_MODE.
+	captures?: TaskCapturesChoice;
 	// LLM provider (anthropic, openai, copilot, google, mistral, deepseek, grok, meta, aws, ollama)
 	provider?: string;
 	// Auto profile - phase-based model and thinking configuration

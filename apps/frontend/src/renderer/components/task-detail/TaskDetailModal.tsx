@@ -106,7 +106,7 @@ import { EditableTaskTitle } from "./EditableTaskTitle";
 import { TaskOverview } from "./TaskOverview";
 import { TaskReview } from "./TaskReview";
 import { TaskSubtasks } from "./TaskSubtasks";
-import { TaskVisualProof } from "./TaskVisualProof";
+import { TaskCaptures } from "./TaskCaptures";
 import { TaskWarnings } from "./TaskWarnings";
 import { SyncFromBranchDialog } from "./task-review/SyncFromBranchDialog";
 import { TaskEmulator } from "./TaskEmulator";
@@ -1276,8 +1276,8 @@ function TaskDetailModalContent({
 									<TaskDetailTab value="changeGraph">
 										{t("tasks:changeGraph.tab")}
 									</TaskDetailTab>
-									<TaskDetailTab value="visualProof">
-										{t("tasks:visualProof.tab")}
+									<TaskDetailTab value="captures">
+										{t("tasks:captures.tab")}
 									</TaskDetailTab>
 									<TaskDetailTab value="emulator">
 										{t("tasks:emulator.tab")}
@@ -1412,12 +1412,13 @@ function TaskDetailModalContent({
 									</TabsContent>
 								)}
 
-								{/* Visual Proof Tab */}
+								{/* Captures Tab: the screens for the PR, before and after;
+								    the visual proof when the task has none. */}
 								<TabsContent
-									value="visualProof"
+									value="captures"
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
-									<TaskVisualProof task={task} />
+									<TaskCaptures task={task} />
 								</TabsContent>
 
 								{/* Emulator Tab */}

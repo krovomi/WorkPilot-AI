@@ -5,6 +5,7 @@ import {
 	Braces,
 	Brain,
 	Bug,
+	Camera,
 	CalendarClock,
 	Cloud,
 	Code,
@@ -89,7 +90,10 @@ export function createSettingsThemes(t: Translate): Record<SettingsTheme, Settin
 			...theme("project"),
 			icon: Settings2,
 			tone: "blue",
-			sections: [{ id: "general", icon: Settings2, label: nav("general"), type: "project" }],
+			sections: [
+				{ id: "general", icon: Settings2, label: nav("general"), type: "project" },
+				{ id: "captures", icon: Camera, label: t("settings:captures.navLabel"), type: "project" },
+			],
 			priority: 1,
 		},
 		integrations: {

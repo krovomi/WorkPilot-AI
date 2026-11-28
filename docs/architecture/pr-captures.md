@@ -180,6 +180,49 @@ branche protégée, PR illisible) est un code dans `<spec>/captures/pr-sync.json
 En mode `review`, `pr_captures/approval.py` enregistre les signatures des images qu'une personne a
 publiées : une capture reprise ensuite attend un nouveau « Publier ».
 
+## Dans l'app
+
+L'onglet « Captures » de la tâche (`task-detail/TaskCaptures.tsx`) remplace « Preuves
+visuelles ». Il lit `publication.json`, `pr-sync.json` et `approval.json` par le main
+(`main/task-captures/read-captures.ts`), qui ne garde que des champs vérifiés et bornés (statuts et
+codes en liste fermée, textes sur une ligne, URL de PR en `https`) : jamais une valeur, il n'y en a
+pas dans ces fichiers. Pour chaque écran : l'« avant » et l'« après » tels que la PR les montre, les
+types remplacés par des faux, le statut d'une copie gardée sur la tâche. Une tâche sans captures
+montre sa preuve visuelle, et un bouton y mène depuis les captures.
+
+L'app ne montre que les copies publiables : une image n'est lue (`TASK_CAPTURES_IMAGE`) que si la
+publication la nomme, en PNG, résolue (liens compris) dans `captures/published/`. Un original ne
+quitte jamais le dossier de la spec, même vers l'écran.
+
+| Bouton | Quand | Effet |
+|---|---|---|
+| Publier dans la PR | `CAPTURES_PUBLISH=review`, des copies publiables pas encore publiées | `pr_captures_runner.py approve`, puis la section |
+| Retirer de la PR | `review`, copies publiées | `withdraw` : l'approbation oubliée, la section et ses images retirées |
+| Mettre à jour la PR | sauf `never` | `sync` : la section refaite depuis les captures du moment |
+
+Le renderer ne nomme qu'une tâche et une action d'une liste fermée (`TASK_CAPTURES_ACTION`) ; le
+main construit tout le reste (`ipc-handlers/task/task-captures-runner.ts`) : dossier du projet
+enregistré, nom de spec et branche de base de la tâche, revérifiés comme le runner les vérifie. Le
+runner trouve lui-même la PR de la branche. Une carte du serveur n'a pas de bouton : le serveur
+publie ses captures (lot 4).
+
+Sur la carte du Kanban, `Task.captures` (résumé joint par `project-store.ts`, lu une fois par
+changement de fichier) donne la pastille appareil photo (`task-captures/TaskCapturesBadge.tsx`) :
+le nombre d'écrans et leur état (dans la PR, en attente de « Publier », prêtes, gardées sur la
+tâche, retenues). L'aperçu au survol montre le premier écran. Une carte d'un projet du serveur
+reçoit les deux fichiers JSON dans l'instantané du tableau (`remote-board.ts`), sans image.
+
+Le choix de la carte (« suivre le projet », « toujours », « jamais ») se règle dans l'onglet et
+part au build en `WORKPILOT_CAPTURES` (`agent/env-utils.ts`, `applyCapturesChoice`). Les clés
+`CAPTURES_*` se règlent dans Paramètres › Projet › Captures des PR
+(`settings/CapturesSettings.tsx`) ; le main remet chaque valeur dans la forme que le backend
+accepte avant de l'écrire (`main/task-captures/captures-env.ts`) : aucun saut de ligne, aucune
+branche refusée.
+
+La preuve visuelle laisse la place : quand la tâche a des captures, la création de la PR ne la
+relance pas, et un lancement à la main reste sur la tâche (`keepOnTask` : pas de commit sur la
+branche de la tâche, pas de commentaire de PR).
+
 ## Réglages
 
 | Clé (`.workpilot/.env` ou environnement) | Défaut | Effet |
@@ -227,7 +270,7 @@ temps, pour le registre RGPD : [pr-captures-data.md](../pr-captures-data.md).
    `docintel.visual_qa`, la comparaison sur les pages capturées.
 2. **Publier dans la PR** (ce document) : `pr_captures/section.py` et `approval.py`,
    `core/capture_hosting/`, l'appel dans `push_and_create_pr`, `runners/pr_captures_runner.py`.
-3. **Montrer** : onglet Captures qui lit `publication.json` et `pr-sync.json` (la preuve visuelle
+3. **Montrer** (« Dans l'app ») : onglet Captures qui lit `publication.json` et `pr-sync.json` (la preuve visuelle
    en repli), boutons « Publier » et « Retirer » sur le runner, pastille et aperçu sur la carte,
    réglages, FR et EN ; la preuve visuelle cesse de commiter sur la branche de la tâche et de
    poster son commentaire quand la tâche a des captures.

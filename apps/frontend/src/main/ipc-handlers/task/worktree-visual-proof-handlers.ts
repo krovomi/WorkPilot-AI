@@ -5,6 +5,7 @@ import { IPC_CHANNELS } from "../../../shared/constants";
 import type { IPCResult, VisualProofRun } from "../../../shared/types";
 import { type PythonEnvManager } from "../../python-env-manager";
 import { visualProofService } from "../../visual-proof-service";
+import { taskHasCaptures } from "../../task-captures/attach";
 import { findTaskWorktree } from "../../worktree-paths";
 import { findTaskAndProject } from "./shared";
 import { getTaskBaseBranch } from "./worktree-git-refs";
@@ -53,6 +54,8 @@ export function registerWorktreeVisualProofHandlers(
 					prUrl,
 					worktreePath: worktreePath ?? undefined,
 					autoBuildPath: project.autoBuildPath,
+					// The PR shows the task's captures: this run stays on the task.
+					keepOnTask: taskHasCaptures(project, task.specId),
 				});
 
 				updateVisualProofMetadata(
@@ -145,10 +148,11 @@ export function registerWorktreeVisualProofHandlers(
 					prUrl,
 				);
 
-				// Publish any already-captured run to the PR.
+				// Publish any already-captured run to the PR, unless the PR shows
+				// the task's captures (its own section, `core/capture_hosting/`).
 				const existingProof = task.metadata?.visualProof;
 				let visualProof: VisualProofRun | undefined;
-				if (existingProof) {
+				if (existingProof && !taskHasCaptures(project, task.specId)) {
 					visualProof = await visualProofService.publishToPr(
 						existingProof,
 						prUrl,

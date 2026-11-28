@@ -26,7 +26,12 @@ import {
 } from "./task-provider-env";
 import { AgentState } from "./agent-state";
 import { ClaudeSwapPins } from "./claude-swap-pins";
-import { applyMobileTargets, applyTddOverride, applyVerifyLoop } from "./env-utils";
+import {
+	applyCapturesChoice,
+	applyMobileTargets,
+	applyTddOverride,
+	applyVerifyLoop,
+} from "./env-utils";
 import type {
 	RoadmapConfig,
 	SpecCreationMetadata,
@@ -356,15 +361,18 @@ export class AgentManager extends EventEmitter {
 		}
 
 		// Get combined environment variables
-		const combinedEnv = applyVerifyLoop(
-			applyMobileTargets(
-				applyTddOverride(
-					this.processManager.getCombinedEnv(projectPath),
-					metadata?.tddMode,
+		const combinedEnv = applyCapturesChoice(
+			applyVerifyLoop(
+				applyMobileTargets(
+					applyTddOverride(
+						this.processManager.getCombinedEnv(projectPath),
+						metadata?.tddMode,
+					),
+					metadata?.mobileTargets,
 				),
-				metadata?.mobileTargets,
+				metadata?.verifyLoop,
 			),
-			metadata?.verifyLoop,
+			metadata?.captures,
 		);
 
 		// spec_runner.py will auto-start run.py after spec creation completes
@@ -510,17 +518,20 @@ export class AgentManager extends EventEmitter {
 		}
 
 		// Get combined environment variables
-		const combinedEnv = applyVerifyLoop(
-			applyMobileTargets(
-				applyTddOverride(
-					this.processManager.getCombinedEnv(
-						options.envProjectPath ?? projectPath,
+		const combinedEnv = applyCapturesChoice(
+			applyVerifyLoop(
+				applyMobileTargets(
+					applyTddOverride(
+						this.processManager.getCombinedEnv(
+							options.envProjectPath ?? projectPath,
+						),
+						options.tddMode,
 					),
-					options.tddMode,
+					options.mobileTargets,
 				),
-				options.mobileTargets,
+				options.verifyLoop,
 			),
-			options.verifyLoop,
+			options.captures,
 		);
 
 		const args = [runPath, "--spec", specId, "--project-dir", projectPath];

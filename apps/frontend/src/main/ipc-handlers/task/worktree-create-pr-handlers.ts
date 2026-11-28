@@ -29,6 +29,7 @@ import {
 import { getBestAvailableProfileEnv } from "../../rate-limit-detector";
 import { getEffectiveSourcePath } from "../../updater/path-resolver";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
+import { taskHasCaptures } from "../../task-captures/attach";
 import { visualProofService } from "../../visual-proof-service";
 import { findTaskWorktree } from "../../worktree-paths";
 import { findTaskAndProject } from "./shared";
@@ -317,7 +318,13 @@ export function registerWorktreeCreatePRHandlers(
 											debug,
 										});
 									}
-									if (options?.runVisualProof !== false) {
+									// A task with captures already has them in the PR's
+									// « Captures » section: no second launch of the app,
+									// no commit on its branch, no comment of its own.
+									if (
+										options?.runVisualProof !== false &&
+										!taskHasCaptures(project, task.specId)
+									) {
 										visualProof = await visualProofService.run({
 											taskId: task.id,
 											projectPath: project.path,

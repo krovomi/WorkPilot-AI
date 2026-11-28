@@ -16,6 +16,7 @@ import { createHookProxy } from "./utils/hookProxyFactory";
 
 export type ProjectSettingsSection =
 	| "general"
+	| "captures"
 	| "linear"
 	| "github"
 	| "gitlab"

@@ -114,6 +114,9 @@ export const IPC_CHANNELS = {
 	TASK_VISUAL_PROOF_RUN: "task:visualProofRun", // Run emulator + screenshot proof (PR optional)
 	TASK_VISUAL_PROOF_SYNC: "task:visualProofSync", // Detect a PR on the branch and publish stored captures to it
 	TASK_VISUAL_PROOF_STATUS: "task:visualProofStatus", // Query whether a visual proof run is in progress for a task
+	TASK_CAPTURES_GET: "task:capturesGet", // The task's PR captures (publication.json + pr-sync.json), read again
+	TASK_CAPTURES_IMAGE: "task:capturesImage", // One published copy (captures/published/*.png) of the task's captures
+	TASK_CAPTURES_ACTION: "task:capturesAction", // Publish, withdraw or sync the task's captures in its PR (runner)
 	TASK_PR_FOLLOWUP_START: "task:prFollowupStart", // Drive the task's PR to merge: fix red checks and review threads
 	TASK_PR_FOLLOWUP_STOP: "task:prFollowupStop",
 	TASK_PR_FOLLOWUP_STATUS: "task:prFollowupStatus", // Running or not, and the last look at the PR

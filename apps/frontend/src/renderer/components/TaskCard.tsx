@@ -80,6 +80,8 @@ import { CardLabels } from "./kanban/labels/CardLabels";
 import { CardTypeChip } from "./kanban/CardTypeChip";
 import { TaskCardPreview } from "./kanban/TaskCardPreview";
 import { sameRunFacts, TaskRunFactsRow } from "./kanban/TaskRunFacts";
+import { sameCaptures } from "./task-captures/captures-state";
+import { TaskCapturesBadge } from "./task-captures/TaskCapturesBadge";
 import {
 	contextMenuPoint,
 	isFromPortal,
@@ -1182,6 +1184,8 @@ function taskCardPropsAreEqual(
 		prevTask.verification?.score === nextTask.verification?.score &&
 		// The finished card's run facts (time, spend, people).
 		sameRunFacts(prevTask, nextTask) &&
+		// The camera badge (captures for the PR).
+		sameCaptures(prevTask, nextTask) &&
 		// Check if any subtask statuses changed (compare all subtasks)
 		prevTask.subtasks.every(
 			(s, i) => s.status === nextTask.subtasks[i]?.status,
@@ -1620,6 +1624,9 @@ export const TaskCard = memo(function TaskCard({
 
 						{/* Once done: agents' time, tokens and cost, creator and launcher */}
 						<TaskRunFactsRow task={task} />
+
+						{/* The task's captures for its PR: how many, and where they stand */}
+						<TaskCapturesBadge task={task} />
 
 						{/* Azure DevOps pipeline badge (CI/CD loop) */}
 						<PipelineBadge task={task} t={t} />

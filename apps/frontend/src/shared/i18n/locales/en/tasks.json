@@ -3552,5 +3552,123 @@
 		"filterBy": "Show the tasks labelled {{label}}",
 		"failedTitle": "Labels not saved",
 		"failedDescription": "The task could not be saved. Try again."
+	},
+	"captures": {
+		"tab": "Captures",
+		"title": "Captures for the PR",
+		"count_one": "{{count}} screen",
+		"count_other": "{{count}} screens",
+		"state": {
+			"published": "In the PR",
+			"waiting": "Waiting for Publish",
+			"ready": "Ready for the PR",
+			"kept": "Kept on the task",
+			"withheld": "Held back"
+		},
+		"stateHint": {
+			"published": "The pull request shows these screens in its « Captures » section, before and after.",
+			"waiting": "The project reviews captures first: they go into the PR once someone presses Publish.",
+			"ready": "They go into the pull request as soon as it exists, or when you update it.",
+			"kept": "The project keeps captures on the task: nothing is sent to the forge.",
+			"withheld": "No copy could be checked for personal data, so none leaves this computer."
+		},
+		"fakesReplaced": "Personal data replaced by fakes of the same format: {{kinds}}.",
+		"fakesNone": "Checked: no personal data found on these screens.",
+		"itemFakes_one": "{{count}} value replaced by a fake ({{kinds}}).",
+		"itemFakes_other": "{{count}} values replaced by fakes ({{kinds}}).",
+		"withheld_one": "{{count}} screen stays on the task: its copy could not be checked.",
+		"withheld_other": "{{count}} screens stay on the task: their copies could not be checked.",
+		"syncedAt": "PR updated {{date}}",
+		"side": {
+			"before": "Before",
+			"after": "After"
+		},
+		"sideCaption": "{{label}} · {{side}}",
+		"zoom": "Enlarge {{label}}",
+		"previewAlt": "First capture: {{label}}",
+		"noBefore": "No « before »: the base branch was not captured for this screen.",
+		"imageFailed": "This copy could not be read.",
+		"untitled": "Screen",
+		"keptOnTask": "Stays on the task",
+		"status": {
+			"pseudonymized": "Personal data replaced by fakes",
+			"clean": "Checked, nothing personal",
+			"unchecked": "Not checked (no page and no local OCR): kept on the task",
+			"withheld": "Held back: too much personal data, or a check failed",
+			"failed": "No copy: the image could not be read"
+		},
+		"platform": {
+			"web": "Web",
+			"desktop": "Desktop",
+			"android": "Android",
+			"ios": "iOS"
+		},
+		"variant": {
+			"mobile": "Phone view"
+		},
+		"actions": {
+			"approve": "Publish in the PR",
+			"withdraw": "Withdraw from the PR",
+			"sync": "Update the PR",
+			"openPr": "Open the PR",
+			"visualProof": "Visual proof"
+		},
+		"done": {
+			"approve": "Published: the PR shows the captures.",
+			"withdraw": "Withdrawn: the PR no longer shows them.",
+			"sync": "The PR is up to date."
+		},
+		"noPrYet": "No pull request is open for this task yet: the captures will go in when it is created.",
+		"errors": {
+			"invalid-action": "This action is not available.",
+			"server-project": "Captures of a server card are published by the server.",
+			"no-captures": "This task has no captures.",
+			"python-not-ready": "The Python environment is not ready yet.",
+			"backend-not-found": "WorkPilot's backend was not found.",
+			"timeout": "The forge took too long to answer.",
+			"runner-refused": "The update was refused: check the forge's sign-in.",
+			"no-answer": "The update gave no answer.",
+			"spawn-failed": "The update could not start.",
+			"unknown": "The update failed."
+		},
+		"syncReason": {
+			"no-credentials": "The PR was not updated: no forge sign-in for this project.",
+			"pr-unreadable": "The PR could not be read.",
+			"pr-write-failed": "The PR's description could not be written.",
+			"attachments-refused": "Azure DevOps refused the attachments.",
+			"push-refused": "The captures branch could not be pushed (protected branch?).",
+			"error": "The last update of the PR failed."
+		},
+		"choice": {
+			"label": "For this task",
+			"project": "Follow the project",
+			"always": "Always take captures",
+			"never": "Never take captures"
+		},
+		"backToCaptures": "Back to the captures",
+		"empty": {
+			"none": "This task has no captures yet: they are taken during the verification of a task that touches a screen. Its visual proof is below.",
+			"notYet": "Captures are planned for this task: none taken yet. Its visual proof is below.",
+			"no-ui-files": "This task changes no screen, so it takes no captures. Its visual proof is below.",
+			"no-changed-files": "This task has no changes yet. Its visual proof is below.",
+			"turned-off": "Captures are turned off for this task. Its visual proof is below."
+		},
+		"serverCard": "A server card: its captures are published by the server.",
+		"badge": {
+			"count_one": "{{count}}",
+			"count_other": "{{count}}",
+			"title_one": "{{count}} capture · {{state}}",
+			"title_other": "{{count}} captures · {{state}}"
+		},
+		"kinds": {
+			"email": "email",
+			"phone": "phone",
+			"iban": "IBAN",
+			"card": "card number",
+			"name": "name",
+			"address": "address",
+			"birthdate": "date of birth",
+			"secret": "secret"
+		}
 	}
 }

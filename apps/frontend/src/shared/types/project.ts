@@ -445,6 +445,10 @@ export interface ProjectEnvConfig {
 		persistMaster?: boolean;
 	};
 
+	// Captures of a task for its pull request (`apps/backend/pr_captures/`,
+	// docs/architecture/pr-captures.md). The CAPTURES_* keys of this file.
+	captures?: ProjectCapturesConfig;
+
 	// Channel Notifications (task done → PR ready announcement)
 	// Microsoft Teams
 	teamsNotificationsEnabled?: boolean;
@@ -644,4 +648,24 @@ export interface FileSearchResult {
 	relativePath: string;
 	name: string;
 	isDirectory: boolean;
+}
+
+/** The team's captures settings, as `pr_captures/settings.py` reads them. */
+export interface ProjectCapturesConfig {
+	/** `CAPTURES_MODE`: `auto` (a screen is touched), `always`, `never`. */
+	mode?: "auto" | "always" | "never";
+	/** `CAPTURES_COMPARE`: take the "before" on the base branch - default: true. */
+	compare?: boolean;
+	/** `CAPTURES_MASK`: replace personal data with fakes - default: true. */
+	mask?: boolean;
+	/** `CAPTURES_MASK_SELECTORS`: extra CSS selectors, comma-separated. */
+	maskSelectors?: string;
+	/** `CAPTURES_PUBLISH`: `auto`, `review`, `never`. */
+	publish?: "auto" | "review" | "never";
+	/** `CAPTURES_PUBLISH_UNCHECKED`: publish a capture no pass could check - default: false. */
+	publishUnchecked?: boolean;
+	/** `CAPTURES_RETENTION_DAYS`: 0 keeps them; default 30. */
+	retentionDays?: number;
+	/** `CAPTURES_BRANCH`: the images' branch on GitHub, GitLab, Bitbucket. */
+	branch?: string;
 }
