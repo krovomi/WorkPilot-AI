@@ -1,11 +1,10 @@
 ---
 feature: Captures de tâche pour la PR (avant/après, faux)
 summary: >-
-  Une tâche dont les fichiers changés touchent un écran (toutes piles, WinDev et templates serveur
-  compris) prépare ses captures pour la PR : la vérification les prend, la comparaison avec la base
-  donne l’« avant », chaque donnée personnelle est remplacée par une fausse du même type et du même
-  format (dans la page, sinon par OCR local) ; `pr_captures/` écrit
-  `captures/publication.json`.
+  Une tâche dont les changements touchent un écran (toutes piles) prépare ses captures : la
+  vérification prend l’« après », la base l’« avant », chaque donnée personnelle devient une fausse
+  du même format ; les copies vont sur une branche à part (GitHub, GitLab, Bitbucket) ou en pièces
+  jointes (Azure DevOps) et la section « Captures » de la PR est remplacée à chaque synchro.
 ---
 
 # Captures d'une tâche pour sa PR
@@ -130,6 +129,57 @@ Leub a choisi (28/11/2026) que les copies vérifiées partent dans la PR sans re
 `CAPTURES_PUBLISH=auto` par défaut ; `review` les fait attendre un « Publier » ; `never` les garde
 sur la tâche.
 
+## Dans la PR
+
+`core/capture_hosting/` (`sync_pr_captures`) met les copies publiables là où la PR peut les
+montrer et écrit sa section « Captures » (`pr_captures/section.py`) : un tableau Écran / Avant /
+Après, une ligne qui dit que les données personnelles sont des faux, une autre qui compte les
+captures restées sur la tâche. Il tourne dès que `push_and_create_pr` a la PR, puis à la demande
+(`runners/pr_captures_runner.py sync`, `approve`, `withdraw`) quand les captures changent ou
+qu'une personne publie ou retire.
+
+| Forge | Images | Corps |
+|---|---|---|
+| GitHub | branche des captures, `…/blob/<branche>/<chemin>?raw=1` | `gh api` (PATCH) |
+| GitLab | branche des captures, `…/-/raw/<branche>/<chemin>` | `glab api` (PUT) |
+| Bitbucket Cloud | branche des captures, `…/raw/<branche>/<chemin>` | API REST, titre gardé |
+| Azure DevOps | pièces jointes de la PR (`wp-capture-…`) | API REST, 4 000 caractères au plus |
+
+GitHub n'a pas d'API pour joindre une image au corps d'une PR, et celles de GitLab et Bitbucket
+demanderaient un identifiant de plus. Le dépôt qui vient d'accepter le push de la tâche accepte
+aussi celui des images : elles vont sur une branche à elles (`CAPTURES_BRANCH`,
+`workpilot-captures`), sans historique commun avec le code, donc jamais fusionnable par erreur, et
+la branche de la tâche ne porte aucune image (`core/capture_hosting/branch.py`) :
+
+- chaque publication écrit un seul commit sans parent, construit par la plomberie git dans un index
+  temporaire : ni la copie de travail, ni l'index, ni les worktrees de la personne ne bougent ;
+- le push est gardé par `--force-with-lease` sur le commit remplacé, et rejoué si une autre tâche
+  a publié entre-temps ;
+- chaque tâche a son dossier `<spec>-pr<numéro>` et sa date dans `index.json` ; une tâche plus
+  vieille que `CAPTURES_RETENTION_DAYS` (depuis sa dernière mise à jour, `0` : jamais) est retirée
+  au passage suivant, et l'image retirée n'est plus atteignable depuis la branche ;
+- le chemin d'une image finit par une empreinte de ses octets : une capture reprise a une autre
+  adresse, aucune forge ne montre l'ancienne depuis son cache.
+
+Une image n'est lisible que par qui voit le dépôt (le navigateur envoie sa session à la forge) :
+une PR d'un dépôt privé ne rend pas ses captures publiques.
+
+Sur Azure DevOps, les images sont des pièces jointes de la PR ; une synchronisation retire les
+nôtres qui ne sont plus montrées, jamais celles d'une personne. La description est bornée à
+4 000 caractères : les écrans en trop sont retirés par la fin et comptés.
+
+La section est remplacée entre deux marqueurs, jamais ajoutée deux fois, et retirée avec ses images
+quand plus rien n'est à montrer (`CAPTURES_PUBLISH=never`, attente d'un « Publier », tâche sans
+écran). Un libellé écrit par la vérification arrive comme texte, débarrassé de ce que Markdown ou
+HTML liraient. Seul un fichier PNG de `captures/published/` est envoyé. Le runner ne prend pas
+d'URL de PR : il cherche celle de la branche de la tâche, donc aucune autre PR ne peut être
+modifiée. Une tâche sans capture ne fait aucun appel à la forge. Un refus (pas d'identifiant,
+branche protégée, PR illisible) est un code dans `<spec>/captures/pr-sync.json`, jamais une PR en
+échec.
+
+En mode `review`, `pr_captures/approval.py` enregistre les signatures des images qu'une personne a
+publiées : une capture reprise ensuite attend un nouveau « Publier ».
+
 ## Réglages
 
 | Clé (`.workpilot/.env` ou environnement) | Défaut | Effet |
@@ -141,19 +191,21 @@ sur la tâche.
 | `CAPTURES_MASK_SELECTORS` | — | sélecteurs CSS en plus (30 au plus, 200 caractères chacun) |
 | `CAPTURES_PUBLISH` | `auto` | `auto`, `review`, `never` |
 | `CAPTURES_PUBLISH_UNCHECKED` | `false` | publier une capture qu'aucune passe n'a pu vérifier |
-| `CAPTURES_RETENTION_DAYS` | `30` | jours de conservation des images publiées après la fusion (lot 2) |
+| `CAPTURES_RETENTION_DAYS` | `30` | jours de conservation des images d'une tâche sur la branche des captures après leur dernière mise à jour (`0` : sans limite) |
+| `CAPTURES_BRANCH` | `workpilot-captures` | branche des images sur GitHub, GitLab et Bitbucket |
 
 ## Lots
 
 1. **Décider et capturer** (ce document) : `pr_captures/` (feuille sur `docintel` et `uiux`,
    `tests/test_import_contracts.py`), `verify/captures_step.py`, la variante dans
    `docintel.visual_qa`, la comparaison sur les pages capturées.
-2. **Publier dans la PR** : section « Captures » dans le corps de la PR GitHub, GitLab, Azure DevOps
-   et Bitbucket, hébergement des images par forge, mise à jour de la section, purge après fusion ;
-   la preuve visuelle cesse de commiter sur la branche de la tâche.
-3. **Montrer** : onglet Captures qui lit `publication.json` (la preuve visuelle en repli), pastille
-   et aperçu sur la carte, réglages, FR et EN.
+2. **Publier dans la PR** (ce document) : `pr_captures/section.py` et `approval.py`,
+   `core/capture_hosting/`, l'appel dans `push_and_create_pr`, `runners/pr_captures_runner.py`.
+3. **Montrer** : onglet Captures qui lit `publication.json` et `pr-sync.json` (la preuve visuelle
+   en repli), boutons « Publier » et « Retirer » sur le runner, pastille et aperçu sur la carte,
+   réglages, FR et EN ; la preuve visuelle cesse de commiter sur la branche de la tâche et de
+   poster son commentaire quand la tâche a des captures.
 4. **Serveur, mobile, docs**.
 
-Tests : `tests/pr_captures/` (dont les scripts de page joués dans un vrai Chromium),
-`tests/test_verify_compare.py`.
+Tests : `tests/pr_captures/` (dont les scripts de page joués dans un vrai Chromium et la branche
+des captures poussée vers un vrai dépôt nu), `tests/test_verify_compare.py`.

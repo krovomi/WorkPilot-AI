@@ -12,6 +12,7 @@ token, and this module has no use for them (`docintel.settings.read_keys`).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -35,6 +36,7 @@ MASK_SELECTORS_ENV = "CAPTURES_MASK_SELECTORS"
 PUBLISH_ENV = "CAPTURES_PUBLISH"
 UNCHECKED_ENV = "CAPTURES_PUBLISH_UNCHECKED"
 RETENTION_ENV = "CAPTURES_RETENTION_DAYS"
+BRANCH_ENV = "CAPTURES_BRANCH"
 
 SETTINGS_KEYS = (
     MODE_ENV,
@@ -45,6 +47,7 @@ SETTINGS_KEYS = (
     PUBLISH_ENV,
     UNCHECKED_ENV,
     RETENTION_ENV,
+    BRANCH_ENV,
 )
 
 #: ``auto``: only a task whose changes touch the interface; ``always`` and
@@ -60,6 +63,13 @@ PUBLISH_MODES = ("auto", "review", "never")
 #: bounded so a pasted stylesheet does not become the mask list.
 MAX_SELECTORS = 30
 MAX_SELECTOR_CHARS = 200
+
+#: The branch that holds the published images on GitHub, GitLab and Bitbucket.
+#: It shares no history with the code and is never merged.
+DEFAULT_BRANCH = "workpilot-captures"
+_BRANCH = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._-]{0,62}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,62}){0,2}$"
+)
 
 
 def _truthy(value: object, default: bool) -> bool:
@@ -97,6 +107,13 @@ def _selectors(value: object) -> tuple[str, ...]:
     return tuple(found)
 
 
+def _branch(value: object) -> str:
+    text = str(value or "").strip()
+    if not _BRANCH.match(text) or ".." in text or text.endswith((".lock", ".")):
+        return DEFAULT_BRANCH
+    return text
+
+
 @dataclass(frozen=True)
 class CaptureSettings:
     mode: str = "auto"
@@ -111,8 +128,9 @@ class CaptureSettings:
     #: Publish a capture no check could read (no OCR engine for a window or a
     #: phone screen). Off: such a capture stays on the task.
     publish_unchecked: bool = False
-    #: Days the published images are kept after the PR is merged or closed.
+    #: Days the published images of a task are kept after their last update.
     retention_days: int = 30
+    branch: str = DEFAULT_BRANCH
 
     def to_dict(self) -> dict:
         return {
@@ -124,6 +142,7 @@ class CaptureSettings:
             "publish": self.publish,
             "publishUnchecked": self.publish_unchecked,
             "retentionDays": self.retention_days,
+            "branch": self.branch,
         }
 
 
@@ -152,4 +171,5 @@ def load_settings(
         publish=_choice(values.get(PUBLISH_ENV), PUBLISH_MODES, "auto"),
         publish_unchecked=_truthy(values.get(UNCHECKED_ENV, "false"), False),
         retention_days=_days(values.get(RETENTION_ENV), 30),
+        branch=_branch(values.get(BRANCH_ENV)),
     )
