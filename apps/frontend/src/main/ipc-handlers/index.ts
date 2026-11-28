@@ -78,6 +78,7 @@ import { registerFormulaMatrixHandlers } from "./formula-matrix-handlers";
 import { registerBenchHandlers } from "./bench-handlers";
 import { registerBoardAskHandlers } from "./board-ask-handlers";
 import { registerSprintHandlers } from "./sprint-handlers";
+import { registerSprintProposalHandlers } from "./sprint-proposal-handlers";
 import { registerBoardMcpHandlers } from "./board-mcp-handlers";
 import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
@@ -694,6 +695,7 @@ export function setupIpcHandlers(
 	// « Interroger le tableau »: a question answered with the related tickets
 	registerBoardAskHandlers();
 	registerSprintHandlers();
+	registerSprintProposalHandlers();
 
 	// Agent Debugger handlers (Feature 1)
 	registerAgentDebuggerHandlers();

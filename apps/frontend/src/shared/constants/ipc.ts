@@ -1555,6 +1555,7 @@ export const IPC_CHANNELS = {
 	SPRINTS_COMPLETE: "sprints:complete",
 	SPRINTS_DELETE: "sprints:delete",
 	SPRINTS_LIST: "sprints:list",
+	SPRINTS_PROPOSE: "sprints:propose",
 	SPRINTS_SAVE: "sprints:save",
 	SPRINTS_START: "sprints:start",
 	SWARM_ANALYZE: "swarm:analyze",

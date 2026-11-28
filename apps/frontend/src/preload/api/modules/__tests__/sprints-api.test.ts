@@ -23,5 +23,11 @@ describe("createSprintsAPI", () => {
 		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.SPRINTS_COMPLETE, "p1", "sp-0000000a", report);
 		await api.deleteSprint("p1", "sp-0000000a");
 		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.SPRINTS_DELETE, "p1", "sp-0000000a");
+		await api.proposeSprint({ projectId: "p1", sprintId: "sp-0000000a", variant: "bugs" });
+		expect(invokeIpc).toHaveBeenCalledWith(IPC_CHANNELS.SPRINTS_PROPOSE, {
+			projectId: "p1",
+			sprintId: "sp-0000000a",
+			variant: "bugs",
+		});
 	});
 });
