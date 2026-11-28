@@ -34,6 +34,8 @@ PUBLIC_PATHS = {
     "/auth/password-reset/lookup",
     "/auth/password-reset/confirm",
     "/health",
+    # Opened by its own bearer token, not an account (routers/operations.py).
+    "/metrics",
     "/docs",
     "/openapi.json",
 }
@@ -428,6 +430,7 @@ def mount_server_mode(app: FastAPI) -> bool:
         ("server.routers.usage", "usage"),
         ("server.routers.usage_admin", "usage_admin"),
         ("server.routers.usage_self", "usage_self"),
+        ("server.routers.operations", "operations"),
         ("server.routers.usage_report", "usage_report"),
         ("server.routers.needs_you", "needs-you"),
         ("server.routers.access_tokens", "access-tokens"),
@@ -440,6 +443,10 @@ def mount_server_mode(app: FastAPI) -> bool:
             continue
         app.include_router(module.router)
 
+    from server.telemetry import RequestSpans
+
+    # Outermost, so a span times the whole answer, refusals included.
+    app.add_middleware(RequestSpans)
     _run_periodic_jobs(app)
     logger.info("WorkPilot server mode ACTIVE (multi-user, auth required)")
     return True

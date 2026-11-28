@@ -376,6 +376,7 @@ desktop applications** platform to the registration with the redirect URI
 | `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | 60 | How long a forgotten-password link stays usable, kept between 5 and 1440 minutes. A new link cancels the previous one; the link works once and signs the account out everywhere. |
 | `WORKPILOT_USAGE_RETENTION_DAYS` | 365 | How many days the server keeps token use per run and job and each person's presence days, kept between 30 and 3650; older rows are erased every hour. What is recorded: [server-usage-data.md](server-usage-data.md) (French). |
 | `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS` | 183 | How many days the server keeps page activity (off by default; each organization turns it on in Administration → Usage), kept between 30 and 3650. An organization may set its own retentions there; these two variables apply to the organizations that did not. |
+| `WORKPILOT_METRICS_TOKEN` | — | Bearer token a Prometheus scraper sends to `/metrics` in server mode, at least 32 characters; without it `/metrics` answers 404. A secret: keep it in `.env.server`. |
 | `WORKPILOT_REPORT_TIMEZONE` | Europe/Paris | Time zone (IANA name) of the daily usage report for the organizations that did not set their own; an unknown name reads as UTC. |
 | `WORKPILOT_REPORT_LANGUAGE` | fr | Language (`fr` or `en`) of the usage report for the organizations that did not set their own. |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | 12 | Minimum length of a local password. It can only raise the floor: a value below 12 keeps 12. |

@@ -339,6 +339,9 @@ class ServerSettings:
     # How long usage data is kept (tokens per run, presence days), in days.
     usage_retention_days: int
     page_activity_retention_days: int
+    # The bearer token a Prometheus scraper sends to ``/metrics``; empty, or
+    # shorter than 32 characters, and ``/metrics`` answers 404.
+    metrics_token: str
 
     # SMTP for transactional email (invitation links). All empty => email
     # disabled and the API returns the invite link for manual delivery.
@@ -445,6 +448,7 @@ class ServerSettings:
             page_activity_retention_days=_env_int(
                 "WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS", 183
             ),
+            metrics_token=os.environ.get("WORKPILOT_METRICS_TOKEN", "").strip(),
             smtp_host=os.environ.get("WORKPILOT_SMTP_HOST", ""),
             smtp_port=_env_int("WORKPILOT_SMTP_PORT", 587),
             smtp_user=os.environ.get("WORKPILOT_SMTP_USER", ""),
