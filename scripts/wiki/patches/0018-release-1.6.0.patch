@@ -1,0 +1,333 @@
+From 63ead5420ee9e1b0f75f5125b913cb281272e1b9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 28 Nov 2026 09:47:57 +0000
+Subject: [PATCH] docs(wiki): release 1.6.0 (What's new, Roadmap, Kanban, AI
+ accounts, gateways, Bitbucket, microVM, approval tiers, code mode)
+
+---
+ AI-Providers.fr.md      |  9 +++++++++
+ AI-Providers.md         |  6 ++++++
+ Advanced-Features.fr.md |  6 ++++++
+ Advanced-Features.md    |  4 ++++
+ Home.md                 |  6 +++---
+ Integrations.fr.md      |  8 ++++++++
+ Integrations.md         |  6 ++++++
+ Roadmap.fr.md           | 42 ++++++++++++++++++++++++++++++++++++++++-
+ Roadmap.md              | 15 ++++++++++++++-
+ Security.fr.md          |  8 ++++++++
+ Security.md             |  8 ++++++++
+ User-Interface.fr.md    | 18 ++++++++++++++++++
+ User-Interface.md       | 18 ++++++++++++++++++
+ 13 files changed, 149 insertions(+), 5 deletions(-)
+
+diff --git a/AI-Providers.fr.md b/AI-Providers.fr.md
+index 8122913..cf4e90a 100644
+--- a/AI-Providers.fr.md
++++ b/AI-Providers.fr.md
+@@ -71,6 +71,9 @@ C'est une des fonctionnalités les plus appréciées : **enregistrer plusieurs c
+ ### Comment la bascule fonctionne
+ L'onglet **Basculement auto** ordonne une chaîne : chaque compte Claude, chaque profil API, et chaque provider sans compte à lui ici (Copilot par `gh`, une clé dans les réglages, Ollama, un CLI d'agent). Une tâche arrêtée par une limite ou une connexion perdue reprend sur l'entrée utilisable suivante, par le même chemin que « Reprendre avec… », à la phase où elle s'est arrêtée ; le journal de la tâche dit d'où vers où elle est passée. Une entrée déjà essayée pour cette tâche est sautée pendant 6 heures, une entrée retirée de la chaîne garde sa place, et une tâche change au plus 6 fois. Conception : [provider-failover.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/provider-failover.md).
+ 
++### Plusieurs comptes par provider
++Un provider à clé d'API (OpenAI, Google, Mistral, DeepSeek, Grok, Meta, OpenRouter, Hugging Face, Cursor, Windsurf ; AWS en paire de clés et région) peut garder plusieurs clés, chiffrées dans le processus principal de l'app, dont une par défaut donnée aux tâches ; Claude garde ses profils OAuth, et Copilot, Codex CLI et Gemini CLI ont un dossier de connexion par compte. La popin du provider change le compte par défaut, chaque compte montre sa dépense face à un budget mensuel facultatif, et un projet ou une seule carte Kanban peut épingler son propre compte. Quand une tâche reçoit un 401, un 429 ou un quota épuisé, la bascule essaie d'abord les autres comptes du même provider, puis le reste de la chaîne ; seul le compte change. Sur un serveur d'équipe, chaque membre y garde ses propres comptes. Conception : [ai-accounts.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/ai-accounts.md).
++
+ ### Nom du forfait
+ La répartition de l'utilisation affiche le forfait de chaque compte tel que le fournisseur l'indique : Claude Pro, Max 5x ou Max 20x (lu dans la connexion de Claude Code), ChatGPT Plus ou Pro (Codex CLI), Copilot Free, Pro, Pro+, Business ou Enterprise, Windsurf, Cursor. Un compte facturé par clé d'API dit « Clé API · à l'usage » ; un fournisseur qui ne nomme pas son forfait affiche « Abonnement ». Rien n'est deviné et aucun appel réseau n'est ajouté.
+ 
+@@ -160,6 +163,12 @@ OLLAMA_BASE_URL=http://localhost:11434
+ 
+ ---
+ 
++## 🌐 Passerelles de modèles : OpenRouter et Hugging Face
++
++OpenRouter et Hugging Face Inference Providers sont des providers à part entière, menés par le client compatible OpenAI comme Mistral, DeepSeek et Grok : une clé (`OPENROUTER_API_KEY`, `HUGGINGFACE_API_KEY` ou `HF_TOKEN`), des centaines de modèles. La liste des modèles est lue en direct, sans clé, et ne garde que ceux qui appellent des outils ; le prix et la fenêtre de contexte viennent de la passerelle, l'effort passe par `reasoning.effort`, et la clé est testée sur le compte, jamais sur la liste. OpenRouter ajoute des modèles de repli, un ordre des fournisseurs et un réglage de confidentialité ; un modèle du Hub peut être essayé dans le cloud avant d'être choisi. Le tri des issues GitHub peut comparer les issues par le sens avec des embeddings Hugging Face. Conception : [gateway-providers.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/gateway-providers.md).
++
++---
++
+ ## 🔌 Endpoint custom OpenAI-compatible
+ 
+ Vous pouvez utiliser **n'importe quel service** qui expose une API compatible OpenAI :
+diff --git a/AI-Providers.md b/AI-Providers.md
+index 52045c9..050a322 100644
+--- a/AI-Providers.md
++++ b/AI-Providers.md
+@@ -52,8 +52,14 @@ A first-run wizard walks through setting up any provider and reports honestly wh
+ 
+ The **Auto failover** tab orders a chain of entries: each Claude account, each API profile, and each provider without an account of its own here (Copilot through `gh`, a key in the settings, Ollama, an agent CLI). A task stopped by a rate limit or a lost connection resumes on the next usable entry, through the same path as « Resume with… », at the phase where it stopped; the task's log says from where to where it moved. An entry already tried for that task is skipped for 6 hours, an entry you removed from the chain keeps its place, and a task moves at most 6 times. Design: [provider-failover.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/provider-failover.md).
+ 
++**Several accounts per provider.** A provider with an API key (OpenAI, Google, Mistral, DeepSeek, Grok, Meta, OpenRouter, Hugging Face, Cursor, Windsurf; AWS as a key pair and region) can hold several keys, encrypted in the app's main process, one of them the default given to tasks; Claude keeps its OAuth profiles, and Copilot, Codex CLI and Gemini CLI get one sign-in folder per account. The provider popover switches the default, each account shows its spend against an optional monthly budget, and a project or a single Kanban card can pin its own account. When a task hits a 401, a 429 or a spent quota, failover first tries the other accounts of the same provider, then the rest of the chain; only the account changes. On a team server, each member keeps their own accounts there. Design: [ai-accounts.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/ai-accounts.md).
++
+ **Plan names.** The usage breakdown shows each account's plan as the provider reports it: Claude Pro, Max 5x or Max 20x (read from Claude Code's sign-in), ChatGPT Plus or Pro (Codex CLI), Copilot Free, Pro, Pro+, Business or Enterprise, Windsurf, Cursor. An account billed by API key says « API key · pay as you go »; a provider that does not name its plan shows « Subscription ». Nothing is guessed and no extra network call is made.
+ 
++## Model gateways: OpenRouter and Hugging Face
++
++OpenRouter and Hugging Face Inference Providers are providers of their own, driven by the OpenAI-compatible client like Mistral, DeepSeek and Grok: one key (`OPENROUTER_API_KEY`, `HUGGINGFACE_API_KEY` or `HF_TOKEN`), hundreds of models. The model list is read live, without a key, and keeps only the models that call tools; price and context window come from the gateway, effort goes through `reasoning.effort`, and the key is tested on the account, never on the list. OpenRouter adds fallbacks, a provider order and a privacy setting; a Hub model can be tried in the cloud before it is picked. GitHub issue triage can compare issues by meaning with Hugging Face embeddings. Design: [gateway-providers.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/gateway-providers.md).
++
+ ---
+ 
+ ➡️ Continue: [Memory system](Memory-System)
+diff --git a/Advanced-Features.fr.md b/Advanced-Features.fr.md
+index 3ca09bb..d9d878c 100644
+--- a/Advanced-Features.fr.md
++++ b/Advanced-Features.fr.md
+@@ -336,6 +336,12 @@ Reprenez la main sur une tâche **pendant** son exécution.
+ 
+ ---
+ 
++## 🧮 Mode code
++
++Au lieu d'un appel d'outil par tour, un agent peut écrire un court script. Pour les providers de la boucle WorkPilot, `run_script` lance un seul script JavaScript sous Node (sans `process`, `require`, `fetch` ni `eval`) et chaque appel qu'il fait repasse par les mêmes contrôles qu'un appel direct. Pour une tâche Claude, dans son worktree et dans les terminaux d'agent, le REPL de Claude Code peut être activé. Coupé par défaut ; les Paramètres proposent coupé, auto ou activé, et une tâche ou une seule phase peut choisir. Conception : [code-mode.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/code-mode.md).
++
++---
++
+ ## ⚖️ Consensus Arbiter
+ 
+ Quand plusieurs agents émettent des avis divergents (par ex. un scan **sécurité** vs une revue **QA**), l'arbitre de consensus les **réconcilie en un verdict unique** et met en évidence les conflits fichier par fichier, plutôt que de laisser l'utilisateur trancher à l'aveugle.
+diff --git a/Advanced-Features.md b/Advanced-Features.md
+index 04ddb4b..04aded3 100644
+--- a/Advanced-Features.md
++++ b/Advanced-Features.md
+@@ -50,6 +50,10 @@ The **Code migration** page (Toolbox) analyses a framework, version or language
+ 
+ ![Code migration](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/code-migration.png)
+ 
++## Code mode
++
++Instead of one tool call per turn, an agent can write a short script. For the providers of the WorkPilot loop, `run_script` runs one JavaScript script under Node (no `process`, `require`, `fetch` or `eval`) and every call it makes goes back through the same tool checks as a direct call. For a Claude task, in its worktree and in the agent terminals, Claude Code's own REPL can be turned on. Off by default; Settings offers off, auto or on, and a task or a single phase can choose. Design: [code-mode.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/code-mode.md).
++
+ ---
+ 
+ ➡️ Continue: [Contributing](Contributing)
+diff --git a/Home.md b/Home.md
+index 9d75b0c..dd3cd0b 100644
+--- a/Home.md
++++ b/Home.md
+@@ -6,11 +6,11 @@
+ 
+ ---
+ 
+-## 🆕 What's new in 1.5.0 / Nouveautés de la 1.5.0
++## 🆕 What's new in 1.6.0 / Nouveautés de la 1.6.0
+ 
+-Agent rules become a versioned policy they cannot get around, every tool result is scanned for prompt injection before the agent reads it, and a red team agent attacks what each task built. A plan rehearsal replays the spec's plan before the build, and the migration guard says what a task's migrations would do to a production database. The quality agents (accessibility with a WCAG 2.2 score, i18n, API contract watcher, doc drift, flaky tests, compliance evidence, notebooks) cover every stack and fix on a review branch. The Release Train now deploys your services itself, the Git history surgeon cleans up a branch, Best-of-N gets an arbiter, the carbon profiler a monthly budget, production incidents from Sentry become bug-fix cards, and the coach learns your coding style and gives it to the agents. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
++The Kanban becomes an agile board: Failed and Abandoned columns, sprints, swimlanes, list and timeline views, reports, labels and quick filters, cards coloured by type, quick add, right-click menus and multi-select, and a board you can ask questions in any language. Each AI provider and each forge takes several accounts (a default, a monthly budget, one pinned per project or card, failover to the same provider's other accounts first); OpenRouter, Hugging Face and Bitbucket Cloud join the list. The app now decides where a task's long test suites run (here, on the forge's CI or on the server), pull requests get approval tiers N0 to N3, code mode lets agents run one script instead of many calls, and a task can run in its own microVM. The team server measures usage within the GDPR, sends a daily report and enforces monthly token budgets, and the mobile app is redesigned. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
+ 
+-Garde-fous en code, red team et agents qualité pour toutes les stacks.
++Un Kanban agile qu'on interroge, plusieurs comptes par IA et par forge, et des suites longues placées là où elles tiennent.
+ 
+ ---
+ 
+diff --git a/Integrations.fr.md b/Integrations.fr.md
+index ae1cef4..664969d 100644
+--- a/Integrations.fr.md
++++ b/Integrations.fr.md
+@@ -69,6 +69,14 @@ Intégration pour les **Work Items** et **Pull Requests** Azure.
+ 
+ ---
+ 
++## 🪣 Bitbucket Cloud et plusieurs comptes de forge
++
++**Bitbucket Cloud** est une forge comme les autres pour un projet local : vues des issues et des pull requests, Bitbucket Pipelines dans la boucle de CI, et la PR de la tâche ouverte par le backend. Son jeton est chiffré dans `.workpilot/.env`, masqué à l'interface, et n'est envoyé qu'à api.bitbucket.org. Conception : [bitbucket.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/bitbucket.md).
++
++**Plusieurs comptes par forge** : les comptes GitHub, GitLab, Azure DevOps et Bitbucket sont enregistrés une fois pour l'app, jetons chiffrés dans le processus principal, et chaque projet nomme le sien dans son `.workpilot/.env`. Chaque projet lit ses issues, PR et pipelines dans le dépôt de ses propres remotes git ; un dépôt vide, ou qui n'est aucun des remotes, est signalé avec le bon à un clic. Conception : [forge-accounts.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/forge-accounts.md), [forge-repositories.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/forge-repositories.md).
++
++---
++
+ ## 📐 Linear
+ 
+ Import **en masse** des tickets Linear avec filtres :
+diff --git a/Integrations.md b/Integrations.md
+index bb120af..4e203ff 100644
+--- a/Integrations.md
++++ b/Integrations.md
+@@ -36,6 +36,12 @@ WorkPilot AI connects to the tools teams already use for planning, shipping and
+ | Notifications | Slack, Teams, Discord, Google Chat, webhooks, ntfy, Telegram |
+ <!-- AUTOGEN:NARRATIVE:END -->
+ 
++## Bitbucket Cloud and several forge accounts
++
++**Bitbucket Cloud** is a forge like the others for a local project: issues and pull request views, Bitbucket Pipelines in the CI loop, and the task's PR opened by the backend. Its token is encrypted in `.workpilot/.env`, masked to the interface, and only ever sent to api.bitbucket.org. Design: [bitbucket.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/bitbucket.md).
++
++**Several accounts per forge**: GitHub, GitLab, Azure DevOps and Bitbucket accounts are registered once for the app, tokens encrypted in the main process, and each project names its own in its `.workpilot/.env`. Each project reads its issues, PRs and pipelines from the repository of its own git remotes; an empty repository, or one that is none of the remotes, is flagged with the right one a click away. Design: [forge-accounts.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/forge-accounts.md), [forge-repositories.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/forge-repositories.md).
++
+ ---
+ 
+ ➡️ Continue: [AI providers](AI-Providers)
+diff --git a/Roadmap.fr.md b/Roadmap.fr.md
+index ed4e1db..db52014 100644
+--- a/Roadmap.fr.md
++++ b/Roadmap.fr.md
+@@ -20,7 +20,47 @@ WorkPilot AI vise à devenir le **framework de référence pour le développemen
+ 
+ ## 🧭 Versions récentes
+ 
+-### v1.5.0 — Stable actuelle (10 novembre 2026)
++### v1.6.0 — Stable actuelle (28 novembre 2026)
++
++*Un Kanban agile qu'on interroge, plusieurs comptes par IA et par forge, et des suites longues placées là où elles tiennent.* Détail dans le
++[CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
++
++- **Kanban agile, comme Jira** : colonnes Échec et Abandonnée avec la raison, drapeau Bloquée,
++  sprints avec points, couloirs, affichages Tableau / Liste / Frise, rapports (burndown, vélocité,
++  flux cumulé, temps de cycle, débit), étiquettes, filtres rapides, vues enregistrées et archivage
++  auto, en local comme en mode serveur
++- **Interroger le tableau** dans n'importe quelle langue : tous les tickets, éléments de feuille de
++  route, idées et changements fusionnés liés, classés par le sens avec un modèle d'embeddings local
++  d'abord, et « Vérifier une idée » pour une fonctionnalité prévue ; sur le bureau, un serveur
++  d'équipe et le téléphone
++- **Un tableau plus rapide** : cartes colorées par type avec aperçu au survol, ajout rapide, clic
++  droit, sélection Ctrl/Maj avec actions en masse et Ctrl+Z, bandeaux de colonne avec jauge de
++  capacité, faits d'exécution sur les cartes terminées, courte vérification par l'IA avant le départ
++- **Plusieurs comptes par provider IA et par forge** : un compte par défaut, dépense et budget
++  mensuel par compte, un compte épinglé par projet ou par carte, bascule d'abord vers les autres
++  comptes du même provider ; Copilot, Codex CLI et Gemini CLI avec plusieurs connexions ; les comptes
++  de chaque membre sur un serveur d'équipe
++- **Nouveaux providers et forges** : OpenRouter et Hugging Face comme providers à part entière,
++  Bitbucket Cloud comme forge
++- **Où tournent les longues suites** : ici, sur la CI de la forge depuis une branche poussée sans PR,
++  ou sur le serveur, d'après les ressources libres de la machine ; tests touchés d'abord, autres
++  cartes vertes remises sur la nouvelle base après une fusion
++- **Niveaux d'approbation** N0 à N3 sur chaque pull request, voie express pour les PR de
++  dépendances ; **mode code** (`run_script`, REPL de Claude Code) ; une **microVM Docker Sandboxes**
++  par tâche, en option
++- **Serveur d'équipe** : usage mesuré dans le cadre du RGPD (mon utilisation, export, effacement,
++  activité des pages coupée par défaut), rapport quotidien par e-mail, budgets mensuels de jetons par
++  personne, groupe et projet, page de santé et métriques Prometheus, mot de passe oublié, tout
++  fournisseur OpenID Connect, installation configurable pour un VPS, le réseau local ou un seul poste
++- **App mobile** refaite : onglets par projet, boîte « Pour vous », recherche et actions rapides sur
++  le tableau, mise en page tablette, chat d'équipe, interroger le tableau, vue d'ensemble de
++  l'organisation
++- Aussi : vagues d'exécution, saisons du Pixel Office, partage et export vidéo des replays, matrice
++  d'appareils, enregistreur du Browser Agent, surveillance et rollback des déploiements, revue de PR
++  qui apprend, cycle de vie de la mémoire, politique de gouvernance, WinDev, REA et de nombreuses
++  corrections
++
++### v1.5.0 — 10 novembre 2026
+ 
+ *Garde-fous en code, red team et agents qualité pour toutes les stacks.* Détail dans le
+ [CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
+diff --git a/Roadmap.md b/Roadmap.md
+index 0e888c5..e3369dd 100644
+--- a/Roadmap.md
++++ b/Roadmap.md
+@@ -29,7 +29,20 @@ Together with Insights (which can turn a codebase finding into a task) and Ideat
+ 
+ ## Recent releases
+ 
+-### v1.5.0 — current stable (November 10, 2026)
++### v1.6.0 — current stable (November 28, 2026)
++
++- **Agile Kanban, as in Jira**: Failed and Abandoned columns with the reason, the Blocked flag, sprints with points, swimlanes, Board / List / Timeline layouts, reports (burndown, velocity, cumulative flow, cycle time, throughput), labels, quick filters, saved views and auto-archive, in local and server mode
++- **Ask the board** in any language: every related ticket, roadmap item, idea and merged change, ranked by meaning with a local embeddings model first, and « Check an idea » for a planned feature; on the desktop, a team server and the phone
++- **Faster board**: cards coloured by type with a preview on hover, quick add, right-click menus, Ctrl/Shift selection with bulk actions and Ctrl+Z, column bands with a capacity gauge, run facts on finished cards, a short AI check before the first start
++- **Several accounts per AI provider and per forge**: a default, a spend and monthly budget per account, one pinned per project or Kanban card, failover first to the same provider's other accounts; Copilot, Codex CLI and Gemini CLI with several sign-ins; each member's own accounts on a team server
++- **New providers and forges**: OpenRouter and Hugging Face as first-class providers, Bitbucket Cloud as a forge
++- **Where the long suites run**: here, on the forge's CI from a branch pushed without a PR, or on the server, from the machine's free resources; touched tests first, other green cards rebased after a merge
++- **Approval tiers** N0 to N3 on every pull request, an express lane for dependency PRs; **code mode** (`run_script`, Claude Code's REPL); an optional **Docker Sandboxes microVM** per task
++- **Team server**: usage measured within the GDPR (my usage, export, erasure, page activity off by default), a daily report by email, monthly token budgets per person, group and project, a health page and Prometheus metrics, a forgotten password reset, any OpenID Connect provider, a configurable install for a VPS, the local network or one computer
++- **Mobile app** redesigned: project tabs, a « For you » inbox, board search and quick actions, a tablet layout, team chat, ask the board, the organization's overview
++- Also: execution waves, Pixel Office seasons, replay sharing and video export, device matrix, Browser Agent recorder, deploy watch and rollback, review feedback that learns, memory lifecycle, governance policy, WinDev, REA and many fixes
++
++### v1.5.0 — November 10, 2026
+ 
+ - **Guardrails as code**: a versioned, layered policy that agents cannot get around, enforced in task worktrees too; every tool result is scanned for prompt injection before the agent reads it
+ - **Red team**: after QA, an agent tries to break what the task built, judged by WorkPilot's own run
+diff --git a/Security.fr.md b/Security.fr.md
+index cbd3482..628e7b4 100644
+--- a/Security.fr.md
++++ b/Security.fr.md
+@@ -285,6 +285,14 @@ Réglages : **Sécurité et performance → Détection d'anomalies** (seuils et
+ 
+ ![Réglages du bac à sable](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/sandbox.png)
+ 
++### Une microVM par tâche (en option)
++
++Coupée par défaut, dans **Paramètres → Sandbox** : chaque tâche peut tourner dans une microVM Docker Sandboxes (`sbx`) avec son propre noyau et son moteur Docker, seul son worktree monté et le réseau fermé à la liste autorisée. Les CLI d'agent y tournent avec les clés propres à sbx, les Paramètres montrent l'état de sbx, et la VM est purgée avec le worktree. C'est aussi ce qui isole les commandes d'un agent sous Windows 11. Conception : [os-sandbox.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/os-sandbox.md).
++
++### Niveaux d'approbation des pull requests
++
++Chaque pull request reçoit un niveau lu sans modèle, d'après son type, les couches et chemins sensibles touchés, sa taille, sa CI et la revue croisée : **N0** et **N1** fusionnent seules une fois tout vert, **N2** et **N3** attendent une personne. Les niveaux commencent en observation ; la section `approvals` de `workpilot.policy.yaml` ne peut que les durcir, et le bac à sable de la tâche et les hôtes refusés comptent parmi les faits. Les PR Dependabot et Renovate passent par une **voie express** du même moteur, sans tâche ni modèle : une PR N0 verte fusionne à la tête jugée, seulement quand l'interrupteur est mis. Conception : [approval-tiers.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/approval-tiers.md), [express-lane.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/express-lane.md).
++
+ ---
+ 
+ ## 🎛 Paramètres de sécurité
+diff --git a/Security.md b/Security.md
+index 7e9d573..f8f364d 100644
+--- a/Security.md
++++ b/Security.md
+@@ -44,6 +44,14 @@ Settings: **Security & performance → Anomaly Detection** (thresholds and what
+ 
+ ![Sandbox settings](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/sandbox.png)
+ 
++## A microVM per task (optional)
++
++Off by default, in **Settings → Sandbox**: each task can run in a Docker Sandboxes microVM (`sbx`) with its own kernel and Docker engine, only its worktree mounted and the network closed to the allowlist. The agent CLIs run inside it with sbx's own keys, Settings shows sbx's status, and the VM is purged with the worktree. It is also what isolates an agent's commands on Windows 11. Design: [os-sandbox.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/os-sandbox.md).
++
++## Approval tiers for pull requests
++
++Each pull request gets a tier read without a model, from its kind, the layers and sensitive paths it touches, its size, its CI and the cross review: **N0** and **N1** merge on their own once everything is green, **N2** and **N3** wait for a person. The tiers start in observe mode; the `approvals` section of `workpilot.policy.yaml` can only make them stricter, and a task's sandbox and refused hosts count among the facts. Dependabot and Renovate PRs take an **express lane** through the same engine, with no task and no model: a green N0 merges at the head that was judged, only when the switch is on. Design: [approval-tiers.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/approval-tiers.md), [express-lane.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/express-lane.md).
++
+ ---
+ 
+ ➡️ Continue: [Customization](Customization)
+diff --git a/User-Interface.fr.md b/User-Interface.fr.md
+index 9be2eba..8a244e6 100644
+--- a/User-Interface.fr.md
++++ b/User-Interface.fr.md
+@@ -84,6 +84,24 @@ Une tâche trop grosse pour une petite PR se découpe d'elle-même après la pla
+ 
+ ![Rapports](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-reports.png)
+ 
++### Travailler vite sur le tableau
++
++- **Couleurs des cartes** : chaque carte prend la couleur de son type (14 types en 5 familles : fonctionnalité, correction, refactorisation, sécurité…), lu depuis son genre, sa catégorie, sa sévérité et son origine, sans rien à remplir ; un aperçu s'ouvre après 700 ms de survol. Une carte terminée montre le temps des agents, les tokens et le coût, qui l'a créée et qui l'a lancée.
++- **Ajout rapide** depuis Planification, File d'attente et En cours : une carte par ligne collée ; « + » dans En cours crée la carte et la démarre.
++- **Clic droit** sur une carte ou une colonne : les mêmes actions que « ⋮ » (Type ▸, Priorité ▸, Modifier…). Le clic avec **Ctrl/Maj** et Ctrl+A sélectionnent plusieurs cartes pour des actions en masse, et une sélection entière se glisse d'un coup ; une suppression attend quelques secondes et Ctrl+Z la reprend ; F2 renomme en place, les flèches passent d'une carte à l'autre et Ctrl+/ montre les touches.
++- **Bandeaux de colonne** : chaque en-tête est teinté de la couleur de la colonne, avec un gros compteur, une jauge de capacité (créneaux d'En cours, limite WIP) qui passe à l'ambre et une ligne de résumé masquable.
++- **Avant le premier démarrage**, la machine est vérifiée (git, un premier commit, le compte) et une carte courte est relue une fois par l'IA, qui peut poser jusqu'à trois questions ; elle ne bloque jamais le départ.
++
++Conception : [kanban-quick-edit.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-quick-edit.md), [kanban-card-colors.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-card-colors.md), [kanban-columns.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-columns.md), [task-readiness.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/task-readiness.md).
++
++### Interroger le tableau
++
++Posez une question dans n'importe quelle langue (« l'export CSV a-t-il déjà été fait ? ») et obtenez tous les tickets liés, avec la feuille de route, les idées et les changements fusionnés. Le modèle du provider choisi traduit la question vers les langues du tableau, les mots (BM25) et le sens (un modèle d'embeddings, local d'abord) classent les candidats, et le modèle juge ce que la réponse couvre ; sans modèle, le classement répond seul. « Vérifier une idée » dit à un product owner si une fonctionnalité prévue existe déjà. Cela marche sur un tableau local, sur celui d'un serveur d'équipe depuis le bureau, et dans l'app mobile. Conception : [board-ask.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/board-ask.md).
++
++### Où tournent les longues suites
++
++Avant une revue QA complète, l'app décide sans modèle où tourne la suite complète du projet : sur cette machine, sur la CI de la forge depuis la branche de la tâche poussée sans PR (GitHub Actions, Azure Pipelines, GitLab CI, Bitbucket Pipelines, Jenkins), ou sur le serveur WorkPilot, d'après le CPU, la RAM, le GPU et la VRAM libres et la charge mesurée de la suite ; sans place, la suite attend son tour, elle n'est jamais sautée. Les tests touchés passent d'abord, le choix d'une carte l'emporte sur celui du projet, la fusion attend pendant que la CI tourne, et après une fusion les autres cartes vertes reprennent la nouvelle base et repartent. Conception : [test-placement.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/test-placement.md), [suite-base-refresh.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/suite-base-refresh.md).
++
+ ### Actions disponibles sur une carte
+ 
+ - **Preview** (icône écran) — lance l'app dans l'**App Emulator** intégré
+diff --git a/User-Interface.md b/User-Interface.md
+index 33308e7..6057e14 100644
+--- a/User-Interface.md
++++ b/User-Interface.md
+@@ -79,6 +79,24 @@ A task too big for one small PR splits itself after planning into « Part k/N »
+ 
+ ![Reports](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-reports.png)
+ 
++### Working fast on the board
++
++- **Card colours**: each card takes the colour of its type (14 types in 5 families: feature, bug fix, refactoring, security…), read from its kind, category, severity and origin, nothing to fill in; a preview opens after 700 ms on hover. A finished card shows the agents' time, tokens and cost, who created it and who started it.
++- **Quick add** from Planning, Queue and In Progress: one card per pasted line; « + » in In Progress creates the card and starts it.
++- **Right-click** on a card or a column: the same actions as « ⋮ » (Type ▸, Priority ▸, Edit…). **Ctrl/Shift** click and Ctrl+A select several cards for bulk actions, and a whole selection drags at once; a delete waits a few seconds and Ctrl+Z takes it back; F2 renames in place, the arrow keys move between cards and Ctrl+/ shows the keys.
++- **Column bands**: each header is tinted with the column's colour, with a big count, a capacity gauge (In Progress slots, WIP limit) that turns amber, and a one-line summary you can hide.
++- **Before the first start**, the machine is checked (git, a first commit, the account) and a short card is read once by the AI, which may ask up to three questions; it never blocks the start.
++
++Design: [kanban-quick-edit.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-quick-edit.md), [kanban-card-colors.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-card-colors.md), [kanban-columns.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-columns.md), [task-readiness.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/task-readiness.md).
++
++### Ask the board
++
++Ask a question in any language (« has the CSV export already been done? ») and get every related ticket, with the roadmap, the ideas and the merged changes. The selected provider's model translates the question into the board's languages, words (BM25) and meaning (an embeddings model, local first) rank the candidates, and the model judges what the answer covers; without a model the ranking answers alone. « Check an idea » tells a product owner whether a planned feature is already there. It works on a local board, on a team server's board from the desktop, and in the mobile app. Design: [board-ask.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/board-ask.md).
++
++### Where the long suites run
++
++Before a full QA review, the app decides without a model where the project's full suite runs: on this machine, on the forge's CI from the task's branch pushed without a PR (GitHub Actions, Azure Pipelines, GitLab CI, Bitbucket Pipelines, Jenkins), or on the WorkPilot server, from the free CPU, RAM, GPU and VRAM and the suite's measured load; with no room, the suite queues, it is never skipped. The touched tests run first, a card's own choice wins over the project's, the merge waits while the CI runs, and after a merge the other green cards take the new base and run again. Design: [test-placement.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/test-placement.md), [suite-base-refresh.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/suite-base-refresh.md).
++
+ ### Actions available on a card
+ 
+ - **Preview** (screen icon) — launches the app in the embedded **App Emulator**
+-- 
+2.43.0
+
