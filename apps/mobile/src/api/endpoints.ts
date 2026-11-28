@@ -35,6 +35,7 @@ import type { Memory } from "../context/index-file";
 import type { AskAnswer } from "../board-ask/types";
 import type { MyUsage, UsageNotice } from "../usage/types";
 import type { AiAccount, AiAccounts } from "../ai-accounts/types";
+import type { CaptureSideName, CardCaptures } from "../captures/types";
 import { decided, type MemoryDecision, type MemoryLifecycle } from "../context/lifecycle";
 import type { EngineOption, SettingsPayload } from "../new-card/engine";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
@@ -144,6 +145,21 @@ export function api(client: ServerClient) {
 					source: "mobile",
 				})
 			).messages,
+		/** What the card's pull request shows of its captures (`shared_board/captures.py`). */
+		captures: async (projectId: string, cardId: string) =>
+			(await client.request<{ captures: CardCaptures }>("GET", cardsPath(projectId, cardId, "captures"))).captures,
+		/** One published copy, fakes in place of personal data: a screen by its place in the list. */
+		captureImage: (projectId: string, cardId: string, index: number, side: CaptureSideName) =>
+			client.request<{ mimeType: "image/png"; data: string }>(
+				"GET",
+				cardsPath(projectId, cardId, `captures/${index}/${side}`),
+			),
+		publishCaptures: async (projectId: string, cardId: string) =>
+			(await client.request<{ captures: CardCaptures }>("POST", cardsPath(projectId, cardId, "captures/publish")))
+				.captures,
+		withdrawCaptures: async (projectId: string, cardId: string) =>
+			(await client.request<{ captures: CardCaptures }>("POST", cardsPath(projectId, cardId, "captures/withdraw")))
+				.captures,
 		requestChanges: (projectId: string, cardId: string, feedback: string) =>
 			client.request("POST", cardsPath(projectId, cardId, "request-changes"), { feedback }),
 		runs: (projectId: string, specId: string) => client.request<AgentRun[]>("GET", runsPath(projectId, specId)),

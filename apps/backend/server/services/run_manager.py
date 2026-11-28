@@ -75,7 +75,11 @@ PHASE_ARGS: dict[str, list[str]] = {
 #: Writes the spec (and its plan) from the card's description, then stops:
 #: ``runners/spec_runner.py --no-build``.
 SPEC_PHASE = "spec"
-PHASES: tuple[str, ...] = (SPEC_PHASE, *PHASE_ARGS)
+#: Puts the card's published captures in its pull request, or takes them out,
+#: once the team's review answered (``runners/pr_captures_runner.py sync``).
+#: No agent runs; the forge is written with the starter's token.
+CAPTURES_PHASE = "captures"
+PHASES: tuple[str, ...] = (SPEC_PHASE, *PHASE_ARGS, CAPTURES_PHASE)
 
 
 def _json_file(path: Path) -> dict:
@@ -184,6 +188,17 @@ def build_command(
                 metadata["requireReviewBeforeCoding"] = True
                 target.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
             cmd.append("--no-build")
+    elif phase == CAPTURES_PHASE:
+        # The runner takes no model: no agent runs.
+        return [
+            sys.executable,
+            str(BACKEND_DIR / "runners" / "pr_captures_runner.py"),
+            "sync",
+            "--project-dir",
+            server_path,
+            "--spec-name",
+            spec_name,
+        ]
     else:
         cmd = [
             sys.executable,

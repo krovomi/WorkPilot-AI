@@ -43,7 +43,7 @@ from server.services.events import emit_board_event
 from server.services.needs_you import set_approval_check
 from server.services.status_history import plan_status, record_status_change
 from shared_board import attachments as card_images
-from shared_board import listing, review, steering, unblock
+from shared_board import captures, listing, review, steering, unblock
 from shared_board import settings as card_settings
 from shared_board.cards import _card_or_404, _index_row, _require_writer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,6 +67,10 @@ SNAPSHOT_FILES: dict[str, int] = {
     "status_history.json": 100_000,
     "spec.md": 300_000,
     "qa_report.md": 300_000,
+    # What the card's pull request shows of its captures, and how the last
+    # sync went (``shared_board/captures.py``): kinds of data, never a value.
+    "captures/publication.json": 200_000,
+    "captures/pr-sync.json": 20_000,
 }
 MAX_SNAPSHOT_CARDS = 500
 
@@ -107,12 +111,16 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
 
 def _card_files(directory: Path) -> dict[str, str]:
     files: dict[str, str] = {}
+    base = directory.resolve()
     for name, limit in SNAPSHOT_FILES.items():
         path = directory / name
         try:
+            # A file in a sub-folder (``captures/``) is read only if the folder
+            # is not a link out of the card either.
             if (
                 path.is_file()
                 and not path.is_symlink()
+                and path.resolve().parent == (base / name).parent
                 and path.stat().st_size <= limit
             ):
                 files[name] = path.read_text(encoding="utf-8")
@@ -450,3 +458,19 @@ router.add_api_route("/cards/{card_id}/steering", steering.steer_card, methods=[
 # The same check rings its person's "needs you" channels as a plan to
 # approve (server/services/needs_you.py).
 set_approval_check(_approval_pending)
+
+# A card's captures for its pull request (``shared_board/captures.py``).
+router.add_api_route(
+    "/cards/{card_id}/captures", captures.card_captures, methods=["GET"]
+)
+router.add_api_route(
+    "/cards/{card_id}/captures/{index}/{side}",
+    captures.card_capture_image,
+    methods=["GET"],
+)
+router.add_api_route(
+    "/cards/{card_id}/captures/publish", captures.publish_captures, methods=["POST"]
+)
+router.add_api_route(
+    "/cards/{card_id}/captures/withdraw", captures.withdraw_captures, methods=["POST"]
+)

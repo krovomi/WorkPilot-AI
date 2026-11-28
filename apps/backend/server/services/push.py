@@ -60,6 +60,7 @@ _PHASES = {
         "qa": "QA",
         "merge": "Merge",
         "pr": "Pull request",
+        "captures": "Captures",
     },
     "fr": {
         "spec": "Spec",
@@ -67,6 +68,7 @@ _PHASES = {
         "qa": "QA",
         "merge": "Fusion",
         "pr": "Pull request",
+        "captures": "Captures",
     },
 }
 _BODIES = {

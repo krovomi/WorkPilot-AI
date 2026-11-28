@@ -169,7 +169,8 @@ export interface CardSettings {
 	goalError: string | null;
 }
 
-export type RunPhase = "spec" | "build" | "qa" | "merge" | "pr";
+/** `captures` puts a card's published captures in its pull request, or takes them out. */
+export type RunPhase = "spec" | "build" | "qa" | "merge" | "pr" | "captures";
 
 export interface AgentRun {
 	id: string;

@@ -450,7 +450,7 @@ async def test_a_run_skips_the_review_only_for_who_may_approve(monkeypatch, tmp_
 def test_run_phases_are_non_interactive_and_never_force_the_approval(tmp_path):
     from server.services.run_manager import PHASES, build_command
 
-    assert set(PHASES) == {"spec", "build", "qa", "merge", "pr"}
+    assert set(PHASES) == {"spec", "build", "qa", "merge", "pr", "captures"}
     build = build_command("build", "001-x", str(tmp_path), None, tmp_path)
     assert "--auto-continue" in build and "--force" not in build
     assert "--create-pr" in build_command("pr", "001-x", str(tmp_path), None, tmp_path)
