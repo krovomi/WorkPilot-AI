@@ -22,8 +22,10 @@ vi.mock("../../agent/task-provider-env", () => ({
 }));
 
 import {
+	accountPinKey,
 	chainHasOtherProvider,
 	excludedEntries,
+	pinnedAccountOf,
 	stoppedTask,
 	taskPhaseProvider,
 } from "../task-phase-provider";
@@ -57,6 +59,30 @@ describe("stoppedTask", () => {
 		expect(stoppedTask("t1")).toEqual({ provider: "copilot", projectId: "p1", specDirs: ["/specs/main", "/specs/wt"] });
 		found.task = { metadata: { engine: { qa: "openai" }, paused: { paused_phase: "qa_review" } } };
 		expect(taskPhaseProvider("t1", "p1")).toBe("openai");
+	});
+});
+
+describe("the account a stopped task is pinned to", () => {
+	it("reads the task's pin first, then its project's, under the provider's key", () => {
+		found.task = { metadata: { engine: { coding: "gemini" }, aiAccounts: { google: "g-task" } } };
+		found.project = { id: "p1", settings: { aiAccounts: { google: "g-project", claude: "work" } } };
+		expect(stoppedTask("t1")).toMatchObject({ provider: "gemini", pinKey: "google", pinnedAccount: "g-task" });
+		found.task = { metadata: { engine: { coding: "gemini" } } };
+		expect(stoppedTask("t1")).toMatchObject({ pinKey: "google", pinnedAccount: "g-project" });
+		found.task = { metadata: {} };
+		expect(stoppedTask("t1")).toMatchObject({ provider: "anthropic", pinKey: "claude", pinnedAccount: "work" });
+	});
+
+	it("has no pin for a provider without accounts, nor for a pin that is not text", () => {
+		found.task = { metadata: { engine: { coding: "copilot" }, aiAccounts: { copilot: "x" } } };
+		found.project = { id: "p1", settings: {} };
+		expect(stoppedTask("t1")).toMatchObject({ pinKey: undefined, pinnedAccount: undefined });
+		expect(accountPinKey("claude")).toBe("claude");
+		expect(accountPinKey("ollama")).toBeUndefined();
+		expect(pinnedAccountOf({ openai: 3 }, "openai")).toBeUndefined();
+		expect(pinnedAccountOf({ openai: "" }, "openai")).toBeUndefined();
+		expect(pinnedAccountOf(["openai"], "openai")).toBeUndefined();
+		expect(pinnedAccountOf(null, "openai")).toBeUndefined();
 	});
 });
 

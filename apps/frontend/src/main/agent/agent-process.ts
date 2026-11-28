@@ -41,6 +41,7 @@ import {
 import {
 	createSDKRateLimitInfo,
 	detectAuthFailure,
+	detectBillingFailure,
 	detectRateLimit,
 	getBestAvailableProfileEnv,
 } from "../rate-limit-detector";
@@ -370,8 +371,21 @@ export class AgentProcessManager {
 			this.emitter.emit("sdk-rate-limit", rateLimitInfo);
 			return true;
 		}
+		if (this.handleSpentBalance(taskId, allOutput)) return true;
 
 		return this.handleAuthFailure(taskId, allOutput);
+	}
+
+	/**
+	 * A spent balance or credit (HTTP 402, "Insufficient Balance") stops the
+	 * account like a limit does: off Claude, the task moves to the next
+	 * account of the chain when the failover on limits is on.
+	 */
+	private handleSpentBalance(taskId: string, allOutput: string): boolean {
+		if (!detectBillingFailure(allOutput).isBillingFailure) return false;
+		const settings = getClaudeProfileManager().getAutoSwitchSettings();
+		if (!settings.enabled || !settings.autoSwitchOnRateLimit) return false;
+		return this.requestProviderFailover(taskId, "rate_limit", false);
 	}
 
 	private handleRateLimitWithAutoSwap(

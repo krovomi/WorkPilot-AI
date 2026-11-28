@@ -1,10 +1,12 @@
 /**
  * The accounts the failover chain can order, built from what the AI accounts
- * page knows is connected: Claude accounts, API profiles, then every other
- * connected provider (Copilot, OpenAI, Mistral, Ollama, coding-agent CLIs...).
+ * page knows is connected: Claude accounts, API profiles, the accounts of
+ * Settings → AI accounts (several per provider), then every other connected
+ * provider (Copilot, OpenAI, Mistral, Ollama, coding-agent CLIs...).
  * The ids are the ones the main reads (shared/utils/failover-chain.ts).
  */
 import type { ClaudeProfile } from "@shared/types/agent";
+import type { AiAccountView } from "@shared/types/ai-accounts";
 import type { APIProfile } from "@shared/types/profile";
 import {
 	apiProfileProvider,
@@ -41,6 +43,9 @@ export interface FailoverSources {
 	/** Usage measured per Claude profile id. */
 	readonly usage?: ReadonlyMap<string, { sessionPercent?: number; weeklyPercent?: number }>;
 	readonly copilotLogin?: string;
+	/** The accounts of Settings → AI accounts, and each provider's default. */
+	readonly aiAccounts?: readonly AiAccountView[];
+	readonly aiAccountDefaults?: Readonly<Record<string, string>>;
 }
 
 const CLAUDE = "anthropic";
@@ -77,6 +82,19 @@ export function buildFailoverAccounts(sources: FailoverSources): FailoverAccount
 			isActive: profile.id === sources.activeApiProfileId,
 		});
 		covered.add(provider);
+	}
+	// Several accounts of one provider: each is its own entry, and the
+	// provider's generic entry would only repeat its default account.
+	for (const account of sources.aiAccounts ?? []) {
+		if (!account.hasKey) continue;
+		accounts.push({
+			id: failoverEntryId("account", account.id),
+			kind: "account",
+			provider: account.provider,
+			label: account.name,
+			isActive: sources.aiAccountDefaults?.[account.provider] === account.id,
+		});
+		covered.add(account.provider);
 	}
 	for (const { name, label } of sources.providers) {
 		if (!sources.connected[name] || covered.has(name)) continue;

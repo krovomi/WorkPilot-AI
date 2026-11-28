@@ -3276,9 +3276,11 @@
 			"masterOff": "Off: a task stopped by a limit waits for you.",
 			"triggersTitle": "When to switch",
 			"rateLimit": "On a usage limit",
-			"rateLimitHint": "The provider refuses requests until its limit resets.",
+			"rateLimitHint": "The provider refuses requests until its limit resets, or the account's quota or credit is spent.",
 			"authFailure": "On a lost sign-in",
 			"authFailureHint": "The account's sign-in or key no longer works.",
+			"sameProviderFirst": "Other accounts of the same provider first",
+			"sameProviderFirstHint": "A task stopped on one account moves to the next account of that provider in the chain before trying another provider.",
 			"proactive": "Before the limit (Claude accounts)",
 			"proactiveHint": "Moves to another Claude account when usage passes these thresholds.",
 			"session": "Session threshold",
@@ -3290,6 +3292,7 @@
 			"kind": {
 				"oauth": "Claude account",
 				"api": "API profile",
+				"account": "Account",
 				"provider": "Provider"
 			},
 			"active": "In use",

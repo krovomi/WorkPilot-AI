@@ -3276,9 +3276,11 @@
 			"masterOff": "Désactivé : une tâche arrêtée par une limite vous attend.",
 			"triggersTitle": "Quand basculer",
 			"rateLimit": "Sur une limite d'usage",
-			"rateLimitHint": "Le provider refuse les requêtes jusqu'à la remise à zéro de sa limite.",
+			"rateLimitHint": "Le provider refuse les requêtes jusqu'à la remise à zéro de sa limite, ou le quota ou le crédit du compte est épuisé.",
 			"authFailure": "Sur une connexion perdue",
 			"authFailureHint": "La connexion ou la clé du compte ne fonctionne plus.",
+			"sameProviderFirst": "D'abord les autres comptes du même provider",
+			"sameProviderFirstHint": "Une tâche arrêtée sur un compte passe au compte suivant de ce provider dans la chaîne avant d'essayer un autre provider.",
 			"proactive": "Avant la limite (comptes Claude)",
 			"proactiveHint": "Passe à un autre compte Claude quand l'usage dépasse ces seuils.",
 			"session": "Seuil de session",
@@ -3290,6 +3292,7 @@
 			"kind": {
 				"oauth": "Compte Claude",
 				"api": "Profil API",
+				"account": "Compte",
 				"provider": "Provider"
 			},
 			"active": "En cours",

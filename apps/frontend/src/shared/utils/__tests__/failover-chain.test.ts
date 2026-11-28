@@ -18,7 +18,12 @@ const candidate = (id: string, provider: string): FailoverCandidate => {
 };
 
 describe("parseFailoverEntry", () => {
-	it("reads the three kinds of entry", () => {
+	it("reads the four kinds of entry", () => {
+		expect(parseFailoverEntry("account-8f1c2d3e-aaaa-4bbb-8ccc-1234567890ab")).toEqual({
+			id: "account-8f1c2d3e-aaaa-4bbb-8ccc-1234567890ab",
+			kind: "account",
+			key: "8f1c2d3e-aaaa-4bbb-8ccc-1234567890ab",
+		});
 		expect(parseFailoverEntry("oauth-work")).toEqual({ id: "oauth-work", kind: "oauth", key: "work" });
 		expect(parseFailoverEntry("api-profile_1")).toEqual({ id: "api-profile_1", kind: "api", key: "profile_1" });
 		expect(parseFailoverEntry("provider-copilot")).toEqual({
@@ -33,7 +38,7 @@ describe("parseFailoverEntry", () => {
 	});
 
 	it("refuses anything else", () => {
-		for (const id of ["", "oauth-", "oauth-../x", "api- spaced", "Copilot", "x", "provider-/etc", "gemini-", "a--b"]) {
+		for (const id of ["", "oauth-", "account-", "account-../x", "oauth-../x", "api- spaced", "Copilot", "x", "provider-/etc", "gemini-", "a--b"]) {
 			expect(parseFailoverEntry(id)).toBeNull();
 		}
 	});
@@ -115,6 +120,22 @@ describe("pickNextFailover", () => {
 		expect(pickNextFailover(chain, { ...base, provider: "mistral", isUsable: () => false })).toBeNull();
 	});
 
+	it("tries the other accounts of the stopped provider before another provider", () => {
+		const accounts = [
+			candidate("oauth-perso", "anthropic"),
+			candidate("account-m1", "mistral"),
+			candidate("account-o1", "openai"),
+			candidate("provider-openai", "openai"),
+			candidate("account-o2", "openai"),
+		];
+		const context = { ...base, provider: "openai", currentEntryId: "account-o1" };
+		expect(pickNextFailover(accounts, context)?.id).toBe("account-o2");
+		// Off: the chain's own order, whatever the provider.
+		expect(pickNextFailover(accounts, { ...context, sameProviderFirst: false })?.id).toBe("oauth-perso");
+		// No other account of the provider left: the chain goes on to the others.
+		expect(pickNextFailover(accounts, { ...context, tried: new Set(["account-o2"]) })?.id).toBe("oauth-perso");
+	});
+
 	it("builds ids from a kind and a key", () => {
 		expect(failoverEntryId("api", "x")).toBe("api-x");
 	});
@@ -136,6 +157,8 @@ describe("sanitizeAutoSwitchUpdate", () => {
 		expect(sanitizeAutoSwitchUpdate({ weeklyThreshold: 49.5, autoSwitchOnAuthFailure: true })).toEqual({
 			autoSwitchOnAuthFailure: true,
 		});
+		expect(sanitizeAutoSwitchUpdate({ sameProviderFirst: false })).toEqual({ sameProviderFirst: false });
+		expect(sanitizeAutoSwitchUpdate({ sameProviderFirst: "no" })).toBeNull();
 	});
 
 	it("refuses a value with nothing valid in it", () => {
