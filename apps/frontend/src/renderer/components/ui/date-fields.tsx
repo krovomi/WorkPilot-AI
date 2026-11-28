@@ -58,6 +58,9 @@ interface BoundedFieldProps extends FieldProps {
 const ICON_BUTTON =
 	"absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50";
 
+// Above a dialog (z-60), like the Select list: most of these fields live in one.
+const LAYER = "z-70";
+
 const CELL =
 	"rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-30";
 
@@ -155,7 +158,7 @@ export function DateField({
 						<Calendar className="h-4 w-4" aria-hidden="true" />
 					</button>
 				</PopoverTrigger>
-				<PopoverContent align="end" className="w-auto p-3">
+				<PopoverContent align="end" className={cn(LAYER, "w-auto p-3")}>
 					<DayCalendar value={value} min={min} max={max} language={language} onPick={pick} />
 				</PopoverContent>
 			</Popover>
@@ -314,7 +317,7 @@ export function MonthField({
 					<Calendar className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
 				</button>
 			</PopoverTrigger>
-			<PopoverContent align="start" className="w-64 space-y-2 p-3">
+			<PopoverContent align="start" className={cn(LAYER, "w-64 space-y-2 p-3")}>
 				<div className="flex items-center justify-between">
 					<button type="button" className={cn(CELL, "p-1.5 hover:bg-accent")} aria-label={t("dateField.previousYear")} onClick={() => setYear(year - 1)}>
 						<ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -411,7 +414,7 @@ export function TimeField({ id, value, onValueChange, disabled, className, ...ar
 				</PopoverTrigger>
 				<PopoverContent
 					align="end"
-					className="w-36 p-1"
+					className={cn(LAYER, "w-36 p-1")}
 					onOpenAutoFocus={(event) => {
 						event.preventDefault();
 						list.current?.querySelector<HTMLButtonElement>(`[data-time="${nearest}"]`)?.focus();
