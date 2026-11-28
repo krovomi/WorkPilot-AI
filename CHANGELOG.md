@@ -14,6 +14,43 @@ Changes not released yet are not written here: each PR adds a fragment to
 folds them into a new section at release time (`python scripts/changelog.py preview`
 shows the next notes). Two open PRs no longer edit the same lines.
 
+## 1.6.1 - Planifier et proposer un sprint avec l'IA, des dates dans la langue de l'app
+
+La vue « Planifier » d'un sprint montre sa capacité face à la vélocité et se manie au glisser-déposer
+ou au clavier, et « Proposer le sprint » remplit le sprint jusqu'à sa capacité avec l'IA du provider
+choisi, une raison par tâche (des règles proposent seules sans modèle). Les dates et les heures suivent
+la langue de l'app sur le bureau et le mobile, la microVM d'une tâche reste fermée à son allowlist, et
+les builds de release tournent sur un Node.js accepté par REA.
+
+### ✨ Nouveautés
+
+- **La vue « Planifier » d'un sprint montre sa capacité et se manie plus vite** : une jauge en points compare le sprint à la vélocité des 3 derniers sprints (ou à une cible pour un premier sprint), avec l'historique à côté ; la disponibilité de l'équipe se règle en %. Les tâches se glissent d'un côté à l'autre, ou s'envoient au clavier, et le dernier déplacement s'annule. Le backlog a des filtres rapides (urgentes, bugs, non estimées) et un bouton « Estimer » ; une tâche reportée du sprint précédent est marquée, une tâche qui attend une tâche restée au backlog aussi, avec « L'ajouter aussi ». Un sprint planifié démarre depuis la vue.
+- **Le sprint en cours s'affiche au-dessus du Kanban, et se planifie** : un bandeau nomme le sprint actif (ou celui du filtre) avec ses dates, les jours restants et son avancement. Il permet de n'afficher que ses tâches, de le planifier, de le démarrer ou de le terminer. La vue « Planifier » met le backlog à côté des tâches du sprint : on coche des tâches pour les ajouter ou les renvoyer, et la vélocité signale un sprint trop chargé. Elle s'ouvre aussi dès qu'un sprint est créé.
+- **Moteur de « Proposer le sprint »** : à partir de la capacité du sprint (sa vélocité), des règles classent le backlog (priorité, bugs, ce qu'une tâche débloque, but du sprint, âge) et ajoutent d'abord ce qu'une tâche attend ; le modèle du provider choisi compose le sprint parmi les mieux classées et explique chaque choix dans la langue de l'app, puis les règles vérifient que la capacité tient. Sans modèle, les règles proposent seules. Le modèle ne lit que le titre, le début de la description, la priorité, le type, les points, les étiquettes et les dépendances.
+- **« Proposer le sprint » dans la vue Planifier** : depuis le bandeau du sprint, la vue Planifier ou la création d'un sprint, on règle l'objectif, la capacité et l'intention (Équilibré, Plus prudent, Bugs d'abord, Autour du but), puis l'IA du provider choisi propose les tâches qui remplissent le sprint, en pointillés violets, chacune avec sa raison. Sous la ligne de capacité, les meilleures qui n'y tiennent pas ; on retire, on ajoute, on relance une variante, on prend l'objectif proposé, puis « Ajouter N tâches », annulable. Sans modèle, des règles proposent quand même.
+
+### 🐛 Corrections
+
+- **Les champs de date suivent la langue de l'app** : les dates de sprint, de rapport d'usage, de délégation, de changelog, le mois de conformité et les heures d'automatisation s'écrivent 28/11/2026 et 14:30 en français, avec un calendrier qui commence le lundi ; l'anglais garde 11/28/2026 et 02:30 PM. Avant, ces champs natifs prenaient le format de la région du système (mm/dd/yyyy sous un Windows anglais).
+- **Plus aucune date brute** : les mois (2026-11) et les jours (2026-11-28) encore affichés tels quels sur le bureau (conformité, carbone, Best-of-N, notebooks, déploiements, revues de PR, branches, usage, tests instables) et sur le mobile (mon usage, vue d'ensemble de l'administration) passent au format de la langue.
+- **MicroVM Docker.** La VM d'une tâche n'atteint que les hôtes de la liste de la tâche, une
+  commande arrêtée au délai s'arrête aussi dans la VM, sbx est lancé sans les identifiants de
+  l'hôte, et OpenCode s'installe dans la VM sans Node.
+
+### 🧪 Filets de test
+
+- **Le test des chemins refusés en mode serveur ouvre sa propre base** : il reprenait le moteur de base laissé par un test précédent, lié à une autre boucle d'événements, et échouait selon l'ordre des tests (CI de main après la 1.6.0).
+
+### 📚 Documentation
+
+- **Planifier et proposer un sprint, dans les README, la liste des fonctionnalités et le wiki** : la jauge de capacité, les déplacements rapides et « Proposer le sprint » (variantes, but suggéré, ce que lit le modèle).
+
+### 🧹 Maintenance
+
+- **Les builds de release demandent un Node.js accepté par REA** : l'audit de l'app empaquetée refusait le Node 22 trop ancien du runner macOS ; `release.yml` demande désormais `^22.23.4`, la plage de `apps/backend/rea/pin.json`, et un test garde les deux d'accord.
+
+---
+
 ## 1.6.0 - Un Kanban agile qu'on interroge, plusieurs comptes par IA et par forge
 
 Le Kanban devient un tableau agile comme Jira (colonnes Échec et Abandonnée, sprints, couloirs, liste,
