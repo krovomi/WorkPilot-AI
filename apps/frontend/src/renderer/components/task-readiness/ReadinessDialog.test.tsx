@@ -55,31 +55,66 @@ describe("ReadinessDialog", () => {
 		expect(useTaskReadinessStore.getState().held).toEqual([]);
 	});
 
-	it("saves the answers into the description, then starts the card", async () => {
-		show({ ready: false, questions });
-		const [first, second] = screen.getAllByRole("textbox", { name: "Answer" });
-		expect(first).toHaveValue("The admin page");
-		expect(second).toHaveValue("");
-		await userEvent.type(second, "Firefox");
-		await userEvent.click(screen.getByRole("button", { name: "Save and start" }));
+	it("saves the answers after what the card says, then starts the card", async () => {
+		show({ ready: false, questions }, [card({ description: "What I wrote on the card" })]);
+		// The card's own text is shown: the person sees it is read.
+		expect(screen.getByRole("region", { name: "What the agent will read" })).toHaveTextContent("What I wrote on the card");
+		// A suggestion is offered, never written in for the person.
+		const page = screen.getByRole("textbox", { name: "Which page?" });
+		const browser = screen.getByRole("textbox", { name: "Which browser?" });
+		expect(page).toHaveValue("");
+		expect(screen.getByRole("button", { name: "Add details and start" })).toBeDisabled();
+		await userEvent.click(screen.getByRole("button", { name: "Suggestion: The admin page" }));
+		expect(page).toHaveValue("The admin page");
+		// Taken, the suggestion is no longer offered.
+		expect(screen.queryByRole("button", { name: /Suggestion:/ })).not.toBeInTheDocument();
+		await userEvent.type(browser, "Firefox");
+		await userEvent.click(screen.getByRole("button", { name: "Add details and start" }));
 		await waitFor(() => expect(api.fn("updateTaskStatus")).toHaveBeenCalledWith("t1", "in_progress", {}));
 		expect(api.fn("updateTask").mock.calls[0][1].description).toBe(
-			"Short\n\n## Clarifications before the start\n\n**Which page?**\n\nThe admin page\n\n**Which browser?**\n\nFirefox\n",
+			"What I wrote on the card\n\n## Clarifications before the start\n\n**Which page?**\n\nThe admin page\n\n**Which browser?**\n\nFirefox\n",
 		);
 		expect(useTaskReadinessStore.getState().accepted.has("t1")).toBe(true);
 		expect(useTaskReadinessStore.getState().held).toEqual([]);
 	});
 
+	it("leaves out a suggestion nobody took, and saves with Ctrl+Enter", async () => {
+		show({ ready: false, questions });
+		// Nothing answered: the shortcut does nothing.
+		await userEvent.keyboard("{Control>}{Enter}{/Control}");
+		expect(api.fn("updateTask")).not.toHaveBeenCalled();
+		await userEvent.type(screen.getByRole("textbox", { name: "Which browser?" }), "Firefox");
+		await userEvent.keyboard("{Control>}{Enter}{/Control}");
+		await waitFor(() => expect(api.fn("updateTask")).toHaveBeenCalledTimes(1));
+		expect(api.fn("updateTask").mock.calls[0][1].description).toBe(
+			"Short\n\n## Clarifications before the start\n\n**Which browser?**\n\nFirefox\n",
+		);
+	});
+
+	it("says when the card has nothing beyond its title, and how many cards wait", () => {
+		useTaskStore.setState({ tasks: [card({ description: "Fix login" }), card({ id: "t2" })] });
+		useTaskReadinessStore.setState({
+			held: [
+				{ taskId: "t1", readiness: { ready: false, questions } as never },
+				{ taskId: "t2", readiness: { ready: false, questions } as never },
+			],
+			accepted: new Set(),
+		});
+		render(<ReadinessDialog />);
+		expect(screen.getByText("Nothing beyond the title.")).toBeInTheDocument();
+		expect(screen.getByText("Pre-start check · 2 cards waiting")).toBeInTheDocument();
+	});
+
 	it("starts as it is, into the queue when « En cours » is full", async () => {
 		show({ ready: false, questions }, [card(), card({ id: "run", status: "in_progress" })]);
-		await userEvent.click(screen.getByRole("button", { name: "Start anyway" }));
+		await userEvent.click(screen.getByRole("button", { name: "Start without details" }));
 		await waitFor(() => expect(api.fn("updateTaskStatus")).toHaveBeenCalledWith("t1", "queue", {}));
 		expect(api.fn("updateTask")).not.toHaveBeenCalled();
 	});
 
 	it("leaves a queued card where it is when the slots are taken", async () => {
 		show({ ready: false, questions }, [card({ status: "queue" }), card({ id: "run", status: "in_progress" })]);
-		await userEvent.click(screen.getByRole("button", { name: "Start anyway" }));
+		await userEvent.click(screen.getByRole("button", { name: "Start without details" }));
 		await waitFor(() => expect(useTaskReadinessStore.getState().accepted.has("t1")).toBe(true));
 		expect(api.fn("updateTaskStatus")).not.toHaveBeenCalled();
 	});
@@ -87,7 +122,8 @@ describe("ReadinessDialog", () => {
 	it("keeps the card when the answers cannot be saved", async () => {
 		api.fn("updateTask").mockResolvedValue({ success: false, error: "locked" });
 		show({ ready: false, questions });
-		await userEvent.click(screen.getByRole("button", { name: "Save and start" }));
+		await userEvent.type(screen.getByRole("textbox", { name: "Which browser?" }), "Firefox");
+		await userEvent.click(screen.getByRole("button", { name: "Add details and start" }));
 		expect(await screen.findByText(/could not be saved/)).toBeInTheDocument();
 		expect(api.fn("updateTaskStatus")).not.toHaveBeenCalled();
 	});

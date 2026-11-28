@@ -1,21 +1,26 @@
 {
 	"readiness": {
 		"checking": "Pré-analyse de « {{title}} »…",
-		"title": "Avant de démarrer « {{title}} »",
-		"questionsIntro": "La carte est courte : l'agent devrait deviner. Répondez en une ligne, la réponse s'ajoute à la description.",
+		"questionsIntro": "La carte est courte : sans précisions, l'agent devra deviner. Répondez à ce que vous savez, laissez vide le reste.",
 		"problemIntro": "Le démarrage échouerait :",
 		"problems": {
 			"no_git": "Le projet n'est pas un dépôt git. WorkPilot construit chaque tâche dans un worktree : lancez « git init » dans le dossier du projet.",
 			"no_commit": "Le dépôt git n'a encore aucun commit. Faites un premier commit, puis redémarrez la carte.",
 			"no_auth": "Le compte Claude n'est pas connecté. Connectez-le dans Paramètres, Profils Claude, puis redémarrez la carte."
 		},
-		"answerLabel": "Réponse",
 		"sectionTitle": "Précisions avant le démarrage",
 		"later": "Plus tard",
 		"close": "Fermer",
-		"startAnyway": "Démarrer quand même",
-		"saveAndStart": "Enregistrer et démarrer",
-		"saveFailed": "Les réponses n'ont pas pu être enregistrées. La carte n'a pas démarré."
+		"startAnyway": "Démarrer sans préciser",
+		"saveAndStart": "Préciser et démarrer",
+		"saveFailed": "Les réponses n'ont pas pu être enregistrées. La carte n'a pas démarré.",
+		"kicker": "Pré-analyse",
+		"kickerMany": "Pré-analyse · {{count}} cartes en attente",
+		"cardReads": "Ce que l'agent lira",
+		"titleOnly": "Rien de plus que le titre.",
+		"answerPlaceholder": "Votre réponse, en une ligne",
+		"useSuggestion": "Suggestion : {{suggestion}}",
+		"footerHint": "Vos réponses s'ajoutent à la fin de la description · Ctrl+Entrée"
 	},
 	"dictation": {
 		"pending": "Ajoutez ou annulez le brouillon vocal avant de continuer.",
