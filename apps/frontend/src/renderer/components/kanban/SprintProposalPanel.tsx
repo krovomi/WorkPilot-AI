@@ -254,7 +254,7 @@ function Ready({ sprint, canEdit }: { sprint: Sprint; canEdit: boolean }) {
 				<span className="flex-1 text-sm font-semibold">
 					{t("tasks:kanban.sprints.proposal.title", { count: offered.length, points })}
 				</span>
-				<span className="rounded bg-violet-500/10 px-1.5 text-2xs font-medium text-[color-mix(in_oklab,var(--color-violet-500)_70%,var(--color-foreground))]">
+				<span className="rounded bg-violet-500/10 px-1.5 text-2xs font-medium text-violet-700 dark:text-violet-300">
 					{shown.mode === "ai" ? t("tasks:kanban.sprints.proposal.byAi") : t("tasks:kanban.sprints.proposal.byRules")}
 				</span>
 				<Button
@@ -274,7 +274,7 @@ function Ready({ sprint, canEdit }: { sprint: Sprint; canEdit: boolean }) {
 						type="button"
 						aria-expanded={why}
 						onClick={() => setWhy((open) => !open)}
-						className="inline-flex items-center gap-1 font-medium text-[color-mix(in_oklab,var(--color-violet-500)_70%,var(--color-foreground))]"
+						className="inline-flex items-center gap-1 font-medium text-violet-700 dark:text-violet-300"
 					>
 						{t("tasks:kanban.sprints.proposal.why")}
 						<ChevronDown className={cn("h-3.5 w-3.5 transition-transform", why && "rotate-180")} aria-hidden="true" />
@@ -360,7 +360,7 @@ export function ProposalHeader({ sprint, canEdit }: { sprint: Sprint; canEdit: b
 				size="sm"
 				variant="outline"
 				data-testid="sprint-proposal-open"
-				className="w-full gap-2 border-dashed border-violet-500/50 text-[color-mix(in_oklab,var(--color-violet-500)_70%,var(--color-foreground))] hover:bg-violet-500/10"
+				className="w-full gap-2 border-dashed border-violet-500/50 text-violet-700 dark:text-violet-300 hover:bg-violet-500/10"
 				onClick={() => openSettings(sprint.id)}
 			>
 				<Sparkles className="h-4 w-4" />
@@ -408,7 +408,7 @@ function Row({
 		>
 			<div className="grid min-w-0 flex-1 gap-0.5">
 				<span className={cn("min-w-0 truncate", kind === "out" && "line-through")}>{task.title}</span>
-				<span className="flex min-w-0 items-center gap-1 text-2xs text-[color-mix(in_oklab,var(--color-violet-500)_70%,var(--color-foreground))]">
+				<span className="flex min-w-0 items-center gap-1 text-2xs text-violet-700 dark:text-violet-300">
 					<Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
 					<span className="truncate">{reason}</span>
 				</span>
@@ -482,7 +482,7 @@ export function ProposalRows({ sprint, tasks, busy }: { sprint: Sprint; tasks: r
 			{shown.below.length > 0 && (
 				<li
 					data-testid="sprint-proposal-line"
-					className="flex items-center gap-2 px-1 py-1 text-2xs font-semibold uppercase tracking-wide text-[color-mix(in_oklab,var(--color-violet-500)_70%,var(--color-foreground))]"
+					className="flex items-center gap-2 px-1 py-1 text-2xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300"
 				>
 					<span className="h-px flex-1 border-t border-dashed border-violet-500/60" aria-hidden="true" />
 					{t("tasks:kanban.sprints.proposal.line", { count: shown.capacity })}
