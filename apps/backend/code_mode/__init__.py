@@ -13,6 +13,8 @@ the gateways.
   session's executor, so every inner call passes the checks of an ordinary one.
 - ``protocol``: the record of a script's calls, read by the safety watch.
 - ``tool``: the definition the model is offered.
+- ``native``: Claude Code's own code mode (``REPL``) for a Claude SDK session,
+  through its settings file, when the session and the CLI allow it.
 
 Design: ``docs/architecture/code-mode.md``.
 """
