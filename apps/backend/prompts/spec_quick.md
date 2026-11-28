@@ -43,21 +43,29 @@ Use the **`Write` tool** to create `spec.md` in the spec directory with this con
 ```markdown
 # Quick Spec: [Task Name]
 
-## Task
+## Overview
 [One sentence description]
+
+## Workflow Type
+simple
+
+## Task Scope
+[Brief description of the change - a few sentences max]
 
 ## Files to Modify
 - `[path/to/file]` - [what to change]
 
-## Change Details
-[Brief description of the change - a few sentences max]
-
-## Verification
+## Success Criteria
 - [ ] [How to verify the change works]
 
 ## Notes
 [Any gotchas or considerations - optional]
 ```
+
+Keep the four headings `Overview`, `Workflow Type`, `Task Scope` and
+`Success Criteria` exactly: the validator looks for them, and a spec without
+one costs a whole repair session. A task that changes no file (a question, a
+check) leaves `Files to Modify` empty and says so in `Task Scope`.
 
 **Keep it short!** A simple spec should be 20-50 lines, not 200+.
 
@@ -81,6 +89,7 @@ with this content (fill in the bracketed placeholders):
 
 ```json
 {
+  "feature": "[short task name]",
   "spec_name": "[spec-name]",
   "workflow_type": "simple",
   "total_phases": 1,
@@ -166,16 +175,19 @@ Ready for implementation.
 ```markdown
 # Quick Spec: Button Color Change
 
-## Task
+## Overview
 Update primary button color from blue (#3B82F6) to green (#22C55E).
+
+## Workflow Type
+simple
+
+## Task Scope
+Change the `primaryColor` variable from `#3B82F6` to `#22C55E`.
 
 ## Files to Modify
 - `src/components/Button.tsx` - Update color constant
 
-## Change Details
-Change the `primaryColor` variable from `#3B82F6` to `#22C55E`.
-
-## Verification
+## Success Criteria
 - [ ] Buttons appear green in the UI
 - [ ] No console errors
 ```
@@ -188,16 +200,19 @@ Change the `primaryColor` variable from `#3B82F6` to `#22C55E`.
 ```markdown
 # Quick Spec: Fix Welcome Typo
 
-## Task
+## Overview
 Correct spelling of "recieve" to "receive" in welcome message.
+
+## Workflow Type
+simple
+
+## Task Scope
+Find "You will recieve" and change to "You will receive".
 
 ## Files to Modify
 - `src/pages/Home.tsx` - Fix typo on line 42
 
-## Change Details
-Find "You will recieve" and change to "You will receive".
-
-## Verification
+## Success Criteria
 - [ ] Welcome message displays correctly
 ```
 

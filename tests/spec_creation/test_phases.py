@@ -601,6 +601,8 @@ async def test_validation_asks_the_fixer_then_fails_with_every_error(spec_dir) -
 
     assert not result.success
     assert [c[0] for c in agent.calls] == ["validation_fixer.md", "validation_fixer.md"]
-    assert "**context** validation failed:" in agent.calls[0][1]
+    # context.json is written without a model; the fixer hears of the rest.
+    assert "**context** validation failed:" not in agent.calls[0][1]
+    assert "**prereqs** validation failed:" in agent.calls[0][1]
     assert "prereqs: project_index.json not found" in result.errors
     assert "plan: implementation_plan.json not found" in result.errors

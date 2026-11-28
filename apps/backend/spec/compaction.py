@@ -16,6 +16,15 @@ _SYSTEM_PROMPT = (
 )
 
 
+#: Characters per word of a summary, to compare an output with `target_words`.
+_CHARS_PER_WORD = 6
+
+
+def verbatim_max_chars(target_words: int) -> int:
+    """The longest phase output that is passed on as it is, without a model."""
+    return max(target_words, 0) * _CHARS_PER_WORD
+
+
 async def summarize_phase_output(
     phase_name: str,
     phase_output: str,
@@ -45,6 +54,12 @@ async def summarize_phase_output(
     Returns:
         Concise summary of key findings, decisions, and insights from the phase
     """
+    # An output shorter than the summary asked for is its own summary: the
+    # session would cost a whole prefix (~32 k tokens on Claude) to say it
+    # again. A simple card's discovery, requirements and quick spec all are.
+    if len(phase_output.strip()) <= verbatim_max_chars(target_words):
+        return phase_output.strip()
+
     # Limit input size to avoid token overflow
     max_input_chars = 15000
     truncated_output = phase_output[:max_input_chars]

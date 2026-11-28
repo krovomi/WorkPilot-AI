@@ -73,7 +73,7 @@ async def test_a_failed_summary_hands_back_the_raw_output(
     )
 
     summary = await compaction.summarize_phase_output(
-        "planning", "y" * 3000, project_dir=tmp_path, spec_dir=tmp_path
+        "planning", "y" * 4000, project_dir=tmp_path, spec_dir=tmp_path
     )
 
     assert summary.startswith("[Summarization failed: provider down]")

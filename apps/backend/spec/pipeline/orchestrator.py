@@ -133,6 +133,27 @@ class SpecOrchestrator:
         # Stores summaries from completed phases to provide context to subsequent phases
         self._phase_summaries: dict[str, str] = {}
 
+    def _apply_card_engine(self, task_logger) -> None:
+        """Take the card's spec model and effort if they changed since launch.
+
+        See `live_engine`: a change made while the spec runs used to reach
+        the coder and the QA, never the remaining spec phases.
+        """
+        from .live_engine import pending_change
+
+        change = pending_change(self.spec_dir, self.model, self.thinking_level)
+        if change is None:
+            return
+        if change.model:
+            self.model = change.model
+            if self._agent_runner is not None:
+                self._agent_runner.model = change.model
+        if change.effort:
+            self.thinking_level = change.effort
+        message = f"Spec engine changed on the card: {change.describe()}"
+        print_status(message, "info")
+        task_logger.log(message, LogEntryType.INFO)
+
     def _get_agent_runner(self) -> AgentRunner:
         """Get or create the agent runner.
 
@@ -359,6 +380,7 @@ class SpecOrchestrator:
             """
             nonlocal phase_num
             phase_num += 1
+            self._apply_card_engine(task_logger)
             display_name, display_icon = PHASE_DISPLAY.get(
                 name, (name.upper(), Icons.GEAR)
             )

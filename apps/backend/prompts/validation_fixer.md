@@ -86,27 +86,10 @@ If error says "Missing required field: X":
 2. Determine what value X should have based on context
 3. Add the field with appropriate value
 
-Example fix for missing `task_description` in context.json:
-```bash
-# Read current file
-cat context.json
-
-# If file has "task" instead of "task_description", rename the field
-# Use jq or python to fix:
-python3 -c "
-import json
-with open('context.json', 'r') as f:
-    data = json.load(f)
-# Rename 'task' to 'task_description' if present
-if 'task' in data and 'task_description' not in data:
-    data['task_description'] = data.pop('task')
-# Or add if completely missing
-if 'task_description' not in data:
-    data['task_description'] = 'Task description not provided'
-with open('context.json', 'w') as f:
-    json.dump(data, f, indent=2)
-"
-```
+Example fix for missing `task_description` in context.json: `Read` the file;
+if it has `"task"` instead of `"task_description"`, rename the key with `Edit`;
+if the field is missing altogether, add it with `Edit` (or rewrite the whole
+file with `Write`, keeping every other field).
 
 ### Invalid Field Value
 
@@ -138,11 +121,7 @@ Parse the validation errors provided. For each error:
 
 ## PHASE 2: READ THE FILE
 
-```bash
-cat [failed_file]
-```
-
-Understand:
+`Read` the failed file. Understand:
 - Current structure
 - What's present vs what's missing
 - Any obvious issues (typos, wrong field names)
@@ -151,46 +130,22 @@ Understand:
 
 ## PHASE 3: APPLY FIX
 
-Make the minimal change needed to fix the validation error.
+Make the minimal change needed to fix the validation error, with `Edit` (or
+`Write` for a file that is not worth patching). This covers JSON as well as
+Markdown: add the missing key, or the missing `## Section Name` heading with
+its content.
 
-**For JSON files:**
-```python
-import json
-
-with open("[file]", "r") as f:
-    data = json.load(f)
-
-# Apply fix
-data["missing_field"] = "value"
-
-with open("[file]", "w") as f:
-    json.dump(data, f, indent=2)
-```
-
-**For Markdown files:**
-```bash
-# Add missing section
-cat >> spec.md << 'EOF'
-
-## Missing Section
-
-[Content for the missing section]
-EOF
-```
+**Use your file tools, never a script.** `python3 -c`, `node -e`, `jq` and
+shell heredocs (`cat >> … << EOF`) are refused by the command allowlist or break
+on Windows: each attempt is a wasted turn.
 
 ---
 
 ## PHASE 4: VERIFY FIX
 
-After fixing, verify the file is now valid:
-
-```bash
-# For JSON - verify it's valid JSON
-python3 -c "import json; json.load(open('[file]'))"
-
-# For markdown - verify section exists
-grep -E "^##? [Section Name]" spec.md
-```
+`Read` the file again: the JSON must still be one valid document, the
+Markdown must carry the heading exactly as the validator names it. `Grep` is
+enough to check a heading (`^##? Section Name`).
 
 ---
 
