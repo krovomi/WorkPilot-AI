@@ -13,7 +13,8 @@ prompt. Its contract:
   API that is up. The port is ours to choose when the stack takes one
   (`{port}`, `PORT`, `ASPNETCORE_URLS`…); otherwise the first loopback URL the
   app prints is believed, which is how Vite announces itself when its default
-  port is taken;
+  port is taken. A port we chose that another process takes before the app
+  binds (two verifications at once) is chosen again;
 * a Windows app (WPF, WinForms, WinUI) has no URL: it is ready when its
   window shows, found by UI Automation among the windows of the process tree
   it started (`verify.window`), and that window is pinned for the session;
@@ -76,6 +77,15 @@ class LaunchResult:
         data = asdict(self)
         data["errors"] = [e.to_dict() for e in self.errors]
         return data
+
+
+# What a server prints when its port is held by another process: Python,
+# Node, .NET/Kestrel, Go, and Windows sockets (WSAEADDRINUSE, 10048).
+_PORT_TAKEN = re.compile(
+    r"address already in use|EADDRINUSE|only one usage of each socket address"
+    r"|failed to bind to address|WinError 10048",
+    re.I,
+)
 
 
 def _fill(text: str, port: int) -> str:
@@ -215,6 +225,75 @@ def launch(
         return LaunchResult(target.name, "refused", detail="no launch command detected")
 
     port = free_port(target.port) if target.port else free_port()
+    result = _start(
+        target, project, base, port, raw_command, started, timeout, window_title
+    )
+    # free_port() only saw the port free: another launch (a second task verified
+    # at the same time) can take it before the app binds. Only a port the app
+    # receives can be changed, and only within the same deadline.
+    while (
+        result.status == "exited"
+        and _takes_our_port(target, raw_command)
+        and _PORT_TAKEN.search(result.log_tail)
+        and time.time() < started + timeout
+    ):
+        port = free_port()
+        result = _start(
+            target, project, base, port, raw_command, started, timeout, window_title
+        )
+    return result
+
+
+def _exited(
+    target: Target,
+    project: Path,
+    pid: int,
+    code: int,
+    log_path: Path,
+    command: str,
+    started: float,
+) -> LaunchResult:
+    """The app's process ended before it could be verified, with what it printed."""
+    log = read_log(log_path)
+    return LaunchResult(
+        target.name,
+        "exited",
+        pid=pid,
+        log_path=str(log_path),
+        exit_code=code,
+        seconds=round(time.time() - started, 1),
+        command=command,
+        errors=collect_errors(log, project, source=f"log:{target.name}")
+        or [
+            VerifyError(
+                "crash", f"the process exited with code {code}", source="launch"
+            )
+        ],
+        log_tail=log[-4000:],
+        detail=f"exited with code {code} before answering",
+    )
+
+
+def _takes_our_port(target: Target, raw_command: str) -> bool:
+    """True when the port reaches the app (``{port}`` or a port variable)."""
+    return bool(
+        "{port}" in raw_command
+        or target.port_env
+        or any("{port}" in value for value in target.env.values())
+    )
+
+
+def _start(
+    target: Target,
+    project: Path,
+    base: Path,
+    port: int,
+    raw_command: str,
+    started: float,
+    timeout: float,
+    window_title: str,
+) -> LaunchResult:
+    """Start ``raw_command`` on ``port`` and wait until ``started + timeout``."""
     cwd = (project / target.root).resolve()
     try:
         cwd.relative_to(project.resolve())
@@ -307,26 +386,9 @@ def launch(
         while time.time() < deadline:
             code = process.poll()
             if code is not None:
-                log = read_log(log_path)
                 stop_process(base, target.name)
-                return LaunchResult(
-                    target.name,
-                    "exited",
-                    pid=process.pid,
-                    log_path=str(log_path),
-                    exit_code=code,
-                    seconds=round(time.time() - started, 1),
-                    command=final_command,
-                    errors=collect_errors(log, project, source=f"log:{target.name}")
-                    or [
-                        VerifyError(
-                            "crash",
-                            f"the process exited with code {code}",
-                            source="launch",
-                        )
-                    ],
-                    log_tail=log[-4000:],
-                    detail=f"exited with code {code} before answering",
+                return _exited(
+                    target, project, process.pid, code, log_path, final_command, started
                 )
             if driver is not None:
                 try:
@@ -397,6 +459,13 @@ def launch(
     # (EF migrations, the first request's exception) before judging it.
     time.sleep(1.0)
     log = read_log(log_path)
+    code = process.poll()
+    if code is not None and _PORT_TAKEN.search(log):
+        # Ours could not bind: what answered is another process on that port.
+        stop_process(base, target.name)
+        return _exited(
+            target, project, process.pid, code, log_path, final_command, started
+        )
     status = probe(url + ready_path)
     errors = collect_errors(log, project, source=f"log:{target.name}")
     if status is not None and status >= 500:
