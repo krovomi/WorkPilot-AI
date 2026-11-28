@@ -216,14 +216,27 @@ def build_command(
     return cmd
 
 
-#: Secrets injected into the run env when the launching user configured them.
-USER_SECRET_ENV: dict[str, str] = {
-    "azure_pat": "AZURE_DEVOPS_PAT",
-    "jira_token": "JIRA_API_TOKEN",
-    "linear_api_key": "LINEAR_API_KEY",
-    "github_token": "GITHUB_TOKEN",
-    "gitlab_token": "GITLAB_TOKEN",
-}
+@dataclass(frozen=True)
+class RunIntegration:
+    """An integration whose personal token a run receives from its launcher.
+
+    ``label`` is the name an operator reads in a log; ``kind`` is the stored
+    secret's kind and ``env_name`` the variable the run gets it in.
+    """
+
+    label: str
+    kind: str
+    env_name: str
+
+
+#: Injected into the run env when the launching user configured them.
+RUN_INTEGRATIONS: tuple[RunIntegration, ...] = (
+    RunIntegration("Azure DevOps", "azure_pat", "AZURE_DEVOPS_PAT"),
+    RunIntegration("Jira", "jira_token", "JIRA_API_TOKEN"),
+    RunIntegration("Linear", "linear_api_key", "LINEAR_API_KEY"),
+    RunIntegration("GitHub", "github_token", "GITHUB_TOKEN"),
+    RunIntegration("GitLab", "gitlab_token", "GITLAB_TOKEN"),
+)
 
 
 class RunManagerError(RuntimeError):
@@ -599,26 +612,21 @@ class RunManager:
                 await project_group_names(db, user_id, project_id) if project_id else []
             )
             env[RECALL_TEAMS_ENV] = json.dumps(teams, ensure_ascii=False)
-            for kind, env_name in USER_SECRET_ENV.items():
+            for integration in RUN_INTEGRATIONS:
                 try:
-                    value = await get_user_secret(db, user_id, kind)
+                    value = await get_user_secret(db, user_id, integration.kind)
                 except Exception as e:  # vault misconfig must not block runs
-                    # Type only, never the message: this is the failure path of
-                    # a secret read, and the backend that raised it is free to
-                    # quote the value it was handling.
-                    #
-                    # `kind` stays, and keeps a `py/clear-text-logging` alert
-                    # on this line. It is a key of USER_SECRET_ENV — the
-                    # literal string "jira_token", never a token — and CodeQL
-                    # is matching the name, not a value. Dropping it would
-                    # leave an operator with "a secret failed to load" and no
-                    # way to tell which integration to go and fix.
+                    # The integration's display name and the error type only:
+                    # the backend that raised may quote the value it handled,
+                    # and the operator still learns which integration to fix.
                     logger.warning(
-                        "Could not read secret %s: %s", kind, type(e).__name__
+                        "Could not load the %s token for a run: %s",
+                        integration.label,
+                        type(e).__name__,
                     )
                     continue
                 if value:
-                    env[env_name] = value
+                    env[integration.env_name] = value
             env.update(await _account_keys(db, user_id))
         return env
 

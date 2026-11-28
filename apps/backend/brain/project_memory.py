@@ -59,6 +59,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from . import spec_birth
 from .lifecycle import announce, provenance, scopes
 from .lifecycle import journal as lifecycle_journal
 from .lifecycle import store as lifecycle_store
@@ -865,8 +866,13 @@ class ProjectMemory:
 
     def load_sessions(self, *, spec_only: bool = True) -> list[dict[str, Any]]:
         sessions = []
+        # A spec name is reused when a task is deleted and the next one takes
+        # its number: an earlier task's sessions are not this one's history.
+        born = spec_birth.born_at(self.spec_dir) if spec_only and self.spec_id else None
         for rel, meta, _ in self._recall("session"):
             if spec_only and self.spec_id and meta.get("spec") != self.spec_id:
+                continue
+            if spec_birth.predates(meta.get("timestamp"), born):
                 continue
             item = {
                 k: meta.get(k)

@@ -406,6 +406,14 @@ carte `BrainTaskCard`, `brain_recall` et Obsidian lisent donc exactement ce que
 le coder lit. **La mémoire est par projet, pas par spec** : la tâche suivante du
 même projet part de ce que celle-ci a appris.
 
+**L'historique des sessions, lui, est celui de la tâche.** Une note de session nomme
+sa tâche par le dossier de spec (`003-test`), et ce nom revient : une tâche
+supprimée cède son numéro à la suivante, et le même titre donne le même nom.
+`load_sessions` écarte donc une session de même nom écrite avant le début de la
+tâche du dossier (`brain/spec_birth.py` : le plus ancien du `created_at` du plan,
+de la première entrée de `status_history.json` et des dates des fichiers du
+dossier, à une minute près). Une date illisible garde la note.
+
 **L'API est celle qu'avaient les appelants.** `ProjectMemory` répond aux
 méthodes qu'avait l'ancien `GraphitiMemory` (`save_gotcha`,
 `get_patterns_and_gotchas`, `get_session_history`, `close`…) ;
