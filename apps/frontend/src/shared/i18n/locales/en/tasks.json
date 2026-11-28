@@ -728,7 +728,8 @@
 		"layout": {
 			"label": "Layout",
 			"board": "Board",
-			"list": "List"
+			"list": "List",
+			"timeline": "Timeline"
 		},
 		"list": {
 			"caption": "The board's cards as a list",
@@ -812,6 +813,11 @@
 					"qa_rejected": "Rejected by QA"
 				}
 			}
+		},
+		"timeline": {
+			"card": "Card",
+			"span": "{{status}}: {{start}} to {{end}}",
+			"running": "{{status}}: since {{start}}, still running"
 		}
 	},
 	"queue": {

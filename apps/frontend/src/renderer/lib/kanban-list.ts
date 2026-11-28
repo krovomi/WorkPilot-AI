@@ -10,9 +10,9 @@ import type { Sprint, Task } from "../../shared/types";
 import { taskPoints } from "../../shared/utils/sprints";
 import { PRIORITY_WEIGHT } from "./kanban-filter";
 
-/** How the board is shown: its columns, or a list of its cards. */
-export type BoardLayout = "board" | "list";
-export const BOARD_LAYOUTS: readonly BoardLayout[] = ["board", "list"];
+/** How the board is shown: its columns, a list of its cards, or their timeline. */
+export type BoardLayout = "board" | "list" | "timeline";
+export const BOARD_LAYOUTS: readonly BoardLayout[] = ["board", "list", "timeline"];
 
 /** A list column the rows can be sorted by. */
 export type ListSortField = "title" | "status" | "priority" | "sprint" | "area" | "points" | "updated";

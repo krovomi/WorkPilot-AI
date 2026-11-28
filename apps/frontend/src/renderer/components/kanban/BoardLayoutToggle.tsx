@@ -1,15 +1,15 @@
 /**
- * The toolbar's choice between the board's columns and the list of its
- * cards (`BoardList`). A per-viewer preference, kept with the lanes'
+ * The toolbar's choice between the board's columns, the list of its cards
+ * (`BoardList`) and their timeline (`BoardTimeline`). A per-viewer preference, kept with the lanes'
  * (`stores/kanban-lanes-store.ts`), and brought back by a saved view.
  */
-import { Columns3, List } from "lucide-react";
+import { ChartGantt, Columns3, List } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { BOARD_LAYOUTS, type BoardLayout } from "../../lib/kanban-list";
 import { cn } from "../../lib/utils";
 import { useKanbanLanesStore } from "../../stores/kanban-lanes-store";
 
-const ICONS: Record<BoardLayout, typeof List> = { board: Columns3, list: List };
+const ICONS: Record<BoardLayout, typeof List> = { board: Columns3, list: List, timeline: ChartGantt };
 
 export function BoardLayoutToggle() {
 	const { t } = useTranslation(["tasks"]);

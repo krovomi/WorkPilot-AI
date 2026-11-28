@@ -23,6 +23,7 @@ import { useKanbanLanesStore } from "../../stores/kanban-lanes-store";
 import { useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
 import { BoardList, type ListSection } from "./BoardList";
+import { BoardTimeline } from "./BoardTimeline";
 
 const NO_TASKS: Task[] = [];
 const NO_KEYS: string[] = [];
@@ -145,7 +146,7 @@ export function BoardLanes({ projectId, columnOrder, tasksByStatus, renderColumn
 	);
 	const labelOf = useLaneLabel(grouping);
 
-	if (layout === "list") {
+	if (layout !== "board") {
 		const sections: ListSection[] =
 			grouping === "none"
 				? [{ key: "all", rows: rowsOf(columnOrder, tasksByStatus) }]
@@ -155,7 +156,14 @@ export function BoardLanes({ projectId, columnOrder, tasksByStatus, renderColumn
 						marker: <LaneMarker grouping={grouping} lane={lane} />,
 						rows: rowsOf(columnOrder, lane.columns),
 					}));
-		return (
+		return layout === "timeline" ? (
+			<BoardTimeline
+				sections={sections}
+				collapsed={collapsed ?? NO_KEYS}
+				onToggleSection={toggleCollapsed}
+				onOpenTask={onOpenTask}
+			/>
+		) : (
 			<BoardList
 				sections={sections}
 				columnOrder={columnOrder}

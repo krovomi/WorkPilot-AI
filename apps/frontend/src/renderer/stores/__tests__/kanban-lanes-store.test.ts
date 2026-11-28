@@ -82,7 +82,7 @@ describe("useKanbanLanesStore", () => {
 			layout: "list",
 			listSort: { field: "points", direction: "desc" },
 		});
-		expect(readLanePreferences({ layout: "timeline", listSort: { field: "x" } })).toMatchObject({
+		expect(readLanePreferences({ layout: "calendar", listSort: { field: "x" } })).toMatchObject({
 			layout: "board",
 			listSort: null,
 		});

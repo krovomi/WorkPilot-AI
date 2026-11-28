@@ -728,7 +728,8 @@
 		"layout": {
 			"label": "Affichage",
 			"board": "Tableau",
-			"list": "Liste"
+			"list": "Liste",
+			"timeline": "Frise"
 		},
 		"list": {
 			"caption": "Les cartes du tableau, en liste",
@@ -812,6 +813,11 @@
 					"qa_rejected": "Refusée par la QA"
 				}
 			}
+		},
+		"timeline": {
+			"card": "Tâche",
+			"span": "{{status}} : du {{start}} au {{end}}",
+			"running": "{{status}} : depuis le {{start}}, en cours"
 		}
 	},
 	"queue": {
