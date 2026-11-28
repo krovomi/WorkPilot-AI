@@ -233,18 +233,20 @@ export function toMatch(ticket: BoardTicket, extra: Partial<BoardAskMatch> = {})
 
 /**
  * `[T7]` references of the answer turned into `[n]`, the 1-based position of
- * that ticket in the matches; a reference to a ticket not kept is dropped.
+ * that ticket in the matches; a reference to a ticket not kept is dropped
+ * with the blanks before it, and no blank is left before a comma or a full
+ * stop. A blank before « : », « ; », « ! » or « ? » stays: French writes one.
  */
 export function citeMatches(answer: string, order: readonly string[]): string {
 	return answer
-		.replace(/\[(T\d+)(?:\s*,\s*(T\d+))*\]/g, (whole) => {
+		.replace(/([ \t]*)\[(T\d+)(?:\s*,\s*(T\d+))*\]/g, (whole, blanks: string) => {
 			const cited = [...whole.matchAll(/T\d+/g)]
 				.map((m) => order.indexOf(m[0]))
 				.filter((i) => i >= 0)
 				.map((i) => `[${i + 1}]`);
-			return cited.join("");
+			return cited.length > 0 ? `${blanks}${cited.join("")}` : "";
 		})
-		.replace(/[ \t]+([.,;:!?])/g, "$1")
+		.replace(/[ \t]+([.,])/g, "$1")
 		.replace(/[ \t]{2,}/g, " ")
 		.trim();
 }
