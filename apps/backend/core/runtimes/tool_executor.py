@@ -274,6 +274,7 @@ class ToolExecutor:
         # The OS sandbox `run_command` runs in (`os_sandbox`), decided on the
         # first command so a bare executor that never runs one costs nothing.
         self._sandbox = None
+        self._script_sandbox = None
         self.working_directory = self.project_dir
         if working_directory is not None:
             self.working_directory = self._resolve_within_project(working_directory)
@@ -963,6 +964,21 @@ class ToolExecutor:
                 self.project_dir, self.spec_dir, microvm=True
             )
         return self._sandbox
+
+    def script_sandbox(self):
+        """The OS sandbox ``run_script``'s Node runs in, on this machine.
+
+        Never the task's microVM: its image may have no Node, and the script's
+        own commands already reach the VM through ``execute``.
+        """
+        sandbox = self.session_sandbox()
+        if getattr(sandbox, "vm", None) is None:
+            return sandbox
+        if self._script_sandbox is None:
+            from os_sandbox import session_sandbox
+
+            self._script_sandbox = session_sandbox(self.project_dir, self.spec_dir)
+        return self._script_sandbox
 
     async def _stop_command(self, process) -> None:
         """Reap the shell and its children when a command times out or is cancelled."""

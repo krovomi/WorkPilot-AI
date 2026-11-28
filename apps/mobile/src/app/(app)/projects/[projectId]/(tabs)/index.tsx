@@ -129,7 +129,7 @@ export default function Board() {
 								<Pressable
 									key={group.column}
 									accessibilityRole="tab"
-									accessibilityState={{ selected }}
+									aria-selected={selected}
 									onPress={() => {
 										if (!selected) tick();
 										setChosen(group.column);
