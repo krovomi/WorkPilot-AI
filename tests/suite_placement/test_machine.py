@@ -47,10 +47,37 @@ def test_another_build_is_counted_but_not_this_one(monkeypatch, tmp_path):
             subprocess.run(
                 [sys.executable, "-c", "import time; time.sleep(0.05)"], check=True
             )
-        assert machine_module.count_builds() == before + 1
+        assert machine_module.count_builds() == before + 1, _seen(child.pid)
     finally:
         child.kill()
         child.wait()
+
+
+def _seen(pid: int) -> str:
+    """What count_builds saw of the child and its own children, for the message."""
+    import psutil
+
+    lines = [f"backend dir: {machine_module._BACKEND_DIR}"]
+    try:
+        root = psutil.Process(pid)
+        tree = [root, *root.children(recursive=True)]
+    except psutil.Error as error:
+        return f"child {pid} is gone: {error!r}"
+    for process in tree:
+        try:
+            cmdline = process.cmdline()
+        except psutil.Error as error:
+            lines.append(f"{process.pid}: cmdline refused: {error!r}")
+            continue
+        resolved = []
+        for arg in cmdline[1:3]:
+            try:
+                resolved.append(str(Path(arg).resolve()))
+            except OSError as error:
+                resolved.append(repr(error))
+        build = machine_module._is_build(cmdline)
+        lines.append(f"{process.pid}: {cmdline} -> {resolved}, build={build}")
+    return "\n".join(lines)
 
 
 def _smi(monkeypatch, stdout: str, returncode: int = 0) -> None:
