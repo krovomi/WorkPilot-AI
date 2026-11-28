@@ -40,6 +40,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
 import { BoardAskButton } from "./board-ask/BoardAskButton";
 import { BoardLayoutToggle } from "./BoardLayoutToggle";
+import { BoardReportsButton } from "./reports/BoardReports";
 import { KanbanMoreMenu } from "./KanbanMoreMenu";
 import { LaneGroupingMenu } from "./LaneGroupingMenu";
 import { SprintMenu } from "./SprintMenu";
@@ -448,6 +449,7 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 			<BoardLayoutToggle />
 			<SprintMenu />
 			<LaneGroupingMenu />
+			<BoardReportsButton />
 
 			<Separator orientation="vertical" className="h-5" />
 

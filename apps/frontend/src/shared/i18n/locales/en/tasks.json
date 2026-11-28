@@ -742,6 +742,76 @@
 				"points": "Points",
 				"updated": "Updated"
 			}
+		},
+		"reports": {
+			"button": "Reports",
+			"title": "Reports",
+			"description": "Measured from the project's cards and sprints, whatever the board's filters. Points are the Smart Estimation score, never a duration.",
+			"day": "Day",
+			"sprint": "Sprint",
+			"cards": "Cards",
+			"tabs": {
+				"burndown": "Burndown",
+				"velocity": "Velocity",
+				"flow": "Cumulative flow",
+				"cycle": "Cycle time",
+				"throughput": "Throughput",
+				"ends": "Unsuccessful ends"
+			},
+			"burndown": {
+				"empty": "No sprint in progress. Start one from the « Sprints » menu to follow its burndown.",
+				"chart": "Burndown of {{name}}",
+				"summary": "{{name}}: {{left}} of {{scope}} points left.",
+				"ideal": "Ideal",
+				"remaining": "Points left"
+			},
+			"velocity": {
+				"empty": "No sprint closed yet: the velocity appears with the first one.",
+				"chart": "Points committed and done per sprint",
+				"summary": "Average of the last 3 sprints: {{points}} points.",
+				"committed": "Committed",
+				"done": "Done"
+			},
+			"flow": {
+				"chart": "Cards per stage, last 30 days",
+				"summary": "Cards per stage at the end of each day of the last 30 days. A band that widens is work piling up.",
+				"bands": {
+					"todo": "To do",
+					"doing": "In progress",
+					"review": "In review",
+					"done": "Done"
+				}
+			},
+			"cycle": {
+				"empty": "No card finished in the last 90 days with a known start.",
+				"chart": "Cycle time of the cards finished in the last 90 days",
+				"summary_one": "{{count}} card finished: {{median}} days from start to done.",
+				"summary_other": "{{count}} cards finished: median {{median}} days from start to done, 85 % within {{p85}} days.",
+				"span": "From start to done",
+				"bins": {
+					"lt1": "< 1 day",
+					"d1to3": "1–3 days",
+					"d3to7": "3–7 days",
+					"d7to14": "1–2 weeks",
+					"gt14": "> 2 weeks"
+				}
+			},
+			"throughput": {
+				"chart": "Cards finished per week",
+				"summary_one": "{{count}} card finished in the last {{weeks}} weeks.",
+				"summary_other": "{{count}} cards finished in the last {{weeks}} weeks.",
+				"week": "Week of"
+			},
+			"ends": {
+				"empty": "No card ended without success.",
+				"failed": "Failed",
+				"abandoned": "Abandoned",
+				"reasons": {
+					"errors": "Build errors",
+					"prompt_too_long": "Prompt too long",
+					"qa_rejected": "Rejected by QA"
+				}
+			}
 		}
 	},
 	"queue": {
