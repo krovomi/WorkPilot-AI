@@ -166,3 +166,55 @@ def test_an_older_publication_shape_is_ignored(tmp_path):
     assert load_publication(spec) is None
     (spec / "captures" / PUBLICATION_FILE).write_text("not json", encoding="utf-8")
     assert load_publication(spec) is None
+
+
+def test_a_capture_that_is_gone_has_no_signature(tmp_path):
+    from pr_captures.publication import _signature
+
+    assert _signature(tmp_path / "gone.png") == ""
+
+
+def test_a_garbled_earlier_publication_is_read_around(tmp_path, monkeypatch):
+    _no_ocr(monkeypatch)
+    spec = tmp_path / "001-x"
+    _file(spec, "task", "http://127.0.0.1:5173/orders")
+    (spec / "captures").mkdir(parents=True, exist_ok=True)
+    (spec / "captures" / PUBLICATION_FILE).write_text(
+        json.dumps(
+            {"version": 1, "items": ["noise", {"before": "x", "after": {"source": 3}}]}
+        ),
+        encoding="utf-8",
+    )
+    payload = build_publication(spec, decision=NEEDED, settings=CaptureSettings())
+    assert [i["key"] for i in payload["items"]] == ["web|orders|"]
+
+
+def test_a_capture_that_cannot_be_prepared_is_left_out_not_fatal(tmp_path, monkeypatch):
+    import pr_captures.publication as publication
+
+    _no_ocr(monkeypatch)
+    spec = tmp_path / "001-x"
+    _file(spec, "task", "http://127.0.0.1:5173/orders")
+    _file(spec, "task", "http://127.0.0.1:5173/cart")
+    real = publication.protect_capture
+
+    def protect(source, target, **kwargs):
+        if "orders" in source.name:
+            raise OSError("disk full")
+        return real(source, target, **kwargs)
+
+    monkeypatch.setattr(publication, "protect_capture", protect)
+    payload = build_publication(spec, decision=NEEDED, settings=CaptureSettings())
+    assert [i["key"] for i in payload["items"]] == ["web|cart|"]
+
+
+def test_a_publication_that_cannot_be_written_is_still_returned(tmp_path, monkeypatch):
+    _no_ocr(monkeypatch)
+    spec = tmp_path / "001-x"
+    _file(spec, "task", "http://127.0.0.1:5173/orders")
+    blocker = spec / "captures" / PUBLICATION_FILE
+    blocker.mkdir(parents=True)
+    (blocker / "taken").write_text("x", encoding="utf-8")
+    payload = build_publication(spec, decision=NEEDED, settings=CaptureSettings())
+    assert payload["publishable"] == 1
+    assert load_publication(spec) is None

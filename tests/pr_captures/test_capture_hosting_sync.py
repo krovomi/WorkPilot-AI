@@ -443,3 +443,221 @@ def test_the_runner_names_no_pull_request_itself(tmp_path, monkeypatch, capsys):
         == 0
     )
     assert json.loads(capsys.readouterr().out) == {"result": {"status": "no-pr"}}
+
+
+# ── When a step of the sync fails ────────────────────────────────────────
+
+
+def test_a_sync_record_that_cannot_be_written_still_says_what_happened(project):
+    spec = _spec(project)
+    blocker = spec / "captures" / "pr-sync.json"
+    blocker.mkdir()
+    (blocker / "taken").write_text("x", encoding="utf-8")
+    result = _sync(project, spec, run=FakeGh())
+    assert result["status"] == "published"
+    assert blocker.is_dir()
+
+
+def test_a_published_copy_that_is_gone_is_left_out(project):
+    spec = _spec(project)
+    (spec / "captures" / "published" / "base" / "web--orders.png").unlink()
+    gh = FakeGh()
+    result = _sync(project, spec, run=gh)
+    assert (result["status"], result["hosted"]) == ("published", 1)
+    assert "/before/" not in gh.body
+
+
+def test_a_section_shown_before_and_since_removed_by_hand_is_not_rewritten(project):
+    spec = _spec(project, needed=False)
+    (spec / "captures" / "pr-sync.json").write_text(
+        json.dumps({"section": True, "prUrl": GITHUB_PR}), encoding="utf-8"
+    )
+    gh = FakeGh(body="## Summary, edited by a person\n")
+    result = _sync(project, spec, run=gh)
+    assert result["status"] == "nothing"
+    assert not any("--input" in call for call in gh.calls)
+
+
+def test_a_body_the_forge_refuses_to_take_is_reported(project):
+    spec = _spec(project)
+    gh = FakeGh()
+
+    def refusing(args, cwd):
+        return (1, "") if "--input" in args else gh(args, cwd)
+
+    result = _sync(project, spec, run=refusing)
+    assert (result["status"], result["reason"]) == ("failed", "pr-write-failed")
+
+
+def test_an_unexpected_failure_is_a_short_reason_never_an_exception(project):
+    spec = _spec(project)
+
+    def broken(args, cwd):
+        raise ValueError("odd answer")
+
+    result = _sync(project, spec, run=broken)
+    assert (result["status"], result["reason"]) == ("failed", "error")
+    assert load_sync(spec)["reason"] == "error"
+
+
+def _azure_sync(project: Path, spec: Path, azure) -> dict:
+    return _sync(
+        project,
+        spec,
+        provider="azure_devops",
+        pr_url="https://dev.azure.com/org/p/_git/app/pullrequest/42",
+        gh=None,
+        azure_auth=("", "pat"),
+        session=azure,
+    )
+
+
+def test_azure_attachments_that_cannot_be_listed_leave_the_description(project):
+    spec = _spec(project)
+    azure = FakeAzure()
+    azure.get = lambda url, **kwargs: FakeResponse(401)
+    result = _azure_sync(project, spec, azure)
+    assert (result["status"], result["reason"]) == ("failed", "attachments-refused")
+    assert azure.description == "PR"
+
+
+def test_an_azure_image_already_attached_is_linked_when_its_upload_is_refused(project):
+    import hashlib
+
+    spec = _spec(project)
+    after = spec / "captures" / "published" / "task" / "web--orders.png"
+    digest = hashlib.sha256(after.read_bytes()).hexdigest()[:12]
+    kept = f"wp-capture-{digest}-after-web--orders.png"
+    azure = FakeAzure()
+    azure.attachments[kept] = b""
+    azure.post = lambda url, data=None, **kwargs: FakeResponse(500)
+    result = _azure_sync(project, spec, azure)
+    assert (result["status"], result["hosted"]) == ("published", 1)
+    assert f"/pullRequests/42/attachments/{kept}" in azure.description
+    assert kept in azure.attachments
+
+
+def test_a_sync_after_the_pr_that_cannot_get_its_credentials_is_skipped(tmp_path):
+    from core.capture_hosting import sync_after_pr
+
+    class Manager:
+        project_dir = tmp_path
+
+        def _get_azure_devops_credentials(self):
+            raise OSError("no keyring")
+
+    result = sync_after_pr(
+        Manager(),
+        "001-x",
+        "azure_devops",
+        "https://dev.azure.com/o/p/_git/a/pullrequest/1",
+        None,
+    )
+    assert result == {"status": "failed", "reason": "error"}
+
+
+def _runner_world(tmp_path, monkeypatch, *, pr_url, spec_dir=None):
+    import core.capture_hosting as hosting
+    import core.worktree as worktree
+    import foundation.git_provider as git_provider
+
+    project = tmp_path / "project"
+    project.mkdir()
+    _git(project, "init", "-q", "-b", "main")
+    _git(
+        project,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "i",
+    )
+    spec = spec_dir or project / ".workpilot" / "specs" / "001-x"
+    spec.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(hosting, "task_spec_dir", lambda manager, name: spec)
+    monkeypatch.setattr(
+        worktree.WorktreeManager, "find_existing_pr_url", lambda self, *a: pr_url
+    )
+    monkeypatch.setattr(git_provider, "detect_git_provider", lambda path: "github")
+    synced: list[tuple] = []
+    monkeypatch.setattr(
+        hosting,
+        "sync_after_pr",
+        lambda manager, name, provider, url, remote: (
+            synced.append((name, provider, url, remote)) or {"status": "published"}
+        ),
+    )
+    return project, spec, synced
+
+
+def test_the_runner_withdraws_then_syncs_the_task_s_own_pull_request(
+    tmp_path, monkeypatch, capsys
+):
+    import runners.pr_captures_runner as runner
+    from pr_captures.approval import approve, approved_signatures
+
+    project, spec, synced = _runner_world(tmp_path, monkeypatch, pr_url=GITHUB_PR)
+    (spec / "captures").mkdir()
+    (spec / "captures" / "publication.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "items": [{"after": {"publishable": True, "signature": "s1"}}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    approve(spec)
+    assert approved_signatures(spec) == {"s1"}
+    code = runner.main(
+        ["withdraw", "--project-dir", str(project), "--spec-name", "001-x"]
+    )
+    assert code == 0
+    assert json.loads(capsys.readouterr().out) == {"result": {"status": "published"}}
+    assert approved_signatures(spec) == set()
+    assert synced == [("001-x", "github", GITHUB_PR, None)]
+
+
+def test_the_runner_refuses_a_spec_folder_outside_the_project(
+    tmp_path, monkeypatch, capsys
+):
+    import runners.pr_captures_runner as runner
+
+    project, _, synced = _runner_world(
+        tmp_path, monkeypatch, pr_url=GITHUB_PR, spec_dir=tmp_path / "elsewhere"
+    )
+    code = runner.main(["sync", "--project-dir", str(project), "--spec-name", "001-x"])
+    assert code == 1
+    assert "outside the project" in capsys.readouterr().out
+    assert synced == []
+
+
+def test_the_runner_started_by_the_app_answers_one_json_line(tmp_path):
+    import os
+    import sys
+
+    backend = Path(__file__).resolve().parents[2] / "apps" / "backend"
+    done = subprocess.run(
+        [
+            sys.executable,
+            str(backend / "runners" / "pr_captures_runner.py"),
+            "sync",
+            "--project-dir",
+            str(tmp_path / "gone"),
+            "--spec-name",
+            "001-x",
+        ],
+        cwd=backend,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
+        timeout=120,
+        check=False,
+    )
+    assert done.returncode == 1
+    assert list(json.loads(done.stdout.strip().splitlines()[-1])) == ["error"]

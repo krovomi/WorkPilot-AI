@@ -163,3 +163,112 @@ def test_an_unreachable_remote_is_a_reason_not_an_error(repo):
         "001-x-pr1", {"t/a.png": _png(repo.parent / "a.png", (1, 1, 1))}
     )
     assert (result.ok, result.reason) == (False, "remote-unreachable")
+
+
+# ── When one git step fails ──────────────────────────────────────────────
+
+
+class _Done:
+    def __init__(self, returncode: int, stdout: str = "", stderr: str = ""):
+        self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
+
+
+def _failing(verb: str, answer: _Done | None = None):
+    """The real git, except `verb`, which answers `answer` (a failure)."""
+    from foundation.git_executable import run_git
+
+    def git(args, **kwargs):
+        if args[0] == verb:
+            return answer or _Done(1, "", "fatal: refused")
+        return run_git(args, **kwargs)
+
+    return git
+
+
+def _published_once(repo: Path) -> dict[str, Path]:
+    files = {
+        "captures/published/task/home.png": _png(repo.parent / "s" / "a.png", (1, 2, 3))
+    }
+    assert (
+        BranchStore(repo, "origin", "workpilot-captures").update("001-x-pr1", files).ok
+    )
+    return files
+
+
+@pytest.mark.parametrize(
+    ("verb", "answer", "reason"),
+    [
+        ("fetch", None, "fetch-failed"),
+        ("ls-tree", None, "read-failed"),
+        ("hash-object", _Done(0, "not a sha"), "write-failed"),
+        ("read-tree", None, "write-failed"),
+        ("update-index", None, "write-failed"),
+        ("write-tree", _Done(0, ""), "write-failed"),
+        ("commit-tree", _Done(0, "zzz"), "write-failed"),
+        ("push", _Done(1, "", "remote: hook declined"), "push-refused"),
+    ],
+)
+def test_a_git_step_that_fails_is_the_result_s_reason_and_nothing_moves(
+    repo, verb, answer, reason
+):
+    files = _published_once(repo)
+    before = _remote_files(repo)
+    store = BranchStore(
+        repo, "origin", "workpilot-captures", git=_failing(verb, answer)
+    )
+    result = store.update("002-y-pr2", files)
+    assert (result.ok, result.reason, result.paths) == (False, reason, {})
+    assert _remote_files(repo) == before
+
+
+def test_a_branch_that_keeps_moving_gives_up_busy(repo):
+    files = _published_once(repo)
+    store = BranchStore(
+        repo,
+        "origin",
+        "workpilot-captures",
+        git=_failing("push", _Done(1, "", "! [rejected] (stale info)")),
+    )
+    assert store.update("002-y-pr2", files).reason == "busy"
+
+
+def test_an_index_that_is_not_json_is_read_as_empty(repo):
+    files = _published_once(repo)
+    from foundation.git_executable import run_git
+
+    def git(args, **kwargs):
+        if args[:2] == ["cat-file", "blob"]:
+            return _Done(0, "{broken")
+        return run_git(args, **kwargs)
+
+    result = BranchStore(repo, "origin", "workpilot-captures", git=git).update(
+        "002-y-pr2", files
+    )
+    assert result.ok
+    index = json.loads(
+        _git(repo.parent / "remote.git", "show", "workpilot-captures:index.json")
+    )
+    assert set(index["tasks"]) == {"002-y-pr2"}
+
+
+def test_dates_without_a_zone_or_unreadable_age_like_any_other(repo):
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    store = BranchStore(
+        repo,
+        "origin",
+        "workpilot-captures",
+        now=lambda: start + timedelta(days=31),
+    )
+    index = {
+        "tasks": {
+            "naive-old": {"updatedAt": "2025-12-01T00:00:00"},
+            "naive-new": {
+                "updatedAt": (start + timedelta(days=30))
+                .replace(tzinfo=None)
+                .isoformat()
+            },
+            "garbled": {"updatedAt": "yesterday"},
+            "empty": None,
+        }
+    }
+    assert store._expired(index) == {"naive-old", "garbled", "empty"}
