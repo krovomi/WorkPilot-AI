@@ -56,10 +56,23 @@ def test_a_session_without_an_account_records_none(tmp_path, monkeypatch):
         ("Gemini", "g-1"),
         ("google", "g-1"),
         ("deepseek", None),
+        ("openai-codex-cli", "cx-1"),
+        ("copilot", "cp-1"),
+        ("gemini-cli", "gc-1"),
     ],
 )
 def test_backend_names_map_to_the_apps(provider, expected):
-    env = {ENV_VAR: json.dumps({"claude": "claude:work", "google": "g-1"})}
+    env = {
+        ENV_VAR: json.dumps(
+            {
+                "claude": "claude:work",
+                "google": "g-1",
+                "codex": "cx-1",
+                "copilot": "cp-1",
+                "gemini-cli": "gc-1",
+            }
+        )
+    }
     assert account_for(provider, env) == expected
 
 

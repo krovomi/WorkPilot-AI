@@ -24,7 +24,13 @@ _MAX_RAW = 4_000
 _ID = re.compile(r"^[A-Za-z0-9._:-]{1,100}$")
 
 # The names a backend session gives a provider, mapped to the app's.
-_ALIASES = {"anthropic": "claude", "claude-code": "claude", "gemini": "google"}
+_ALIASES = {
+    "anthropic": "claude",
+    "claude-code": "claude",
+    "gemini": "google",
+    # The Codex CLI client (core/codex_cli_client.py); its accounts are "codex" sign-ins.
+    "openai-codex-cli": "codex",
+}
 
 
 def _provider_key(provider: str) -> str:

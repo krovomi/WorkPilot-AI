@@ -35,9 +35,15 @@ export function processAccounts(
 	const accounts: Record<string, string> = {};
 	try {
 		const store = aiAccountStore();
-		const withKey = new Set(store.list().filter((a) => a.hasKey).map((a) => a.id));
+		// A key account runs once it has a key, a CLI sign-in once it is signed in.
+		const usable = new Set(
+			store
+				.list()
+				.filter((a) => a.hasKey || a.signedIn === true)
+				.map((a) => a.id),
+		);
 		for (const [provider, id] of Object.entries(store.defaults())) {
-			if (withKey.has(id) && AI_ACCOUNT_KEY_PATTERN.test(id)) accounts[provider] = id;
+			if (usable.has(id) && AI_ACCOUNT_KEY_PATTERN.test(id)) accounts[provider] = id;
 		}
 	} catch (error) {
 		// An unreadable store leaves the spend unattributed, never the task unstarted.

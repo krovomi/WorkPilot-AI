@@ -89,6 +89,16 @@ describe("processAccounts", () => {
 		});
 	});
 
+	it("names a signed-in CLI account chosen by default, not one signed out", () => {
+		const signedIn = { id: "cx-1", provider: "codex", name: "Work", hasKey: false, kind: "login", signedIn: true };
+		const signedOut = { id: "cp-1", provider: "copilot", name: "Old", hasKey: false, kind: "login", signedIn: false };
+		setAiAccountStoreForTests({
+			list: () => [signedIn, signedOut],
+			defaults: () => ({ codex: "cx-1", copilot: "cp-1" }),
+		} as unknown as AiAccountStore);
+		expect(processAccounts()).toEqual({ codex: "cx-1" });
+	});
+
 	it("still starts the process when the store cannot be read", () => {
 		setAiAccountStoreForTests({
 			list: () => {
