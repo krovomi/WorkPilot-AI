@@ -192,7 +192,7 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 <tr>
 <td width="50%" valign="top">
 
-**Détail d'une tâche** : le plan découpé en sous-tâches avec les fichiers que chacune touche, les logs, les fichiers modifiés, les preuves visuelles et l'émulateur.
+**Détail d'une tâche** : le plan découpé en sous-tâches avec les fichiers que chacune touche, la zone « Guider l'agent » pour orienter l'agent en cours, les logs, les fichiers modifiés, le graphe des modifications, les captures avant/après et l'émulateur.
 
 ![Détail d'une tâche et ses sous-tâches](.github/assets/showcase/task-detail.png)
 
@@ -280,9 +280,9 @@ Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ress
 </td>
 <td valign="top">
 
-**Bac à sable** : un instantané du worktree de la tâche avant chaque session d'agent, restauré quand la surveillance des anomalies arrête une session ; mode d'écriture restreint et limites par session.
+**Bac à sable** : un instantané du worktree de la tâche avant chaque session d'agent, restauré quand la surveillance des anomalies arrête une session ; une microVM Docker par tâche en option ; mode d'écriture restreint et limites par session.
 
-![Réglages du bac à sable : instantanés et retour arrière, mode d'écriture, limites par session](.github/assets/showcase/sandbox.png)
+![Réglages du bac à sable : instantanés et retour arrière, microVM Docker par tâche, mode d'écriture](.github/assets/showcase/sandbox.png)
 
 </td>
 </tr>
