@@ -17,6 +17,7 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `ColumnBand.tsx` | ~200 | bandeau d'une colonne : icône, compteur, jauge, résumé (`lib/column-pulse.ts`), état vide ([conception](../../../../../../docs/architecture/kanban-columns.md)) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
 | `BoardLanes.tsx` · `LaneGroupingMenu.tsx` | ~200 · ~140 | couloirs (swimlanes), logique dans `lib/kanban-lanes.ts` ([conception](../../../../../../docs/architecture/kanban-swimlanes.md)) |
+| `BoardLayoutToggle.tsx` · `BoardList.tsx` | ~50 · ~170 | bascule Tableau / Liste et vue liste, rendue par `BoardLanes`, tri dans `lib/kanban-list.ts` ([conception](../../../../../../docs/architecture/kanban-list-view.md)) |
 | `SprintMenu.tsx` · `SprintDialogs.tsx` | ~250 · ~200 | sprints, état dans `stores/sprint-store.ts`, règles dans `shared/utils/sprints.ts` ([conception](../../../../../../docs/architecture/kanban-sprints.md)) |
 | `board-ask/` | — | « Interroger le tableau », réponse par `main/board-ask/` ([conception](../../../../../../docs/architecture/board-ask.md)) |
 | `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F182) |

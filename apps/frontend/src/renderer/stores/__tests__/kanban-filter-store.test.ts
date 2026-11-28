@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SORT, EMPTY_FILTERS } from "../../lib/kanban-filter";
 import { type SavedView, useKanbanFilterStore } from "../kanban-filter-store";
+import { DEFAULT_LANE_PREFERENCES, useKanbanLanesStore } from "../kanban-lanes-store";
 
 const api = { getKanbanBoardState: vi.fn(), saveKanbanBoardState: vi.fn() };
 const INITIAL = useKanbanFilterStore.getState();
@@ -29,6 +30,7 @@ async function open(projectId: string, data?: unknown) {
 
 beforeEach(() => {
 	useKanbanFilterStore.setState(INITIAL, true);
+	useKanbanLanesStore.setState({ ...DEFAULT_LANE_PREFERENCES, projectId: null });
 	localStorage.clear();
 	api.getKanbanBoardState.mockReset();
 	api.saveKanbanBoardState.mockReset().mockResolvedValue({ success: true });
@@ -260,6 +262,32 @@ describe("saved views", () => {
 
 		store().applyView("missing");
 		expect(store().filters.sources).toEqual(["jira", "github"]);
+	});
+
+	it("keeps the layout, the lanes and the list's sort with a view, and brings them back", () => {
+		const lanes = useKanbanLanesStore.getState();
+		lanes.setLayout("list");
+		lanes.setGrouping("priority");
+		lanes.setListSort({ field: "points", direction: "desc" });
+		store().saveCurrentView("Plan");
+		expect(store().savedViews[0]).toMatchObject({
+			layout: "list",
+			grouping: "priority",
+			listSort: { field: "points", direction: "desc" },
+		});
+
+		lanes.setLayout("board");
+		lanes.setGrouping("none");
+		lanes.setListSort(null);
+		store().saveCurrentView("Plain");
+		expect(store().savedViews[1].listSort).toBeNull();
+
+		store().applyView(store().savedViews[0].id);
+		expect(useKanbanLanesStore.getState()).toMatchObject({
+			layout: "list",
+			grouping: "priority",
+			listSort: { field: "points", direction: "desc" },
+		});
 	});
 
 	it("deletes a view everywhere", () => {

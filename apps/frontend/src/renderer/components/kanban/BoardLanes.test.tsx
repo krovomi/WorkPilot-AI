@@ -121,6 +121,108 @@ describe("BoardLanes", () => {
 	});
 });
 
+describe("BoardLanes as a list", () => {
+	function list(backlog: Task[], done: Task[] = []) {
+		const onOpenTask = vi.fn();
+		const tasksByStatus = { ...emptyColumnGroups(), backlog, done };
+		render(
+			<BoardLanes
+				projectId="p"
+				columnOrder={COLUMNS}
+				tasksByStatus={tasksByStatus}
+				renderColumn={() => null}
+				onOpenTask={onOpenTask}
+			/>,
+		);
+		return onOpenTask;
+	}
+	const titles = () =>
+		within(screen.getByRole("table"))
+			.queryAllByRole("row")
+			.slice(1)
+			.map((row) => within(row).queryAllByRole("cell")[0]?.textContent)
+			.filter(Boolean);
+
+	beforeEach(() => {
+		useSprintStore.setState({ sprints: [{ id: "sp-0000000a", name: "Sprint 12", state: "active", createdAt: "t" }] });
+	});
+
+	it("shows each card's fields, opens a card and sorts by a column", async () => {
+		const user = userEvent.setup();
+		localStorage.setItem("kanban-lanes-p", JSON.stringify({ layout: "list" }));
+		const metadata = {
+			priority: "high",
+			sprintId: "sp-0000000a",
+			area: "web",
+			flagged: true,
+			kind: "bug_fix",
+			smartEstimate: { complexityScore: 3 },
+		} as Task["metadata"];
+		const onOpenTask = list(
+			[{ ...card("b", metadata), title: "Beta", updatedAt: "2026-11-02T10:00:00Z" } as unknown as Task],
+			[{ ...card("a", { sprintId: "sp-0000000f" }), title: "Alpha" } as Task],
+		);
+		expect(screen.queryByTestId("kanban-lanes")).toBeNull();
+		expect(titles()).toEqual(["Beta", "Alpha"]);
+		const [beta, alpha] = screen.getAllByRole("row").slice(1);
+		expect(within(beta).getAllByRole("cell").map((cell) => cell.textContent)).toEqual([
+			"Beta",
+			"Planning",
+			"High",
+			"Sprint 12",
+			"web",
+			"3",
+			expect.stringMatching(/2026/),
+		]);
+		expect(within(beta).getByLabelText("Blocked")).toBeInTheDocument();
+		// The bug's colour, and a neutral dot for a card without a type.
+		expect(beta.querySelector("span[style]")).not.toBeNull();
+		expect(alpha.querySelector("span[style]")).toBeNull();
+		expect(within(alpha).getAllByRole("cell").map((cell) => cell.textContent)).toEqual([
+			"Alpha",
+			"Done",
+			"—",
+			"Unknown sprint",
+			"—",
+			"—",
+			"—",
+		]);
+
+		await user.click(within(alpha).getByRole("button", { name: "Alpha" }));
+		expect(onOpenTask).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
+
+		const header = screen.getByRole("columnheader", { name: "Card" });
+		await user.click(within(header).getByRole("button"));
+		expect(header).toHaveAttribute("aria-sort", "ascending");
+		expect(titles()).toEqual(["Alpha", "Beta"]);
+		await user.click(within(header).getByRole("button"));
+		expect(header).toHaveAttribute("aria-sort", "descending");
+		expect(titles()).toEqual(["Beta", "Alpha"]);
+		await user.click(within(header).getByRole("button"));
+		expect(header).toHaveAttribute("aria-sort", "none");
+	});
+
+	it("cuts the list into the lanes' sections, folds one, and says when nothing matches", async () => {
+		const user = userEvent.setup();
+		localStorage.setItem("kanban-lanes-p", JSON.stringify({ layout: "list", grouping: "priority" }));
+		list([card("a", { priority: "high" }), card("b")]);
+		const high = screen.getByRole("rowgroup", { name: "High" });
+		expect(within(high).getByText("Card a")).toBeInTheDocument();
+		expect(within(screen.getByRole("rowgroup", { name: "No priority" })).getByText("Card b")).toBeInTheDocument();
+		const fold = within(high).getByRole("button", { name: /High/ });
+		await user.click(fold);
+		expect(fold).toHaveAttribute("aria-expanded", "false");
+		expect(within(high).queryByText("Card a")).toBeNull();
+		expect(screen.queryByText("No card matches the filters.")).toBeNull();
+	});
+
+	it("says when no card matches", () => {
+		localStorage.setItem("kanban-lanes-p", JSON.stringify({ layout: "list" }));
+		list([]);
+		expect(screen.getByText("No card matches the filters.")).toBeInTheDocument();
+	});
+});
+
 describe("LaneGroupingMenu", () => {
 	it("picks a grouping, pins blocked cards and adds a sub-project", async () => {
 		const user = userEvent.setup();

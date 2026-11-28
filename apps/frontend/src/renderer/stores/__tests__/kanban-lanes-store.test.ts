@@ -32,7 +32,7 @@ describe("readLanePreferences", () => {
 			collapsed: { area: ["api", 3], nonsense: ["x"] },
 			areas: ["api", " api ", "bad\nname", 12, "web"],
 		});
-		expect(read).toEqual({ grouping: "area", pinFlagged: false, collapsed: { area: ["api"] }, areas: ["api", "web"] });
+		expect(read).toEqual({ grouping: "area", pinFlagged: false, collapsed: { area: ["api"] }, areas: ["api", "web"], layout: "board", listSort: null });
 	});
 });
 
@@ -72,5 +72,30 @@ describe("useKanbanLanesStore", () => {
 	it("flips the pinned lane of blocked cards", () => {
 		useKanbanLanesStore.getState().togglePinFlagged();
 		expect(useKanbanLanesStore.getState().pinFlagged).toBe(false);
+	});
+
+	it("keeps the layout and the list's sort, and reads back only valid ones", () => {
+		useKanbanLanesStore.getState().loadForProject("p");
+		useKanbanLanesStore.getState().setLayout("list");
+		useKanbanLanesStore.getState().setListSort({ field: "points", direction: "desc" });
+		expect(JSON.parse(localStorage.getItem("kanban-lanes-p") ?? "{}")).toMatchObject({
+			layout: "list",
+			listSort: { field: "points", direction: "desc" },
+		});
+		expect(readLanePreferences({ layout: "timeline", listSort: { field: "x" } })).toMatchObject({
+			layout: "board",
+			listSort: null,
+		});
+	});
+
+	it("brings back what a saved view holds, and leaves alone what it does not", () => {
+		const lanes = () => useKanbanLanesStore.getState();
+		lanes().loadForProject("p");
+		lanes().applyView({ layout: "list", grouping: "sprint", listSort: { field: "title", direction: "asc" } });
+		expect(lanes()).toMatchObject({ layout: "list", grouping: "sprint", listSort: { field: "title", direction: "asc" } });
+		lanes().applyView({});
+		expect(lanes()).toMatchObject({ layout: "list", grouping: "sprint", listSort: { field: "title", direction: "asc" } });
+		lanes().applyView({ layout: "wall", grouping: "assignee", listSort: null });
+		expect(lanes()).toMatchObject({ layout: "board", grouping: "none", listSort: null });
 	});
 });

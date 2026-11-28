@@ -16,13 +16,16 @@ import { CARD_TYPES } from "../../../shared/constants/card-types";
 import type { TaskStatusColumn } from "../../../shared/constants/task";
 import type { Task } from "../../../shared/types";
 import { buildLanes, FLAGGED_LANE, type Lane, type LaneGrouping, laneDropId, NO_VALUE_LANE } from "../../lib/kanban-lanes";
+import { rowsOf } from "../../lib/kanban-list";
 import { cn } from "../../lib/utils";
 import { orderedSprints } from "../../../shared/utils/sprints";
 import { useKanbanLanesStore } from "../../stores/kanban-lanes-store";
 import { useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
+import { BoardList, type ListSection } from "./BoardList";
 
 const NO_TASKS: Task[] = [];
+const NO_KEYS: string[] = [];
 /** A priority lane's dot, in the colours of the card's priority badge. */
 const PRIORITY_DOTS: Record<string, string> = {
 	urgent: "bg-destructive",
@@ -43,6 +46,8 @@ interface BoardLanesProps {
 	tasksByStatus: Record<TaskStatusColumn, Task[]>;
 	/** One column; `droppableId` is set inside a lane. */
 	renderColumn: (status: TaskStatusColumn, tasks: Task[], droppableId?: string) => ReactNode;
+	/** Opens a card from the list layout. */
+	onOpenTask?: (task: Task) => void;
 }
 
 /** The sub-projects the project index knows (a monorepo's services), loaded once per project. */
@@ -114,7 +119,7 @@ function useLaneLabel(grouping: LaneGrouping) {
 	};
 }
 
-export function BoardLanes({ projectId, columnOrder, tasksByStatus, renderColumn }: BoardLanesProps) {
+export function BoardLanes({ projectId, columnOrder, tasksByStatus, renderColumn, onOpenTask }: BoardLanesProps) {
 	const { t } = useTranslation(["tasks"]);
 	const loadForProject = useKanbanLanesStore((s) => s.loadForProject);
 	const grouping = useKanbanLanesStore((s) => s.grouping);
@@ -122,6 +127,7 @@ export function BoardLanes({ projectId, columnOrder, tasksByStatus, renderColumn
 	const collapsed = useKanbanLanesStore((s) => s.collapsed[s.grouping]);
 	const extraAreas = useKanbanLanesStore((s) => s.areas);
 	const toggleCollapsed = useKanbanLanesStore((s) => s.toggleCollapsed);
+	const layout = useKanbanLanesStore((s) => s.layout);
 	const sprints = useSprintStore((s) => s.sprints);
 	const knownSprints = useMemo(() => orderedSprints(sprints), [sprints]);
 	useEffect(() => loadForProject(projectId), [projectId, loadForProject]);
@@ -138,6 +144,27 @@ export function BoardLanes({ projectId, columnOrder, tasksByStatus, renderColumn
 		[tasksByStatus, grouping, pinFlagged, indexedAreas, extraAreas, knownSprints],
 	);
 	const labelOf = useLaneLabel(grouping);
+
+	if (layout === "list") {
+		const sections: ListSection[] =
+			grouping === "none"
+				? [{ key: "all", rows: rowsOf(columnOrder, tasksByStatus) }]
+				: lanes.map((lane) => ({
+						key: lane.key,
+						label: labelOf(lane),
+						marker: <LaneMarker grouping={grouping} lane={lane} />,
+						rows: rowsOf(columnOrder, lane.columns),
+					}));
+		return (
+			<BoardList
+				sections={sections}
+				columnOrder={columnOrder}
+				collapsed={collapsed ?? NO_KEYS}
+				onToggleSection={toggleCollapsed}
+				onOpenTask={onOpenTask}
+			/>
+		);
+	}
 
 	if (grouping === "none") {
 		return (

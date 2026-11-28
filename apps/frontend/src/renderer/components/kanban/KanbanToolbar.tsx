@@ -39,6 +39,7 @@ import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
 import { BoardAskButton } from "./board-ask/BoardAskButton";
+import { BoardLayoutToggle } from "./BoardLayoutToggle";
 import { KanbanMoreMenu } from "./KanbanMoreMenu";
 import { LaneGroupingMenu } from "./LaneGroupingMenu";
 import { SprintMenu } from "./SprintMenu";
@@ -391,9 +392,19 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 										<button
 											type="button"
 											onClick={() => applyView(view.id)}
-											className="flex-1 truncate rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60 transition-colors"
+											className="flex min-w-0 flex-1 flex-col rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60 transition-colors"
 										>
-											{view.name}
+											<span className="truncate">{view.name}</span>
+											{view.layout && (
+												<span className="truncate text-2xs text-muted-foreground">
+													{view.grouping && view.grouping !== "none"
+														? t("kanban.views.summary", {
+																layout: t(`kanban.layout.${view.layout}`),
+																lanes: t(`kanban.lanes.groupings.${view.grouping}`),
+															})
+														: t(`kanban.layout.${view.layout}`)}
+												</span>
+											)}
 										</button>
 										<Button
 											variant="ghost"
@@ -434,6 +445,7 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 				</PopoverContent>
 			</Popover>
 
+			<BoardLayoutToggle />
 			<SprintMenu />
 			<LaneGroupingMenu />
 
