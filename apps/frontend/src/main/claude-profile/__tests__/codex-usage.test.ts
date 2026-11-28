@@ -9,10 +9,31 @@ import {
 	parseChatGPTUsageResponse,
 	parseRateLimitsFromRollout,
 	readCodexAuth,
+	resolveCodexHome,
 	splitSessionWeekly,
 } from "../codex-usage";
 
+const login = vi.hoisted(() => ({ home: undefined as string | undefined }));
+vi.mock("../../ai-accounts/login-accounts", () => ({ defaultLoginHome: () => login.home }));
+
 const NOW = Date.parse("2026-09-24T10:00:00Z");
+
+describe("resolveCodexHome", () => {
+	afterEach(() => {
+		login.home = undefined;
+		vi.unstubAllEnvs();
+	});
+
+	it("reads the default Codex account's folder first, then CODEX_HOME, then ~/.codex", () => {
+		vi.stubEnv("CODEX_HOME", " /env/codex ");
+		login.home = "/accounts/codex/a";
+		expect(resolveCodexHome()).toBe("/accounts/codex/a");
+		login.home = undefined;
+		expect(resolveCodexHome()).toBe("/env/codex");
+		vi.stubEnv("CODEX_HOME", "");
+		expect(resolveCodexHome()).toMatch(/\.codex$/);
+	});
+});
 
 describe("parseChatGPTUsageResponse", () => {
 	it("reads both windows of the usage API", () => {
