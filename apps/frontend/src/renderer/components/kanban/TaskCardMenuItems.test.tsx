@@ -49,6 +49,15 @@ describe("TaskCardMenuItems", () => {
 		expect(onUnflag).toHaveBeenCalled();
 	});
 
+	it("opens the labels of a task from the edit group", async () => {
+		const user = userEvent.setup();
+		const onEditLabels = vi.fn();
+		renderItems({ onEditLabels, onDelete: vi.fn() });
+		await user.click(screen.getByRole("menuitem", { name: "Labels…" }));
+		expect(onEditLabels).toHaveBeenCalled();
+		expect(separators()).toBe(1);
+	});
+
 	it("sets a task aside, or resumes it, from the work group", async () => {
 		const user = userEvent.setup();
 		const onAbandon = vi.fn();

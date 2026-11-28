@@ -138,6 +138,10 @@ INSTANT_PATTERN = (
 )
 #: A sub-project name (Kanban lanes): one line of text, no control character.
 AREA_PATTERN = r"^[^\x00-\x1f\x7f]{1,80}$"
+#: A card's label (`shared/utils/task-labels.ts`): 30 characters, no control character.
+Label = Annotated[
+    str, Field(min_length=1, max_length=30, pattern=r"^[^\x00-\x1f\x7f]+$")
+]
 #: Metadata keys this module writes as they are given (``None`` removes them).
 PLAIN_KEYS = (
     "priority",
@@ -155,10 +159,11 @@ PLAIN_KEYS = (
     "flaggedAt",
     "area",
     "sprintId",
+    "labels",
 )
 #: Keys only the board reads (lanes, flag, sprint): a run does not, so they may change during one.
 BOARD_ONLY_KEYS = frozenset(
-    {"area", "sprintId", "flagged", "flaggedReason", "flaggedAt"}
+    {"area", "sprintId", "labels", "flagged", "flaggedReason", "flaggedAt"}
 )
 
 
@@ -199,6 +204,17 @@ class CardSettings(BaseModel):
     flaggedAt: str | None = Field(default=None, pattern=INSTANT_PATTERN)
     area: str | None = Field(default=None, max_length=80, pattern=AREA_PATTERN)
     sprintId: str | None = Field(default=None, pattern=r"^sp-[0-9a-f]{8}$")
+    labels: list[Label] | None = Field(default=None, max_length=10)
+
+    @field_validator("labels")
+    @classmethod
+    def _labels(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        labels = [" ".join(label.split()) for label in value]
+        if any(not label for label in labels):
+            raise ValueError("a label cannot be blank")
+        return labels
 
     def plain_value(self, key: str) -> Any:
         """The value written to ``task_metadata.json``; ``None`` removes the key."""
@@ -316,7 +332,8 @@ def read_settings(root: Path, directory: Path) -> dict[str, Any]:
         **{
             key: metadata.get(key)
             for key in PLAIN_KEYS
-            if key.startswith(("abandoned", "flagged")) or key in ("area", "sprintId")
+            if key.startswith(("abandoned", "flagged"))
+            or key in ("area", "sprintId", "labels")
         },
         "goal": None,
         "goalError": None,

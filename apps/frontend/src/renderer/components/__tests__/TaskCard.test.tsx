@@ -36,6 +36,7 @@ import { consumePendingTaskDetailTab } from "../../lib/task-detail-nav";
 import { useAbandonRequestStore } from "../../stores/abandon-request-store";
 import { useFlagRequestStore } from "../../stores/flag-request-store";
 import { useKanbanBlockerStore } from "../../stores/kanban-blocker-store";
+import { useLabelRequestStore } from "../../stores/label-request-store";
 import { useKanbanConflictStore } from "../../stores/kanban-conflict-store";
 import { useProjectStore } from "../../stores/project-store";
 import { useSmartEstimationStore } from "../../stores/smart-estimation-store";
@@ -782,6 +783,10 @@ describe("TaskCard — options menu", () => {
 		await openMenu();
 		await user.click(await screen.findByRole("menuitem", { name: "Abandon…" }));
 		expect(useAbandonRequestStore.getState().ids).toEqual(["task-1"]);
+		await openMenu();
+		await user.click(await screen.findByRole("menuitem", { name: "Labels…" }));
+		expect(useLabelRequestStore.getState().taskId).toBe("task-1");
+		useLabelRequestStore.getState().close();
 		unmount();
 		useFlagRequestStore.getState().close();
 		useAbandonRequestStore.getState().close();

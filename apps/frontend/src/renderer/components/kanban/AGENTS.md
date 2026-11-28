@@ -19,6 +19,7 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `BoardLanes.tsx` · `LaneGroupingMenu.tsx` | ~200 · ~140 | couloirs (swimlanes), logique dans `lib/kanban-lanes.ts` ([conception](../../../../../../docs/architecture/kanban-swimlanes.md)) |
 | `BoardLayoutToggle.tsx` · `BoardList.tsx` | ~50 · ~170 | Tableau / Liste, rendue par `BoardLanes` ; tri : `lib/kanban-list.ts` |
 | `BoardTimeline.tsx` | ~160 | frise ; barres : `lib/kanban-timeline.ts` |
+| `labels/` | — | étiquettes ; `shared/utils/task-labels.ts`, filtres : `lib/kanban-filter.ts` |
 | `SprintMenu.tsx` · `SprintDialogs.tsx` | ~250 · ~200 | sprints ; `stores/sprint-store.ts`, `shared/utils/sprints.ts` |
 | `reports/` | — | rapports (burndown, vélocité…) ; `lib/kanban-reports.ts` |
 | `board-ask/` | — | « Interroger le tableau », réponse par `main/board-ask/` ([conception](../../../../../../docs/architecture/board-ask.md)) |

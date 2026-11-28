@@ -781,6 +781,8 @@ export interface TaskMetadata {
 	area?: string;
 	/** The sprint the card is planned in (`shared/types/sprint.ts`). */
 	sprintId?: string;
+	/** Labels a person put on the card (`shared/utils/task-labels.ts`). */
+	labels?: string[];
 
 	// Archive status
 	archivedAt?: string; // ISO date when task was archived

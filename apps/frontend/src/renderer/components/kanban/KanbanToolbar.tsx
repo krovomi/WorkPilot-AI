@@ -23,10 +23,12 @@ import type { Task, TaskCategory, TaskPriority } from "../../../shared/types";
 import {
 	activeFilterCount,
 	hasActiveFilters,
+	QUICK_FILTERS,
 	type TaskSortField,
 	TASK_SOURCES,
 	type TaskSource,
 } from "../../lib/kanban-filter";
+import { boardLabels } from "../../../shared/utils/task-labels";
 import { splitGroupTone } from "../../../shared/utils/task-split";
 import { cn } from "../../lib/utils";
 import { useShortcutsHelpStore } from "../../stores/shortcuts-help-store";
@@ -34,6 +36,7 @@ import { toneClass } from "../charter";
 import { TeamRoomBar } from "../collaboration";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
 import { useProjectStore } from "../../stores/project-store";
+import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -137,6 +140,9 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 	const toggleCategory = useKanbanFilterStore((s) => s.toggleCategory);
 	const togglePriority = useKanbanFilterStore((s) => s.togglePriority);
 	const toggleGroup = useKanbanFilterStore((s) => s.toggleGroup);
+	const toggleLabel = useKanbanFilterStore((s) => s.toggleLabel);
+	const toggleQuick = useKanbanFilterStore((s) => s.toggleQuick);
+	const tasks = useTaskStore((s) => s.tasks);
 	const setSortField = useKanbanFilterStore((s) => s.setSortField);
 	const toggleSortDirection = useKanbanFilterStore((s) => s.toggleSortDirection);
 	const clearFilters = useKanbanFilterStore((s) => s.clearFilters);
@@ -150,6 +156,9 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 	const projectId = useProjectStore((s) => s.selectedProjectId);
 
 	const count = activeFilterCount(filters);
+	const labels = boardLabels(tasks);
+	const labelOn = (label: string) =>
+		(filters.labels ?? []).some((item) => item.toLocaleLowerCase() === label.toLocaleLowerCase());
 	const filtersActive = hasActiveFilters(filters);
 
 	const commitSaveView = () => {
@@ -264,6 +273,18 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 					</div>
 
 					<div className="space-y-4 p-4">
+						{/* Jira's quick filters: one click, then the finer dimensions below */}
+						<FilterSection title={t("kanban.filter.quickLabel")} activeCount={filters.quick?.length}>
+							{QUICK_FILTERS.map((quick) => (
+								<FilterChip
+									key={quick}
+									label={t(`kanban.filter.quick.${quick}`)}
+									active={filters.quick?.includes(quick) ?? false}
+									onToggle={() => toggleQuick(quick)}
+								/>
+							))}
+						</FilterSection>
+
 						{/* Priority — short and high-value, so first */}
 						<FilterSection
 							title={t("kanban.filter.priorityLabel")}
@@ -310,6 +331,14 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 								/>
 							))}
 						</FilterSection>
+
+						{labels.length > 0 && (
+							<FilterSection title={t("kanban.filter.labelsLabel")} activeCount={filters.labels?.length}>
+								{labels.map((label) => (
+									<FilterChip key={label} label={label} active={labelOn(label)} onToggle={() => toggleLabel(label)} />
+								))}
+							</FilterSection>
+						)}
 
 						<Separator />
 

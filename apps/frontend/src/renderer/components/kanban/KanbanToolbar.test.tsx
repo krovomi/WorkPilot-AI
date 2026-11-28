@@ -18,6 +18,7 @@ import { DEFAULT_LANE_PREFERENCES, useKanbanLanesStore } from "../../stores/kanb
 import { useMultiRepoStore } from "../../stores/multi-repo-store";
 import { useProjectStore } from "../../stores/project-store";
 import { useShortcutsHelpStore } from "../../stores/shortcuts-help-store";
+import { useTaskStore } from "../../stores/task-store";
 import { TooltipProvider } from "../ui/tooltip";
 import { KanbanToolbar } from "./KanbanToolbar";
 
@@ -121,6 +122,24 @@ describe("filter panel", () => {
 		await userEvent.click(within(panel).getByRole("button", { name: "Reset" }));
 		expect(filters().priorities).toEqual([]);
 		expect(within(panel).queryByRole("button", { name: "Reset" })).toBeNull();
+	});
+
+	it("offers the quick filters, and the labels the board uses", async () => {
+		renderToolbar();
+		let panel = await openFilters();
+		expect(within(panel).queryByText("Labels")).toBeNull();
+		await userEvent.click(within(panel).getByRole("button", { name: "Blocked" }));
+		await userEvent.click(within(panel).getByRole("button", { name: "Changed this week" }));
+		expect(filters().quick).toEqual(["flagged", "recent"]);
+		await userEvent.keyboard("{Escape}");
+
+		useTaskStore.setState({ tasks: [{ id: "a", metadata: { labels: ["api", "Front"] } }] as never });
+		panel = await openFilters();
+		await userEvent.click(within(panel).getByRole("button", { name: "Front" }));
+		expect(filters().labels).toEqual(["Front"]);
+		expect(within(panel).getByRole("button", { name: "Front" })).toHaveAttribute("aria-pressed", "true");
+		expect(within(panel).getByRole("button", { name: "api" })).toHaveAttribute("aria-pressed", "false");
+		useTaskStore.setState({ tasks: [] });
 	});
 
 	it("names priorities and categories in the app language", async () => {
