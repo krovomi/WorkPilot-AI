@@ -1,5 +1,5 @@
 import { Tag } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	TASK_KINDS,
@@ -10,6 +10,13 @@ import { useToast } from "../../hooks/use-toast";
 import { cn } from "../../lib/utils";
 import { persistUpdateTask } from "../../stores/task-store";
 import { Badge } from "../ui/badge";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "../ui/select";
 
 /** Below this the backend's verdict is a proposal, and the badge says so. */
 const PROPOSED_BELOW = 0.6;
@@ -46,7 +53,6 @@ export function TaskKindBadge({
 }: TaskKindBadgeProps) {
 	const { t } = useTranslation(["tasks"]);
 	const { toast } = useToast();
-	const selectId = useId();
 	const [saving, setSaving] = useState(false);
 
 	const kind = task.metadata?.kind;
@@ -92,37 +98,39 @@ export function TaskKindBadge({
 		);
 	}
 
+	// The app's Select (Radix), not a native <select>: a native list is drawn
+	// by the OS and ignores the colour theme (white list in every dark theme).
 	return (
-		<label
-			htmlFor={selectId}
-			className={cn(
-				"inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs",
-				KIND_COLORS[kind],
-				className,
-			)}
-			title={title}
+		<Select
+			value={kind}
+			disabled={saving}
+			onValueChange={(next) => void onChange(next as TaskKind)}
 		>
-			<Tag className="h-3 w-3" aria-hidden="true" />
-			<span className="sr-only">{t("kind.change")}</span>
-			<select
-				id={selectId}
-				value={kind}
-				disabled={saving}
-				onChange={(e) => void onChange(e.target.value as TaskKind)}
-				className="bg-transparent text-xs outline-none cursor-pointer"
+			<SelectTrigger
 				aria-label={t("kind.change")}
+				title={title}
+				className={cn(
+					"h-auto w-auto gap-1 rounded-full bg-transparent px-2 py-0.5 text-xs",
+					"cursor-pointer hover:bg-accent/40 [&>svg:last-child]:h-3 [&>svg:last-child]:w-3",
+					KIND_COLORS[kind],
+					className,
+				)}
 			>
+				<Tag className="h-3 w-3 shrink-0" aria-hidden="true" />
+				<SelectValue />
+				{source === "user" ? (
+					<span className="opacity-70">({t("kind.chosen")})</span>
+				) : proposed ? (
+					<span className="opacity-70">({t("kind.proposed")})</span>
+				) : null}
+			</SelectTrigger>
+			<SelectContent>
 				{TASK_KINDS.map((k) => (
-					<option key={k} value={k}>
+					<SelectItem key={k} value={k} className="py-1.5 text-xs">
 						{t(`kind.values.${k}`)}
-					</option>
+					</SelectItem>
 				))}
-			</select>
-			{source === "user" ? (
-				<span className="opacity-70">({t("kind.chosen")})</span>
-			) : proposed ? (
-				<span className="opacity-70">({t("kind.proposed")})</span>
-			) : null}
-		</label>
+			</SelectContent>
+		</Select>
 	);
 }

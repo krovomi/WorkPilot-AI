@@ -258,8 +258,9 @@ describe("AdministrationView", () => {
 		expect(tabs).toHaveLength(8);
 		expect(screen.queryByRole("button", { name: "Organizations" })).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Usage" }));
-		// No usage bridge in this world: the tab stays on its loading line.
-		expect(screen.getByText("Loading…")).toBeInTheDocument();
+		// No usage bridge in this world: the figures stay on their loading lines.
+		expect(screen.getByRole("tab", { name: "Figures" })).toHaveAttribute("aria-selected", "true");
+		expect(screen.getAllByText("Loading…").length).toBeGreaterThan(0);
 	});
 
 	it("shows a store error and lets it be dismissed", async () => {

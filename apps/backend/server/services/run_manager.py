@@ -411,7 +411,7 @@ class RunManager:
             async with get_session_factory()() as quota_db:
                 # Raises HTTPException(429/402) — checked before the spec is
                 # reserved, so a refused run leaves no reservation behind.
-                await enforce_run_quota(quota_db, org_id)
+                await enforce_run_quota(quota_db, org_id, user_id, project_id)
 
         # Reserve the spec BEFORE the first await. The reservation used to
         # happen after the DB round-trip below, so two concurrent requests

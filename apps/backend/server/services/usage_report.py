@@ -34,7 +34,7 @@ from server.db.models import (
 )
 from server.services import usage_settings
 from server.services.quotas import tokens_used_this_month
-from sqlalchemy import ColumnElement, Select, func, select
+from sqlalchemy import ColumnElement, Select, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 #: The longest period one view covers, as the longest retention.
@@ -260,7 +260,10 @@ async def summary(db: AsyncSession, scope: Scope) -> dict:
                 func.coalesce(func.sum(UsageRecord.cache_read_tokens), 0),
                 func.coalesce(func.sum(UsageRecord.cost_micro_usd), 0),
                 func.count(UsageRecord.id),
-                func.coalesce(func.max(UsageRecord.estimated), False),
+                # Postgres has no max() over a boolean: count the estimated rows.
+                func.coalesce(
+                    func.sum(case((UsageRecord.estimated.is_(True), 1), else_=0)), 0
+                ),
             ).where(*usage_where(scope))
         )
     ).one()

@@ -48,6 +48,9 @@ WORKPILOT_PASSWORD_RESET_TTL_MINUTES=60
 WORKPILOT_USAGE_RETENTION_DAYS=365
 # How many days page activity is kept (off unless an organization turns it on).
 WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS=183
+# The bearer token a Prometheus scraper sends to /metrics (32 characters or
+# more, `openssl rand -hex 32`); left empty, /metrics answers 404.
+WORKPILOT_METRICS_TOKEN=
 
 # SMTP for invitation and forgotten-password emails (leave WORKPILOT_SMTP_HOST
 # empty to disable; the admin UI then shows a copyable link instead).

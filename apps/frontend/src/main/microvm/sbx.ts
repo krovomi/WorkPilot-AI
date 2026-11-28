@@ -33,14 +33,18 @@ export function sbxPath(): string | null {
 	return findExecutable("sbx", installDirs());
 }
 
-/** The VM of a worktree, as the backend names it (`os_sandbox.microvm.vm_name`). */
-export function microvmName(worktree: string, windows = isWindows()): string {
-	let key = worktree;
+/** The path with its links resolved, as Python's `Path.resolve()` gives it. */
+function resolvedPath(worktree: string): string {
 	try {
-		key = realpathSync.native(worktree);
+		return realpathSync.native(worktree);
 	} catch {
-		key = path.resolve(worktree);
+		return path.resolve(worktree);
 	}
+}
+
+/** The VM of a worktree, as the backend names it (`os_sandbox.microvm.vm_name`). */
+export function microvmName(worktree: string, windows = isWindows(), resolve = resolvedPath): string {
+	let key = resolve(worktree);
 	if (windows) key = key.toLowerCase();
 	return MICROVM_PREFIX + createHash("sha256").update(key, "utf8").digest("hex").slice(0, 16);
 }
