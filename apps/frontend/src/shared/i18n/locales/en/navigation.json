@@ -140,7 +140,14 @@
 		"action": "Install or unlock a keyring (GNOME Keyring, KWallet…) and restart WorkPilot AI: your keys will then be encrypted.",
 		"readableDescription": "The backend reads these keys straight from your projects' .workpilot/.env (or, when WorkPilot AI runs from source, from its own .env), so they stay unencrypted there, in a file only your user account can read: {{keys}}.",
 		"readableAction": "Remove from the project settings any key you no longer use. Running from source, configure Claude in Settings, where credentials are encrypted, and remove its token from the backend's .env.",
-		"dismiss": "Dismiss"
+		"dismiss": "Dismiss",
+		"wslDescription": "WorkPilot AI could not reach Windows encryption (DPAPI) from WSL, so your API keys and tokens are kept on this device unencrypted, in files only your user account can read.",
+		"wslAction": "Check that Windows interop is on in WSL ([interop] enabled=true in /etc/wsl.conf), then retry: your keys will be encrypted right away, no restart needed.",
+		"retry": "Encrypt now",
+		"retrying": "Encrypting…",
+		"retryFailed": "Windows encryption is still unreachable.",
+		"restart": "Restart WorkPilot AI",
+		"hideForGood": "Don't show again"
 	},
 	"claudeCode": {
 		"checking": "Checking Claude Code...",

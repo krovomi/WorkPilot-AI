@@ -6,31 +6,42 @@ import {
 	setupSecureStorageListeners,
 	useSecureStorageStore,
 } from "../stores/secure-storage-store";
-import { SecureStorageBanner } from "./SecureStorageBanner";
+import { useSettingsStore } from "../stores/settings-store";
+import { bannerFingerprint, SecureStorageBanner } from "./SecureStorageBanner";
 
 const protectedStatus: SecureStorageStatus = {
 	keyringAvailable: true,
+	protection: "os-keyring",
 	backend: "gnome_libsecret",
 	readableSecretKeys: [],
 	secretsAtRisk: false,
+	fix: null,
 };
 const atRiskStatus: SecureStorageStatus = {
 	keyringAvailable: false,
+	protection: null,
 	backend: "basic_text",
 	readableSecretKeys: [],
 	secretsAtRisk: true,
+	fix: "restart",
 };
 const readableStatus: SecureStorageStatus = {
 	keyringAvailable: true,
+	protection: "os-keyring",
 	backend: "gnome_libsecret",
 	readableSecretKeys: ["CONTEXT7_API_KEY"],
 	secretsAtRisk: true,
+	fix: null,
 };
+const wslStatus: SecureStorageStatus = { ...atRiskStatus, fix: "retry" };
 
 describe("SecureStorageBanner", () => {
 	beforeEach(async () => {
 		await i18n.changeLanguage("en");
 		useSecureStorageStore.setState({ status: null, dismissed: false });
+		useSettingsStore.setState((state) => ({
+			settings: { ...state.settings, secureStorageBannerHidden: undefined },
+		}));
 	});
 
 	afterEach(cleanup);
@@ -130,5 +141,93 @@ describe("SecureStorageBanner", () => {
 
 		push?.(atRiskStatus);
 		expect(useSecureStorageStore.getState().status).toEqual(atRiskStatus);
+	});
+
+	it("under WSL without DPAPI, offers to encrypt now and says when it still cannot", async () => {
+		const fixSecureStorage = vi
+			.fn()
+			.mockResolvedValue({ success: true, data: wslStatus });
+		Object.assign(window.electronAPI, { fixSecureStorage });
+		useSecureStorageStore.getState().setStatus(wslStatus);
+		render(<SecureStorageBanner />);
+
+		expect(screen.getByRole("alert")).toHaveTextContent("DPAPI");
+		fireEvent.click(screen.getByRole("button", { name: "Encrypt now" }));
+
+		await vi.waitFor(() =>
+			expect(screen.getByRole("alert")).toHaveTextContent(
+				"Windows encryption is still unreachable.",
+			),
+		);
+		expect(fixSecureStorage).toHaveBeenCalledWith();
+	});
+
+	it("goes away once the fix encrypts the secrets", async () => {
+		Object.assign(window.electronAPI, {
+			fixSecureStorage: vi.fn().mockResolvedValue({
+				success: true,
+				data: { ...protectedStatus, protection: "windows-dpapi" },
+			}),
+		});
+		useSecureStorageStore.getState().setStatus(wslStatus);
+		render(<SecureStorageBanner />);
+
+		fireEvent.click(screen.getByRole("button", { name: "Encrypt now" }));
+
+		await vi.waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+	});
+
+	it("offers a restart on Linux, where the keyring is chosen at launch", () => {
+		useSecureStorageStore.getState().setStatus(atRiskStatus);
+		render(<SecureStorageBanner />);
+
+		expect(
+			screen.getByRole("button", { name: "Restart WorkPilot AI" }),
+		).toBeInTheDocument();
+	});
+
+	it("\"Don't show again\" hides this situation for good, not a new one", async () => {
+		const saveSettings = vi.fn().mockResolvedValue({ success: true });
+		Object.assign(window.electronAPI, { saveSettings });
+		useSecureStorageStore.getState().setStatus(atRiskStatus);
+		render(<SecureStorageBanner />);
+
+		fireEvent.click(screen.getByRole("button", { name: "Don't show again" }));
+
+		await vi.waitFor(() =>
+			expect(saveSettings).toHaveBeenCalledWith({
+				secureStorageBannerHidden: "no-encryption",
+			}),
+		);
+		await vi.waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+
+		// Another situation (a project key kept readable) still warns.
+		useSecureStorageStore.getState().setStatus(readableStatus);
+		expect(await screen.findByRole("alert")).toHaveTextContent(
+			"CONTEXT7_API_KEY",
+		);
+	});
+
+	it("fingerprints a situation by what is exposed, never by a value", () => {
+		expect(bannerFingerprint(atRiskStatus)).toBe("no-encryption");
+		expect(
+			bannerFingerprint({
+				keyringAvailable: true,
+				readableSecretKeys: ["B_KEY", "A_KEY"],
+			}),
+		).toBe("readable:A_KEY,B_KEY");
+	});
+
+	it("is translated in French, buttons included", async () => {
+		await i18n.changeLanguage("fr");
+		useSecureStorageStore.getState().setStatus(wslStatus);
+		render(<SecureStorageBanner />);
+
+		expect(
+			screen.getByRole("button", { name: "Chiffrer maintenant" }),
+		).toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: "Ne plus afficher" }),
+		).toBeInTheDocument();
 	});
 });

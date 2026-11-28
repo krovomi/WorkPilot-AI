@@ -117,7 +117,12 @@ import { initSentryMain } from "./sentry";
 import { armSmokeTest, isSmokeTest } from "./smoke-test";
 import { forgeAccountsFilePath } from "./forge/forge-accounts";
 import { aiAccountsFilePath } from "./ai-accounts/ai-accounts";
-import { initSecretStorage, primeSecretFiles } from "./secret-storage";
+import {
+	initSecretStorage,
+	preloadAppKey,
+	primeSecretFiles,
+	setPlaintextSecretsRewriter,
+} from "./secret-storage";
 import {
 	getSettingsPath,
 	migrateSettingsSecrets,
@@ -631,6 +636,8 @@ if (isWindows()) {
 
 // Linux without a declared desktop (WSL…): use the running keyring, not basic_text
 selectLinuxPasswordStore();
+// WSL: unwrap the DPAPI-kept secrets key while Electron starts (secret-storage.ts)
+preloadAppKey();
 
 // MCP App views get a scheme of their own, with their own CSP; Electron only
 // accepts the registration before ready (mcp-apps/view-protocol.ts).
@@ -1297,6 +1304,8 @@ async function main() {
 	// Secrets at rest: probe the keyring and decrypt what is on disk with the
 	// async safeStorage API, before anything reads those files.
 	await initSecretStorage(appSecretFiles());
+	// The banner's "retry" (WSL) rewrites what is still in clear the same way.
+	setPlaintextSecretsRewriter(migrateSecretsAtRest);
 	// Listing these reads settings.json, decrypted ahead by now.
 	await primeSecretFiles(envSecretFiles());
 

@@ -8,6 +8,8 @@ interface SecureStorageState {
 	setStatus(status: SecureStorageStatus): void;
 	dismiss(): void;
 	refresh(): Promise<void>;
+	/** The banner's one-click fix; true when secrets are now encrypted. */
+	fix(): Promise<boolean>;
 }
 
 /** A key the previous status did not name: the user has not been told yet. */
@@ -32,6 +34,18 @@ export const useSecureStorageStore = create<SecureStorageState>((set) => ({
 				!namesNewKeys(state.status, status),
 		})),
 	dismiss: () => set({ dismissed: true }),
+	fix: async () => {
+		try {
+			const result = await window.electronAPI.fixSecureStorage();
+			if (result.success && result.data) {
+				useSecureStorageStore.getState().setStatus(result.data);
+				return result.data.keyringAvailable;
+			}
+		} catch {
+			// The last known status stands.
+		}
+		return false;
+	},
 	refresh: async () => {
 		try {
 			const result = await window.electronAPI.getSecureStorageStatus();
