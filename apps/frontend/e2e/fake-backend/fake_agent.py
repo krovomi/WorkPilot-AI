@@ -68,10 +68,19 @@ def _now() -> str:
 
 
 def _read_json(path: Path) -> dict:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
+    # The app writes the plan in place: a read in the middle of its write sees
+    # half a file. Read again rather than start over from an empty plan, which
+    # lost the card's title and status (the agents keep what they read).
+    deadline = time.monotonic() + 5.0
+    while True:
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except OSError:
+            return {}
+        except json.JSONDecodeError:
+            if time.monotonic() > deadline:
+                return {}
+            time.sleep(0.05)
 
 
 def _write_json(path: Path, data: dict) -> None:

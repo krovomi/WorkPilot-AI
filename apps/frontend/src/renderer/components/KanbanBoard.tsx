@@ -1,5 +1,4 @@
 import {
-	closestCorners,
 	DndContext,
 	type DragEndEvent,
 	type DragOverEvent,
@@ -71,6 +70,7 @@ import {
 } from "../lib/kanban-filter";
 import { orderQueue } from "../lib/kanban-queue";
 import { cn } from "../lib/utils";
+import { boardCollision } from "../lib/board-collision";
 import { openAppEmulatorDialog } from "../stores/app-emulator-store";
 import {
 	DEFAULT_COLUMN_WIDTH,
@@ -2421,7 +2421,7 @@ export function KanbanBoard({
 			</div>
 			<DndContext
 				sensors={sensors}
-				collisionDetection={closestCorners}
+				collisionDetection={boardCollision}
 				onDragStart={handleDragStart}
 				onDragOver={laneDrag.onDragOver}
 				onDragEnd={laneDrag.onDragEnd}

@@ -166,6 +166,13 @@ Pendant le glisser, la carte sous le pointeur s'affiche en pile avec le nombre d
 sélection (`groupMoveTargets`) s'affiche comme refusée. Révision humaine vers Terminé garde sa
 confirmation, puis le flux de création des PR.
 
+Où tombe une carte lâchée (`lib/board-collision.ts`, `boardCollision`) : sur ce que le pointeur
+survole (une carte, sinon sa colonne ou son couloir), et seulement sans pointeur (glisser au
+clavier) ou au-dessus de rien sur les coins les plus proches. Avec les coins seuls, une carte lâchée
+au milieu d'une colonne vide et haute revenait dans sa colonne dès qu'une carte s'y tenait à la
+même hauteur : les quatre coins d'une colonne haute sont loin de tout. `e2e/kanban-agile.e2e.ts`
+glisse dans une fenêtre large et haute, où le défaut se voyait.
+
 ### Supprimer sans confirmer une carte neuve
 
 Une carte sur laquelle rien n'a travaillé (`isLightCard` de `lib/card-edits.ts` : Planification
@@ -235,6 +242,7 @@ dans `stores/shortcuts-help-store.ts`, que la barre d'outils et le tableau parta
 | `renderer/components/kanban/PointerMenu.tsx` | menu au pointeur, `isFromPortal`, `withoutPortalEvents` |
 | `renderer/hooks/useBoardSelection.ts`, `useBoardShortcuts.ts`, `useBoardBulkEdits.ts` | sélection, touches, actions sur la sélection |
 | `renderer/lib/group-move.ts`, `components/kanban/DragOverlayCard.tsx` | où va chaque carte d'une sélection déplacée, pile sous le pointeur |
+| `renderer/lib/board-collision.ts` | la cible d'un dépôt : sous le pointeur d'abord |
 | `renderer/components/kanban/BulkActionBar.tsx`, `board-selection-context.ts` | barre d'actions, sélection pour le clic droit |
 | `renderer/lib/card-edits.ts`, `stores/board-undo-store.ts` | carte neuve, type et priorité en masse, Ctrl+Z |
 | `renderer/stores/pending-delete-store.ts`, `components/kanban/deleteCardsLater.tsx` | suppression différée |
