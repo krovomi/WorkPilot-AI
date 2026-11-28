@@ -25,7 +25,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { app } from "electron";
-import { detectWsl, readAutomountRoot } from "./open-external";
+import { detectWsl, readAutomountRoot } from "./platform/wsl";
 import { findExecutable } from "./platform";
 
 export const WSL_KEY_FILE = "secret-key.dpapi";
@@ -39,6 +39,9 @@ const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 /** Reads mode then data (base64) from stdin, writes the result (base64). */
 const DPAPI_SCRIPT = [
 	"$ErrorActionPreference = 'Stop'",
+	// Windows PowerShell otherwise writes a CLIXML progress record to stderr
+	// on every start ("Preparing modules for first use").
+	"$ProgressPreference = 'SilentlyContinue'",
 	"Add-Type -AssemblyName System.Security",
 	"$mode = [Console]::In.ReadLine()",
 	"$data = [Convert]::FromBase64String([Console]::In.ReadLine())",
