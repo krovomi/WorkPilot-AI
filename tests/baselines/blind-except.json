@@ -369,6 +369,7 @@
   "apps/backend/uiux/relevance.py": {"blind": 1, "silent": 0},
   "apps/backend/uiux/runtime.py": {"blind": 1, "silent": 0},
   "apps/backend/verify/api.py": {"blind": 3, "silent": 0},
+  "apps/backend/verify/captures_step.py": {"blind": 1, "silent": 0},
   "apps/backend/verify/detect.py": {"blind": 6, "silent": 0},
   "apps/backend/verify/devtools.py": {"blind": 15, "silent": 3},
   "apps/backend/verify/endpoints.py": {"blind": 4, "silent": 2},

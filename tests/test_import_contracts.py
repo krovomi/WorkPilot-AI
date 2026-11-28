@@ -318,6 +318,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "skills_registry",
         "tasks",
     },
+    # The captures of a task for its pull request (docs/architecture/pr-captures.md):
+    # the shared captures store and the local OCR chain in docintel, what a
+    # screen is in uiux. The verification calls it; it never imports verify.
+    "pr_captures": {"docintel", "uiux"},
     # Smart Estimation's calibration loop (docs/architecture/smart-estimation.md):
     # its ledger through foundation's JSON lock, the merge diff through
     # foundation's git. A leaf the estimation runner and the merge event read.
