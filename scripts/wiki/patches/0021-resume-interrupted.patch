@@ -1,0 +1,61 @@
+From 23e786da55889619170e33297709ece8fd8b2825 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 28 Nov 2026 19:07:15 +0000
+Subject: [PATCH] docs(wiki): resume the tasks a close or a crash interrupted
+
+---
+ User-Interface.fr.md | 13 +++++++++++++
+ User-Interface.md    | 13 +++++++++++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/User-Interface.fr.md b/User-Interface.fr.md
+index b37e380..8e3573e 100644
+--- a/User-Interface.fr.md
++++ b/User-Interface.fr.md
+@@ -116,6 +116,19 @@ Posez une question dans n'importe quelle langue (« l'export CSV a-t-il déjà 
+ 
+ Avant une revue QA complète, l'app décide sans modèle où tourne la suite complète du projet : sur cette machine, sur la CI de la forge depuis la branche de la tâche poussée sans PR (GitHub Actions, Azure Pipelines, GitLab CI, Bitbucket Pipelines, Jenkins), ou sur le serveur WorkPilot, d'après le CPU, la RAM, le GPU et la VRAM libres et la charge mesurée de la suite ; sans place, la suite attend son tour, elle n'est jamais sautée. Les tests touchés passent d'abord, le choix d'une carte l'emporte sur celui du projet, la fusion attend pendant que la CI tourne, et après une fusion les autres cartes vertes reprennent la nouvelle base et repartent. Conception : [test-placement.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/test-placement.md), [suite-base-refresh.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/suite-base-refresh.md).
+ 
++### Reprendre après une fermeture ou un plantage
++
++Fermer WorkPilot met en pause les tâches qui tournent (la même pause que le bouton Pause, dans chaque copie de la spec), et le démarrage suivant demande lesquelles reprendre. Chaque tâche montre son projet, son provider et son modèle, la façon dont elle s'est arrêtée (WorkPilot fermé, WorkPilot arrêté sans se fermer, ou « Arrêter tous les agents ») et où elle repartira : Spec, Plan, Code n/m avec la prochaine sous-tâche, ou QA.
++
++- **Cochées par défaut** : ce que l'app a interrompu. Un « Arrêter tous les agents » ou un « stop » à l'assistant vocal est listé décoché, et une tâche dont la reprise échouerait tout de suite (connexion Claude expirée pour une tâche sur Claude, dossier de spec disparu) est décochée avec la raison et un lien « Se reconnecter ».
++- **Limite « En cours »** : celle de chaque projet est respectée ; au-delà, une tâche attend et part quand une place se libère.
++- **Plus tard** (ou Échap) : les tâches restent en pause et ne sont pas reproposées au démarrage suivant. Leur carte affiche **Interrompue**, avec comment et quand dans l'infobulle, et un bouton Reprendre ; une carte en pause n'est jamais lue comme « Bloqué », donc la récupération ne remet jamais à zéro la sous-tâche où elle s'était arrêtée. « N tâches interrompues · Reprendre… » dans la barre du Kanban rouvre la liste.
++- **Paramètres > Paramètres d'agent** : Me demander (par défaut), Tout reprendre (ce que l'app a interrompu, sans vos propres arrêts) ou Ne rien reprendre. « La prochaine fois » dans le dialogue enregistre le même choix.
++
++Chaque reprise suit le chemin du bouton Reprendre : le backend reprend la phase depuis le dossier de la spec, continue la sous-tâche en cours et rouvre la session Claude quand il y en a une, sur tous les providers. Conception : [pause-resume.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/pause-resume.md).
++
++![Au démarrage : les tâches interrompues, chacune avec son moteur, sa façon de s'arrêter et l'étape où elle repart](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/interrupted-tasks.png)
++
+ ### Actions disponibles sur une carte
+ 
+ - **Preview** (icône écran) — lance l'app dans l'**App Emulator** intégré
+diff --git a/User-Interface.md b/User-Interface.md
+index 59654f1..45035ef 100644
+--- a/User-Interface.md
++++ b/User-Interface.md
+@@ -111,6 +111,19 @@ Ask a question in any language (« has the CSV export already been done? ») and
+ 
+ Before a full QA review, the app decides without a model where the project's full suite runs: on this machine, on the forge's CI from the task's branch pushed without a PR (GitHub Actions, Azure Pipelines, GitLab CI, Bitbucket Pipelines, Jenkins), or on the WorkPilot server, from the free CPU, RAM, GPU and VRAM and the suite's measured load; with no room, the suite queues, it is never skipped. The touched tests run first, a card's own choice wins over the project's, the merge waits while the CI runs, and after a merge the other green cards take the new base and run again. Design: [test-placement.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/test-placement.md), [suite-base-refresh.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/suite-base-refresh.md).
+ 
++### Resuming after a close or a crash
++
++Closing WorkPilot pauses the builds that run (the Pause button's own pause, in every spec copy), and the next launch asks which to resume. Each build shows its project, its provider and model, how it stopped (WorkPilot closed, WorkPilot stopped without closing, or « Stop all agents ») and where it picks up: Spec, Plan, Code n/m with the next subtask, or QA.
++
++- **Ticked by default**: what the app interrupted. A « Stop all agents » or voice « stop » is listed unticked, and a build whose resume would fail at once (Claude sign-in expired for a build on Claude, spec folder gone) is unticked with the reason and a « Reconnect » link.
++- **In Progress limit**: each project's limit is kept; past it, a build waits and starts when a slot frees up.
++- **Later** (or Escape): the builds stay paused and are not offered at the next launch. Their card reads **Interrupted**, with how and when in its tooltip, and a Resume button; a paused card is never read as « Stuck », so the stuck recovery never resets the subtask it stopped on. The toolbar's « N interrupted tasks · Resume… » brings the list back.
++- **Settings > Agent Settings**: Ask me (default), Resume all (what the app interrupted, without your own stops) or Resume none. « Next time » in the dialog saves the same choice.
++
++Every resume takes the Resume button's path: the backend re-enters the phase from the spec folder, continues the subtask the build was on and reopens the Claude session when there is one, on every provider. Design: [pause-resume.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/pause-resume.md).
++
++![At launch: the interrupted tasks, each with its engine, how it stopped and the step it resumes at](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/interrupted-tasks.png)
++
+ ### Actions available on a card
+ 
+ - **Preview** (screen icon) — launches the app in the embedded **App Emulator**
+-- 
+2.43.0
+

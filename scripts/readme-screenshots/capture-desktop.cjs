@@ -61,7 +61,7 @@ function waitForPreview(deadline = Date.now() + 60_000) {
 	});
 }
 
-async function openApp(browser) {
+async function openApp(browser, init) {
 	const page = await browser.newPage({
 		viewport: VIEWPORT,
 		colorScheme: process.env.COLOR_SCHEME || "dark",
@@ -73,6 +73,7 @@ async function openApp(browser) {
 	}
 	await page.addInitScript({ path: path.join(__dirname, "preview-init.js") });
 	await page.addInitScript({ path: path.join(__dirname, "demo-data.js") });
+	if (init) await page.addInitScript(init);
 	page.on("pageerror", (e) =>
 		console.warn("pageerror:", e.message.slice(0, 160)),
 	);
@@ -177,6 +178,72 @@ const TERMINAL_SESSIONS = [
 	],
 ];
 
+/**
+ * The board after WorkPilot closed on two builds and crashed on a third
+ * (docs/architecture/pause-resume.md): their cards read « Interrupted », and
+ * the toolbar's chip lists them, as the launch dialog does.
+ */
+function interruptedBoard() {
+	const minute = 60_000;
+	const at = (ms) => new Date(Date.now() - ms).toISOString();
+	const pauses = {
+		"t-05": { paused_phase: "coding", paused_at: at(14 * minute) },
+		"t-06": { paused_phase: "coding", paused_at: at(14 * minute) },
+		"t-07": { paused_phase: "qa_review", paused_at: at(2 * 60 * minute), crashed: true },
+	};
+	const o = window.__DEMO_OVERRIDES__;
+	const getTasks = o.getTasks;
+	o.getTasks = async (projectId) => {
+		const result = await getTasks(projectId);
+		return {
+			...result,
+			data: result.data.map((task) =>
+				pauses[task.id]
+					? {
+							...task,
+							metadata: {
+								...task.metadata,
+								paused: {
+									enabled: true,
+									reason: "app_shutdown",
+									paused_subtask_id: null,
+									...pauses[task.id],
+								},
+							},
+						}
+					: task,
+			),
+		};
+	};
+	const row = (taskId, title, origin, phase, done, total, next, provider, model) => ({
+		taskId,
+		projectId: "mock-project-1",
+		projectName: "acme-storefront",
+		title,
+		origin,
+		interruptedAt: pauses[taskId]?.paused_at ?? at(12 * minute),
+		phase,
+		subtasksDone: done,
+		subtasksTotal: total,
+		nextSubtask: next,
+		provider,
+		model,
+		blocker: null,
+		selectedByDefault: true,
+	});
+	o.listInterruptedTasks = async () => [
+		row("t-05", "One-page checkout", "app_exit", "coding", 2, 5, "Stripe Payment Element", "claude", "sonnet"),
+		row("t-06", "Typo-tolerant product search (1/2): fuzzy index", "app_exit", "coding", 1, 3, "Fuzzy matcher", "mistral", "codestral"),
+		row("t-07", "Export reports as CSV", "crash", "qa_review", 4, 4, null, "openai", "gpt-5.5"),
+	];
+}
+
+/** Per shot: what the page holds before the app starts. */
+const INIT = {
+	"interrupted-cards": interruptedBoard,
+	"interrupted-tasks": interruptedBoard,
+};
+
 const SHOTS = {
 	kanban: (page) => page.waitForTimeout(2500),
 	// The agile board (docs/architecture/kanban-*.md): lanes by sprint, the list, the timeline, the reports.
@@ -187,6 +254,13 @@ const SHOTS = {
 		await page.waitForTimeout(2000);
 		await page.getByRole("button", { name: "Reports" }).first().click();
 		await page.waitForTimeout(1500);
+	},
+	// Builds a close or a crash interrupted: « Interrupted » cards, then the list (pause-resume.md).
+	"interrupted-cards": (page) => page.getByTestId("interrupted-tasks-banner").waitFor(),
+	"interrupted-tasks": async (page) => {
+		await page.getByTestId("interrupted-tasks-banner").click();
+		await page.getByTestId("interrupted-tasks-dialog").waitFor();
+		await page.waitForTimeout(600);
 	},
 	// The planning view of a sprint, then « Proposer le sprint » in it (docs/architecture/sprint-proposal.md).
 	"sprint-planning": (page) => openSprintPlanning(page),
@@ -305,7 +379,7 @@ async function openSettingsSection(page, label) {
 		);
 		for (const [name, go] of Object.entries(SHOTS)) {
 			if (only.length && !only.includes(name)) continue;
-			const page = await openApp(browser);
+			const page = await openApp(browser, INIT[name]);
 			await go(page);
 			// The activity pill counts the demo tasks left running: noise here.
 			const hide = page.getByRole("button", { name: "Hide", exact: true });

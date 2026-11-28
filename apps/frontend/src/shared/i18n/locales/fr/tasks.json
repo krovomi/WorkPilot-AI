@@ -648,6 +648,8 @@
 			"qa_other": "{{count}} en QA",
 			"paused_one": "{{count}} en pause",
 			"paused_other": "{{count}} en pause",
+			"interrupted_one": "{{count}} interrompue",
+			"interrupted_other": "{{count}} interrompues",
 			"failedErrors_one": "{{count}} exécution en échec",
 			"failedErrors_other": "{{count}} exécutions en échec",
 			"failedQa_one": "{{count}} refusée par la QA",

@@ -39,7 +39,7 @@ import { allSpecDirs, currentPausePhase, getSpecPaths, resumePausedTask } from "
  *
  * `interrupted-runs.ts` records, when WorkPilot closes, which builds were
  * running (`reason: "app_shutdown"`). This module decides what the next launch
- * does with them, from Settings › Agents (`interruptedTasksOnLaunch`):
+ * does with them, from Settings > Agent Settings (`interruptedTasksOnLaunch`):
  *
  * - `ask` (default): the renderer shows the list (InterruptedTasksDialog) and
  *   the person ticks what to resume. « Plus tard » marks the rest deferred, so
@@ -311,9 +311,8 @@ export function deferInterrupted(items: InterruptedTask[]): void {
 }
 
 /**
- * Apply Settings › Agents to these interrupted tasks: offer them (next to any
- * still unanswered), resume them, or leave them. Returns what was offered or
- * resumed.
+ * At launch, once the window has loaded: apply Settings > Agent Settings to the
+ * builds the last exit interrupted. Returns what was offered or resumed.
  */
 async function offerTasks(
 	agentManager: AgentManager,
