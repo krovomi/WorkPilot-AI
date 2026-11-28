@@ -7,6 +7,14 @@ import "@testing-library/jest-dom/vitest";
 import "@shared/i18n";
 import { fetchLocalBackend } from "./local-backend-shim";
 
+// Windows DPAPI through WSL interop (main/wsl-secret-key.ts) never runs under
+// test: a suite started from WSL would reach the real powershell.exe and turn
+// every "no keyring" case into an encrypted one. Its tests inject their deps.
+vi.mock("../main/wsl-secret-key", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../main/wsl-secret-key")>()),
+	loadWslSecretKey: async () => null,
+}));
+
 // Mock localStorage for tests that need it
 const createLocalStorageMock = () => {
 	let store: Record<string, string> = {};

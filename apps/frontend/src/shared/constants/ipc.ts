@@ -13,6 +13,7 @@ export const IPC_CHANNELS = {
 	// Secrets at rest: is the OS keyring protecting stored API keys / tokens?
 	SECURE_STORAGE_STATUS: "secureStorage:status",
 	SECURE_STORAGE_STATUS_CHANGED: "secureStorage:statusChanged", // main → renderer
+	SECURE_STORAGE_FIX: "secureStorage:fix",
 	// Project operations
 	PROJECT_ADD: "project:add",
 	PROJECT_REMOVE: "project:remove",

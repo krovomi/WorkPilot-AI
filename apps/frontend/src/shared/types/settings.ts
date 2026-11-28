@@ -358,6 +358,9 @@ export interface AppSettings {
 	onboardingCompleted?: boolean;
 	// Setup Hub home-screen banner dismissed by the user
 	setupBannerDismissed?: boolean;
+	// "Don't show again" on the unencrypted-secrets banner: the situation it
+	// was hidden for (SecureStorageBanner `bannerFingerprint`), so a new one shows
+	secureStorageBannerHidden?: string;
 	// Selected agent profile for preset model/thinking configurations
 	selectedAgentProfile?: string;
 	// Active LLM provider (e.g. 'anthropic', 'openai', 'google', 'ollama', ...)
