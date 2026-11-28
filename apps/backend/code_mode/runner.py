@@ -62,9 +62,11 @@ class Executor(Protocol):
     project_dir: Path
     working_directory: Path
 
-    async def execute(self, tool_name: str, arguments: dict[str, Any]) -> Any: ...
+    async def execute(self, tool_name: str, arguments: dict[str, Any]) -> Any:
+        """Run one tool call through the session's checks."""
 
-    def session_sandbox(self) -> Any: ...
+    def script_sandbox(self) -> Any:
+        """The OS sandbox the script's Node runs in."""
 
 
 class ScriptError(RuntimeError):
@@ -240,7 +242,7 @@ async def run_script(
     node, version = await _node()
     argv = node_argv(node, version)
     env = host_env()
-    sandbox = executor.session_sandbox()
+    sandbox = executor.script_sandbox()
     if getattr(sandbox, "isolated", False):
         argv, env = sandbox.wrap(argv, env, cwd=executor.working_directory)
     launch = spawn or asyncio.create_subprocess_exec
