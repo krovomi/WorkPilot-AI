@@ -31,6 +31,7 @@ import {
 } from "../provider-failover/task-phase-provider";
 import { agentSafetyEnv } from "./agent-safety-env";
 import { codeModeEnv } from "./code-mode-env";
+import { pinnedClaudeProfile, pinnedClaudeProfileEnv } from "./pinned-claude-profile";
 import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
 import {
@@ -178,6 +179,12 @@ export class AgentProcessManager {
 	// Use null to indicate not yet configured - getPythonPath() will use fallback
 	private _pythonPath: string | null = null;
 	private autoBuildSourcePath: string = "";
+	/**
+	 * Task → the Claude profile its card or project pins, so that a rate limit
+	 * or a failed sign-in in its output is charged to that profile, and the
+	 * auto-swap looks for another one than it.
+	 */
+	private readonly pinnedProfiles = new Map<string, string>();
 
 	constructor(state: AgentState, events: AgentEvents, emitter: EventEmitter) {
 		this.state = state;
@@ -246,7 +253,9 @@ export class AgentProcessManager {
 		taskProviders?: TaskProviderPlan,
 	): NodeJS.ProcessEnv {
 		// Get best available Claude profile environment (automatically handles rate limits)
-		const profileResult = getBestAvailableProfileEnv();
+		// A Claude account pinned by the card or its project wins (ai-account-pins.ts).
+		const profileResult =
+			pinnedClaudeProfileEnv(taskProviders) ?? getBestAvailableProfileEnv();
 		const profileEnv = profileResult.env;
 		// Use getAugmentedEnv() to ensure common tool paths (dotnet, homebrew, etc.)
 		// are available even when app is launched from Finder/Dock
@@ -339,7 +348,7 @@ export class AgentProcessManager {
 			allOutput.slice(-500),
 		);
 
-		const rateLimitDetection = detectRateLimit(allOutput);
+		const rateLimitDetection = detectRateLimit(allOutput, this.pinnedProfiles.get(taskId));
 		appLog.info("[AgentProcess] Rate limit detection result:", {
 			isRateLimited: rateLimitDetection.isRateLimited,
 			resetTime: rateLimitDetection.resetTime,
@@ -515,7 +524,7 @@ export class AgentProcessManager {
 			return false;
 		}
 
-		const authFailureDetection = detectAuthFailure(allOutput);
+		const authFailureDetection = detectAuthFailure(allOutput, this.pinnedProfiles.get(taskId));
 
 		if (!authFailureDetection.isAuthFailure) {
 			appLog.info(
@@ -895,7 +904,7 @@ export class AgentProcessManager {
 			// and the UI should prompt re-authentication.
 			try {
 				const profileManager = getClaudeProfileManager();
-				const activeProfile = profileManager.getActiveProfile();
+				const activeProfile = pinnedClaudeProfile(taskProviders) ?? profileManager.getActiveProfile();
 				if (activeProfile?.configDir) {
 					const tokenResult = await ensureValidToken(
 						activeProfile.configDir,
@@ -956,7 +965,10 @@ export class AgentProcessManager {
 		// While marked, the UsageMonitor's ensureValidToken() will SKIP refresh for this
 		// configDir, preventing token revocation that would cause 401 in the subprocess.
 		const profileManager = getClaudeProfileManager();
-		const agentConfigDir = profileManager.getActiveProfile()?.configDir;
+		const pinnedProfile = pinnedClaudeProfile(taskProviders);
+		if (pinnedProfile) this.pinnedProfiles.set(taskId, pinnedProfile.id);
+		else this.pinnedProfiles.delete(taskId);
+		const agentConfigDir = (pinnedProfile ?? profileManager.getActiveProfile())?.configDir;
 		if (agentConfigDir) {
 			markAgentRunning(agentConfigDir);
 			appLog.info(

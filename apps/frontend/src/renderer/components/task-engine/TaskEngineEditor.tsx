@@ -15,11 +15,14 @@ import {
 	ENGINE_PHASES,
 	type EnginePhase,
 	type EngineTrio,
+	engineProviders,
 	isUniformEngine,
 	seedEngine,
 	type TaskEngine,
 } from "../../../shared/utils/task-engine";
+import type { AiAccountPins } from "../../../shared/types/ai-accounts";
 import { useConfiguredProviders } from "../../hooks/useConfiguredProviders";
+import { AiAccountPinsEditor } from "../ai-account-pins/AiAccountPinsEditor";
 import { useSettingsStore } from "../../stores/settings-store";
 import { EngineTrioPicker } from "./EngineTrioPicker";
 import { PhaseCodeModePicker } from "./PhaseCodeModePicker";
@@ -39,6 +42,14 @@ interface TaskEngineEditorProps {
 	 */
 	phaseCodeMode?: PhaseCodeMode;
 	onPhaseCodeModeChange?: (next: PhaseCodeMode) => void;
+	/**
+	 * The AI account this card pins per provider (`aiAccounts`). Given with
+	 * its setter, each provider of the engine that has a choice offers one.
+	 */
+	accounts?: AiAccountPins;
+	onAccountsChange?: (next: AiAccountPins | undefined) => void;
+	/** The project's pins, shown as what the card inherits. */
+	inheritedAccounts?: AiAccountPins;
 }
 
 /**
@@ -61,6 +72,9 @@ export function TaskEngineEditor({
 	disabled = false,
 	phaseCodeMode,
 	onPhaseCodeModeChange,
+	accounts,
+	onAccountsChange,
+	inheritedAccounts,
 }: TaskEngineEditorProps) {
 	const { t } = useTranslation(["tasks", "settings"]);
 	const settings = useSettingsStore((s) => s.settings);
@@ -187,6 +201,18 @@ export function TaskEngineEditor({
 						</div>
 					))}
 				</div>
+			)}
+
+			{onAccountsChange && (
+				<AiAccountPinsEditor
+					providers={engineProviders(engine)}
+					value={accounts}
+					onChange={onAccountsChange}
+					inherited={inheritedAccounts}
+					scope="card"
+					idPrefix={idPrefix}
+					disabled={disabled}
+				/>
 			)}
 		</div>
 	);

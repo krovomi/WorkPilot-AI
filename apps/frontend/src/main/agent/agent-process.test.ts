@@ -279,7 +279,25 @@ vi.mock("../provider-failover/task-phase-provider", () => ({
 	chainHasOtherProvider: () => failover.otherProvider,
 }));
 
+// The Claude profile a card or its project pins (none unless a test sets one).
+const pinned = vi.hoisted(() => ({
+	profile: undefined as { id: string; name: string; configDir: string } | undefined,
+}));
+vi.mock("./pinned-claude-profile", () => ({
+	pinnedClaudeProfile: () => pinned.profile,
+	pinnedClaudeProfileEnv: () =>
+		pinned.profile
+			? {
+					env: { CLAUDE_CONFIG_DIR: pinned.profile.configDir },
+					profileId: pinned.profile.id,
+					profileName: pinned.profile.name,
+					wasSwapped: false,
+				}
+			: undefined,
+}));
+
 import { getClaudeProfileManager } from "../claude-profile-manager";
+import { ensureValidToken, markAgentRunning } from "../claude-profile/token-refresh";
 import { getToolInfo } from "../cli-tool-manager";
 import { projectStore } from "../project-store";
 import { pythonEnvManager } from "../python-env-manager";
@@ -1355,5 +1373,57 @@ describe("AgentProcessManager - an expired refresh token asks for the sign-in be
 		withAutoSwitch(true, true);
 		manager.requestReauthBeforeSpawn("task-1", "primary", "Refresh token expired");
 		expect(failures).toEqual([]);
+	});
+});
+
+describe("AgentProcessManager - a Claude account pinned by the card or its project", () => {
+	let processManager: AgentProcessManager;
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		spawnCalls.length = 0;
+		mockProcesses.length = 0;
+		delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+		vi.mocked(profileService.getAPIProfileEnv).mockResolvedValue({});
+		vi.mocked(ensureValidToken).mockResolvedValue({ wasRefreshed: false } as never);
+		processManager = new AgentProcessManager(new AgentState(), new AgentEvents(), new EventEmitter());
+	});
+
+	afterEach(() => {
+		pinned.profile = undefined;
+		processManager.killAllProcesses();
+	});
+
+	it("runs on the pinned profile: its token is refreshed and marked in use, never the active one", async () => {
+		pinned.profile = { id: "work", name: "Work", configDir: "/profiles/work" };
+		await processManager.spawnProcess(
+			"task-1",
+			"/fake/cwd",
+			["run.py"],
+			{},
+			"task-execution",
+			undefined,
+			{
+				providers: ["claude"],
+				startProvider: "claude",
+				usesClaude: true,
+				accounts: { claude: "work" },
+			},
+		);
+
+		expect(spawnCalls).toHaveLength(1);
+		expect(spawnCalls[0].options.env.CLAUDE_CONFIG_DIR).toBe("/profiles/work");
+		expect(rateLimitDetector.getBestAvailableProfileEnv).not.toHaveBeenCalled();
+		expect(ensureValidToken).toHaveBeenCalledWith("/profiles/work", undefined, { forceRefresh: true });
+		expect(markAgentRunning).toHaveBeenCalledWith("/profiles/work");
+
+		// A failure in its output is charged to the pinned profile, not the active one.
+		(
+			processManager as unknown as {
+				handleProcessFailure: (taskId: string, output: string, type: string) => boolean;
+			}
+		).handleProcessFailure("task-1", "Error: 401 Unauthorized", "task-execution");
+		expect(rateLimitDetector.detectRateLimit).toHaveBeenCalledWith("Error: 401 Unauthorized", "work");
+		expect(rateLimitDetector.detectAuthFailure).toHaveBeenCalledWith("Error: 401 Unauthorized", "work");
 	});
 });

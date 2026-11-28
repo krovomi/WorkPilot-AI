@@ -25,9 +25,12 @@ import { useTranslation } from "react-i18next";
 import {
 	buildEngineMetadata,
 	defaultEngineProvider,
+	engineProviders,
 	seedEngine,
 	type TaskEngine,
 } from "../../shared/utils/task-engine";
+import type { AiAccountPins } from "../../shared/types/ai-accounts";
+import { pinsForProviders } from "../../shared/utils/ai-account-pins";
 import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
 import { type PhaseCodeMode, phaseCodeModeMetadata } from "../../shared/utils/code-mode";
 import {
@@ -162,6 +165,12 @@ export function TaskCreationWizard({
 	);
 	const [engine, setEngine] = useState<TaskEngine>(seedTaskEngine);
 	const [phaseCodeMode, setPhaseCodeMode] = useState<PhaseCodeMode>({});
+	// The AI account the card pins per provider (absent = the project's, else the default).
+	const [aiAccounts, setAiAccounts] = useState<AiAccountPins | undefined>(undefined);
+	const projectAiAccounts = useMemo(
+		() => projects.find((p) => p.id === projectId)?.settings?.aiAccounts,
+		[projects, projectId],
+	);
 	// Read through a ref by the open/reset effect below: a Settings change
 	// while the dialog is open must not reset the form the person is filling.
 	const seedTaskEngineRef = useRef(seedTaskEngine);
@@ -298,6 +307,7 @@ export function TaskCreationWizard({
 						DEFAULT_PHASE_THINKING,
 				);
 				setEngine(draft.engine ?? seedTaskEngineRef.current());
+				setAiAccounts(undefined);
 				setImages(draft.images);
 				setReferencedFiles(draft.referencedFiles ?? []);
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
@@ -347,6 +357,7 @@ export function TaskCreationWizard({
 				);
 				setEngine(seedTaskEngineRef.current());
 				setPhaseCodeMode({});
+				setAiAccounts(undefined);
 				setImages([]);
 				setReferencedFiles([]);
 				setRequireReviewBeforeCoding(false);
@@ -673,6 +684,9 @@ export function TaskCreationWizard({
 			// model and effort, locked so nothing global replaces them later.
 			Object.assign(metadata, buildEngineMetadata(engine));
 			Object.assign(metadata, phaseCodeModeMetadata(phaseCodeMode));
+			// The card's account pins, for the providers its engine uses.
+			const pins = pinsForProviders(aiAccounts, engineProviders(engine));
+			if (pins) metadata.aiAccounts = pins;
 			if (images.length > 0) metadata.attachedImages = images;
 			if (allReferencedFiles.length > 0)
 				metadata.referencedFiles = allReferencedFiles;
@@ -764,6 +778,7 @@ export function TaskCreationWizard({
 				DEFAULT_PHASE_THINKING,
 		);
 		setEngine(seedTaskEngine());
+		setAiAccounts(undefined);
 		setImages([]);
 		setReferencedFiles([]);
 		setRequireReviewBeforeCoding(false);
@@ -954,6 +969,9 @@ export function TaskCreationWizard({
 							idPrefix="new-task-engine"
 							phaseCodeMode={phaseCodeMode}
 							onPhaseCodeModeChange={setPhaseCodeMode}
+							accounts={aiAccounts}
+							onAccountsChange={setAiAccounts}
+							inheritedAccounts={projectAiAccounts}
 							disabled={isCreating}
 						/>
 					}

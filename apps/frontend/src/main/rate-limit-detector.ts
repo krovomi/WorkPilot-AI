@@ -722,7 +722,7 @@ export function getBestAvailableProfileEnv(): BestProfileEnvResult {
  * @param env - Profile environment from getProfileEnv() or getActiveProfileEnv()
  * @returns Environment with CLAUDE_CODE_OAUTH_TOKEN cleared if CLAUDE_CONFIG_DIR is set
  */
-function ensureCleanProfileEnv(
+export function ensureCleanProfileEnv(
 	env: Record<string, string>,
 ): Record<string, string> {
 	if (env.CLAUDE_CONFIG_DIR && !env.CLAUDE_CODE_OAUTH_TOKEN) {

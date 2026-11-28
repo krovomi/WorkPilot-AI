@@ -381,6 +381,32 @@ describe("Subprocess Spawn Integration", () => {
 			);
 		}, 30000); // Increase timeout for Windows CI (dynamic imports are slow)
 
+		it("restarts a task moved to another Claude profile on that profile, even when pinned", async () => {
+			const { AgentManager } = await import("../../main/agent");
+			const manager = new AgentManager();
+			manager.configure(undefined, AUTO_CLAUDE_SOURCE);
+			const promise = manager.startTaskExecution("task-1", TEST_PROJECT_PATH, "spec-001");
+			await new Promise((resolve) => setImmediate(resolve));
+
+			const setActiveProfile = vi.fn();
+			Object.assign(mockProfileManager, { setActiveProfile });
+			vi.useFakeTimers();
+			try {
+				expect(manager.restartTask("task-1", "spare")).toBe(true);
+				vi.clearAllTimers();
+			} finally {
+				vi.useRealTimers();
+				Reflect.deleteProperty(mockProfileManager, "setActiveProfile");
+			}
+			expect(setActiveProfile).toHaveBeenCalledWith("spare");
+			const swaps = (manager as unknown as {
+				claudeSwaps: { apply: (id: string, pins: object) => object };
+			}).claudeSwaps;
+			expect(swaps.apply("task-1", { claude: "work" })).toEqual({ claude: "spare" });
+			mockProcess.emit("exit", 0);
+			await promise;
+		}, 30000);
+
 		it("should spawn Python process for QA process", async () => {
 			// Add delay for CI mock initialization
 			if (setupMockDelay > 0) {

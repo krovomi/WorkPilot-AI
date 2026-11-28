@@ -19,11 +19,13 @@ import { AgentQueueManager } from "./agent-queue";
 import { buildSpecModelArgs } from "./spec-launch-config";
 import {
 	planTaskProviders,
+	taskAccountPins,
 	readTaskMetadataFor,
 	taskEngineFromMetadata,
 	type TaskProviderPlan,
 } from "./task-provider-env";
 import { AgentState } from "./agent-state";
+import { ClaudeSwapPins } from "./claude-swap-pins";
 import { applyMobileTargets, applyTddOverride, applyVerifyLoop } from "./env-utils";
 import type {
 	RoadmapConfig,
@@ -36,6 +38,8 @@ import type {
  * This is a slim facade that delegates to focused modules
  */
 export class AgentManager extends EventEmitter {
+	/** The Claude profile an auto-swap moved a pinned task to (claude-swap-pins.ts). */
+	private readonly claudeSwaps = new ClaudeSwapPins();
 	private state: AgentState;
 	private events: AgentEvents;
 	private processManager: AgentProcessManager;
@@ -82,6 +86,7 @@ export class AgentManager extends EventEmitter {
 	private taskProviderPlan(
 		location: { projectPath: string; specId?: string; specDir?: string },
 		startPhase: EnginePhase,
+		taskId?: string,
 	): TaskProviderPlan | undefined {
 		const metadata = readTaskMetadataFor(location);
 		if (!metadata) return undefined;
@@ -92,6 +97,8 @@ export class AgentManager extends EventEmitter {
 			taskEngineFromMetadata(metadata, undefined, project?.settings?.provider),
 			startPhase,
 		);
+		// The accounts the card (else its project) pins, per provider.
+		plan.accounts = this.claudeSwaps.apply(taskId, taskAccountPins(metadata, project?.settings));
 		// The cross review opens a session on its own provider: its
 		// credentials go to the build too. Claude's are not added here; they
 		// follow the task's own OAuth chain, as `buildTaskProviderEnv` says.
@@ -300,6 +307,7 @@ export class AgentManager extends EventEmitter {
 		const providerPlan = this.taskProviderPlan(
 			{ projectPath, specDir },
 			"spec",
+			taskId,
 		);
 		if (
 			this.requiresClaudeAuth(providerPlan) &&
@@ -457,6 +465,7 @@ export class AgentManager extends EventEmitter {
 		const providerPlan = this.taskProviderPlan(
 			{ projectPath, specId },
 			"coding",
+			taskId,
 		);
 		if (
 			this.requiresClaudeAuth(providerPlan) &&
@@ -645,7 +654,7 @@ export class AgentManager extends EventEmitter {
 		];
 
 		// Auto-start the local Ollama server if that's the active provider.
-		const providerPlan = this.taskProviderPlan({ projectPath, specId }, "qa");
+		const providerPlan = this.taskProviderPlan({ projectPath, specId }, "qa", taskId);
 		await this.ensureLocalServerIfNeeded(undefined, providerPlan);
 
 		await this.processManager.spawnProcess(
@@ -862,6 +871,8 @@ export class AgentManager extends EventEmitter {
 			if (currentActiveId !== newProfileId) {
 				profileManager.setActiveProfile(newProfileId);
 			}
+			// A task pinned on a Claude profile restarts on the new one too.
+			this.claudeSwaps.remember(taskId, newProfileId);
 		}
 		this.killTask(taskId);
 		setTimeout(() => {

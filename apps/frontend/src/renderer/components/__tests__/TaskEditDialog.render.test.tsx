@@ -15,6 +15,24 @@ import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
 import { TaskEditDialog } from "../TaskEditDialog";
 
+// The account pins have their own tests: here a button removes the card's
+// OpenAI pin and pins a Claude profile, beside the project's pins it was given.
+vi.mock("../ai-account-pins/AiAccountPinsEditor", () => ({
+	AiAccountPinsEditor: ({
+		value,
+		onChange,
+		inherited,
+	}: {
+		value?: Record<string, string>;
+		onChange: (pins: Record<string, string>) => void;
+		inherited?: Record<string, string>;
+	}) => (
+		<button type="button" onClick={() => onChange({ claude: "team" })}>
+			{`pins ${JSON.stringify(value ?? {})} over ${JSON.stringify(inherited ?? {})}`}
+		</button>
+	),
+}));
+
 const api = {
 	updateTask: vi.fn(),
 	duplicateTask: vi.fn(),
@@ -112,6 +130,20 @@ describe("TaskEditDialog edit", () => {
 		expect(updates.base).toBeUndefined();
 		expect(onOpenChange).toHaveBeenCalledWith(false);
 		expect(useTaskStore.getState().tasks[0].title).toBe("Fix the login form");
+	});
+
+	it("saves the accounts the card pins, and only when they changed", async () => {
+		useProjectStore.setState({
+			projects: [{ id: "p1", name: "Repo", path: "/repo", settings: { aiAccounts: { openai: "client" } } } as never],
+		});
+		const { onSaved } = renderDialog({
+			task: makeTask({ metadata: { provider: "anthropic", aiAccounts: { claude: "work", ollama: "x" } } }),
+		});
+		fireEvent.click(screen.getByRole("button", { name: /Next: engine/ }));
+		fireEvent.click(await screen.findByText('pins {"claude":"work"} over {"openai":"client"}'));
+		fireEvent.click(await screen.findByRole("button", { name: "Save Changes" }));
+		await waitFor(() => expect(onSaved).toHaveBeenCalled());
+		expect(api.updateTask.mock.calls[0][1].metadata.aiAccounts).toEqual({ claude: "team" });
 	});
 
 	it("says the save failed and stays open", async () => {
