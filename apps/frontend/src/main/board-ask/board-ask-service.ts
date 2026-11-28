@@ -11,13 +11,17 @@
  *    conversation) into one standalone question and the words a ticket about
  *    it would use, in every language the board is written in.
  * 2. **Search.** A keyword search ({@link KeywordIndex}) over every ticket
- *    keeps the best candidates; a small board is read whole.
+ *    and, when an embeddings model can be asked (`semantic-search.ts`), a
+ *    ranking by meaning, run while the model understands the question; the
+ *    two rankings are fused ({@link fuseRanks}) and keep the best
+ *    candidates. A small board is read whole.
  * 3. **Judge.** The model reads the candidates and says, for each one that
  *    relates, how much of the question it covers and why, then answers citing
  *    them.
  *
  * Without an answer from the model (no provider, a timeout, unreadable
- * output) the keyword search answers alone: the panel always has something.
+ * output) the fused ranking answers alone, or the keyword search when no
+ * embeddings model could be asked: the panel always has something.
  * Ticket text, the question and the conversation enter the prompts as quoted
  * data (S2); what comes back is read as JSON into closed lists and bounded
  * strings, and a ticket is only ever named by a reference this code gave.
@@ -27,13 +31,15 @@ import type {
 	BoardAskCoverage,
 	BoardAskMatch,
 	BoardAskResult,
+	BoardAskSemantic,
 	BoardAskTurn,
 	Task,
 } from "../../shared/types";
 import { BOARD_ASK_COVERAGES, BOARD_ASK_LIMITS } from "../../shared/types/board-ask";
 import { detectLanguages, KeywordIndex, type QueryTerm } from "../../shared/utils/board-ask-search";
 import { quoteUntrusted } from "../security/untrusted-text";
-import { type BoardTicket, ticketDigest, ticketDocument, toTicket } from "./tickets";
+import type { SemanticFn, SemanticRanking } from "./semantic-search";
+import { type BoardTicket, ticketDigest, ticketDocument, ticketMeaning, toTicket } from "./tickets";
 
 /** A board this small is read whole by the model: nothing to miss. */
 export const SMALL_BOARD = 30;
@@ -46,6 +52,13 @@ const MAX_TERMS = 60;
 const MAX_TERM_CHARS = 60;
 const MAX_ANSWER_CHARS = 3000;
 const MAX_REASON_CHARS = 300;
+/** Reciprocal rank fusion's constant: a rank's weight is 1 / (RRF_K + rank). */
+const RRF_K = 60;
+/**
+ * Without a model to judge them, the tickets ranked by meaning that are
+ * listed: those within this much of the closest one's cosine.
+ */
+export const SEMANTIC_BAND = 0.12;
 const LANGUAGE_NAMES: Readonly<Record<string, string>> = {
 	en: "English",
 	fr: "French",
@@ -69,6 +82,8 @@ export interface AskBoardInput {
 	appLanguage: string;
 	complete: CompletionFn;
 	readSpec?: (task: Task) => string;
+	/** Ranks the tickets by meaning; absent when the person turned it off. */
+	semantic?: SemanticFn;
 }
 
 interface QueryPlan {
@@ -229,6 +244,34 @@ export function citeMatches(answer: string, order: readonly string[]): string {
 		.trim();
 }
 
+/**
+ * Several rankings of ids made one (reciprocal rank fusion): an id ranked
+ * well by any of them comes up, and one ranked well by both comes first.
+ */
+export function fuseRanks(rankings: readonly (readonly string[])[], k = RRF_K): string[] {
+	const score = new Map<string, number>();
+	for (const ranking of rankings) {
+		ranking.forEach((id, rank) => {
+			score.set(id, (score.get(id) ?? 0) + 1 / (k + rank + 1));
+		});
+	}
+	return [...score.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+}
+
+/** The closest tickets of a ranking by meaning: `top` of them, or those within the band. */
+function closest(meaning: SemanticRanking | null, top: number, band?: number): string[] {
+	if (!meaning || meaning.scores.length === 0) return [];
+	const best = meaning.scores[0].score;
+	return meaning.scores
+		.filter((s) => band === undefined || s.score >= best - band)
+		.slice(0, top)
+		.map((s) => s.id);
+}
+
+function semanticInfo(meaning: SemanticRanking): BoardAskSemantic {
+	return { ...meaning.source, indexed: meaning.indexed, total: meaning.total };
+}
+
 function recency(ticket: BoardTicket): number {
 	return ticket.updatedAt ? Date.parse(ticket.updatedAt) : 0;
 }
@@ -243,13 +286,21 @@ export async function askBoard(input: AskBoardInput): Promise<BoardAskResult> {
 	const index = new KeywordIndex(tickets.map(ticketDocument));
 	const boardLanguages = detectLanguages(tickets.map((t) => `${t.title} ${t.description}`)).slice(0, 4);
 
-	const plan = parseQueryPlan(
-		await input.complete(
-			buildUnderstandPrompt(question, input.history, boardLanguages),
-			SYSTEM_PROMPT,
-			"BoardAskUnderstand",
-		),
-	);
+	// A follow-up means what it means after the question before it.
+	const meaningQuery = [...(input.history ?? []).slice(-1).map((turn) => turn.question), question].join("\n");
+	const meaningAsked = input.semantic
+		? input
+				.semantic(
+					meaningQuery,
+					tickets.map((t) => ({ id: t.id, text: ticketMeaning(t) })),
+				)
+				.catch(() => null)
+		: Promise.resolve(null);
+	const [understood, meaning] = await Promise.all([
+		input.complete(buildUnderstandPrompt(question, input.history, boardLanguages), SYSTEM_PROMPT, "BoardAskUnderstand"),
+		meaningAsked,
+	]);
+	const plan = parseQueryPlan(understood);
 	const standalone = plan?.question || question;
 	const query: QueryTerm[] = [
 		{ text: question, weight: 1 },
@@ -258,30 +309,34 @@ export async function askBoard(input: AskBoardInput): Promise<BoardAskResult> {
 		// A follow-up's words are in the conversation more than in itself.
 		...(input.history ?? []).slice(-1).map((turn) => ({ text: turn.question, weight: 0.4 })),
 	];
-	const hits = index.search(query, Math.max(KEYWORD_RESULTS, MAX_CANDIDATES));
+	const keywordIds = index.search(query, Math.max(KEYWORD_RESULTS, MAX_CANDIDATES)).map((hit) => hit.id);
+	const hits = fuseRanks([keywordIds, closest(meaning, MAX_CANDIDATES)]);
+	const listed = meaning ? fuseRanks([keywordIds, closest(meaning, KEYWORD_RESULTS, SEMANTIC_BAND)]) : keywordIds;
+	const semantic = meaning ? { semantic: semanticInfo(meaning) } : {};
 
 	let candidates: BoardTicket[];
 	if (tickets.length <= SMALL_BOARD) {
-		const rank = new Map(hits.map((hit, i) => [hit.id, i]));
+		const rank = new Map(hits.map((id, i) => [id, i]));
 		candidates = [...tickets].sort(
 			(a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity) || recency(b) - recency(a),
 		);
 	} else {
-		candidates = hits.map((hit) => byId.get(hit.id)).filter((t): t is BoardTicket => Boolean(t));
+		candidates = hits.map((id) => byId.get(id)).filter((t): t is BoardTicket => Boolean(t));
 	}
 	candidates = candidates.slice(0, Math.max(SMALL_BOARD, MAX_CANDIDATES));
 	const expandedTerms = plan?.terms.length ? plan.terms : undefined;
 
 	const keywordAnswer = (): BoardAskResult => ({
 		answer: "",
-		matches: hits
+		matches: listed
 			.slice(0, KEYWORD_RESULTS)
-			.map((hit) => byId.get(hit.id))
+			.map((id) => byId.get(id))
 			.filter((t): t is BoardTicket => Boolean(t))
 			.map((t) => toMatch(t)),
-		mode: "keywords",
+		mode: meaning ? "semantic" : "keywords",
 		searched: tickets.length,
 		...(expandedTerms ? { expandedTerms } : {}),
+		...semantic,
 	});
 	if (candidates.length === 0) return keywordAnswer();
 
@@ -314,5 +369,6 @@ export async function askBoard(input: AskBoardInput): Promise<BoardAskResult> {
 		mode: "ai",
 		searched: tickets.length,
 		...(expandedTerms ? { expandedTerms } : {}),
+		...semantic,
 	};
 }
