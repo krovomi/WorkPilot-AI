@@ -9,6 +9,7 @@ import { emptyColumnGroups } from "../../lib/kanban-columns";
 import { FLAGGED_LANE, laneDropId, NO_VALUE_LANE } from "../../lib/kanban-lanes";
 import { useLaneOverStore } from "../../hooks/useLaneDrag";
 import { DEFAULT_LANE_PREFERENCES, useKanbanLanesStore } from "../../stores/kanban-lanes-store";
+import { useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
 import type { TaskStatusColumn } from "../../../shared/constants/task";
 import type { Task } from "../../../shared/types";
@@ -42,6 +43,19 @@ beforeEach(() => {
 });
 
 describe("BoardLanes", () => {
+	it("names a sprint's lane with its state, and an unknown sprint as such", () => {
+		useSprintStore.setState({
+			sprints: [
+				{ id: "sp-0000000b", name: "Sprint 13", state: "planned", createdAt: "t" },
+				{ id: "sp-0000000a", name: "Sprint 12", state: "active", createdAt: "t" },
+			],
+		});
+		localStorage.setItem("kanban-lanes-p", JSON.stringify({ grouping: "sprint" }));
+		board([card("a", { sprintId: "sp-0000000a" }), card("x", { sprintId: "sp-0000000f" })]);
+		const names = screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"));
+		expect(names).toEqual(["Sprint 12 · Active", "Sprint 13 · Planned", "Unknown sprint", "Backlog (no sprint)"]);
+	});
+
 	it("renders the columns in one row without a grouping", () => {
 		const renderColumn = board([card("a")]);
 		expect(screen.queryByTestId("kanban-lanes")).toBeNull();

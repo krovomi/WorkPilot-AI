@@ -41,6 +41,7 @@ import { Separator } from "../ui/separator";
 import { BoardAskButton } from "./board-ask/BoardAskButton";
 import { KanbanMoreMenu } from "./KanbanMoreMenu";
 import { LaneGroupingMenu } from "./LaneGroupingMenu";
+import { SprintMenu } from "./SprintMenu";
 import { QuickCommandBar } from "./QuickCommandBar";
 import { ServerBoardNotice, useSelectedServerProject } from "./ServerBoardNotice";
 
@@ -433,6 +434,7 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 				</PopoverContent>
 			</Popover>
 
+			<SprintMenu />
 			<LaneGroupingMenu />
 
 			<Separator orientation="vertical" className="h-5" />

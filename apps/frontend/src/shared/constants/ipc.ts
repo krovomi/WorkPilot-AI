@@ -1539,6 +1539,12 @@ export const IPC_CHANNELS = {
 	SPEC_APPROVAL_DELEGATION_CREATE: "specApproval:delegationCreate",
 	SPEC_APPROVAL_DELEGATION_REVOKE: "specApproval:delegationRevoke",
 	SPEC_APPROVAL_DELEGATES_LIST: "specApproval:delegatesList",
+	// Sprints of a project's Kanban (main/ipc-handlers/sprint-handlers.ts)
+	SPRINTS_COMPLETE: "sprints:complete",
+	SPRINTS_DELETE: "sprints:delete",
+	SPRINTS_LIST: "sprints:list",
+	SPRINTS_SAVE: "sprints:save",
+	SPRINTS_START: "sprints:start",
 	SWARM_ANALYZE: "swarm:analyze",
 	SWARM_CANCEL: "swarm:cancel",
 	SWARM_EVENT: "swarm:event",

@@ -17,7 +17,9 @@ import type { TaskStatusColumn } from "../../../shared/constants/task";
 import type { Task } from "../../../shared/types";
 import { buildLanes, FLAGGED_LANE, type Lane, type LaneGrouping, laneDropId, NO_VALUE_LANE } from "../../lib/kanban-lanes";
 import { cn } from "../../lib/utils";
+import { orderedSprints } from "../../../shared/utils/sprints";
 import { useKanbanLanesStore } from "../../stores/kanban-lanes-store";
+import { useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
 
 const NO_TASKS: Task[] = [];
@@ -85,6 +87,7 @@ function LaneMarker({ grouping, lane }: { grouping: LaneGrouping; lane: Lane }) 
 function useLaneLabel(grouping: LaneGrouping) {
 	const { t } = useTranslation(["tasks"]);
 	const tasks = useTaskStore((s) => s.tasks);
+	const sprints = useSprintStore((s) => s.sprints);
 	return (lane: Lane): string => {
 		if (lane.key === FLAGGED_LANE) return t("tasks:kanban.lanes.flagged");
 		if (lane.key === NO_VALUE_LANE || !lane.value) return t(`tasks:kanban.lanes.noValue.${grouping}`);
@@ -96,6 +99,11 @@ function useLaneLabel(grouping: LaneGrouping) {
 				return t(`tasks:cardType.values.${value}`);
 			case "source":
 				return t(`tasks:kanban.filter.sources.${value}`);
+			case "sprint": {
+				const sprint = sprints.find((item) => item.id === value);
+				if (!sprint) return t("tasks:kanban.sprints.unknown");
+				return `${sprint.name} · ${t(`tasks:kanban.sprints.states.${sprint.state}`)}`;
+			}
 			case "parent": {
 				const parent = tasks.find((task) => task.specId === value || task.id === value);
 				return parent?.title || value;
@@ -114,6 +122,8 @@ export function BoardLanes({ projectId, columnOrder, tasksByStatus, renderColumn
 	const collapsed = useKanbanLanesStore((s) => s.collapsed[s.grouping]);
 	const extraAreas = useKanbanLanesStore((s) => s.areas);
 	const toggleCollapsed = useKanbanLanesStore((s) => s.toggleCollapsed);
+	const sprints = useSprintStore((s) => s.sprints);
+	const knownSprints = useMemo(() => orderedSprints(sprints), [sprints]);
 	useEffect(() => loadForProject(projectId), [projectId, loadForProject]);
 
 	const indexedAreas = useIndexedAreas(projectId, grouping === "area");
@@ -123,8 +133,9 @@ export function BoardLanes({ projectId, columnOrder, tasksByStatus, renderColumn
 				grouping,
 				pinFlagged,
 				knownAreas: [...indexedAreas, ...extraAreas],
+				knownSprints,
 			}),
-		[tasksByStatus, grouping, pinFlagged, indexedAreas, extraAreas],
+		[tasksByStatus, grouping, pinFlagged, indexedAreas, extraAreas, knownSprints],
 	);
 	const labelOf = useLaneLabel(grouping);
 

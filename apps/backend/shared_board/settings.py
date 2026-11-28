@@ -154,6 +154,11 @@ PLAIN_KEYS = (
     "flaggedReason",
     "flaggedAt",
     "area",
+    "sprintId",
+)
+#: Keys only the board reads (lanes, flag, sprint): a run does not, so they may change during one.
+BOARD_ONLY_KEYS = frozenset(
+    {"area", "sprintId", "flagged", "flaggedReason", "flaggedAt"}
 )
 
 
@@ -193,6 +198,7 @@ class CardSettings(BaseModel):
     flaggedReason: str | None = Field(default=None, max_length=500)
     flaggedAt: str | None = Field(default=None, pattern=INSTANT_PATTERN)
     area: str | None = Field(default=None, max_length=80, pattern=AREA_PATTERN)
+    sprintId: str | None = Field(default=None, pattern=r"^sp-[0-9a-f]{8}$")
 
     def plain_value(self, key: str) -> Any:
         """The value written to ``task_metadata.json``; ``None`` removes the key."""
@@ -310,7 +316,7 @@ def read_settings(root: Path, directory: Path) -> dict[str, Any]:
         **{
             key: metadata.get(key)
             for key in PLAIN_KEYS
-            if key.startswith(("abandoned", "flagged")) or key == "area"
+            if key.startswith(("abandoned", "flagged")) or key in ("area", "sprintId")
         },
         "goal": None,
         "goalError": None,

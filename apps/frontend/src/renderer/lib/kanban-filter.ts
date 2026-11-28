@@ -51,7 +51,12 @@ export interface KanbanFilters {
 	priorities: TaskPriority[];
 	/** One split group (the split task's spec id): only its parts are shown. */
 	group?: string;
+	/** One sprint's cards (its id), or "none" for the cards in no sprint (the backlog). */
+	sprint?: string;
 }
+
+/** The sprint filter value for the cards in no sprint. */
+export const NO_SPRINT = "none";
 
 export interface KanbanSort {
 	field: TaskSortField;
@@ -122,7 +127,8 @@ export function hasActiveFilters(filters: KanbanFilters): boolean {
 		filters.sources.length > 0 ||
 		filters.categories.length > 0 ||
 		filters.priorities.length > 0 ||
-		Boolean(filters.group)
+		Boolean(filters.group) ||
+		Boolean(filters.sprint)
 	);
 }
 
@@ -134,6 +140,7 @@ export function activeFilterCount(filters: KanbanFilters): number {
 	count += filters.categories.length;
 	count += filters.priorities.length;
 	if (filters.group) count++;
+	if (filters.sprint) count++;
 	return count;
 }
 
@@ -143,6 +150,10 @@ export function taskMatchesFilters(
 	filters: KanbanFilters,
 ): boolean {
 	if (filters.group && splitGroupId(task) !== filters.group) return false;
+	if (filters.sprint) {
+		const sprintId = task.metadata?.sprintId;
+		if (filters.sprint === NO_SPRINT ? Boolean(sprintId) : sprintId !== filters.sprint) return false;
+	}
 
 	if (filters.sources.length > 0) {
 		if (!filters.sources.includes(getTaskSource(task))) return false;

@@ -100,6 +100,9 @@ export function TaskCardMenus({
 			},
 			onSetPriority: (priority: TaskPriority) =>
 				void save({ priority }, t("tasks:kanban.undoLabels.priority")),
+			// The sprint is the board's, not the run's: it changes while an agent works.
+			onSetSprint: (sprintId: string | null) =>
+				void save({ sprintId: sprintId ?? undefined }, t("tasks:kanban.sprints.undoLabel")),
 			moves: onStatusChange && {
 				targets: manualMoveTargets({
 					status: task.status,
@@ -145,7 +148,8 @@ export function TaskCardMenus({
 		t,
 	]);
 
-	const itemProps = { ...actions, currentType, currentPriority, isLocked };
+	const currentSprint = task.metadata?.sprintId ?? null;
+	const itemProps = { ...actions, currentType, currentPriority, currentSprint, isLocked };
 
 	return (
 		<>
