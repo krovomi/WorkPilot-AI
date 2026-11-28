@@ -631,7 +631,12 @@ def test_the_vm_gets_placeholders_never_a_name_it_could_abuse(sbx, worktree):
         ["opencode"], {}, None, stdin=True, vm_env={"OPENAI_API_KEY": "proxy-managed"}
     )
     assert "OPENAI_API_KEY=proxy-managed" in argv
-    for bad in ({"LD_PRELOAD=x": "1"}, {"lower": "1"}, {"OK": "a\nb"}):
+    for bad in (
+        {"LD_PRELOAD=x": "1"},
+        {"lower": "1"},
+        {"OK": "a\nb"},
+        {"GH_TOKEN": "x"},
+    ):
         with pytest.raises(microvm.MicrovmError):
             vm.exec_argv(["opencode"], {}, None, vm_env=bad)
 
@@ -696,3 +701,9 @@ def test_sbx_gets_no_credential_of_the_host():
         {"PATH": "/bin", "GH_TOKEN": "x", "ANTHROPIC_API_KEY": "y", "HOME": "/h"}
     )
     assert env == {"PATH": "/bin", "HOME": "/h", "SBX_NO_TELEMETRY": "1"}
+
+
+def test_the_github_token_sbx_puts_in_a_vm_is_emptied_for_each_command(sbx, worktree):
+    argv = _vm(worktree).exec_argv(["git", "push"], {"GH_TOKEN": "host"}, None)
+    assert "GH_TOKEN=" in argv and "GITHUB_TOKEN=" in argv
+    assert "GH_TOKEN=host" not in argv
