@@ -334,4 +334,11 @@ export const childProcessModule = {
 		});
 		return child;
 	},
+	/** Imported by modules the monitor loads (windows-paths.ts); no tool runs here. */
+	execFile: (command: string, ...rest: unknown[]) => {
+		const callback = rest.find((value) => typeof value === "function") as
+			| ((error: Error) => void)
+			| undefined;
+		setImmediate(() => callback?.(new Error(`spawn ${command} ENOENT`)));
+	},
 };
