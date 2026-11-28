@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from test_placement import machine as machine_module
@@ -36,10 +37,12 @@ def test_another_build_is_counted_but_not_this_one(monkeypatch, tmp_path):
     fake_backend = tmp_path / "backend"
     fake_backend.mkdir()
     entry = fake_backend / "run.py"
-    entry.write_text("import time\ntime.sleep(30)\n", encoding="utf-8")
+    # Killed below once counted: it only has to outlive the wait on a slow runner.
+    entry.write_text("import time\ntime.sleep(600)\n", encoding="utf-8")
     monkeypatch.setattr(machine_module, "_BACKEND_DIR", fake_backend.resolve())
     before = machine_module.count_builds()
     child = subprocess.Popen([sys.executable, str(entry), "--spec", "002"])
+    began = time.monotonic()
     try:
         for _ in range(50):
             if machine_module.count_builds() == before + 1:
@@ -47,7 +50,9 @@ def test_another_build_is_counted_but_not_this_one(monkeypatch, tmp_path):
             subprocess.run(
                 [sys.executable, "-c", "import time; time.sleep(0.05)"], check=True
             )
+        waited = time.monotonic() - began
         assert machine_module.count_builds() == before + 1, (
+            f"after {waited:.1f} s, child exit code {child.poll()}\n"
             f"{_seen(child.pid)}\n{_what_runs(entry)}"
         )
     finally:
