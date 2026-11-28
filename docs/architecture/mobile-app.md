@@ -219,7 +219,7 @@ Les jetons personnels (GitHub, GitLab, Azure DevOps, Jira, Linear) sont ceux que
 chiffrés pour les appels de la personne, par exemple ceux du relais GitHub et GitLab. Le téléphone
 envoie un jeton une fois et ne le relit jamais : le serveur ne dit que lesquels sont enregistrés.
 
-Les comptes IA de la personne suivent la même règle ([ai-accounts.md](ai-accounts.md)) :
+Les comptes IA de la personne suivent la même règle ([ai-accounts.md](ai-accounts.md#en-mode-serveur)) :
 plusieurs clés par fournisseur, une par défaut, que ses runs utilisent à la place de celle du
 serveur. L'écran (Réglages → Mes comptes IA, si le rôle a `settings.account.read`) montre chaque
 fournisseur qui a des comptes, le défaut coché parmi eux et « Le compte du serveur » (aucun défaut) ;
