@@ -6,6 +6,7 @@ import { useProjectStore } from "../../stores/project-store";
 import { createTask } from "../../stores/task-store";
 import { CharterButton, Chip, Notice, Panel, type Tone } from "../charter";
 import { buildFlakyTask, type FlakyTaskKind } from "./flaky-task";
+import { formatAppDate } from "../../lib/date-format";
 
 type T = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -124,7 +125,7 @@ export function FlakyTestCard({
 
 			{history && history.observations > 0 && (
 				<div className="wp-meta mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 whitespace-normal">
-					{history.firstSeen && <span>{t("history.firstSeen", { date: history.firstSeen.slice(0, 10) })}</span>}
+					{history.firstSeen && <span>{t("history.firstSeen", { date: formatAppDate(history.firstSeen) })}</span>}
 					<span className="inline-flex items-center gap-1">
 						{history.trend === "worse" && <TrendingUp className="h-3 w-3 text-destructive" aria-hidden="true" />}
 						{history.trend === "better" && <TrendingDown className="h-3 w-3 text-success" aria-hidden="true" />}

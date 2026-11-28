@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { NotebookMonth } from "../../../shared/types/notebook-agent";
 import { Section } from "../charter";
+import { formatAppMonth } from "../../lib/date-format";
 
 interface NotebookMetricsProps {
 	readonly projectPath: string | undefined;
@@ -52,7 +53,7 @@ export function NotebookMetrics({ projectPath }: NotebookMetricsProps): React.Re
 				<tbody>
 					{months.map((month) => (
 						<tr key={month.month} className="border-t border-border/40">
-							<td className="py-1 pr-3 font-mono">{month.month}</td>
+							<td className="py-1 pr-3 font-mono">{formatAppMonth(month.month, "short")}</td>
 							<td className="py-1 pr-3">{month.notebooks}</td>
 							<td className="py-1 pr-3">{month.findings}</td>
 							<td className="py-1 pr-3">{month.runs}</td>

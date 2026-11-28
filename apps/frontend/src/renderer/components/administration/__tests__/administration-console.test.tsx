@@ -327,9 +327,9 @@ describe("OverviewTab", () => {
 		expect(screen.getByText("12 specs")).toBeInTheDocument();
 		expect(screen.getByText("88%")).toBeInTheDocument();
 		expect(screen.getByRole("img", { name: "Runs over the last 7 days" })).toBeInTheDocument();
-		expect(screen.getByTitle("2026-11-16: 4")).toHaveStyle({ height: "100%" });
-		expect(screen.getByTitle("2026-11-15: 0")).toHaveStyle({ height: "0%" });
-		expect(screen.getByText("11-16")).toBeInTheDocument();
+		expect(screen.getByTitle("11/16/2026: 4")).toHaveStyle({ height: "100%" });
+		expect(screen.getByTitle("11/15/2026: 0")).toHaveStyle({ height: "0%" });
+		expect(screen.getByText("11/16")).toBeInTheDocument();
 
 		// No budget: the month's tokens are shown without a limit.
 		expect(screen.getByText("Monthly token budget")).toBeInTheDocument();

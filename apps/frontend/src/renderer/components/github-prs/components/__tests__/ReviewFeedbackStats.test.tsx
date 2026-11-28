@@ -169,7 +169,7 @@ describe("ReviewFeedbackStats", () => {
 		await openPanel();
 
 		const table = await screen.findByRole("table", { name: t("months.title") });
-		expect(table).toHaveTextContent("2026-11");
+		expect(table).toHaveTextContent("Nov 2026");
 		expect(table).toHaveTextContent("2.5");
 		expect(table).toHaveTextContent("—");
 		expect(screen.getByText(t("months.hint"))).toBeVisible();
@@ -177,6 +177,7 @@ describe("ReviewFeedbackStats", () => {
 
 		await act(() => i18n.changeLanguage("fr"));
 		expect(screen.getByRole("table", { name: "Par mois" })).toHaveTextContent("2,5");
+		expect(screen.getByRole("table", { name: "Par mois" })).toHaveTextContent("nov. 2026");
 	});
 
 	it("shows no monthly table when there is nothing to count", async () => {

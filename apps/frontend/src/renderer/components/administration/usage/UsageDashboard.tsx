@@ -19,7 +19,7 @@ import type {
 	UsageQuery,
 	UsageSummary,
 } from "@shared/types/server-usage";
-import { Input, Label, NativeSelect } from "@/components/ui";
+import { DateField, Label, NativeSelect } from "@/components/ui";
 import { useAdminStore } from "@/stores/admin-store";
 import { usePermission, usePermissionsStore } from "@/stores/permissions-store";
 import { PersonSheet } from "./PersonSheet";
@@ -175,20 +175,18 @@ export function UsageDashboard() {
 					<>
 						<div className="space-y-1">
 							<Label htmlFor="usage-start">{t("usage.dashboard.start")}</Label>
-							<Input
+							<DateField
 								id="usage-start"
-								type="date"
 								value={custom.start}
-								onChange={(e) => setCustom((c) => ({ ...c, start: e.target.value }))}
+								onValueChange={(start) => setCustom((c) => ({ ...c, start }))}
 							/>
 						</div>
 						<div className="space-y-1">
 							<Label htmlFor="usage-end">{t("usage.dashboard.end")}</Label>
-							<Input
+							<DateField
 								id="usage-end"
-								type="date"
 								value={custom.end}
-								onChange={(e) => setCustom((c) => ({ ...c, end: e.target.value }))}
+								onValueChange={(end) => setCustom((c) => ({ ...c, end }))}
 							/>
 						</div>
 					</>

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { UsageReport, UsageReportKind } from "@shared/types/server-usage";
-import { Button, Input, Label, NativeSelect } from "@/components/ui";
+import { Button, DateField, Label, NativeSelect } from "@/components/ui";
 import { formatCount, formatDay, formatRate, formatTokens, formatUsd } from "./usage-format";
 
 const KINDS: readonly UsageReportKind[] = ["daily", "weekly", "monthly"];
@@ -191,7 +191,7 @@ export function UsageReportPreview() {
 				</div>
 				<div className="space-y-1">
 					<Label htmlFor="report-day">{t("usage.report.preview.day")}</Label>
-					<Input id="report-day" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+					<DateField id="report-day" value={day} onValueChange={setDay} />
 				</div>
 				<Button variant="outline" disabled={loading} onClick={() => void show(kind, day)}>
 					{t("usage.report.preview.show")}

@@ -7,6 +7,7 @@
 
 import { useTranslation } from "react-i18next";
 import type { ReviewFeedbackMonth } from "../../../../shared/types/review-feedback";
+import { formatAppMonth } from "../../../lib/date-format";
 
 function perPr(row: ReviewFeedbackMonth, language: string): string {
 	if (row.reviews === 0) return "—";
@@ -44,7 +45,7 @@ export function ReviewFeedbackMonths({ rows }: { rows: ReviewFeedbackMonth[] }) 
 					{rows.map((row) => (
 						<tr key={row.month} className="border-t border-border/50">
 							<td className="py-1">
-								<code>{row.month}</code>
+								{formatAppMonth(row.month, "short")}
 							</td>
 							<td className="text-right">{row.reviews}</td>
 							<td className="text-right">{perPr(row, i18n.language)}</td>

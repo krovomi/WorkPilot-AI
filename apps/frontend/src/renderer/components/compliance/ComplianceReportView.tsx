@@ -3,7 +3,9 @@ import type React from "react";
 import { useEffect, useId } from "react";
 import { useTranslation } from "react-i18next";
 import type { ComplianceReport } from "../../../shared/types/compliance";
+import { dayOf } from "../../lib/date-input";
 import { useComplianceStore } from "../../stores/compliance-store";
+import { MonthField } from "../ui/date-fields";
 import {
 	CharterButton,
 	Chip,
@@ -108,13 +110,12 @@ export function ComplianceReportView({ projectPath }: ComplianceReportViewProps)
 					<label htmlFor={monthId} className="wp-kicker ml-2">
 						{t("compliance:period")}
 					</label>
-					<input
+					<MonthField
 						id={monthId}
-						type="month"
-						className="h-7 rounded-md border border-border bg-background px-2 text-xs"
+						className="h-7 rounded-md bg-background px-2 text-xs"
 						value={period}
-						max={new Date().toISOString().slice(0, 7)}
-						onChange={(e) => setPeriod(e.target.value)}
+						max={dayOf(new Date()).slice(0, 7)}
+						onValueChange={setPeriod}
 						disabled={isScanning}
 						aria-describedby={`${monthId}-hint`}
 					/>

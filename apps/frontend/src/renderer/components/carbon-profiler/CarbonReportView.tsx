@@ -3,7 +3,7 @@ import type React from "react";
 import { useEffect, useId } from "react";
 import { useTranslation } from "react-i18next";
 import type { CarbonAdvice, CarbonBreakdown, CarbonExportFormat, CarbonReport } from "../../../shared/types/carbon-profiler";
-import { formatAppDateTime } from "../../lib/date-format";
+import { formatAppDateTime, formatAppMonth } from "../../lib/date-format";
 import { currentMonth, useCarbonProfilerStore } from "../../stores/carbon-profiler-store";
 import {
 	Bar,
@@ -79,7 +79,7 @@ export function CarbonReportView({ projectPath }: CarbonReportViewProps): React.
 							<NativeSelect id={monthId} value={month} onChange={(e) => setMonth(e.target.value)}>
 								{monthChoices(report, month).map((m) => (
 									<option key={m || "all"} value={m}>
-										{m || t("carbonProfiler:month.all")}
+										{m ? formatAppMonth(m) : t("carbonProfiler:month.all")}
 									</option>
 								))}
 							</NativeSelect>
@@ -130,7 +130,7 @@ export function CarbonReportView({ projectPath }: CarbonReportViewProps): React.
 						{projectPath && (
 							<Section
 								kicker={t("carbonProfiler:kickers.export")}
-								title={t("carbonProfiler:export.title", { month: month || currentMonth() })}
+								title={t("carbonProfiler:export.title", { month: formatAppMonth(month || currentMonth()) })}
 								description={t("carbonProfiler:export.description")}
 							>
 								<div className="flex flex-wrap gap-2">
@@ -303,7 +303,7 @@ function ReportBody({ report }: { readonly report: CarbonReport }): React.ReactE
 					<div className="grid gap-1.5">
 						{report.months.map((m) => (
 							<div key={m.month} className="grid grid-cols-[5rem_1fr_6rem] items-center gap-3 text-xs">
-								<span className="font-mono">{m.month}</span>
+								<span className="font-mono">{formatAppMonth(m.month, "short")}</span>
 								<Bar value={(m.co2G / trendTop) * 100} tone="green" />
 								<span className="text-right font-mono">{kg(m.co2G)} kg</span>
 							</div>

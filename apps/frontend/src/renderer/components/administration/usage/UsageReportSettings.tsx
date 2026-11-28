@@ -13,7 +13,7 @@ import type {
 	UsageReportSettings as Settings,
 	UsageReportSettingsUpdate,
 } from "@shared/types/server-usage";
-import { Button, Input, Label, NativeSelect, Textarea } from "@/components/ui";
+import { Button, Input, Label, NativeSelect, Textarea, TimeField } from "@/components/ui";
 import { formatAppDateTime } from "@/lib/date-format";
 import { usePermission } from "@/stores/permissions-store";
 import { UsageReportPreview } from "./UsageReportPreview";
@@ -203,12 +203,11 @@ export function UsageReportSettings() {
 				<div className="flex flex-wrap gap-4">
 					<div className="space-y-1">
 						<Label htmlFor="report-time">{t("usage.report.time")}</Label>
-						<Input
+						<TimeField
 							id="report-time"
-							type="time"
 							disabled={disabled}
 							value={form.time}
-							onChange={(e) => change({ time: e.target.value })}
+							onValueChange={(time) => change({ time })}
 						/>
 					</div>
 					<div className="min-w-64 space-y-1">

@@ -55,6 +55,7 @@ describe("my usage", () => {
 		expect(screen.getByText("Cost: $2.50 (partly estimated)")).toBeTruthy();
 		expect(screen.getByText("Runs: 3, 2 succeeded")).toBeTruthy();
 		expect(screen.getByText("234")).toBeTruthy();
+		expect(screen.getByText("11/27/2026")).toBeTruthy();
 		expect(screen.getByText("Sign-in: auth.login.local")).toBeTruthy();
 		expect(screen.getByText("Run: coding · succeeded")).toBeTruthy();
 		expect(screen.getByText("home")).toBeTruthy();

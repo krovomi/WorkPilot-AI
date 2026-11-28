@@ -25,7 +25,9 @@ import {
 	appDateLocale,
 	formatAppDate,
 	formatAppDateTime,
+	formatAppDay,
 	formatAppDayLabel,
+	formatAppMonth,
 	formatAppTime,
 } from "../date-format";
 
@@ -70,6 +72,12 @@ describe("formatting with an explicit language", () => {
 		expect(formatDateIn(NOV_2.getTime(), "en")).toBe("11/2/2026");
 	});
 
+	it("reads a bare YYYY-MM-DD as that local day, not UTC midnight", () => {
+		const day = toValidDate("2026-11-28") as Date;
+		expect([day.getFullYear(), day.getMonth(), day.getDate(), day.getHours()]).toEqual([2026, 10, 28, 0]);
+		expect(formatDateIn("2026-11-28", "fr")).toBe("28/11/2026");
+	});
+
 	it("returns an empty string instead of 'Invalid Date'", () => {
 		for (const bad of [null, undefined, "", "not a date", Number.NaN]) {
 			expect(toValidDate(bad)).toBeNull();
@@ -95,6 +103,23 @@ describe("renderer helpers follow the app language", () => {
 		await i18n.changeLanguage("en");
 		expect(appDateLocale()).toBe("en-US");
 		expect(formatAppDate(NOV_2)).toBe("11/2/2026");
+	});
+
+	it("writes calendar days and months, and leaves anything else as it was", async () => {
+		await i18n.changeLanguage("fr");
+		expect(formatAppDay("2026-11-28")).toBe("28/11/2026");
+		expect(formatAppDay("2026-11-28", { day: "2-digit", month: "2-digit" })).toBe("28/11");
+		expect(formatAppMonth("2026-09")).toBe("septembre 2026");
+		expect(formatAppMonth("2026-09", "short")).toBe("sept. 2026");
+		expect(formatAppDay("2026-99-99")).toBe("2026-99-99");
+		expect(formatAppMonth("2026-13")).toBe("2026-13");
+		expect(formatAppMonth("all")).toBe("all");
+		expect(formatAppDay("2026-W48")).toBe("2026-W48");
+
+		await i18n.changeLanguage("en");
+		expect(formatAppDay("2026-11-28")).toBe("11/28/2026");
+		expect(formatAppMonth("2026-09")).toBe("September 2026");
+		expect(formatAppMonth("2026-09", "short")).toBe("Sep 2026");
 	});
 
 	it("names today and yesterday, then writes a short date", async () => {

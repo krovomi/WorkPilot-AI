@@ -55,10 +55,18 @@ const { t } = useTranslation(['navigation', 'common']);
 
 Les dates suivent la langue de l'app, pas la région du système : `fr` écrit `02/11/2026 16:30`,
 `en` écrit `11/2/2026, 4:30 PM`. Dans le renderer, une date s'affiche avec `formatAppDate`,
-`formatAppDateTime`, `formatAppTime` ou `formatAppDayLabel` de `src/renderer/lib/date-format.ts`
-(hors renderer : `formatDateIn(value, language)` de `src/shared/utils/date-format.ts`). Appeler
+`formatAppDateTime`, `formatAppTime` ou `formatAppDayLabel` de `src/renderer/lib/date-format.ts`,
+un jour `YYYY-MM-DD` avec `formatAppDay`, un mois `YYYY-MM` avec `formatAppMonth` (jamais tels quels ;
+hors renderer : `formatDateIn(value, language)` de `src/shared/utils/date-format.ts`). Appeler
 `toLocaleDateString`, `toLocaleTimeString`, `new Date(…).toLocaleString` ou `Intl.DateTimeFormat`
 sans `dateLocale(…)` est refusé par `src/renderer/lib/__tests__/date-format.test.ts`.
+
+Une date se saisit avec `DateField`, `MonthField` ou `TimeField` de `components/ui/date-fields.tsx`,
+jamais avec `<input type="date">` (ni `time`, `month`, `week`, `datetime-local`) : Chromium y écrit
+la région du système (`mm/dd/yyyy` sous un Windows anglais), pas la langue de l'app, même avec
+`lang`. Les valeurs restent celles du champ natif (`YYYY-MM-DD`, `YYYY-MM`, `HH:MM`) ;
+`components/ui/__tests__/date-fields.test.tsx` refuse un champ natif. L'app mobile écrit ses dates
+par `src/ui/format.ts` (`formatDate`, `formatDay`), gardé par `tests/test_mobile_app_dates.py`.
 
 La règle est vérifiée par `src/renderer/__tests__/jsx-literal-text.test.ts`. Il parse chaque `.tsx`
 du renderer (hors tests, mocks, stories) avec `parseAst` de Vite et refuse trois choses : un texte
