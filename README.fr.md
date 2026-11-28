@@ -99,6 +99,35 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 
 **Tableau Kanban** (ci-dessus) : décrivez une tâche et suivez-la de la planification jusqu'à la pull request. Chaque carte montre sa phase, son avancement, le provider au travail et son sujet ; les parties d'une tâche découpée partagent une couleur et une marque « Partie k/N ». Les colonnes suivent le pipeline : Planification, File d'attente, En cours, Révision IA, Révision humaine, PR ouverte (tant qu'une pull request attend sa fusion), Terminé, plus Build rouge quand la CI du projet échoue sur la branche d'une tâche. La barre d'outils tient sur une ligne ; son menu « ⋯ » contient **Multi-dépôts** (un changement sur plusieurs dépôts) et **Purger** (libère la place prise par les worktrees des cartes terminées).
 
+**Tableau agile, comme Jira** ([sprints](docs/architecture/kanban-sprints.md), [couloirs](docs/architecture/kanban-swimlanes.md), [liste](docs/architecture/kanban-list-view.md), [frise](docs/architecture/kanban-timeline.md), [rapports](docs/architecture/kanban-reports.md)) : les tâches qui finissent sans succès ont leurs colonnes, **Échec** et **Abandonnée** (avec la raison : doublon, ne sera pas fait, PR fermée…), et une tâche peut être marquée **Bloquée** avec ce qui la bloque. Planifiez en **sprints** (démarrage, clôture avec report, points issus de Smart Estimation, jamais une durée), coupez le tableau en **couloirs** par sprint, sous-projet, priorité, type, source ou tâche parente, et passez de **Tableau** à **Liste** (colonnes triables) ou **Frise** (chaque tâche de son début à sa fin, les sprints en tête). Les **Rapports** tracent le burndown, la vélocité, le flux cumulé, le temps de cycle, le débit et les fins non abouties. **Étiquettes**, filtres rapides (Bloquées, Modifiées cette semaine, Mes tâches sur un serveur d'équipe) et vues enregistrées gardent le tableau lisible ; les tâches terminées peuvent s'archiver d'elles-mêmes après 7, 14 ou 30 jours.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+![Couloirs par sprint : le couloir des tâches bloquées en premier, puis le Sprint 12 avec ses colonnes](.github/assets/showcase/kanban-lanes.png)
+
+</td>
+<td width="50%" valign="top">
+
+![Vue liste par sprint : statut, priorité, sprint, sous-projet, points et dernière mise à jour](.github/assets/showcase/kanban-list.png)
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+![Frise : une barre par tâche du début à la fin, la ligne du jour et les dates des sprints](.github/assets/showcase/kanban-timeline.png)
+
+</td>
+<td valign="top">
+
+![Rapports : le burndown du Sprint 12, points restants face à la ligne idéale](.github/assets/showcase/kanban-reports.png)
+
+</td>
+</tr>
+</table>
+
 <table>
 <tr>
 <td width="50%" valign="top">
@@ -227,6 +256,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 
 **Pipeline de construction**
 - **Tableau Kanban** avec approbation de la spec, pause et reprise, relance par phase, messages de pilotage pendant que l'agent travaille, et une revue guidée avec des commentaires de ligne renvoyés au fixer ; des diffs aux couleurs de git, colorés selon le langage pour chaque stack, mots modifiés surlignés et disposition côte à côte « Auto ».
+- **Tableau agile** : colonnes Échec et Abandonnée, drapeau Bloquée, sprints avec points, couloirs, affichages Tableau / Liste / Frise, rapports (burndown, vélocité, flux cumulé, temps de cycle, débit, fins non abouties), étiquettes, filtres rapides et archivage auto, en local comme en mode serveur.
 - Le **mode Essaim** construit côte à côte les sous-tâches que le plan permet, chacune dans son propre worktree, fusionnées dans la branche de la tâche après chaque vague.
 - **Découpage automatique** des grosses tâches en petites PR groupées, **tâches empilées**, **Best-of-N** (construire une tâche 2 à 4 fois sur des moteurs différents et garder la meilleure, avec un arbitre quand les variantes ne font pas la même chose) et changements **multi-dépôts**, sur le provider, le modèle et l'effort choisis pour eux.
 - L'**essai à blanc** rejoue le plan d'une spec sur la branche de base avant le build ; après la QA, un agent **red team** essaie de casser ce que la tâche a construit, et la **garde des migrations** dit ce que les migrations de la tâche feraient à une base en production, pour toutes les stacks.

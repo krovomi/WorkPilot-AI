@@ -72,6 +72,12 @@ async function openApp(browser) {
 		console.warn("pageerror:", e.message.slice(0, 160)),
 	);
 	await page.goto(URL, { waitUntil: "networkidle" });
+	await settle(page);
+	return page;
+}
+
+/** First-run prompts a fresh page shows: skip the setup, take the menu, fold the CLI panel. */
+async function settle(page) {
 	await page.waitForTimeout(1500);
 	const skip = page.getByText("Skip Setup");
 	if (await skip.count()) {
@@ -93,7 +99,6 @@ async function openApp(browser) {
 		await cli.first().click();
 		await page.waitForTimeout(300);
 	}
-	return page;
 }
 
 /** Opens a sidebar view: its space on the rail first, then its row in the panel. */
@@ -169,6 +174,15 @@ const TERMINAL_SESSIONS = [
 
 const SHOTS = {
 	kanban: (page) => page.waitForTimeout(2500),
+	// The agile board (docs/architecture/kanban-*.md): lanes by sprint, the list, the timeline, the reports.
+	"kanban-lanes": (page) => withBoardLayout(page, { grouping: "sprint", layout: "board" }),
+	"kanban-list": (page) => withBoardLayout(page, { grouping: "sprint", layout: "list" }),
+	"kanban-timeline": (page) => withBoardLayout(page, { grouping: "none", layout: "timeline" }),
+	"kanban-reports": async (page) => {
+		await page.waitForTimeout(2000);
+		await page.getByRole("button", { name: "Reports" }).first().click();
+		await page.waitForTimeout(1500);
+	},
 	"task-detail": async (page) => {
 		await page.getByText("One-page checkout", { exact: true }).first().click();
 		await page.waitForTimeout(1500);
@@ -226,6 +240,16 @@ const SHOTS = {
 		await page.waitForTimeout(1500);
 	},
 };
+
+/** Shows the demo board with saved lane preferences (`stores/kanban-lanes-store.ts`). */
+async function withBoardLayout(page, preferences) {
+	await page.evaluate((prefs) => {
+		localStorage.setItem("kanban-lanes-mock-project-1", JSON.stringify(prefs));
+	}, preferences);
+	await page.reload({ waitUntil: "networkidle" });
+	await settle(page);
+	await page.waitForTimeout(2000);
+}
 
 /** Opens Settings on one section of its navigation. */
 async function openSettingsSection(page, label) {

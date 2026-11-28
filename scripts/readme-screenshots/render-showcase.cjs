@@ -303,6 +303,10 @@ img{display:block}
 }
 const FRAME_TITLES = {
 	kanban: "WorkPilot AI — Kanban",
+	"kanban-lanes": "WorkPilot AI — Kanban, lanes by sprint",
+	"kanban-list": "WorkPilot AI — Kanban, list",
+	"kanban-timeline": "WorkPilot AI — Kanban, timeline",
+	"kanban-reports": "WorkPilot AI — Kanban reports",
 	"task-detail": "WorkPilot AI — Task",
 	terminals: "WorkPilot AI — Agent terminals",
 	insights: "WorkPilot AI — Insights",
