@@ -52,9 +52,8 @@ l'UI n'existe pas.
   Côté UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un jeton, ni le corps d'une requête d'authentification.
 - **Nouveau stockage d'identifiant** côté Electron : `safeStorage`. S'il est indisponible, refuser
   ou avertir l'utilisateur ; ne pas retomber silencieusement sur du texte clair.
-  `apps/frontend/src/main/secret-storage.ts` décide de la forme sur disque (`enc:…`) ; sous
-  WSL sans trousseau, clé gardée par le DPAPI de Windows (`encw:…`, `wsl-secret-key.ts`) ; sans
-  chiffrement, fichier `0600` et bannière dans l'UI. `settings.json` ne se lit et ne s'écrit que par
+  `apps/frontend/src/main/secret-storage.ts` décide de la forme sur disque (`enc:…`, ou `encw:…`
+  sous WSL sans trousseau : DPAPI de Windows) ; sans chiffrement, `0600` et bannière dans l'UI. `settings.json` ne se lit et ne s'écrit que par
   `settings-utils.ts`, `profiles.json` que par les profile managers, `<projet>/.workpilot/.env`
   que par `project-env-file.ts` : un module qui parse le fichier lui-même reçoit du chiffré. Une
   clé secrète du `.env` de projet se classe dans `shared/constants/project-env-secrets.json` :
