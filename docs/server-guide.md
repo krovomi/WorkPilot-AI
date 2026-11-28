@@ -159,6 +159,7 @@ Les plus utilisées :
 | `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | `60` | un lien de mot de passe oublié doit durer plus ou moins longtemps (de 5 à 1440 minutes) |
 | `WORKPILOT_USAGE_RETENTION_DAYS` | `365` | votre registre RGPD fixe une autre durée pour la consommation et la présence (de 30 à 3650 jours) ; ce qui est gardé : [server-usage-data.md](server-usage-data.md) |
 | `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS` | `183` | une autre durée pour l'activité par page (de 30 à 3650 jours) ; chaque organisation peut aussi régler les siennes dans **Administration → Usage** |
+| `WORKPILOT_METRICS_TOKEN` | — | un Prometheus lit les métriques du serveur (`/metrics`) : un jeton de 32 caractères au moins, à générer comme les autres secrets ; détail : [server-operations.md, Surveiller le serveur](server-operations.md#surveiller-le-serveur) |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | `12` | une politique de mot de passe plus stricte (jamais moins de 12) |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | refuser les mots de passe connus des fuites |
 | `WORKPILOT_ACCESS_TOKEN_TTL_MINUTES` | `15` | rarement |

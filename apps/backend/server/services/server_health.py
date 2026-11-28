@@ -4,7 +4,7 @@
 (``GET /admin/platform/health``, platform administrators only) says why:
 
 - ``database``: a ``SELECT 1``, how long it took, and the schema revision;
-- ``disk``: free space where the database, the clones and the data live;
+- ``disk``: free space where the clones and a SQLite database live;
   under 10 % free is ``degraded``, under 2 % ``error``;
 - ``queue``: runs and jobs queued and running, against the server's limit;
 - ``version``: the server's version and Python's;
@@ -18,7 +18,6 @@ person, a project or a path: volumes are named by their role.
 
 from __future__ import annotations
 
-import os
 import platform
 import re
 import shutil
@@ -138,8 +137,7 @@ def _volume(name: str, path: Path) -> dict:
 
 def disk() -> dict:
     settings = get_settings()
-    data = os.environ.get("WORKPILOT_DATA_DIR") or str(Path.home() / ".workpilot")
-    places = {"repositories": settings.repos_root, "data": Path(data)}
+    places = {"repositories": settings.repos_root}
     sqlite = _sqlite_file(settings.database_url)
     if sqlite is not None:
         places["database"] = sqlite

@@ -80,6 +80,14 @@ l'app mobile de chaque membre comptent les pages qu'il ouvre et envoient les com
 (`server/services/page_activity.py`). La désactiver efface aussitôt les comptes de
 l'organisation. Chaque changement est inscrit au journal d'audit.
 
+## Ce que voient la supervision et les traces
+
+Les métriques Prometheus (`/metrics`) et la page de santé ne comptent que par organisation, par
+fournisseur et par état : jamais une personne, un projet ni un chemin. Les traces OpenTelemetry
+des requêtes, quand l'opérateur en active l'envoi vers son propre collecteur, ne portent que la
+route (son modèle, pas l'adresse réelle), la méthode et le code de réponse. Rien n'est envoyé
+ailleurs que là où l'opérateur l'a configuré : pas de nouveau sous-traitant.
+
 ## Combien de temps
 
 Chaque organisation règle sa durée dans **Administration → Usage** : une pour la consommation et

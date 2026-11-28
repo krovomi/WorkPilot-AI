@@ -94,7 +94,6 @@ async def test_the_health_page_says_why(world, landlock):
     assert checks["database"]["latency_ms"] >= 0
     assert {v["name"] for v in checks["disk"]["volumes"]} == {
         "repositories",
-        "data",
         "database",
     }
     queue = checks["queue"]
