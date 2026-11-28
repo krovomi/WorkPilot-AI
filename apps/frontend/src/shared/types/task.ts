@@ -18,6 +18,7 @@ import type {
 import type { AnomalyPauseDetail, SandboxPauseDetail } from "./agent-safety";
 import type { PolicyPauseDetail } from "./governance";
 import type { TaskGoalSummary } from "./goal";
+import type { TaskCapturesChoice, TaskCapturesSummary } from "./task-captures";
 import type { MobileBootstrapMark, MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
 import type {
@@ -644,6 +645,10 @@ export interface TaskMetadata {
 	// WORKPILOT_VERIFY_LOOP at spawn time.
 	verifyLoop?: boolean;
 
+	// Captures for the pull request (per-task). "always" / "never" override the
+	// project's CAPTURES_MODE, absent follows it. Injected as WORKPILOT_CAPTURES.
+	captures?: TaskCapturesChoice;
+
 	// The one window a Windows app (WPF, WinForms, WinUI) is verified in: part
 	// of its title. Read by the backend from task_metadata.json; absent = the
 	// launched app's main window.
@@ -852,6 +857,11 @@ export interface Task {
 	 * a missing part is unknown, never zero.
 	 */
 	runFacts?: TaskRunFacts;
+	/**
+	 * The captures prepared for its pull request (`main/task-captures/`):
+	 * absent when the task has none. Read by the card's badge and preview.
+	 */
+	captures?: TaskCapturesSummary;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -1505,6 +1515,11 @@ export interface VisualProofRunOptions {
 	 * with its data, and every reader of the repository will see it.
 	 */
 	includeWalkthrough?: boolean;
+	/**
+	 * The task has captures for its PR (`main/task-captures/`): the run stays
+	 * on this computer, nothing committed on the task's branch, no PR comment.
+	 */
+	keepOnTask?: boolean;
 }
 
 /**

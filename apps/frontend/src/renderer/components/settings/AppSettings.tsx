@@ -120,6 +120,7 @@ export type AppSection =
 
 export type ProjectSettingsSection =
 	| "general"
+	| "captures"
 	| "azure-devops"
 	| "jira"
 	| "figma"

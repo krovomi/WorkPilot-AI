@@ -515,6 +515,7 @@ export function registerTaskRecoveryHandlers(ctx: ExecutionHandlerContext): void
 						useLocalBranch: task.metadata?.useLocalBranch,
 						tddMode: task.metadata?.tddMode,
 						verifyLoop: task.metadata?.verifyLoop,
+						captures: task.metadata?.captures,
 						mobileTargets: task.metadata?.mobileTargets,
 						// A stuck task is one whose process died mid-session: pick
 						// that session back up, as a resume does.

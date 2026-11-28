@@ -110,6 +110,20 @@ export function applyVerifyLoop(
 }
 
 /**
+ * Apply a card's captures choice (`pr_captures/settings.py`, `WORKPILOT_CAPTURES`):
+ * `always` / `never` win over the project's `CAPTURES_MODE`; undefined follows
+ * it, and a value inherited from the app's own environment is dropped.
+ */
+export function applyCapturesChoice(
+	env: Record<string, string>,
+	captures?: string,
+): Record<string, string> {
+	const { WORKPILOT_CAPTURES: _omit, ...rest } = env;
+	if (captures !== "always" && captures !== "never") return rest;
+	return { ...rest, WORKPILOT_CAPTURES: captures };
+}
+
+/**
  * The project's cross-review engine as the variables `cross_review/review.py`
  * reads. Nothing when the project names no second engine, or names one
  * without a model: the backend would refuse it anyway, and saying nothing

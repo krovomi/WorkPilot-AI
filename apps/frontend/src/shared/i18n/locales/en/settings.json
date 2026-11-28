@@ -3552,5 +3552,51 @@
 		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators.",
 		"rights": "You can see them and download everything kept about you in Settings, My usage. To have your account erased, ask a platform administrator.",
 		"understood": "I understand"
+	},
+	"captures": {
+		"navLabel": "PR captures",
+		"title": "Captures for pull requests",
+		"description": "Screens a task takes before and after its changes, shown in its pull request with personal data replaced by fakes.",
+		"groups": {
+			"when": {
+				"title": "When",
+				"description": "A card can still choose « always » or « never » for itself, in its Captures tab."
+			},
+			"privacy": {
+				"title": "Personal data",
+				"description": "Checked on this computer before a capture leaves it."
+			},
+			"publish": {
+				"title": "In the pull request",
+				"description": "GitHub, GitLab and Bitbucket keep the images on a branch of their own; Azure DevOps as PR attachments."
+			}
+		},
+		"modeLabel": "Take captures",
+		"modeHint": "Automatic: only for a task whose changes touch a screen (every stack).",
+		"mode": {
+			"auto": "Automatic",
+			"always": "Always",
+			"never": "Never"
+		},
+		"compare": "Take the « before » on the base branch",
+		"compareHint": "Replays the captured pages on the base branch, for a before/after pair.",
+		"mask": "Replace personal data with fakes",
+		"maskHint": "E-mail, phone, IBAN, card, name, address: a fake of the same kind and format. Off: the image is published as it is.",
+		"selectors": "Extra private elements",
+		"selectorsHint": "CSS selectors, comma-separated (30 at most), in addition to [data-private], [data-pii] and [data-sensitive].",
+		"selectorsPlaceholder": ".customer-name, #account",
+		"publishUnchecked": "Publish captures nothing could check",
+		"publishUncheckedHint": "A window or phone screen without local OCR. Off: they stay on the task.",
+		"publishLabel": "Publish",
+		"publishHint": "Automatic: into the PR as soon as it exists. After review: someone presses Publish in the task.",
+		"publish": {
+			"auto": "Automatic",
+			"review": "After review",
+			"never": "Never (keep on the task)"
+		},
+		"retention": "Days kept",
+		"retentionHint": "After their last update, on the captures branch. 0: no limit.",
+		"branch": "Captures branch",
+		"branchHint": "Never merged, shares no history with the code."
 	}
 }

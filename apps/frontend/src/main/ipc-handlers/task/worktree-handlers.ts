@@ -61,6 +61,7 @@ import { registerWorktreeMergeHandlers } from "./worktree-merge-handlers";
 import { registerWorktreeFileHandlers } from "./worktree-file-handlers";
 import { registerWorktreeCreatePRHandlers } from "./worktree-create-pr-handlers";
 import { registerWorktreeVisualProofHandlers } from "./worktree-visual-proof-handlers";
+import { registerTaskCapturesHandlers } from "./task-captures-handlers";
 // Moved to ./worktree-git-refs.ts (audit lot L11, F36); re-exported for existing importers.
 export { GIT_BRANCH_REGEX, validateWorktreeBranch } from "./worktree-git-refs";
 
@@ -78,6 +79,7 @@ export function registerWorktreeHandlers(
 	registerWorktreeFileHandlers();
 	registerWorktreeCreatePRHandlers(pythonEnvManager, getMainWindow);
 	registerWorktreeVisualProofHandlers(pythonEnvManager, getMainWindow);
+	registerTaskCapturesHandlers(pythonEnvManager, getMainWindow);
 
 	/**
 	 * Get the worktree status for a task

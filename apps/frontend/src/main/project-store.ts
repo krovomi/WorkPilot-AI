@@ -41,6 +41,7 @@ import { stripHtml } from "./ipc-handlers/shared/sanitize";
 import { getAutoBuildPath, isInitialized } from "./project-initializer";
 import { readCiSuite } from "./suite-placement/ci-suite";
 import { readSuitePlacement } from "./suite-placement/placement-file";
+import { attachCaptures } from "./task-captures/attach";
 import { attachRunFacts } from "./task-run-facts";
 import { readStatusHistory } from "./task-status-history";
 import { updateExistingFile } from "./utils/existing-file";
@@ -449,13 +450,17 @@ export class ProjectStore {
 		);
 	}
 
-	/** Who created and launched each task, and what it spent (`task-run-facts.ts`). */
+	/**
+	 * Who created and launched each task, what it spent (`task-run-facts.ts`),
+	 * and the captures it prepared for its PR (`task-captures/attach.ts`).
+	 */
 	private withRunFacts(project: Project, tasks: Task[], local: boolean): Task[] {
 		const specs = path.join(project.path, getSpecsDir(project.autoBuildPath));
-		return attachRunFacts(project.path, tasks, {
+		const withFacts = attachRunFacts(project.path, tasks, {
 			local,
 			specDirOf: (task) => path.join(specs, task.specId),
 		});
+		return attachCaptures(project, withFacts, local);
 	}
 
 	/**

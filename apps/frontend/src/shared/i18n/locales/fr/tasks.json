@@ -3552,5 +3552,123 @@
 		"filterBy": "Voir les tâches étiquetées {{label}}",
 		"failedTitle": "Étiquettes non enregistrées",
 		"failedDescription": "La tâche n'a pas pu être enregistrée. Réessaie."
+	},
+	"captures": {
+		"tab": "Captures",
+		"title": "Captures pour la PR",
+		"count_one": "{{count}} écran",
+		"count_other": "{{count}} écrans",
+		"state": {
+			"published": "Dans la PR",
+			"waiting": "En attente de « Publier »",
+			"ready": "Prêtes pour la PR",
+			"kept": "Gardées sur la tâche",
+			"withheld": "Retenues"
+		},
+		"stateHint": {
+			"published": "La pull request montre ces écrans dans sa section « Captures », avant et après.",
+			"waiting": "Le projet relit les captures d'abord : elles vont dans la PR quand quelqu'un appuie sur « Publier ».",
+			"ready": "Elles vont dans la pull request dès qu'elle existe, ou quand vous la mettez à jour.",
+			"kept": "Le projet garde les captures sur la tâche : rien n'est envoyé à la forge.",
+			"withheld": "Aucune copie n'a pu être vérifiée pour les données personnelles : aucune ne quitte cet ordinateur."
+		},
+		"fakesReplaced": "Données personnelles remplacées par des fausses du même format : {{kinds}}.",
+		"fakesNone": "Vérifiées : aucune donnée personnelle trouvée sur ces écrans.",
+		"itemFakes_one": "{{count}} valeur remplacée par une fausse ({{kinds}}).",
+		"itemFakes_other": "{{count}} valeurs remplacées par des fausses ({{kinds}}).",
+		"withheld_one": "{{count}} écran reste sur la tâche : sa copie n'a pas pu être vérifiée.",
+		"withheld_other": "{{count}} écrans restent sur la tâche : leurs copies n'ont pas pu être vérifiées.",
+		"syncedAt": "PR mise à jour le {{date}}",
+		"side": {
+			"before": "Avant",
+			"after": "Après"
+		},
+		"sideCaption": "{{label}} · {{side}}",
+		"zoom": "Agrandir {{label}}",
+		"previewAlt": "Première capture : {{label}}",
+		"noBefore": "Pas d'« avant » : la branche de base n'a pas été capturée pour cet écran.",
+		"imageFailed": "Cette copie n'a pas pu être lue.",
+		"untitled": "Écran",
+		"keptOnTask": "Reste sur la tâche",
+		"status": {
+			"pseudonymized": "Données personnelles remplacées par des fausses",
+			"clean": "Vérifiée, rien de personnel",
+			"unchecked": "Non vérifiée (ni page, ni OCR local) : gardée sur la tâche",
+			"withheld": "Retenue : trop de données personnelles, ou une vérification a échoué",
+			"failed": "Pas de copie : l'image n'a pas pu être lue"
+		},
+		"platform": {
+			"web": "Web",
+			"desktop": "Bureau",
+			"android": "Android",
+			"ios": "iOS"
+		},
+		"variant": {
+			"mobile": "Vue téléphone"
+		},
+		"actions": {
+			"approve": "Publier dans la PR",
+			"withdraw": "Retirer de la PR",
+			"sync": "Mettre à jour la PR",
+			"openPr": "Ouvrir la PR",
+			"visualProof": "Preuve visuelle"
+		},
+		"done": {
+			"approve": "Publiées : la PR montre les captures.",
+			"withdraw": "Retirées : la PR ne les montre plus.",
+			"sync": "La PR est à jour."
+		},
+		"noPrYet": "Aucune pull request n'est ouverte pour cette tâche : les captures y iront à sa création.",
+		"errors": {
+			"invalid-action": "Cette action n'est pas disponible.",
+			"server-project": "Les captures d'une carte du serveur sont publiées par le serveur.",
+			"no-captures": "Cette tâche n'a pas de captures.",
+			"python-not-ready": "L'environnement Python n'est pas encore prêt.",
+			"backend-not-found": "Le backend de WorkPilot est introuvable.",
+			"timeout": "La forge a mis trop de temps à répondre.",
+			"runner-refused": "La mise à jour a été refusée : vérifiez la connexion à la forge.",
+			"no-answer": "La mise à jour n'a rien répondu.",
+			"spawn-failed": "La mise à jour n'a pas pu démarrer.",
+			"unknown": "La mise à jour a échoué."
+		},
+		"syncReason": {
+			"no-credentials": "La PR n'a pas été mise à jour : aucune connexion à la forge pour ce projet.",
+			"pr-unreadable": "La PR n'a pas pu être lue.",
+			"pr-write-failed": "La description de la PR n'a pas pu être écrite.",
+			"attachments-refused": "Azure DevOps a refusé les pièces jointes.",
+			"push-refused": "La branche des captures n'a pas pu être poussée (branche protégée ?).",
+			"error": "La dernière mise à jour de la PR a échoué."
+		},
+		"choice": {
+			"label": "Pour cette tâche",
+			"project": "Suivre le projet",
+			"always": "Toujours prendre des captures",
+			"never": "Ne jamais prendre de captures"
+		},
+		"backToCaptures": "Revenir aux captures",
+		"empty": {
+			"none": "Cette tâche n'a pas encore de captures : elles sont prises pendant la vérification d'une tâche qui touche un écran. Sa preuve visuelle est ci-dessous.",
+			"notYet": "Des captures sont prévues pour cette tâche : aucune prise pour l'instant. Sa preuve visuelle est ci-dessous.",
+			"no-ui-files": "Cette tâche ne change aucun écran : elle ne prend pas de captures. Sa preuve visuelle est ci-dessous.",
+			"no-changed-files": "Cette tâche n'a pas encore de changements. Sa preuve visuelle est ci-dessous.",
+			"turned-off": "Les captures sont coupées pour cette tâche. Sa preuve visuelle est ci-dessous."
+		},
+		"serverCard": "Une carte du serveur : ses captures sont publiées par le serveur.",
+		"badge": {
+			"count_one": "{{count}}",
+			"count_other": "{{count}}",
+			"title_one": "{{count}} capture · {{state}}",
+			"title_other": "{{count}} captures · {{state}}"
+		},
+		"kinds": {
+			"email": "e-mail",
+			"phone": "téléphone",
+			"iban": "IBAN",
+			"card": "numéro de carte",
+			"name": "nom",
+			"address": "adresse",
+			"birthdate": "date de naissance",
+			"secret": "secret"
+		}
 	}
 }
