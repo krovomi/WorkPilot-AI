@@ -530,13 +530,14 @@ def protect_capture(
     With the protection turned off by the team, the copy is the image
     re-encoded (metadata dropped) and the result is ``clean`` with no check.
     """
-    try:
-        from PIL import Image
+    from PIL import Image
 
+    try:
         with Image.open(image) as source:
             source.load()
             picture = source.convert("RGB")
-    except Exception:  # noqa: BLE001 - an unreadable capture is not published
+    except (OSError, ValueError, Image.DecompressionBombError):
+        # An unreadable capture is not published.
         return ProtectResult("failed", notes=["image:unreadable"])
 
     if not enabled:
@@ -574,7 +575,9 @@ def protect_capture(
             result.checks.append(f"ocr:{outcome.engine or 'local'}")
         else:
             result.notes.append(f"ocr:{outcome.reason or 'failed'}")
-    except Exception as exc:  # noqa: BLE001 - a check that breaks fails closed
+    except (OSError, ValueError, RuntimeError, LookupError) as exc:
+        # A check that breaks fails closed; any other error reaches
+        # `build_publication`'s caller, and nothing is published either.
         logger.debug("pr_captures: OCR pass failed: %s", exc)
         result.status = "withheld"
         result.notes.append("ocr:failed")

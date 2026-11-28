@@ -30,6 +30,10 @@ from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
 
+#: What a browser tool raises: a dead tab (OSError, TimeoutError), a driver
+#: error (RuntimeError), an answer it could not read (ValueError).
+_PAGE_ERRORS = (OSError, ValueError, RuntimeError)
+
 __all__ = ["after_verify", "capture_side", "protected_screenshot"]
 
 
@@ -71,9 +75,9 @@ async def protected_screenshot(
                 mapping, kinds = found
                 check = PageCheck(len(mapping), kinds, sorted(set(mapping.values())))
                 if mapping:
-                    await browser.evaluate(apply_script(mapping))
                     swapped = True
-        except Exception as exc:  # noqa: BLE001 - the capture is then OCR's to check
+                    await browser.evaluate(apply_script(mapping))
+        except _PAGE_ERRORS as exc:  # the capture is then OCR's to check
             logger.debug("verify: page pseudonyms skipped: %s", exc)
             check = None
     try:
@@ -82,7 +86,7 @@ async def protected_screenshot(
         if swapped:
             try:
                 await browser.evaluate(restore_script())
-            except Exception as exc:  # noqa: BLE001
+            except _PAGE_ERRORS as exc:
                 logger.debug("verify: page pseudonyms not restored: %s", exc)
     if ok and check is not None:
         write_page_check(path, check)
@@ -239,7 +243,8 @@ async def after_verify(
             log("verify: captures of the base branch, for the pull request")
             try:
                 await (compare or run_base_comparison)(project, spec)
-            except Exception as exc:  # noqa: BLE001 - a missing "before" is not a failure
+            except (OSError, ValueError, RuntimeError, LookupError) as exc:
+                # A missing "before" is not a failure.
                 logger.debug("verify: base captures skipped: %s", exc)
         return await asyncio.to_thread(
             build_publication,
