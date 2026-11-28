@@ -548,7 +548,7 @@
 			"addStarted": "Add and start",
 			"addTooltip": "Add a task (N)",
 			"ariaLabel": "Describe the new task",
-			"placeholder": "Describe the task… Paste a list to create one task per line.",
+			"placeholder": "Task title, then Shift+Enter for its description. Paste a list to create one task per line.",
 			"type": "Type",
 			"noType": "No type (detected automatically)",
 			"priority": "Priority",

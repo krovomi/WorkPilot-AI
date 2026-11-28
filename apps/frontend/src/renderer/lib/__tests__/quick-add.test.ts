@@ -46,6 +46,8 @@ describe("quick add", () => {
 		expect(splitsByDefault("Export CSV")).toBe(false);
 		const long = "x".repeat(QUICK_ADD_TITLE_MAX + 1);
 		expect(splitsByDefault(`Context first\n${long}`)).toBe(false);
+		// Typed lines are a title and its description: one card.
+		expect(splitsByDefault("Export CSV\nFix the filter", false)).toBe(false);
 	});
 
 	it("makes a short line the title and keeps it as the description", () => {
@@ -54,13 +56,23 @@ describe("quick add", () => {
 		]);
 	});
 
-	it("leaves the title to the generator for a long or multi-line text", () => {
+	it("makes the first line of a multi-line text the title, the whole text the description", () => {
+		// Report of 28 November: the description typed under the title was lost.
+		expect(buildQuickAddItems("Just tell me if you see this ticket?\nIt is #1405, on GitHub", false)).toEqual([
+			{
+				title: "Just tell me if you see this ticket?",
+				description: "Just tell me if you see this ticket?\nIt is #1405, on GitHub",
+			},
+		]);
+	});
+
+	it("leaves the title to the generator when the first line is too long for one", () => {
 		const long = "y".repeat(QUICK_ADD_TITLE_MAX + 1);
 		expect(buildQuickAddItems(long, false)).toEqual([
 			{ title: "", description: long },
 		]);
-		expect(buildQuickAddItems("Line one\nLine two", false)).toEqual([
-			{ title: "", description: "Line one\nLine two" },
+		expect(buildQuickAddItems(`${long}\nmore`, false)).toEqual([
+			{ title: "", description: `${long}\nmore` },
 		]);
 	});
 

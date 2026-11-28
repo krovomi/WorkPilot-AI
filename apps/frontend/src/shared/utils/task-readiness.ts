@@ -4,6 +4,7 @@
  * Design: docs/architecture/task-readiness.md.
  */
 import type { Task, TaskStatus } from "../types";
+import { stripHtmlTags } from "./acceptance-criteria";
 
 /** Below this many characters of description (title aside), a card is short. */
 export const SHORT_CARD_CHARS = 80;
@@ -25,8 +26,24 @@ export function isShortCard(task: Pick<Task, "title" | "description" | "subtasks
 	return cardBody(task).length < SHORT_CARD_CHARS;
 }
 
-/** What a card says besides its title: "" when its description only repeats it. */
+/** Whether a description is rich text (the edit dialog, a tracker import). */
+export function isHtmlDescription(description: string | undefined): boolean {
+	return (description ?? "").trimStart().startsWith("<");
+}
+
+/**
+ * What a card says besides its title, as text: "" when its description only
+ * repeats it. Rich text is read without its tags, so a described card is not
+ * taken for an empty one (or the reverse) because of its markup.
+ */
 export function cardBody(task: Pick<Task, "title" | "description">): string {
-	const description = (task.description ?? "").trim();
+	const raw = (task.description ?? "").trim();
+	const description = isHtmlDescription(raw)
+		? stripHtmlTags(raw.replace(/<(br|\/p|\/div|\/li|\/h[1-6])\b[^>]*>/gi, "\n"))
+				.replace(/&nbsp;/g, " ")
+				.replace(/[ \t]+/g, " ")
+				.replace(/\s*\n\s*/g, "\n")
+				.trim()
+		: raw;
 	return description === task.title.trim() ? "" : description;
 }

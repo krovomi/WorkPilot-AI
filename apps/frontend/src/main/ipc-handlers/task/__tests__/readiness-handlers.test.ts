@@ -81,10 +81,12 @@ describe("checkTaskReadiness", () => {
 		expect(await checkTaskReadiness(id)).toEqual({ ready: false, questions });
 		expect(state.review).toHaveBeenCalledTimes(1);
 		expect(state.review).toHaveBeenCalledWith("Fix login", "", "fr");
-		(state.task as Record<string, unknown>).description = "On the admin page";
+		(state.task as Record<string, unknown>).description = "<p>On the <b>admin</b> page</p>";
 		state.review.mockResolvedValue({ ready: true, questions: [] });
 		expect(await checkTaskReadiness(id)).toEqual({ ready: true });
 		expect(state.review).toHaveBeenCalledTimes(2);
+		// Rich text reaches the review as text.
+		expect(state.review).toHaveBeenLastCalledWith("Fix login", "On the admin page", "fr");
 	});
 
 	it("does not review a described card, a resumed one, or when the review cannot run", async () => {
