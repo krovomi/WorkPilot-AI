@@ -211,6 +211,7 @@ export function startExpressLane(): void {
 	timer = setInterval(() => void look(), EVERY_MS);
 	first.unref?.();
 	timer.unref?.();
+	app.once("before-quit", stopExpressLane);
 }
 
 export function stopExpressLane(): void {

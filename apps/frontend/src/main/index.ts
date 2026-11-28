@@ -79,7 +79,6 @@ import { getSourceEnvPath } from "./ipc-handlers/settings-handlers";
 import { stopAllPrFollowups } from "./ipc-handlers/task/pr-followup-handlers";
 import { stopSplitMergeWatch } from "./ipc-handlers/task/split-merge-watch";
 import { stopMergedWatch } from "./worktree-purge/merged-watch";
-import { startExpressLane, stopExpressLane } from "./express-lane";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
 import { loadPersistedState, restoreSession } from "./server-connection";
@@ -1322,9 +1321,6 @@ async function main() {
 		pythonEnvManager,
 	);
 
-	// The project's own dependency PRs, merged in N0 when the setting is on.
-	startExpressLane();
-
 	// Initialize credential integration to load Windsurf usage data from local cache
 	initializeCredentialIntegration().catch((error) => {
 		console.warn("[main] Failed to initialize credential integration:", error);
@@ -1450,7 +1446,6 @@ app.on("before-quit", (event) => {
 	stopAllPrFollowups();
 	stopSplitMergeWatch();
 	stopMergedWatch();
-	stopExpressLane();
 
 	const usageMonitor = getUsageMonitor();
 	usageMonitor.stop();

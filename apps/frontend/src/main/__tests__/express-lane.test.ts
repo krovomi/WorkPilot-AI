@@ -18,7 +18,7 @@ vi.mock("node:child_process", async (importOriginal) => ({
 	spawn: spawnMock,
 }));
 vi.mock("electron", () => ({
-	app: { isPackaged: false, getAppPath: () => "/app/frontend" },
+	app: { isPackaged: false, getAppPath: () => "/app/frontend", once: vi.fn() },
 }));
 vi.mock("../app-logger", () => ({ appLog: { info: vi.fn(), warn: vi.fn(), debug: vi.fn() } }));
 vi.mock("../project-store", () => ({ projectStore: { getProjects: () => stored.projects } }));
@@ -263,6 +263,7 @@ describe("startExpressLane", () => {
 			const read = vi.spyOn(settings, "readSettingsFile");
 			startExpressLane();
 			startExpressLane(); // a second start keeps the one timer
+			expect(app.once).toHaveBeenCalledWith("before-quit", stopExpressLane);
 			await vi.advanceTimersByTimeAsync(3 * 60_000);
 			expect(read).toHaveBeenCalledTimes(1);
 			await vi.advanceTimersByTimeAsync(30 * 60_000);
