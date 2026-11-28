@@ -28,10 +28,11 @@ _TOKEN = "ghp_" + "A" * 36  # pragma: allowlist secret
 @pytest.fixture(autouse=True)
 async def server(monkeypatch, tmp_path):
     from cryptography.fernet import Fernet
-    from server.services.run_manager import USER_SECRET_ENV
+    from server.services.run_manager import RUN_INTEGRATIONS
 
+    run_env_names = {integration.env_name for integration in RUN_INTEGRATIONS}
     for key in list(server_config.os.environ):
-        if key.startswith("WORKPILOT_") or key in USER_SECRET_ENV.values():
+        if key.startswith("WORKPILOT_") or key in run_env_names:
             monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("WORKPILOT_SERVER_MODE", "1")
     monkeypatch.setenv("WORKPILOT_JWT_SECRET", _VALID_SECRET)
@@ -103,6 +104,27 @@ async def test_a_token_is_set_by_its_owner_and_given_to_their_runs_only(monkeypa
             "deleted": True
         }
     assert "GITHUB_TOKEN" not in await RunManager()._build_env("u-ada", "run-3")
+
+
+@pytest.mark.asyncio
+async def test_a_token_the_vault_cannot_read_names_its_integration_not_its_value(
+    monkeypatch, caplog
+):
+    from server.services import run_manager
+
+    async def unreadable(_db, _user_id, kind):
+        if kind == "github_token":
+            raise ValueError(f"cannot decrypt {_TOKEN}")
+        return None
+
+    monkeypatch.setattr(run_manager, "get_user_secret", unreadable)
+    with caplog.at_level("WARNING", logger=run_manager.logger.name):
+        env = await run_manager.RunManager()._build_env("u-ada", "run-1")
+
+    assert "GITHUB_TOKEN" not in env
+    assert "Could not load the GitHub token for a run: ValueError" in caplog.text
+    assert _TOKEN not in caplog.text
+    assert "github_token" not in caplog.text
 
 
 @pytest.mark.asyncio
