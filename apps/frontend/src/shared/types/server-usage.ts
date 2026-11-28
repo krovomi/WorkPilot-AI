@@ -193,3 +193,134 @@ export interface UsageNotice {
 	page_activity_retention_days: number;
 	visible_to: string[];
 }
+
+/** The kinds of usage report: each day, each week, each month. */
+export type UsageReportKind = "daily" | "weekly" | "monthly";
+
+/** One address the report goes to, and whether it belongs to a member. */
+export interface UsageReportRecipient {
+	address: string;
+	member: boolean;
+}
+
+/** One report sent, scheduled or asked for. */
+export interface UsageReportSend {
+	kind: string;
+	/** The first day of the period it covered (`YYYY-MM-DD`). */
+	period: string;
+	/** `sent`, `failed`, `no_smtp` or `no_recipient`. */
+	status: string;
+	recipients: number;
+	/** ISO 8601. */
+	at: string;
+}
+
+/** What `PUT /admin/usage/report/settings` takes. */
+export interface UsageReportSettingsUpdate {
+	enabled: boolean;
+	/** `HH:MM`, in `timezone`. */
+	time: string;
+	/** An IANA time zone. */
+	timezone: string;
+	/** Weekdays, 0 Monday to 6 Sunday. */
+	days: number[];
+	/** Empty: the members whose role reads usage. */
+	recipients: string[];
+	language: "fr" | "en";
+	/** Whether people are named; off, totals only. */
+	names: boolean;
+	weekly: boolean;
+	monthly: boolean;
+}
+
+/** The report's settings, as `GET /admin/usage/report/settings` answers. */
+export interface UsageReportSettings extends Omit<UsageReportSettingsUpdate, "recipients"> {
+	recipients: UsageReportRecipient[];
+	/** Whether the server can send mail; without it the report is only read here. */
+	email_enabled: boolean;
+	/** Who it goes to while no address is chosen. */
+	default_recipients: string[];
+	last_sends: UsageReportSend[];
+}
+
+/** A figure of the report, against the period before (and, daily, the week's mean). */
+export interface UsageReportFigure {
+	value: number | null;
+	previous: number | null;
+	average: number | null;
+}
+
+/** A budget past an alert threshold, as the report lists it. */
+export interface UsageReportAlert {
+	kind: "budget" | "budget_scope";
+	scope?: string;
+	name?: string | null;
+	threshold: number;
+	percent: number;
+}
+
+/** The report of one period, as `GET /admin/usage/report` answers (the email's content). */
+export interface UsageReport {
+	kind: UsageReportKind;
+	organization: string | null;
+	start: string;
+	end: string;
+	names: boolean;
+	figures: Record<string, UsageReportFigure>;
+	dormant: number;
+	/** Null names when the report names nobody. */
+	top: Array<{ name: string | null; tokens: number; cost_usd: number }>;
+	engines: Array<{ provider: string; model: string; tokens: number; cost_usd: number; runs: number }>;
+	failures: Array<{ cause: string; runs: number; jobs: number }>;
+	alerts: UsageReportAlert[];
+}
+
+/** What `POST /admin/usage/report/send` answers. */
+export interface UsageReportSent {
+	status: string;
+	recipients: number;
+	period: string;
+}
+
+/** Who a budget holds back: a member, a group or a project. */
+export type UsageBudgetScope = "person" | "group" | "project";
+
+/** A monthly token budget with what it used this month. */
+export interface UsageBudget {
+	/** Null for the organization's own budget (set in Quotas). */
+	id: string | null;
+	scope: string;
+	target_id: string | null;
+	name: string | null;
+	monthly_tokens: number;
+	/** Whether a new run is refused once it is spent. */
+	block: boolean;
+	used: number;
+	percent: number;
+}
+
+/** An alert raised at 80 or 100 % of a budget. */
+export interface UsageBudgetAlert {
+	budget_id: string | null;
+	scope: string;
+	/** The first day of the month (`YYYY-MM-DD`). */
+	month: string;
+	threshold: number;
+	percent: number;
+	recipients: number;
+}
+
+/** What `/admin/usage/budgets` answers. */
+export interface UsageBudgets {
+	organization: UsageBudget | null;
+	budgets: UsageBudget[];
+	alerts: UsageBudgetAlert[];
+}
+
+/** What `PUT /admin/usage/budgets` takes. */
+export interface UsageBudgetUpdate {
+	scope: UsageBudgetScope;
+	target_id: string;
+	monthly_tokens: number;
+	block: boolean;
+}

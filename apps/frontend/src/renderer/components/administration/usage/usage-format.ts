@@ -4,7 +4,7 @@
  * A period is a pair of UTC days (`YYYY-MM-DD`, both included), as the
  * server reads them. Numbers follow the app's language, like its dates.
  */
-import { appDateLocale } from "@/lib/date-format";
+import { appDateLocale, formatAppDate } from "@/lib/date-format";
 
 export type PeriodPreset = "7d" | "30d" | "month" | "custom";
 
@@ -24,6 +24,14 @@ export function periodOf(preset: Exclude<PeriodPreset, "custom">, now = new Date
 	const days = preset === "7d" ? 7 : 30;
 	const start = new Date(now.getTime() - (days - 1) * 86_400_000);
 	return { start: day(start), end };
+}
+
+/**
+ * A server day (`YYYY-MM-DD`) in the app's language. Read as UTC, as the
+ * server writes it, so a time zone west of UTC does not show the day before.
+ */
+export function formatDay(day: string, options?: Intl.DateTimeFormatOptions): string {
+	return formatAppDate(day, { timeZone: "UTC", ...options });
 }
 
 export function formatCount(value: number): string {
