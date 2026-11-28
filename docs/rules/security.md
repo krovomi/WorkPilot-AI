@@ -47,10 +47,9 @@ l'UI n'existe pas.
   démarrage de `provider_api.py` ; `run.py` et chaque runner l'installent en tête de leur bloc
   `__main__` (`tests/test_entrypoints_redaction.py`), un nouveau point d'entrée aussi. Le masque
   s'applique à la création de chaque enregistrement, donc aussi aux handlers posés après ;
-  `foundation/debug.py`, qui écrit hors `logging`, passe par `redact_text`. Côté
-  Electron, `app-logger.ts` expurge chaque message avant écriture (hook electron-log,
-  `shared/utils/secret-redaction.ts`). Côté UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un
-  jeton, ni le corps d'une requête d'authentification.
+  `foundation/debug.py`, qui écrit hors `logging`, passe par `redact_text`. Côté Electron,
+  `app-logger.ts` expurge chaque message avant écriture (hook electron-log, `shared/utils/secret-redaction.ts`).
+  Côté UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un jeton, ni le corps d'une requête d'authentification.
 - **Nouveau stockage d'identifiant** côté Electron : `safeStorage`. S'il est indisponible, refuser
   ou avertir l'utilisateur ; ne pas retomber silencieusement sur du texte clair.
   `apps/frontend/src/main/secret-storage.ts` décide de la forme sur disque (`enc:…`) ; sous
