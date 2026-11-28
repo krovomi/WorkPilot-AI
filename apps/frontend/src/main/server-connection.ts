@@ -262,12 +262,14 @@ export async function getServerAuthConfig(
 /**
  * Authenticated request against the current server, attaching the access
  * token and the organization it acts in. An expired access token is refreshed
- * once, shared with any concurrent caller, and the request sent again.
+ * once, shared with any concurrent caller, and the request sent again. With
+ * `as: "text"` the answer comes back as text (a CSV or a file to save).
  */
 export async function authedFetch<T>(
 	pathName: string,
 	method: string,
 	body?: unknown,
+	as: "json" | "text" = "json",
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
 	if (!serverUrl) return { ok: false, error: "No server URL configured" };
 	if (!accessToken) return { ok: false, error: "Not authenticated" };
@@ -298,6 +300,7 @@ export async function authedFetch<T>(
 				return { ok: false, error: text || `HTTP ${res.status}` };
 			}
 		}
+		if (as === "text") return { ok: true, data: text as T };
 		return { ok: true, data: (text ? JSON.parse(text) : null) as T };
 	} catch (err) {
 		return {

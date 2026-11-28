@@ -27,6 +27,7 @@ import { ServerMcpSettings } from "./ServerMcpSettings";
 import { ServerNeedsYouSettings } from "./ServerNeedsYouSettings";
 import { ServerReplayLinksSettings } from "./ServerReplayLinksSettings";
 import { ServerConnectSettings } from "./ServerConnectSettings";
+import { MyUsageSettings } from "./MyUsageSettings";
 import { ServerSessionSettings } from "./ServerSessionSettings";
 import { ServerTokensSettings } from "./ServerTokensSettings";
 import { ModuleStage, Notice, toneClass } from "../charter";
@@ -104,6 +105,7 @@ export type AppSection =
 	// Multi-utilisateurs (serveur ; les invitations pour les admins seulement)
 	| "team-invitations"
 	| "server-session"
+	| "server-my-usage"
 	| "server-tokens"
 	| "server-mcp"
 	| "server-needs-you"
@@ -182,6 +184,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		...(isServerAdmin ? [] : ["team-invitations"]),
 		// "server-session" stays: in local mode it is where one signs in.
 		...(serverMode === "server" ? [] : [
+					"server-my-usage",
 					"server-tokens",
 					"server-mcp",
 					"server-needs-you",
@@ -470,6 +473,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				) : (
 					<ServerConnectSettings onConnect={() => onOpenChange(false)} />
 				);
+			case "server-my-usage":
+				return serverMode === "server" ? <MyUsageSettings /> : null;
 			case "server-tokens":
 				return serverMode === "server" ? <ServerTokensSettings /> : null;
 			case "server-mcp":

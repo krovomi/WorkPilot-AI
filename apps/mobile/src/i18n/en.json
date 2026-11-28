@@ -359,6 +359,29 @@
 			"merge_with_changes": "Mergeable after small changes",
 			"needs_revision": "Needs revision",
 			"blocked": "Blocked"
+		},
+		"feedback": {
+			"useful": "Useful",
+			"notUseful": "Not useful",
+			"why": "Why is it not useful?",
+			"notApplicable": "Does not apply here",
+			"held": "Waiting for a maintainer",
+			"heldTitle": "Rejections waiting for you",
+			"heldHint": "The reviewer learns from them once you approve: it will raise such remarks less on this project.",
+			"approve": "Approve",
+			"discard": "Discard",
+			"verdict": {
+				"accepted": "Useful",
+				"rejected": "Not useful",
+				"not_applicable": "Does not apply"
+			},
+			"reason": {
+				"false_positive": "It is wrong",
+				"too_pedantic": "Too pedantic",
+				"project_convention": "Our convention",
+				"legacy_exception": "Legacy code, on purpose",
+				"other": "Another reason"
+			}
 		}
 	},
 	"dashboard": {
@@ -519,6 +542,29 @@
 			"codebase_discovery": "Discovery",
 			"task_outcome": "Outcome",
 			"session_insight": "Session"
+		},
+		"trash": "Trash",
+		"pinned": "Pinned",
+		"pin": "Pin",
+		"unpin": "Unpin",
+		"forget": "Forget",
+		"forgetTitle": "Forget this memory?",
+		"forgetBody": "The agents stop reading it. It stays in the trash, where anyone who may write the project's insights can put it back.",
+		"restore": "Put back",
+		"trashHint": "A forgotten memory stays {{days}} days in the trash. {{pinned}} of {{limit}} memories are pinned.",
+		"trashEmpty": "Nothing in the trash.",
+		"forgottenBy": "Forgotten by {{name}}, {{date}}",
+		"forgottenOn": "Forgotten {{date}}",
+		"restorableUntil": "Can be put back until {{date}}",
+		"refused": {
+			"pin-limit": "At most {{limit}} memories can be pinned: unpin one first.",
+			"pinned": "A pinned memory cannot be forgotten: unpin it first.",
+			"not-found": "This memory is no longer there: the list is read again.",
+			"exists": "A memory of the same name is back already.",
+			"expired": "It stayed too long in the trash to be put back.",
+			"no-brain": "The project has no memory yet.",
+			"invalid": "The server did not recognize this memory.",
+			"failed": "The server did not take this decision."
 		}
 	},
 	"tokens": {
@@ -545,7 +591,7 @@
 	},
 	"admin": {
 		"title": "Administration",
-		"summary": "Members, invitations, groups and roles of this organization.",
+		"summary": "Overview, members, invitations, groups, roles, sessions, quotas and audit log of this organization.",
 		"of": "Organization: {{org}}",
 		"remove": "Remove",
 		"projectRole": {
@@ -634,6 +680,85 @@
 			"scope": {
 				"org": "Organization",
 				"project": "Project"
+			}
+		},
+		"overview": {
+			"title": "Overview",
+			"summary": "What the organization's agents do now and over the week, and its quotas.",
+			"running": "Agents running",
+			"queued": "Waiting to run",
+			"success": "Runs that succeeded, 7 days",
+			"members": "Members",
+			"activeOf": "{{active}} active of {{total}}",
+			"projects": "Projects",
+			"cards": "Cards",
+			"runs24h": "Runs in the last 24 h",
+			"failed24h": "Failed in the last 24 h",
+			"week": "The last 7 days",
+			"dayRuns_one": "{{date}}: {{count}} run",
+			"dayRuns_other": "{{date}}: {{count}} runs",
+			"noRuns": "No run this week.",
+			"topUsers": "Who started the most runs",
+			"runs_one": "{{count}} run",
+			"runs_other": "{{count}} runs",
+			"failures": "Last failures",
+			"status": {
+				"queued": "Waiting",
+				"running": "Running",
+				"succeeded": "Succeeded",
+				"failed": "Failed",
+				"cancelled": "Cancelled"
+			}
+		},
+		"sessions": {
+			"title": "Sessions",
+			"summary": "Who is signed in, how and until when, and sign someone out.",
+			"empty": "Nobody is signed in.",
+			"since": "since {{date}}",
+			"until": "until {{date}}",
+			"revoke": "Sign out everywhere",
+			"revokeTitle": "Sign {{name}} out of every device?",
+			"revokeBody": "They have to sign in again on each device. Their account stays as it is."
+		},
+		"quotas": {
+			"title": "Quotas",
+			"summary": "Seats, projects, agents at once and tokens a month, with their use now.",
+			"use": "Use now",
+			"limitsTitle": "Limits",
+			"limits": {
+				"max_users": "Seats",
+				"max_projects": "Projects",
+				"max_concurrent_runs": "Agents at once",
+				"monthly_token_budget": "Tokens this month"
+			},
+			"usedOf": "{{used}} of {{limit}}",
+			"usedNoLimit": "{{used}}, no limit",
+			"hint": "An empty field means no limit.",
+			"unlimited": "No limit",
+			"hardStop": "Stop the agents at the token budget",
+			"hardStopHint": "Without it, the budget only warns: the agents keep going past it.",
+			"invalid": "A limit is a whole number, 0 or more.",
+			"save": "Save the limits",
+			"saved": "Saved.",
+			"readOnly": "You can read the quotas, not change them.",
+			"meter": "{{name}} used"
+		},
+		"audit": {
+			"title": "Audit log",
+			"summary": "What was done in the organization, by whom and when.",
+			"empty": "Nothing recorded yet.",
+			"system": "the server",
+			"openHint": "Shows the details of this line",
+			"only": "Only {{action}}",
+			"all": "Show everything",
+			"filter": "Only this action",
+			"more": "Show older lines",
+			"methods": {
+				"local": "password",
+				"entra": "Microsoft Entra",
+				"oidc": "single sign-on",
+				"invite": "invitation",
+				"unknown": "another sign-in"
 			}
 		}
 	},
@@ -1033,5 +1158,30 @@
 		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators.",
 		"rights": "You can see them and share everything kept about you in Settings, My usage. To have your account erased, ask a platform administrator.",
 		"understood": "I understand"
+	"cardLog": {
+		"title": "Log of #{{id}}",
+		"open": "See the whole log",
+		"phase": "Phase",
+		"show": "Show",
+		"all": "Everything",
+		"errors": "Errors",
+		"noTools": "Without the tools",
+		"find": "Find in the log",
+		"live": "An agent works: the log is read again every 3 seconds.",
+		"still": "No agent works on this card now.",
+		"follow": "Follow the end",
+		"empty": "No line to show."
+	},
+	"cardFiles": {
+		"open": "See the file full screen",
+		"previous": "Previous",
+		"next": "Next",
+		"position": "File {{index}} of {{count}}",
+		"status": {
+			"added": "Added",
+			"modified": "Modified",
+			"deleted": "Deleted",
+			"renamed": "Renamed"
+		}
 	}
 }

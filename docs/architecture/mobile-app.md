@@ -244,8 +244,27 @@ seul un administrateur de la plateforme peut inviter un administrateur du serveu
 (membres, projets atteints avec leur rôle, rôle donné dans l'organisation) et les rôles (un rôle
 intégré se lit, un rôle personnalisé se crée, se modifie permission par permission et se supprime).
 Chaque page n'apparaît qu'avec sa permission de lecture (`org.member.read`, `org.invitation.read`,
-`org.role.read`) et chaque action qu'avec celle d'écriture ; le serveur revérifie tout. Les
-organisations, quotas, sessions et journal d'audit restent sur le bureau.
+`org.role.read`) et chaque action qu'avec celle d'écriture ; le serveur revérifie tout.
+
+La console du bureau y est aussi (`src/admin/`, `src/app/(app)/admin/`) :
+
+- **Vue d'ensemble** (`GET /admin/overview`, `analytics.read`) : les agents en cours et en attente,
+  la semaine jour par jour, qui a lancé le plus, les derniers échecs et l'usage des quotas. Un
+  contributeur a aussi `analytics.read` : comme sur le bureau, les Réglages n'offrent
+  l'administration qu'à qui administre autre chose (`administers` dans `src/admin/pages.ts`).
+- **Quotas** (`/admin/quotas`, lecture `org.quota.read`, écriture `org.quota.write`) : chaque
+  plafond avec son usage ; un champ vide lève la limite. Le téléphone n'envoie que ce qui a changé,
+  et le serveur distingue une limite absente (gardée) d'une limite `null` (levée), et refuse un
+  nombre négatif.
+- **Journal d'audit** (`GET /admin/audit`, `audit.read`) : 50 lignes à la fois jusqu'aux 500 que
+  sert le serveur, le détail d'une ligne, et le filtre par son action. L'adresse IP que le serveur
+  garde pour chaque ligne n'est pas affichée sur le téléphone (RGPD : minimisation).
+- **Sessions** (`GET /admin/sessions`, `org.session.read`) : les connexions de chaque personne,
+  comment et jusqu'à quand ; `org.session.revoke` déconnecte une autre personne de tous ses
+  appareils (`DELETE /admin/sessions/{id}`), jamais soi-même depuis là. Les adresses IP ne sont
+  pas affichées non plus.
+
+Les organisations de la plateforme restent sur le bureau.
 
 ## Tableau de bord, sessions et analyses
 
@@ -442,8 +461,32 @@ depuis le bureau, sur chaque projet qu'elle atteint encore (`GET /api/features/r
 avec leur état et leurs ouvertures, et arrête un lien (`DELETE /{id}?project_id=`, le serveur
 revérifie l'auteur).
 
+## La carte en profondeur : journal, fichiers, revue et mémoire
+
+« Voir tout le journal » ouvre le journal d'une carte en plein écran
+(`cards/[cardId]/logs.tsx`) : une phase à la fois, filtré aux erreurs ou sans les appels d'outils,
+avec une recherche par mots. Tant qu'une phase tourne, l'écran relit `GET .../logs` toutes les
+3 secondes et suit la fin, sauf si la personne coupe « Suivre la fin » ; il ne dessine que les
+2 000 dernières lignes d'une phase. Un fichier modifié s'ouvre lui aussi en plein écran
+(`cards/[cardId]/files.tsx`) avec les numéros de ligne avant et après, lus des en-têtes `@@`
+(`src/card/patch.ts`), et le fichier précédent ou suivant. Le fichier est désigné par sa place dans
+la liste des changements (`?file=`), jamais par un chemin que le serveur aurait à croire.
+
+Sur une PR GitHub, chaque constat de la revue IA reçoit l'avis de l'équipe
+(`server/routes/forge_review_feedback.py`) : utile ou pas, et pourquoi (`src/forge/ReviewFeedback.tsx`).
+Il faut le droit d'écrire (`task.write`, le serveur revérifie le rôle d'auteur du projet). Un rejet
+que le serveur met de côté attend un mainteneur, qui l'approuve ou l'écarte depuis la même PR. GitLab
+n'a pas encore cette route : l'app n'affiche pas les boutons.
+
+La mémoire du projet (Contexte) se gère du téléphone avec le cycle de vie du serveur
+(`shared_features/context_lifecycle.py`, `src/context/MemoryViews.tsx`) : épingler un souvenir
+(dans la limite du serveur), l'oublier (il part à la corbeille, jamais effacé tout de suite) et le
+remettre tant que la durée de rétention court. Lire demande `insight.read`, changer
+`insight.write` ; un refus du serveur (limite atteinte, souvenir épinglé, délai passé) est dit dans
+la langue de l'app.
+
 ## Ce qui vient
 
 - Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.
-- Les organisations, les quotas, les sessions et le journal d'audit de l'administration.
+- Les organisations de la plateforme dans l'administration.
 - La publication sur l'App Store et Google Play (comptes Apple et Google, projet EAS).

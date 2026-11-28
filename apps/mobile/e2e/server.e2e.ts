@@ -20,7 +20,7 @@
  * approved from the phone, built (the fake agent checks the approval as a
  * build does and commits in the card's workspace), reviewed with its changes
  * and sent back to a build that runs; a person shows their name on the
- * team's leaderboard, a choice the server keeps, and finds their replay links. The browser cannot set headers on a WebSocket, so on the web the
+ * team's leaderboard, a choice the server keeps, and finds their replay links; a built card's changed file opens full screen, and the project memory's trash reads from the server; an admin reads the organization's overview, sets and lifts a quota (kept by the server and written to the audit log) and sees who is signed in. The browser cannot set headers on a WebSocket, so on the web the
  * board follows by its periodic read; the header handshake is the native
  * app's (unit-tested in `src/__tests__`).
  *
@@ -628,4 +628,63 @@ test("Alice shows her name on the team's leaderboard, and finds her replay links
 	await openSettings(alice, world.project);
 	await alice.getByRole("button", { name: "My replay links" }).click();
 	await expect(alice.getByText("You have shared no replay.")).toBeVisible({ timeout: 30_000 });
+});
+
+test("Alice reads a built card's file full screen, and the project memory's trash", async () => {
+	const alice = signedInPage("alice");
+	// The card built in an earlier scenario waits for review, its changes read from its workspace.
+	await home(alice, world.project);
+	await alice.getByRole("button", { name: "What waits for you" }).click();
+	await alice.getByRole("button", { name: `Greet the team by name, ${world.project}` }).click({ timeout: 30_000 });
+	await alice.getByRole("button", { name: "Show or hide the changes of BUILD_NOTES.md" }).click({ timeout: 60_000 });
+	await alice.getByRole("button", { name: "See the file full screen" }).click();
+	await expect(alice.getByText(/^File 1 of \d+$/)).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByRole("heading", { name: "BUILD_NOTES.md" })).toBeVisible();
+	await expect(alice.getByText("+Built by the fake agent.").filter({ visible: true }).first()).toBeVisible();
+	await expect(alice.getByRole("button", { name: "Previous" })).toBeDisabled();
+	await shot(alice, "25-file");
+
+	await openProject(alice, world.project);
+	await morePage(alice, "Context");
+	const trash = alice.getByRole("tab", { name: "Trash" });
+	await trash.click();
+	await expect(trash).toHaveAttribute("aria-selected", "true");
+	// No build has learned anything on this project yet: the server has no memory to keep a trash for.
+	await expect(alice.getByText(/^No memories yet/)).toBeVisible({ timeout: 30_000 });
+});
+
+test("Alice reads the organization's overview, lifts a quota she set, and finds it in the audit log", async () => {
+	const alice = signedInPage("alice");
+	await openSettings(alice, world.project);
+	await alice.getByRole("button", { name: "Administration", exact: true }).click();
+
+	await alice.getByRole("link", { name: /^Overview/ }).click();
+	await expect(alice.getByText("Agents running")).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText(/^\d+ active of \d+$/)).toBeVisible();
+	await shot(alice, "26-overview");
+	await alice.goBack();
+
+	await alice.getByRole("link", { name: /^Quotas/ }).click();
+	const seats = alice.getByLabel("Seats", { exact: true });
+	await seats.fill("40", { timeout: 30_000 });
+	await alice.getByRole("button", { name: "Save the limits" }).click();
+	await expect(alice.getByText("Saved.")).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText(/^\d+ of 40$/)).toBeVisible();
+	// Emptied, the limit is lifted on the server, not left as it was.
+	await seats.fill("");
+	await alice.getByRole("button", { name: "Save the limits" }).click();
+	await expect(alice.getByText(/^\d+, no limit$/).first()).toBeVisible({ timeout: 30_000 });
+	await expect(seats).toHaveValue("");
+	await shot(alice, "27-quotas");
+	await alice.goBack();
+
+	await alice.getByRole("link", { name: /^Audit log/ }).click();
+	await expect(alice.getByText("org.quota.updated").first()).toBeVisible({ timeout: 30_000 });
+	await alice.goBack();
+
+	// Bob signed in earlier: his sign-in is listed, and Alice's own has no sign-out here.
+	await alice.getByRole("link", { name: /^Sessions/ }).click();
+	await expect(alice.getByText(`${world.emails.alice} (you)`)).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText(world.emails.bob, { exact: true })).toBeVisible();
+	await expect(alice.getByRole("button", { name: "Sign out everywhere" }).first()).toBeVisible();
 });

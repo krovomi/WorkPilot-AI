@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { MyPermissions } from "../../api/types";
-import { visiblePages } from "../../admin/pages";
+import { administers as canAdminister } from "../../admin/pages";
 import { LockSection } from "../../auth/LockSection";
 import { SessionSection } from "../../auth/SessionSection";
 import { useSession } from "../../auth/session";
@@ -39,7 +39,7 @@ export default function Settings() {
 
 	// Signed in, so read: the session sets the permissions with the signed-in status.
 	const organizations = (permissions as MyPermissions).organizations;
-	const administers = visiblePages(can).length > 0;
+	const administers = canAdminister(can);
 	const org = organizations.find((o) => o.id === permissions?.org_id);
 	return (
 		<ScrollView contentContainerStyle={styles.content}>

@@ -359,6 +359,29 @@
 			"merge_with_changes": "Fusionnable après de petits changements",
 			"needs_revision": "À reprendre",
 			"blocked": "Bloquée"
+		},
+		"feedback": {
+			"useful": "Utile",
+			"notUseful": "Pas utile",
+			"why": "Pourquoi n'est-ce pas utile ?",
+			"notApplicable": "Ne s'applique pas ici",
+			"held": "En attente d'un mainteneur",
+			"heldTitle": "Rejets qui vous attendent",
+			"heldHint": "Le relecteur en apprend une fois que vous approuvez : il fera moins ce genre de remarque sur ce projet.",
+			"approve": "Approuver",
+			"discard": "Écarter",
+			"verdict": {
+				"accepted": "Utile",
+				"rejected": "Pas utile",
+				"not_applicable": "Ne s'applique pas"
+			},
+			"reason": {
+				"false_positive": "C'est faux",
+				"too_pedantic": "Trop pointilleux",
+				"project_convention": "Notre convention",
+				"legacy_exception": "Code ancien, voulu ainsi",
+				"other": "Une autre raison"
+			}
 		}
 	},
 	"dashboard": {
@@ -519,6 +542,29 @@
 			"codebase_discovery": "Découverte",
 			"task_outcome": "Résultat",
 			"session_insight": "Session"
+		},
+		"trash": "Corbeille",
+		"pinned": "Épinglée",
+		"pin": "Épingler",
+		"unpin": "Désépingler",
+		"forget": "Oublier",
+		"forgetTitle": "Oublier cette mémoire ?",
+		"forgetBody": "Les agents ne la lisent plus. Elle reste dans la corbeille, où quiconque peut écrire les insights du projet peut la remettre.",
+		"restore": "Remettre",
+		"trashHint": "Une mémoire oubliée reste {{days}} jours dans la corbeille. {{pinned}} mémoires sur {{limit}} sont épinglées.",
+		"trashEmpty": "La corbeille est vide.",
+		"forgottenBy": "Oubliée par {{name}}, le {{date}}",
+		"forgottenOn": "Oubliée le {{date}}",
+		"restorableUntil": "Peut être remise jusqu'au {{date}}",
+		"refused": {
+			"pin-limit": "Au plus {{limit}} mémoires peuvent être épinglées : désépinglez-en une d'abord.",
+			"pinned": "Une mémoire épinglée ne peut pas être oubliée : désépinglez-la d'abord.",
+			"not-found": "Cette mémoire n'est plus là : la liste est relue.",
+			"exists": "Une mémoire du même nom est déjà revenue.",
+			"expired": "Elle est restée trop longtemps dans la corbeille pour être remise.",
+			"no-brain": "Le projet n'a pas encore de mémoire.",
+			"invalid": "Le serveur n'a pas reconnu cette mémoire.",
+			"failed": "Le serveur n'a pas pris cette décision."
 		}
 	},
 	"tokens": {
@@ -545,7 +591,7 @@
 	},
 	"admin": {
 		"title": "Administration",
-		"summary": "Membres, invitations, groupes et rôles de cette organisation.",
+		"summary": "Vue d'ensemble, membres, invitations, groupes, rôles, sessions, quotas et journal d'audit de cette organisation.",
 		"of": "Organisation : {{org}}",
 		"remove": "Retirer",
 		"projectRole": {
@@ -634,6 +680,85 @@
 			"scope": {
 				"org": "Organisation",
 				"project": "Projet"
+			}
+		},
+		"overview": {
+			"title": "Vue d'ensemble",
+			"summary": "Ce que font les agents de l'organisation maintenant et sur la semaine, et ses quotas.",
+			"running": "Agents en cours",
+			"queued": "En attente",
+			"success": "Exécutions réussies, 7 jours",
+			"members": "Membres",
+			"activeOf": "{{active}} actifs sur {{total}}",
+			"projects": "Projets",
+			"cards": "Cartes",
+			"runs24h": "Exécutions des dernières 24 h",
+			"failed24h": "Échecs des dernières 24 h",
+			"week": "Les 7 derniers jours",
+			"dayRuns_one": "{{date}} : {{count}} exécution",
+			"dayRuns_other": "{{date}} : {{count}} exécutions",
+			"noRuns": "Aucune exécution cette semaine.",
+			"topUsers": "Qui a lancé le plus d'exécutions",
+			"runs_one": "{{count}} exécution",
+			"runs_other": "{{count}} exécutions",
+			"failures": "Derniers échecs",
+			"status": {
+				"queued": "En attente",
+				"running": "En cours",
+				"succeeded": "Réussie",
+				"failed": "Échouée",
+				"cancelled": "Annulée"
+			}
+		},
+		"sessions": {
+			"title": "Sessions",
+			"summary": "Qui est connecté, comment et jusqu'à quand, et déconnecter quelqu'un.",
+			"empty": "Personne n'est connecté.",
+			"since": "depuis le {{date}}",
+			"until": "jusqu'au {{date}}",
+			"revoke": "Déconnecter partout",
+			"revokeTitle": "Déconnecter {{name}} de tous ses appareils ?",
+			"revokeBody": "Cette personne devra se reconnecter sur chaque appareil. Son compte reste tel quel."
+		},
+		"quotas": {
+			"title": "Quotas",
+			"summary": "Places, projets, agents en même temps et jetons par mois, avec leur usage actuel.",
+			"use": "Usage actuel",
+			"limitsTitle": "Limites",
+			"limits": {
+				"max_users": "Places",
+				"max_projects": "Projets",
+				"max_concurrent_runs": "Agents en même temps",
+				"monthly_token_budget": "Jetons ce mois-ci"
+			},
+			"usedOf": "{{used}} sur {{limit}}",
+			"usedNoLimit": "{{used}}, sans limite",
+			"hint": "Un champ vide veut dire sans limite.",
+			"unlimited": "Sans limite",
+			"hardStop": "Arrêter les agents au budget de jetons",
+			"hardStopHint": "Sans cette option, le budget ne fait qu'avertir : les agents continuent au-delà.",
+			"invalid": "Une limite est un nombre entier, 0 ou plus.",
+			"save": "Enregistrer les limites",
+			"saved": "Enregistré.",
+			"readOnly": "Vous pouvez lire les quotas, pas les modifier.",
+			"meter": "{{name}} : usage"
+		},
+		"audit": {
+			"title": "Journal d'audit",
+			"summary": "Ce qui a été fait dans l'organisation, par qui et quand.",
+			"empty": "Rien d'enregistré pour l'instant.",
+			"system": "le serveur",
+			"openHint": "Affiche le détail de cette ligne",
+			"only": "Seulement {{action}}",
+			"all": "Tout afficher",
+			"filter": "Seulement cette action",
+			"more": "Afficher les lignes plus anciennes",
+			"methods": {
+				"local": "mot de passe",
+				"entra": "Microsoft Entra",
+				"oidc": "authentification unique",
+				"invite": "invitation",
+				"unknown": "autre connexion"
 			}
 		}
 	},
@@ -1033,5 +1158,30 @@
 		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur.",
 		"rights": "Vous pouvez les consulter et partager tout ce qui est conservé sur vous dans Réglages, Mon usage. Pour faire effacer votre compte, demandez à un administrateur de la plateforme.",
 		"understood": "J'ai compris"
+	"cardLog": {
+		"title": "Journal de #{{id}}",
+		"open": "Voir tout le journal",
+		"phase": "Phase",
+		"show": "Afficher",
+		"all": "Tout",
+		"errors": "Erreurs",
+		"noTools": "Sans les outils",
+		"find": "Chercher dans le journal",
+		"live": "Un agent travaille : le journal est relu toutes les 3 secondes.",
+		"still": "Aucun agent ne travaille sur cette tâche maintenant.",
+		"follow": "Suivre la fin",
+		"empty": "Aucune ligne à afficher."
+	},
+	"cardFiles": {
+		"open": "Voir le fichier en plein écran",
+		"previous": "Précédent",
+		"next": "Suivant",
+		"position": "Fichier {{index}} sur {{count}}",
+		"status": {
+			"added": "Ajouté",
+			"modified": "Modifié",
+			"deleted": "Supprimé",
+			"renamed": "Renommé"
+		}
 	}
 }

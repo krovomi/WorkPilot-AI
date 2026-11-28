@@ -51,7 +51,7 @@ import type { SetupDeepLink } from "./components/setup-hub/useSetupStatus";
 import { GuidedTourOverlay } from "./components/guided-tour/GuidedTourOverlay";
 import { useGuidedTourStore } from "./components/guided-tour/guided-tour-store";
 import { useSetupHubStore } from "./stores/setup-hub-store";
-import { ServerLoginScreen } from "./components/auth/ServerLoginScreen";
+import { ServerGate } from "./components/auth/ServerGate";
 import { TerminalGrid } from "./components/TerminalGrid";
 import { Toaster } from "./components/ui/toaster";
 import { CliStatusProvider } from "./contexts/CliStatusContext";
@@ -1463,7 +1463,7 @@ export function App() {
 				<CliStatusProvider>
 					<TooltipProvider>
 						{/* Multi-user server mode: connection gate */}
-						{showServerLogin && <ServerLoginScreen />}
+						<ServerGate showLogin={showServerLogin} />
 						<div className="flex h-screen bg-background">
 							{/* Sidebar */}
 							<Sidebar

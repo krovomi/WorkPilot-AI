@@ -33,6 +33,7 @@ import type { Leaderboard, LeaderboardPeriod, LeaderboardScope, ReplayShare } fr
 import type { Channel, ChannelSettings, Moment, NeedsYouOverview, TestResult } from "../needs-you/types";
 import type { Memory } from "../context/index-file";
 import type { MyUsage, UsageNotice } from "../usage/types";
+import { decided, type MemoryDecision, type MemoryLifecycle } from "../context/lifecycle";
 import type { EngineOption, SettingsPayload } from "../new-card/engine";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
 import type {
@@ -201,12 +202,31 @@ export function api(client: ServerClient) {
 			client.request<{ cancelled: boolean }>("POST", featurePath("analyses", `/${kind}/jobs/${enc(jobId)}/cancel`, projectId)),
 		memories: async (projectId: string, query: string) => {
 			const q = query.trim();
-			const found = await client.request<{ available: boolean; memories?: Memory[]; results?: Memory[] }>(
+			type Row = Omit<Memory, "id"> & { id?: string; path?: string };
+			const found = await client.request<{ available: boolean; memories?: Row[]; results?: Row[] }>(
 				"GET",
 				featurePath("context", "/memories", projectId, `&limit=50${q ? `&query=${enc(q)}` : ""}`),
 			);
-			return { available: found.available, memories: (q ? found.results : found.memories) ?? [] };
+			// A search result is named by its vault path, as a listed memory by its id.
+			const rows = (q ? found.results : found.memories) ?? [];
+			return {
+				available: found.available,
+				memories: rows.map(({ path, ...m }): Memory => ({ ...m, id: m.id ?? path ?? "" })),
+			};
 		},
+		/** The memory's trash, its pins and how long a forgotten one stays. */
+		memoryLifecycle: (projectId: string) =>
+			client.request<MemoryLifecycle>("GET", featurePath("context", "/memory/lifecycle", projectId, "&limit=1")),
+		forgetMemory: async (projectId: string, id: string, reason: string) =>
+			decided(
+				await client.request<MemoryDecision>("POST", featurePath("context", "/memory/forget", projectId), { id, reason }),
+			),
+		restoreMemory: async (projectId: string, id: string) =>
+			decided(await client.request<MemoryDecision>("POST", featurePath("context", "/memory/restore", projectId), { id })),
+		pinMemory: async (projectId: string, id: string, pinned: boolean) =>
+			decided(
+				await client.request<MemoryDecision>("POST", featurePath("context", "/memory/pin", projectId), { id, pinned }),
+			),
 		/** The policy of the project, its waiting calls and its agents, as the server reads them. */
 		governance: (projectId: string) =>
 			client.request<GovernanceReport>("GET", featurePath("governance", "", projectId)),
