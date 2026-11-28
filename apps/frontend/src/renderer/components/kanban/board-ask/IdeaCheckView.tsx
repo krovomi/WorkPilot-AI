@@ -26,7 +26,7 @@ import { createTask } from "../../../stores/task-store";
 import { Chip, type Tone } from "../../charter";
 import { Button } from "../../ui/button";
 import { Textarea } from "../../ui/textarea";
-import { MatchRow, ModeLine, SemanticModeSelect } from "./board-ask-parts";
+import { MatchRow, ModeLine, SemanticModeSelect, SourcesMenu } from "./board-ask-parts";
 import { hasWorkLeft, ideaCard } from "./idea-card";
 
 const VERDICT_TONE: Readonly<Record<BoardIdeaVerdict, Tone>> = {
@@ -285,7 +285,8 @@ export function IdeaCheckView({ projectId, onOpenTask }: IdeaCheckViewProps) {
 
 			<div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pt-3">
 				<p className="min-w-0 flex-1 basis-64 text-2xs text-muted-foreground">{t("kanban.ask.privacy")}</p>
-				<SemanticModeSelect />
+				<SourcesMenu />
+						<SemanticModeSelect />
 				{check && (
 					<Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={restart} disabled={pending}>
 						<RotateCcw className="h-3.5 w-3.5" aria-hidden />

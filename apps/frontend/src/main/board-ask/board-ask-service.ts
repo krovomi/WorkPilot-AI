@@ -39,7 +39,7 @@ import { BOARD_ASK_COVERAGES, BOARD_ASK_LIMITS } from "../../shared/types/board-
 import { detectLanguages, KeywordIndex, type QueryTerm } from "../../shared/utils/board-ask-search";
 import { quoteUntrusted } from "../security/untrusted-text";
 import type { SemanticFn, SemanticRanking } from "./semantic-search";
-import { type BoardTicket, ticketDigest, ticketDocument, ticketMeaning, toTicket } from "./tickets";
+import { type BoardTicket, boardTickets, ticketDigest, ticketDocument, ticketMeaning } from "./tickets";
 
 /** A board this small is read whole by the model: nothing to miss. */
 export const SMALL_BOARD = 30;
@@ -82,6 +82,8 @@ export interface AskBoardInput {
 	appLanguage: string;
 	complete: CompletionFn;
 	readSpec?: (task: Task) => string;
+	/** The roadmap's features, the ideas and the merged changes, read with the cards (`sources.ts`). */
+	sources?: readonly BoardTicket[];
 	/** Ranks the tickets by meaning; absent when the person turned it off. */
 	semantic?: SemanticFn;
 }
@@ -180,7 +182,8 @@ export function buildJudgePrompt(
 		'  covers part of it, "related" when it only touches the subject;',
 		'- "reason": one short sentence saying what it did or plans, and how that relates.',
 		"Leave out the tickets that do not relate. Keep the tickets' state in mind: a planned or abandoned",
-		"ticket did not deliver anything.",
+		"ticket did not deliver anything. A ticket with a Kind line is not a card: a roadmap feature or an",
+		"idea is a plan, a merged change is code already delivered.",
 		"",
 		'Then write "answer": a short answer to the question (at most 5 sentences) that cites tickets by their',
 		"reference in brackets, like [T3]. Say plainly when nothing relates.",
@@ -222,6 +225,8 @@ export function toMatch(ticket: BoardTicket, extra: Partial<BoardAskMatch> = {})
 		state: ticket.state,
 		...(ticket.updatedAt ? { updatedAt: ticket.updatedAt } : {}),
 		...(ticket.archived ? { archived: true } : {}),
+		...(ticket.kind ? { kind: ticket.kind } : {}),
+		...(ticket.ref ? { ref: ticket.ref } : {}),
 		...extra,
 	};
 }
@@ -278,7 +283,7 @@ function recency(ticket: BoardTicket): number {
 
 export async function askBoard(input: AskBoardInput): Promise<BoardAskResult> {
 	const question = input.question.trim().slice(0, BOARD_ASK_LIMITS.question);
-	const tickets = input.tasks.map((task) => toTicket(task, input.readSpec)).filter((t) => t.title || t.description);
+	const tickets = boardTickets(input.tasks, input.readSpec, input.sources);
 	if (tickets.length === 0 || !question) {
 		return { answer: "", matches: [], mode: "keywords", searched: tickets.length };
 	}

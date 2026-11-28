@@ -331,3 +331,24 @@ describe("checkIdea", () => {
 		for (const word of words) expect(judge).toContain(`Title: ${word} variant`);
 	});
 });
+
+describe("checkIdea, with the other sources", () => {
+	it("checks the idea against the roadmap and the history too", async () => {
+		const change = {
+			...toTicket(task("x", "unused"), noSpec),
+			id: "change:abcdef12",
+			title: "Export users to CSV (#42)",
+			kind: "change" as const,
+			ref: "#42",
+		};
+		const result = await checkIdea({
+			tasks: [],
+			sources: [change],
+			idea: "Export users to CSV",
+			appLanguage: "en",
+			complete: async () => null,
+		});
+		expect(result.searched).toBe(1);
+		expect(result.requirements[0]?.matches).toEqual([expect.objectContaining({ taskId: "change:abcdef12", kind: "change", ref: "#42" })]);
+	});
+});

@@ -7,7 +7,7 @@
 
 import { closeSync, openSync, readSync } from "node:fs";
 import path from "node:path";
-import type { BoardAskState, ReviewReason, Task } from "../../shared/types";
+import type { BoardAskKind, BoardAskState, ReviewReason, Task } from "../../shared/types";
 import type { SearchDocument } from "../../shared/utils/board-ask-search";
 
 /** What is read of a spec file, at most: its opening says what the task is. */
@@ -32,7 +32,18 @@ export interface BoardTicket {
 	archived: boolean;
 	/** The ticket it was imported from (Jira, Azure DevOps), when it was. */
 	external?: string;
+	/** Absent for a card; a roadmap feature, an idea or a merged change otherwise (`sources.ts`). */
+	kind?: Exclude<BoardAskKind, "card">;
+	/** A change's pull request (`#123`) or short commit id. */
+	ref?: string;
 }
+
+/** How the model is told what a ticket that is not a card is. */
+const KIND_NAMES: Readonly<Record<Exclude<BoardAskKind, "card">, string>> = {
+	roadmap: "roadmap feature",
+	idea: "idea (Ideation)",
+	change: "change merged into the project's branch",
+};
 
 /** Where a task stands, said the way a product owner reads it. */
 export function ticketState(task: Pick<Task, "status" | "reviewReason" | "metadata">): BoardAskState {
@@ -104,6 +115,15 @@ export function toTicket(task: Task, readSpec: (task: Task) => string = (t) => r
 	};
 }
 
+/** The cards as tickets, then the other sources: what is searched, without the empty ones. */
+export function boardTickets(
+	tasks: readonly Task[],
+	readSpec?: (task: Task) => string,
+	sources: readonly BoardTicket[] = [],
+): BoardTicket[] {
+	return [...tasks.map((task) => toTicket(task, readSpec)), ...sources].filter((t) => t.title || t.description);
+}
+
 /** The fields the keyword search reads, the title counting most. */
 export function ticketDocument(ticket: BoardTicket): SearchDocument {
 	return {
@@ -123,6 +143,7 @@ export function ticketDocument(ticket: BoardTicket): SearchDocument {
 export function ticketDigest(ticket: BoardTicket, maxChars: number): string {
 	const lines = [
 		`Title: ${ticket.title}`,
+		...(ticket.kind ? [`Kind: ${KIND_NAMES[ticket.kind]}${ticket.ref ? ` ${ticket.ref}` : ""}`] : []),
 		`State: ${ticket.state}${ticket.archived ? " (archived)" : ""}${ticket.updatedAt ? `, last change ${ticket.updatedAt.slice(0, 10)}` : ""}`,
 	];
 	if (ticket.description) lines.push(`Description: ${ticket.description.replace(/\s+/g, " ").slice(0, 500)}`);

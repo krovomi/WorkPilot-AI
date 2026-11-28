@@ -20,7 +20,7 @@ déjà été développée, même en partie. Leub a retenu quatre lots.
 | 1 | le panneau, la recherche par mots-clés, le modèle pour comprendre et juger |
 | 2 | des embeddings multilingues quand un modèle est là (Ollama, LM Studio, API du provider) : [le sens](#le-sens-lot-2) |
 | 3 | « Vérifier une idée » : une fonctionnalité collée, sa couverture exigence par exigence : [l'idée](#vérifier-une-idée-lot-3) |
-| 4 | d'autres sources (roadmap, idées, PR et commits), le mode serveur, l'app mobile |
+| 4 | d'autres sources (roadmap, idées, PR et commits) : [les sources](#les-autres-sources-lot-4) ; puis le mode serveur, l'app mobile |
 
 ## Pourquoi pas seulement des embeddings
 
@@ -134,6 +134,30 @@ comprises** : c'est ce qu'un product owner veut retrouver. L'état est dit avec 
 (`ticketState` : terminé, en revue, en cours, prévu, échec, abandonné), le début de
 `<spec>/spec.md` (16 Ko lus au plus, 1 500 caractères gardés) complète la description.
 
+### Les autres sources (lot 4)
+
+« Est-ce déjà fait ? » ne se lit pas que sur le tableau : ce qui est prévu est souvent dans la
+roadmap ou dans Ideation, et ce qui est livré dans l'historique. `main/board-ask/sources.ts` en
+fait des tickets de plus, cherchés, classés par le sens et jugés comme les cartes, dans les deux
+onglets :
+
+| Source | Lue dans | État | Pas lue deux fois |
+|---|---|---|---|
+| Roadmap | `.workpilot/roadmap/roadmap.json` : titre, description, raison, critères, user stories | `done`, `in_progress`, sinon prévu | une fonctionnalité dont la spec est une carte |
+| Idées | `.workpilot/ideation/ideation.json` : titre, description, raison, changement proposé, fichiers | rejetée ou archivée : abandonnée ; sinon prévue | une idée dont la tâche existe |
+| Changements fusionnés | `git log --first-parent --max-count=300 HEAD` : titre de la PR (sujet squashé ou corps d'un commit de merge), corps sans les trailers | terminé | les merges de branche et les montées de dépendances sont laissés de côté |
+
+Le prompt dit au modèle ce qu'est chaque ticket (ligne `Kind`) : une fonctionnalité ou une idée
+n'est qu'un plan, un changement fusionné est du code livré. Le panneau l'affiche par une puce
+(Roadmap, Idée, Changement fusionné) et le numéro de PR ou le commit ; seule une carte s'ouvre.
+Le menu **Sources** du pied de panneau choisit ce qui est lu en plus des cartes (réglage
+`boardAskSources`, toutes par défaut, relu en liste fermée).
+
+Un fichier n'est lu que résolu dans le dossier du projet (liens compris) et sous 4 Mo, 500
+éléments au plus ; git est lancé par son chemin, avec une liste d'arguments, sans shell, 10 s au
+plus. Une source illisible est laissée de côté. Ces textes sont du contenu du dépôt : ils entrent
+dans les prompts cités, comme les cartes (S2).
+
 ## Frontières
 
 - **Renderer (S6).** Il n'envoie qu'un id de projet, une question (1 000 caractères au plus) et la
@@ -159,6 +183,7 @@ comprises** : c'est ce qu'un product owner veut retrouver. L'état est dit avec 
 | `main/board-ask/board-ask-service.ts` | prompts, lecture des réponses, les trois étapes, la fusion |
 | `main/board-ask/semantic-search.ts` | lance le runner d'embeddings, relit son classement, le réglage |
 | `apps/backend/board_ask/semantic.py`, `runners/board_ask_embed_runner.py` | le modèle d'embeddings : choix, appels, cache des vecteurs |
+| `main/board-ask/sources.ts` | roadmap, idées et changements fusionnés en tickets, le réglage des sources |
 | `main/board-ask/idea-check.ts` | « Vérifier une idée » : découpe, recherche par exigence, jugement |
 | `main/ipc-handlers/board-ask-handlers.ts` | canaux `boardAsk:ask` et `boardAsk:checkIdea`, revalidation |
 | `renderer/stores/board-ask-store.ts` | panneau ouvert, onglet, une conversation et une idée par projet |
@@ -167,6 +192,7 @@ comprises** : c'est ce qu'un product owner veut retrouver. L'état est dit avec 
 Tests : `shared/utils/__tests__/board-ask-search.test.ts`,
 `main/board-ask/__tests__/board-ask-service.test.ts`,
 `main/board-ask/__tests__/semantic-search.test.ts`, `main/board-ask/__tests__/idea-check.test.ts`,
+`main/board-ask/__tests__/sources.test.ts`,
 `tests/board_ask/`, `main/ipc-handlers/__tests__/board-ask-handlers.test.ts`,
 `renderer/components/kanban/board-ask/BoardAskPanel.test.tsx`, `IdeaCheckView.test.tsx`,
 `idea-card.test.ts`.

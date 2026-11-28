@@ -695,6 +695,20 @@
 					"buildsOn": "S'appuie sur : {{tickets}}",
 					"original": "Idée d'origine"
 				}
+			},
+			"kind": {
+				"roadmap": "Roadmap",
+				"idea": "Idée",
+				"change": "Changement fusionné"
+			},
+			"sources": {
+				"button_one": "{{count}} source",
+				"button_other": "{{count}} sources",
+				"hint": "En plus des cartes, le tableau lit aussi :",
+				"cards": "Cartes du tableau",
+				"roadmap": "Fonctionnalités de la roadmap",
+				"ideas": "Idées d'Ideation",
+				"history": "Changements fusionnés dans la branche (historique git)"
 			}
 		},
 		"lanes": {

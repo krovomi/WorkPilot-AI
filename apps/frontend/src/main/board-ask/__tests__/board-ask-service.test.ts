@@ -21,7 +21,7 @@ import {
 	SMALL_BOARD,
 } from "../board-ask-service";
 import type { SemanticFn } from "../semantic-search";
-import { readSpecOpening, ticketDigest, ticketMeaning, ticketState, toTicket } from "../tickets";
+import { type BoardTicket, readSpecOpening, ticketDigest, ticketMeaning, ticketState, toTicket } from "../tickets";
 
 function task(id: string, title: string, overrides: Partial<Task> = {}): Task {
 	return {
@@ -342,5 +342,48 @@ describe("tickets", () => {
 		const digest = ticketDigest(ticket, 60);
 		expect(digest.length).toBe(60);
 		expect(ticketDigest(ticket, 2000)).toContain("State: done (archived), last change 2026-11-01");
+	});
+});
+
+describe("askBoard, with the other sources", () => {
+	const change: BoardTicket = {
+		id: "change:abcdef12",
+		title: "feat: export users to CSV (#42)",
+		description: "",
+		spec: "",
+		subtasks: [],
+		files: [],
+		state: "done",
+		archived: false,
+		kind: "change",
+		ref: "#42",
+	};
+	const roadmap: BoardTicket = { ...change, id: "roadmap:f1", title: "Export the invoices", kind: "roadmap", state: "planned" };
+	delete roadmap.ref;
+
+	it("searches them with the cards, says what they are, and tells the model", async () => {
+		const prompts: string[] = [];
+		const result = await askBoard({
+			tasks: [task("csv", "Export CSV des factures")],
+			sources: [change, roadmap, { ...change, id: "change:empty", title: "", description: "" }],
+			question: "export",
+			appLanguage: "en",
+			complete: async (prompt) => {
+				prompts.push(prompt);
+				return null;
+			},
+			readSpec: noSpec,
+		});
+		expect(result.searched).toBe(3);
+		const byId = new Map(result.matches.map((m) => [m.taskId, m]));
+		expect(byId.get("change:abcdef12")).toMatchObject({ kind: "change", ref: "#42", state: "done" });
+		expect(byId.get("roadmap:f1")).toMatchObject({ kind: "roadmap" });
+		expect(byId.get("roadmap:f1")).not.toHaveProperty("ref");
+		expect(byId.get("csv")).not.toHaveProperty("kind");
+		expect(buildJudgePrompt("q", [{ ref: "T1", ticket: change }], "en", undefined)).toContain(
+			"Kind: change merged into the project's branch #42",
+		);
+		expect(ticketDigest(roadmap, 2000)).toContain("Kind: roadmap feature\n");
+		expect(ticketDigest({ ...roadmap, kind: "idea" }, 2000)).toContain("Kind: idea (Ideation)");
 	});
 });

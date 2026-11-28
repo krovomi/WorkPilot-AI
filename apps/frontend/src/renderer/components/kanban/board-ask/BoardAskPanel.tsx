@@ -17,7 +17,7 @@ import { useTaskStore } from "../../../stores/task-store";
 import { Button } from "../../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../ui/dialog";
 import { Textarea } from "../../ui/textarea";
-import { MatchRow, ModeLine, matchElementId, SemanticModeSelect } from "./board-ask-parts";
+import { MatchRow, ModeLine, matchElementId, SemanticModeSelect, SourcesMenu } from "./board-ask-parts";
 import { IdeaCheckView } from "./IdeaCheckView";
 
 const EMPTY: BoardAskEntry[] = [];
@@ -276,6 +276,7 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 					</div>
 					<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
 						<p className="min-w-0 flex-1 basis-64 text-2xs text-muted-foreground">{t("kanban.ask.privacy")}</p>
+						<SourcesMenu />
 						<SemanticModeSelect />
 						{entries.length > 0 && (
 							<Button

@@ -42,7 +42,7 @@ import {
 	toMatch,
 } from "./board-ask-service";
 import type { SemanticManyFn, SemanticRanking } from "./semantic-search";
-import { type BoardTicket, ticketDigest, ticketDocument, ticketMeaning, toTicket } from "./tickets";
+import { type BoardTicket, boardTickets, ticketDigest, ticketDocument, ticketMeaning } from "./tickets";
 
 /** Candidates read per requirement. */
 export const PER_REQUIREMENT = 8;
@@ -65,6 +65,8 @@ export interface CheckIdeaInput {
 	appLanguage: string;
 	complete: CompletionFn;
 	readSpec?: (task: Task) => string;
+	/** The roadmap's features, the ideas and the merged changes (`sources.ts`). */
+	sources?: readonly BoardTicket[];
 	semantic?: SemanticManyFn;
 }
 
@@ -151,7 +153,8 @@ export function buildIdeaJudgePrompt(
 		"For each requirement, read the tickets (they may be written in another language: judge by meaning)",
 		"and give:",
 		'- "verdict": "done" when finished tickets already deliver it, "partial" when they deliver part of',
-		'  it or when it is only in progress, planned or abandoned, "missing" when no ticket holds it;',
+		'  it or when it is only in progress, planned or abandoned, "missing" when no ticket holds it; a',
+		"  roadmap feature or an idea (its Kind line) is only a plan, a merged change is delivered code;",
 		'- "tickets": the references of the tickets that hold it or part of it, best first (none for missing);',
 		'- "reason": one short sentence on what exists and what is left.',
 		'Then write "summary": two or three sentences on what is already there and what a new card should',
@@ -197,7 +200,7 @@ export function parseIdeaJudgement(
 
 export async function checkIdea(input: CheckIdeaInput): Promise<BoardIdeaResult> {
 	const idea = input.idea.trim().slice(0, BOARD_ASK_LIMITS.idea);
-	const tickets = input.tasks.map((task) => toTicket(task, input.readSpec)).filter((t) => t.title || t.description);
+	const tickets = boardTickets(input.tasks, input.readSpec, input.sources);
 	const split =
 		parseSplit(idea ? await input.complete(buildSplitPrompt(idea), SYSTEM_PROMPT, "BoardIdeaSplit") : null) ??
 		splitWithoutModel(idea);

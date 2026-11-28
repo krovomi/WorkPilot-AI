@@ -150,6 +150,41 @@ describe("BoardAskPanel", () => {
 		await waitFor(() => expect(select).toHaveValue("local"));
 	});
 
+	it("says which tickets are not cards, and saves the sources read", async () => {
+		askBoard.mockResolvedValueOnce({
+			success: true,
+			data: {
+				answer: "",
+				matches: [{ taskId: "change:abc", title: "Export users", state: "done", kind: "change", ref: "#42" }],
+				mode: "keywords",
+				searched: 3,
+			},
+		});
+		useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, boardAskSources: undefined } });
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="p1" />);
+		await userEvent.type(screen.getByRole("textbox", { name: /Ask a question/ }), "export{Enter}");
+		expect(await screen.findByText("Merged change")).toBeInTheDocument();
+		expect(screen.getByText("#42")).toBeInTheDocument();
+		// Not a card: nothing to open.
+		expect(screen.getByRole("button", { name: /Export users/ })).toBeDisabled();
+
+		await userEvent.click(screen.getByRole("button", { name: "4 sources" }));
+		expect(screen.getByRole("menuitemcheckbox", { name: "Board cards" })).toHaveAttribute("aria-checked", "true");
+		await userEvent.click(screen.getByRole("menuitemcheckbox", { name: /Changes merged/ }));
+		await waitFor(() =>
+			expect(api.fn("saveSettings")).toHaveBeenCalledWith({ boardAskSources: ["roadmap", "ideas"] }),
+		);
+		await waitFor(() =>
+			expect(screen.getByRole("menuitemcheckbox", { name: /Changes merged/ })).toHaveAttribute("aria-checked", "false"),
+		);
+		expect(screen.getByRole("button", { name: "3 sources", hidden: true })).toBeInTheDocument();
+		await userEvent.click(screen.getByRole("menuitemcheckbox", { name: /Changes merged/ }));
+		await waitFor(() =>
+			expect(api.fn("saveSettings")).toHaveBeenLastCalledWith({ boardAskSources: ["roadmap", "ideas", "history"] }),
+		);
+	});
+
 	it("asks an example question from the empty state", async () => {
 		useBoardAskStore.setState({ open: true });
 		render(<BoardAskButton projectId="p1" />);

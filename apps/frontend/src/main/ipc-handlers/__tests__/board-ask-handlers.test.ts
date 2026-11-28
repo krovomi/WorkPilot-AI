@@ -18,6 +18,8 @@ const state = vi.hoisted(() => ({
 	rankingsOptions: [] as unknown[],
 	rankings: vi.fn(),
 	mode: "auto",
+	sourceCalls: [] as unknown[][],
+	sources: [] as unknown[],
 }));
 
 vi.mock("electron", () => ({
@@ -34,6 +36,13 @@ vi.mock("../../project-store", () => ({
 vi.mock("../../server-projects", () => ({ getServerProject: (id: unknown) => (state.server.has(id as string) ? {} : undefined) }));
 vi.mock("../../app-language", () => ({ getAppLanguage: () => "fr" }));
 vi.mock("../../oneshot-llm", () => ({ runOneShotLLM: state.oneShot }));
+vi.mock("../../board-ask/sources", () => ({
+	readBoardSourcesSetting: () => ["roadmap", "history"],
+	readBoardSources: async (...args: unknown[]) => {
+		state.sourceCalls.push(args);
+		return state.sources;
+	},
+}));
 vi.mock("../../board-ask/semantic-search", () => ({
 	readSemanticMode: () => state.mode,
 	createSemanticSearch: (options: { mode: string }) => {
@@ -77,6 +86,8 @@ beforeEach(() => {
 	state.rankings.mockReset();
 	state.rankings.mockResolvedValue(null);
 	state.mode = "auto";
+	state.sourceCalls = [];
+	state.sources = [];
 });
 
 describe("parseBoardAskRequest", () => {
@@ -224,5 +235,34 @@ describe("handleBoardIdea", () => {
 		expect(none.success && none.data?.mode).toBe("keywords");
 		expect(complete).toHaveBeenCalled();
 		expect(state.rankings).not.toHaveBeenCalled();
+	});
+});
+
+describe("the other sources", () => {
+	const roadmap = {
+		id: "roadmap:f1",
+		title: "Export CSV per role",
+		description: "",
+		spec: "",
+		subtasks: [],
+		files: [],
+		state: "planned",
+		archived: false,
+		kind: "roadmap",
+	};
+
+	it("are read in the project's folder with the sources of the settings, for a question and an idea", async () => {
+		state.sources = [roadmap];
+		const asked = await handleBoardAsk({ projectId: "p1", question: "export csv role" }, undefined, null);
+		expect(asked.success && asked.data?.matches.map((m) => [m.taskId, m.kind])).toEqual([
+			["roadmap:f1", "roadmap"],
+			["t1", undefined],
+		]);
+		const checked = await handleBoardIdea({ projectId: "p1", idea: "Export CSV per role" }, undefined, null);
+		expect(checked.success && checked.data?.searched).toBe(2);
+		expect(state.sourceCalls).toEqual([
+			["/projects/one", state.tasks, ["roadmap", "history"]],
+			["/projects/one", state.tasks, ["roadmap", "history"]],
+		]);
 	});
 });
