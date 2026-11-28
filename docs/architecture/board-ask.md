@@ -184,7 +184,9 @@ L'app mobile n'a pas de modèle à elle : le serveur répond. Une page **Interro
 (onglet *Plus*, `apps/mobile/src/app/(app)/projects/[projectId]/ask.tsx`) envoie la question à
 `POST /api/board/ask` (`shared_board/ask.py`), qui lance un job du projet
 (`server/services/project_jobs.py`) : `runners/board_ask_runner.py` sur le clone, avec le provider
-du projet par `core.oneshot` (tous les providers, un tour, aucun outil). L'app relit
+du projet par `core.oneshot` (tous les providers, un tour, aucun outil) ; un provider sans
+identifiants sur le serveur refuse avant de répondre, et le runner répond alors par les mots des
+cartes (`keywords`), comme le bureau sans modèle. L'app relit
 `GET /api/board/ask/jobs/<id>` toutes les 3 s jusqu'à la réponse ; *Arrêter* annule le job.
 
 - **Les mêmes étapes.** `board_ask/answer.py` reprend celles du bureau (comprendre, chercher,
@@ -234,4 +236,6 @@ Tests : `shared/utils/__tests__/board-ask-search.test.ts`,
 `idea-card.test.ts`, `tests/backend/test_shared_board_ask.py`,
 `apps/mobile/src/__tests__/app/board-ask.test.tsx`.
 De bout en bout, dans l'app construite contre un faux serveur Ollama : `apps/frontend/e2e/board-ai.e2e.ts`
-(question, suivi, repli par mots-clés et par le sens, « Vérifier une idée » jusqu'à la carte).
+(question, suivi, repli par mots-clés et par le sens, « Vérifier une idée » jusqu'à la carte) ; sur un
+vrai serveur sans modèle : `apps/frontend/e2e/server-board.server-e2e.ts` (bureau) et
+`apps/mobile/e2e/server.e2e.ts` (téléphone, le job du serveur).

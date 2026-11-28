@@ -2,9 +2,9 @@
  * The pieces every `*.server-e2e.ts` spec shares: a real WorkPilot server
  * started by `tests/server_e2e/app_world.py`, seeded with two organizations
  * (Alice, its administrator, and Bob in the first, with the projects "Team
- * Board", "Team Site" on a fake GitHub and "Team Docs" on a fake GitLab;
- * Carol in the second), and the app's own screens to sign in and open a
- * project's board.
+ * Board", "Team Site" on a fake GitHub, "Team Docs" on a fake GitLab and
+ * "Team App", whose board the world filled; Carol in the second), and the
+ * app's own screens to sign in and open a project's board.
  *
  * Needs the backend's Python (`apps/backend/.venv`, or
  * `WORKPILOT_E2E_PYTHON`), Linux and port 8765 free.
@@ -32,6 +32,12 @@ export interface World {
 	/** The team's project on GitHub, and the one on GitLab (`fake_forge.py`). */
 	githubProject: string;
 	gitlabProject: string;
+	/**
+	 * A project whose board the world filled (`tests/server_e2e/world_cards.py`):
+	 * the titles of its cards, by what each one is for.
+	 */
+	appProject: string;
+	appCards: { captures: string; emails: string; invoice: string };
 	/** Where the fake forges say what they were asked (`forgeCalls`). */
 	forgeUrl: string;
 	people: Record<Who, Account>;
@@ -113,6 +119,8 @@ export async function startServer(): Promise<Server> {
 		project: answer.project,
 		githubProject: answer.githubProject,
 		gitlabProject: answer.gitlabProject,
+		appProject: answer.appProject,
+		appCards: answer.appCards,
 		forgeUrl: answer.forgeUrl,
 		people: { alice: account("alice"), bob: account("bob"), carol: account("carol") },
 	};
