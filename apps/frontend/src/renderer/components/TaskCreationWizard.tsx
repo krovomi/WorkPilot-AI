@@ -29,6 +29,7 @@ import {
 	type TaskEngine,
 } from "../../shared/utils/task-engine";
 import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
+import { type PhaseCodeMode, phaseCodeModeMetadata } from "../../shared/utils/code-mode";
 import {
 	DEFAULT_AGENT_PROFILES,
 	DEFAULT_PHASE_MODELS,
@@ -160,6 +161,7 @@ export function TaskCreationWizard({
 		[settings, projectProvider],
 	);
 	const [engine, setEngine] = useState<TaskEngine>(seedTaskEngine);
+	const [phaseCodeMode, setPhaseCodeMode] = useState<PhaseCodeMode>({});
 	// Read through a ref by the open/reset effect below: a Settings change
 	// while the dialog is open must not reset the form the person is filling.
 	const seedTaskEngineRef = useRef(seedTaskEngine);
@@ -344,6 +346,7 @@ export function TaskCreationWizard({
 						DEFAULT_PHASE_THINKING,
 				);
 				setEngine(seedTaskEngineRef.current());
+				setPhaseCodeMode({});
 				setImages([]);
 				setReferencedFiles([]);
 				setRequireReviewBeforeCoding(false);
@@ -669,6 +672,7 @@ export function TaskCreationWizard({
 			// The task owns its engine from the start: every phase's provider,
 			// model and effort, locked so nothing global replaces them later.
 			Object.assign(metadata, buildEngineMetadata(engine));
+			Object.assign(metadata, phaseCodeModeMetadata(phaseCodeMode));
 			if (images.length > 0) metadata.attachedImages = images;
 			if (allReferencedFiles.length > 0)
 				metadata.referencedFiles = allReferencedFiles;
@@ -948,6 +952,8 @@ export function TaskCreationWizard({
 							engine={engine}
 							onChange={setEngine}
 							idPrefix="new-task-engine"
+							phaseCodeMode={phaseCodeMode}
+							onPhaseCodeModeChange={setPhaseCodeMode}
 							disabled={isCreating}
 						/>
 					}

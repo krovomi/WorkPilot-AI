@@ -20,6 +20,7 @@ import type {
 import type { APIProfile } from "@shared/types/profile";
 import { frontendDebugLog } from "../../shared/utils/debug-logger";
 import { localBackendUrl } from "../local-backend-port";
+import { reauthSnapshot, usageProfileOf } from "./usage-profile";
 import {
 	type ApiProvider,
 	getProviderLabel,
@@ -4303,10 +4304,8 @@ export class UsageMonitor extends EventEmitter {
 		// Step 2: Search OAuth profiles (ClaudeProfileManager) — these are always 'anthropic'
 		if (providerName === "anthropic") {
 			try {
-				const profileManager = getClaudeProfileManager();
-				const allOauthProfiles =
-					profileManager.getProfilesSortedByAvailability();
-				const oauthProfile = allOauthProfiles?.[0];
+				// The active account first: with several, the most available is not it
+				const oauthProfile = usageProfileOf(getClaudeProfileManager());
 
 				if (oauthProfile) {
 					this.debugLog(
@@ -4316,9 +4315,9 @@ export class UsageMonitor extends EventEmitter {
 					// Get credential for the OAuth profile
 					const credential = await this.getCredentialForProfile(oauthProfile);
 					if (!credential) {
-						// No credential yet (fresh install, token expired, etc.)
-						// Fall through to Step 4 to return a minimal Anthropic snapshot so the
-						// UI exits loading state instead of spinning indefinitely.
+						// Expired or revoked sign-in: offer to reconnect. Otherwise (fresh
+						// install…) Step 4 returns a minimal snapshot so the UI stops loading.
+						if (this.needsReauthProfiles.has(oauthProfile.id)) return reauthSnapshot(oauthProfile);
 						console.warn(
 							"[UsageMonitor:getUsageForProvider] Step 2: No credential found for OAuth profile:",
 							oauthProfile.name,
@@ -4353,9 +4352,7 @@ export class UsageMonitor extends EventEmitter {
 					}
 				} else {
 					console.warn(
-						"[UsageMonitor:getUsageForProvider] Step 2: No OAuth profiles found in ClaudeProfileManager (total profiles:",
-						allOauthProfiles?.length ?? 0,
-						")",
+						"[UsageMonitor:getUsageForProvider] Step 2: No OAuth profiles found in ClaudeProfileManager",
 					);
 				}
 			} catch (error) {

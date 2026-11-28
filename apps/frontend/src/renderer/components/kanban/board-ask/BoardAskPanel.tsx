@@ -69,7 +69,7 @@ function AnswerText({
 						onClick={() => onCite(index)}
 						title={match.title}
 						aria-label={t("kanban.ask.citation", { index: index + 1, title: match.title })}
-						className="mx-0.5 inline-flex h-4 min-w-4 -translate-y-1 items-center justify-center rounded bg-primary/15 px-1 align-baseline text-[10px] font-semibold text-primary hover:bg-primary/25"
+						className="mx-0.5 inline-flex h-4 min-w-4 -translate-y-1 items-center justify-center rounded bg-primary/15 px-1 align-baseline text-3xs font-semibold text-primary hover:bg-primary/25"
 					>
 						{index + 1}
 					</button>
@@ -109,7 +109,7 @@ function MatchRow({
 					highlighted && "border-primary/60 bg-primary/10",
 				)}
 			>
-				<span className="mt-0.5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold tabular-nums text-muted-foreground">
+				<span className="mt-0.5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-muted text-2xs font-semibold tabular-nums text-muted-foreground">
 					{index + 1}
 				</span>
 				<span className="min-w-0 flex-1 space-y-1">
@@ -125,13 +125,13 @@ function MatchRow({
 							{t(`kanban.ask.state.${match.state}`)}
 						</Chip>
 						{match.archived && (
-							<span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+							<span className="inline-flex items-center gap-1 text-2xs text-muted-foreground">
 								<Archive className="h-3 w-3" aria-hidden />
 								{t("kanban.ask.archived")}
 							</span>
 						)}
 						{match.updatedAt && (
-							<span className="text-[11px] text-muted-foreground tabular-nums">
+							<span className="text-2xs text-muted-foreground tabular-nums">
 								{formatAppDate(match.updatedAt)}
 							</span>
 						)}
@@ -176,7 +176,7 @@ function EntryView({
 			)}
 			{result && (
 				<div className="space-y-3 rounded-2xl rounded-bl-md border border-border/60 bg-muted/30 p-3.5">
-					<div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+					<div className="flex flex-wrap items-center gap-2 text-2xs text-muted-foreground">
 						{result.mode === "ai" ? (
 							<span className="inline-flex items-center gap-1 font-medium text-primary">
 								<Sparkles className="h-3 w-3" aria-hidden />
@@ -325,7 +325,7 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 						</Button>
 					</div>
 					<div className="flex items-center justify-between gap-3">
-						<p className="text-[11px] text-muted-foreground">{t("kanban.ask.privacy")}</p>
+						<p className="text-2xs text-muted-foreground">{t("kanban.ask.privacy")}</p>
 						{entries.length > 0 && (
 							<Button
 								variant="ghost"

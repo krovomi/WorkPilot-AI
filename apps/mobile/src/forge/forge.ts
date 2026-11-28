@@ -9,12 +9,15 @@
 import { ApiError, type ServerClient } from "../api/client";
 import type { FeatureJob, FeatureJobOutput } from "../features/types";
 import type {
+	FeedbackView,
 	ForgeComment,
 	ForgeFile,
 	ForgeIssue,
 	ForgeKind,
 	ForgePull,
 	ForgeReview,
+	HeldFeedback,
+	ReviewFeedbackApi,
 	ReviewFinding,
 } from "./types";
 
@@ -61,6 +64,8 @@ export interface Forge {
 	reviews(numbers: number[]): Promise<Record<string, ForgeReview | null>>;
 	startReview(n: number, followup: boolean): Promise<FeatureJob>;
 	reviewJob(jobId: string, after?: number): Promise<FeatureJobOutput>;
+	/** Feedback on the review's findings: GitHub only. */
+	feedback: ReviewFeedbackApi | null;
 }
 
 export function makeForge(client: ServerClient, projectId: string, kind: ForgeKind, repoUrl: string): Forge | null {
@@ -97,12 +102,32 @@ export function makeForge(client: ServerClient, projectId: string, kind: ForgeKi
 			client.request<FeatureJob>("POST", `${reviewsBase}/jobs${q}`, { number: n, followup }),
 		reviewJob: (jobId: string, after = 0) =>
 			client.request<FeatureJobOutput>("GET", `${reviewsBase}/jobs/${enc(jobId)}${q}&after=${after}`),
+		feedback: kind === "github" ? reviewFeedback(client, reviewsBase, q) : null,
 	};
 	return kind === "github" ? github(relay, client, q, path, common) : gitlab(relay, path, common);
 }
 
 type Relay = (method: string, endpoint: string, body?: unknown) => Promise<unknown>;
-type Common = Pick<Forge, "kind" | "reviews" | "startReview" | "reviewJob">;
+type Common = Pick<Forge, "kind" | "reviews" | "startReview" | "reviewJob" | "feedback">;
+
+function reviewFeedback(client: ServerClient, base: string, q: string): ReviewFeedbackApi {
+	return {
+		forPull: (n) => client.request<FeedbackView>("GET", `${base}/${n}/feedback${q}`),
+		send: (n, findingId, verdict, reason) =>
+			client.request<FeedbackView>("POST", `${base}/${n}/feedback${q}`, {
+				finding_id: findingId,
+				verdict,
+				...(reason ? { reason } : {}),
+			}),
+		held: async () => {
+			const answer = await client.request<{ held?: HeldFeedback[]; maintainer?: boolean }>("GET", `${base}/feedback${q}`);
+			return { held: answer.held ?? [], maintainer: answer.maintainer === true };
+		},
+		decideHeld: async (pr, findingId, approve) => {
+			await client.request("POST", `${base}/feedback/held${q}`, { pr, finding_id: findingId, approve });
+		},
+	};
+}
 
 function github(relay: Relay, client: ServerClient, q: string, path: string, common: Common): Forge {
 	const repo = `/repos/${path}`;
