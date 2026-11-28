@@ -3363,7 +3363,13 @@
 				"stepRun": "Appuyez sur Entrée pour lancer la commande affichée.",
 				"stepFollow": "Suivez les étapes qu'elle affiche (une page du navigateur peut s'ouvrir).",
 				"stepClose": "Fermez ce terminal quand il indique que vous êtes connecté."
-			}
+			},
+			"keyId": "ID de clé d'accès",
+			"secretKey": "Clé d'accès secrète",
+			"secretPlaceholder": "Collez la clé d'accès secrète du compte",
+			"secretKeep": "Laisser vide pour garder le secret enregistré",
+			"region": "Région",
+			"testUnchecked": "Clé enregistrée. {{provider}} n'offre aucune vérification que WorkPilot puisse lancer avec elle : la première tâche dira si elle marche."
 		},
 		"spend": {
 			"month": "Ce mois-ci : {{cost}} · {{tokens}} tokens",

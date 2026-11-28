@@ -3363,7 +3363,13 @@
 				"stepRun": "Press Enter to run the command shown.",
 				"stepFollow": "Follow the steps it prints (a browser page may open).",
 				"stepClose": "Close this terminal once it says you are signed in."
-			}
+			},
+			"keyId": "Access key ID",
+			"secretKey": "Secret access key",
+			"secretPlaceholder": "Paste the account's secret access key",
+			"secretKeep": "Leave empty to keep the saved secret",
+			"region": "Region",
+			"testUnchecked": "Key saved. {{provider}} offers no check WorkPilot can run with it: the first task tells whether it works."
 		},
 		"spend": {
 			"month": "This month: {{cost}} · {{tokens}} tokens",

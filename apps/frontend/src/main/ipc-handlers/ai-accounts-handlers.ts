@@ -62,12 +62,13 @@ export function listAiAccounts(): IPCResult<AiAccountsSnapshot> {
 
 export async function saveAiAccount(input: unknown): Promise<IPCResult<AiAccountView>> {
 	if (!input || typeof input !== "object") return { success: false, error: "Invalid account" };
-	const { id, apiKey } = input as { id?: unknown; apiKey?: unknown };
+	const { id, apiKey, secretKey } = input as { id?: unknown; apiKey?: unknown; secretKey?: unknown };
 	if (id !== undefined && accountId(id) === null) {
 		return { success: false, error: "Invalid account" };
 	}
 	// Encrypted ahead with the async API, so the synchronous write never asks the keyring.
-	if (typeof apiKey === "string") await prepareSecrets([unmaskSecret(apiKey)]);
+	const typed = [apiKey, secretKey].filter((value): value is string => typeof value === "string");
+	if (typed.length > 0) await prepareSecrets(typed.map((value) => unmaskSecret(value)));
 	try {
 		return { success: true, data: aiAccountStore().save(input as AiAccountInput) };
 	} catch (error) {
@@ -98,6 +99,9 @@ export function setDefaultAiAccount(provider: unknown, id: unknown): IPCResult {
 	}
 }
 
+/** Providers whose key has no check here (AWS signs its requests, Cursor and Windsurf list nothing). */
+const UNCHECKED_PROVIDERS: ReadonlySet<string> = new Set(["aws", "cursor", "windsurf"]);
+
 /** The connection test's outcome, without anything the provider answered beyond a count. */
 export async function testSavedAiAccount(
 	id: unknown,
@@ -113,7 +117,9 @@ export async function testSavedAiAccount(
 	const account = store.get(checked);
 	if (!account) return { success: false, error: "Account not found" };
 	const apiKey = store.keyOf(checked);
-	if (!apiKey) return { success: true, data: { ok: false, error: "No key" } };
+	if (!apiKey || !account.hasKey) return { success: true, data: { ok: false, error: "No key" } };
+	// No endpoint the app can ask with this key alone: saved, not tried.
+	if (UNCHECKED_PROVIDERS.has(account.provider)) return { success: true, data: { ok: true, unchecked: true } };
 	try {
 		// The provider's own endpoint: no URL comes from the renderer.
 		const result = await test(account.provider, apiKey);
