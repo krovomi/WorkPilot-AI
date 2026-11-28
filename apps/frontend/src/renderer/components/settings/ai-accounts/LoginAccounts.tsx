@@ -14,9 +14,11 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Button, Input, Label } from "@/components/ui";
 import { confirmAction } from "@/components/ui/confirm-dialog";
+import { useAiAccountUsageStore } from "@/stores/ai-account-usage-store";
 import { aiAccountsOf, useAiAccountsStore } from "@/stores/ai-accounts-store";
 import { Chip, Notice } from "../../charter";
 import { AuthTerminal } from "../AuthTerminal";
+import { AccountSpend } from "./AccountSpend";
 
 interface SignIn extends AiAccountSignIn {
 	name: string;
@@ -52,6 +54,10 @@ export function LoginAccounts({ provider }: LoginAccountsProps) {
 	useEffect(() => {
 		if (!loaded) void load();
 	}, [loaded, load]);
+
+	useEffect(() => {
+		void useAiAccountUsageStore.getState().load();
+	}, []);
 
 	const mine = aiAccountsOf(accounts, provider);
 	const defaultId = defaults[provider];
@@ -214,6 +220,7 @@ export function LoginAccounts({ provider }: LoginAccountsProps) {
 							<p className={signedIn ? "text-xs text-muted-foreground" : "text-xs text-warning"}>
 								{signedIn ? t("aiAccounts.accounts.login.signedIn") : t("aiAccounts.accounts.login.signedOut")}
 							</p>
+							<AccountSpend accountKey={account.id} />
 						</div>
 						<div className="flex flex-wrap gap-2">
 							{!isDefault && signedIn && (

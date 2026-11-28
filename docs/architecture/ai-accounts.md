@@ -154,10 +154,11 @@ ne contient donc aucune clé : c'est un dossier que le main crée sous
 
 Chaque processus d'agent reçoit `WORKPILOT_AI_ACCOUNTS` (`main/ai-accounts/account-attribution.ts`,
 posé par `agent-process.ts`) : un objet JSON provider → clé de compte, le compte par défaut de
-chaque provider à clé API qui en a un, et `claude:<profil>` pour la connexion Claude du processus.
+chaque provider à clé API qui en a un (avec sa clé), celui de chaque outil CLI (Copilot, Codex,
+Gemini CLI) s'il est connecté, et `claude:<profil>` pour la connexion Claude du processus.
 Des identifiants seulement, jamais une clé. `foundation/ai_account.py` relit la variable comme une
 entrée (objet borné, ids `[A-Za-z0-9._:-]{1,100}`, alias `anthropic` → `claude`, `gemini` →
-`google`) et `core/usage_tracker.py` écrit `account_id` à côté de la session dans
+`google`, `openai-codex-cli` → `codex`) et `core/usage_tracker.py` écrit `account_id` à côté de la session dans
 `.workpilot/cost_data.json`. Une session sur la clé principale ou un profil de `profiles.json` n'a
 pas de compte : son coût n'est attribué à personne plutôt qu'au mauvais compte.
 

@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../../../shared/i18n";
 import type { AiAccountSignIn, AiAccountsSnapshot, AiAccountView } from "../../../../../shared/types/ai-accounts";
+import { useAiAccountUsageStore } from "../../../../stores/ai-account-usage-store";
 import { useAiAccountsStore } from "../../../../stores/ai-accounts-store";
 import { LoginAccounts } from "../LoginAccounts";
 
@@ -66,6 +67,24 @@ const bridge = {
 	}),
 	signInAiAccount: vi.fn(async () => ({ success: true, data: PLAN })),
 	requestAllProfilesUsage: vi.fn(),
+	getAiAccountUsage: vi.fn(async () => ({
+		success: true,
+		data: {
+			month: "2026-11",
+			accounts: {
+				c1: {
+					key: "c1",
+					costUsd: 3,
+					inputTokens: 900_000,
+					outputTokens: 100_000,
+					sessions: 2,
+					complete: true,
+					budgetUsd: 0,
+					level: "none",
+				},
+			},
+		},
+	})),
 };
 
 beforeEach(() => {
@@ -78,6 +97,7 @@ beforeEach(() => {
 		mainKeys: [],
 	};
 	useAiAccountsStore.setState({ accounts: [], defaults: {}, mainKeys: [], loaded: false, error: null });
+	useAiAccountUsageStore.setState({ month: "", accounts: {}, loaded: false });
 	(globalThis as { electronAPI?: unknown }).electronAPI = bridge;
 });
 
@@ -105,6 +125,14 @@ describe("LoginAccounts", () => {
 		expect(within(row("c2")).getByText("Not signed in")).toBeInTheDocument();
 		// Only a signed-in account can become the default.
 		expect(within(row("c2")).queryByRole("button", { name: /Use by default/ })).toBeNull();
+	});
+
+	it("shows each account's spend this month", async () => {
+		render(<LoginAccounts provider="copilot" />);
+		await screen.findByText("Work");
+		expect(await within(row("c1")).findByText("This month: $3.00 · 1M tokens")).toBeInTheDocument();
+		expect(within(row("c2")).getByText("This month: $0.00 · 0 tokens")).toBeInTheDocument();
+		expect(bridge.getAiAccountUsage).toHaveBeenCalled();
 	});
 
 	it("makes an account the default, then goes back to this computer's sign-in", async () => {
