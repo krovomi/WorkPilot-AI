@@ -415,7 +415,11 @@ async def _deterministic_evidence(
                 await browser.emulate("mobile")
                 await toolbox.call(
                     "verify_screenshot",
-                    {"label": f"{target.name} mobile view", "target": target.name},
+                    {
+                        "label": f"{target.name} mobile view",
+                        "target": target.name,
+                        "variant": "mobile",
+                    },
                 )
                 await browser.emulate("desktop")
         if target.kind == "backend-api":

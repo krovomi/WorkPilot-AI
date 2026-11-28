@@ -257,6 +257,14 @@ async def observe_side(
                 seen["network"] = network_entries(await browser.network())
                 if await browser.screenshot(shot):
                     seen["screenshot"] = str(shot)
+        if record.get("_spec_dir"):
+            # The pages the verification captured, on this side, filed as
+            # "before" (base) and "after" (task) for the pull request.
+            from .captures_step import capture_side
+
+            seen["captures"] = await capture_side(
+                toolbox, record, side_spec.name, Path(record["_spec_dir"]), shot.parent
+            )
     finally:
         await close_toolboxes(code_dir)
         stop_all(toolbox.base)
@@ -331,6 +339,12 @@ def _side_spec(spec: Path, side: str) -> Path:
     return folder
 
 
+def _captured_pages(record: dict) -> bool:
+    from .captures_step import _screens
+
+    return bool(_screens(record))
+
+
 def _skipped(base: Path, record: dict, reason: str) -> dict:
     entry = {"status": "skipped", "reason": reason, "at": time.time()}
     record["compare"] = entry
@@ -377,9 +391,15 @@ async def run_base_comparison(
         return {"status": "skipped", "reason": "nothing verified to compare"}
     if not load_settings(project).enabled:
         return _skipped(base, record, "verification turned off")
-    if not record.get("scenario") and not record.get("endpoints"):
+    if (
+        not record.get("scenario")
+        and not record.get("endpoints")
+        and not _captured_pages(record)
+    ):
         return _skipped(
-            base, record, "the verification recorded no scenario and no endpoint call"
+            base,
+            record,
+            "the verification recorded no scenario, no endpoint call and no page",
         )
     sha = base_commit(project)
     if not sha:
@@ -405,7 +425,7 @@ async def run_base_comparison(
             return _skipped(base, record, "the base branch could not be checked out")
         report = await asyncio.to_thread(prepare_worktree, main, checkout, port_key)
         linked = list(report.linked)
-        context = {**record, "_project_dir": str(project)}
+        context = {**record, "_project_dir": str(project), "_spec_dir": str(spec)}
         seen["base"] = await observe(
             checkout, _side_spec(spec, "base"), context, shots / "base.png"
         )

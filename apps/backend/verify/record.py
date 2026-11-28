@@ -201,7 +201,15 @@ def fold_events(record: dict, events: list[dict]) -> dict:
             record["screenshots"].append(
                 {
                     k: event.get(k)
-                    for k in ("path", "label", "target", "platform", "url", "window")
+                    for k in (
+                        "path",
+                        "label",
+                        "target",
+                        "platform",
+                        "url",
+                        "window",
+                        "variant",
+                    )
                 }
             )
         elif kind == "perf":

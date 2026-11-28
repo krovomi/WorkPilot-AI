@@ -75,6 +75,9 @@ MANIFEST_FILE = "manifest.json"
 RECORD_FILE = "visual_qa.json"
 SIDES = ("base", "task")
 PLATFORMS = ("web", "android", "ios", "desktop")
+#: The same screen in another frame: a web page at a phone's width is still
+#: the web page, and must not replace its desktop capture.
+VARIANTS = ("", "mobile")
 SOURCES = (
     "emulator",
     "visual-proof",
@@ -142,12 +145,14 @@ class Capture:
     source: str = "manual"
     label: str = ""
     expected: list[str] = field(default_factory=list)
+    variant: str = ""
     file: Path | None = field(default=None, repr=False, compare=False)
 
     @property
     def key(self) -> str:
         """Same key, same screen: base and task captures pair on it."""
-        return f"{self.platform}|{slug(self.route) or 'screen'}|{self.locale.lower()}"
+        key = f"{self.platform}|{slug(self.route) or 'screen'}|{self.locale.lower()}"
+        return f"{key}|{self.variant}" if self.variant else key
 
     def to_dict(self) -> dict:
         payload = asdict(self)
@@ -201,6 +206,8 @@ def _manifest(spec_dir: Path) -> dict[str, dict]:
 def _from_stem(stem: str) -> tuple[str, str, str]:
     """(platform, route, locale) from `android--orders--fr`, else a bare stem."""
     parts = stem.split("--")
+    if len(parts) > 2 and parts[-1] in VARIANTS:
+        parts = parts[:-1]
     if parts[0] in PLATFORMS and len(parts) >= 2:
         return parts[0], parts[1], parts[2] if len(parts) > 2 else ""
     return "web", stem, ""
@@ -238,6 +245,9 @@ def spec_captures(spec_dir: Path) -> list[Capture]:
                         for e in _items(entry.get("expected"), 40)
                         if isinstance(e, str) and e.strip()
                     ],
+                    variant=entry.get("variant")
+                    if entry.get("variant") in VARIANTS
+                    else ("mobile" if path.stem.endswith("--mobile") else ""),
                     file=path,
                 )
             )
@@ -939,6 +949,7 @@ def save_capture(
     locale: str = "",
     label: str = "",
     expected: list[str] | None = None,
+    variant: str = "",
 ) -> SavedCapture:
     """Write a capture under `captures/<side>/`, named by what it shows.
 
@@ -965,9 +976,12 @@ def save_capture(
     locale = _text(locale, 20) or locale_from_url(url)
     if locale and not re.match(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?$", locale):
         locale = ""
+    variant = next((v for v in VARIANTS if v == variant), "")
     name = f"{platform}--{slug(route) or 'screen'}" + (
         f"--{slug(locale)}" if locale else ""
     )
+    if variant:
+        name = f"{name}--{variant}"
     root = os.path.realpath(os.path.join(spec_dir, CAPTURES_DIR, side))
     resolved = os.path.realpath(os.path.join(root, f"{name}.{kind}"))
     if not resolved.startswith(root + os.sep):
@@ -1011,6 +1025,7 @@ def save_capture(
             for e in (expected or [])[:40]
             if isinstance(e, str) and e.strip()
         ],
+        "variant": variant,
         "capturedAt": _now(),
     }
     _write_manifest(Path(spec_dir), entry)

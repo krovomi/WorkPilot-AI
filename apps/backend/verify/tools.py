@@ -661,10 +661,21 @@ class VerifyToolbox:
         label = str(args.get("label") or "screenshot")[:120]
         slug = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")[:50] or "screenshot"
         path = self.base / "screenshots" / f"{slug}.png"
-        ok = await browser.screenshot(path, full_page=bool(args.get("full_page")))
+        # A closed list: the phone-width view of a page is the same screen.
+        variant = "mobile" if args.get("variant") == "mobile" else ""
+        from .captures_step import protected_screenshot
+
+        ok = await protected_screenshot(
+            browser,
+            path,
+            project_dir=self.project_dir,
+            spec_dir=self.spec_dir,
+            base=self.base,
+            full_page=bool(args.get("full_page")),
+        )
         if not ok:
             return "Error: the screenshot could not be taken"
-        filed = self._file_capture(path, label, target)
+        filed = self._file_capture(path, label, target, variant)
         append_event(
             self.base,
             "screenshot",
@@ -674,6 +685,7 @@ class VerifyToolbox:
                 "target": target.name if target else "",
                 "url": self._current_url,
                 "platform": "desktop" if target and target.kind == "desktop" else "web",
+                **({"variant": variant} if variant else {}),
             },
         )
         return _json({"path": str(path), "filed_for_visual_review": filed})
@@ -753,24 +765,25 @@ class VerifyToolbox:
         )
         return f"Done: {answer.get('done') or action} on {ref}{note}"
 
-    def _file_capture(self, path: Path, label: str, target: Target | None) -> bool:
+    def _file_capture(
+        self, path: Path, label: str, target: Target | None, variant: str = ""
+    ) -> bool:
         if self.spec_dir is None:
             return False
         try:
-            from docintel.visual_qa import save_capture
+            from .captures_step import file_with_check
 
-            saved = save_capture(
+            return file_with_check(
                 self.spec_dir,
-                path.read_bytes(),
+                path,
                 side="task",
                 platform="desktop"
                 if target is not None and target.kind in ("desktop", "windows-app")
                 else "web",
-                source="verifier",
                 url=self._current_url,
                 label=label,
+                variant=variant,
             )
-            return saved.status == "saved"
         except Exception:  # noqa: BLE001
             return False
 
