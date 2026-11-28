@@ -249,6 +249,10 @@ RULES: dict[tuple[str, str], Rule] = {
     ("POST", "/api/board/cards/{card_id}/subtasks/{subtask_id}/unblock"): scoped(
         "task.write"
     ),
+    ("GET", "/api/board/cards/{card_id}/captures"): scoped("task.read"),
+    ("GET", "/api/board/cards/{card_id}/captures/{index}/{side}"): scoped("task.read"),
+    ("POST", "/api/board/cards/{card_id}/captures/publish"): scoped("review.approve"),
+    ("POST", "/api/board/cards/{card_id}/captures/withdraw"): scoped("review.approve"),
     ("GET", "/api/board/cards/{card_id}/steering"): scoped("task.read"),
     ("POST", "/api/board/cards/{card_id}/steering"): scoped("agent.execute"),
     ("POST", "/api/board/cards/{card_id}/task-token"): scoped("task.write"),

@@ -194,6 +194,32 @@ publiées : une capture reprise ensuite attend un nouveau « Publier ».
 | `CAPTURES_RETENTION_DAYS` | `30` | jours de conservation des images d'une tâche sur la branche des captures après leur dernière mise à jour (`0` : sans limite) |
 | `CAPTURES_BRANCH` | `workpilot-captures` | branche des images sur GitHub, GitLab et Bitbucket |
 
+## En mode serveur et sur le téléphone
+
+Sur un projet du serveur d'équipe, la tâche tourne sur le clone du serveur : la vérification, la
+comparaison et `build_publication` y écrivent comme sur un poste. Le serveur montre ces captures
+à l'app mobile et à l'app de bureau connectée (`shared_board/captures.py`), par `project_id` et
+carte, jamais par chemin :
+
+| Route | Permission | Rôle |
+|---|---|---|
+| `GET /api/board/cards/{id}/captures` | `task.read` | `publication.json` et `pr-sync.json` résumés : par écran le statut, le nombre de valeurs remplacées et leurs types, l'état de la PR ; ni chemin, ni empreinte, ni valeur, et un lien de PR seulement en `https://` |
+| `GET /api/board/cards/{id}/captures/{n}/{before\|after}` | `task.read` | une copie publiable en PNG base64 : l'écran est sa place dans la liste, le fichier celui que la liste nomme, résolu sous `captures/published/`, signature PNG vérifiée ; une copie retenue ou une capture d'origine répond 404 |
+| `POST …/captures/publish`, `…/withdraw` | `review.approve` (`ROUTE_OVERRIDES`) et rôle de membre | la réponse à la revue (`CAPTURES_PUBLISH=review` seulement, sinon 409), par `pr_captures.approval`, inscrite à l'audit (`task.captures.published`, `task.captures.withdrawn`) |
+| run `captures` | `agent.execute` et `vcs.pr.create` (`PHASE_PERMISSIONS`) | `runners/pr_captures_runner.py sync` sur le clone, avec le jeton de forge de qui le lance ; aucun agent, aucun modèle |
+
+La copie lue est celle du worktree de la tâche ou du dossier de la carte, la plus récente, comme le
+runner la choisit. L'instantané du tableau envoie aussi `captures/publication.json` et
+`captures/pr-sync.json` (un dossier lié hors de la carte est ignoré) : la pastille de l'app de
+bureau s'allume pour une carte du serveur ; les images, elles, ne passent que par la route.
+
+Sur le téléphone, la carte a une section « Captures pour la PR » (nombre d'écrans, état de la PR,
+la ligne des faux) qui ouvre `cards/[cardId]/captures` : chaque écran avant et après, ses types
+remplacés, ce qui reste sur la tâche, le lien de la PR, et en mode `review` **Publier** ou
+**Retirer** puis le run `captures` quand la personne en a les droits (sinon la PR suit à sa
+prochaine synchronisation). Le téléphone ne garde aucune image. Ce qui est traité et combien de
+temps, pour le registre RGPD : [pr-captures-data.md](../pr-captures-data.md).
+
 ## Lots
 
 1. **Décider et capturer** (ce document) : `pr_captures/` (feuille sur `docintel` et `uiux`,
@@ -205,7 +231,10 @@ publiées : une capture reprise ensuite attend un nouveau « Publier ».
    en repli), boutons « Publier » et « Retirer » sur le runner, pastille et aperçu sur la carte,
    réglages, FR et EN ; la preuve visuelle cesse de commiter sur la branche de la tâche et de
    poster son commentaire quand la tâche a des captures.
-4. **Serveur, mobile, docs**.
+4. **Serveur, mobile, docs** (ce document) : `shared_board/captures.py`, la phase `captures` de
+   `server/services/run_manager.py`, l'écran `apps/mobile/src/app/(app)/projects/[projectId]/cards/[cardId]/captures.tsx`
+   et `apps/mobile/src/captures/`, le registre [pr-captures-data.md](../pr-captures-data.md), les README.
 
-Tests : `tests/pr_captures/` (dont les scripts de page joués dans un vrai Chromium et la branche
+Tests : `tests/backend/test_shared_board_captures.py` (routes du serveur, refus compris),
+`apps/mobile/src/__tests__/app/card-captures.test.tsx`, `tests/pr_captures/` (dont les scripts de page joués dans un vrai Chromium et la branche
 des captures poussée vers un vrai dépôt nu), `tests/test_verify_compare.py`.

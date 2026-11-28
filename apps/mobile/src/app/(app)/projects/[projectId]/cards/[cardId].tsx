@@ -18,6 +18,7 @@ import {
 import { ACTION_ICONS } from "../../../../../board/actionIcons";
 import { ACTIVE_COLUMNS, boardColumn } from "../../../../../board/columns";
 import { ApprovalSection } from "../../../../../card/ApprovalSection";
+import { CapturesSection } from "../../../../../card/CapturesSection";
 import { ChangesSection } from "../../../../../card/ChangesSection";
 import { LogsSection } from "../../../../../card/LogsSection";
 import { canEditCard, EditCard } from "../../../../../card/EditCard";
@@ -275,6 +276,18 @@ export default function CardScreen() {
 					router.push({
 						pathname: "/projects/[projectId]/cards/[cardId]/files",
 						params: { projectId, cardId, file: String(file) },
+					})
+				}
+			/>
+
+			<CapturesSection
+				key={`captures-${revision}`}
+				projectId={projectId}
+				cardId={cardId}
+				onOpen={() =>
+					router.push({
+						pathname: "/projects/[projectId]/cards/[cardId]/captures",
+						params: { projectId, cardId, specId: card.specId ?? "" },
 					})
 				}
 			/>
