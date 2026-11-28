@@ -617,8 +617,27 @@
 				"failed": "Failed",
 				"abandoned": "Abandoned"
 			},
-			"privacy": "The question and the tickets go to the AI provider chosen in Settings. Nothing is saved.",
-			"newConversation": "New conversation"
+			"privacy": "The question and the tickets go to the AI provider chosen in Settings, and to an embeddings model (this computer's first). Vectors are kept on this computer only.",
+			"newConversation": "New conversation",
+			"modeSemantic": "Ranked by meaning",
+			"semanticHint": "No answer from the AI (no provider, or it did not answer): these tickets are the closest to the question in meaning and words, whatever their language.",
+			"semanticTitle": "An embeddings model compared the meaning of the question with each ticket's",
+			"semanticSource": {
+				"local": "Meaning: {{model}}, on this computer",
+				"cloud": "Meaning: {{model}} ({{provider}} API)"
+			},
+			"semanticPartial": "{{indexed}} of {{total}} tickets read by meaning so far; the rest follow with the next questions",
+			"semanticMode": {
+				"label": "By meaning",
+				"auto": "Auto",
+				"local": "This computer only",
+				"off": "Off",
+				"hint": {
+					"auto": "An embeddings model on this computer (Ollama, LM Studio), else your provider's embeddings API (OpenAI, Mistral, Google, Hugging Face)",
+					"local": "Only an embeddings model on this computer: tickets never leave it for this step",
+					"off": "Keywords and the AI model only"
+				}
+			}
 		},
 		"lanes": {
 			"title": "Swimlanes",

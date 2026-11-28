@@ -11,6 +11,7 @@ import type { BoardAskRequest, BoardAskResult, BoardAskTurn, IPCResult } from ".
 import { BOARD_ASK_LIMITS } from "../../shared/types/board-ask";
 import { getAppLanguage } from "../app-language";
 import { askBoard, type CompletionFn } from "../board-ask/board-ask-service";
+import { createSemanticSearch, readSemanticMode, type SemanticFn } from "../board-ask/semantic-search";
 import { runOneShotLLM } from "../oneshot-llm";
 import { projectStore } from "../project-store";
 import { getServerProject } from "../server-projects";
@@ -50,7 +51,11 @@ export function parseBoardAskRequest(raw: unknown): BoardAskRequest | string {
 	return { projectId, question: question.trim(), history: turns.slice(-BOARD_ASK_LIMITS.historyTurns) };
 }
 
-export async function handleBoardAsk(raw: unknown, complete?: CompletionFn): Promise<IPCResult<BoardAskResult>> {
+export async function handleBoardAsk(
+	raw: unknown,
+	complete?: CompletionFn,
+	semantic?: SemanticFn | null,
+): Promise<IPCResult<BoardAskResult>> {
 	const request = parseBoardAskRequest(raw);
 	if (typeof request === "string") return { success: false, error: request };
 	// A server board is asked on the server (a later lot): its cards are not read here.
@@ -74,6 +79,10 @@ export async function handleBoardAsk(raw: unknown, complete?: CompletionFn): Pro
 		history: request.history,
 		appLanguage: getAppLanguage(),
 		complete: run,
+		semantic:
+			semantic === undefined
+				? createSemanticSearch({ projectDir: project.path, mode: readSemanticMode() })
+				: (semantic ?? undefined),
 	});
 	return { success: true, data };
 }
