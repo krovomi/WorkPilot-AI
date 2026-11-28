@@ -141,6 +141,48 @@ exits; one in AI review takes no slot, as on the board. A pause the **user**
 asked for has no reason and stays a pause, as do the pauses the backend takes
 itself (`budget`, `budget_stall`, `tool_loop`) and the policy ones.
 
+**A team server that restarts offers the same choice.** In server mode the runs
+are the server's, not the app's: `settle_orphans` (`server/services/run_manager.py`)
+used to mark every `queued`/`running` run with no process behind it `failed`.
+It now marks it `interrupted` (its error still says the server restarted), and
+`server/services/interrupted_runs.py` decides what is offered: the latest run of
+each card, still `interrupted`, never answered (`resume_answered_at`), in a
+phase that can pick up where it stopped (`spec`, `build`, `qa`; a `merge`, `pr`
+or `captures` run is not offered, it is started again by hand). Each row reads
+the card's plan in the build workspace copy (only if it resolves inside the
+clone) for the phase steps and the next unfinished subtask, which is where the
+build resumes: `reopen_interrupted_subtasks` runs on the server too. A card
+whose spec folder is gone is listed unticked with `spec_missing`.
+
+- `GET /users/me/interrupted-runs` (`task.read`) lists the person's own runs;
+  a project owner (an org admin is one on every project of the org) also sees
+  the teammates' runs, unticked, with who started them.
+- `POST /projects/{id}/specs/{spec}/runs/{run}/resume` (role `member`,
+  `agent.execute`, and the phase's own permission, as for a start) starts the
+  same phase with the same model through the start path, so claims, the quota
+  and the review rules hold. Only who started the run or a project owner may
+  answer it; a run no longer offered answers 409. A build that had started
+  approved (`started_approved`, recorded at each start) keeps its approval on
+  the plan it wrote (`keep_approval`), as `set_approval_carry` does for a live
+  build: the crash is not a modification. The audit log writes `spec.run.resumed`.
+- `POST /users/me/interrupted-runs/later` (`task.read`) sets the others aside:
+  only runs the person may answer are touched, so a forged id does nothing.
+
+The desktop adds these rows to its launch dialog (`interrupted-server.ts`, the
+`server_restart` origin): at launch, and again when a server session starts
+(`onServerSignedIn` of `server-connection.ts`; a token refresh is not a start),
+deduplicated against what is already offered. « Reprendre » sends each ticked
+server row to the resume route, « Plus tard » to the set-aside route; neither
+goes through the local slot limit, the server keeps its own. The mobile app
+shows the same prompt once signed in (`src/interrupted/`). No new personal
+data is stored: the rows are read from the runs and the cards the server
+already holds, and the name of a teammate is only shown to an owner of the
+project.
+
+Project jobs (`project_jobs.py`) stay `failed` on restart: a job keeps no
+arguments to start it again, and the clients that poll a job wait for one of
+its final states.
+
 **The interrupted subtask is continued, not skipped.** `get_next_subtask` picks
 `pending` work only, so a subtask the dead process had marked `in_progress` was
 passed over — or, when it was the last, the build reported "no pending

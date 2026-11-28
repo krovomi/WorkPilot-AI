@@ -52,6 +52,29 @@ vi.mock("../../../task-state-manager", () => ({
 	},
 }));
 
+const server = vi.hoisted(() => ({
+	tasks: [] as unknown[],
+	ids: new Set<string>(),
+	resumed: [] as string[][],
+	setAside: [] as string[][],
+}));
+
+vi.mock("../interrupted-server", () => ({
+	collectServerInterruptedTasks: async () => {
+		for (const task of server.tasks as Array<{ taskId: string }>) server.ids.add(task.taskId);
+		return server.tasks;
+	},
+	isServerInterruptedTask: (taskId: string) => server.ids.has(taskId),
+	resumeServerInterrupted: async (taskIds: string[]) => {
+		server.resumed.push(taskIds);
+		for (const taskId of taskIds) server.ids.delete(taskId);
+		return { resumed: [...taskIds], waiting: [], failed: [] };
+	},
+	setServerInterruptedAside: async (taskIds: string[]) => {
+		server.setAside.push(taskIds);
+	},
+}));
+
 vi.mock("../../../file-watcher", () => ({ fileWatcher: { watch: vi.fn(), unwatch: vi.fn() } }));
 vi.mock("../../../worktree-paths", () => ({ findTaskWorktree: () => null }));
 vi.mock("../../../app-logger", () => ({
@@ -64,6 +87,7 @@ import { interruptionOrigin } from "../interrupted-origin";
 import {
 	collectInterruptedTasks,
 	offerInterruptedTasksAtLaunch,
+	offerServerInterruptedTasks,
 	parseResumeIds,
 	registerInterruptedTaskHandlers,
 	resetInterruptedPromptForTests,
@@ -161,6 +185,10 @@ beforeEach(() => {
 	sent.length = 0;
 	settings.value = {};
 	claudeAuth.valid = true;
+	server.tasks = [];
+	server.ids.clear();
+	server.resumed.length = 0;
+	server.setAside.length = 0;
 	resetInterruptedPromptForTests();
 });
 
@@ -432,5 +460,78 @@ describe("the person's answer", () => {
 		running.length = 0; // the first build ends
 		manager.exit(first.id, project.id);
 		await vi.waitFor(() => expect(manager.startTaskExecution).toHaveBeenCalledTimes(2));
+	});
+});
+
+describe("in server mode, the runs the team server stopped", () => {
+	const serverTask = (taskId: string, selectedByDefault = true) => ({
+		taskId,
+		projectId: "srv-1",
+		projectName: "Team",
+		title: taskId,
+		origin: "server_restart",
+		interruptedAt: null,
+		phase: "coding",
+		subtasksDone: 1,
+		subtasksTotal: 3,
+		nextSubtask: null,
+		provider: null,
+		model: null,
+		blocker: null,
+		selectedByDefault,
+		onServer: true,
+	});
+
+	it("are offered with the local builds at launch", async () => {
+		register(createProject(), createTask(paused("app_shutdown")));
+		server.tasks = [serverTask("server:srv-1:001-a")];
+
+		const offer = await offerInterruptedTasksAtLaunch(asManager(fakeAgentManager()), () => null);
+
+		expect(offer?.tasks.map((t) => t.taskId)).toEqual(["task-1", "server:srv-1:001-a"]);
+	});
+
+	it("arrive once signed in, next to the unanswered ones, never twice", async () => {
+		register(createProject(), createTask(paused("app_shutdown")));
+		const manager = asManager(fakeAgentManager());
+		await offerInterruptedTasksAtLaunch(manager, () => null);
+		server.tasks = [serverTask("server:srv-1:001-a")];
+
+		const offer = await offerServerInterruptedTasks(manager, () => null);
+
+		expect(offer?.tasks.map((t) => t.taskId)).toEqual(["task-1", "server:srv-1:001-a"]);
+		expect(await offerServerInterruptedTasks(manager, () => null)).toBeNull();
+	});
+
+	it("are resumed or set aside by the server, the local ones here", async () => {
+		const project = createProject();
+		const local = createTask(paused("app_shutdown"));
+		register(project, local);
+		server.tasks = [serverTask("server:srv-1:001-a"), serverTask("server:srv-1:002-b")];
+		const manager = fakeAgentManager();
+		registerInterruptedTaskHandlers(asManager(manager));
+		await offerInterruptedTasksAtLaunch(asManager(manager), () => null);
+
+		const resolve = handlers.get(IPC_CHANNELS.TASK_INTERRUPTED_RESOLVE);
+		const result = await resolve?.({}, ["server:srv-1:001-a", local.id]);
+
+		expect(result).toEqual({
+			resumed: ["server:srv-1:001-a", local.id],
+			waiting: [],
+			failed: [],
+		});
+		expect(server.resumed).toEqual([["server:srv-1:001-a"]]);
+		expect(server.setAside).toEqual([["server:srv-1:002-b"]]);
+		expect(manager.startTaskExecution).toHaveBeenCalledTimes(1);
+	});
+
+	it("« Tout reprendre » resumes only the person's own", async () => {
+		settings.value = { interruptedTasksOnLaunch: "always" };
+		server.tasks = [serverTask("server:srv-1:001-a"), serverTask("server:srv-1:002-b", false)];
+
+		const offer = await offerServerInterruptedTasks(asManager(fakeAgentManager()), () => null);
+
+		expect(offer).toMatchObject({ mode: "resumed", resumed: ["server:srv-1:001-a"] });
+		expect(server.resumed).toEqual([["server:srv-1:001-a"]]);
 	});
 });

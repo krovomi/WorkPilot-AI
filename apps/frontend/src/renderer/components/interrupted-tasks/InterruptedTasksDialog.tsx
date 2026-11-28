@@ -108,7 +108,7 @@ function TaskRow({
 					<span
 						className={cn(
 							"rounded-full border px-2 text-xs",
-							task.origin === "crash"
+							task.origin === "crash" || task.origin === "server_restart"
 								? "border-warning/40 bg-warning/10 text-warning"
 								: "border-border text-muted-foreground",
 						)}
@@ -122,6 +122,11 @@ function TaskRow({
 				<p className="text-xs text-muted-foreground">
 					{task.origin === "stopped_by_you" ? t(`${K}.stoppedByYou`, { where }) : where}
 				</p>
+				{task.startedByName && (
+					<p className="text-xs text-muted-foreground">
+						{t(`${K}.startedBy`, { name: task.startedByName })}
+					</p>
+				)}
 				{task.blocker && (
 					<p className="flex flex-wrap items-center gap-2 text-xs text-destructive">
 						<AlertTriangle className="h-3.5 w-3.5" />
@@ -154,7 +159,8 @@ function useSlotLines(tasks: InterruptedTask[], selected: Set<string>): string[]
 	return useMemo(() => {
 		const perProject = new Map<string, { name: string; count: number }>();
 		for (const task of tasks) {
-			if (!selected.has(task.taskId) || stepOf(task) === "qa") continue;
+			// A server card waits behind the server's own limit, not this project's.
+			if (!selected.has(task.taskId) || stepOf(task) === "qa" || task.onServer) continue;
 			const entry = perProject.get(task.projectId) ?? { name: task.projectName, count: 0 };
 			entry.count += 1;
 			perProject.set(task.projectId, entry);
@@ -227,7 +233,9 @@ function OfferDialog({ tasks }: { readonly tasks: InterruptedTask[] }) {
 		>
 			<DialogContent className="max-w-2xl" data-testid="interrupted-tasks-dialog">
 				<DialogTitle>{t(`${K}.title`, { count: tasks.length })}</DialogTitle>
-				<DialogDescription>{t(`${K}.description`)}</DialogDescription>
+				<DialogDescription>
+					{t(tasks.some((task) => task.onServer) ? `${K}.descriptionServer` : `${K}.description`)}
+				</DialogDescription>
 				<div className="flex items-center justify-between px-0.5 text-xs text-muted-foreground">
 					<span>{t(`${K}.selectedCount`, { count: selected.size, total: tasks.length })}</span>
 					<button

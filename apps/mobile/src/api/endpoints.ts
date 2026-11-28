@@ -36,6 +36,7 @@ import type { AskAnswer } from "../board-ask/types";
 import type { MyUsage, UsageNotice } from "../usage/types";
 import type { AiAccount, AiAccounts } from "../ai-accounts/types";
 import type { CaptureSideName, CardCaptures } from "../captures/types";
+import type { InterruptedRun } from "../interrupted/types";
 import { decided, type MemoryDecision, type MemoryLifecycle } from "../context/lifecycle";
 import type { EngineOption, SettingsPayload } from "../new-card/engine";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
@@ -167,6 +168,15 @@ export function api(client: ServerClient) {
 			client.request<AgentRun>("POST", runsPath(projectId, specId), { phase }),
 		cancelRun: (projectId: string, specId: string, runId: string) =>
 			client.request<{ cancelled: boolean }>("POST", runsPath(projectId, specId, `/${enc(runId)}/cancel`)),
+		/** The runs the server stopped (restarted) that the person may resume. */
+		interruptedRuns: async () =>
+			(await client.request<{ runs: InterruptedRun[] }>("GET", "/users/me/interrupted-runs")).runs,
+		/** The same phase again, from where it stopped, with the permission starting a run takes. */
+		resumeRun: (projectId: string, specId: string, runId: string) =>
+			client.request<AgentRun>("POST", runsPath(projectId, specId, `/${enc(runId)}/resume`)),
+		/** « Later »: the server stops offering these runs, here and on the desktop. */
+		setInterruptedRunsAside: (runIds: string[]) =>
+			client.request<{ set_aside: string[] }>("POST", "/users/me/interrupted-runs/later", { run_ids: runIds }),
 		registerDevice: (token: string, platform: "ios" | "android", locale: string) =>
 			client.request<{ registered: boolean }>("PUT", "/users/me/devices", { token, platform, locale }),
 		unregisterDevice: (token: string) =>

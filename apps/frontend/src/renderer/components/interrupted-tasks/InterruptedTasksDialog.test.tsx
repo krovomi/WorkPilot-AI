@@ -93,6 +93,31 @@ describe("InterruptedTasksDialog", () => {
 		expect(screen.getByText("3 of 3 selected")).toBeInTheDocument();
 	});
 
+	it("lists a server card the team server stopped, a teammate's unticked, with no slot line", async () => {
+		show([
+			item({ taskId: "server:p9:001-a", projectId: "p9", origin: "server_restart", onServer: true }),
+			item({
+				taskId: "server:p9:002-b",
+				projectId: "p9",
+				title: "Bob's card",
+				origin: "server_restart",
+				onServer: true,
+				selectedByDefault: false,
+				startedByName: "Bob",
+			}),
+		]);
+		expect(screen.getByText(/WorkPilot or the team server stopped/)).toBeInTheDocument();
+		expect(screen.getAllByText("Server restarted · 14 min ago")).toHaveLength(2);
+		expect(screen.getByText("Started by Bob: unticked, it is their run.")).toBeInTheDocument();
+		expect(screen.getByText("1 of 2 selected")).toBeInTheDocument();
+		await userEvent.click(screen.getByRole("button", { name: "Select all" }));
+		expect(screen.queryByText(/will wait for a free slot/)).not.toBeInTheDocument();
+		await userEvent.click(screen.getByTestId("interrupted-resume"));
+		await waitFor(() =>
+			expect(resolveInterruptedTasks).toHaveBeenCalledWith(["server:p9:001-a", "server:p9:002-b"]),
+		);
+	});
+
 	it("saves « Next time » with the answer", async () => {
 		useSettingsStore.setState((s) => ({ settings: { ...s.settings, interruptedTasksOnLaunch: undefined } }));
 		show([item()]);

@@ -128,6 +128,8 @@ RULES: dict[tuple[str, str], Rule] = {
     ("DELETE", "/users/me/needs-you/channels/{channel}"): needs("task.read"),
     ("POST", "/users/me/needs-you/channels/{channel}/test"): needs("agent.execute"),
     ("PUT", "/users/me/needs-you/preferences"): needs("task.read"),
+    ("GET", "/users/me/interrupted-runs"): needs("task.read"),
+    ("POST", "/users/me/interrupted-runs/later"): needs("task.read"),
     # --- Projects, their members, specs and runs ------------------------------
     ("GET", "/projects"): signed_in(),
     ("POST", "/projects"): signed_in(),
@@ -149,6 +151,9 @@ RULES: dict[tuple[str, str], Rule] = {
     ),
     ("POST", "/projects/{project_id}/specs/{spec_id}/runs/{run_id}/cancel"): project(
         "member", "agent.cancel"
+    ),
+    ("POST", "/projects/{project_id}/specs/{spec_id}/runs/{run_id}/resume"): project(
+        "member", "agent.execute"
     ),
     # --- Administration --------------------------------------------------------
     ("GET", "/admin/orgs"): platform(),

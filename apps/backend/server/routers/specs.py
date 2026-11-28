@@ -9,6 +9,7 @@ can act on the spec. Claims auto-release when the spec reaches
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -206,16 +207,18 @@ async def release_spec(
     return await _spec_to_public(db, spec)
 
 
-@router.post("/{spec_id}/runs", response_model=AgentRunPublic, status_code=202)
-async def start_run(
+async def _launch(
+    db: AsyncSession,
+    request: Request,
+    user: CurrentUser,
     project_id: str,
     spec_id: str,
-    body: StartRunRequest,
-    request: Request,
-    user: CurrentUser = Depends(require_project_role(ProjectRole.MEMBER.value)),
-    db: AsyncSession = Depends(get_db),
-) -> AgentRunPublic:
-    """Launch an agent run on the server. Auto-claims the spec for the caller.
+    phase: str,
+    model: str | None,
+    pr: dict | None,
+    before_start: Callable[[Project, SpecIndex], None] | None = None,
+) -> tuple[SpecIndex, AgentRun]:
+    """Check the caller may run ``phase`` on the card, claim it, queue the run.
 
     Requires ``agent.execute`` on top of project membership: starting a run
     executes code against a repository with file and network tools, which is
@@ -224,7 +227,7 @@ async def start_run(
     from server.services.run_manager import RunManagerError, get_run_manager
 
     principal = get_principal(request)
-    for needed in ("agent.execute", *PHASE_PERMISSIONS.get(body.phase, ())):
+    for needed in ("agent.execute", *PHASE_PERMISSIONS.get(phase, ())):
         if not principal.has(needed):
             raise HTTPException(status_code=403, detail=f"Missing permission: {needed}")
 
@@ -248,28 +251,118 @@ async def start_run(
     if spec.claimed_by is None:
         spec.claimed_by = user.id
         spec.claimed_at = datetime.now(UTC)
+    if before_start is not None:
+        before_start(project, spec)
 
     try:
         run = await get_run_manager().start_run(
             spec=spec,
             project_id=project_id,
             server_path=project.server_path,
-            phase=body.phase,
+            phase=phase,
             user_id=user.id,
-            model=body.model,
+            model=model,
             org_id=project.org_id,
-            pr=body.pr.model_dump() if body.pr else None,
+            pr=pr,
             may_skip_review=may_skip_review,
         )
     except RunManagerError as e:
         raise HTTPException(status_code=409, detail=str(e))
+    return spec, run
 
+
+@router.post("/{spec_id}/runs", response_model=AgentRunPublic, status_code=202)
+async def start_run(
+    project_id: str,
+    spec_id: str,
+    body: StartRunRequest,
+    request: Request,
+    user: CurrentUser = Depends(require_project_role(ProjectRole.MEMBER.value)),
+    db: AsyncSession = Depends(get_db),
+) -> AgentRunPublic:
+    """Launch an agent run on the server. Auto-claims the spec for the caller."""
+    spec, run = await _launch(
+        db,
+        request,
+        user,
+        project_id,
+        spec_id,
+        body.phase,
+        body.model,
+        body.pr.model_dump() if body.pr else None,
+    )
     db.add(
         AuditLog(
             user_id=user.id,
             project_id=project_id,
             action="spec.run.started",
             payload={"spec": spec.spec_name, "phase": body.phase, "run_id": run.id},
+        )
+    )
+    await db.commit()
+    return AgentRunPublic.model_validate(run)
+
+
+@router.post(
+    "/{spec_id}/runs/{run_id}/resume", response_model=AgentRunPublic, status_code=202
+)
+async def resume_run(
+    project_id: str,
+    spec_id: str,
+    run_id: str,
+    request: Request,
+    user: CurrentUser = Depends(require_project_role(ProjectRole.MEMBER.value)),
+    db: AsyncSession = Depends(get_db),
+) -> AgentRunPublic:
+    """Resume a run a server restart interrupted, where it stopped.
+
+    The same phase again, with the same model, by the caller and with the
+    permission starting it takes (``_launch``): a spec is written again, a
+    build re-enters its plan at the first subtask not done, QA runs again.
+    Only the person who started it or an owner of the project may, and only
+    while it is still offered (``server/services/interrupted_runs.py``). A
+    build that started approved keeps that approval over the progress it
+    wrote, as a build that ended does.
+    """
+    from server.services import interrupted_runs
+    from server.services.run_manager import keep_approval
+
+    _require(request, "agent.execute")
+    old = await db.get(AgentRun, run_id)
+    if old is None or old.spec_id != spec_id:
+        raise HTTPException(status_code=404, detail="Run not found for this spec")
+    if not interrupted_runs.may_answer(old, user.id, effective_project_role(request)):
+        raise HTTPException(
+            status_code=403,
+            detail="Only who started this run or an owner of the project resumes it",
+        )
+    if not await interrupted_runs.is_offered(db, old):
+        raise HTTPException(
+            status_code=409, detail="This run is no longer waiting to be resumed"
+        )
+    phase, started_approved = old.phase, old.started_approved
+
+    def carry(project: Project, spec: SpecIndex) -> None:
+        if phase == "build" and started_approved:
+            keep_approval(
+                Path(project.server_path) / ".workpilot" / "specs" / spec.spec_name
+            )
+
+    spec, run = await _launch(
+        db, request, user, project_id, spec_id, phase, old.model, None, carry
+    )
+    old.resume_answered_at = datetime.now(UTC)
+    db.add(
+        AuditLog(
+            user_id=user.id,
+            project_id=project_id,
+            action="spec.run.resumed",
+            payload={
+                "spec": spec.spec_name,
+                "phase": phase,
+                "run_id": run.id,
+                "resumed": run_id,
+            },
         )
     )
     await db.commit()
