@@ -5,18 +5,27 @@
  * whether a feature was already built, even partly.
  */
 
-import { Archive, ArrowUp, Loader2, MessageSquareText, RotateCcw, Search, Sparkles } from "lucide-react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { Archive, ArrowUp, Languages, Loader2, MessageSquareText, RotateCcw, Search, Sparkles } from "lucide-react";
+import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { BoardAskCoverage, BoardAskMatch, BoardAskState, Task } from "../../../../shared/types";
-import { BOARD_ASK_LIMITS } from "../../../../shared/types/board-ask";
+import type {
+	BoardAskCoverage,
+	BoardAskMatch,
+	BoardAskResult,
+	BoardAskSemanticMode,
+	BoardAskState,
+	Task,
+} from "../../../../shared/types";
+import { BOARD_ASK_LIMITS, BOARD_ASK_SEMANTIC_MODES } from "../../../../shared/types/board-ask";
 import { formatAppDate } from "../../../lib/date-format";
 import { cn } from "../../../lib/utils";
 import { type BoardAskEntry, useBoardAskStore } from "../../../stores/board-ask-store";
+import { saveSettings, useSettingsStore } from "../../../stores/settings-store";
 import { useTaskStore } from "../../../stores/task-store";
 import { Chip, type Tone } from "../../charter";
 import { Button } from "../../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../ui/dialog";
+import { NativeSelect } from "../../ui/native-select";
 import { Textarea } from "../../ui/textarea";
 
 const EMPTY: BoardAskEntry[] = [];
@@ -76,6 +85,72 @@ function AnswerText({
 				);
 			})}
 		</p>
+	);
+}
+
+/** How the tickets were found: the model's answer, by meaning, or by keywords. */
+function ModeLine({ result }: { readonly result: BoardAskResult }) {
+	const { t } = useTranslation(["tasks"]);
+	const semantic = result.semantic;
+	return (
+		<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-muted-foreground">
+			{result.mode === "ai" && (
+				<span className="inline-flex items-center gap-1 font-medium text-primary">
+					<Sparkles className="h-3 w-3" aria-hidden />
+					{t("kanban.ask.modeAi")}
+				</span>
+			)}
+			{result.mode === "semantic" && (
+				<span className="inline-flex items-center gap-1 font-medium">
+					<Languages className="h-3 w-3" aria-hidden />
+					{t("kanban.ask.modeSemantic")}
+				</span>
+			)}
+			{result.mode === "keywords" && (
+				<span className="inline-flex items-center gap-1 font-medium">
+					<Search className="h-3 w-3" aria-hidden />
+					{t("kanban.ask.modeKeywords")}
+				</span>
+			)}
+			<span>{t("kanban.ask.searched", { count: result.searched })}</span>
+			{semantic && (
+				<span title={t("kanban.ask.semanticTitle")}>
+					{t(`kanban.ask.semanticSource.${semantic.kind}`, {
+						model: semantic.model,
+						provider: semantic.provider,
+					})}
+				</span>
+			)}
+			{semantic && semantic.indexed < semantic.total && (
+				<span>{t("kanban.ask.semanticPartial", { indexed: semantic.indexed, total: semantic.total })}</span>
+			)}
+		</div>
+	);
+}
+
+/** Whether the tickets are also ranked by meaning, saved in the settings. */
+function SemanticModeSelect() {
+	const { t } = useTranslation(["tasks"]);
+	const value = useSettingsStore((s) => s.settings.boardAskSemantic) ?? "auto";
+	const id = useId();
+	return (
+		<div className="flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground">
+			<Languages className="h-3.5 w-3.5" aria-hidden />
+			<label htmlFor={id}>{t("kanban.ask.semanticMode.label")}</label>
+			<NativeSelect
+				id={id}
+				value={value}
+				onChange={(event) => void saveSettings({ boardAskSemantic: event.target.value as BoardAskSemanticMode })}
+				className="h-7 px-1.5 text-2xs"
+				title={t(`kanban.ask.semanticMode.hint.${value}`)}
+			>
+				{BOARD_ASK_SEMANTIC_MODES.map((mode) => (
+					<option key={mode} value={mode}>
+						{t(`kanban.ask.semanticMode.${mode}`)}
+					</option>
+				))}
+			</NativeSelect>
+		</div>
 	);
 }
 
@@ -176,23 +251,12 @@ function EntryView({
 			)}
 			{result && (
 				<div className="space-y-3 rounded-2xl rounded-bl-md border border-border/60 bg-muted/30 p-3.5">
-					<div className="flex flex-wrap items-center gap-2 text-2xs text-muted-foreground">
-						{result.mode === "ai" ? (
-							<span className="inline-flex items-center gap-1 font-medium text-primary">
-								<Sparkles className="h-3 w-3" aria-hidden />
-								{t("kanban.ask.modeAi")}
-							</span>
-						) : (
-							<span className="inline-flex items-center gap-1 font-medium">
-								<Search className="h-3 w-3" aria-hidden />
-								{t("kanban.ask.modeKeywords")}
-							</span>
-						)}
-						<span>{t("kanban.ask.searched", { count: result.searched })}</span>
-					</div>
+					<ModeLine result={result} />
 					{result.answer && <AnswerText answer={result.answer} matches={result.matches} onCite={cite} />}
-					{result.mode === "keywords" && result.matches.length > 0 && (
-						<p className="text-xs text-muted-foreground">{t("kanban.ask.keywordsHint")}</p>
+					{result.mode !== "ai" && result.matches.length > 0 && (
+						<p className="text-xs text-muted-foreground">
+							{t(result.mode === "semantic" ? "kanban.ask.semanticHint" : "kanban.ask.keywordsHint")}
+						</p>
 					)}
 					{result.matches.length === 0 && !result.answer && (
 						<p className="text-sm text-muted-foreground">{t("kanban.ask.noMatch")}</p>
@@ -324,8 +388,9 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 							{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
 						</Button>
 					</div>
-					<div className="flex items-center justify-between gap-3">
-						<p className="text-2xs text-muted-foreground">{t("kanban.ask.privacy")}</p>
+					<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+						<p className="min-w-0 flex-1 basis-64 text-2xs text-muted-foreground">{t("kanban.ask.privacy")}</p>
+						<SemanticModeSelect />
 						{entries.length > 0 && (
 							<Button
 								variant="ghost"
