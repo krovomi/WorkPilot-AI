@@ -3342,6 +3342,18 @@
 				"addAndSignIn": "Ajouter et se connecter",
 				"deleteDescription": "Son dossier de connexion reste sur le disque ; WorkPilot cesse de l'utiliser."
 			}
+		},
+		"spend": {
+			"month": "Ce mois-ci : {{cost}} · {{tokens}} tokens",
+			"monthShort": "Dépensé ce mois-ci",
+			"floor": "(au moins)",
+			"floorHint": "Des sessions ont utilisé des tokens sans prix connu : le coût réel est plus élevé.",
+			"noBudget": "Aucun budget mensuel",
+			"budget": "{{pct}} % de {{budget}} par mois",
+			"editBudget": "Fixer le budget mensuel",
+			"budgetLabel": "Budget mensuel en dollars US",
+			"budgetPlaceholder": "ex. 50 (vide : aucun)",
+			"invalid": "Saisis un montant en dollars, ou laisse vide pour aucun budget."
 		}
 	},
 	"governance": {

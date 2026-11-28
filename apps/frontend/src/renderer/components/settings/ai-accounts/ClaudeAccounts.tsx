@@ -6,14 +6,17 @@
  */
 
 import type { ClaudeProfile } from "@shared/types";
+import { claudeAccountKey } from "@shared/types/ai-account-usage";
 import { Check, Loader2, LogIn, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Input, Label } from "@/components/ui";
 import { confirmAction } from "@/components/ui/confirm-dialog";
+import { useAiAccountUsageStore } from "@/stores/ai-account-usage-store";
 import { loadClaudeProfiles, useClaudeProfileStore } from "@/stores/claude-profile-store";
 import { Chip, Notice } from "../../charter";
 import { AuthTerminal } from "../AuthTerminal";
+import { AccountSpend } from "./AccountSpend";
 
 interface SignIn {
 	terminalId: string;
@@ -43,6 +46,7 @@ export function ClaudeAccounts() {
 
 	useEffect(() => {
 		void loadClaudeProfiles();
+		void useAiAccountUsageStore.getState().load();
 	}, []);
 
 	const run = useCallback(
@@ -216,6 +220,7 @@ export function ClaudeAccounts() {
 									? profile.email || t("aiAccounts.accounts.claude.signedIn")
 									: t("aiAccounts.accounts.claude.signedOut")}
 							</p>
+							<AccountSpend accountKey={claudeAccountKey(profile.id)} />
 						</div>
 						<div className="flex flex-wrap gap-2">
 							{!isDefault && signedIn && (

@@ -92,6 +92,18 @@ describe("workspace ledgers", () => {
 		expect(readUsages(project).map((u) => u.provider)).toEqual(["openai"]);
 	});
 
+	it("keeps the AI account a session names, when it is a plain label", () => {
+		write(".workpilot/cost_data.json", {
+			usages: [
+				{ provider: "openai", input_tokens: 1, output_tokens: 1, cost: 0.01, timestamp: at, account_id: "acc-1" },
+				{ provider: "claude", input_tokens: 1, output_tokens: 1, cost: 0.01, timestamp: at, account_id: "claude:work" },
+				{ provider: "openai", input_tokens: 1, output_tokens: 1, cost: 0.01, timestamp: at, account_id: "a b/../c" },
+				{ provider: "openai", input_tokens: 1, output_tokens: 1, cost: 0.01, timestamp: at, account_id: 3 },
+			],
+		});
+		expect(readUsages(project).map((u) => u.account_id)).toEqual(["acc-1", "claude:work", undefined, undefined]);
+	});
+
 	it("is empty, not broken, for a project with no ledger or a garbage one", () => {
 		write(".workpilot/cost_data.json", { usages: [null, "x", { provider: "a" }, { timestamp: at, cost: -5, input_tokens: "9" }] });
 		write(".workpilot/dashboard_snapshot.json", "not an object");
