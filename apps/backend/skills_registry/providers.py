@@ -59,6 +59,53 @@ class SandboxSpec:
     # Files inside `state` the agent must not change (pi's trust.json: the
     # trust a person grants), kept read-only when they exist.
     read_only: tuple[str, ...] = ()
+    # How the CLI runs inside the task's Docker Sandboxes microVM, when the
+    # person turned that on; None: it stays on the host.
+    microvm: MicrovmSpec | None = None
+
+
+_COMMAND_NAME = re.compile(r"^[a-z][a-z0-9._-]*$")
+
+
+@dataclass(frozen=True)
+class MicrovmSpec:
+    """A CLI inside the microVM (`os_sandbox.microvm`, `cli_subprocess`).
+
+    ``command`` is its name in the VM; ``install`` the ``sh`` line that puts
+    it there, run once per VM; ``secrets`` the sbx service of each API key the
+    CLI can use and the variables it reads it from. In the VM those variables
+    hold a placeholder: the sbx proxy adds the real key to the request, so no
+    key ever enters the VM, and none is copied by WorkPilot.
+    """
+
+    command: str
+    install: str
+    secrets: tuple[tuple[str, tuple[str, ...]], ...] = ()
+
+
+def _parse_microvm(name: str, raw: object) -> MicrovmSpec | None:
+    if raw is None:
+        return None
+    from os_sandbox.microvm import SBX_SERVICES
+
+    where = f"providers.yaml: {name}.sandbox.microvm"
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be a mapping")
+    command = str(raw.get("command") or "")
+    if not _COMMAND_NAME.match(command):
+        raise ValueError(f"{where}.command {command!r} is not a command name")
+    install = str(raw.get("install") or "").strip()
+    if not install or "\n" in install or "\0" in install:
+        raise ValueError(f"{where}.install must be one sh line")
+    secrets: list[tuple[str, tuple[str, ...]]] = []
+    for service, names in (raw.get("secrets") or {}).items():
+        if service not in SBX_SERVICES:
+            raise ValueError(f"{where}.secrets: {service!r} is not a sbx service")
+        variables = tuple(str(n) for n in (names or ()))
+        if not variables or not all(_ENV_NAME.match(n) for n in variables):
+            raise ValueError(f"{where}.secrets.{service} must list variable names")
+        secrets.append((str(service), variables))
+    return MicrovmSpec(command=command, install=install, secrets=tuple(secrets))
 
 
 def _parse_sandbox(name: str, raw: object) -> SandboxSpec | None:
@@ -81,7 +128,12 @@ def _parse_sandbox(name: str, raw: object) -> SandboxSpec | None:
             raise ValueError(
                 f"providers.yaml: {name}.sandbox.network entry {entry!r} is not a host"
             )
-    return SandboxSpec(state=state, network=network, read_only=read_only)
+    return SandboxSpec(
+        state=state,
+        network=network,
+        read_only=read_only,
+        microvm=_parse_microvm(name, raw.get("microvm")),
+    )
 
 
 #: What may appear in an ACP agent's launch vector, a mode id or a method id:

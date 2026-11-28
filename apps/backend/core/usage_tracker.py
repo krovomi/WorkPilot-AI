@@ -27,6 +27,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+from foundation.ai_account import account_for
 from foundation.json_ledger import update_json
 from foundation.usage_channel import report as report_to_server
 
@@ -353,6 +354,10 @@ def _append_cost_data(
         "usage_source": usage_source,
         "timestamp": datetime.now(UTC).isoformat(),
     }
+    # The app's AI account this session ran on, for the spend per account.
+    account = account_for(provider)
+    if account:
+        record["account_id"] = account
 
     def change(data: object) -> dict:
         if not isinstance(data, dict):

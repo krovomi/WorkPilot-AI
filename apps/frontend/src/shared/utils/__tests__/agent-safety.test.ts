@@ -59,11 +59,16 @@ describe("normalizeAgentSafety", () => {
 	});
 
 	it("keeps the microVM off unless turned on, and bounds its size", () => {
-		expect(normalizeAgentSafety({}).sandbox.microvm).toEqual({ enabled: false, memoryGb: 0, cpus: 0 });
+		expect(normalizeAgentSafety({}).sandbox.microvm).toEqual({
+			enabled: false,
+			memoryGb: 0,
+			cpus: 0,
+			cliAgents: false,
+		});
 		expect(
 			normalizeAgentSafety({ sandbox: { microvm: { enabled: true, memoryGb: 1e6, cpus: -1 } } }).sandbox
 				.microvm,
-		).toEqual({ enabled: true, memoryGb: MAX_VM_MEMORY_GB, cpus: 0 });
+		).toEqual({ enabled: true, memoryGb: MAX_VM_MEMORY_GB, cpus: 0, cliAgents: false });
 		expect(normalizeAgentSafety({ sandbox: { microvm: { enabled: "on" } } }).sandbox.microvm.enabled).toBe(
 			false,
 		);

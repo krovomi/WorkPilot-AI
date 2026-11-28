@@ -54,6 +54,8 @@ class MicrovmSettings:
     memory_gb: int = 0
     #: CPUs of each task's VM; ``0`` sizes it from the machine.
     cpus: int = 0
+    #: Agent CLIs (OpenCode…) run in the VM too, keyed by sbx's own secrets.
+    cli_agents: bool = False
 
 
 @dataclass(frozen=True)
@@ -188,6 +190,7 @@ def parse_settings(raw: Any) -> AgentSafetySettings:
             enabled=_bool(vm, "enabled", False),
             memory_gb=_int(vm, "memoryGb", 0, 0, MAX_VM_MEMORY_GB),
             cpus=_int(vm, "cpus", 0, 0, MAX_VM_CPUS),
+            cli_agents=_bool(vm, "cliAgents", False),
         ),
     )
 

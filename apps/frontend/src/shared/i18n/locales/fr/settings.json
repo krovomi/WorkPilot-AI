@@ -470,6 +470,8 @@
 				"memoryHint": "Auto : une part de la mémoire libre, entre 2 et 16 Gio.",
 				"cpus": "Processeurs par tâche",
 				"cpusHint": "Auto : la moitié des cœurs de la machine.",
+				"cliAgents": "Lancer aussi les CLI d'agents dans la microVM (expérimental)",
+				"cliAgentsHint": "OpenCode tourne dans la microVM de la tâche, avec les seules clés d'API que vous avez rangées dans sbx (sbx secret set openai, anthropic…) : le proxy de sbx les ajoute, la VM ne les voit jamais. Sans clé dans sbx, ou avec une connexion par abonnement, le CLI reste sur cette machine dans le bac à sable de l'OS, et la carte le dit.",
 				"auto": "auto",
 				"requirements": "Demande la commande sbx (Windows : winget install -h Docker.sbx ; macOS : brew install docker/tap/sbx) et un compte Docker : lance sbx login une fois. Sous Windows, active la plateforme d'hyperviseur Windows. WorkPilot coupe la télémétrie de sbx ; aucun code ni prompt ne quitte la machine. Dans cette version, les commandes de la boucle WorkPilot (OpenAI, Google, Mistral, Copilot, modèles locaux…) tournent dans la VM ; les agents en CLI gardent le bac à sable de l'OS.",
 				"status": {
@@ -3342,6 +3344,18 @@
 				"addAndSignIn": "Ajouter et se connecter",
 				"deleteDescription": "Son dossier de connexion reste sur le disque ; WorkPilot cesse de l'utiliser."
 			}
+		},
+		"spend": {
+			"month": "Ce mois-ci : {{cost}} · {{tokens}} tokens",
+			"monthShort": "Dépensé ce mois-ci",
+			"floor": "(au moins)",
+			"floorHint": "Des sessions ont utilisé des tokens sans prix connu : le coût réel est plus élevé.",
+			"noBudget": "Aucun budget mensuel",
+			"budget": "{{pct}} % de {{budget}} par mois",
+			"editBudget": "Fixer le budget mensuel",
+			"budgetLabel": "Budget mensuel en dollars US",
+			"budgetPlaceholder": "ex. 50 (vide : aucun)",
+			"invalid": "Saisis un montant en dollars, ou laisse vide pour aucun budget."
 		}
 	},
 	"governance": {
