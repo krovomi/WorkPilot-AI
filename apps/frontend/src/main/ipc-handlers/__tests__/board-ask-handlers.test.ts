@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
 	projects: new Map<string, { id: string; path: string }>(),
 	tasks: [] as unknown[],
 	server: new Set<string>(),
+	remote: vi.fn(),
 	oneShot: vi.fn(),
 	semanticOptions: [] as unknown[],
 	semantic: vi.fn(),
@@ -33,7 +34,11 @@ vi.mock("../../project-store", () => ({
 		getTasks: () => state.tasks,
 	},
 }));
-vi.mock("../../server-projects", () => ({ getServerProject: (id: unknown) => (state.server.has(id as string) ? {} : undefined) }));
+vi.mock("../../server-projects", () => ({
+	getServerProject: (id: unknown) =>
+		state.server.has(id as string) ? { id, path: "/user-data/server-mirror" } : undefined,
+}));
+vi.mock("../../remote-board", () => ({ getRemoteTasks: state.remote }));
 vi.mock("../../app-language", () => ({ getAppLanguage: () => "fr" }));
 vi.mock("../../oneshot-llm", () => ({ runOneShotLLM: state.oneShot }));
 vi.mock("../../board-ask/sources", () => ({
@@ -77,6 +82,8 @@ beforeEach(() => {
 		},
 	];
 	state.server = new Set();
+	state.remote.mockReset();
+	state.remote.mockResolvedValue({ success: false, error: "offline" });
 	state.oneShot.mockReset();
 	state.oneShot.mockResolvedValue(null);
 	state.semanticOptions = [];
@@ -119,11 +126,27 @@ describe("parseBoardAskRequest", () => {
 });
 
 describe("handleBoardAsk", () => {
-	it("refuses an unknown project and a server board", async () => {
+	it("refuses an unknown project, and a server board it cannot read", async () => {
 		expect(await handleBoardAsk({ projectId: "nope", question: "q" })).toEqual({ success: false, error: "Unknown project" });
-		state.server.add("p1");
-		expect(await handleBoardAsk({ projectId: "p1", question: "q" })).toEqual({ success: false, error: "server_project" });
+		state.server.add("s1");
+		expect(await handleBoardAsk({ projectId: "s1", question: "q" })).toEqual({ success: false, error: "server_unreachable" });
+		state.remote.mockResolvedValueOnce({ success: true });
+		expect(await handleBoardAsk({ projectId: "s1", question: "q" })).toEqual({ success: false, error: "server_unreachable" });
 		expect(state.oneShot).not.toHaveBeenCalled();
+	});
+
+	it("asks a server board on the cards the server sends, in its mirror, without the local sources", async () => {
+		state.server.add("s1");
+		state.remote.mockResolvedValue({ success: true, data: state.tasks });
+		const result = await handleBoardAsk({ projectId: "s1", question: "export csv" }, undefined, undefined);
+		expect(state.remote).toHaveBeenCalledWith({ id: "s1", path: "/user-data/server-mirror" });
+		expect(result.success && result.data?.matches.map((m) => m.taskId)).toEqual(["t1"]);
+		expect(state.oneShot).toHaveBeenCalledWith(expect.objectContaining({ projectDir: "/user-data/server-mirror" }));
+		expect(state.semanticOptions).toEqual([{ projectDir: "/user-data/server-mirror", mode: "auto" }]);
+		expect(state.sourceCalls).toEqual([]);
+		const idea = await handleBoardIdea({ projectId: "s1", idea: "Export CSV" }, undefined, undefined);
+		expect(idea.success && idea.data?.searched).toBe(1);
+		expect(state.rankingsOptions).toEqual([{ projectDir: "/user-data/server-mirror", mode: "auto" }]);
 	});
 
 	it("asks the active provider in the project's folder and answers by keywords without it", async () => {
@@ -200,10 +223,10 @@ describe("handleBoardIdea", () => {
 			success: false,
 			error: "Unknown project",
 		});
-		state.server.add("p1");
-		expect(await handleBoardIdea({ projectId: "p1", idea: "export" })).toEqual({
+		state.server.add("s1");
+		expect(await handleBoardIdea({ projectId: "s1", idea: "export" })).toEqual({
 			success: false,
-			error: "server_project",
+			error: "server_unreachable",
 		});
 		expect(state.oneShot).not.toHaveBeenCalled();
 	});

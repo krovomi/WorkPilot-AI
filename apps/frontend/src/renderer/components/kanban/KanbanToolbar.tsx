@@ -185,9 +185,9 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 			</div>
 
 			{/* A question about the board, answered with its related tickets. A
-			    server board is asked on the server, in a later lot. */}
-			{!serverProject && projectId && (
-				<BoardAskButton projectId={projectId} onOpenTask={onOpenTask} />
+			    server board's cards are read from the server, with the person's rights. */}
+			{projectId && (
+				<BoardAskButton projectId={projectId} onOpenTask={onOpenTask} serverBoard={Boolean(serverProject)} />
 			)}
 
 			{/* One split group shown alone (a click on a part's badge) */}

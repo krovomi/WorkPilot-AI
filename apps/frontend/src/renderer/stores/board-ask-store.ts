@@ -14,7 +14,7 @@ export interface BoardAskEntry {
 	question: string;
 	status: "pending" | "done" | "error";
 	result?: BoardAskResult;
-	/** `server_project`, or the error the main process gave. */
+	/** `server_unreachable`, or the error the main process gave. */
 	error?: string;
 }
 
@@ -24,7 +24,7 @@ export interface BoardIdeaCheck {
 	idea: string;
 	status: "pending" | "done" | "error";
 	result?: BoardIdeaResult;
-	/** `server_project`, or the error the main process gave. */
+	/** `server_unreachable`, or the error the main process gave. */
 	error?: string;
 	/** The card created with what is missing, once it is. */
 	createdTaskId?: string;

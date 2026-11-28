@@ -20,7 +20,7 @@ déjà été développée, même en partie. Leub a retenu quatre lots.
 | 1 | le panneau, la recherche par mots-clés, le modèle pour comprendre et juger |
 | 2 | des embeddings multilingues quand un modèle est là (Ollama, LM Studio, API du provider) : [le sens](#le-sens-lot-2) |
 | 3 | « Vérifier une idée » : une fonctionnalité collée, sa couverture exigence par exigence : [l'idée](#vérifier-une-idée-lot-3) |
-| 4 | d'autres sources (roadmap, idées, PR et commits) : [les sources](#les-autres-sources-lot-4) ; puis le mode serveur, l'app mobile |
+| 4 | d'autres sources (roadmap, idées, PR et commits) : [les sources](#les-autres-sources-lot-4) ; les tableaux du serveur dans l'app de bureau ; puis l'app mobile |
 
 ## Pourquoi pas seulement des embeddings
 
@@ -170,8 +170,13 @@ dans les prompts cités, comme les cartes (S2).
 - **RGPD.** La question et les tickets ne vont qu'au provider déjà choisi dans les réglages, comme
   pour les autres analyses ; le mode hors-ligne strict s'applique par `runOneShotLLM`. La
   conversation vit en mémoire (`stores/board-ask-store.ts`) et n'est jamais écrite sur disque.
-- **Mode serveur.** Un tableau du serveur n'est pas interrogé ici (le bouton n'y est pas, le
-  handler répond `server_project`) : il le sera sur le serveur, avec sa permission, au lot 4.
+- **Mode serveur (lot 4).** Sur un tableau du serveur, les cartes viennent du serveur
+  (`getRemoteTasks`, `GET /api/board/snapshot`), qui n'envoie que celles que la personne peut
+  lire : sa permission de lecture du tableau est la barrière, côté serveur. La question, le
+  jugement et le sens se font ensuite sur cette machine, avec le provider de la personne, comme
+  pour un tableau local ; la roadmap, les idées et l'historique du serveur ne sont pas lus (le
+  pied du panneau le dit à la place du menu Sources). Sans réponse du serveur, le handler répond
+  `server_unreachable`. L'app mobile, qui n'a pas de modèle à elle, attend une route du serveur.
 
 ## Fichiers
 

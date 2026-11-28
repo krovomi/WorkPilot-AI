@@ -131,7 +131,7 @@ describe("IdeaCheckView", () => {
 
 	it("says when a server board or the check failed, and checks nothing empty", async () => {
 		checkBoardIdea
-			.mockResolvedValueOnce({ success: false, error: "server_project" })
+			.mockResolvedValueOnce({ success: false, error: "server_unreachable" })
 			.mockResolvedValueOnce({ success: false })
 			.mockRejectedValueOnce(new Error("ipc down"))
 			.mockRejectedValueOnce("ipc gone");

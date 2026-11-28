@@ -5,6 +5,7 @@
  * renderer. « Vérifier une idée » (lot 3) sends a project id and the feature
  * planned, and gets what the board already holds of it. Both read the other
  * sources of the project too (roadmap, ideas, merged changes: `sources.ts`).
+ * A server board is read from the server, with the caller's own rights.
  */
 
 import { ipcMain } from "electron";
@@ -16,12 +17,14 @@ import type {
 	BoardIdeaRequest,
 	BoardIdeaResult,
 	IPCResult,
+	Task,
 } from "../../shared/types";
 import { BOARD_ASK_LIMITS } from "../../shared/types/board-ask";
 import { getAppLanguage } from "../app-language";
 import { askBoard, type CompletionFn } from "../board-ask/board-ask-service";
 import { checkIdea } from "../board-ask/idea-check";
 import { readBoardSources, readBoardSourcesSetting } from "../board-ask/sources";
+import type { BoardTicket } from "../board-ask/tickets";
 import {
 	createSemanticRankings,
 	createSemanticSearch,
@@ -31,6 +34,7 @@ import {
 } from "../board-ask/semantic-search";
 import { runOneShotLLM } from "../oneshot-llm";
 import { projectStore } from "../project-store";
+import { getRemoteTasks } from "../remote-board";
 import { getServerProject } from "../server-projects";
 
 const COMPLETION_TIMEOUT_MS = 60_000;
@@ -79,11 +83,32 @@ export function parseBoardIdeaRequest(raw: unknown): BoardIdeaRequest | string {
 	return { projectId, idea: idea.trim() };
 }
 
-/** The local project a request names, or why it is refused. */
-function localProject(projectId: string) {
-	// A server board is asked on the server (a later lot): its cards are not read here.
-	if (getServerProject(projectId)) return "server_project";
-	return projectStore.getProject(projectId) ?? "Unknown project";
+interface Board {
+	projectDir: string;
+	tasks: Task[];
+	sources: BoardTicket[];
+}
+
+/**
+ * The board a request names, or why it is refused. A server board's cards
+ * come from the server, which only sends those its caller may read; its
+ * roadmap, ideas and history stay on the server and are not read here.
+ */
+async function boardOf(projectId: string): Promise<Board | string> {
+	const server = getServerProject(projectId);
+	if (server) {
+		const remote = await getRemoteTasks(server);
+		if (!remote.success || !remote.data) return "server_unreachable";
+		return { projectDir: server.path, tasks: remote.data, sources: [] };
+	}
+	const project = projectStore.getProject(projectId);
+	if (!project) return "Unknown project";
+	const tasks = projectStore.getTasks(project.id);
+	return {
+		projectDir: project.path,
+		tasks,
+		sources: await readBoardSources(project.path, tasks, readBoardSourcesSetting()),
+	};
 }
 
 function completionIn(projectDir: string): CompletionFn {
@@ -104,21 +129,19 @@ export async function handleBoardAsk(
 ): Promise<IPCResult<BoardAskResult>> {
 	const request = parseBoardAskRequest(raw);
 	if (typeof request === "string") return { success: false, error: request };
-	const project = localProject(request.projectId);
-	if (typeof project === "string") return { success: false, error: project };
+	const board = await boardOf(request.projectId);
+	if (typeof board === "string") return { success: false, error: board };
 
-	const run = complete ?? completionIn(project.path);
-	const tasks = projectStore.getTasks(project.id);
 	const data = await askBoard({
-		tasks,
-		sources: await readBoardSources(project.path, tasks, readBoardSourcesSetting()),
+		tasks: board.tasks,
+		sources: board.sources,
 		question: request.question,
 		history: request.history,
 		appLanguage: getAppLanguage(),
-		complete: run,
+		complete: complete ?? completionIn(board.projectDir),
 		semantic:
 			semantic === undefined
-				? createSemanticSearch({ projectDir: project.path, mode: readSemanticMode() })
+				? createSemanticSearch({ projectDir: board.projectDir, mode: readSemanticMode() })
 				: (semantic ?? undefined),
 	});
 	return { success: true, data };
@@ -131,19 +154,18 @@ export async function handleBoardIdea(
 ): Promise<IPCResult<BoardIdeaResult>> {
 	const request = parseBoardIdeaRequest(raw);
 	if (typeof request === "string") return { success: false, error: request };
-	const project = localProject(request.projectId);
-	if (typeof project === "string") return { success: false, error: project };
+	const board = await boardOf(request.projectId);
+	if (typeof board === "string") return { success: false, error: board };
 
-	const tasks = projectStore.getTasks(project.id);
 	const data = await checkIdea({
-		tasks,
-		sources: await readBoardSources(project.path, tasks, readBoardSourcesSetting()),
+		tasks: board.tasks,
+		sources: board.sources,
 		idea: request.idea,
 		appLanguage: getAppLanguage(),
-		complete: complete ?? completionIn(project.path),
+		complete: complete ?? completionIn(board.projectDir),
 		semantic:
 			semantic === undefined
-				? createSemanticRankings({ projectDir: project.path, mode: readSemanticMode() })
+				? createSemanticRankings({ projectDir: board.projectDir, mode: readSemanticMode() })
 				: (semantic ?? undefined),
 	});
 	return { success: true, data };

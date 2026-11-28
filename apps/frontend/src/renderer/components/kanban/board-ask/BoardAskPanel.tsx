@@ -17,7 +17,7 @@ import { useTaskStore } from "../../../stores/task-store";
 import { Button } from "../../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../ui/dialog";
 import { Textarea } from "../../ui/textarea";
-import { MatchRow, ModeLine, matchElementId, SemanticModeSelect, SourcesMenu } from "./board-ask-parts";
+import { BoardSources, MatchRow, ModeLine, matchElementId, SemanticModeSelect } from "./board-ask-parts";
 import { IdeaCheckView } from "./IdeaCheckView";
 
 const EMPTY: BoardAskEntry[] = [];
@@ -94,7 +94,7 @@ function EntryView({
 			)}
 			{entry.status === "error" && (
 				<p className="text-sm text-destructive" role="alert">
-					{entry.error === "server_project" ? t("kanban.ask.serverProject") : t("kanban.ask.failed")}
+					{entry.error === "server_unreachable" ? t("kanban.ask.serverUnreachable") : t("kanban.ask.failed")}
 				</p>
 			)}
 			{result && (
@@ -162,9 +162,11 @@ function TabSwitch({ tab, onChange }: { readonly tab: BoardAskTab; readonly onCh
 export interface BoardAskPanelProps {
 	readonly projectId: string;
 	readonly onOpenTask?: (task: Task) => void;
+	/** A board of the server: its cards only, read from the server. */
+	readonly serverBoard?: boolean;
 }
 
-export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
+export function BoardAskPanel({ projectId, onOpenTask, serverBoard = false }: BoardAskPanelProps) {
 	const { t } = useTranslation(["tasks", "common"]);
 	const open = useBoardAskStore((s) => s.open);
 	const setOpen = useBoardAskStore((s) => s.setOpen);
@@ -223,7 +225,7 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 				<TabSwitch tab={tab} onChange={setTab} />
 
 				{tab === "idea" ? (
-					<IdeaCheckView projectId={projectId} onOpenTask={openTask} />
+					<IdeaCheckView projectId={projectId} onOpenTask={openTask} serverBoard={serverBoard} />
 				) : (
 				<>
 				<div ref={listRef} className="-mx-6 min-h-0 flex-1 space-y-5 overflow-y-auto border-y border-border/60 px-6 py-4">
@@ -276,7 +278,7 @@ export function BoardAskPanel({ projectId, onOpenTask }: BoardAskPanelProps) {
 					</div>
 					<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
 						<p className="min-w-0 flex-1 basis-64 text-2xs text-muted-foreground">{t("kanban.ask.privacy")}</p>
-						<SourcesMenu />
+						<BoardSources serverBoard={serverBoard} />
 						<SemanticModeSelect />
 						{entries.length > 0 && (
 							<Button

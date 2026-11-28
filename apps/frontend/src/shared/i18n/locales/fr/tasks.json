@@ -595,7 +595,7 @@
 			"send": "Envoyer",
 			"searching": "Lecture des tickets…",
 			"failed": "La question n'a pas pu aboutir. Réessayez dans un instant.",
-			"serverProject": "Un tableau du serveur ne peut pas encore être interrogé.",
+			"serverUnreachable": "Les cartes du serveur n'ont pas pu être lues. Vérifiez la connexion au serveur et réessayez.",
 			"modeAi": "Réponse de l'IA",
 			"modeKeywords": "Recherche par mots-clés",
 			"keywordsHint": "Pas de réponse de l'IA (aucun provider, ou il n'a pas répondu) : ces tickets partagent des mots avec la question.",
@@ -701,7 +701,8 @@
 				"cards": "Cartes du tableau",
 				"roadmap": "Fonctionnalités de la roadmap",
 				"ideas": "Idées d'Ideation",
-				"history": "Changements fusionnés dans la branche (historique git)"
+				"history": "Changements fusionnés dans la branche (historique git)",
+				"serverBoard": "Les cartes du serveur, selon vos droits"
 			}
 		},
 		"lanes": {
