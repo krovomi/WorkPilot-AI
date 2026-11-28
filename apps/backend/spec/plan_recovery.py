@@ -591,3 +591,34 @@ def write_recovered_plan(spec_dir: Path, recovered: RecoveredPlan) -> bool:
             # The promotion is what mattered; a leftover copy is cosmetic.
             pass
     return True
+
+
+# --------------------------------------------------------------------------- #
+# Saying why there is no plan
+# --------------------------------------------------------------------------- #
+
+# A planner's answer short enough to be a provider's own message (an API
+# error, a refused model) rather than a plan written as prose.
+_SHORT_ANSWER_CHARS = 300
+
+
+def invalid_plan_message(
+    provider_hint: str = "", response_text: str | None = None
+) -> str:
+    """The line a build that found no plan ends on.
+
+    The schema sentence alone sent people looking at the model's output format
+    when the turn had no plan in it at all: a provider that refuses the model,
+    an error it sent back as text. When the planner's last answer is short, it is quoted, so the card
+    says what the provider actually answered. Secrets are masked first.
+    """
+    message = (
+        "Planning failed: the model did not produce a valid "
+        "implementation_plan.json (unparseable or missing `phases`)." + provider_hint
+    )
+    answer = " ".join((response_text or "").split())
+    if answer and len(answer) <= _SHORT_ANSWER_CHARS:
+        from foundation.log_redaction import redact_text
+
+        return message + f" The planner's last answer was: «{redact_text(answer)}»"
+    return message

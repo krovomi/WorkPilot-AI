@@ -306,6 +306,25 @@ async def test_a_model_the_account_cannot_use_stops_the_loop(spec_dir: Path) -> 
 
 
 @pytest.mark.asyncio
+async def test_an_expired_sign_in_answered_as_text_pauses_for_a_new_one(
+    spec_dir: Path,
+) -> None:
+    """The CLI's 401 sentence is the account, not the model's answer: read as
+    one, three of them failed planning with "missing `phases`"."""
+    text = (
+        "Failed to authenticate. API Error: 401 OAuth access token has expired. "
+        "Re-authenticate to continue."
+    )
+    client = _SdkClient([AssistantMessage(TextBlock(text))])
+
+    status, response, error = await run_agent_session(client, "go", spec_dir)
+
+    assert status == "error"
+    assert error == {"type": "authentication", "message": text}
+    assert response == text
+
+
+@pytest.mark.asyncio
 async def test_a_prompt_too_long_answer_breaks_the_resume_chain(
     spec_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
