@@ -109,16 +109,19 @@ class SessionSandbox:
         *,
         cwd: Path | str | None = None,
         stdin: bool = False,
+        vm_env: dict[str, str] | None = None,
     ) -> tuple[list[str], dict[str, str]]:
         """`argv` and `env` as launched: under the sandbox when it is on.
 
         `stdin`: the command reads its stdin (a microVM forwards it then).
+        `vm_env`: variables WorkPilot sets inside a microVM (`TaskVm.exec_argv`).
         """
         policy = self.policy
         if not self.isolated or policy is None:
             return list(argv), dict(env)
         if self.vm is not None:
-            return self.vm.exec_argv(list(argv), env, cwd, stdin=stdin), sbx_env(env)
+            argv = self.vm.exec_argv(list(argv), env, cwd, stdin=stdin, vm_env=vm_env)
+            return argv, sbx_env(env)
         if cwd is not None:
             policy = replace(policy, cwd=Path(cwd).resolve())
         command = sandboxed(list(argv), policy, env)

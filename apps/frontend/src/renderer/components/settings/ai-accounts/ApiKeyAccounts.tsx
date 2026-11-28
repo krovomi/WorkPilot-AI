@@ -14,8 +14,10 @@ import { useTranslation } from "react-i18next";
 import { Button, Input, Label } from "@/components/ui";
 import { confirmAction } from "@/components/ui/confirm-dialog";
 import { formatAppDateTime } from "@/lib/date-format";
+import { useAiAccountUsageStore } from "@/stores/ai-account-usage-store";
 import { aiAccountsOf, useAiAccountsStore } from "@/stores/ai-accounts-store";
 import { Chip, Notice } from "../../charter";
+import { AccountSpend } from "./AccountSpend";
 
 interface Draft {
 	id?: string;
@@ -126,6 +128,7 @@ export function ApiKeyAccounts({ provider, providerName }: ApiKeyAccountsProps) 
 
 	useEffect(() => {
 		void load();
+		void useAiAccountUsageStore.getState().load();
 	}, [load]);
 
 	const accounts = useMemo(() => aiAccountsOf(allAccounts, provider), [allAccounts, provider]);
@@ -250,6 +253,7 @@ export function ApiKeyAccounts({ provider, providerName }: ApiKeyAccountsProps) 
 										: t("aiAccounts.accounts.keySet")
 									: t("aiAccounts.accounts.noKey")}
 							</p>
+							<AccountSpend accountKey={account.id} />
 							{result && <TestLine result={result} />}
 						</div>
 						<div className="flex flex-wrap gap-2">

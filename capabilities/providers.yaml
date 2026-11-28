@@ -65,6 +65,12 @@
 #                          `127.0.0.1:port` a local endpoint
 #                 read_only files under `state` the agent may not change
 #                          (pi's trust.json), when they exist
+#                 microvm  how the CLI runs in the task's Docker Sandboxes
+#                          microVM when Settings > Sandbox allows it:
+#                          `command` (its name there), `install` (one line,
+#                          run once per VM), `secrets` (sbx service → the
+#                          CLI's key variables, set to sbx's placeholder;
+#                          the real key never leaves sbx)
 #               A CLI without this block is not sandboxed, and its card says so.
 #
 # Adding a real adapter for a provider is a strictly better outcome than
@@ -276,6 +282,20 @@ opencode:
       - ~/.config/opencode
       - ~/.cache/opencode
       - ~/.local/state/opencode
+    # With Settings > Sandbox > microVM > agent CLIs on: OpenCode runs in the
+    # task's microVM, for the keys the person stored in sbx (never copied by
+    # WorkPilot; the VM's variables hold a placeholder the sbx proxy replaces).
+    microvm:
+      command: opencode
+      install: npm install -g opencode-ai@latest
+      secrets:
+        anthropic: [ANTHROPIC_API_KEY]
+        openai: [OPENAI_API_KEY]
+        google: [GOOGLE_GENERATIVE_AI_API_KEY, GEMINI_API_KEY]
+        mistral: [MISTRAL_API_KEY]
+        groq: [GROQ_API_KEY]
+        openrouter: [OPENROUTER_API_KEY]
+        xai: [XAI_API_KEY]
     network: &llm_hosts
       - api.anthropic.com
       - console.anthropic.com

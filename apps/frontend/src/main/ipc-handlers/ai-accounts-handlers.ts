@@ -18,6 +18,7 @@ import {
 	type AiAccountTestResult,
 	type AiAccountView,
 } from "../../shared/types/ai-accounts";
+import { accountBudgetStore } from "../ai-accounts/account-budgets";
 import { hasMainKey } from "../ai-accounts/ai-account-key";
 import { aiAccountStore, isAiAccountProvider } from "../ai-accounts/ai-accounts";
 import { signInPlanOf } from "../ai-accounts/login-accounts";
@@ -77,9 +78,10 @@ export async function saveAiAccount(input: unknown): Promise<IPCResult<AiAccount
 export function deleteAiAccount(id: unknown): IPCResult {
 	const checked = accountId(id);
 	if (checked === null) return { success: false, error: "Invalid account" };
-	return aiAccountStore().delete(checked)
-		? { success: true }
-		: { success: false, error: "Account not found" };
+	if (!aiAccountStore().delete(checked)) return { success: false, error: "Account not found" };
+	// Its budget and alerts go with it.
+	accountBudgetStore().forget(checked);
+	return { success: true };
 }
 
 export function setDefaultAiAccount(provider: unknown, id: unknown): IPCResult {

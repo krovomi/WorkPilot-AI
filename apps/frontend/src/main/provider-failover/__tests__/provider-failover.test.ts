@@ -14,8 +14,29 @@ const manager = {
 	isProfileRateLimited: vi.fn(),
 };
 const profilesFile = { profiles: [] as Array<{ id: string; baseUrl: string; apiKey?: string }>, activeProfileId: null as string | null };
-const stopped = { value: null as null | { provider: string; projectId: string; specDirs: string[] } };
+const stopped = {
+	value: null as null | {
+		provider: string;
+		projectId: string;
+		specDirs: string[];
+		pinKey?: string;
+		pinnedAccount?: string;
+	},
+};
 const excluded = { value: [] as string[] };
+type Account = { id: string; provider: string; name: string; hasKey: boolean; createdAt: string };
+const aiAccounts = {
+	accounts: [] as Account[],
+	defaults: {} as Record<string, string>,
+	broken: false,
+};
+const account = (id: string, provider: string, hasKey = true): Account => ({
+	id,
+	provider,
+	name: id.toUpperCase(),
+	hasKey,
+	createdAt: "2026-11-28T00:00:00.000Z",
+});
 
 vi.mock("../../claude-profile-manager", () => ({ getClaudeProfileManager: () => manager }));
 vi.mock("../../services/profile/profile-manager", () => ({
@@ -26,8 +47,16 @@ vi.mock("../../ipc-handlers/task/resume-with-provider", () => ({ resumeTaskWithP
 vi.mock("../../app-logger", () => ({ appLog: { info: vi.fn(), warn: vi.fn() } }));
 vi.mock("../task-phase-provider", () => ({
 	FAILOVER_REQUEST_EVENT: "provider-failover-request",
+	accountPinKey: (provider: string) =>
+		provider === "anthropic" ? "claude" : ["openai", "mistral", "google"].includes(provider) ? provider : undefined,
 	excludedEntries: () => excluded.value,
 	stoppedTask: () => stopped.value,
+}));
+vi.mock("../../ai-accounts/ai-accounts", () => ({
+	aiAccountStore: () => {
+		if (aiAccounts.broken) throw new Error("unreadable");
+		return { list: () => aiAccounts.accounts, defaults: () => aiAccounts.defaults };
+	},
 }));
 
 import { resumeTaskWithProvider } from "../../ipc-handlers/task/resume-with-provider";
@@ -37,6 +66,8 @@ import {
 	FAILOVER_REQUEST_EVENT,
 	failoverEnabledFor,
 	failTaskOver,
+	isCoolingDown,
+	offClaudeEntry,
 	registerProviderFailover,
 	resetProviderFailoverState,
 } from "../provider-failover";
@@ -73,6 +104,9 @@ beforeEach(() => {
 	profilesFile.activeProfileId = null;
 	stopped.value = { provider: "anthropic", projectId: "p1", specDirs: [specDir] };
 	excluded.value = [];
+	aiAccounts.accounts = [];
+	aiAccounts.defaults = {};
+	aiAccounts.broken = false;
 	resume.mockResolvedValue({ success: true });
 });
 
@@ -107,6 +141,127 @@ describe("buildFailoverChain", () => {
 	it("falls back to the Claude accounts when no order was saved", () => {
 		expect(buildFailoverChain([], [claude("a"), claude("b")], []).map((c) => c.id)).toEqual(["oauth-a", "oauth-b"]);
 	});
+
+	it("places the AI accounts the order names, then the ones it does not name yet", () => {
+		const chain = buildFailoverChain(
+			["account-o2", "oauth-a", "account-gone"],
+			[claude("a")],
+			[],
+			[account("o1", "openai"), account("o2", "openai"), account("m1", "mistral")] as never,
+		);
+		expect(chain.map((c) => [c.id, c.provider])).toEqual([
+			["account-o2", "openai"],
+			["oauth-a", "anthropic"],
+			["account-o1", "openai"],
+			["account-m1", "mistral"],
+		]);
+	});
+});
+
+describe("offClaudeEntry", () => {
+	const accounts = [account("o1", "openai"), account("o2", "openai"), account("m1", "mistral")] as never;
+
+	it("is the pinned account, else the provider's default, else the provider", () => {
+		expect(offClaudeEntry({ provider: "openai", pinKey: "openai", pinnedAccount: "o2" }, accounts, { openai: "o1" })).toBe(
+			"account-o2",
+		);
+		expect(offClaudeEntry({ provider: "openai", pinKey: "openai" }, accounts, { openai: "o1" })).toBe("account-o1");
+		expect(offClaudeEntry({ provider: "openai", pinKey: "openai" }, accounts, {})).toBe("provider-openai");
+		expect(offClaudeEntry({ provider: "copilot" }, accounts, {})).toBe("provider-copilot");
+	});
+
+	it("ignores a pin or a default that names another provider's account, or none", () => {
+		expect(offClaudeEntry({ provider: "openai", pinKey: "openai", pinnedAccount: "m1" }, accounts, { openai: "m1" })).toBe(
+			"provider-openai",
+		);
+		expect(offClaudeEntry({ provider: "openai", pinKey: "openai", pinnedAccount: "gone" }, accounts, {})).toBe(
+			"provider-openai",
+		);
+	});
+});
+
+describe("failTaskOver across the accounts of one provider", () => {
+	const onOpenai = (pinnedAccount?: string) => ({
+		provider: "openai",
+		projectId: "p1",
+		specDirs: [specDir],
+		pinKey: "openai",
+		pinnedAccount,
+	});
+
+	beforeEach(() => {
+		stopped.value = onOpenai();
+		aiAccounts.accounts = [account("o1", "openai"), account("o2", "openai"), account("o3", "openai"), account("m1", "mistral")];
+		aiAccounts.defaults = { openai: "o1" };
+		manager.getAccountPriorityOrder.mockReturnValue(["oauth-perso", "account-m1", "account-o1", "account-o2", "account-o3"]);
+	});
+
+	it("moves the task to the next account of its provider and pins it on that task only", async () => {
+		const { emitter, logs } = agent();
+		const target = await failTaskOver(emitter, "t1", "rate_limit", "p1", NOW);
+		expect(target?.id).toBe("account-o2");
+		expect(resume).toHaveBeenCalledWith(emitter, "t1", "openai", {
+			keepClaudeSession: false,
+			accountPin: { key: "openai", id: "o2" },
+		});
+		expect(manager.setActiveProfile).not.toHaveBeenCalled();
+		expect(logs.join("")).toContain("openai → openai (O2)");
+	});
+
+	it("starts from the account pinned on the task, not the provider's default", async () => {
+		stopped.value = onOpenai("o2");
+		// The chain is walked from the top: o1, the provider's default, comes first.
+		expect((await failTaskOver(agent().emitter, "t1", "rate_limit", "p1", NOW))?.id).toBe("account-o1");
+		expect(isCoolingDown("account-o2", NOW + 1000)).toBe(true);
+		expect(isCoolingDown("account-o1", NOW + 1000)).toBe(false);
+	});
+
+	it("follows the chain's order across providers when same-provider-first is off", async () => {
+		manager.getAutoSwitchSettings.mockReturnValue({
+			enabled: true,
+			autoSwitchOnRateLimit: true,
+			autoSwitchOnAuthFailure: true,
+			sameProviderFirst: false,
+		});
+		manager.hasValidAuth.mockReturnValue(false);
+		const target = await failTaskOver(agent().emitter, "t1", "rate_limit", "p1", NOW);
+		expect(target?.id).toBe("account-m1");
+		expect(resume).toHaveBeenCalledWith(expect.anything(), "t1", "mistral", {
+			keepClaudeSession: false,
+			accountPin: { key: "mistral", id: "m1" },
+		});
+	});
+
+	it("skips an account without a key and one that stopped another task lately", async () => {
+		aiAccounts.accounts = [account("o1", "openai"), account("o2", "openai", false), account("o3", "openai")];
+		stopped.value = onOpenai("o3");
+		// Task 1 stops on o3 and moves to o1, the only other account with a key.
+		expect((await failTaskOver(agent().emitter, "t1", "rate_limit", "p1", NOW))?.id).toBe("account-o1");
+		expect(isCoolingDown("account-o3", NOW + 1000)).toBe(true);
+		expect(isCoolingDown("account-o3", NOW + 61 * 60 * 1000)).toBe(false);
+		// Task 2 stops on o1: o3 is still cooling down, o2 has no key.
+		stopped.value = onOpenai("o1");
+		manager.hasValidAuth.mockReturnValue(false);
+		expect(await failTaskOver(agent().emitter, "t2", "rate_limit", "p1", NOW + 1000)).toBeNull();
+	});
+
+	it("keeps a refused key out of the chain longer than a limit", async () => {
+		await failTaskOver(agent().emitter, "t1", "auth_failure", "p1", NOW);
+		expect(isCoolingDown("account-o1", NOW + 2 * 60 * 60 * 1000)).toBe(true);
+		expect(isCoolingDown("account-o1", NOW + 7 * 60 * 60 * 1000)).toBe(false);
+	});
+
+	it("starts from the Claude profile pinned on a Claude task", async () => {
+		stopped.value = { provider: "anthropic", projectId: "p1", specDirs: [], pinKey: "claude", pinnedAccount: "work" };
+		manager.getAccountPriorityOrder.mockReturnValue(["oauth-perso", "oauth-work"]);
+		expect((await failTaskOver(agent().emitter, "t1", "rate_limit", "p1", NOW))?.id).toBe("oauth-perso");
+	});
+
+	it("works without the AI accounts when their store cannot be read", async () => {
+		aiAccounts.broken = true;
+		manager.getAccountPriorityOrder.mockReturnValue(["account-o2", "provider-mistral"]);
+		expect((await failTaskOver(agent().emitter, "t1", "rate_limit", "p1", NOW))?.id).toBe("provider-mistral");
+	});
 });
 
 describe("failTaskOver", () => {
@@ -117,8 +272,11 @@ describe("failTaskOver", () => {
 		expect(target?.id).toBe("oauth-work");
 		expect(manager.setActiveProfile).toHaveBeenCalledWith("work");
 		expect(existsSync(path.join(specDir, "RATE_LIMIT_PAUSE"))).toBe(false);
-		expect(resume).toHaveBeenCalledWith(emitter, "t1", "anthropic", { keepClaudeSession: false });
-		expect(logs.join("")).toContain("anthropic → anthropic (oauth-work)");
+		expect(resume).toHaveBeenCalledWith(emitter, "t1", "anthropic", {
+			keepClaudeSession: false,
+			accountPin: { key: "claude", id: "work" },
+		});
+		expect(logs.join("")).toContain("anthropic → anthropic (work)");
 	});
 
 	it("leaves an active API profile to sign in with a Claude account", async () => {

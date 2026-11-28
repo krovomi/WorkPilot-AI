@@ -440,3 +440,91 @@ def test_the_name_is_the_apps_for_the_same_path(monkeypatch):
 
     monkeypatch.setattr(microvm, "Path", _Resolved)
     assert microvm.vm_name("/home/me/wt") == "workpilot-194449c0cfe5d0df"
+
+
+# ── Agent CLIs in the VM (lot C2b) ───────────────────────────────────────
+
+
+def test_network_rules_are_added_to_a_running_vm_never_recreated(sbx, worktree):
+    vm = _vm(worktree)
+    microvm.ensure_vm(vm)
+    wider = microvm.TaskVm(
+        vm.name,
+        vm.mounts,
+        vm.resources,
+        (*vm.network, "api.openai.com:443"),
+        vm.worktree,
+    )
+    sbx.calls.clear()
+    assert microvm.ensure_vm(wider) is False
+    assert sbx.verbs() == ["ls", "policy allow"]
+    assert sbx.calls[-1][-1] == "api.openai.com:443"
+    sbx.calls.clear()
+    assert microvm.ensure_vm(wider) is False
+    assert sbx.verbs() == ["ls"]
+
+
+def test_an_agent_cli_is_installed_once(sbx, worktree):
+    vm = _vm(worktree)
+    microvm.ensure_vm(vm)
+    sbx.calls.clear()
+    microvm.ensure_tool(vm, "opencode", "npm install -g opencode-ai@latest")
+    microvm.ensure_tool(vm, "opencode", "npm install -g opencode-ai@latest")
+    installs = [c for c in sbx.calls if c[0] == "exec"]
+    assert len(installs) == 1
+    assert installs[0][:4] == ["exec", vm.name, "sh", "-c"]
+    assert installs[0][4].startswith("command -v opencode >/dev/null 2>&1 || ")
+
+
+def test_a_failed_install_says_so(sbx, worktree):
+    vm = _vm(worktree)
+    microvm.ensure_vm(vm)
+    sbx.fail["exec"] = "npm: not found"
+    with pytest.raises(microvm.MicrovmError, match="npm: not found"):
+        microvm.ensure_tool(vm, "opencode", "npm install -g opencode-ai@latest")
+
+
+@pytest.mark.parametrize(
+    ("stdout", "expected"),
+    [
+        ('[{"service": "anthropic"}, {"service": "openai"}]', {"anthropic", "openai"}),
+        ('{"secrets": [{"name": "OpenAI"}]}', {"openai"}),
+        ('["mistral", "unknown"]', {"mistral"}),
+        (
+            "SERVICE   SCOPE\nanthropic global\ngithub    my-vm\n",
+            {"anthropic", "github"},
+        ),
+    ],
+)
+def test_the_services_sbx_holds_a_key_for_are_read_never_the_keys(
+    monkeypatch, stdout, expected
+):
+    calls = []
+
+    def fake(args, *, timeout=60):
+        calls.append(list(args))
+        return subprocess.CompletedProcess(args, 0, stdout, "")
+
+    monkeypatch.setattr(microvm, "run_sbx", fake)
+    assert microvm.secret_services() == expected
+    assert calls[0] == ["secret", "ls", "--json"]
+
+
+def test_no_secret_list_reads_as_no_key(monkeypatch):
+    monkeypatch.setattr(
+        microvm,
+        "run_sbx",
+        lambda args, timeout=60: subprocess.CompletedProcess(args, 1, "", "boom"),
+    )
+    assert microvm.secret_services() == frozenset()
+
+
+def test_the_vm_gets_placeholders_never_a_name_it_could_abuse(sbx, worktree):
+    vm = _vm(worktree)
+    argv = vm.exec_argv(
+        ["opencode"], {}, None, stdin=True, vm_env={"OPENAI_API_KEY": "proxy-managed"}
+    )
+    assert "OPENAI_API_KEY=proxy-managed" in argv
+    for bad in ({"LD_PRELOAD=x": "1"}, {"lower": "1"}, {"OK": "a\nb"}):
+        with pytest.raises(microvm.MicrovmError):
+            vm.exec_argv(["opencode"], {}, None, vm_env=bad)

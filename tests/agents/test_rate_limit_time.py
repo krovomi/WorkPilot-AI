@@ -72,3 +72,22 @@ def test_a_time_that_cannot_be_read_is_none(message: str) -> None:
 def test_no_error_info_is_none() -> None:
     assert parse_rate_limit_reset_time(None) is None
     assert parse_rate_limit_reset_time({}) is None
+
+
+def test_a_spent_quota_pauses_for_an_hour_when_no_reset_time_is_given() -> None:
+    from agents.rate_limit_time import QUOTA_PAUSE_SECONDS, quota_pause
+
+    before = datetime.now().timestamp()
+    resume = quota_pause({"message": "Error code: 429 insufficient_quota"})
+    assert resume is not None
+    assert (
+        before + QUOTA_PAUSE_SECONDS - 2 <= resume <= before + QUOTA_PAUSE_SECONDS + 2
+    )
+
+
+def test_a_short_limit_or_no_error_is_no_quota_pause() -> None:
+    from agents.rate_limit_time import quota_pause
+
+    assert quota_pause({"message": "429 Too Many Requests"}) is None
+    assert quota_pause(None) is None
+    assert quota_pause({}) is None

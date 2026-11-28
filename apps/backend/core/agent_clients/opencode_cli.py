@@ -230,7 +230,13 @@ class OpenCodeCliAgentClient(CliSubprocessAgentClient):
                 session_id=self.session_id,
                 agent=self.agent,
             )
-            command = build_windows_command(logical[0], logical[1:])
+            # In the task's microVM the command is a Linux one, never a
+            # Windows launcher (`cli_microvm`).
+            command = (
+                logical
+                if self.runs_in_microvm()
+                else build_windows_command(logical[0], logical[1:])
+            )
             process = await self._spawn(command, prompt.encode("utf-8"))
         except (OSError, RuntimeError, ValueError) as error:
             raise _opencode_error(error) from error

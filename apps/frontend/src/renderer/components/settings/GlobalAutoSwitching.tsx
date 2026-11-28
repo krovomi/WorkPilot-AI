@@ -263,6 +263,14 @@ export function GlobalAutoSwitching({
 							onChange={(value) => void update({ autoSwitchOnAuthFailure: value })}
 						/>
 						<ToggleRow
+							id="failover-same-provider"
+							title={t("aiAccounts.failover.sameProviderFirst")}
+							hint={t("aiAccounts.failover.sameProviderFirstHint")}
+							checked={settings.sameProviderFirst !== false}
+							disabled={off || saving}
+							onChange={(value) => void update({ sameProviderFirst: value })}
+						/>
+						<ToggleRow
 							id="failover-proactive"
 							title={t("aiAccounts.failover.proactive")}
 							hint={t("aiAccounts.failover.proactiveHint")}

@@ -163,6 +163,7 @@ MOBILE_PAGES: frozenset[str] = frozenset(
         "settings",
         "share",
         "tokens",
+        "ai-accounts",
     }
 )
 

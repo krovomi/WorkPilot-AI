@@ -19,7 +19,7 @@ export const DEFAULT_AGENT_SAFETY: AgentSafetySettings = {
 		maxFilesWritten: 200,
 		maxFileSizeMb: 10,
 		maxSessionMinutes: 0,
-		microvm: { enabled: false, memoryGb: 0, cpus: 0 },
+		microvm: { enabled: false, memoryGb: 0, cpus: 0, cliAgents: false },
 	},
 	anomaly: {
 		enabled: true,
@@ -102,6 +102,7 @@ export function normalizeAgentSafety(raw: unknown): AgentSafetySettings {
 				enabled: bool(vm, "enabled", d.sandbox.microvm.enabled),
 				memoryGb: num(vm, "memoryGb", d.sandbox.microvm.memoryGb, 0, MAX_VM_MEMORY_GB),
 				cpus: num(vm, "cpus", d.sandbox.microvm.cpus, 0, MAX_VM_CPUS),
+				cliAgents: bool(vm, "cliAgents", d.sandbox.microvm.cliAgents),
 			},
 		},
 		anomaly: {

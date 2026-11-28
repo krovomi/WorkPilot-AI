@@ -81,6 +81,14 @@ export default function Settings() {
 					/>
 				) : null}
 				<ListRow icon="key" title={t("tokens.title")} subtitle={t("tokens.summary")} onPress={() => router.push("/tokens")} />
+				{can("settings.account.read") ? (
+					<ListRow
+						icon="cpu"
+						title={t("aiAccounts.title")}
+						subtitle={t("aiAccounts.summary")}
+						onPress={() => router.push("/ai-accounts")}
+					/>
+				) : null}
 				<ListRow
 					icon="bar-chart-2"
 					title={t("myUsage.title")}

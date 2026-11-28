@@ -4,7 +4,8 @@
  * default: the next task, test or view of that provider runs on it. A
  * provider can list two groups: its API keys, and the sign-ins of its CLI
  * (OpenAI's keys and Codex CLI's sign-ins). Claude's accounts keep their own
- * list in the popover (its OAuth profiles, with their usage).
+ * list in the popover (its OAuth profiles, with their usage). Each account
+ * shows what it spent this month (`main/ai-accounts/account-usage.ts`).
  */
 
 import { accountProviderOf, loginProviderOf } from "@shared/types/ai-accounts";
@@ -12,6 +13,8 @@ import { KeyRound, LogIn } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
+import { formatUsd } from "@/components/administration/usage/usage-format";
+import { useAiAccountUsageStore } from "@/stores/ai-account-usage-store";
 import { aiAccountsOf, useAiAccountsStore } from "@/stores/ai-accounts-store";
 
 interface ProviderAccountSwitcherProps {
@@ -38,9 +41,12 @@ export function ProviderAccountSwitcher({ provider }: ProviderAccountSwitcherPro
 	const [switching, setSwitching] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const hasAccounts = accountProvider !== undefined || loginProvider !== undefined;
+	const spend = useAiAccountUsageStore((s) => s.accounts);
 
 	useEffect(() => {
-		if (hasAccounts) void useAiAccountsStore.getState().load();
+		if (!hasAccounts) return;
+		void useAiAccountsStore.getState().load();
+		void useAiAccountUsageStore.getState().load();
 	}, [hasAccounts]);
 
 	const groups: Group[] = [];
@@ -108,6 +114,14 @@ export function ProviderAccountSwitcher({ provider }: ProviderAccountSwitcherPro
 						>
 							<Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
 							<span className="min-w-0 flex-1 truncate text-xs font-medium">{entry.name}</span>
+							{spend[entry.id] && spend[entry.id].costUsd > 0 && (
+								<span
+									className="text-3xs tabular-nums opacity-80"
+									title={t("settings:aiAccounts.spend.monthShort")}
+								>
+									{formatUsd(spend[entry.id].costUsd)}
+								</span>
+							)}
 							<span
 								className={`rounded-md px-2 py-0.5 text-3xs ${
 									isActive ? "bg-primary-foreground/20" : "bg-primary/10 text-primary"

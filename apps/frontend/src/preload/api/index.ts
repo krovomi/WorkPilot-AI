@@ -36,6 +36,10 @@ import {
 	type ForgeAccountsAPI,
 } from "./modules/forge-accounts-api";
 import { type AiAccountsAPI, createAiAccountsAPI } from "./modules/ai-accounts-api";
+import {
+	type AiAccountUsageAPI,
+	createAiAccountUsageAPI,
+} from "./modules/ai-account-usage-api";
 import { type ApprovalsAPI, createApprovalsAPI } from "./modules/approvals-api";
 import {
 	type BlastRadiusAPI,
@@ -386,6 +390,7 @@ export interface ElectronAPI
 		LocalBackendAPI,
 		ForgeAccountsAPI,
 		AiAccountsAPI,
+		AiAccountUsageAPI,
 		ApprovalsAPI,
 		ReplayAPI,
 		BlastRadiusAPI,
@@ -551,6 +556,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createLocalBackendAPI(),
 		...createForgeAccountsAPI(),
 		...createAiAccountsAPI(),
+		...createAiAccountUsageAPI(),
 		...createApprovalsAPI(),
 		...createReplayAPI(),
 		...createBlastRadiusAPI(),

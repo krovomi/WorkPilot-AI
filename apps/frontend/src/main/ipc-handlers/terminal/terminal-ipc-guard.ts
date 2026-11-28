@@ -79,6 +79,7 @@ const isAutoSwitch = isShaped({
 	weeklyThreshold: optional(isPercent),
 	autoSwitchOnRateLimit: optional(isBoolean),
 	autoSwitchOnAuthFailure: optional(isBoolean),
+	sameProviderFirst: optional(isBoolean),
 });
 
 const isRetry = isShaped({

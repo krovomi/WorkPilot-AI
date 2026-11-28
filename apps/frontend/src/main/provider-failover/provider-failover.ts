@@ -15,12 +15,16 @@
  * task's own « Reprendre avec… »: the engine is written into task_metadata.json
  * from the stopped phase on, and the conversation log carries the context.
  * Changing Claude account sets the active profile first, as the Claude-only
- * auto-switch always did.
+ * auto-switch always did. Changing to an account of Settings → AI accounts
+ * (`account-<id>`) pins that account on the stopped task only (its
+ * `aiAccounts` in task_metadata.json): the provider's default, and so every
+ * other task, stays as it is.
  */
 import { rmSync } from "node:fs";
 import path from "node:path";
 import { getProvider as getRegistryProvider } from "../../shared/services/providerRegistry";
 import type { ClaudeProfile } from "../../shared/types/agent";
+import type { AiAccountView } from "../../shared/types/ai-accounts";
 import type { APIProfile } from "../../shared/types/profile";
 import {
 	apiProfileProvider,
@@ -34,15 +38,18 @@ import {
 	isClaudeProvider,
 } from "../../shared/utils/task-engine";
 import type { AgentManager } from "../agent/agent-manager";
+import { aiAccountStore } from "../ai-accounts/ai-accounts";
 import type { ExecutionProgressData } from "../agent/types";
 import { appLog } from "../app-logger";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import { resumeTaskWithProvider } from "../ipc-handlers/task/resume-with-provider";
 import { loadProfilesFile, setActiveAPIProfile } from "../services/profile/profile-manager";
 import {
+	accountPinKey,
 	excludedEntries,
 	FAILOVER_REQUEST_EVENT,
 	type FailoverReason,
+	type StoppedTask,
 	stoppedTask,
 } from "./task-phase-provider";
 
@@ -59,6 +66,16 @@ const TRIED_TTL_MS = 6 * 60 * 60 * 1000;
 const SETTLE_MS = 30_000;
 /** More moves than any chain needs; past it the task stays where it stopped. */
 const MAX_MOVES_PER_TASK = 6;
+/**
+ * How long an entry a task left is skipped by every other task: a rate limit
+ * or a spent quota lifts within the hour, a refused key needs the person.
+ * Claude accounts are not counted here: their limits are recorded with the
+ * reset time Claude gives (`isProfileRateLimited`).
+ */
+const COOLDOWN_MS: Readonly<Record<FailoverReason, number>> = {
+	rate_limit: 60 * 60 * 1000,
+	auth_failure: 6 * 60 * 60 * 1000,
+};
 
 interface TaskFailoverState {
 	readonly tried: Set<string>;
@@ -68,6 +85,13 @@ interface TaskFailoverState {
 
 const states = new Map<string, TaskFailoverState>();
 const inFlight = new Set<string>();
+/** Entry id → until when no task moves to it (it just stopped one). */
+const coolingDown = new Map<string, number>();
+
+/** Whether `entryId` stopped a task lately, for any task. */
+export function isCoolingDown(entryId: string, now: number = Date.now()): boolean {
+	return (coolingDown.get(entryId) ?? 0) > now;
+}
 
 function stateFor(taskId: string, now: number): TaskFailoverState {
 	const existing = states.get(taskId);
@@ -81,6 +105,7 @@ function stateFor(taskId: string, now: number): TaskFailoverState {
 export function resetProviderFailoverState(): void {
 	states.clear();
 	inFlight.clear();
+	coolingDown.clear();
 }
 
 /** Whether the person switched the failover on for this reason. */
@@ -95,19 +120,28 @@ export function failoverEnabledFor(reason: FailoverReason): boolean {
 /**
  * The chain as stored, each entry with its provider. Entries whose account no
  * longer exists are dropped. With no order saved yet, the Claude accounts in
- * their saved order: what the Claude-only auto-switch did.
+ * their saved order: what the Claude-only auto-switch did. AI accounts the
+ * order does not name yet follow, in the order they were added: the page
+ * shows them there too.
  */
 export function buildFailoverChain(
 	order: readonly string[],
 	claudeProfiles: readonly ClaudeProfile[],
 	apiProfiles: readonly APIProfile[],
+	aiAccounts: readonly AiAccountView[] = [],
 ): FailoverCandidate[] {
-	const ids = order.length > 0 ? order : claudeProfiles.map((p) => failoverEntryId("oauth", p.id));
+	const named = order.length > 0 ? order : claudeProfiles.map((p) => failoverEntryId("oauth", p.id));
+	const unnamed = aiAccounts
+		.map((account) => failoverEntryId("account", account.id))
+		.filter((id) => !named.includes(id));
 	const chain: FailoverCandidate[] = [];
-	for (const id of ids) {
+	for (const id of [...named, ...unnamed]) {
 		const entry = parseFailoverEntry(id);
 		if (!entry) continue;
-		if (entry.kind === "oauth") {
+		if (entry.kind === "account") {
+			const account = aiAccounts.find((a) => a.id === entry.key);
+			if (account) chain.push({ ...entry, provider: account.provider });
+		} else if (entry.kind === "oauth") {
 			if (claudeProfiles.some((p) => p.id === entry.key)) {
 				chain.push({ ...entry, provider: "anthropic" });
 			}
@@ -123,6 +157,49 @@ export function buildFailoverChain(
 
 function taskLog(agentManager: AgentManager, taskId: string, projectId: string, line: string): void {
 	agentManager.emit("log", taskId, `\n[WorkPilot] ${line}\n`, projectId);
+}
+
+/** The AI accounts, or none when the store cannot be read now. */
+function readAiAccounts(): { accounts: AiAccountView[]; defaults: Record<string, string> } {
+	try {
+		const store = aiAccountStore();
+		return { accounts: store.list(), defaults: store.defaults() };
+	} catch (error) {
+		appLog.warn("[ProviderFailover] AI accounts unreadable:", (error as Error).message);
+		return { accounts: [], defaults: {} };
+	}
+}
+
+/**
+ * The entry a task off Claude ran on: its pinned account, else its
+ * provider's default account, else the provider itself (its main key, a CLI).
+ */
+export function offClaudeEntry(
+	stopped: Pick<StoppedTask, "provider" | "pinKey" | "pinnedAccount">,
+	accounts: readonly AiAccountView[],
+	defaults: Readonly<Record<string, string>>,
+): string {
+	const own = (id: string | undefined) =>
+		id !== undefined && accounts.some((a) => a.id === id && a.provider === stopped.pinKey);
+	if (own(stopped.pinnedAccount)) return failoverEntryId("account", stopped.pinnedAccount as string);
+	const fallback = stopped.pinKey ? defaults[stopped.pinKey] : undefined;
+	if (own(fallback)) return failoverEntryId("account", fallback as string);
+	return failoverEntryId("provider", stopped.provider);
+}
+
+/** How the task log names an entry: the account's own name when it has one. */
+function entryLabel(
+	candidate: FailoverCandidate,
+	accounts: readonly AiAccountView[],
+	claudeProfiles: readonly ClaudeProfile[],
+): string {
+	const name =
+		candidate.kind === "account"
+			? accounts.find((a) => a.id === candidate.key)?.name
+			: candidate.kind === "oauth"
+				? claudeProfiles.find((p) => p.id === candidate.key)?.name
+				: undefined;
+	return name ? `${candidate.provider} (${name})` : candidate.provider;
 }
 
 /**
@@ -147,25 +224,40 @@ export async function failTaskOver(
 		const profileManager = getClaudeProfileManager();
 		const profilesFile = await loadProfilesFile();
 		const claudeProfiles = profileManager.getSettings().profiles;
+		const { accounts, defaults } = readAiAccounts();
 		const chain = buildFailoverChain(
 			normalizeFailoverOrder(profileManager.getAccountPriorityOrder()) ?? [],
 			claudeProfiles,
 			profilesFile.profiles,
+			accounts,
 		);
 		const onClaude = isClaudeProvider(stopped.provider);
+		const pinnedClaude =
+			onClaude && claudeProfiles.some((p) => p.id === stopped.pinnedAccount)
+				? stopped.pinnedAccount
+				: undefined;
 		const currentEntryId = !onClaude
-			? failoverEntryId("provider", stopped.provider)
+			? offClaudeEntry(stopped, accounts, defaults)
 			: profilesFile.activeProfileId
 				? failoverEntryId("api", profilesFile.activeProfileId)
-				: failoverEntryId("oauth", profileManager.getActiveProfile().id);
+				: failoverEntryId("oauth", pinnedClaude ?? profileManager.getActiveProfile().id);
 		state.tried.add(currentEntryId);
+		// Claude accounts keep their own limit record, with its reset time.
+		if (parseFailoverEntry(currentEntryId)?.kind !== "oauth") {
+			coolingDown.set(currentEntryId, now + COOLDOWN_MS[reason]);
+		}
 
 		const target = pickNextFailover(chain, {
 			provider: stopped.provider,
 			currentEntryId,
 			tried: state.tried,
 			excluded: excludedEntries(),
+			sameProviderFirst: profileManager.getAutoSwitchSettings().sameProviderFirst !== false,
 			isUsable: (candidate) => {
+				if (isCoolingDown(candidate.id, now)) return false;
+				if (candidate.kind === "account") {
+					return accounts.some((a) => a.id === candidate.key && a.hasKey);
+				}
 				if (candidate.kind === "oauth") {
 					return (
 						profileManager.hasValidAuth(candidate.key) &&
@@ -200,8 +292,15 @@ export async function failTaskOver(
 		state.tried.add(target.id);
 		state.moves += 1;
 		state.lastAt = now;
+		// The account this task, and only this task, runs on from now on.
+		const pinKey = accountPinKey(target.provider);
+		const accountPin =
+			pinKey && (target.kind === "account" || target.kind === "oauth")
+				? { key: pinKey, id: target.key }
+				: undefined;
 		const result = await resumeTaskWithProvider(agentManager, taskId, target.provider, {
 			keepClaudeSession: false,
+			accountPin,
 		});
 		if (!result.success) {
 			appLog.warn(`[ProviderFailover] task ${taskId}: resume on ${target.provider} failed: ${result.error}`);
@@ -211,7 +310,7 @@ export async function failTaskOver(
 			agentManager,
 			taskId,
 			stopped.projectId,
-			`Auto failover (${reason === "rate_limit" ? "limit reached" : "sign-in failed"}): ${stopped.provider} → ${target.provider} (${target.id}).`,
+			`Auto failover (${reason === "rate_limit" ? "limit reached" : "sign-in failed"}): ${stopped.provider} → ${entryLabel(target, accounts, claudeProfiles)}.`,
 		);
 		appLog.info(`[ProviderFailover] task ${taskId}: ${stopped.provider} -> ${target.id}`);
 		return target;

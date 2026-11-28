@@ -1,4 +1,4 @@
-import { Box, Info, RefreshCw } from "lucide-react";
+import { Bot, Box, Info, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentSafetySettings } from "../../../shared/types";
@@ -81,6 +81,14 @@ export function MicrovmSettings({
 							onChange={(cpus) => onChange({ cpus })}
 						/>
 					</div>
+					<SwitchRow
+						id="sandbox-microvm-cli"
+						icon={<Bot className="h-5 w-5 text-primary" />}
+						title={t(`${K}.cliAgents`)}
+						description={t(`${K}.cliAgentsHint`)}
+						checked={microvm.cliAgents}
+						onChange={(cliAgents) => onChange({ cliAgents })}
+					/>
 					<div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-xs">
 						<span
 							className={status?.ready ? "text-success" : "text-warning"}
