@@ -5,6 +5,7 @@ import {
 	EMPTY_FILTERS,
 	type KanbanFilters,
 	type KanbanSort,
+	type QuickFilter,
 	type TaskSortDirection,
 	type TaskSortField,
 	type TaskSource,
@@ -161,6 +162,9 @@ interface KanbanFilterState {
 	toggleGroup: (group: string) => void;
 	/** Show one sprint's cards (or "none": the backlog), or every card with undefined. */
 	setSprint: (sprint: string | undefined) => void;
+	/** Add or remove a label from the filter (compared without case). */
+	toggleLabel: (label: string) => void;
+	toggleQuick: (quick: QuickFilter) => void;
 	setSortField: (field: TaskSortField) => void;
 	setSortDirection: (direction: TaskSortDirection) => void;
 	toggleSortDirection: () => void;
@@ -178,6 +182,19 @@ interface KanbanFilterState {
 function viewLayout(): Pick<SavedView, "layout" | "grouping" | "listSort"> {
 	const { layout, grouping, listSort } = useKanbanLanesStore.getState();
 	return { layout, grouping, listSort: listSort ? { ...listSort } : null };
+}
+
+/** A copy of filters that later edits to the live ones leave alone. */
+function copyFilters(filters: KanbanFilters): KanbanFilters {
+	const copy: KanbanFilters = {
+		...filters,
+		sources: [...filters.sources],
+		categories: [...filters.categories],
+		priorities: [...filters.priorities],
+	};
+	if (filters.labels) copy.labels = [...filters.labels];
+	if (filters.quick) copy.quick = [...filters.quick];
+	return copy;
 }
 
 /** Toggle a value's presence in an array (immutably). */
@@ -306,6 +323,24 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 			persist();
 		},
 
+		toggleLabel: (label) => {
+			set((state) => {
+				const current = state.filters.labels ?? [];
+				const key = label.toLocaleLowerCase();
+				const has = current.some((item) => item.toLocaleLowerCase() === key);
+				const labels = has ? current.filter((item) => item.toLocaleLowerCase() !== key) : [...current, label];
+				return { filters: { ...state.filters, labels } };
+			});
+			persist();
+		},
+
+		toggleQuick: (quick) => {
+			set((state) => ({
+				filters: { ...state.filters, quick: toggleInArray(state.filters.quick ?? [], quick) },
+			}));
+			persist();
+		},
+
 		setSortField: (field) => {
 			set((state) => ({ sort: { ...state.sort, field } }));
 			persist();
@@ -340,13 +375,7 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 					globalThis.crypto?.randomUUID?.() ??
 					`view-${Date.now()}-${Math.random().toString(36).slice(2)}`,
 				name: trimmed,
-				// Deep-copy so later edits to the live filters don't mutate the view.
-				filters: {
-					...filters,
-					sources: [...filters.sources],
-					categories: [...filters.categories],
-					priorities: [...filters.priorities],
-				},
+				filters: copyFilters(filters),
 				sort: { ...sort },
 				...viewLayout(),
 			};
@@ -360,12 +389,7 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 			const view = get().savedViews.find((v) => v.id === id);
 			if (!view) return;
 			set({
-				filters: {
-					...view.filters,
-					sources: [...view.filters.sources],
-					categories: [...view.filters.categories],
-					priorities: [...view.filters.priorities],
-				},
+				filters: copyFilters(view.filters),
 				sort: { ...view.sort },
 			});
 			persist();

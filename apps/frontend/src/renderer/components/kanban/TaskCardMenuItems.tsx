@@ -12,6 +12,7 @@ import {
 	Pencil,
 	Play,
 	Shapes,
+	Tag,
 	Trash2,
 	Undo2,
 	X,
@@ -40,6 +41,8 @@ export interface TaskCardMenuActions {
 	onSetPriority?: (priority: TaskPriority) => void;
 	/** Puts the card in a sprint, or back in the backlog (null). */
 	onSetSprint?: (sprintId: string | null) => void;
+	/** Opens the labels dialog (the board's labels: an agent's run neither reads nor changes them). */
+	onEditLabels?: () => void;
 	/** The columns the card can be moved to by hand, and the move. */
 	moves?: {
 		targets: readonly TaskStatus[];
@@ -78,6 +81,7 @@ export function TaskCardMenuItems({
 	onSetType,
 	onSetPriority,
 	onSetSprint,
+	onEditLabels,
 	moves,
 	onEstimate,
 	onDuplicate,
@@ -96,7 +100,7 @@ export function TaskCardMenuItems({
 }: TaskCardMenuItemsProps) {
 	const { t } = useTranslation(["tasks"]);
 	const hasMoves = !!moves && moves.targets.length > 0;
-	const hasEditGroup = !!(onOpen || onEdit || onSetType || onSetPriority || onSetSprint || hasMoves);
+	const hasEditGroup = !!(onOpen || onEdit || onSetType || onSetPriority || onSetSprint || onEditLabels || hasMoves);
 	const hasWorkGroup = !!(
 		onEstimate || onDuplicate || onPause || onResume || onSyncFromBranch || onFlag || onUnflag || onAbandon || onUnabandon
 	);
@@ -156,6 +160,12 @@ export function TaskCardMenuItems({
 						<SprintChoiceMenuItems current={currentSprint} onSelect={onSetSprint} />
 					</DropdownMenuSubContent>
 				</DropdownMenuSub>
+			)}
+			{onEditLabels && (
+				<DropdownMenuItem onSelect={onEditLabels}>
+					<Tag className="mr-2 h-4 w-4" />
+					{t("tasks:cardLabels.cardMenu")}
+				</DropdownMenuItem>
 			)}
 			{moves && hasMoves && (
 				<DropdownMenuSub>

@@ -4,12 +4,14 @@
  */
 import { AbandonRequestDialog } from "./AbandonRequestDialog";
 import { FlagRequestDialog } from "./FlagRequestDialog";
+import { LabelsDialog } from "./labels/LabelsDialog";
 
 export function BoardDialogs() {
 	return (
 		<>
 			<AbandonRequestDialog />
 			<FlagRequestDialog />
+			<LabelsDialog />
 		</>
 	);
 }

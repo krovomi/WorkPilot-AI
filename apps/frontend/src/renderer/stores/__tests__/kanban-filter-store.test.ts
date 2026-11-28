@@ -167,6 +167,17 @@ describe("filters and sort", () => {
 		expect(store().filters).toEqual(EMPTY_FILTERS);
 	});
 
+	it("toggles labels without case, and the quick filters", () => {
+		store().toggleLabel("Front");
+		store().toggleLabel("api");
+		store().toggleQuick("flagged");
+		expect(store().filters).toMatchObject({ labels: ["Front", "api"], quick: ["flagged"] });
+		store().toggleLabel("FRONT");
+		store().toggleQuick("flagged");
+		expect(store().filters).toMatchObject({ labels: ["api"], quick: [] });
+		expect(cached("kanban-filters-p1").filters.labels).toEqual(["api"]);
+	});
+
 	it("shows one split group, then everything again", () => {
 		store().toggleGroup("001-split");
 		expect(store().filters.group).toBe("001-split");
@@ -235,6 +246,19 @@ describe("saved views", () => {
 		store().saveCurrentView("v");
 		store().toggleSource("jira");
 		expect(store().savedViews[0].filters.sources).toEqual(["github"]);
+	});
+
+	it("keeps the labels and quick filters with a view, as copies", () => {
+		store().toggleLabel("api");
+		store().toggleQuick("recent");
+		store().saveCurrentView("Mine");
+		store().toggleLabel("front");
+		expect(store().savedViews[0].filters).toMatchObject({ labels: ["api"], quick: ["recent"] });
+		store().clearFilters();
+		store().applyView(store().savedViews[0].id);
+		store().toggleQuick("flagged");
+		expect(store().filters).toMatchObject({ labels: ["api"], quick: ["recent", "flagged"] });
+		expect(store().savedViews[0].filters.quick).toEqual(["recent"]);
 	});
 
 	it("names a view without crypto.randomUUID too", () => {

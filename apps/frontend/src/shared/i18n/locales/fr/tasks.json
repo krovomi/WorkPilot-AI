@@ -373,6 +373,12 @@
 				"insights": "Insights",
 				"generated": "Générée par une page",
 				"manual": "Manuelle"
+			},
+			"quickLabel": "Filtres rapides",
+			"labelsLabel": "Étiquettes",
+			"quick": {
+				"flagged": "Bloquées",
+				"recent": "Modifiées cette semaine"
 			}
 		},
 		"sort": {
@@ -3293,5 +3299,22 @@
 			"unsandboxed": "lancée sans bac à sable",
 			"blocked_hosts": "a tenté un hôte refusé"
 		}
+	},
+	"cardLabels": {
+		"cardMenu": "Étiquettes…",
+		"dialogTitle": "Étiquettes",
+		"dialogDescription": "Des mots courts pour retrouver « {{title}} » et filtrer le tableau.",
+		"listLabel": "Étiquettes",
+		"none": "Aucune étiquette pour l'instant.",
+		"remove": "Retirer l'étiquette {{label}}",
+		"placeholder": "Nouvelle étiquette",
+		"inputLabel": "Étiquette à ajouter",
+		"add": "Ajouter",
+		"full": "Une tâche porte {{count}} étiquettes au plus.",
+		"suggestions": "Déjà sur le tableau",
+		"suggest": "+ {{label}}",
+		"filterBy": "Voir les tâches étiquetées {{label}}",
+		"failedTitle": "Étiquettes non enregistrées",
+		"failedDescription": "La tâche n'a pas pu être enregistrée. Réessaie."
 	}
 }
