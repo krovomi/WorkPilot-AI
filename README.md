@@ -97,6 +97,35 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 
 **Kanban board** (above): describe a task and follow it from planning to the pull request. Each card shows its phase, its progress, the provider at work and what it is about; the parts of a split task share a colour and a « Part k/N » mark. Columns follow the pipeline: Planning, Queue, In Progress, AI Review, Human Review, Open PR (while a pull request waits to be merged), Done, plus Red Build when the project's CI fails on a task branch. The toolbar holds on one line; its « ⋯ » menu has **Multi-repo** (one change across several repositories) and **Purge** (frees the disk space held by the worktrees of finished cards).
 
+**Agile board, as in Jira** ([sprints](docs/architecture/kanban-sprints.md), [swimlanes](docs/architecture/kanban-swimlanes.md), [list](docs/architecture/kanban-list-view.md), [timeline](docs/architecture/kanban-timeline.md), [reports](docs/architecture/kanban-reports.md)): tasks that end without success get their own columns, **Failed** and **Abandoned** (with why: duplicate, won't do, PR closed…), and a task can be flagged **Blocked** with its reason. Plan in **sprints** (start, close with carry-over, points from Smart Estimation, never a duration), cut the board into **swimlanes** by sprint, sub-project, priority, type, source or parent, and switch between **Board**, **List** (sortable columns) and **Timeline** (each task from its start to its end, the sprints along the top). **Reports** draw the burndown, velocity, cumulative flow, cycle time, throughput and unsuccessful ends. **Labels**, quick filters (Blocked, Changed this week, My tasks on a team server) and saved views keep a board readable; finished tasks can archive themselves after 7, 14 or 30 days.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+![Swimlanes by sprint: the blocked lane pinned first, then Sprint 12 with its columns](.github/assets/showcase/kanban-lanes.png)
+
+</td>
+<td width="50%" valign="top">
+
+![List view grouped by sprint: status, priority, sprint, sub-project, points and last update](.github/assets/showcase/kanban-list.png)
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+![Timeline: one bar per task from start to end, today's line and the sprints' dates](.github/assets/showcase/kanban-timeline.png)
+
+</td>
+<td valign="top">
+
+![Reports: the burndown of Sprint 12, points left against the ideal line](.github/assets/showcase/kanban-reports.png)
+
+</td>
+</tr>
+</table>
+
 <table>
 <tr>
 <td width="50%" valign="top">
@@ -225,6 +254,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 
 **Build pipeline**
 - **Kanban board** with spec approval, pause and resume, per-phase re-run, steering messages while the agent works, and a guided review with line comments sent back to the fixer; diffs in git colours, with syntax highlighting for every stack, changed words marked and an Auto side-by-side layout.
+- **Agile board**: Failed and Abandoned columns, Blocked flag, sprints with points, swimlanes, Board / List / Timeline layouts, reports (burndown, velocity, cumulative flow, cycle time, throughput, unsuccessful ends), labels, quick filters and auto-archive, in local and server mode.
 - **Swarm mode** builds the subtasks a plan allows side by side, each in its own worktree, merged into the task's branch after each wave.
 - **Automatic split** of big tasks into small grouped PRs, **stacked tasks**, **Best-of-N** (build a task 2 to 4 times on different engines and keep the best, with an arbiter when the variants do not do the same thing) and **multi-repo** changes, on the provider, model and effort you pick for them.
 - **Plan rehearsal** replays a spec's plan over the base branch before the build; after QA, a **red team** agent tries to break what the task built, and the **migration guard** says what the task's migrations would do to a production database, for every stack.

@@ -1,0 +1,88 @@
+From 731ce4367fa3bdca6aca22963319432b941dcead Mon Sep 17 00:00:00 2001
+From: WorkPilot Wiki Bot <noreply@workpilot.ai>
+Date: Sat, 28 Nov 2026 00:41:22 +0000
+Subject: [PATCH] docs(wiki): the agile Kanban (sprints, lanes, list, timeline,
+ reports, labels)
+
+---
+ User-Interface.fr.md | 19 +++++++++++++++++++
+ User-Interface.md    | 19 +++++++++++++++++++
+ 2 files changed, 38 insertions(+)
+
+diff --git a/User-Interface.fr.md b/User-Interface.fr.md
+index 2a1195a..9be2eba 100644
+--- a/User-Interface.fr.md
++++ b/User-Interface.fr.md
+@@ -55,6 +55,8 @@ Depuis la 1.4.0, tous les modules et toutes les pages de paramètres partagent *
+ | **Revue IA** | QA et passe de revue indépendante |
+ | **Revue humaine** | Résultats prêts pour votre revue |
+ | **Terminé** | Fusionné ou PR créée |
++| **Échec** | Tâches finies sur une erreur ou une revue en échec, avec la raison |
++| **Abandonnée** | Tâches mises de côté, avec la raison (doublon, ne sera pas fait, PR fermée sans fusion…) ; on la reprend pour y retravailler |
+ | **Build rouge** | Visible quand la CI du projet a tourné sur une branche de tâche : un run rouge y déplace la carte et lance une réparation automatique, jusqu'à trois fois |
+ 
+ La barre d'outils tient sur une ligne dès 1 280 px de large : rafraîchir, recherche, filtres, vues enregistrées et commande rapide. Son menu « ⋯ » contient **Multi-dépôts** (un changement sur plusieurs dépôts, une carte par dépôt) et **Purger** (libère la place prise par les worktrees des cartes terminées), chacun avec une phrase qui dit à quoi il sert. Tant qu'une tâche tourne, le bouton rouge **Arrêter tous les agents** au pied du rail (Ctrl+Maj+.) met en pause chaque tâche en cours.
+@@ -65,6 +67,23 @@ Une tâche trop grosse pour une petite PR se découpe d'elle-même après la pla
+ 
+ ![Détail d'une tâche](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/task-detail.png)
+ 
++### Tableau agile (comme Jira)
++
++- **Bloquée** : on marque une tâche avec ce qui la bloque ; elle reste dans sa colonne avec un bandeau rouge, et dans son propre couloir quand les couloirs sont actifs.
++- **Sprints** (« Sprints » dans la barre d'outils) : planifier, démarrer, clôturer (les tâches non finies sont reportées). Les points viennent de Smart Estimation, jamais une durée. ([sprints](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-sprints.md))
++- **Couloirs** : couper le tableau par sprint, sous-projet, priorité, type, source ou tâche parente ; glisser une tâche dans un autre couloir change ce champ. ([couloirs](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-swimlanes.md))
++- **Tableau, Liste, Frise** : la bascule à côté de « Sprints ». La liste se trie sur chaque colonne ; la frise trace chaque tâche de son début à sa fin (ou à aujourd'hui), les sprints en tête. Les vues enregistrées gardent l'affichage. ([liste](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-list-view.md), [frise](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-timeline.md))
++- **Rapports** : burndown, vélocité, flux cumulé, temps de cycle, débit et fins non abouties, mesurés sur l'historique des statuts. ([rapports](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-reports.md))
++- **Étiquettes et filtres rapides** : « Étiquettes… » dans le menu d'une tâche ; Bloquées, Modifiées cette semaine et, sur un serveur d'équipe, Mes tâches. Paramètres → Affichage peut archiver les tâches terminées après 7, 14 ou 30 jours. ([étiquettes](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-labels.md), [archivage auto](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-auto-archive.md))
++
++![Couloirs par sprint](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-lanes.png)
++
++![Vue liste](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-list.png)
++
++![Frise](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-timeline.png)
++
++![Rapports](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-reports.png)
++
+ ### Actions disponibles sur une carte
+ 
+ - **Preview** (icône écran) — lance l'app dans l'**App Emulator** intégré
+diff --git a/User-Interface.md b/User-Interface.md
+index 348eef0..33308e7 100644
+--- a/User-Interface.md
++++ b/User-Interface.md
+@@ -50,6 +50,8 @@ Since 1.4.0, every module and every Settings page share **one UI charter**, take
+ | **AI Review** | QA and the independent review pass |
+ | **Human Review** | Results ready for your review |
+ | **Done** | Merged or PR created |
++| **Failed** | Tasks that ended in error or with a failed review, with the reason |
++| **Abandoned** | Tasks set aside, with why (duplicate, won't do, PR closed without merge…); resume one to work on it again |
+ | **Red Build** | Shown when the project's CI has run on a task branch: a red run moves the card here and starts an automatic repair, up to three times |
+ 
+ The toolbar holds on one line from 1,280 px wide: refresh, search, filters, saved views and the quick command. Its « ⋯ » menu holds **Multi-repo** (one change across several repositories, one card per repository) and **Purge** (frees the disk space held by the worktrees of finished cards), each with a sentence saying what it does. While a task runs, the red **Stop all agents** button at the foot of the rail (Ctrl+Shift+.) pauses every running task.
+@@ -60,6 +62,23 @@ A task too big for one small PR splits itself after planning into « Part k/N »
+ 
+ ![Task detail](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/task-detail.png)
+ 
++### Agile board (as in Jira)
++
++- **Blocked**: flag a task with what blocks it; it stays in its column with a red banner, and its own lane when lanes are on.
++- **Sprints** (toolbar « Sprints »): plan, start, close (unfinished tasks carried over). Points come from Smart Estimation, never a duration. ([sprints](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-sprints.md))
++- **Swimlanes**: cut the board by sprint, sub-project, priority, type, source or parent; dragging a task to another lane changes that field. ([swimlanes](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-swimlanes.md))
++- **Board, List, Timeline**: the toggle next to « Sprints ». The list sorts by any column; the timeline draws each task from its start to its end (or today), with the sprints along the top. Saved views keep the layout. ([list](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-list-view.md), [timeline](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-timeline.md))
++- **Reports**: burndown, velocity, cumulative flow, cycle time, throughput and unsuccessful ends, measured from the status history. ([reports](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-reports.md))
++- **Labels and quick filters**: « Labels… » in a task's menu; Blocked, Changed this week and, on a team server, My tasks. Settings → Display can archive finished tasks after 7, 14 or 30 days. ([labels](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-labels.md), [auto-archive](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-auto-archive.md))
++
++![Swimlanes by sprint](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-lanes.png)
++
++![List view](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-list.png)
++
++![Timeline](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-timeline.png)
++
++![Reports](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-reports.png)
++
+ ### Actions available on a card
+ 
+ - **Preview** (screen icon) — launches the app in the embedded **App Emulator**
+-- 
+2.43.0
+
