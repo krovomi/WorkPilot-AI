@@ -233,7 +233,8 @@
 		"running": "En cours",
 		"succeeded": "Réussi",
 		"failed": "Échoué",
-		"cancelled": "Annulé"
+		"cancelled": "Annulé",
+		"interrupted": "Interrompu"
 	},
 	"settings": {
 		"title": "Réglages",
@@ -1312,5 +1313,35 @@
 		"kind_address": "adresse",
 		"kind_birthdate": "date de naissance",
 		"kind_secret": "secret"
+	},
+	"interrupted": {
+		"title_one": "{{count}} tâche a été interrompue",
+		"title_other": "{{count}} tâches ont été interrompues",
+		"description": "Le serveur de l'équipe s'est arrêté pendant qu'elles tournaient. Choisis celles à reprendre : chacune repart de la dernière étape terminée.",
+		"selected_one": "{{count}} sur {{total}} sélectionnée",
+		"selected_other": "{{count}} sur {{total}} sélectionnées",
+		"steps": {
+			"spec": "Spec",
+			"planning": "Plan",
+			"coding": "Code",
+			"codingCount": "Code {{done}}/{{total}}",
+			"qa": "QA"
+		},
+		"where": {
+			"spec": "Reprendra la spec, en gardant les fichiers déjà écrits.",
+			"planning": "Reprendra la planification.",
+			"coding": "Reprendra le code à la prochaine sous-tâche non terminée.",
+			"subtask": "Reprendra à « {{subtask}} », avec le travail déjà sur disque.",
+			"qa_review": "Reprendra la revue QA."
+		},
+		"origin": "Redémarrage du serveur",
+		"originWithTime": "Redémarrage du serveur · {{ago}}",
+		"startedBy": "Lancée par {{name}} : décochée, c'est son run.",
+		"blocker": {
+			"spec_missing": "Le dossier de sa carte a disparu : elle ne peut pas reprendre."
+		},
+		"later": "Plus tard",
+		"resume_one": "Reprendre ({{count}})",
+		"resume_other": "Reprendre ({{count}})"
 	}
 }

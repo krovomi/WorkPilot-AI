@@ -132,6 +132,14 @@ describe("a server project's workspace", () => {
 					started_at: "2026-10-31T10:00:00+00:00",
 					tokens: null,
 				},
+				{
+					id: "r-2",
+					kind: "run",
+					spec: "002-export",
+					phase: "build",
+					status: "interrupted",
+					started_at: "2026-10-31T11:00:00+00:00",
+				},
 				{ id: "x", kind: "other", started_at: "2026-10-31T10:00:00+00:00" },
 				{ id: "y", kind: "run", started_at: "not a date" },
 			],
@@ -160,6 +168,15 @@ describe("a server project's workspace", () => {
 				started_at: "2026-10-31T10:00:00+00:00",
 				task_title: "roadmap",
 				phase: "roadmap",
+			},
+			{
+				session_id: "r-2",
+				kind: "run",
+				status: "cancelled",
+				started_at: "2026-10-31T11:00:00+00:00",
+				task_title: "002-export",
+				task_id: "002-export",
+				phase: "build",
 			},
 		]);
 	});

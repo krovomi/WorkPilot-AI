@@ -161,13 +161,19 @@ describe("card screen", () => {
 		const state = {
 			card: card({ column: "human_review" }),
 			details: details({ column: "human_review", spec: "x", approval: { approved: true, approvedBy: "Ada", approvedAt: null } }),
-			runs: [run("succeeded", "build", { error: null }), run("failed", "qa", { id: "run-qa", error: "Tests red" })],
+			runs: [
+				run("succeeded", "build", { error: null }),
+				run("failed", "qa", { id: "run-qa", error: "Tests red" }),
+				run("interrupted", "build", { id: "run-int", error: null }),
+			],
 		};
 		const server = serveCard(state, { [`POST ${RUNS_PATH}`]: (c: Call) => run("queued", (c.body as { phase: string }).phase) });
 		await openApp("/projects/p1/cards/007-search");
 		expect(await screen.findByText("Tests red")).toBeTruthy();
 		expect(screen.getByText("Succeeded")).toBeTruthy();
 		expect(screen.getByText("Failed")).toBeTruthy();
+		// Stopped by a server restart: it did not fail.
+		expect(screen.getByText("Interrupted")).toBeTruthy();
 
 		await fireEvent.press(screen.getByRole("button", { name: "Merge" }));
 		await waitFor(() => expect(started(server)).toEqual(["merge"]));

@@ -233,7 +233,8 @@
 		"running": "Running",
 		"succeeded": "Succeeded",
 		"failed": "Failed",
-		"cancelled": "Cancelled"
+		"cancelled": "Cancelled",
+		"interrupted": "Interrupted"
 	},
 	"settings": {
 		"title": "Settings",
@@ -1312,5 +1313,35 @@
 		"kind_address": "address",
 		"kind_birthdate": "date of birth",
 		"kind_secret": "secret"
+	},
+	"interrupted": {
+		"title_one": "{{count}} task was interrupted",
+		"title_other": "{{count}} tasks were interrupted",
+		"description": "The team server stopped while they were running. Pick the ones to resume: each one picks up from its last finished step.",
+		"selected_one": "{{count}} of {{total}} selected",
+		"selected_other": "{{count}} of {{total}} selected",
+		"steps": {
+			"spec": "Spec",
+			"planning": "Plan",
+			"coding": "Code",
+			"codingCount": "Code {{done}}/{{total}}",
+			"qa": "QA"
+		},
+		"where": {
+			"spec": "Resumes the spec, keeping the files already written.",
+			"planning": "Resumes the planning.",
+			"coding": "Resumes the coding at the next unfinished subtask.",
+			"subtask": "Resumes at “{{subtask}}”, with the work already on disk.",
+			"qa_review": "Resumes the QA review."
+		},
+		"origin": "Server restarted",
+		"originWithTime": "Server restarted · {{ago}}",
+		"startedBy": "Started by {{name}}: unticked, it is their run.",
+		"blocker": {
+			"spec_missing": "Its card folder is gone: it cannot be resumed."
+		},
+		"later": "Later",
+		"resume_one": "Resume ({{count}})",
+		"resume_other": "Resume ({{count}})"
 	}
 }

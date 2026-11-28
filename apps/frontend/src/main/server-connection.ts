@@ -167,12 +167,32 @@ export function setMode(newMode: ConnectionMode, url?: string): void {
 	persist();
 }
 
+const signInListeners = new Set<() => void>();
+
+/**
+ * Called each time a session starts: a sign-in, or the session restored at
+ * launch (not a token refresh). Returns the unsubscribe.
+ */
+export function onServerSignedIn(listener: () => void): () => void {
+	signInListeners.add(listener);
+	return () => signInListeners.delete(listener);
+}
+
 function applyTokens(tokens: TokenResponse): void {
+	const startsSession = !accessToken;
 	accessToken = tokens.access_token;
 	refreshToken = tokens.refresh_token;
 	currentUser = tokens.user;
 	persist();
 	scheduleRefresh(tokens.expires_in);
+	if (!startsSession) return;
+	for (const listener of signInListeners) {
+		try {
+			listener();
+		} catch (err) {
+			console.warn("[server-connection] A sign-in listener failed:", err);
+		}
+	}
 }
 
 function scheduleRefresh(expiresInSeconds: number): void {
