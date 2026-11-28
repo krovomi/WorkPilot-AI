@@ -1,7 +1,8 @@
 /**
  * The dialogs of the Kanban's sprints: creating or editing one (name, goal,
- * days) and closing the active one (what it did, where its unfinished cards
- * go). Opened from the toolbar's « Sprints » menu (SprintMenu).
+ * days; a new one opens its planning view) and closing the active one (what
+ * it did, where its unfinished cards go). Opened from the toolbar's
+ * « Sprints » menu (SprintMenu) and the board's sprint banner.
  *
  * Design: docs/architecture/kanban-sprints.md.
  */
@@ -47,6 +48,7 @@ export function SprintEditDialog({ sprint, open, onOpenChange }: SprintEditDialo
 	const { t } = useTranslation(["tasks", "common"]);
 	const ids = useId();
 	const save = useSprintStore((s) => s.save);
+	const openPlanning = useSprintStore((s) => s.openPlanning);
 	const failed = useSprintFailure();
 	const [name, setName] = useState(sprint?.name ?? "");
 	const [goal, setGoal] = useState(sprint?.goal ?? "");
@@ -59,9 +61,14 @@ export function SprintEditDialog({ sprint, open, onOpenChange }: SprintEditDialo
 	const submit = async () => {
 		if (!draft || saving) return;
 		setSaving(true);
+		const before = new Set(useSprintStore.getState().sprints.map((item) => item.id));
 		const outcome = await save(draft);
 		setSaving(false);
-		if (failed(outcome)) onOpenChange(false);
+		if (!failed(outcome)) return;
+		onOpenChange(false);
+		// A new sprint is empty: its planning view is the next step.
+		const created = sprint ? undefined : useSprintStore.getState().sprints.find((item) => !before.has(item.id));
+		if (created) openPlanning(created.id);
 	};
 
 	return (

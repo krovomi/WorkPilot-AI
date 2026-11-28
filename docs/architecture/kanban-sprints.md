@@ -79,7 +79,24 @@ ou d'appeler le serveur, qui les revérifie.
   (regroupement « Sprint », [kanban-swimlanes.md](kanban-swimlanes.md)) ; les deux s'annulent par
   Ctrl+Z (`applyCardChoice`).
 
+- **Le bandeau du sprint** (`kanban/SprintBanner.tsx`, rendu par `BoardLanes` au-dessus de toutes
+  les dispositions) nomme le sprint dont parle le tableau : celui du filtre, sinon le sprint en
+  cours (`focusedSprint`, `lib/sprint-planning.ts`). Il donne ses dates, les jours de calendrier
+  qui restent jusqu'à son dernier jour (un compte de jours, jamais une estimation du travail), ce
+  qu'il contient et ce qui est fait, puis l'étape suivante : n'afficher que ses cartes, le
+  planifier, le démarrer ou le terminer. Sans sprint en cours ni filtré, rien ne s'affiche. Avant
+  lui, un sprint créé et démarré n'apparaissait que dans le menu : le tableau n'en disait rien.
+- **La vue de planification** (`kanban/SprintPlanningDialog.tsx`) met le backlog (cartes sans
+  sprint, ni terminées, ni abandonnées, ni archivées, de la plus urgente à la plus ancienne) à
+  côté des cartes du sprint. On coche puis « Ajouter au sprint » ou « Renvoyer au backlog », ou
+  on prend la flèche d'une carte ; une recherche filtre le backlog. Les points du sprint sont
+  comparés à la vélocité, et un avertissement s'affiche au-delà. Elle s'ouvre depuis le bandeau,
+  depuis le bouton « Planifier » de chaque sprint ouvert du menu, et d'elle-même après la création
+  d'un sprint. Une seule est ouverte à la fois (`planningId` du store), jamais sur un sprint
+  terminé. Les déplacements passent par `assign` du store, qui refuse un sprint terminé ou
+  inconnu ; les arguments sont revérifiés par le main comme pour le menu d'une carte. Un lecteur
+  d'un projet du serveur ne voit pas les boutons.
+
 ## Ce qui reste pour les lots suivants
 
-La vue de planification (backlog et sprints côte à côte), « proposer le sprint » d'après la
-vélocité, le burndown et le rapport de sprint (lot 6) lisent ce modèle sans le changer.
+« Proposer le sprint » d'après la vélocité lit ce modèle sans le changer.

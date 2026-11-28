@@ -754,7 +754,7 @@
 			"button": "Sprints",
 			"allCards": "All cards",
 			"backlog": "Backlog (no sprint)",
-			"empty": "No sprint yet. Create one, then put cards in it from their menu or by dragging them into its lane (Swimlanes: Sprint).",
+			"empty": "No sprint yet. Create one, then plan it: pick its cards from the backlog.",
 			"unknown": "Unknown sprint",
 			"states": {
 				"planned": "Planned",
@@ -796,7 +796,41 @@
 			"cardsNotMoved_other": "{{count}} cards could not be moved: the sprint was not changed.",
 			"cardMenu": "Sprint",
 			"noneToJoin": "No open sprint",
-			"undoLabel": "sprint change"
+			"undoLabel": "sprint change",
+			"planning": {
+				"open": "Plan",
+				"title": "Plan « {{name}} »",
+				"hint": "Tick cards in the backlog and add them to the sprint, or send cards back. Points are the cards' Smart Estimation scores.",
+				"search": "Search the backlog",
+				"selectAll": "Select every card shown",
+				"summary_one": "{{count}} card · {{points}} pts",
+				"summary_other": "{{count}} cards · {{points}} pts",
+				"points_one": "{{count}} pt",
+				"points_other": "{{count}} pts",
+				"add_one": "Add {{count}} card to the sprint",
+				"add_other": "Add {{count}} cards to the sprint",
+				"remove_one": "Send {{count}} card back to the backlog",
+				"remove_other": "Send {{count}} cards back to the backlog",
+				"addOne": "Add to the sprint",
+				"removeOne": "Back to the backlog",
+				"backlogEmpty": "No card left to plan: every open card is already in a sprint.",
+				"noMatch": "No backlog card matches this search.",
+				"sprintEmpty": "This sprint has no card yet. Tick cards in the backlog, then « Add to the sprint ».",
+				"underVelocity": "{{points}} pts planned · velocity {{velocity}} pts",
+				"overVelocity": "{{points}} pts planned: more than the velocity ({{velocity}} pts)"
+			},
+			"banner": {
+				"showOnly": "Show only this sprint",
+				"showAll": "Show every card",
+				"empty": "No card in this sprint yet.",
+				"emptyPlan": "No card in this sprint yet: plan it to add some.",
+				"progressLabel": "Sprint progress",
+				"daysLeft_one": "{{count}} day left",
+				"daysLeft_other": "{{count}} days left",
+				"lastDay": "Last day",
+				"overdue_one": "Ended {{count}} day ago",
+				"overdue_other": "Ended {{count}} days ago"
+			}
 		},
 		"layout": {
 			"label": "Layout",

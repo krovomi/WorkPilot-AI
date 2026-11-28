@@ -139,9 +139,18 @@ création ; une VM créée pour d'autres montages ou une autre allowlist est sup
 | Le pointeur `.git` d'un worktree, sous Windows | un fichier `gitdir:` réécrit pour la VM, monté par-dessus ; celui de l'hôte n'est pas touché |
 | Git | `safe.directory '*'` et le `core.autocrlf` de l'hôte, dans la configuration globale de la VM, jamais dans celle du dépôt |
 
-**Réseau** : la VM est créée avec `--deny-network`, puis reçoit l'allowlist du bac à sable de l'OS
-en règles propres à elle (`sbx policy allow network --sandbox <nom>`, ports 443 et 80), plus les
-sources de son système et de son moteur Docker (`VM_HOSTS`). Une entrée locale (`127.0.0.1:11434`)
+**Réseau** : sbx donne à chaque VM sa politique globale (une liste d'environ 200 hôtes permis,
+`balanced`), et une règle de refus gagne toujours sur une règle d'autorisation. La VM est donc
+créée fermée (`--deny-network "**"` : l'option prend les hôtes refusés), puis `_ensure_network`
+refuse pour elle chaque hôte de la politique globale (`sbx policy ls --json --type network
+--decision allow`) dont la tâche n'a pas besoin, autorise l'allowlist du bac à sable de l'OS en
+règles propres à elle (`sbx policy allow network --sandbox <nom>`, ports 443 et 80) plus les
+sources de son système et de son moteur Docker (`VM_HOSTS`), et retire enfin le refus de `**`.
+Une règle globale qui couvre un hôte de la tâche (`**.docker.com` pour le registre Docker) reste
+ouverte : son refus l'emporterait. Les refus sont recalculés à chaque session (un hôte ajouté à
+la politique globale est refusé à son tour ; un refus que la tâche vient à contredire est levé).
+Une politique globale qui permet tout (`**`) ne peut pas être tenue : la VM n'est pas utilisée et
+la carte le dit. Une entrée locale (`127.0.0.1:11434`)
 devient `localhost:11434`, joint depuis la VM par `host.docker.internal`. Les refus sont lus dans
 `sbx policy log --json` et ajoutés à la sortie de la commande comme ceux du proxy.
 
@@ -159,14 +168,22 @@ lance `sbx version` et `sbx ls --json` ; la vraie preuve est la création.
 chez Docker. Un compte Docker reste exigé par `sbx login` : c'est pourquoi l'option est coupée par
 défaut.
 
+**sbx est lancé sans les identifiants de l'hôte** (`sbx_env`, même règle que
+`security/child_env.py`) : il se connecte seul (`sbx login`, ses clés dans le trousseau), et ce que
+son environnement porte peut être passé à la VM.
+
+**Arrêt** : tuer `sbx exec` sur l'hôte laisse la commande tourner dans la VM. Chaque commande y
+démarre dans sa propre session (`setsid -w sh -c 'echo $$ > <fichier>; exec "$@"'`, `RUN_SCRIPT`)
+et note son groupe de processus dans `/tmp/workpilot-run-<id>.pid` ; au délai ou à l'annulation,
+`SessionSandbox.stop(argv)` (`stop_run`) envoie TERM puis KILL à ce groupe par un second
+`sbx exec`. `run_command` et les CLI d'agents l'appellent après avoir arrêté le processus hôte.
+
 Une commande lancée dans la VM n'a pas de stdin (`DEVNULL`) : sbx attend sur un tube ouvert que la commande ne lit pas. Celle qui lit son stdin le demande (`wrap(…, stdin=True)`, qui ajoute `sbx exec -i`).
 
-Vérifié sous Windows 11 avec sbx 0.54.1 : création (55 s la première fois, image comprise, puis 7 s), git dans le worktree par le pointeur réécrit, écriture du worktree vue par l'hôte, `.git` en lecture seule refusé à l'écriture, codes de sortie (3 donne 3, commande inconnue 127), `-e`, `-w`, `--memory` et `--cpus`. Restent à vérifier : le réseau (`--deny-network` puis règles par VM, champs de `policy log`), `host.docker.internal`, et la commande tuée au délai.
+Vérifié sous Windows 11 avec sbx 0.54.1 : création (55 s la première fois, image comprise, puis 7 s), git dans le worktree par le pointeur réécrit, écriture du worktree vue par l'hôte, `.git` en lecture seule refusé à l'écriture, codes de sortie (3 donne 3, commande inconnue 127), `-e`, `-w`, `--memory` et `--cpus`. Puis : le réseau fermé puis ouvert hôte par hôte comme ci-dessus (pypi.org refusé, example.org permis), les champs de `policy log` (`host`, `count`, `rule`, `reason`), `host.docker.internal` vers `localhost:<port>` de l'hôte, l'arrêt par le fichier du groupe, Docker dans la VM (chaque VM a son moteur), et l'image `shell` (Debian 13 : curl, python3, git ; ni Node ni npm).
 
 Limites connues : sous Windows, les dépendances installées dans la VM sont des binaires Linux (un
-`node_modules` installé par l'hôte n'y tourne pas toujours, et inversement) ; une commande arrêtée
-par le délai l'est côté hôte (`sbx exec`), son processus dans la VM n'est pas encore tué ; sbx
-exige Windows 11 avec la plateforme d'hyperviseur, macOS 14 sur Apple silicon ou Ubuntu 24.04 avec
+`node_modules` installé par l'hôte n'y tourne pas toujours, et inversement) ; sbx exige Windows 11 avec la plateforme d'hyperviseur, macOS 14 sur Apple silicon ou Ubuntu 24.04 avec
 KVM. La purge avec le worktree et l'état de sbx sont dans Paramètres > Sandbox.
 
 ### Un CLI d'agent dans la VM (lot C2, expérimental)
@@ -191,14 +208,18 @@ doit être celui d'un service rangé (`anthropic/…` demande `anthropic`).
 Interrupteur coupé, rien ne change.
 
 **Installation** : `ensure_tool` lance `command -v <cmd> || { <install>; }` dans la VM, sous le
-verrou de la VM, et le note dans son état ; les sessions suivantes ne le refont pas. Les hôtes du
-CLI (`network`) s'ajoutent aux règles de la VM par `sbx policy allow network --sandbox`, sans la
-recréer : les règles d'une VM ne font que grandir.
+verrou de la VM, et le note dans son état ; les sessions suivantes ne le refont pas. L'image n'a
+pas Node : OpenCode s'installe en binaire autonome, l'archive `opencode-linux-<x64|arm64>` du
+registre npm extraite dans `~/.local/opencode` et liée dans `~/.local/bin` (dans le `PATH` de la
+VM), sans root. Les hôtes du CLI (`network`) s'ajoutent aux règles de la VM sans la recréer.
 
 Limites : le CLI doit aussi être installé sur l'hôte (sa détection reste celle de l'hôte) ; ses
-serveurs MCP ne sont pas lancés dans la VM (ils sont retirés de la session, avec un avertissement) ;
-le format de `sbx secret ls` et la présence de Node dans l'image `shell` restent à vérifier sur une
-machine réelle.
+serveurs MCP ne sont pas lancés dans la VM (ils sont retirés de la session, avec un avertissement).
+Vérifié sous Windows : `sbx secret ls --json` donne `{"secrets": [{"scope", "type", "name",
+"secret": "(stored)"}], …}` (des noms, jamais une valeur), le proxy ajoute la clé rangée à
+`api.anthropic.com`, OpenCode 1.19.6 s'installe et lance la requête ; il écrit sous
+`~/.config`, `~/.local/share`, `~/.cache` et `~/.local/state` de la VM, et tente `models.dev` et
+`models.opencode.ai` (refusés, il s'en passe).
 
 ## Le garde-fou : la carte le dit au lancement
 

@@ -4,12 +4,12 @@
  * the velocity of the last closed sprints, and, for a person who may change
  * the board, creating, starting, closing, editing and deleting sprints.
  *
- * A card joins a sprint from its menu or by being dragged into the sprint's
- * lane (grouping « Sprint »).
+ * A card joins a sprint from its planning view (« Plan »), its menu, or by
+ * being dragged into the sprint's lane (grouping « Sprint »).
  *
  * Design: docs/architecture/kanban-sprints.md.
  */
-import { CalendarRange, IterationCw, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
+import { CalendarRange, IterationCw, ListPlus, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Sprint } from "../../../shared/types";
@@ -50,12 +50,14 @@ export function SprintMenu() {
 	const load = useSprintStore((s) => s.load);
 	const start = useSprintStore((s) => s.start);
 	const remove = useSprintStore((s) => s.remove);
+	const openPlanning = useSprintStore((s) => s.openPlanning);
 	const tasks = useTaskStore((s) => s.tasks);
 	const filter = useKanbanFilterStore((s) => s.filters.sprint);
 	const setSprint = useKanbanFilterStore((s) => s.setSprint);
 	const failed = useSprintFailure();
 	const [editing, setEditing] = useState<{ sprint?: Sprint } | null>(null);
 	const [closing, setClosing] = useState<Sprint | null>(null);
+	const [menuOpen, setMenuOpen] = useState(false);
 
 	useEffect(() => {
 		if (projectId) void load(projectId);
@@ -99,7 +101,7 @@ export function SprintMenu() {
 
 	return (
 		<>
-			<Popover>
+			<Popover open={menuOpen} onOpenChange={setMenuOpen}>
 				<PopoverTrigger asChild>
 					<Button
 						variant="ghost"
@@ -195,6 +197,18 @@ export function SprintMenu() {
 									)}
 									{canEdit && sprint.state !== "closed" && (
 										<div className="mt-1.5 flex flex-wrap gap-1">
+											<Button
+												size="sm"
+												variant="outline"
+												className="h-6 gap-1 px-2 text-xs"
+												onClick={() => {
+													setMenuOpen(false);
+													openPlanning(sprint.id);
+												}}
+											>
+												<ListPlus className="h-3 w-3" />
+												{t("tasks:kanban.sprints.planning.open")}
+											</Button>
 											{sprint.state === "planned" && (
 												<Button
 													size="sm"

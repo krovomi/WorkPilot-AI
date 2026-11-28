@@ -754,7 +754,7 @@
 			"button": "Sprints",
 			"allCards": "Toutes les tâches",
 			"backlog": "Backlog (sans sprint)",
-			"empty": "Aucun sprint pour l'instant. Créez-en un, puis ajoutez-y des tâches depuis leur menu ou en les glissant dans son couloir (Couloirs : Sprint).",
+			"empty": "Aucun sprint pour l'instant. Créez-en un, puis planifiez-le : choisissez ses tâches dans le backlog.",
 			"unknown": "Sprint inconnu",
 			"states": {
 				"planned": "Planifié",
@@ -796,7 +796,41 @@
 			"cardsNotMoved_other": "{{count}} tâches n'ont pas pu être déplacées : le sprint n'a pas été modifié.",
 			"cardMenu": "Sprint",
 			"noneToJoin": "Aucun sprint ouvert",
-			"undoLabel": "changement de sprint"
+			"undoLabel": "changement de sprint",
+			"planning": {
+				"open": "Planifier",
+				"title": "Planifier « {{name}} »",
+				"hint": "Cochez des tâches du backlog et ajoutez-les au sprint, ou renvoyez-en au backlog. Les points sont les scores Smart Estimation des tâches.",
+				"search": "Chercher dans le backlog",
+				"selectAll": "Sélectionner toutes les tâches affichées",
+				"summary_one": "{{count}} tâche · {{points}} pts",
+				"summary_other": "{{count}} tâches · {{points}} pts",
+				"points_one": "{{count}} pt",
+				"points_other": "{{count}} pts",
+				"add_one": "Ajouter {{count}} tâche au sprint",
+				"add_other": "Ajouter {{count}} tâches au sprint",
+				"remove_one": "Renvoyer {{count}} tâche au backlog",
+				"remove_other": "Renvoyer {{count}} tâches au backlog",
+				"addOne": "Ajouter au sprint",
+				"removeOne": "Renvoyer au backlog",
+				"backlogEmpty": "Plus aucune tâche à planifier : toutes les tâches ouvertes sont déjà dans un sprint.",
+				"noMatch": "Aucune tâche du backlog ne correspond à cette recherche.",
+				"sprintEmpty": "Ce sprint n'a pas encore de tâche. Cochez des tâches du backlog, puis « Ajouter au sprint ».",
+				"underVelocity": "{{points}} pts planifiés · vélocité {{velocity}} pts",
+				"overVelocity": "{{points}} pts planifiés : plus que la vélocité ({{velocity}} pts)"
+			},
+			"banner": {
+				"showOnly": "N'afficher que ce sprint",
+				"showAll": "Afficher toutes les tâches",
+				"empty": "Aucune tâche dans ce sprint pour l'instant.",
+				"emptyPlan": "Aucune tâche dans ce sprint : planifiez-le pour en ajouter.",
+				"progressLabel": "Avancement du sprint",
+				"daysLeft_one": "{{count}} jour restant",
+				"daysLeft_other": "{{count}} jours restants",
+				"lastDay": "Dernier jour",
+				"overdue_one": "Terminé depuis {{count}} jour",
+				"overdue_other": "Terminé depuis {{count}} jours"
+			}
 		},
 		"layout": {
 			"label": "Affichage",
