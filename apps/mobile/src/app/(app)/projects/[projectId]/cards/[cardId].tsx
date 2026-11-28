@@ -317,14 +317,20 @@ export default function CardScreen() {
 	);
 }
 
+/** A run's colour and icon: an interrupted run waits to be resumed, it did not fail. */
+function runLook(status: string, theme: ReturnType<typeof useTheme>): { color: string; icon: IconName } {
+	if (status === "succeeded") return { color: theme.success, icon: "check-circle" };
+	if (status === "failed") return { color: theme.danger, icon: "x-circle" };
+	if (status === "interrupted") return { color: theme.warning, icon: "pause-circle" };
+	return { color: theme.textMuted, icon: "loader" };
+}
+
 function RunRow({ run, locale }: { run: AgentRun; locale: string }) {
 	const { t, i18n } = useTranslation();
 	const theme = useTheme();
 	const status = i18n.exists(`runStatus.${run.status}`) ? t(`runStatus.${run.status}`) : run.status;
 	const phase = i18n.exists(`runPhase.${run.phase}`) ? t(`runPhase.${run.phase}`) : run.phase;
-	const color =
-		run.status === "succeeded" ? theme.success : run.status === "failed" ? theme.danger : theme.textMuted;
-	const icon: IconName = run.status === "succeeded" ? "check-circle" : run.status === "failed" ? "x-circle" : "loader";
+	const { color, icon } = runLook(run.status, theme);
 	return (
 		<View style={[styles.run, { borderColor: theme.border }]}>
 			<Icon name={icon} size={18} color={color} />

@@ -5,6 +5,8 @@ import { createIpcListener, invokeIpc } from "./modules/ipc-utils";
 
 export interface SecureStorageAPI {
 	getSecureStorageStatus(): Promise<IPCResult<SecureStorageStatus>>;
+	/** The banner's one-click fix; the main decides what it does. */
+	fixSecureStorage(): Promise<IPCResult<SecureStorageStatus>>;
 	onSecureStorageStatusChanged(
 		callback: (status: SecureStorageStatus) => void,
 	): () => void;
@@ -15,6 +17,10 @@ export function createSecureStorageAPI(): SecureStorageAPI {
 		getSecureStorageStatus: () =>
 			invokeIpc<IPCResult<SecureStorageStatus>>(
 				IPC_CHANNELS.SECURE_STORAGE_STATUS,
+			),
+		fixSecureStorage: () =>
+			invokeIpc<IPCResult<SecureStorageStatus>>(
+				IPC_CHANNELS.SECURE_STORAGE_FIX,
 			),
 		onSecureStorageStatusChanged: (callback) =>
 			createIpcListener<[SecureStorageStatus]>(

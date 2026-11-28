@@ -140,7 +140,14 @@
 		"action": "Installez ou déverrouillez un trousseau (GNOME Keyring, KWallet…) puis redémarrez WorkPilot AI : vos clés seront alors chiffrées.",
 		"readableDescription": "Le backend lit ces clés directement dans le .workpilot/.env de vos projets (ou, quand WorkPilot AI tourne depuis les sources, dans son propre .env) : elles y restent non chiffrées, dans un fichier lisible uniquement par votre compte utilisateur : {{keys}}.",
 		"readableAction": "Retirez des paramètres du projet les clés que vous n'utilisez plus. Depuis les sources, configurez Claude dans les Paramètres, où les identifiants sont chiffrés, et retirez son jeton du .env du backend.",
-		"dismiss": "Ignorer"
+		"dismiss": "Ignorer",
+		"wslDescription": "WorkPilot AI n'a pas pu joindre le chiffrement de Windows (DPAPI) depuis WSL : vos clés API et jetons sont conservés sur cet appareil sans chiffrement, dans des fichiers lisibles uniquement par votre compte utilisateur.",
+		"wslAction": "Vérifiez que l'interopérabilité Windows est active dans WSL ([interop] enabled=true dans /etc/wsl.conf), puis réessayez : vos clés seront chiffrées aussitôt, sans redémarrer.",
+		"retry": "Chiffrer maintenant",
+		"retrying": "Chiffrement…",
+		"retryFailed": "Le chiffrement de Windows reste injoignable.",
+		"restart": "Redémarrer WorkPilot AI",
+		"hideForGood": "Ne plus afficher"
 	},
 	"claudeCode": {
 		"checking": "Vérification du CLI IA...",

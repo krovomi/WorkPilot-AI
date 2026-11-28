@@ -57,6 +57,9 @@ RECALL_TEAMS_ENV = "WORKPILOT_RECALL_TEAMS"
 
 #: Error of a run the server was running when it stopped.
 INTERRUPTED = "Interrupted: the server stopped while the run was queued or running"
+#: Status of such a run: it did not fail, and its card offers to resume it
+#: (``server/services/interrupted_runs.py``).
+INTERRUPTED_STATUS = "interrupted"
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
@@ -316,6 +319,13 @@ def _keep_approval(spec_dir: Path) -> None:
         logger.warning("Approval of %s not carried over: %s", spec_dir.name, exc)
 
 
+def keep_approval(spec_dir: Path) -> None:
+    """Carry a build's approval over the plan it wrote, as a build that ended
+    does: for the resume of a build a restart interrupted, which started
+    approved (``AgentRun.started_approved``) and never got to keep it."""
+    _keep_approval(spec_dir)
+
+
 def _mint_ws_token(run_id: str, hours: int = 12) -> str:
     """Service token for the agent's streaming connection.
 
@@ -569,11 +579,14 @@ class RunManager:
         return runs
 
     async def settle_orphans(self) -> int:
-        """Mark failed the runs left queued or running by a server that stopped.
+        """Mark interrupted the runs left queued or running by a server that stopped.
 
         Nothing will ever finish them: they showed as running forever and
         counted against the organization's run quota, so every new run got a
-        429 after a restart during builds. Returns how many were settled.
+        429 after a restart during builds. They used to be marked failed; an
+        interrupted run did not fail, and the person who started it (or an
+        owner of the project) is offered to resume it from where it stopped
+        (``server/services/interrupted_runs.py``). Returns how many were settled.
         """
         async with get_session_factory()() as db:
             runs = await db.scalars(
@@ -583,7 +596,7 @@ class RunManager:
             for run in runs:
                 if run.id in self._tracked:
                     continue
-                run.status = "failed"
+                run.status = INTERRUPTED_STATUS
                 run.error = INTERRUPTED
                 run.finished_at = datetime.now(UTC)
                 settled += 1
@@ -661,7 +674,9 @@ class RunManager:
                         "cancelled",
                     )
                     return
-                await self._set_run_status(run_id, "running")
+                spec_dir = Path(server_path) / ".workpilot" / "specs" / spec_name
+                approved = _approved_before_build(phase, spec_dir)
+                await self._set_run_status(run_id, "running", started_approved=approved)
                 await self._notify(
                     project_id, spec_id, spec_name, run_id, phase, user_id, "running"
                 )
@@ -669,9 +684,6 @@ class RunManager:
                 follower = asyncio.create_task(
                     follow_status(Path(server_path), spec_name, user_id)
                 )
-
-                spec_dir = Path(server_path) / ".workpilot" / "specs" / spec_name
-                approved = _approved_before_build(phase, spec_dir)
                 with tempfile.TemporaryDirectory(prefix="workpilot-run-") as scratch:
                     cmd = build_command(
                         phase,
@@ -749,7 +761,11 @@ class RunManager:
                 _run_ended(RunEnded(project_id, spec_name, phase, status))
 
     async def _set_run_status(
-        self, run_id: str, status: str, error: str | None = None
+        self,
+        run_id: str,
+        status: str,
+        error: str | None = None,
+        started_approved: bool = False,
     ) -> None:
         async with get_session_factory()() as db:
             run = await db.get(AgentRun, run_id)
@@ -757,6 +773,8 @@ class RunManager:
                 return
             run.status = status
             run.error = error
+            if started_approved:
+                run.started_approved = True
             if status in {"succeeded", "failed", "cancelled"}:
                 run.finished_at = datetime.now(UTC)
             await db.commit()

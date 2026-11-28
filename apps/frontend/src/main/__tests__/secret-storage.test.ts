@@ -28,6 +28,9 @@ vi.mock("../platform", async (importOriginal) => ({
 	isLinux: () => true,
 }));
 
+// Not WSL, wherever the suite runs: the DPAPI fallback has its own tests.
+vi.mock("../open-external", () => ({ detectWsl: () => false }));
+
 const fake = sharedFakeSafeStorage();
 type SecretStorage = typeof import("../secret-storage");
 
@@ -66,9 +69,11 @@ describe("secret-storage", () => {
 
 			expect(storage.getSecureStorageStatus()).toEqual({
 				keyringAvailable: true,
+				protection: "os-keyring",
 				backend: "gnome_libsecret",
 				readableSecretKeys: [],
 				secretsAtRisk: false,
+				fix: null,
 			});
 		});
 
@@ -119,9 +124,12 @@ describe("secret-storage", () => {
 			expect(storage.encryptSecret("sk-plain")).toBe("sk-plain");
 			expect(storage.getSecureStorageStatus()).toEqual({
 				keyringAvailable: false,
+				protection: null,
 				backend: "basic_text",
 				readableSecretKeys: [],
 				secretsAtRisk: true,
+				// Linux outside WSL: the keyring is chosen at launch.
+				fix: "restart",
 			});
 			// What basic_text encrypted earlier still reads back.
 			expect(storage.decryptSecret(fakeEncrypted("older"))).toBe("older");
@@ -160,9 +168,11 @@ describe("secret-storage", () => {
 
 			expect(storage.getSecureStorageStatus()).toEqual({
 				keyringAvailable: true,
+				protection: "os-keyring",
 				backend: "gnome_libsecret",
 				readableSecretKeys: ["CONTEXT7_API_KEY", "SLACK_WEBHOOK_URL"],
 				secretsAtRisk: true,
+				fix: null,
 			});
 			expect(listener).toHaveBeenCalledTimes(2);
 		});

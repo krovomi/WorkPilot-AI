@@ -120,10 +120,13 @@ export interface TimeTravelDecisionHeatmapResult extends TimeTravelResult {
 export interface SecureStorageStatus {
 	/**
 	 * Secrets are encrypted with a key the OS keeps (Keychain, DPAPI,
-	 * libsecret, KWallet). False when safeStorage cannot encrypt at all, and
-	 * on Linux's `basic_text` backend, whose key is compiled into Chromium.
+	 * libsecret, KWallet; under WSL without a usable keyring, Windows DPAPI
+	 * through interop). False when nothing can encrypt, and on Linux's
+	 * `basic_text` backend, whose key is compiled into Chromium.
 	 */
 	keyringAvailable: boolean;
+	/** What encrypts new secrets: the OS keyring, the WSL DPAPI key, or nothing. */
+	protection: "os-keyring" | "windows-dpapi" | null;
 	/** Linux only: the safeStorage backend Electron selected. */
 	backend: string | null;
 	/**
@@ -138,7 +141,15 @@ export interface SecureStorageStatus {
 	 * being told.
 	 */
 	secretsAtRisk: boolean;
+	/**
+	 * Linux without encryption: what the banner's button does — `retry` asks
+	 * Windows DPAPI again (WSL), `restart` relaunches the app so a keyring
+	 * unlocked meanwhile is used. Null when there is nothing to fix.
+	 */
+	fix: SecureStorageFix | null;
 }
+
+export type SecureStorageFix = "retry" | "restart";
 
 // ============================================
 // Windsurf key installed by the local IDE

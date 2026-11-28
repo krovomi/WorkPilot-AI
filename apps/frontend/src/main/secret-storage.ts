@@ -30,14 +30,30 @@
  * (secrets already encrypted are kept as they are, new ones written in clear
  * with the banner). Windows (DPAPI) never prompts; macOS shows its own Keychain
  * dialog the user answers, so neither is bounded.
+ *
+ * WSL without a usable keyring (none installed, or locked behind a prompt
+ * WSLg cannot show) uses Windows DPAPI instead, through interop: a key of the
+ * app's own, kept on disk only wrapped by DPAPI (wsl-secret-key.ts), encrypts
+ * the secrets as `encw:<base64>` (AES-256-GCM). The banner then has nothing to
+ * say. Values already `enc:` keep needing the keyring that wrote them.
  */
 
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { app, safeStorage } from "electron";
-import type { SecureStorageStatus } from "../shared/types/ipc";
+import type {
+	SecureStorageFix,
+	SecureStorageStatus,
+} from "../shared/types/ipc";
+import { detectWsl } from "./open-external";
 import { isLinux } from "./platform";
+import { loadWslSecretKey } from "./wsl-secret-key";
 
 export const ENCRYPTED_SECRET_PREFIX = "enc:";
+/** AES-256-GCM under the WSL key Windows DPAPI keeps (wsl-secret-key.ts). */
+export const APP_KEY_SECRET_PREFIX = "encw:";
+const GCM_IV_BYTES = 12;
+const GCM_TAG_BYTES = 16;
 
 type StatusListener = (status: SecureStorageStatus) => void;
 
@@ -47,6 +63,14 @@ let secretsStored = false;
 /** A secret was written in clear because encryption failed or was unavailable. */
 let plaintextWritten = false;
 let decryptWarned = false;
+/** WSL only: the key DPAPI unwrapped for this session; null without one. */
+let appKey: Buffer | null = null;
+let underWsl: boolean | undefined;
+let appKeyPreload: Promise<Buffer | null> | null = null;
+/** Rewrites the secrets still in clear (index.ts registers its migration). */
+let rewritePlaintextSecrets: () => Promise<void> = async () => {
+	// Until index.ts registers the startup migration: nothing to rewrite.
+};
 /** File → the secret keys it keeps readable on purpose (names only). */
 const readableSecrets = new Map<string, readonly string[]>();
 /**
@@ -156,6 +180,7 @@ export async function initSecretStorage(
 		// async API still asks the Secret Service, and a locked one opens an
 		// unlock prompt (blank under WSLg) for nothing: do not ask at all.
 		asyncEncryptionAvailable = false;
+		await loadAppKey();
 		publish();
 		return;
 	}
@@ -166,8 +191,74 @@ export async function initSecretStorage(
 		asyncEncryptionAvailable = false;
 	}
 	if (asyncEncryptionAvailable && isLinux()) await probeLinuxKeyring();
+	await loadAppKey();
 	await primeSecretFiles(files);
 	publish();
+}
+
+/**
+ * WSL: start unwrapping the key already on disk before `ready`, so the second
+ * or two PowerShell takes to start runs alongside Electron's own startup
+ * instead of delaying the window. Creating one waits for initSecretStorage,
+ * which knows whether a keyring can encrypt.
+ */
+export function preloadAppKey(): void {
+	if (!isLinux() || appKeyPreload) return;
+	appKeyPreload = loadWslSecretKey({ create: false }).catch(() => null);
+}
+
+/**
+ * WSL: unwrap the DPAPI-kept key — created when no keyring can encrypt, only
+ * read when one can (it still decrypts the `encw:` values written without it).
+ * Never throws; elsewhere it does nothing.
+ */
+async function loadAppKey(): Promise<void> {
+	if (!isLinux()) return;
+	try {
+		const preloaded = appKeyPreload ? await appKeyPreload : null;
+		appKeyPreload = null;
+		appKey =
+			preloaded ?? (await loadWslSecretKey({ create: !keyringAvailable() }));
+	} catch {
+		appKey = null;
+	}
+	if (appKey) {
+		console.warn(
+			"[SecretStorage] No usable Linux keyring under WSL: secrets are encrypted with a key Windows DPAPI keeps for this Windows account.",
+		);
+	}
+}
+
+/** The startup migration, which the banner's retry runs again once it can encrypt. */
+export function setPlaintextSecretsRewriter(rewrite: () => Promise<void>): void {
+	rewritePlaintextSecrets = rewrite;
+}
+
+/**
+ * What the banner's button does: under WSL, ask DPAPI again (interop or
+ * PowerShell may have been unavailable at launch); elsewhere on Linux the
+ * keyring is chosen at launch, so restart. Null when nothing is to fix.
+ */
+export function secureStorageFix(): SecureStorageFix | null {
+	if (!isLinux() || encryptionAvailable()) return null;
+	underWsl ??= detectWsl();
+	return underWsl ? "retry" : "restart";
+}
+
+/**
+ * The banner's "retry": load the WSL key again, creating it if need be.
+ * When secrets can now be encrypted, those still in clear are rewritten (the
+ * startup migration, see setPlaintextSecretsRewriter) and the banner goes away.
+ */
+export async function retrySecretEncryption(): Promise<boolean> {
+	if (!encryptionAvailable()) await loadAppKey();
+	if (encryptionAvailable()) {
+		await rewritePlaintextSecrets();
+		// Rewritten encrypted: what was written in clear no longer is.
+		plaintextWritten = false;
+	}
+	publish();
+	return encryptionAvailable();
 }
 
 /**
@@ -288,20 +379,59 @@ function keyringAvailable(backend = selectedBackend()): boolean {
 	return safeStorageReady() && backend !== "basic_text";
 }
 
+/** A new secret can be written encrypted: OS keyring, or the WSL DPAPI key. */
+function encryptionAvailable(backend = selectedBackend()): boolean {
+	return keyringAvailable(backend) || appKey !== null;
+}
+
+function sealWithAppKey(key: Buffer, value: string): string {
+	const iv = randomBytes(GCM_IV_BYTES);
+	const cipher = createCipheriv("aes-256-gcm", key, iv);
+	const body = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+	const sealed = Buffer.concat([iv, cipher.getAuthTag(), body]);
+	return `${APP_KEY_SECRET_PREFIX}${sealed.toString("base64")}`;
+}
+
+/** The secret behind an `encw:` value; throws when the key does not open it. */
+function openWithAppKey(key: Buffer, stored: string): string {
+	const sealed = Buffer.from(
+		stored.slice(APP_KEY_SECRET_PREFIX.length),
+		"base64",
+	);
+	if (sealed.length < GCM_IV_BYTES + GCM_TAG_BYTES) {
+		throw new Error("truncated value");
+	}
+	const decipher = createDecipheriv(
+		"aes-256-gcm",
+		key,
+		sealed.subarray(0, GCM_IV_BYTES),
+	);
+	decipher.setAuthTag(
+		sealed.subarray(GCM_IV_BYTES, GCM_IV_BYTES + GCM_TAG_BYTES),
+	);
+	return Buffer.concat([
+		decipher.update(sealed.subarray(GCM_IV_BYTES + GCM_TAG_BYTES)),
+		decipher.final(),
+	]).toString("utf8");
+}
+
 function readableSecretKeys(): string[] {
 	return [...new Set([...readableSecrets.values()].flat())].sort();
 }
 
 export function getSecureStorageStatus(): SecureStorageStatus {
 	const backend = selectedBackend();
-	const available = keyringAvailable(backend);
+	const keyring = keyringAvailable(backend);
+	const available = keyring || appKey !== null;
 	const readable = readableSecretKeys();
 	return {
 		keyringAvailable: available,
+		protection: keyring ? "os-keyring" : appKey ? "windows-dpapi" : null,
 		backend,
 		readableSecretKeys: readable,
 		secretsAtRisk:
 			plaintextWritten || (secretsStored && !available) || readable.length > 0,
+		fix: secureStorageFix(),
 	};
 }
 
@@ -366,7 +496,9 @@ function notePlaintextWritten(): void {
 
 export function isEncryptedSecret(value: unknown): value is string {
 	return (
-		typeof value === "string" && value.startsWith(ENCRYPTED_SECRET_PREFIX)
+		typeof value === "string" &&
+		(value.startsWith(ENCRYPTED_SECRET_PREFIX) ||
+			value.startsWith(APP_KEY_SECRET_PREFIX))
 	);
 }
 
@@ -391,6 +523,7 @@ export function encryptSecret(value: string): string {
 			console.warn("[SecretStorage] safeStorage failed to encrypt:", error);
 		}
 	}
+	if (appKey) return sealWithAppKey(appKey, value);
 	notePlaintextWritten();
 	return value;
 }
@@ -404,6 +537,15 @@ export function decryptSecret(stored: string): string | undefined {
 	if (!stored) return stored;
 	noteSecretStored();
 	if (!isEncryptedSecret(stored)) return stored;
+	if (stored.startsWith(APP_KEY_SECRET_PREFIX)) {
+		if (!appKey) return undefined;
+		try {
+			return openWithAppKey(appKey, stored);
+		} catch (error) {
+			warnUndecryptable(error);
+			return undefined;
+		}
+	}
 	const cached = decryptedCache.get(stored);
 	if (cached !== undefined) return cached;
 	if (!safeStorageReady()) return undefined;
@@ -414,15 +556,18 @@ export function decryptSecret(stored: string): string | undefined {
 		remember(stored, secret);
 		return secret;
 	} catch (error) {
-		if (!decryptWarned) {
-			decryptWarned = true;
-			console.warn(
-				"[SecretStorage] A stored secret cannot be decrypted; it is kept as is:",
-				error,
-			);
-		}
+		warnUndecryptable(error);
 		return undefined;
 	}
+}
+
+function warnUndecryptable(error: unknown): void {
+	if (decryptWarned) return;
+	decryptWarned = true;
+	console.warn(
+		"[SecretStorage] A stored secret cannot be decrypted; it is kept as is:",
+		error,
+	);
 }
 
 type SecretKeyPredicate = (key: string) => boolean;

@@ -1,7 +1,7 @@
 ---
 feature: Secrets au repos
 summary: >-
-  Clés et jetons chiffrés par `safeStorage` (trousseau WSL déclaré), logs Electron caviardés ;
+  Clés et jetons chiffrés par `safeStorage` (sous WSL sans trousseau : DPAPI de Windows), logs Electron caviardés ;
   `.env` de projet et du backend : jetons chiffrés ; âge de chaque clé, rappel à 90 jours.
 ---
 
@@ -25,6 +25,7 @@ One module now decides what a secret looks like on disk —
 | Situation | What is written | What the user sees |
 |---|---|---|
 | OS keyring (Keychain, DPAPI, libsecret, KWallet) | `enc:<base64>` safeStorage ciphertext | nothing |
+| WSL without a usable keyring, Windows DPAPI reachable | `encw:<base64>` AES-256-GCM under a key DPAPI keeps (below) | nothing |
 | No keyring: `safeStorage` unavailable, or Linux `basic_text` | the secret itself, in a `0600` file | the sidebar banner (`SecureStorageBanner`), logged once |
 | Encryption throws although a keyring is reported | the secret itself, in a `0600` file | the same banner |
 | A process that cannot call `safeStorage` reads the file itself (a project's `readable` keys, the backend's `.env` from source) | the secret itself, in a `0600` file | the banner, naming the keys |
@@ -72,6 +73,48 @@ for. `secret-storage.ts` keeps writing in clear and the banner stays, as
 before. The values encrypted in a session with the keyring need it in the
 next: launched without it, they cannot be decrypted and are kept as they are
 (see *Reading never destroys*).
+
+## WSL: Windows DPAPI
+
+Under WSL the section above rarely ends with a keyring: none is installed, or
+GNOME Keyring runs on another bus than the session's (started by hand with
+`dbus-run-session` or `dbus-launch`), or it is locked and its unlock prompt
+renders blank. Even when it works, nothing unlocks it at login, so its
+password is asked after every WSL restart. The Windows side of the same user
+always has DPAPI, which is what the Windows build uses through safeStorage.
+
+`apps/frontend/src/main/wsl-secret-key.ts` gives WSL a key of its own:
+
+- 32 random bytes, created the first time no keyring can encrypt. On disk,
+  `<userData>/secret-key.dpapi` (`0600`, created exclusively) holds them only
+  wrapped by `ProtectedData.Protect` (CurrentUser scope, an entropy string of
+  the app's own). The key is checked to unwrap before anything is encrypted
+  with it, and lives in memory only.
+- DPAPI is reached through interop: `powershell.exe` (the one on the C:
+  drive WSL mounts, else the one on `PATH`) with a fixed `-EncodedCommand`
+  script; the bytes go on stdin, never in an argument. The child gets `PATH`,
+  `WSL_INTEROP` and `WSL_DISTRO_NAME` only, and `WSLENV` empty, so none of the
+  app's environment reaches Windows (rule S4). Each call is bounded
+  (`DPAPI_TIMEOUT_MS`); PowerShell's cold start takes a second or two.
+- The unwrap of an existing key starts before `ready` (`preloadAppKey`), next
+  to Electron's own startup, so the window is not delayed. Creating one waits
+  for `initSecretStorage`, which knows whether a keyring can encrypt.
+- A blob this Windows account cannot unwrap (profile copied from another
+  user or machine) is never replaced: the values it encrypted need it. The
+  session then has no key and falls back to clear text with the banner.
+- `secret-storage.ts` writes `encw:` + base64(IV 12 bytes, GCM tag 16 bytes,
+  ciphertext). `isEncryptedSecret` accepts both prefixes, so every reader and
+  migration treats an `encw:` value as encrypted. A keyring that becomes usable
+  later takes over for new secrets; the key is still read to decrypt the
+  `encw:` values, and an `enc:` value still needs the keyring that wrote it.
+
+The threat model is the same as safeStorage's: a copy of the profile folder
+(backup, sync, another account) cannot decrypt; a process running as the same
+user, which can call DPAPI or an unlocked keyring itself, can.
+
+Interop disabled (`[interop] enabled=false`), PowerShell blocked by policy, a
+timeout: no key, secrets in clear with the banner, whose button asks DPAPI
+again (below).
 
 ## Startup never waits on the keyring
 
@@ -214,8 +257,21 @@ pulls it on start (`secureStorage:status`) and the main process pushes it
 (`secureStorage:statusChanged`) the first time a secret is seen, the first time
 one is written in clear, and when the readable keys change. With a keyring the
 banner names the readable keys; without one it gives the keyring advice.
-Dismissing it lasts for the session; secrets newly exposed, or a key it has not
-named yet, bring it back.
+The status also says what encrypts (`protection`: `os-keyring`,
+`windows-dpapi` or null) and, on Linux without encryption, what the banner's
+button does (`fix`).
+
+- **The button** calls `secureStorage:fix`, which takes no argument: the main
+  decides. Under WSL (`retry`) it asks DPAPI again and, when it now has a
+  key, runs the startup migration again (`setPlaintextSecretsRewriter`), so
+  the secrets left in clear are encrypted without a restart. Elsewhere on
+  Linux (`restart`) the password store is chosen before `ready`, so it
+  relaunches the app.
+- **The cross** hides it for the session; secrets newly exposed, or a key it
+  has not named yet, bring it back.
+- **"Don't show again"** saves `secureStorageBannerHidden` in the settings:
+  the situation it was hidden for (`no-encryption`, or `readable:` and the
+  key names, never a value). Another situation shows the banner again.
 
 ## Logs
 

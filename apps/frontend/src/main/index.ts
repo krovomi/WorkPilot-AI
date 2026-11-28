@@ -71,7 +71,10 @@ import {
 	configureToolsFromSettings,
 	preWarmToolCache,
 } from "./cli-tool-manager";
-import { offerInterruptedTasksAtLaunch } from "./ipc-handlers/task/interrupted-prompt";
+import {
+	offerInterruptedTasksAtLaunch,
+	offerServerInterruptedTasks,
+} from "./ipc-handlers/task/interrupted-prompt";
 import { pauseRunningTasksForShutdown } from "./ipc-handlers/task/interrupted-runs";
 import { getSourceEnvPath } from "./ipc-handlers/settings-handlers";
 import { stopAllPrFollowups } from "./ipc-handlers/task/pr-followup-handlers";
@@ -79,7 +82,7 @@ import { stopSplitMergeWatch } from "./ipc-handlers/task/split-merge-watch";
 import { stopMergedWatch } from "./worktree-purge/merged-watch";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
-import { loadPersistedState, restoreSession } from "./server-connection";
+import { loadPersistedState, onServerSignedIn, restoreSession } from "./server-connection";
 import {
 	enforceWebviewPreferences,
 	isPermissionGranted,
@@ -114,7 +117,12 @@ import { initSentryMain } from "./sentry";
 import { armSmokeTest, isSmokeTest } from "./smoke-test";
 import { forgeAccountsFilePath } from "./forge/forge-accounts";
 import { aiAccountsFilePath } from "./ai-accounts/ai-accounts";
-import { initSecretStorage, primeSecretFiles } from "./secret-storage";
+import {
+	initSecretStorage,
+	preloadAppKey,
+	primeSecretFiles,
+	setPlaintextSecretsRewriter,
+} from "./secret-storage";
 import {
 	getSettingsPath,
 	migrateSettingsSecrets,
@@ -628,6 +636,8 @@ if (isWindows()) {
 
 // Linux without a declared desktop (WSL…): use the running keyring, not basic_text
 selectLinuxPasswordStore();
+// WSL: unwrap the DPAPI-kept secrets key while Electron starts (secret-storage.ts)
+preloadAppKey();
 
 // MCP App views get a scheme of their own, with their own CSP; Electron only
 // accepts the registration before ready (mcp-apps/view-protocol.ts).
@@ -1095,6 +1105,12 @@ function resumeInterruptedTasksWhenReady(): void {
 	} else {
 		run();
 	}
+	// Server mode: the runs the team server stopped, once a session is signed in.
+	onServerSignedIn(() => {
+		offerServerInterruptedTasks(manager, () => mainWindow).catch((error) => {
+			appLog.warn("[main] Could not offer the server's interrupted runs:", error);
+		});
+	});
 }
 
 // Initialize profile manager and handle migrated profiles
@@ -1288,6 +1304,8 @@ async function main() {
 	// Secrets at rest: probe the keyring and decrypt what is on disk with the
 	// async safeStorage API, before anything reads those files.
 	await initSecretStorage(appSecretFiles());
+	// The banner's "retry" (WSL) rewrites what is still in clear the same way.
+	setPlaintextSecretsRewriter(migrateSecretsAtRest);
 	// Listing these reads settings.json, decrypted ahead by now.
 	await primeSecretFiles(envSecretFiles());
 

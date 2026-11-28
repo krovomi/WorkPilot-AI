@@ -495,6 +495,18 @@ remettre tant que la durée de rétention court. Lire demande `insight.read`, ch
 `insight.write` ; un refus du serveur (limite atteinte, souvenir épinglé, délai passé) est dit dans
 la langue de l'app.
 
+## Les runs qu'un redémarrage du serveur a interrompus
+
+Une fois la session ouverte, `src/interrupted/InterruptedRunsGate.tsx` lit
+`GET /users/me/interrupted-runs` et, s'il y en a, ouvre la même invite que le bureau au lancement
+(`InterruptedRunsModal.tsx`) : le projet, le modèle, quand le serveur s'est arrêté, les étapes de la
+phase et l'endroit où elle repartira. Les runs de la personne sont cochés ; ceux d'un coéquipier
+(vus par un `owner` du projet) et ceux qui ne peuvent pas reprendre sont décochés. « Reprendre »
+appelle la route de reprise pour chaque run coché, « Plus tard » ou la fermeture met les autres de
+côté sur le serveur, donc le bureau ne les propose plus non plus. Un run refusé reste dans la liste
+avec la raison du serveur. Sur la carte, un run interrompu se lit « Interrompu ». Conception :
+[pause-resume.md](pause-resume.md).
+
 ## Ce qui vient
 
 - Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.
