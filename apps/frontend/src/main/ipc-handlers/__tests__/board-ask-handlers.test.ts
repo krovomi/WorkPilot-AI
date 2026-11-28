@@ -1,7 +1,8 @@
 /**
  * The IPC of « Interroger le tableau » revalidates what the renderer sends
  * (S6): a project id it knows, a bounded question, a bounded conversation.
- * The tickets are always the project's own, read here.
+ * The tickets are always the project's own, read here. « Vérifier une idée »
+ * gets the same checks for its bounded idea.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
@@ -14,6 +15,8 @@ const state = vi.hoisted(() => ({
 	oneShot: vi.fn(),
 	semanticOptions: [] as unknown[],
 	semantic: vi.fn(),
+	rankingsOptions: [] as unknown[],
+	rankings: vi.fn(),
 	mode: "auto",
 }));
 
@@ -37,9 +40,19 @@ vi.mock("../../board-ask/semantic-search", () => ({
 		state.semanticOptions.push(options);
 		return options.mode === "off" ? undefined : state.semantic;
 	},
+	createSemanticRankings: (options: { mode: string }) => {
+		state.rankingsOptions.push(options);
+		return options.mode === "off" ? undefined : state.rankings;
+	},
 }));
 
-import { handleBoardAsk, parseBoardAskRequest, registerBoardAskHandlers } from "../board-ask-handlers";
+import {
+	handleBoardAsk,
+	handleBoardIdea,
+	parseBoardAskRequest,
+	parseBoardIdeaRequest,
+	registerBoardAskHandlers,
+} from "../board-ask-handlers";
 
 beforeEach(() => {
 	state.projects = new Map([["p1", { id: "p1", path: "/projects/one" }]]);
@@ -60,6 +73,9 @@ beforeEach(() => {
 	state.semanticOptions = [];
 	state.semantic.mockReset();
 	state.semantic.mockResolvedValue(null);
+	state.rankingsOptions = [];
+	state.rankings.mockReset();
+	state.rankings.mockResolvedValue(null);
 	state.mode = "auto";
 });
 
@@ -142,5 +158,71 @@ describe("handleBoardAsk", () => {
 		const none = await handleBoardAsk({ projectId: "p1", question: "export csv" }, undefined, null);
 		expect(none.success && none.data?.mode).toBe("keywords");
 		expect(state.semantic).not.toHaveBeenCalled();
+	});
+});
+
+describe("parseBoardIdeaRequest", () => {
+	it.each([
+		[null, "Invalid request"],
+		[["p1"], "Invalid request"],
+		[{ projectId: 3, idea: "x" }, "Invalid project id"],
+		[{ projectId: "x".repeat(201), idea: "x" }, "Invalid project id"],
+		[{ projectId: "p1" }, "Invalid idea"],
+		[{ projectId: "p1", idea: "  \n " }, "Invalid idea"],
+		[{ projectId: "p1", idea: "i".repeat(6001) }, "Invalid idea"],
+	])("refuses %j", (raw, error) => {
+		expect(parseBoardIdeaRequest(raw)).toBe(error);
+	});
+
+	it("keeps the project id and the trimmed idea only", () => {
+		expect(parseBoardIdeaRequest({ projectId: "p1", idea: " Export CSV \n", tasks: [{ id: "forged" }] })).toEqual({
+			projectId: "p1",
+			idea: "Export CSV",
+		});
+	});
+});
+
+describe("handleBoardIdea", () => {
+	it("refuses a bad request, an unknown project and a server board", async () => {
+		expect(await handleBoardIdea({ projectId: "p1", idea: "" })).toEqual({ success: false, error: "Invalid idea" });
+		expect(await handleBoardIdea({ projectId: "nope", idea: "export" })).toEqual({
+			success: false,
+			error: "Unknown project",
+		});
+		state.server.add("p1");
+		expect(await handleBoardIdea({ projectId: "p1", idea: "export" })).toEqual({
+			success: false,
+			error: "server_project",
+		});
+		expect(state.oneShot).not.toHaveBeenCalled();
+	});
+
+	it("checks the idea against the project's tickets with the active provider, through its channel", async () => {
+		registerBoardAskHandlers();
+		const handler = state.handlers.get(IPC_CHANNELS.BOARD_ASK_CHECK_IDEA);
+		const result = (await handler?.({}, { projectId: "p1", idea: "Export CSV of the users" })) as {
+			success: boolean;
+			data: { mode: string; requirements: { verdict: string; matches: { taskId: string }[] }[] };
+		};
+		expect(result.success).toBe(true);
+		expect(result.data.mode).toBe("keywords");
+		expect(result.data.requirements).toHaveLength(1);
+		expect(result.data.requirements[0]?.verdict).toBe("unknown");
+		expect(result.data.requirements[0]?.matches.map((m) => m.taskId)).toEqual(["t1"]);
+		expect(state.oneShot).toHaveBeenCalledWith(
+			expect.objectContaining({ projectDir: "/projects/one", debugLabel: "BoardIdeaSplit" }),
+		);
+		expect(state.rankingsOptions).toEqual([{ projectDir: "/projects/one", mode: "auto" }]);
+	});
+
+	it("ranks no meaning when it is turned off, or when the caller says so", async () => {
+		state.mode = "off";
+		const off = await handleBoardIdea({ projectId: "p1", idea: "Export CSV" });
+		expect(off.success && off.data?.semantic).toBeUndefined();
+		const complete = vi.fn(async () => null);
+		const none = await handleBoardIdea({ projectId: "p1", idea: "Export CSV" }, complete, null);
+		expect(none.success && none.data?.mode).toBe("keywords");
+		expect(complete).toHaveBeenCalled();
+		expect(state.rankings).not.toHaveBeenCalled();
 	});
 });

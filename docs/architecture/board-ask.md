@@ -19,7 +19,7 @@ déjà été développée, même en partie. Leub a retenu quatre lots.
 |---|---|
 | 1 | le panneau, la recherche par mots-clés, le modèle pour comprendre et juger |
 | 2 | des embeddings multilingues quand un modèle est là (Ollama, LM Studio, API du provider) : [le sens](#le-sens-lot-2) |
-| 3 | « Vérifier une idée » : une fonctionnalité collée, sa couverture exigence par exigence |
+| 3 | « Vérifier une idée » : une fonctionnalité collée, sa couverture exigence par exigence : [l'idée](#vérifier-une-idée-lot-3) |
 | 4 | d'autres sources (roadmap, idées, PR et commits), le mode serveur, l'app mobile |
 
 ## Pourquoi pas seulement des embeddings
@@ -96,6 +96,37 @@ Frontières du lot 2 :
   `local` ou `off` évitent. Les vecteurs restent sur la machine ; ni la question ni la conversation
   ne sont écrites.
 
+## Vérifier une idée (lot 3)
+
+Le second onglet du panneau répond à la question du product owner avant qu'il écrive une carte :
+« ce que je prévois, le tableau l'a-t-il déjà, même en partie ? ». Il colle la fonctionnalité
+(une phrase, une liste, une spec, 6 000 caractères au plus) ; `main/board-ask/idea-check.ts` :
+
+1. **Découpe.** Le modèle du provider choisi la coupe en 12 exigences vérifiables au plus et lui
+   donne un titre, dans la langue de l'idée. Sans modèle, ses puces (deux au moins) ou ses
+   phrases sont les exigences, et sa première ligne le titre.
+2. **Cherche.** Chaque exigence est cherchée comme une question : le BM25 (avec le titre de
+   l'idée, à poids 0,3, pour le contexte) et, quand un modèle d'embeddings répond, son sens. Le
+   runner reçoit **toutes les exigences en un appel** (`queries`, 16 au plus) : les tickets ne
+   sont lus et vectorisés qu'une fois. Les deux classements sont fusionnés par RRF, 8 candidats
+   par exigence.
+3. **Juge.** Le modèle lit les exigences (`R1`…) et l'union de leurs candidats (`T1`…, 40 au
+   plus, pris à tour de rôle pour que chaque exigence apporte ses meilleurs) et rend, par
+   exigence, `done`, `partial` ou `missing`, les tickets qui la portent et une phrase ; puis un
+   résumé. Une exigence qu'il ne juge pas, ou toutes quand il ne répond pas, reste `unknown`
+   (« À vérifier ») avec ses 3 tickets les plus proches (la bande du sens écarte les lointains).
+
+**Créer la carte.** Le bouton « Créer une carte avec ce qui manque » crée, par l'API de création
+de tâche qu'utilise déjà le tableau, une carte du backlog : le résumé, puis ce qui est à
+construire, à terminer (avec les tickets sur lesquels s'appuyer) et à vérifier ; ce qui est déjà
+fait est listé à part, l'idée d'origine ferme la description (`kanban/board-ask/idea-card.ts`).
+Rien n'est créé sans ce clic, et rien quand toutes les exigences sont faites.
+
+Les mêmes frontières que la question valent : le renderer n'envoie qu'un id de projet et l'idée,
+revérifiés par `parseBoardIdeaRequest` ; l'idée et les tickets entrent dans les prompts par
+`quoteUntrusted` ; le modèle ne nomme que les références données, les verdicts sont une liste
+fermée ; la dernière idée vérifiée par projet vit en mémoire seulement.
+
 ## Ce qui est lu
 
 Toutes les cartes du projet (`projectStore.getTasks`), **terminées, archivées et abandonnées
@@ -128,12 +159,14 @@ comprises** : c'est ce qu'un product owner veut retrouver. L'état est dit avec 
 | `main/board-ask/board-ask-service.ts` | prompts, lecture des réponses, les trois étapes, la fusion |
 | `main/board-ask/semantic-search.ts` | lance le runner d'embeddings, relit son classement, le réglage |
 | `apps/backend/board_ask/semantic.py`, `runners/board_ask_embed_runner.py` | le modèle d'embeddings : choix, appels, cache des vecteurs |
-| `main/ipc-handlers/board-ask-handlers.ts` | canal `boardAsk:ask`, revalidation |
-| `renderer/stores/board-ask-store.ts` | panneau ouvert, une conversation par projet |
-| `renderer/components/kanban/board-ask/` | bouton de la barre, panneau |
+| `main/board-ask/idea-check.ts` | « Vérifier une idée » : découpe, recherche par exigence, jugement |
+| `main/ipc-handlers/board-ask-handlers.ts` | canaux `boardAsk:ask` et `boardAsk:checkIdea`, revalidation |
+| `renderer/stores/board-ask-store.ts` | panneau ouvert, onglet, une conversation et une idée par projet |
+| `renderer/components/kanban/board-ask/` | bouton de la barre, panneau, onglet `IdeaCheckView.tsx`, carte `idea-card.ts` |
 
 Tests : `shared/utils/__tests__/board-ask-search.test.ts`,
 `main/board-ask/__tests__/board-ask-service.test.ts`,
-`main/board-ask/__tests__/semantic-search.test.ts`, `tests/board_ask/`,
-`main/ipc-handlers/__tests__/board-ask-handlers.test.ts`,
-`renderer/components/kanban/board-ask/BoardAskPanel.test.tsx`.
+`main/board-ask/__tests__/semantic-search.test.ts`, `main/board-ask/__tests__/idea-check.test.ts`,
+`tests/board_ask/`, `main/ipc-handlers/__tests__/board-ask-handlers.test.ts`,
+`renderer/components/kanban/board-ask/BoardAskPanel.test.tsx`, `IdeaCheckView.test.tsx`,
+`idea-card.test.ts`.

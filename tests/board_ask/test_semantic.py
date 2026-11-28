@@ -308,7 +308,7 @@ class TestParseRequest:
 
     def test_a_valid_request(self, tmp_path):
         request = parse_request(self._raw(tmp_path))
-        assert request["query"] == "admin"
+        assert request["queries"] == ["admin"] and request["many"] is False
         assert len(request["documents"][0]["text"]) == semantic.MAX_TEXT_CHARS
 
     @pytest.mark.parametrize(
@@ -328,6 +328,19 @@ class TestParseRequest:
     def test_refusals(self, tmp_path, extra):
         with pytest.raises(ValueError):
             parse_request(self._raw(tmp_path, **extra))
+
+    def test_several_queries(self, tmp_path):
+        raw = self._raw(tmp_path)
+        del raw["query"]
+        request = parse_request({**raw, "queries": [" a ", "b"]})
+        assert request["queries"] == ["a", "b"] and request["many"] is True
+
+    @pytest.mark.parametrize(
+        "queries", [[], "a", ["a", " "], ["a"] * (semantic.MAX_QUERIES + 1)]
+    )
+    def test_bad_queries(self, tmp_path, queries):
+        with pytest.raises(ValueError):
+            parse_request({**self._raw(tmp_path), "queries": queries})
 
     def test_not_an_object(self):
         with pytest.raises(ValueError):
@@ -463,3 +476,30 @@ def test_post_does_not_follow_a_redirect():
             semantic._post(api.url, {}, "k", 5)
     finally:
         api.close()
+
+
+def test_several_queries_share_one_reading_of_the_tickets(api, tmp_path):
+    source, embedder = resolve("auto", tmp_path, None, _env())
+    rankings = semantic.rank_many(source, embedder, ["admin", "csv export"], DOCS)
+    assert rankings is not None
+    assert [r.scores[0]["id"] for r in rankings] == ["t1", "t2"]
+    sent = [t for _, payload, _ in api.calls for t in payload["input"]]
+    # Each text once: a query that is also a ticket's text is not sent twice.
+    assert sorted(sent) == sorted({"admin", *(d["text"] for d in DOCS)})
+
+
+def test_a_query_without_a_vector_gets_no_ranking(monkeypatch, tmp_path):
+    monkeypatch.setattr(semantic, "find", lambda: None)
+
+    def post(url, payload, key, timeout):
+        return {
+            "data": [
+                {"embedding": ["x"] if t == "bad" else _vector_of(t), "index": i}
+                for i, t in enumerate(payload["input"])
+            ]
+        }
+
+    monkeypatch.setattr(semantic, "_post", post)
+    source, embedder = resolve("auto", tmp_path, None, _env())
+    rankings = semantic.rank_many(source, embedder, ["bad", "admin"], DOCS)
+    assert rankings is not None and rankings[0] is None and rankings[1] is not None

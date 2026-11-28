@@ -637,6 +637,57 @@
 					"local": "Seulement un modèle d'embeddings sur cet ordinateur : pour cette étape, les tickets n'en sortent pas",
 					"off": "Mots-clés et modèle d'IA seulement"
 				}
+			},
+			"tabs": {
+				"label": "Interroger le tableau ou vérifier une idée",
+				"ask": "Poser une question",
+				"idea": "Vérifier une idée"
+			},
+			"idea": {
+				"description": "Collez une fonctionnalité prévue, dans n'importe quelle langue : chacune de ses exigences revient déjà faite, en partie faite ou manquante, avec les tickets qui la portent.",
+				"label": "La fonctionnalité à vérifier",
+				"placeholder": "Décrivez la fonctionnalité : une phrase, une liste de besoins ou une spec collée. Par exemple : « Les admins exportent la liste des utilisateurs en CSV, filtrée par rôle, et reçoivent un e-mail quand elle est prête. »",
+				"check": "Vérifier",
+				"length": "{{count}} / {{max}}",
+				"emptyHint": "Le tableau découpe l'idée en exigences et cherche chacune dans tous les tickets, quelle que soit leur langue. Ctrl + Entrée lance la vérification.",
+				"checking": "Lecture du tableau pour chaque exigence…",
+				"failed": "L'idée n'a pas pu être vérifiée. Réessayez.",
+				"noRequirement": "Aucune exigence n'a pu être lue dans cette idée.",
+				"unjudgedHint": "Aucun modèle n'a jugé ces exigences : les tickets les plus proches sont listés, vérifiez-les avant de décider.",
+				"verdict": {
+					"done": "Déjà fait",
+					"partial": "En partie",
+					"missing": "Manquant",
+					"unknown": "À vérifier"
+				},
+				"tally": {
+					"done_one": "{{count}} déjà faite",
+					"done_other": "{{count}} déjà faites",
+					"partial_one": "{{count}} en partie",
+					"partial_other": "{{count}} en partie",
+					"missing_one": "{{count}} manquante",
+					"missing_other": "{{count}} manquantes",
+					"unknown_one": "{{count}} à vérifier",
+					"unknown_other": "{{count}} à vérifier"
+				},
+				"createCard": "Créer une carte avec ce qui manque",
+				"createHint": "La carte ne reprend que les exigences pas encore faites, avec les tickets sur lesquels elles s'appuient. Elle arrive dans le backlog.",
+				"createFailed": "La carte n'a pas pu être créée.",
+				"created": "Carte créée dans le backlog.",
+				"openCard": "Ouvrir la carte",
+				"allDone": "Toutes les exigences sont déjà faites : rien à créer.",
+				"another": "Vérifier une autre idée",
+				"card": {
+					"untitled": "Fonctionnalité à construire",
+					"section": {
+						"missing": "À construire",
+						"partial": "À terminer",
+						"unknown": "À vérifier",
+						"done": "Déjà fait"
+					},
+					"buildsOn": "S'appuie sur : {{tickets}}",
+					"original": "Idée d'origine"
+				}
 			}
 		},
 		"lanes": {

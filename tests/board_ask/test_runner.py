@@ -113,3 +113,30 @@ def test_the_runner_runs_as_the_app_starts_it(tmp_path):
     )
     assert done.returncode == 0, done.stderr
     assert _marker(done.stdout) == {"source": None, "scores": []}
+
+
+def test_several_queries(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(semantic, "find", lambda: None)
+    monkeypatch.setenv("SELECTED_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-0000")
+    vectors = {"admin": [1.0, 0.0], "login": [0.0, 1.0], "bad": "x"}
+
+    def post(url, payload, key, timeout):
+        return {
+            "data": [
+                {"embedding": vectors[t], "index": i}
+                for i, t in enumerate(payload["input"])
+            ]
+        }
+
+    monkeypatch.setattr(semantic, "_post", post)
+    payload = _payload(tmp_path)
+    del payload["query"]
+    payload["queries"] = ["login", "bad", "admin"]
+    assert runner.main(["--input", _write(tmp_path, payload)]) == 0
+    result = _marker(capsys.readouterr().out)
+    assert result["source"]["provider"] == "openai"
+    assert result["rankings"][0]["scores"][0]["id"] == "t2"
+    assert result["rankings"][1] is None
+    assert result["rankings"][2]["scores"][0]["id"] == "t1"
+    assert (result["indexed"], result["total"]) == (2, 2)

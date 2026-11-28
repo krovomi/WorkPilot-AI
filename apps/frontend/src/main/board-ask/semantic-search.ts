@@ -49,6 +49,18 @@ export interface SemanticRanking {
 /** The ranking of *documents* for *query*, or null when no model could be asked. */
 export type SemanticFn = (query: string, documents: readonly SemanticDocument[]) => Promise<SemanticRanking | null>;
 
+/**
+ * A ranking of the same *documents* per query, in their order (null for a
+ * query the model gave no vector for), or null when no model could be asked.
+ */
+export type SemanticManyFn = (
+	queries: readonly string[],
+	documents: readonly SemanticDocument[],
+) => Promise<(SemanticRanking | null)[] | null>;
+
+/** Queries one runner call takes (`board_ask.semantic.MAX_QUERIES`). */
+export const MAX_SEMANTIC_QUERIES = 16;
+
 const name = z.string().min(1).max(200);
 const OutputSchema = z.object({
 	source: z.object({ kind: z.enum(["local", "cloud"]), provider: name, model: name }).nullable(),
@@ -57,24 +69,39 @@ const OutputSchema = z.object({
 	total: z.number().int().nonnegative().optional(),
 });
 
-/** The ranking in the runner's output, kept to the ids asked, or null. */
-export function parseSemanticOutput(stdout: string, ids: ReadonlySet<string>): SemanticRanking | null {
+const ManySchema = z.object({
+	source: OutputSchema.shape.source,
+	rankings: z.array(z.object({ scores: OutputSchema.shape.scores }).nullable()).max(MAX_SEMANTIC_QUERIES),
+	indexed: z.number().int().nonnegative(),
+	total: z.number().int().nonnegative(),
+});
+
+function markerJson(stdout: string): unknown {
 	const line = stdout
 		.split(/\r?\n/)
 		.reverse()
 		.find((l) => l.startsWith(SEMANTIC_MARKER));
-	if (!line) return null;
-	let raw: unknown;
+	if (!line) return undefined;
 	try {
-		raw = JSON.parse(line.slice(SEMANTIC_MARKER.length));
+		return JSON.parse(line.slice(SEMANTIC_MARKER.length));
 	} catch {
-		return null;
+		return undefined;
 	}
-	const parsed = OutputSchema.safeParse(raw);
-	if (!parsed.success || !parsed.data.source) return null;
+}
+
+type Scores = z.infer<typeof OutputSchema>["scores"];
+
+function keptScores(scores: Scores, ids: ReadonlySet<string>): Scores {
 	const seen = new Set<string>();
-	const scores = parsed.data.scores.filter((s) => ids.has(s.id) && !seen.has(s.id) && seen.add(s.id));
-	scores.sort((a, b) => b.score - a.score);
+	const kept = scores.filter((s) => ids.has(s.id) && !seen.has(s.id) && seen.add(s.id));
+	return kept.sort((a, b) => b.score - a.score);
+}
+
+/** The ranking in the runner's output, kept to the ids asked, or null. */
+export function parseSemanticOutput(stdout: string, ids: ReadonlySet<string>): SemanticRanking | null {
+	const parsed = OutputSchema.safeParse(markerJson(stdout));
+	if (!parsed.success || !parsed.data.source) return null;
+	const scores = keptScores(parsed.data.scores, ids);
 	if (scores.length === 0) return null;
 	return {
 		source: parsed.data.source,
@@ -82,6 +109,24 @@ export function parseSemanticOutput(stdout: string, ids: ReadonlySet<string>): S
 		indexed: Math.min(parsed.data.indexed ?? scores.length, ids.size),
 		total: Math.min(parsed.data.total ?? ids.size, ids.size),
 	};
+}
+
+/** One ranking per query asked, from the runner's output, or null. */
+export function parseSemanticRankings(
+	stdout: string,
+	ids: ReadonlySet<string>,
+	queries: number,
+): (SemanticRanking | null)[] | null {
+	const parsed = ManySchema.safeParse(markerJson(stdout));
+	if (!parsed.success || !parsed.data.source || parsed.data.rankings.length !== queries) return null;
+	const { source } = parsed.data;
+	const indexed = Math.min(parsed.data.indexed, ids.size);
+	const total = Math.min(parsed.data.total, ids.size);
+	const rankings = parsed.data.rankings.map((ranking) => {
+		const scores = ranking ? keptScores(ranking.scores, ids) : [];
+		return scores.length > 0 ? { source, scores, indexed, total } : null;
+	});
+	return rankings.some(Boolean) ? rankings : null;
 }
 
 /** The mode in the settings, `auto` when it names none. */
@@ -159,6 +204,27 @@ export interface SemanticSearchOptions {
 	/** The app's folder for the vectors; `<userData>/board-ask` by default. */
 	cacheDir?: string;
 	run?: EmbedRunner;
+}
+
+/** The ranking function of several queries at once, or undefined when the mode is `off`. */
+export function createSemanticRankings(options: SemanticSearchOptions): SemanticManyFn | undefined {
+	if (options.mode === "off") return undefined;
+	const run = options.run ?? runEmbedRunner;
+	return async (queries, documents) => {
+		const docs = documents.slice(0, MAX_SEMANTIC_DOCUMENTS);
+		const asked = queries.map((q) => q.trim()).filter(Boolean);
+		if (asked.length === 0 || asked.length > MAX_SEMANTIC_QUERIES || asked.length !== queries.length || docs.length === 0) {
+			return null;
+		}
+		const stdout = await run({
+			mode: options.mode,
+			cache_dir: options.cacheDir ?? path.join(app.getPath("userData"), "board-ask"),
+			project_dir: options.projectDir,
+			queries: asked,
+			documents: docs,
+		}).catch(() => null);
+		return stdout ? parseSemanticRankings(stdout, new Set(docs.map((d) => d.id)), asked.length) : null;
+	};
 }
 
 /** The ranking function of one question, or undefined when the mode is `off`. */
