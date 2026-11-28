@@ -6,6 +6,7 @@
  * of this computer only.
  */
 
+import type { AiAccountBudgetLevel } from "@shared/types/ai-account-usage";
 import { Pencil, Wallet } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,7 +16,12 @@ import { Button, Input } from "@/components/ui";
 import { usageOf, useAiAccountUsageStore } from "@/stores/ai-account-usage-store";
 import { Bar, type Tone } from "../../charter";
 
-const LEVEL_TONE: Record<string, Tone> = { ok: "green", warning: "amber", exceeded: "red" };
+const LEVEL_TONE: Record<AiAccountBudgetLevel, Tone> = {
+	none: "muted",
+	ok: "green",
+	warning: "amber",
+	exceeded: "red",
+};
 
 export function AccountSpend({ accountKey }: { readonly accountKey: string }) {
 	const { t } = useTranslation("settings");
@@ -30,9 +36,8 @@ export function AccountSpend({ accountKey }: { readonly accountKey: string }) {
 		tokens: formatTokens(tokens),
 	});
 
-	const submit = async () => {
-		if (draft === null) return;
-		const amount = draft.trim() === "" ? 0 : Number(draft.replace(",", "."));
+	const submit = async (typed: string) => {
+		const amount = typed.trim() === "" ? 0 : Number(typed.replace(",", "."));
 		if (!Number.isFinite(amount) || amount < 0) {
 			setError(t("aiAccounts.spend.invalid"));
 			return;
@@ -56,7 +61,7 @@ export function AccountSpend({ accountKey }: { readonly accountKey: string }) {
 							<span className="w-24 shrink-0">
 								<Bar
 									value={(usage.costUsd / usage.budgetUsd) * 100}
-									tone={LEVEL_TONE[usage.level] ?? "accent"}
+									tone={LEVEL_TONE[usage.level]}
 								/>
 							</span>
 							<span className={usage.level === "exceeded" ? "text-destructive" : "text-muted-foreground"}>
@@ -84,7 +89,7 @@ export function AccountSpend({ accountKey }: { readonly accountKey: string }) {
 					className="flex items-center gap-2"
 					onSubmit={(event) => {
 						event.preventDefault();
-						void submit();
+						void submit(draft);
 					}}
 				>
 					<Input

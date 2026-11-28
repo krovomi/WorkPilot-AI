@@ -216,7 +216,9 @@ describe("alerts", () => {
 	it("sends only the budget-reached alert when the budget is passed at once", () => {
 		budgets.setBudget("acc-1", 1);
 		world.usages.set("/p1", [usage("acc-1", 3)]);
+		world.usages.set("/p2", [usage("acc-1", 0.5)]);
 		expect(checkAccountBudgets(NOW, world.projects, budgets, known, world.announce)).toBe(1);
+		expect(world.announce).toHaveBeenCalledWith("p1", expect.anything());
 		expect(budgets.wasSent("acc-1", "2026-11", "warning")).toBe(true);
 	});
 

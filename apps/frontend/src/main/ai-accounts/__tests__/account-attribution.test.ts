@@ -5,7 +5,7 @@
  * the default accounts with a key and the Claude sign-in, as ids only.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -56,6 +56,37 @@ describe("processAccounts", () => {
 
 	it("leaves out a Claude profile id that is not a plain label", () => {
 		expect(processAccounts("a b/c")).toEqual({});
+	});
+
+	it("names no Claude account for a process that does not run on Claude", () => {
+		expect(processAccounts("work", false)).toEqual({});
+		expect(processAccountsEnv("work", false)).toEqual({});
+	});
+
+	it("leaves out a default whose id a hand edit made odd", () => {
+		writeFileSync(
+			path.join(dir, "ai-accounts.json"),
+			JSON.stringify({
+				accounts: [{ id: "a b", provider: "openai", name: "Odd", apiKey: "enc:sk-test-0000", createdAt: "" }],
+				defaults: { openai: "a b" },
+			}),
+			"utf-8",
+		);
+		expect(store.defaults()).toEqual({ openai: "a b" });
+		expect(processAccounts()).toEqual({});
+	});
+
+	it("names the accounts a task pinned over the defaults", () => {
+		const work = store.save({ provider: "openai", name: "Work", apiKey: "sk-test-0000" });
+		store.setDefault("openai", work.id);
+		expect(processAccounts("default-profile", true, { openai: "client-acc", claude: "client-profile" })).toEqual({
+			openai: "client-acc",
+			claude: "claude:client-profile",
+		});
+		expect(processAccounts(null, true, { mistral: "bad id" })).toEqual({ openai: work.id });
+		expect(processAccountsEnv(null, false, { claude: "client-profile" })).toEqual({
+			[AI_ACCOUNTS_ENV]: JSON.stringify({ openai: work.id }),
+		});
 	});
 
 	it("still starts the process when the store cannot be read", () => {

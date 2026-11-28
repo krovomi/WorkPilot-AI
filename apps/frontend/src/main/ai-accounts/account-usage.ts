@@ -211,9 +211,16 @@ export function checkAccountBudgets(
 		const alert: BudgetAlert | null =
 			usage.level === "exceeded" ? "exceeded" : usage.level === "warning" ? "warning" : null;
 		if (!alert || budgets.wasSent(key, month, alert)) continue;
-		const top = [...byProject.entries()].sort((a, b) => b[1] - a[1])[0];
-		if (!top) continue;
-		announce(top[0], alertText(alert, usage, name, language));
+		// Spend over a budget comes from at least one project: the one that spent most.
+		let top = "";
+		let most = -1;
+		for (const [projectId, cost] of byProject) {
+			if (cost > most) {
+				top = projectId;
+				most = cost;
+			}
+		}
+		announce(top, alertText(alert, usage, name, language));
 		budgets.markSent(key, month, alert);
 		// Reaching the budget at once makes the warning pointless.
 		if (alert === "exceeded") budgets.markSent(key, month, "warning");

@@ -20,8 +20,18 @@ import { aiAccountStore } from "./ai-accounts";
 
 export const AI_ACCOUNTS_ENV = "WORKPILOT_AI_ACCOUNTS";
 
-/** Provider → account key for the process about to start. */
-export function processAccounts(claudeProfileId?: string | null): Record<string, string> {
+/**
+ * Provider → account key for the process about to start. `usesClaude` false
+ * (a task with no Claude phase, whose Claude sign-in is cleared) names no
+ * Claude account. `pins` are the accounts a task or its project chose over
+ * the defaults (provider → account id; `claude` → profile id): a caller that
+ * runs the process on a pinned account passes them, so its spend goes there.
+ */
+export function processAccounts(
+	claudeProfileId?: string | null,
+	usesClaude = true,
+	pins: Readonly<Record<string, string>> = {},
+): Record<string, string> {
 	const accounts: Record<string, string> = {};
 	try {
 		const store = aiAccountStore();
@@ -33,15 +43,23 @@ export function processAccounts(claudeProfileId?: string | null): Record<string,
 		// An unreadable store leaves the spend unattributed, never the task unstarted.
 		appLog.warn("[AiAccounts] accounts of the process unreadable:", (error as Error).message);
 	}
-	if (claudeProfileId) {
-		const key = claudeAccountKey(claudeProfileId);
+	for (const [provider, id] of Object.entries(pins)) {
+		if (provider !== "claude" && AI_ACCOUNT_KEY_PATTERN.test(id)) accounts[provider] = id;
+	}
+	const claudeProfile = pins.claude ?? claudeProfileId;
+	if (claudeProfile && usesClaude) {
+		const key = claudeAccountKey(claudeProfile);
 		if (AI_ACCOUNT_KEY_PATTERN.test(key)) accounts.claude = key;
 	}
 	return accounts;
 }
 
 /** The environment variable naming them, or nothing when there is none. */
-export function processAccountsEnv(claudeProfileId?: string | null): Record<string, string> {
-	const accounts = processAccounts(claudeProfileId);
+export function processAccountsEnv(
+	claudeProfileId?: string | null,
+	usesClaude = true,
+	pins: Readonly<Record<string, string>> = {},
+): Record<string, string> {
+	const accounts = processAccounts(claudeProfileId, usesClaude, pins);
 	return Object.keys(accounts).length > 0 ? { [AI_ACCOUNTS_ENV]: JSON.stringify(accounts) } : {};
 }

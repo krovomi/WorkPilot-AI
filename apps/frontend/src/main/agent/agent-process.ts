@@ -325,7 +325,7 @@ export class AgentProcessManager {
 			...claudeAuthClearVars,
 			...providerEnv,
 			// The AI accounts this process runs on, for the spend per account.
-			...processAccountsEnv(nonClaudeProvider ? null : profileResult.profileId),
+			...processAccountsEnv(profileResult.profileId, !nonClaudeProvider),
 			PYTHONUNBUFFERED: "1",
 			PYTHONIOENCODING: "utf-8",
 			PYTHONUTF8: "1",
