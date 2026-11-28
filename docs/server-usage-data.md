@@ -72,6 +72,13 @@ connexion au provider, délai dépassé, tests) : le message lui-même ne sort p
 mêmes vues existent sous `/admin/platform/usage/*` pour les administrateurs de la plateforme,
 toutes organisations confondues.
 
+Dans l'app de bureau, **Administration → Usage → Chiffres** montre ces vues : une période (7 ou
+30 derniers jours, ce mois-ci ou des jours choisis), les filtres, un bouton d'export CSV par
+table, la fiche d'une personne en cliquant sur son nom, et la désactivation d'un compte dormant
+pour qui gère les membres (`org.member.write`). Un administrateur de la plateforme y bascule sur
+toute la plateforme et efface un compte depuis sa fiche. **Collecte et conservation**, à côté,
+règle l'activité par page et les durées.
+
 **Jamais enregistré** : le texte d'un prompt, du code, ce qu'une personne a tapé, un nom de
 fichier, le chemin ou le corps d'une requête, un mot de passe, ni l'adresse tapée pour un compte
 qui n'existe pas.
@@ -133,6 +140,14 @@ l'app mobile de chaque membre comptent les pages qu'il ouvre et envoient les com
 (`server/services/page_activity.py`). La désactiver efface aussitôt les comptes de
 l'organisation. Chaque changement est inscrit au journal d'audit.
 
+## Ce que voient la supervision et les traces
+
+Les métriques Prometheus (`/metrics`) et la page de santé ne comptent que par organisation, par
+fournisseur et par état : jamais une personne, un projet ni un chemin. Les traces OpenTelemetry
+des requêtes, quand l'opérateur en active l'envoi vers son propre collecteur, ne portent que la
+route (son modèle, pas l'adresse réelle), la méthode et le code de réponse. Rien n'est envoyé
+ailleurs que là où l'opérateur l'a configuré : pas de nouveau sous-traitant.
+
 ## Combien de temps
 
 Chaque organisation règle sa durée dans **Administration → Usage** : une pour la consommation et
@@ -154,7 +169,7 @@ l'activité par page.
 
 ## Les droits des personnes
 
-- **Accès** : chacun voit dans **Mon usage** exactement ce que les administrateurs voient de lui
+- **Accès** : chacun voit dans **Mon usage** (Paramètres de l'app de bureau, en mode serveur) exactement ce que les administrateurs voient de lui
   dans l'onglet Usage (`GET /users/me/usage`), et quels rôles de l'organisation le lisent.
 - **Portabilité** : **Mon usage** exporte en un fichier JSON tout ce que le serveur garde de son
   usage, dans toutes ses organisations (`GET /users/me/usage/export`) : compte, consommation,
@@ -171,3 +186,7 @@ l'activité par page.
 - **Opposition** : l'activité par page reste désactivée, ou se désactive (ses comptes sont alors
   effacés) ; pour la consommation et la présence, qui servent aussi aux quotas et aux budgets,
   l'organisation abaisse la durée jusqu'à 30 jours.
+
+Sur le téléphone, **Réglages → Mon usage** montre la même chose sur 30 jours, partage le fichier
+JSON de tout ce qui est gardé et relit le message de ce qui est mesuré ; l'app mobile affiche ce
+message une fois par organisation, comme l'app de bureau.

@@ -7,15 +7,36 @@ export interface PatchLine {
 	n: number;
 	kind: PatchLineKind;
 	text: string;
+	/** The line's number in the file before and after the change, where it has one. */
+	old?: number | null;
+	new?: number | null;
 }
 
-/** The most lines drawn for one file; a phone is not where to read a 10 000-line diff. */
+/** The most lines drawn for one file on the card; a phone is not where to read a 10 000-line diff. */
 export const MAX_PATCH_LINES = 400;
+/** The most lines of the full-screen diff of one file. */
+export const MAX_FULL_PATCH_LINES = 3_000;
 
-export function patchLines(patch: string): { lines: PatchLine[]; truncated: boolean } {
+const HUNK = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+
+export function patchLines(patch: string, max = MAX_PATCH_LINES): { lines: PatchLine[]; truncated: boolean } {
 	const all = patch.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n");
-	const lines = all.slice(0, MAX_PATCH_LINES).map((text, n): PatchLine => ({ n, kind: kindOf(text), text }));
-	return { lines, truncated: all.length > MAX_PATCH_LINES };
+	let before = 0;
+	let after = 0;
+	const lines = all.slice(0, max).map((text, n): PatchLine => {
+		const kind = kindOf(text);
+		if (kind === "hunk") {
+			const start = HUNK.exec(text);
+			before = start ? Number(start[1]) : 0;
+			after = start ? Number(start[2]) : 0;
+			return { n, kind, text, old: null, new: null };
+		}
+		if (kind === "meta" || before === 0 && after === 0) return { n, kind, text, old: null, new: null };
+		if (kind === "added") return { n, kind, text, old: null, new: after++ };
+		if (kind === "removed") return { n, kind, text, old: before++, new: null };
+		return { n, kind, text, old: before++, new: after++ };
+	});
+	return { lines, truncated: all.length > max };
 }
 
 function kindOf(text: string): PatchLineKind {

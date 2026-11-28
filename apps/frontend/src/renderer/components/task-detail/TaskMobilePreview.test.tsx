@@ -3,6 +3,7 @@
  */
 
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../shared/i18n";
@@ -134,7 +135,37 @@ describe("TaskMobilePreview", () => {
 
 	it("offers the booted device by name", async () => {
 		render(<TaskMobilePreview taskId="task-1" project={project} />);
+		const picker = await screen.findByRole("combobox");
+		await waitFor(() => expect(picker).toBeEnabled());
+		const user = userEvent.setup();
+		picker.focus();
+		await user.keyboard("[ArrowDown]");
 		expect(await screen.findByRole("option", { name: /Pixel 8/ })).toBeInTheDocument();
+	});
+
+	it("runs on the device picked in the list", async () => {
+		const tablet = {
+			id: "emulator-5556",
+			name: "Pixel Tablet",
+			platform: "android",
+			kind: "emulator",
+			state: "device",
+			runtime: "",
+			isBooted: true,
+		} as const;
+		mockDetect.mockImplementation(async () => {
+			const plan = flutterPlan({ devices: [...(flutterPlan().devices ?? []), tablet] });
+			useMobileStore.getState().setPlan(plan);
+			return { success: true, data: plan };
+		});
+		render(<TaskMobilePreview taskId="task-1" project={project} />);
+		const picker = await screen.findByRole("combobox");
+		await waitFor(() => expect(picker).toBeEnabled());
+		const user = userEvent.setup();
+		picker.focus();
+		await user.keyboard("[ArrowDown]");
+		await user.click(await screen.findByRole("option", { name: /Pixel Tablet/ }));
+		expect(useMobileStore.getState().device?.id).toBe("emulator-5556");
 	});
 
 	it("says a platform cannot be built here rather than offering a Run that fails", async () => {
