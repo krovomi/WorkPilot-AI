@@ -79,6 +79,7 @@ def project(role: str, permission: str | None = None) -> Rule:
 RULES: dict[tuple[str, str], Rule] = {
     # --- Accounts and sessions -------------------------------------------
     ("GET", "/health"): public(),
+    ("GET", "/metrics"): public(),
     ("GET", "/auth/config"): public(),
     ("POST", "/auth/login"): public(),
     ("POST", "/auth/oidc/exchange"): public(),
@@ -194,6 +195,14 @@ RULES: dict[tuple[str, str], Rule] = {
     ("GET", "/admin/usage/delivery"): needs("usage.read"),
     ("GET", "/admin/usage/presence"): needs("usage.read"),
     ("GET", "/admin/usage/export"): needs("usage.read"),
+    ("GET", "/admin/platform/health"): platform(),
+    ("GET", "/admin/usage/report/settings"): needs("usage.read"),
+    ("PUT", "/admin/usage/report/settings"): needs("usage.write"),
+    ("GET", "/admin/usage/report"): needs("usage.read"),
+    ("POST", "/admin/usage/report/send"): needs("usage.write"),
+    ("GET", "/admin/usage/budgets"): needs("usage.read"),
+    ("PUT", "/admin/usage/budgets"): needs("usage.write"),
+    ("DELETE", "/admin/usage/budgets/{budget_id}"): needs("usage.write"),
     ("GET", "/admin/platform/usage/summary"): platform(),
     ("GET", "/admin/platform/usage/daily"): platform(),
     ("GET", "/admin/platform/usage/people"): platform(),

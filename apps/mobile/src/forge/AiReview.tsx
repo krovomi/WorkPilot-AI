@@ -4,7 +4,7 @@
  * or a follow-up once one exists, followed until the job ends.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, View } from "react-native";
 import { useSession } from "../auth/session";
@@ -15,6 +15,8 @@ import { describeError } from "../i18n";
 import { Button, ErrorBanner, Section } from "../ui/components";
 import { RADIUS, SPACE, type Theme, useTheme } from "../ui/theme";
 import type { Forge } from "./forge";
+import { FindingFeedback, HeldFeedbackList, useReviewFeedback } from "./ReviewFeedback";
+import type { ReviewFeedbackApi, ReviewFinding } from "./types";
 
 export function severityColor(theme: Theme, severity: string): string {
 	if (severity === "critical" || severity === "high") return theme.danger;
@@ -77,18 +79,11 @@ export function AiReview({ forge, number }: { forge: Forge; number: number }) {
 							{review.summary}
 						</Text>
 					) : null}
-					{review.findings.map((f) => (
-						<View key={f.id} style={[styles.finding, { borderColor: theme.border }]}>
-							<Text style={{ color: severityColor(theme, f.severity), fontWeight: "700", fontSize: 12 }}>
-								{f.severity.toUpperCase()}
-								{f.file ? ` · ${f.file}${f.line ? `:${f.line}` : ""}` : ""}
-							</Text>
-							<Text style={{ color: theme.text, fontWeight: "600" }}>{f.title}</Text>
-							<Text style={{ color: theme.textMuted, lineHeight: 20 }} selectable>
-								{f.description}
-							</Text>
-						</View>
-					))}
+					{forge.feedback ? (
+						<FindingsWithFeedback api={forge.feedback} number={number} findings={review.findings} />
+					) : (
+						review.findings.map((f) => <Finding key={f.id} finding={f} />)
+					)}
 				</>
 			) : (
 				<Text style={{ color: theme.textMuted }}>{t("forge.noReview")}</Text>
@@ -103,6 +98,46 @@ export function AiReview({ forge, number }: { forge: Forge; number: number }) {
 				/>
 			) : null}
 		</Section>
+	);
+}
+
+function Finding({ finding: f, children }: { finding: ReviewFinding; children?: ReactNode }) {
+	const theme = useTheme();
+	return (
+		<View style={[styles.finding, { borderColor: theme.border }]}>
+			<Text style={{ color: severityColor(theme, f.severity), fontWeight: "700", fontSize: 12 }}>
+				{f.severity.toUpperCase()}
+				{f.file ? ` · ${f.file}${f.line ? `:${f.line}` : ""}` : ""}
+			</Text>
+			<Text style={{ color: theme.text, fontWeight: "600" }}>{f.title}</Text>
+			<Text style={{ color: theme.textMuted, lineHeight: 20 }} selectable>
+				{f.description}
+			</Text>
+			{children}
+		</View>
+	);
+}
+
+/** The findings with what the team said of each, and the rejections waiting for a maintainer. */
+function FindingsWithFeedback({
+	api,
+	number,
+	findings,
+}: {
+	api: ReviewFeedbackApi;
+	number: number;
+	findings: readonly ReviewFinding[];
+}) {
+	const state = useReviewFeedback(api, number);
+	return (
+		<>
+			{findings.map((f) => (
+				<Finding key={f.id} finding={f}>
+					<FindingFeedback state={state} findingId={f.id} />
+				</Finding>
+			))}
+			<HeldFeedbackList state={state} />
+		</>
 	);
 }
 

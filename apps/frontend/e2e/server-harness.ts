@@ -138,12 +138,25 @@ export async function signIn(page: Page, world: World, who: Account): Promise<vo
 	await page.locator("#login-password").fill(who.password);
 	await page.getByRole("button", { name: /^(Sign in|Connexion)$/ }).click();
 	await expect(page.locator("#login-password")).toBeHidden({ timeout: 30_000 });
-	// The setup wizard may open a moment after the first start.
+	// Two dialogs may open a moment after the sign-in, in either order: the
+	// notice of what the server measures (once per organization) and the
+	// setup wizard (first start).
+	const notice = page.getByRole("button", { name: /^(I understand|J'ai compris)$/ });
 	const skip = page.getByRole("button", { name: /Skip Setup/ });
-	await skip.waitFor({ timeout: 15_000 }).then(
-		() => skip.click(),
-		() => undefined,
-	);
+	for (let dialog = 0; dialog < 2; dialog++) {
+		const shown = await notice
+			.or(skip)
+			.first()
+			.waitFor({ timeout: 15_000 })
+			.then(
+				() => true,
+				() => false,
+			);
+		if (!shown) return;
+		const button = (await notice.isVisible()) ? notice : skip;
+		await button.click();
+		await expect(button).toBeHidden({ timeout: 15_000 });
+	}
 }
 
 /**
