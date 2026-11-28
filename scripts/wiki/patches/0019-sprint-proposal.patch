@@ -1,0 +1,60 @@
+From 220cc87f7d5a36865d979beac85b0f33986237d9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 28 Nov 2026 14:44:57 +0000
+Subject: [PATCH] docs(wiki): plan a sprint and propose it (capacity, Propose
+ the sprint)
+
+---
+ User-Interface.fr.md | 12 ++++++++++++
+ User-Interface.md    | 12 ++++++++++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/User-Interface.fr.md b/User-Interface.fr.md
+index 8a244e6..0891574 100644
+--- a/User-Interface.fr.md
++++ b/User-Interface.fr.md
+@@ -84,6 +84,18 @@ Une tâche trop grosse pour une petite PR se découpe d'elle-même après la pla
+ 
+ ![Rapports](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-reports.png)
+ 
++### Planifier un sprint
++
++« Planifier » sur un sprint ouvre le backlog et le sprint côte à côte.
++
++- **Jauge de capacité** : les points du sprint face à la vélocité des 3 derniers sprints clôturés, avec leurs barres à côté. Une équipe moins disponible ce sprint règle sa disponibilité en %. Un premier sprint, encore sans historique, vise 20 points. Des points seulement, jamais une durée.
++- **Déplacer les tâches** : les glisser d'un côté à l'autre (les tâches cochées partent ensemble), ou appuyer sur → / ← sur un titre ; « Annuler » ou Ctrl+Z reprend le dernier déplacement. Le backlog a des filtres rapides (urgentes, bugs, non estimées), et « Estimer » lance Smart Estimation sur une tâche sans points.
++- **Côté sprint**, une tâche reportée du sprint précédent le dit, et une tâche qui attend une tâche restée au backlog affiche « Attend… » avec « L'ajouter aussi ». Un sprint planifié démarre depuis la vue.
++- **Proposer le sprint** (sur le bandeau du sprint et dans la vue Planifier) : les règles classent le backlog (priorité, bugs, ce qu'une tâche débloque, but du sprint, âge), puis le modèle du provider choisi compose le sprint jusqu'à sa capacité et donne une raison pour chaque tâche, dans la langue de l'app. Ce qu'une tâche attend entre avant elle, et les meilleures tâches qui ne tiennent pas sont montrées sous la ligne. Quatre variantes : Équilibré, Plus prudent (80 % de la capacité), Bugs d'abord, Autour du but. Quand le sprint n'a pas de but, un but est suggéré. Rien ne bouge avant « Ajouter N tâches », qui s'annule. Sans modèle, les règles proposent seules.
++- **Confidentialité** : le modèle ne lit que le titre d'une tâche, le début de sa description, sa priorité, son type, ses points, ses étiquettes et ses dépendances, jamais qui travaille dessus.
++
++Conception : [kanban-sprints.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-sprints.md), [sprint-proposal.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/sprint-proposal.md).
++
+ ### Travailler vite sur le tableau
+ 
+ - **Couleurs des cartes** : chaque carte prend la couleur de son type (14 types en 5 familles : fonctionnalité, correction, refactorisation, sécurité…), lu depuis son genre, sa catégorie, sa sévérité et son origine, sans rien à remplir ; un aperçu s'ouvre après 700 ms de survol. Une carte terminée montre le temps des agents, les tokens et le coût, qui l'a créée et qui l'a lancée.
+diff --git a/User-Interface.md b/User-Interface.md
+index 6057e14..0b93f60 100644
+--- a/User-Interface.md
++++ b/User-Interface.md
+@@ -79,6 +79,18 @@ A task too big for one small PR splits itself after planning into « Part k/N »
+ 
+ ![Reports](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-reports.png)
+ 
++### Planning a sprint
++
++« Plan » on a sprint opens the backlog and the sprint side by side.
++
++- **Capacity gauge**: the sprint's points against the velocity of the last 3 closed sprints, with their bars beside it. A team that is short this sprint sets its availability in %. A first sprint, with no history yet, aims at 20 points. Points only, never a duration.
++- **Moving tasks**: drag them from one side to the other (ticked tasks go together), or press → / ← on a title; « Undo » or Ctrl+Z takes the last move back. The backlog has quick filters (urgent, bugs, not estimated), and « Estimate » runs Smart Estimation on a task without points.
++- **On the sprint side**, a task carried over from the previous sprint says so, and a task waiting on one left in the backlog shows « Waits on… » with « Add it too ». A planned sprint starts from the view.
++- **Propose the sprint** (on the sprint banner and in the planning view): the rules rank the backlog (priority, bugs, what a task unblocks, the sprint goal, age), then the selected provider's model composes the sprint up to its capacity and gives a reason for each task, in the app's language. A task's blockers come in first, and the best tasks that don't fit are shown below the line. Four variants: Balanced, More careful (80 % of the capacity), Bugs first, Around the goal. When the sprint has no goal, one is suggested. Nothing moves until « Add N cards », which can be undone. Without a model, the rules propose on their own.
++- **Privacy**: the model only reads a task's title, the start of its description, its priority, type, points, labels and dependencies, never who works on it.
++
++Design: [kanban-sprints.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-sprints.md), [sprint-proposal.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/sprint-proposal.md).
++
+ ### Working fast on the board
+ 
+ - **Card colours**: each card takes the colour of its type (14 types in 5 families: feature, bug fix, refactoring, security…), read from its kind, category, severity and origin, nothing to fill in; a preview opens after 700 ms on hover. A finished card shows the agents' time, tokens and cost, who created it and who started it.
+-- 
+2.43.0
+
