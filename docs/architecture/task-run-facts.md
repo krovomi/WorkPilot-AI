@@ -48,12 +48,27 @@ qui l'ajoute au relevé `<projet>/.workpilot/cost_data.json` (tokens, cache, co�
 catalogue, `usage_source: "estimated"` quand le provider n'a rien compté et que le texte a servi).
 Le processus principal additionne ce relevé par carte (`usageBySpec`), à la racine et dans les
 workspaces de tâche encore présents (`workspace-ledgers.ledgerDirs`, pour les builds d'avant
-#876). Le relevé est relu seulement quand il change (date et taille), le tableau se recharge
-toutes les 3 s.
+#876). Le relevé est relu seulement quand il change (date et taille) ; la liste des tâches du
+main est gardée 3 s en cache.
 
 Une carte sans session, ou dont les sessions n'ont rien rapporté (ni token ni prix) : consommation
 inconnue (`knownUsage`). Un coût à 0 avec des tokens (modèle local, provider non chiffré) : les
 tokens s'affichent, le coût non.
+
+## Tenu à jour pendant la session
+
+Le main calcule le bilan quand le renderer lit le tableau (`TASK_LIST`) ; un changement de statut,
+lui, ne modifie que le statut de la carte dans le store (`updateTaskStatus`). Sans relecture, une
+carte créée et finie pendant la même session gardait l'état de son premier chargement : toutes
+les lignes du bilan disaient « inconnu » jusqu'au redémarrage de l'app (constaté par Leub le
+28 novembre 2026, avec Claude comme avec tout autre provider).
+
+`renderer/stores/task-run-facts-refresh.ts`, enregistré par `global-listeners.ts`, écoute chaque
+changement de statut d'une carte et relit le tableau du projet par le même `TASK_LIST` (projet
+local ou du serveur, jamais le rafraîchissement forcé) 1,5 s après, puis une seconde fois à 6 s,
+quand le cache de 3 s est passé et que la dernière session a écrit son relevé. Les changements
+rapprochés se regroupent. Seuls `statusHistory` et `runFacts` sont recopiés sur la carte : le
+statut, l'avancement et les logs restent ceux que les événements ont donnés.
 
 ## Les personnes
 

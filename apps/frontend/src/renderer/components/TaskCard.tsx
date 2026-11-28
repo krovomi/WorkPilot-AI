@@ -1583,7 +1583,8 @@ export const TaskCard = memo(function TaskCard({
 						{/* Server card: whose claim holds it (server mode) */}
 						<TaskLockBadge taskId={task.id} className="ml-1" />
 
-						{/* Title - full width, no wrapper; double-click or F2 renames */}
+						{/* Title - full width, no wrapper; double-click or F2 renames. No native
+						    tooltip here or on the description: the hover preview shows both whole. */}
 						{rename.isRenaming ? (
 							<InlineTitleEditor initial={displayTitle} onDone={rename.finish} />
 						) : (
@@ -1594,7 +1595,6 @@ export const TaskCard = memo(function TaskCard({
 									// Leave room for the hover-only delete cross.
 									onDelete && "pr-5",
 								)}
-								title={displayTitle}
 							>
 								{displayTitle}
 							</h3>
@@ -1604,7 +1604,6 @@ export const TaskCard = memo(function TaskCard({
 						{sanitizedDescription && (
 							<p
 								className="kanban-card-desc mt-1 text-xs text-muted-foreground line-clamp-2"
-								title={sanitizedDescription}
 							>
 								{sanitizedDescription}
 							</p>

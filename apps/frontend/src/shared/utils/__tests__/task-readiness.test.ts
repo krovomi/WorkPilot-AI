@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../types";
-import { isFirstStart, isShortCard, SHORT_CARD_CHARS } from "../task-readiness";
+import { cardBody, isFirstStart, isShortCard, SHORT_CARD_CHARS } from "../task-readiness";
 
 const card = (title: string, description: string, subtasks = 0) =>
 	({ title, description, subtasks: Array.from({ length: subtasks }, () => ({})) }) as Task;
+
+describe("cardBody", () => {
+	it("keeps what the card says besides a title it may repeat", () => {
+		expect(cardBody(card("Fix login", " Fix login "))).toBe("");
+		expect(cardBody({ title: "Fix login" } as Task)).toBe("");
+		expect(cardBody(card("Fix login", " The admin page only "))).toBe("The admin page only");
+	});
+});
 
 describe("isShortCard", () => {
 	it("calls a card with only a title, or a short description, short", () => {
