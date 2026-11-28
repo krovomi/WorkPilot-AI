@@ -3,29 +3,42 @@ import { type KeyboardEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SpecInterviewQuestion, Task } from "../../../shared/types";
 import { toast } from "../../hooks/use-toast";
-import { cardBody } from "../../../shared/utils/task-readiness";
+import { cardBody, isHtmlDescription } from "../../../shared/utils/task-readiness";
 import { countRunning } from "../../lib/group-move";
 import { cn, sanitizeMarkdownForDisplay } from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
 import { type HeldCard, useTaskReadinessStore } from "../../stores/task-readiness-store";
 import { persistTaskStatus, persistUpdateTask, useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
+import { escapeHtml } from "../task-form/rich-text-utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
 
 /** How much of the card the dialog shows: enough to see what the agent reads. */
 const CARD_EXCERPT_CHARS = 240;
 
-/** The answers as a section of the description, for the planner. */
+/**
+ * The answers as a section of the description, for the planner: Markdown
+ * after a plain description, HTML after a rich-text one (the edit dialog, a
+ * tracker import), so the card still reads as one text.
+ */
 export function clarificationsSection(
 	title: string,
 	questions: readonly SpecInterviewQuestion[],
 	answers: Readonly<Record<string, string>>,
+	html = false,
 ): string {
-	const lines = ["", "", `## ${title}`, ""];
-	for (const q of questions) {
+	const answered = questions.flatMap((q) => {
 		const answer = answers[q.id]?.trim();
-		if (answer) lines.push(`**${q.question}**`, "", answer, "");
+		return answer ? [{ question: q.question, answer }] : [];
+	});
+	if (html) {
+		const items = answered.map(
+			({ question, answer }) => `<p><strong>${escapeHtml(question)}</strong></p><p>${escapeHtml(answer)}</p>`,
+		);
+		return `<h2>${escapeHtml(title)}</h2>${items.join("")}`;
 	}
+	const lines = ["", "", `## ${title}`, ""];
+	for (const { question, answer } of answered) lines.push(`**${question}**`, "", answer, "");
 	return lines.join("\n");
 }
 
@@ -79,7 +92,13 @@ function HeldCardDialog({ held, task, waiting }: { held: HeldCard; task: Task; w
 			if (save) {
 				// The card as it is now, so what the person wrote on it stays first.
 				const current = useTaskStore.getState().tasks.find((x) => x.id === task.id) ?? task;
-				const description = `${current.description ?? ""}${clarificationsSection(t("tasks:readiness.sectionTitle"), questions, answers)}`;
+				const section = clarificationsSection(
+					t("tasks:readiness.sectionTitle"),
+					questions,
+					answers,
+					isHtmlDescription(current.description),
+				);
+				const description = `${current.description ?? ""}${section}`;
 				if (!(await persistUpdateTask(task.id, { description }))) {
 					toast({ title: t("tasks:readiness.saveFailed"), variant: "destructive" });
 					return;
