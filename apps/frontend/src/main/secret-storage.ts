@@ -45,7 +45,7 @@ import type {
 	SecureStorageFix,
 	SecureStorageStatus,
 } from "../shared/types/ipc";
-import { detectWsl } from "./open-external";
+import { detectWsl } from "./platform/wsl";
 import { isLinux } from "./platform";
 import { loadWslSecretKey } from "./wsl-secret-key";
 

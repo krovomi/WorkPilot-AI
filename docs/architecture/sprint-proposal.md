@@ -101,3 +101,7 @@ de 60 s dépassé, JSON illisible, aucune tâche qui tienne), la proposition des
 - **Ajouter N tâches** passe par le déplacement de la vue : un seul déplacement, que
   « Annuler » (ou Ctrl+Z) défait. Rien ne bouge avant.
 - Un lecteur d'un projet du serveur ne voit ni le bouton ni la proposition.
+
+De bout en bout, dans l'app construite contre un faux serveur Ollama : `apps/frontend/e2e/board-ai.e2e.ts`
+(par les règles sans modèle, puis par le modèle : référence inconnue écartée, bloqueur ajouté avant
+la tâche qui l'attend, ligne de capacité, aucun nom de personne dans le prompt).

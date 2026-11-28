@@ -234,6 +234,8 @@ Tests : `shared/utils/__tests__/board-ask-search.test.ts`,
 `tests/board_ask/`, `main/ipc-handlers/__tests__/board-ask-handlers.test.ts`,
 `renderer/components/kanban/board-ask/BoardAskPanel.test.tsx`, `IdeaCheckView.test.tsx`,
 `idea-card.test.ts`, `tests/backend/test_shared_board_ask.py`,
-`apps/mobile/src/__tests__/app/board-ask.test.tsx` ; de bout en bout, sur un vrai serveur sans
-modèle : `apps/frontend/e2e/server-board.server-e2e.ts` (bureau) et `apps/mobile/e2e/server.e2e.ts`
-(téléphone, le job du serveur).
+`apps/mobile/src/__tests__/app/board-ask.test.tsx`.
+De bout en bout, dans l'app construite contre un faux serveur Ollama : `apps/frontend/e2e/board-ai.e2e.ts`
+(question, suivi, repli par mots-clés et par le sens, « Vérifier une idée » jusqu'à la carte) ; sur un
+vrai serveur sans modèle : `apps/frontend/e2e/server-board.server-e2e.ts` (bureau) et
+`apps/mobile/e2e/server.e2e.ts` (téléphone, le job du serveur).
