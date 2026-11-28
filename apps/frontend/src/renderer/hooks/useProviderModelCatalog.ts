@@ -12,6 +12,7 @@ import {
 	sortClaudeCatalog,
 } from "../../shared/constants/models";
 import { dedupeLocalCatalog } from "../../shared/utils/local-models";
+import { providerRegistry } from "../../shared/services/providerRegistry";
 import { localBackendFetch } from "../lib/local-backend";
 
 /**
@@ -88,6 +89,21 @@ const normalize = (provider: string) =>
 		llamacpp: "llama-cpp",
 	})[provider] ?? provider;
 const ttl = (provider: string) => (isLocal(provider) ? 30_000 : 15 * 60_000);
+/** Coding-agent CLIs: the CLI lists the models of the providers signed in to it. */
+const AGENT_CLIS = new Set(["opencode", "pi", "antigravity", "gemini-cli"]);
+/**
+ * Providers whose live answer is this account's own list. Adding the shipped
+ * list to it would offer models the account cannot call (Copilot answers
+ * `model_not_available_for_integrator`, a CLI `unknown model`).
+ */
+const ACCOUNT_SCOPED = new Set(["copilot", ...AGENT_CLIS]);
+/** The list each CLI ships with, offered when the CLI cannot be asked. */
+const CLI_SHIPPED = new Map(
+	providerRegistry
+		.getAllProviders()
+		.filter((p) => AGENT_CLIS.has(p.name))
+		.map((p) => [p.name, p.models]),
+);
 
 function prepareModels(
 	provider: string,
@@ -106,7 +122,18 @@ function prepareModels(
 					},
 				];
 	}
-	const fallback = getModelsForProvider(provider);
+	const fallback = CLI_SHIPPED.get(provider) ?? getModelsForProvider(provider);
+	if (
+		ACCOUNT_SCOPED.has(provider) &&
+		live.length &&
+		(source === "live" || source === "cache")
+	) {
+		// A CLI's ids are `provider/model` as the CLI wrote them: two spellings
+		// are two ids it accepts, never collapsed onto one.
+		return AGENT_CLIS.has(provider)
+			? [...live]
+			: dedupeModelCatalog<CatalogModel>([...live]);
+	}
 	const merged = dedupeModelCatalog<CatalogModel>([...live, ...fallback]);
 	if (provider === "anthropic") return sortClaudeCatalog(merged);
 	if (isLocal(provider)) {

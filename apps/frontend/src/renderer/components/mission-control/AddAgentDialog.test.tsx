@@ -85,7 +85,7 @@ describe("AddAgentDialog", () => {
 		expect(screen.getByRole("button", { name: "Create Agent" })).toBeEnabled();
 	});
 
-	it("falls back to the provider's first model when none fits the role, and to none", async () => {
+	it("falls back to the provider's first model when none fits the role", async () => {
 		const user = userEvent.setup();
 		const { onAdd } = dialog();
 		await choose(/Role/, /Tester/);
@@ -99,10 +99,14 @@ describe("AddAgentDialog", () => {
 		await user.click(screen.getByRole("button", { name: "Create Agent" }));
 		expect(onAdd.mock.calls[0].slice(2, 4)).toEqual(["deepseek", getModelsForProvider("deepseek")[0].value]);
 
+		// A coding-agent CLI the backend cannot ask offers its shipped list,
+		// led by the CLI's own default.
 		await choose(/Provider/, "OpenCode");
-		await waitFor(() => expect(screen.getByRole("combobox", { name: /^Model/ })).toHaveTextContent(""));
+		await waitFor(() =>
+			expect(screen.getByRole("combobox", { name: /^Model/ })).toHaveTextContent("OpenCode default"),
+		);
 		await user.click(screen.getByRole("button", { name: "Create Agent" }));
-		expect(onAdd.mock.calls[1].slice(2)).toEqual(["opencode", "", ""]);
+		expect(onAdd.mock.calls[1].slice(2, 4)).toEqual(["opencode", "default"]);
 	});
 
 	it("lets the person pick a model, each one named with its tier", async () => {

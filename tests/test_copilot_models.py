@@ -53,6 +53,36 @@ MODELS = [
 ]
 
 
+def test_a_model_not_served_on_chat_completions_is_left_out():
+    """GitHub serves some models only on /responses or /v1/messages; asked on
+    /chat/completions they answer ``model_not_available_for_integrator``."""
+    entries = [
+        {
+            "id": "claude-opus-4.8",
+            "model_picker_enabled": True,
+            "capabilities": {"type": "chat"},
+            "supported_endpoints": ["/v1/messages"],
+        },
+        {
+            "id": "gpt-5.5",
+            "model_picker_enabled": True,
+            "capabilities": {"type": "chat"},
+            "supported_endpoints": ["/chat/completions", "/responses"],
+        },
+        {
+            "id": "gpt-4.1",
+            "model_picker_enabled": True,
+            "capabilities": {"type": "chat"},
+            "supported_endpoints": [],
+        },
+    ]
+
+    ids = [entry["id"] for entry in copilot_models.usable_chat_models(entries)]
+
+    assert ids == ["gpt-5.5", "gpt-4.1"]
+    assert not copilot_models.is_served("claude-opus-4.8", entries)
+
+
 def test_only_usable_chat_models_are_kept():
     ids = [entry["id"] for entry in copilot_models.usable_chat_models(MODELS)]
 

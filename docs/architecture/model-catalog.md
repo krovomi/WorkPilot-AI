@@ -59,3 +59,24 @@ turns it off; see [CONFIGURATION.md](../CONFIGURATION.md).
 `models_registry.py` stays the place for what the registry cannot know: the
 default model of a provider, curated tiers, and prices. A release no longer
 needs it to be *selectable*.
+
+## Coding-agent CLIs and account-scoped lists
+
+OpenCode, pi and Antigravity choose among the providers the person signed in
+to inside the CLI, which WorkPilot cannot see; the catalogue had nothing for
+them and a phase's dropdown showed only the model it already had.
+`cli_models.py` asks the CLI itself (`opencode models`, `pi --list-models`,
+`agy models`) without a shell and with a 15-second limit, keeps only ids a
+launcher argument accepts, labels them from the cached models.dev records, and
+puts `default` (the CLI's own choice) first. Gemini CLI has no listing command
+and takes Gemini ids: its list is the Google catalogue's `gemini-` models.
+The list is read on every request (a `opencode auth login` shows up at the
+next refresh); the dropdown keeps its 15-minute cache. A CLI that is missing,
+slow or failing gives the shipped list in `providerRegistry.ts`.
+
+For these CLIs and for Copilot, a live answer is the account's own list: the
+dropdown no longer appends the shipped list to it, since a model from that
+list may be one the account cannot call. Copilot's `/models` entries that do
+not serve `/chat/completions` (`supported_endpoints`) are left out, and a
+`model_not_available_for_integrator` refusal retries the turn on a served
+model, like `model_not_supported`.

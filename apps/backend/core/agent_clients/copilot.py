@@ -15,7 +15,7 @@ from contextlib import aclosing
 from typing import Any
 
 from copilot_models import EXCHANGE_REFUSED_STATUSES as _EXCHANGE_REFUSED_STATUSES
-from copilot_models import IDE_HEADERS
+from copilot_models import IDE_HEADERS, MODEL_REFUSED_CODES
 from harness.application.loop import run_turns
 from harness.application.subagents import (
     launch_staggered,
@@ -483,7 +483,7 @@ class _CopilotAdapter(ChatCompletionsAdapter):
                         # (e.g. "claude-opus-4.8"). Swap to a supported model
                         # and retry the turn instead of failing the phase.
                         error_text = await resp.text()
-                        if "model_not_supported" in error_text:
+                        if any(code in error_text for code in MODEL_REFUSED_CODES):
                             if not client.allow_model_fallback:
                                 # A caller comparing models (the Arena) wants
                                 # this model's answer or a failure, never

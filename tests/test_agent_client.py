@@ -607,12 +607,17 @@ class TestCopilotAgentClient:
         )
 
     @pytest.mark.asyncio
-    async def test_receive_response_400_model_not_supported_falls_back(self):
-        """A 400 model_not_supported swaps the model and retries (no phase fail).
+    @pytest.mark.parametrize(
+        "code", ["model_not_supported", "model_not_available_for_integrator"]
+    )
+    async def test_receive_response_400_model_not_supported_falls_back(self, code):
+        """A 400 refusing the model swaps it and retries (no phase fail).
 
         Reproduces the QA validation failure where Copilot rejected the model
-        with `{"code":"model_not_supported"}`. The client must fall back to a
-        supported model and recover instead of surfacing the 400 error.
+        with `{"code":"model_not_supported"}`, and the planning one where it
+        answered `model_not_available_for_integrator` (a model GitHub does not
+        serve on /chat/completions). The client must fall back to a supported
+        model and recover instead of surfacing the 400 error.
         """
         client = CopilotAgentClient(
             model="claude-opus-4.8", github_token="ghp_test", max_turns=5
@@ -626,7 +631,7 @@ class TestCopilotAgentClient:
             resp.text = AsyncMock(
                 return_value=(
                     '{"error":{"message":"The requested model is not '
-                    'supported.","code":"model_not_supported","param":"model",'
+                    f'supported.","code":"{code}","param":"model",'
                     '"type":"invalid_request_error"}}'
                 )
             )
@@ -666,7 +671,7 @@ class TestCopilotAgentClient:
             if b.type == ContentBlockType.TEXT
         ]
         assert "Recovered!" in texts
-        assert not any("model_not_supported" in t for t in texts)
+        assert not any(code in t for t in texts)
         # Model was swapped to the supported fallback before retrying.
         assert client.model == "claude-sonnet-4.5"
 
