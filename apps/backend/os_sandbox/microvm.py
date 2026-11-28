@@ -115,6 +115,11 @@ _STOP_SCRIPT = (
 #: rules are in place.
 ALL_HOSTS = "**"
 
+#: Set by sbx itself in every VM (seen with sbx 0.54.1 and no ``github``
+#: secret stored): emptied for each command WorkPilot runs there, which has
+#: no use for a GitHub credential.
+BLANKED_ENV: tuple[str, ...] = ("GH_TOKEN", "GITHUB_TOKEN")
+
 _QUICK_TIMEOUT = 60
 _CREATE_TIMEOUT = 900
 _GIB = 1024**3
@@ -486,8 +491,15 @@ class TaskVm:
         for name in FORWARDED_ENV:
             if env.get(name):
                 argv += ["-e", f"{name}={env[name]}"]
+        for name in BLANKED_ENV:
+            argv += ["-e", f"{name}="]
         for name, value in (vm_env or {}).items():
-            if not _ENV_NAME.match(name) or "\0" in value or "\n" in value:
+            if (
+                not _ENV_NAME.match(name)
+                or name in BLANKED_ENV
+                or "\0" in value
+                or "\n" in value
+            ):
                 raise MicrovmError(f"not a variable for the microVM: {name}")
             argv += ["-e", f"{name}={value}"]
         run_file = f"/tmp/workpilot-run-{secrets.token_hex(8)}.pid"

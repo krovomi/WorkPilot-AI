@@ -170,7 +170,10 @@ défaut.
 
 **sbx est lancé sans les identifiants de l'hôte** (`sbx_env`, même règle que
 `security/child_env.py`) : il se connecte seul (`sbx login`, ses clés dans le trousseau), et ce que
-son environnement porte peut être passé à la VM.
+son environnement porte peut être passé à la VM. sbx 0.54.1 met pourtant de lui-même un
+`GH_TOKEN` de 40 caractères dans chaque VM, sans secret `github` rangé et quel que soit
+l'environnement de la commande `sbx` ; chaque commande que WorkPilot y lance le reçoit vide
+(`BLANKED_ENV` : `GH_TOKEN`, `GITHUB_TOKEN`), et `vm_env` ne peut pas le redonner.
 
 **Arrêt** : tuer `sbx exec` sur l'hôte laisse la commande tourner dans la VM. Chaque commande y
 démarre dans sa propre session (`setsid -w sh -c 'echo $$ > <fichier>; exec "$@"'`, `RUN_SCRIPT`)
