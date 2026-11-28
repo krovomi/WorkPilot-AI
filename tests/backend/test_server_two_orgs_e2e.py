@@ -600,6 +600,9 @@ def _path_values(
         "request_id": str(uuid.uuid4()),
         "share_id": str(uuid.uuid4()),
         "review_id": str(uuid.uuid4()),
+        # A card's PR capture: its position in the list and before / after.
+        "index": "0",
+        "side": "before",
     }
 
 
