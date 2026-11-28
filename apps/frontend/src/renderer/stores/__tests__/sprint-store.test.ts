@@ -107,6 +107,38 @@ describe("sprint store", () => {
 		expect(answer).toHaveBeenLastCalledWith("p1", B);
 	});
 
+	it("plans cards into an open sprint and back, never into a closed or unknown one", async () => {
+		expect(await useSprintStore.getState().assign(["other"], A)).toEqual({ ok: true });
+		expect(sprintOf("other")).toBe(A);
+		expect(await useSprintStore.getState().assign(["other"], null)).toEqual({ ok: true });
+		expect(sprintOf("other")).toBeUndefined();
+		useSprintStore.setState({ sprints: [...sprints, { id: "sp-0000000c", name: "C", state: "closed", createdAt: "t" }] });
+		expect(await useSprintStore.getState().assign(["other"], "sp-0000000c")).toEqual({ ok: false, error: "sprint_closed" });
+		expect(await useSprintStore.getState().assign(["other"], "sp-000000ff")).toEqual({ ok: false, error: "sprint_closed" });
+		expect(sprintOf("other")).toBeUndefined();
+	});
+
+	it("counts the cards a plan could not move", async () => {
+		api.restore();
+		install(new Set(["open"]));
+		expect(await useSprintStore.getState().assign(["open", "other"], B)).toEqual({
+			ok: false,
+			error: "cards_not_moved",
+			failedCards: 1,
+		});
+		expect(sprintOf("other")).toBe(B);
+	});
+
+	it("opens one planning view at a time and forgets it with the project", async () => {
+		useSprintStore.getState().openPlanning(B);
+		expect(useSprintStore.getState().planningId).toBe(B);
+		useSprintStore.getState().closePlanning();
+		expect(useSprintStore.getState().planningId).toBeNull();
+		useSprintStore.getState().openPlanning(A);
+		await useSprintStore.getState().load("p2");
+		expect(useSprintStore.getState().planningId).toBeNull();
+	});
+
 	it("reports a refusal from the main process", async () => {
 		answer.mockResolvedValueOnce({ success: false, error: "another_active" } as never);
 		expect(await useSprintStore.getState().start(B)).toEqual({ ok: false, error: "another_active" });
