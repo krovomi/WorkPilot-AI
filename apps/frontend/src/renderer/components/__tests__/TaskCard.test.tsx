@@ -457,6 +457,46 @@ describe("TaskCard — status badges", () => {
 		expect(screen.getByText("Coding")).toBeInTheDocument();
 	});
 
+	it("reads Interrupted, not the stale phase, on a build the app closed on", async () => {
+		const user = userEvent.setup();
+		renderCard({
+			task: makeTask({
+				status: "in_progress",
+				executionProgress: { phase: "coding", phaseProgress: 40 } as never,
+				metadata: {
+					paused: {
+						enabled: true,
+						reason: "app_shutdown",
+						paused_at: "2026-11-28T18:00:00.000Z",
+					},
+				} as never,
+			}),
+		});
+		expect(screen.getByText("Interrupted")).toBeInTheDocument();
+		expect(screen.queryByText("Coding")).not.toBeInTheDocument();
+		expect(screen.queryByText("Running")).not.toBeInTheDocument();
+		// Nothing runs: no Stop, a labelled Resume through the Reprendre path.
+		expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+		await user.click(screen.getByTestId("task-interrupted-resume"));
+		await waitFor(() =>
+			expect(api.fn("invoke")).toHaveBeenCalledWith("TASK_RESUME", "task-1"),
+		);
+		await user.hover(screen.getByTestId("task-interrupted-badge"));
+		expect((await screen.findAllByText(/WorkPilot was closed while this build ran \(/))[0]).toBeInTheDocument();
+	});
+
+	it("tells a crash apart from a close in the Interrupted tooltip", async () => {
+		const user = userEvent.setup();
+		renderCard({
+			task: makeTask({
+				status: "ai_review",
+				metadata: { paused: { enabled: true, reason: "app_shutdown", crashed: true } } as never,
+			}),
+		});
+		await user.hover(screen.getByTestId("task-interrupted-badge"));
+		expect((await screen.findAllByText(/WorkPilot stopped without closing/))[0]).toBeInTheDocument();
+	});
+
 	it("names the running phase in the app's language", async () => {
 		const { rerender } = renderCard({
 			task: makeTask({
@@ -989,6 +1029,26 @@ describe("TaskCard — re-render rules", () => {
 			await vi.advanceTimersByTimeAsync(61_000);
 		});
 		expect(api.fn("checkTaskRunning")).not.toHaveBeenCalled();
+	});
+
+	it("never reads a paused build as stuck: it has no process by design", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		api = installRendererApi({
+			checkTaskRunning: vi.fn(async () => ({ success: true, data: false })),
+		});
+		renderCard({
+			task: makeTask({
+				id: "task-paused",
+				status: "in_progress",
+				metadata: { paused: { enabled: true, reason: "kill_switch" } } as never,
+			}),
+		});
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(61_000);
+		});
+		expect(api.fn("checkTaskRunning")).not.toHaveBeenCalled();
+		expect(screen.queryByText("Stuck")).not.toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: /Recover/ })).not.toBeInTheDocument();
 	});
 
 	it("is not stuck when activity arrives while the process check is in flight", async () => {

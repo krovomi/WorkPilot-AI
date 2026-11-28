@@ -846,6 +846,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	getTaskStackStatus: async () => ({ success: true, data: { stacked: false } }),
 	updateTaskStack: async () => ({ success: false, error: "Not available in browser mode" }),
 	getInterruptedTasks: async () => null,
+	listInterruptedTasks: async () => [],
 	resolveInterruptedTasks: async () => ({ resumed: [], waiting: [], failed: [] }),
 	onInterruptedTasksOffer: () => () => {
 		/* nothing to remove in the browser mock */

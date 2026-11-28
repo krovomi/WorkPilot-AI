@@ -153,11 +153,20 @@ function settleCrash(task: Task, project: Project): void {
 	writePauseState(allSpecDirs(specPaths), state);
 }
 
-/** Every interrupted build of every project, newest interruption first. */
-export function collectInterruptedTasks(agentManager: AgentManager): InterruptedTask[] {
+/**
+ * Every interrupted build, newest interruption first: of every project at
+ * launch, of one project when the board asks (its builds put off included).
+ */
+export function collectInterruptedTasks(
+	agentManager: AgentManager,
+	options: { readonly projectId?: string; readonly includeDeferred?: boolean } = {},
+): InterruptedTask[] {
 	const found: InterruptedTask[] = [];
 	const isRunning = (id: string) => agentManager.isRunning(id);
-	for (const project of projectStore.getProjects()) {
+	const projects = projectStore
+		.getProjects()
+		.filter((p) => options.projectId === undefined || p.id === options.projectId);
+	for (const project of projects) {
 		let tasks: Task[];
 		try {
 			projectStore.invalidateTasksCache(project.id);
@@ -167,7 +176,7 @@ export function collectInterruptedTasks(agentManager: AgentManager): Interrupted
 			continue;
 		}
 		for (const task of tasks) {
-			const origin = interruptionOrigin(task, isRunning);
+			const origin = interruptionOrigin(task, isRunning, options);
 			if (!origin) continue;
 			try {
 				if (origin === "crash" && !task.metadata?.paused?.enabled) settleCrash(task, project);
@@ -323,6 +332,20 @@ export function registerInterruptedTaskHandlers(agentManager: AgentManager): voi
 	// A reloaded renderer asks again: the offer stands until it is answered.
 	ipcMain.handle(IPC_CHANNELS.TASK_INTERRUPTED_GET, (): InterruptedTasksOffer | null =>
 		offered.length > 0 ? { mode: "ask", tasks: offered } : null,
+	);
+	// The board's « N tâches interrompues » chip: this project's builds, put
+	// off ones included, offered again (and answered through RESOLVE).
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_INTERRUPTED_LIST,
+		(_event, rawProjectId: unknown): InterruptedTask[] => {
+			if (typeof rawProjectId !== "string" || rawProjectId.length === 0) return [];
+			if (!projectStore.getProjects().some((p) => p.id === rawProjectId)) return [];
+			offered = collectInterruptedTasks(agentManager, {
+				projectId: rawProjectId,
+				includeDeferred: true,
+			});
+			return offered;
+		},
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_INTERRUPTED_RESOLVE,

@@ -5,6 +5,8 @@
  */
 import { create } from "zustand";
 import type { InterruptedTask, InterruptedTasksOffer } from "../../shared/types/interrupted-tasks";
+import { useProjectStore } from "./project-store";
+import { loadTasks } from "./task-store";
 
 interface InterruptedTasksState {
 	/** Waiting for the person's answer: the dialog is open while it is set. */
@@ -14,6 +16,16 @@ interface InterruptedTasksState {
 	receive: (offer: InterruptedTasksOffer | null) => void;
 	close: () => void;
 	clearAutoResumed: () => void;
+}
+
+/**
+ * The cards changed on disk: a launch settles a crash into the shutdown pause,
+ * an answer resumes some builds and puts the others off. The board rereads
+ * them so it shows « Interrompue », not a stale « En cours » that turns stuck.
+ */
+function reloadBoard(): void {
+	const projectId = useProjectStore.getState().selectedProjectId;
+	if (projectId) void loadTasks(projectId, { forceRefresh: true });
 }
 
 export const useInterruptedTasksStore = create<InterruptedTasksState>((set) => ({
@@ -27,8 +39,12 @@ export const useInterruptedTasksStore = create<InterruptedTasksState>((set) => (
 		} else {
 			set({ offer: offer.tasks });
 		}
+		reloadBoard();
 	},
-	close: () => set({ offer: null }),
+	close: () => {
+		set({ offer: null });
+		reloadBoard();
+	},
 	clearAutoResumed: () => set({ autoResumed: null }),
 }));
 
