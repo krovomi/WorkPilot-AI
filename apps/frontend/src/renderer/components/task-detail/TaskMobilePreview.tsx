@@ -26,7 +26,13 @@ import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { EmptyState as SharedEmptyState } from "../ui/empty-state";
 
-import { NativeSelect } from "../ui/native-select";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "../ui/select";
 interface TaskMobilePreviewProps {
 	taskId: string;
 	project?: Project;
@@ -225,26 +231,29 @@ export function TaskMobilePreview({
 						className="flex flex-col gap-1 text-xs text-muted-foreground"
 					>
 						{t("mobile:preview.device")}
-						<NativeSelect
-							id="mobile-preview-device"
-							className="min-w-56 px-2 py-1.5 text-sm h-auto"
+						<Select
 							value={device?.id ?? ""}
 							disabled={devices.length === 0 || isBusy}
-							onChange={(event) =>
-								selectDevice(
-									devices.find((d) => d.id === event.target.value) ?? null,
-								)
+							onValueChange={(next) =>
+								// The list only offers ids from `devices`: `null` is the type's due.
+								/* v8 ignore next */
+								selectDevice(devices.find((d) => d.id === next) ?? null)
 							}
 						>
-							{devices.length === 0 && (
-								<option value="">{t("mobile:preview.noDevice")}</option>
-							)}
-							{devices.map((entry) => (
-								<option key={entry.id} value={entry.id}>
-									{deviceLabel(entry, t("mobile:preview.booted"))}
-								</option>
-							))}
-						</NativeSelect>
+							<SelectTrigger
+								id="mobile-preview-device"
+								className="h-auto min-w-56 px-2 py-1.5 text-sm"
+							>
+								<SelectValue placeholder={t("mobile:preview.noDevice")} />
+							</SelectTrigger>
+							<SelectContent>
+								{devices.map((entry) => (
+									<SelectItem key={entry.id} value={entry.id}>
+										{deviceLabel(entry, t("mobile:preview.booted"))}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</label>
 
 					<Button

@@ -36,4 +36,18 @@ describe("AppSettings, team server", () => {
 		expect(await screen.findByText("offline")).toBeInTheDocument();
 		expect(screen.queryByRole("button", { name: "Sign in to a server" })).not.toBeInTheDocument();
 	});
+
+	it("shows my usage on a server only", async () => {
+		const getMyUsage = vi.fn().mockResolvedValue({ ok: false, error: "No organization" });
+		Object.assign(window, { electronAPI: { ...window.electronAPI, serverUsage: { getMyUsage } } });
+		useServerSessionStore.setState({ mode: "server" });
+		const { unmount } = render(
+			<AppSettingsDialog open onOpenChange={vi.fn()} initialSection="server-my-usage" />,
+		);
+		expect(await screen.findByText("The server refused: No organization")).toBeInTheDocument();
+		unmount();
+		useServerSessionStore.setState({ mode: "local" });
+		render(<AppSettingsDialog open onOpenChange={vi.fn()} initialSection="server-my-usage" />);
+		expect(screen.queryByRole("button", { name: "Read again what is measured" })).toBeNull();
+	});
 });

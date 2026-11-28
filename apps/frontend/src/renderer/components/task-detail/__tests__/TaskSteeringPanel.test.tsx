@@ -5,6 +5,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../../shared/i18n";
 import type { Task } from "../../../../shared/types";
@@ -17,6 +18,7 @@ const task = {
 	subtasks: [
 		{ id: "subtask-1", title: "Add the route", status: "completed" },
 		{ id: "subtask-2", title: "Write the tests", status: "pending" },
+		{ id: "subtask-3", title: "", status: "pending" },
 	],
 } as unknown as Task;
 
@@ -70,9 +72,20 @@ describe("TaskSteeringPanel", () => {
 		render(<TaskSteeringPanel task={task} />);
 		await screen.findByText("Use the existing repository");
 		const select = screen.getByRole("combobox", { name: "Who receives it" });
-		// A completed subtask is not offered.
+		const user = userEvent.setup();
+		select.focus();
+		await user.keyboard("[ArrowDown]");
+		const subtask = await screen.findByRole("option", { name: "Write the tests" });
+		// A subtask without a title is offered by its id; a completed one is not.
+		expect(screen.getByRole("option", { name: "subtask-3" })).toBeInTheDocument();
 		expect(screen.queryByRole("option", { name: "Add the route" })).toBeNull();
-		fireEvent.change(select, { target: { value: "subtask-2" } });
+		await user.click(subtask);
+		// Back to the next session, then to the subtask again.
+		await user.keyboard("[ArrowDown]");
+		await user.click(await screen.findByRole("option", { name: "The next session" }));
+		expect(select).toHaveTextContent("The next session");
+		await user.keyboard("[ArrowDown]");
+		await user.click(await screen.findByRole("option", { name: "Write the tests" }));
 		fireEvent.change(screen.getByRole("textbox"), { target: { value: "Only here" } });
 		fireEvent.click(screen.getByRole("button", { name: /Send/ }));
 		await waitFor(() =>
