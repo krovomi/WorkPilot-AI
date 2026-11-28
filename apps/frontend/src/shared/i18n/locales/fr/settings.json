@@ -3382,6 +3382,14 @@
 			"budgetLabel": "Budget mensuel en dollars US",
 			"budgetPlaceholder": "ex. 50 (vide : aucun)",
 			"invalid": "Saisis un montant en dollars, ou laisse vide pour aucun budget."
+		},
+		"pins": {
+			"title": "Compte IA",
+			"projectDescription": "Le compte sur lequel chaque provider tourne pour les tâches de ce projet. Une carte peut en choisir un autre.",
+			"cardDescription": "Le compte sur lequel chaque provider de cette carte tourne. Laisser tel quel pour suivre le projet, ou le compte par défaut du provider.",
+			"inheritDefault": "Compte par défaut ({{name}})",
+			"inheritProject": "Compte du projet ({{name}})",
+			"removed": "Compte supprimé (le compte par défaut est utilisé)"
 		}
 	},
 	"governance": {

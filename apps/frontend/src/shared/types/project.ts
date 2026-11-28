@@ -99,6 +99,11 @@ export interface ProjectSettings {
 	description?: string;
 	/** Provider IA sélectionné (optionnel) */
 	provider?: string;
+	/**
+	 * The AI account each provider runs on for this project's tasks
+	 * (`ai-account-pins.ts`); a card's own pin wins. Absent = default account.
+	 */
+	aiAccounts?: import("./ai-accounts").AiAccountPins;
 }
 
 /** The kinds of task the automatic split measures (the others stay whole). */

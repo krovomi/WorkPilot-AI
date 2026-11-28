@@ -3382,6 +3382,14 @@
 			"budgetLabel": "Monthly budget in US dollars",
 			"budgetPlaceholder": "e.g. 50 (empty: none)",
 			"invalid": "Type an amount in dollars, or leave it empty for no budget."
+		},
+		"pins": {
+			"title": "AI account",
+			"projectDescription": "The account each provider runs on for this project's tasks. A card can pick another one.",
+			"cardDescription": "The account each provider of this card runs on. Leave it to follow the project, or the provider's default account.",
+			"inheritDefault": "Default account ({{name}})",
+			"inheritProject": "Project's account ({{name}})",
+			"removed": "Deleted account (the default one is used)"
 		}
 	},
 	"governance": {

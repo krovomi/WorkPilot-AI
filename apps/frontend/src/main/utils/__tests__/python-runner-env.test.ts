@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
 	pageProviderEnv: {} as Record<string, string>,
 	pages: [] as string[],
 	taskProviderEnv: {} as Record<string, string>,
+	pinnedProfileEnv: {} as Record<string, Record<string, string>>,
 }));
 
 vi.mock("../../env-utils", () => ({
@@ -45,6 +46,12 @@ vi.mock("../../agent/env-utils", () => ({
 			: { ANTHROPIC_API_KEY: "", ANTHROPIC_AUTH_TOKEN: "" },
 }));
 
+vi.mock("../../agent/pinned-claude-profile", () => ({
+	pinnedClaudeProfileEnv: (plan?: { accounts?: Record<string, string> }) => {
+		const env = state.pinnedProfileEnv[plan?.accounts?.claude ?? ""];
+		return env ? { env: { ...env } } : undefined;
+	},
+}));
 vi.mock("../../agent/task-provider-env", () => ({
 	buildTaskProviderEnv: () => ({ ...state.taskProviderEnv }),
 }));
@@ -197,5 +204,20 @@ describe("pythonRunnerEnv", () => {
 			},
 		});
 		expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe("test-oauth-profile-0000");
+	});
+
+	it("signs a task in with the Claude profile its card or project pins", async () => {
+		state.taskProviderEnv = { SELECTED_LLM_PROVIDER: "claude" };
+		state.pinnedProfileEnv = { work: { CLAUDE_CODE_OAUTH_TOKEN: "test-oauth-work-0000" } };
+		const env = await pythonRunnerEnv(BACKEND, {
+			taskProviders: {
+				providers: ["claude"],
+				startProvider: "claude",
+				usesClaude: true,
+				accounts: { claude: "work" },
+			},
+		});
+		expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe("test-oauth-work-0000");
+		state.pinnedProfileEnv = {};
 	});
 });

@@ -8,10 +8,22 @@ vi.mock("../project-store", () => ({
 }));
 vi.mock("../settings-utils", () => ({ readSettingsFile: vi.fn(() => ({})) }));
 vi.mock("../app-logger", () => ({ appLog: { warn: vi.fn(), info: vi.fn() } }));
+const applyPinnedAccount = vi.fn(
+	(env: Record<string, string>, provider: string, accountId: string | undefined) => {
+		if (!accountId) return false;
+		env[`${provider.toUpperCase()}_KEY`] = `pinned:${accountId}`;
+		return true;
+	},
+);
+vi.mock("../ai-accounts/pinned-account-env", () => ({
+	applyPinnedAccount: (...args: Parameters<typeof applyPinnedAccount>) =>
+		applyPinnedAccount(...args),
+}));
 
 import {
 	buildTaskProviderEnv,
 	planTaskProviders,
+	taskAccountPins,
 	taskEngineFromMetadata,
 } from "./task-provider-env";
 
@@ -93,5 +105,32 @@ describe("buildTaskProviderEnv", () => {
 		);
 		expect(env.MISTRAL_API_KEY).toBe("m");
 		expect(env.SELECTED_LLM_PROVIDER).toBe("mistral");
+	});
+});
+
+describe("pinned accounts", () => {
+	it("runs each provider on the account the card or its project pins", () => {
+		const env = buildTaskProviderEnv(
+			{
+				providers: ["openai", "gemini", "mistral"],
+				startProvider: "openai",
+				usesClaude: false,
+				accounts: { openai: "client", google: "work" },
+			},
+			(provider) => ({ [`${provider.toUpperCase()}_KEY`]: "default" }),
+		);
+		expect(env.OPENAI_KEY).toBe("pinned:client");
+		expect(env.GEMINI_KEY).toBe("pinned:work");
+		expect(env.MISTRAL_KEY).toBe("default");
+	});
+
+	it("takes the card's pin over the project's, the project's for the rest", () => {
+		expect(
+			taskAccountPins(
+				{ aiAccounts: { openai: "card" } },
+				{ aiAccounts: { openai: "project", anthropic: "team" } },
+			),
+		).toEqual({ openai: "card", claude: "team" });
+		expect(taskAccountPins(undefined, undefined)).toBeUndefined();
 	});
 });

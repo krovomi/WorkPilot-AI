@@ -688,6 +688,11 @@ export interface TaskMetadata {
 	 * task_metadata.json, `code_mode/settings.py`). A phase left out follows Settings.
 	 */
 	phaseCodeMode?: import("../utils/code-mode").PhaseCodeMode;
+	/**
+	 * The AI account this card runs on, per provider (`ai-account-pins.ts`):
+	 * it wins over the project's pin and the provider's default account.
+	 */
+	aiAccounts?: import("./ai-accounts").AiAccountPins;
 	baseBranch?: string; // Override base branch for this task's worktree
 	prUrl?: string; // GitHub PR URL if task has been submitted as a PR
 	/**

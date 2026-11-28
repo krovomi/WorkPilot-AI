@@ -73,6 +73,7 @@ import { useMobileSetup } from "./task-form/useMobileSetup";
 import {
 	buildEngineMetadata,
 	defaultEngineProvider,
+	engineProviders,
 	isUniformEngine,
 	resolveTaskEngine,
 	sameTrio,
@@ -81,6 +82,8 @@ import {
 	uniformEngine,
 } from "../../shared/utils/task-engine";
 import { BenchEngineHint } from "./bench/BenchRecommendation";
+import type { AiAccountPins } from "../../shared/types/ai-accounts";
+import { pinsForProviders, sanitizeAccountPins } from "../../shared/utils/ai-account-pins";
 import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
 import {
 	normalizePhaseCodeMode,
@@ -237,6 +240,14 @@ export function TaskEditDialog({
 	const [phaseCodeMode, setPhaseCodeMode] = useState<PhaseCodeMode>(() =>
 		normalizePhaseCodeMode(task.metadata?.phaseCodeMode),
 	);
+	// The AI account the card pins per provider (absent = the project's, else the default).
+	const [aiAccounts, setAiAccounts] = useState<AiAccountPins | undefined>(() =>
+		sanitizeAccountPins(task.metadata?.aiAccounts),
+	);
+	const projectAiAccounts = useMemo(
+		() => projects.find((p) => p.id === task.projectId)?.settings?.aiAccounts,
+		[projects, task.projectId],
+	);
 
 	// Agent profile / model configuration
 	const [profileId, setProfileId] = useState<string>(() => {
@@ -389,6 +400,7 @@ export function TaskEditDialog({
 		setEngine(openedEngine);
 		initialEngineRef.current = JSON.stringify(openedEngine);
 		setPhaseCodeMode(normalizePhaseCodeMode(task.metadata?.phaseCodeMode));
+		setAiAccounts(sanitizeAccountPins(task.metadata?.aiAccounts));
 		setError(null);
 		setStep(1);
 
@@ -476,6 +488,11 @@ export function TaskEditDialog({
 		// The engine is "changed" only when it differs from what the dialog
 		// opened with, so plain edits rewrite none of it.
 		const engineChanged = JSON.stringify(engine) !== initialEngineRef.current;
+		// The card's account pins, for the providers its engine uses.
+		const pinsToSave = pinsForProviders(aiAccounts, engineProviders(engine));
+		const accountsChanged =
+			JSON.stringify(pinsToSave ?? null) !==
+			JSON.stringify(sanitizeAccountPins(task.metadata?.aiAccounts) ?? null);
 		const splitBefore = autoSplitMetadata(autoSplitValueFrom(task.metadata));
 		const splitAfter = autoSplitMetadata(autoSplit);
 		const testPlacementChanged =
@@ -498,6 +515,7 @@ export function TaskEditDialog({
 				complexity !== (task.metadata?.complexity || "") ||
 				impact !== (task.metadata?.impact || "") ||
 				engineChanged ||
+				accountsChanged ||
 				requireReviewBeforeCoding !==
 					(task.metadata?.requireReviewBeforeCoding ?? false) ||
 				tddMode !== (task.metadata?.tddMode ?? false) ||
@@ -531,6 +549,8 @@ export function TaskEditDialog({
 		if (isDuplicate || engineChanged) {
 			Object.assign(metadataUpdates, buildEngineMetadata(engine));
 		}
+		// `undefined` removes the key: the card follows its project's accounts again.
+		if (isDuplicate || accountsChanged) metadataUpdates.aiAccounts = pinsToSave;
 		// Its code mode per phase too: written when changed, removed when back to Settings'.
 		const ownCodeMode = phaseCodeModeToSave(phaseCodeMode);
 		const savedCodeMode = phaseCodeModeToSave(normalizePhaseCodeMode(task.metadata?.phaseCodeMode));
@@ -783,6 +803,9 @@ export function TaskEditDialog({
 							disabled={isSaving}
 							phaseCodeMode={phaseCodeMode}
 							onPhaseCodeModeChange={setPhaseCodeMode}
+							accounts={aiAccounts}
+							onAccountsChange={setAiAccounts}
+							inheritedAccounts={projectAiAccounts}
 						/>
 					</div>
 				}
