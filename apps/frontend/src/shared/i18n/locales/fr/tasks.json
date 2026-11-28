@@ -723,6 +723,76 @@
 				"points": "Points",
 				"updated": "Modifiée"
 			}
+		},
+		"reports": {
+			"button": "Rapports",
+			"title": "Rapports",
+			"description": "Mesurés sur les tâches et les sprints du projet, quels que soient les filtres du tableau. Les points sont le score de l'estimation intelligente, jamais une durée.",
+			"day": "Jour",
+			"sprint": "Sprint",
+			"cards": "Tâches",
+			"tabs": {
+				"burndown": "Burndown",
+				"velocity": "Vélocité",
+				"flow": "Flux cumulé",
+				"cycle": "Temps de cycle",
+				"throughput": "Débit",
+				"ends": "Fins non abouties"
+			},
+			"burndown": {
+				"empty": "Aucun sprint en cours. Démarre-en un depuis le menu « Sprints » pour suivre son burndown.",
+				"chart": "Burndown de {{name}}",
+				"summary": "{{name}} : {{left}} points restants sur {{scope}}.",
+				"ideal": "Idéal",
+				"remaining": "Points restants"
+			},
+			"velocity": {
+				"empty": "Aucun sprint terminé : la vélocité apparaît avec le premier.",
+				"chart": "Points engagés et terminés par sprint",
+				"summary": "Moyenne des 3 derniers sprints : {{points}} points.",
+				"committed": "Engagés",
+				"done": "Terminés"
+			},
+			"flow": {
+				"chart": "Tâches par étape, 30 derniers jours",
+				"summary": "Tâches par étape à la fin de chaque jour des 30 derniers jours. Une bande qui s'élargit, c'est du travail qui s'accumule.",
+				"bands": {
+					"todo": "À faire",
+					"doing": "En cours",
+					"review": "En revue",
+					"done": "Terminées"
+				}
+			},
+			"cycle": {
+				"empty": "Aucune tâche terminée ces 90 derniers jours avec un début connu.",
+				"chart": "Temps de cycle des tâches terminées ces 90 derniers jours",
+				"summary_one": "{{count}} tâche terminée : {{median}} jours entre le début et la fin.",
+				"summary_other": "{{count}} tâches terminées : médiane de {{median}} jours entre le début et la fin, 85 % en {{p85}} jours ou moins.",
+				"span": "Du début à la fin",
+				"bins": {
+					"lt1": "< 1 jour",
+					"d1to3": "1 à 3 jours",
+					"d3to7": "3 à 7 jours",
+					"d7to14": "1 à 2 semaines",
+					"gt14": "> 2 semaines"
+				}
+			},
+			"throughput": {
+				"chart": "Tâches terminées par semaine",
+				"summary_one": "{{count}} tâche terminée ces {{weeks}} dernières semaines.",
+				"summary_other": "{{count}} tâches terminées ces {{weeks}} dernières semaines.",
+				"week": "Semaine du"
+			},
+			"ends": {
+				"empty": "Aucune tâche terminée sans succès.",
+				"failed": "En échec",
+				"abandoned": "Abandonnées",
+				"reasons": {
+					"errors": "Erreurs de build",
+					"prompt_too_long": "Prompt trop long",
+					"qa_rejected": "Refusée par la QA"
+				}
+			}
 		}
 	},
 	"queue": {
