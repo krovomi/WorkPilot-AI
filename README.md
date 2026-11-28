@@ -77,10 +77,12 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 
 ## How it works
 
+<a href=".github/assets/showcase/how-it-works-light.png">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/showcase/how-it-works-dark.png">
   <img alt="How it works: plan (you describe a task, spec, planner, you approve), build and check (coder, QA reviewer and QA fixer until QA approves), prove and ship (verify, you review the diff, merge or pull request)" src=".github/assets/showcase/how-it-works-light.png" width="100%">
 </picture>
+</a>
 
 - **Isolated**: every task runs in its own git worktree, so your branch stays untouched until you merge; the worktree is removed once the task's pull request is merged.
 - **Reviewed, always**: pages that write code (test studio, Import Design, changelog, pair programming, the Kanban's quick commands) put it on the branch of a « Generated code » card in Human Review; it reaches your project only through a pull request you review ([generated code](docs/architecture/generated-review.md)).
@@ -103,18 +105,22 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 <tr>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/interrupted-tasks.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/interrupted-tasks-light.png">
   <img alt="At launch: the interrupted tasks, each with its engine, how it stopped and the step it resumes at, ticked by default" src=".github/assets/showcase/interrupted-tasks.png">
 </picture>
+</a>
 
 </td>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/interrupted-cards.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/interrupted-cards-light.png">
   <img alt="The board: Interrupted cards with Resume, « 2 interrupted » on the In Progress band and the toolbar's « 3 interrupted tasks · Resume… »" src=".github/assets/showcase/interrupted-cards.png">
 </picture>
+</a>
 
 </td>
 </tr>
@@ -128,18 +134,22 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 <tr>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/sprint-planning.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-planning-light.png">
   <img alt="Plan a sprint: the capacity gauge against the velocity of the last 3 sprints, the backlog and the sprint side by side" src=".github/assets/showcase/sprint-planning.png">
 </picture>
+</a>
 
 </td>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/sprint-proposal.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-proposal-light.png">
   <img alt="Propose the sprint: the cards offered in dashed violet with their reason, the capacity line and what falls below it" src=".github/assets/showcase/sprint-proposal.png">
 </picture>
+</a>
 
 </td>
 </tr>
@@ -389,10 +399,12 @@ Several accounts per provider can be registered: several keys for each API-key p
 
 How the pieces talk to each other:
 
+<a href=".github/assets/showcase/architecture-light.png">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/showcase/architecture-dark.png">
   <img alt="Architecture: on your machine the desktop app and the Python engine work on your git repository, one worktree per task; the engine talks to AI providers, forges and trackers, and other AI clients; an optional team server shares the board with the mobile app" src=".github/assets/showcase/architecture-light.png" width="100%">
 </picture>
+</a>
 
 Where they live in the repository:
 

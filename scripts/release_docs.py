@@ -96,7 +96,9 @@ Use the file tools only. Do this, then stop:
    true for this version (Features at a glance, A tour of the app, Architecture,
    Command line, Security...). README.fr.md is the French twin: same change,
    same sections, same images. Never touch the download tables, the badges or
-   the STABLE_/BETA_ markers: the release workflow writes them.
+   the STABLE_/BETA_ markers: the release workflow writes them. Every image
+   opens full size on click: a <picture> (light and dark variants) sits inside
+   <a href="..."> naming the file of its <img src>, like the existing ones.
 3. docs/: fix the existing documents that a changed behaviour makes wrong
    (docs/architecture/*.md, docs/rules/*.md, docs/CONFIGURATION.md...). No new file.
 4. The wiki clone in {wiki}: in Home.md, replace the "What's new in ..." section
