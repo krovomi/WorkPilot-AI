@@ -12,6 +12,7 @@ import type { Sprint } from "../../../shared/types";
 import { cleanSprintDraft, MAX_SPRINT_GOAL, MAX_SPRINT_NAME, orderedSprints } from "../../../shared/utils/sprints";
 import { toast } from "../../hooks/use-toast";
 import { cn } from "../../lib/utils";
+import { useSprintProposalStore } from "../../stores/sprint-proposal-store";
 import { type SprintOutcome, sprintReport, useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
@@ -66,9 +67,12 @@ export function SprintEditDialog({ sprint, open, onOpenChange }: SprintEditDialo
 		setSaving(false);
 		if (!failed(outcome)) return;
 		onOpenChange(false);
-		// A new sprint is empty: its planning view is the next step.
+		// A new sprint is empty: its planning view is the next step, on the proposal's settings.
 		const created = sprint ? undefined : useSprintStore.getState().sprints.find((item) => !before.has(item.id));
-		if (created) openPlanning(created.id);
+		if (created) {
+			useSprintProposalStore.getState().openSettings(created.id);
+			openPlanning(created.id);
+		}
 	};
 
 	return (
