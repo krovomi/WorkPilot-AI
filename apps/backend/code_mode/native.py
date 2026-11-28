@@ -17,6 +17,7 @@ session that had it and no longer may starts afresh instead of resuming.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import time
@@ -25,6 +26,8 @@ from pathlib import Path
 from typing import Any
 
 from .settings import offered
+
+logger = logging.getLogger(__name__)
 
 #: The CLI's own switch, read only from the ``env`` block of ``--settings``.
 CLI_VAR = "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE"
@@ -124,8 +127,9 @@ def _write_marker(spec_dir: Path | None, on: bool) -> None:
         (spec_dir / MARKER_FILE).write_text(
             json.dumps({"on": on}) + "\n", encoding="utf-8"
         )
-    except OSError:
-        pass
+    except OSError as error:
+        # The marker only spares a resume that would fail; the session runs without it.
+        logger.debug("Could not record the code mode of %s: %s", spec_dir, error)
 
 
 def make_script_record_hook(spec_dir: Path | None, agent_type: str):
@@ -151,8 +155,9 @@ def make_script_record_hook(spec_dir: Path | None, agent_type: str):
         try:
             with open(spec_dir / SCRIPTS_FILE, "a", encoding="utf-8") as out:
                 out.write(json.dumps(record, ensure_ascii=False) + "\n")
-        except OSError:
-            pass
+        except OSError as error:
+            # Keeping the script is a record, never a gate: the call goes on.
+            logger.debug("Could not keep a code mode script in %s: %s", spec_dir, error)
         return {}
 
     return _hook

@@ -62,9 +62,11 @@ class Executor(Protocol):
     project_dir: Path
     working_directory: Path
 
-    async def execute(self, tool_name: str, arguments: dict[str, Any]) -> Any: ...
+    async def execute(self, tool_name: str, arguments: dict[str, Any]) -> Any:
+        """Run one tool call through the session's checks."""
 
-    def script_sandbox(self) -> Any: ...
+    def script_sandbox(self) -> Any:
+        """The OS sandbox the script's Node runs in."""
 
 
 class ScriptError(RuntimeError):

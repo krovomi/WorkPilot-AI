@@ -187,3 +187,16 @@ def test_the_hook_keeps_each_script_and_never_decides(tmp_path: Path, monkeypatc
 def test_the_hook_without_a_spec_folder_does_nothing():
     hook = make_script_record_hook(None, "coder")
     assert asyncio.run(hook({"tool_name": "REPL", "tool_input": {"code": "1"}})) == {}
+
+
+def test_a_folder_that_cannot_be_written_changes_nothing(tmp_path: Path, monkeypatch):
+    def refuse(*_args, **_kwargs):
+        raise OSError("read-only")
+
+    monkeypatch.setattr(Path, "write_text", refuse)
+    monkeypatch.setattr("builtins.open", refuse)
+    hook = make_script_record_hook(tmp_path, "coder")
+
+    assert asyncio.run(hook({"tool_name": "REPL", "tool_input": {"code": "1"}})) == {}
+    native._write_marker(tmp_path, True)
+    assert not (tmp_path / MARKER_FILE).exists()
