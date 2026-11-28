@@ -19,6 +19,7 @@ import type {
 } from "../../../shared/types";
 import {
 	AI_ACCOUNT_PROVIDERS,
+	AI_LOGIN_PROVIDERS,
 	CLAUDE_ACCOUNT_PROVIDER,
 } from "../../../shared/types/ai-accounts";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
@@ -39,8 +40,11 @@ import { WorktreeRecipeSection } from "./WorktreeRecipeSection";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 
-/** Every provider a project can pin an account for: Claude, then the API-key ones. */
-const PROJECT_PIN_PROVIDERS = [CLAUDE_ACCOUNT_PROVIDER, ...AI_ACCOUNT_PROVIDERS];
+/**
+ * Every provider a project can pin an account for: Claude, the API-key ones
+ * (OpenAI with its Codex CLI sign-ins), then the other CLIs' sign-ins.
+ */
+const PROJECT_PIN_PROVIDERS = [CLAUDE_ACCOUNT_PROVIDER, ...AI_ACCOUNT_PROVIDERS, ...AI_LOGIN_PROVIDERS];
 
 interface GeneralSettingsProps {
 	readonly project: Project;

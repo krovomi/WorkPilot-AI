@@ -23,7 +23,14 @@ const warn = vi.hoisted(() => vi.fn());
 vi.mock("../../app-logger", () => ({ appLog: { warn } }));
 
 import { AiAccountStore, setAiAccountStoreForTests } from "../ai-accounts";
-import { defaultLoginHome, isSignInEnv, loginAccountEnv, signInPlanOf } from "../login-accounts";
+import {
+	applyPinnedLogin,
+	defaultLoginHome,
+	isSignInEnv,
+	loginAccountEnv,
+	pinnedLoginHome,
+	signInPlanOf,
+} from "../login-accounts";
 import { isLoginProvider, LOGIN_SPECS } from "../login-specs";
 
 let dir: string;
@@ -219,5 +226,57 @@ describe("login-accounts", () => {
 		expect(isSignInEnv("CODEX_HOME", path.join(home, ".."))).toBe(false);
 		expect(isSignInEnv("LD_PRELOAD", home)).toBe(false);
 		expect(isSignInEnv("CODEX_HOME", 42)).toBe(false);
+	});
+});
+
+describe("pinned CLI accounts", () => {
+	it("points the task's CLI at the pinned signed-in account, over the default", () => {
+		const work = store.save({ provider: "copilot", name: "Work" });
+		const client = store.save({ provider: "copilot", name: "Client" });
+		signIn("copilot", store.homeOf(work.id) as string);
+		signIn("copilot", store.homeOf(client.id) as string);
+		store.setDefault("copilot", work.id);
+		const env = { ...loginAccountEnv() };
+		expect(applyPinnedLogin(env, "copilot", client.id)).toBe(true);
+		expect(env).toEqual({ COPILOT_GH_CONFIG_DIR: store.homeOf(client.id) });
+	});
+
+	it("runs OpenAI on the pinned Codex sign-in, and Gemini CLI in its folder", () => {
+		const codex = store.save({ provider: "codex", name: "Plan" });
+		const gemini = store.save({ provider: "gemini-cli", name: "Google" });
+		signIn("codex", store.homeOf(codex.id) as string);
+		signIn("gemini-cli", store.homeOf(gemini.id) as string);
+		const env: Record<string, string> = { OPENAI_AUTH_MODE: "api-key" };
+		expect(applyPinnedLogin(env, "openai", codex.id)).toBe(true);
+		expect(applyPinnedLogin(env, "gemini-cli", gemini.id)).toBe(true);
+		expect(env).toEqual({
+			OPENAI_AUTH_MODE: "codex-cli",
+			CODEX_HOME: store.homeOf(codex.id),
+			GEMINI_CLI_HOME: store.homeOf(gemini.id),
+		});
+	});
+
+	it("keeps the default when the pin is absent, gone, of another CLI or signed out", () => {
+		const codex = store.save({ provider: "codex", name: "Plan" });
+		const signedOut = store.save({ provider: "copilot", name: "Later" });
+		signIn("codex", store.homeOf(codex.id) as string);
+		const env: Record<string, string> = {};
+		expect(applyPinnedLogin(env, "copilot", undefined)).toBe(false);
+		expect(applyPinnedLogin(env, "copilot", "missing")).toBe(false);
+		expect(applyPinnedLogin(env, "copilot", codex.id)).toBe(false);
+		expect(applyPinnedLogin(env, "copilot", signedOut.id)).toBe(false);
+		expect(applyPinnedLogin(env, "mistral", codex.id)).toBe(false);
+		expect(env).toEqual({});
+		expect(warn).toHaveBeenCalledTimes(3);
+	});
+
+	it("keeps the default when the store cannot be read", () => {
+		setAiAccountStoreForTests({
+			get: () => {
+				throw new Error("broken");
+			},
+		} as unknown as AiAccountStore);
+		expect(pinnedLoginHome("codex", "some-id")).toBeUndefined();
+		expect(warn).toHaveBeenCalledWith("[ai-accounts] pinned CLI account unreadable:", "broken");
 	});
 });

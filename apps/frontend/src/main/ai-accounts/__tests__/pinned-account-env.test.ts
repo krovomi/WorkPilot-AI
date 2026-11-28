@@ -6,7 +6,7 @@
  * that cannot be served leaves the environment as the credential manager built it.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,12 +21,7 @@ const warn = vi.fn();
 vi.mock("../../app-logger", () => ({ appLog: { warn: (...args: unknown[]) => warn(...args) } }));
 
 import { AiAccountStore, setAiAccountStoreForTests } from "../ai-accounts";
-import {
-	applyPinnedAccount,
-	applyPinnedLoginAccount,
-	pinnedAccountKey,
-	servedAccountPins,
-} from "../pinned-account-env";
+import { applyPinnedAccount, pinnedAccountKey, servedAccountPins } from "../pinned-account-env";
 
 const CLIENT_KEY = "sk-test-client-0000";
 const PERSO_KEY = "sk-test-perso-0000";
@@ -116,55 +111,6 @@ describe("applyPinnedAccount", () => {
 		const env: Record<string, string> = {};
 		expect(applyPinnedAccount(env, "openrouter", account.id)).toBe(true);
 		expect(Object.values(env)).toContain(CLIENT_KEY);
-	});
-});
-
-describe("applyPinnedLoginAccount", () => {
-	/** A Codex CLI account whose CLI signed in, as its auth.json says. */
-	function codexAccount(signedIn = true) {
-		const account = store.save({ provider: "codex", name: "Perso" });
-		const home = store.homeOf(account.id) as string;
-		if (signedIn) writeFileSync(path.join(home, "auth.json"), "{}");
-		return { id: account.id, home };
-	}
-
-	it("points the CLI at the pinned account's folder, OpenAI in its Codex mode", () => {
-		const { id, home } = codexAccount();
-		const env: Record<string, string> = { CODEX_HOME: "/default", OPENAI_AUTH_MODE: "api-key" };
-		expect(applyPinnedLoginAccount(env, "openai", id)).toBe(true);
-		expect(env).toEqual({ CODEX_HOME: home, OPENAI_AUTH_MODE: "codex-cli" });
-	});
-
-	it("serves a Copilot account without touching the OpenAI mode", () => {
-		const account = store.save({ provider: "copilot", name: "Work" });
-		const home = store.homeOf(account.id) as string;
-		writeFileSync(path.join(home, "hosts.yml"), "github.com:\n    user: someone\n");
-		const env: Record<string, string> = {};
-		expect(applyPinnedLoginAccount(env, "copilot", account.id)).toBe(true);
-		expect(env).toEqual({ COPILOT_GH_CONFIG_DIR: home });
-	});
-
-	it("leaves the environment alone for an account not signed in, of another CLI, or none", () => {
-		const { id } = codexAccount(false);
-		const env: Record<string, string> = { CODEX_HOME: "/default" };
-		expect(applyPinnedLoginAccount(env, "openai", id)).toBe(false);
-		expect(applyPinnedLoginAccount(env, "copilot", id)).toBe(false);
-		expect(applyPinnedLoginAccount(env, "openai", "gone")).toBe(false);
-		expect(applyPinnedLoginAccount(env, "openai", undefined)).toBe(false);
-		expect(applyPinnedLoginAccount(env, "mistral", id)).toBe(false);
-		expect(env).toEqual({ CODEX_HOME: "/default" });
-		expect(warn).toHaveBeenCalledTimes(3);
-	});
-
-	it("leaves the environment alone when the store cannot be read", () => {
-		setAiAccountStoreForTests({
-			get: () => {
-				throw new Error("broken");
-			},
-		} as never);
-		const env: Record<string, string> = {};
-		expect(applyPinnedLoginAccount(env, "copilot", "x")).toBe(false);
-		expect(env).toEqual({});
 	});
 });
 

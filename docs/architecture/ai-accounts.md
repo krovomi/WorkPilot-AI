@@ -49,11 +49,9 @@ Les alias (`gemini` → `google`) passent par `accountProviderOf` (`shared/types
 Un projet (`ProjectSettings.aiAccounts`) et une carte Kanban (`TaskMetadata.aiAccounts`, dans
 `task_metadata.json`) peuvent épingler un compte par provider : `{ provider: id }`, où le provider
 est celui des comptes (`google` pour `gemini`), `claude`, dont l'id est un profil OAuth, ou un outil
-CLI (`copilot`, `codex`, `gemini-cli`), dont l'id est un compte connecté. La carte prime, puis le
-projet, puis le compte par défaut (`shared/utils/ai-account-pins.ts`, `mergeAccountPins`). Une
-épingle de la carte remplace aussi celle du projet pour le même moteur sous l'autre clé : une carte
-sur une connexion Codex CLI ne tourne pas sur la clé OpenAI que le projet épingle
-(`siblingPinKeys`). L'épingle n'est qu'un id : elle est nettoyée à la lecture (providers connus,
+CLI (`copilot`, `codex`, `gemini-cli`), dont l'id est un compte de connexion. La carte
+prime, puis le projet, puis le compte par défaut (`shared/utils/ai-account-pins.ts`,
+`mergeAccountPins`). L'épingle n'est qu'un id : elle est nettoyée à la lecture (providers connus,
 id court et imprimable) et le main cherche le compte dans son propre magasin.
 
 - Clé API : `taskAccountPins` (`main/agent/task-provider-env.ts`) remplit
@@ -61,9 +59,14 @@ id court et imprimable) et le main cherche le compte dans son propre magasin.
   que le gestionnaire d'identifiants a choisi (`applyPinnedAccount`,
   `main/ai-accounts/pinned-account-env.ts`), sur l'adresse officielle du provider (l'URL d'un profil
   est retirée), seulement si le compte est bien de ce provider. OpenAI passe alors en clé API.
-- Outil CLI : sans épingle à clé qui s'applique, `buildTaskProviderEnv` pose le dossier du compte
-  CLI épinglé dans la variable du backend de l'outil (`applyPinnedLoginAccount`), seulement si le
-  compte est de cet outil et connecté. OpenAI passe alors en mode Codex (`OPENAI_AUTH_MODE`).
+- Compte d'un outil CLI : `buildTaskProviderEnv` pose, une fois l'environnement de chaque provider
+  réuni (chacun porte les dossiers par défaut de `loginAccountEnv`), la variable du backend de
+  l'outil sur le dossier du compte épinglé (`applyPinnedLogin`, `main/ai-accounts/login-accounts.ts`),
+  seulement si ce compte est de cet outil et connecté. OpenAI a deux épingles exclusives : `openai`
+  (une clé) ou `codex` (une connexion Codex CLI, qui passe la tâche en `OPENAI_AUTH_MODE=codex-cli`) ;
+  en choisir une retire l'autre (`withAccountPin`), l'épingle de la carte remplace les deux du projet
+  (`mergeAccountPins`), et une clé épinglée l'emporte sur une connexion qu'un fichier écrit à la main
+  garderait. Un compte de connexion n'a pas de dépense par appel : `servedAccountPins` l'ignore.
 - Claude : `pinnedClaudeProfileEnv` (`main/agent/pinned-claude-profile.ts`) remplace
   `getBestAvailableProfileEnv` pour la tâche ; le jeton rafraîchi avant le lancement et le profil
   marqué « en cours » sont ceux du profil épinglé. Le profil actif de l'app ne change pas.
@@ -74,7 +77,9 @@ id court et imprimable) et le main cherche le compte dans son propre magasin.
   tâche prend celui-ci une fois (`main/agent/claude-swap-pins.ts`), sans réécrire le fichier.
 - L'interface : `AiAccountPinsEditor` (`renderer/components/ai-account-pins/`), dans le groupe Agent
   des paramètres du projet et sous le moteur de la carte (création et modification). Une ligne par
-  provider qui a un choix : un compte à clé, ou plus d'un profil Claude.
+  provider qui a un choix : un compte à clé, un compte CLI connecté (la ligne d'OpenAI liste ses
+  clés puis ses connexions Codex CLI ; Copilot et Gemini CLI ont la leur), ou plus d'un profil
+  Claude. Sans défaut, une ligne d'outil CLI hérite de « connexion de cet ordinateur ».
 
 
 ## L'interface

@@ -12,14 +12,13 @@
  * was: the task runs on the provider's default, with a warning in the log.
  */
 
-import { accountProviderOf, loginProviderOf } from "../../shared/types/ai-accounts";
+import { accountProviderOf } from "../../shared/types/ai-accounts";
 import { appLog } from "../app-logger";
 import {
 	PROVIDER_BASE_URL_ENV_VARS,
 	PROVIDER_KEY_ENV_VARS,
 } from "../services/provider-settings-keys";
 import { aiAccountStore } from "./ai-accounts";
-import { LOGIN_SPECS } from "./login-specs";
 
 /** The key of `accountId` when it is an account of `provider`, or undefined. */
 export function pinnedAccountKey(
@@ -70,38 +69,6 @@ export function applyPinnedAccount(
 	// A pinned account is an API key: OpenAI's Codex sign-in would ignore it.
 	if (accountProvider === "openai") env.OPENAI_AUTH_MODE = "api-key";
 	return true;
-}
-
-/**
- * Puts the folder of the pinned CLI sign-in account `accountId` into `env`
- * for `provider` (Copilot's GitHub CLI, Codex CLI for OpenAI, Gemini CLI),
- * in place of the default account's that the credential manager set. Only an
- * account of that CLI that is signed in counts; anything else leaves `env`
- * untouched, with a warning. For OpenAI, the task then runs in Codex mode.
- */
-export function applyPinnedLoginAccount(
-	env: Record<string, string>,
-	provider: string,
-	accountId: string | undefined,
-): boolean {
-	const loginProvider = loginProviderOf(provider);
-	const spec = loginProvider ? LOGIN_SPECS[loginProvider] : undefined;
-	if (!loginProvider || !spec || !accountId) return false;
-	try {
-		const store = aiAccountStore();
-		const account = store.get(accountId);
-		const home = store.homeOf(accountId);
-		if (account?.provider !== loginProvider || !account.signedIn || !home) {
-			appLog.warn(`[AiAccounts] pinned ${loginProvider} account not signed in, using the default one`);
-			return false;
-		}
-		env[spec.backendEnv] = home;
-		if (loginProvider === "codex") env.OPENAI_AUTH_MODE = "codex-cli";
-		return true;
-	} catch (error) {
-		appLog.warn("[AiAccounts] pinned CLI account unreadable:", (error as Error).message);
-		return false;
-	}
 }
 
 /**
