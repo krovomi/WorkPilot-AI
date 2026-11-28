@@ -235,6 +235,8 @@ export function TaskMobilePreview({
 							value={device?.id ?? ""}
 							disabled={devices.length === 0 || isBusy}
 							onValueChange={(next) =>
+								// The list only offers ids from `devices`: `null` is the type's due.
+								/* v8 ignore next */
 								selectDevice(devices.find((d) => d.id === next) ?? null)
 							}
 						>
