@@ -32,6 +32,9 @@ suivi d'usage la met à jour dans la même PR.
 | Rapports d'usage envoyés | `usage_report_sends` | une ligne par organisation, type (`daily`, `weekly`, `monthly`) et période : comment l'envoi s'est terminé (`sent`, `failed`, `no_smtp`, `no_recipient`) et **à combien** d'adresses, jamais lesquelles | jusqu'à la suppression de l'organisation |
 | Envois du rapport | `audit_log`, actions `usage.report.sent` (l'envoi planifié) et `usage.report.sent_now` (**Envoyer maintenant**, avec qui l'a demandé) | type, période, issue, nombre d'adresses | historique de l'audit |
 | Réglages du rapport | `audit_log`, actions `usage.report.settings_updated` (heure, fuseau, jours, langue, noms, hebdomadaire, mensuel, avant et après) et `usage.report.recipients_changed` (les adresses ajoutées et retirées) | qui a changé quoi | historique de l'audit |
+| Budgets de tokens | `usage_budgets` | un budget mensuel par personne, groupe ou projet de l'organisation (son identifiant, jamais un nom), et s'il bloque les runs | jusqu'à son retrait, celui de sa cible ou l'effacement du compte visé |
+| Alertes de budget | `usage_budget_alerts` | une ligne par budget, mois et seuil (80 % ou 100 %) : le pourcentage atteint et **à combien** d'adresses l'alerte est partie | jusqu'à la suppression de l'organisation |
+| Budgets et alertes | `audit_log`, actions `usage.budget.set`, `usage.budget.removed` (qui, quelle cible par son identifiant, avant et après) et `usage.budget.alert` (portée, seuil, pourcentage, nombre d'adresses) | | historique de l'audit |
 | Compte effacé | `audit_log`, action `user.erased` | qui a effacé un compte, quand, combien de lignes ont été changées ; jamais quel compte | historique de l'audit |
 
 ### Ce que le tableau en montre
@@ -106,6 +109,19 @@ est noté `no_smtp` et le rapport reste lisible dans l'app (`GET /admin/usage/re
 **Envoyer maintenant** (`POST /admin/usage/report/send`) envoie le rapport de la veille tout de
 suite, sans compter comme l'envoi du jour. L'effacement d'un compte retire son adresse des
 destinataires de chaque organisation.
+
+## Les budgets
+
+En plus du budget mensuel de l'organisation (**Quotas**), **Administration → Usage → Budgets**
+(`/admin/usage/budgets` : lecture `usage.read`, modification `usage.write`) fixe un budget
+mensuel de tokens à une personne, à un groupe (ce que ses membres consomment dans
+l'organisation) ou à un projet, compté depuis le 1er du mois (UTC). Coché **Bloquer**, un budget
+épuisé refuse les nouveaux runs et jobs de ce qu'il couvre (402), comme le blocage de
+l'organisation ; sinon il ne fait qu'alerter. Chaque budget, celui de l'organisation compris,
+lance une alerte par mois à 80 % et une à 100 %, envoyée aux destinataires du rapport et inscrite
+à l'audit ; une alerte ne nomme une personne que si le rapport nomme les personnes. Le rapport
+quotidien liste les budgets au-delà d'un seuil. Le budget d'une personne disparaît avec son
+compte effacé, celui d'un groupe ou d'un projet supprimé à la lecture suivante.
 
 ## L'activité par page
 

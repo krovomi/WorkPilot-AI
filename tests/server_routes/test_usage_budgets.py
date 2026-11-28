@@ -378,3 +378,34 @@ def test_the_alert_email_in_french_names_or_not():
         usage_budgets.Status("org", "org", None, None, 10, False, 1).as_dict()["id"]
         is None
     )
+
+
+async def test_a_run_is_refused_before_it_is_queued(world, month, tmp_path):
+    from server.db.engine import get_session_factory
+    from server.db.models import AgentRun, SpecIndex
+    from server.services.run_manager import get_run_manager
+
+    u = world.users
+    await _set(world, "person", u["contributor_a"], 5000, block=True)
+    async with get_session_factory()() as db:
+        spec = SpecIndex(
+            project_id=world.projects["a"],
+            spec_name="001-x",
+            created_by=u["contributor_a"],
+        )
+        db.add(spec)
+        await db.commit()
+    manager = get_run_manager()
+    with pytest.raises(HTTPException) as refused:
+        await manager.start_run(
+            spec,
+            world.projects["a"],
+            str(tmp_path),
+            "build",
+            u["contributor_a"],
+            org_id=world.orgs["a"],
+        )
+    assert refused.value.status_code == 402
+    assert spec.id not in manager._running_specs
+    async with get_session_factory()() as db:
+        assert (await db.scalars(select(AgentRun))).all() == []

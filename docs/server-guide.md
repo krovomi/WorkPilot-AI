@@ -393,6 +393,12 @@ ensuite les membres du projet, avec le rôle `member` ou `viewer`.
 Exemple : 25 membres, 10 projets, 4 exécutions simultanées, 50 000 000 tokens par mois, blocage
 coché.
 
+**Usage → Budgets** ajoute un budget mensuel de tokens à une personne, un groupe ou un projet,
+avec ou sans blocage ; chaque budget (celui de l'organisation compris) alerte une fois à 80 % et
+une fois à 100 % par mois, par e-mail aux destinataires du rapport d'usage. Exemple : 2 000 000
+tokens par mois au projet « Site », bloquant, et 500 000 au groupe « Stagiaires », en alerte
+seulement.
+
 ### Le rapport d'usage par e-mail
 
 **Usage → Rapport** règle le rapport que chaque organisation reçoit : par défaut chaque jour à
@@ -647,6 +653,15 @@ curl -sS "$WP/admin/usage/report?kind=weekly&day=2026-11-18" -H "Authorization: 
 # Envoyer le rapport de la veille maintenant (usage.write ; 409 sans SMTP)
 curl -sS -X POST $WP/admin/usage/report/send -H "Authorization: Bearer $TOKEN"
 # → { "status": "sent", "recipients": 2, "period": "2026-11-26" }
+
+# Les budgets (usage.read pour lire, usage.write pour changer) ; scope : person, group ou project
+curl -sS $WP/admin/usage/budgets -H "Authorization: Bearer $TOKEN"
+# → { "organization": { "monthly_tokens": 50000000, "used": 1234567, "percent": 2.5, … },
+#     "budgets": [ { "id": "…", "scope": "project", "name": "Site", "used": …, "percent": … } ],
+#     "alerts": [ { "scope": "project", "month": "2026-11-01", "threshold": 80, … } ] }
+curl -sS -X PUT $WP/admin/usage/budgets -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"scope": "project", "target_id": "<project_id>", "monthly_tokens": 2000000, "block": true}'
+curl -sS -X DELETE $WP/admin/usage/budgets/<budget_id> -H "Authorization: Bearer $TOKEN"
 
 # Mon usage : ce que les administrateurs voient de moi, et l'export de toutes mes données d'usage
 curl -sS $WP/users/me/usage -H "Authorization: Bearer $TOKEN"
