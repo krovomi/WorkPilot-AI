@@ -140,10 +140,13 @@ export async function signIn(page: Page, world: World, who: Account): Promise<vo
 	await expect(page.locator("#login-password")).toBeHidden({ timeout: 30_000 });
 	// Two dialogs may open a moment after the sign-in, in either order: the
 	// notice of what the server measures (once per organization) and the
-	// setup wizard (first start).
+	// setup wizard (first start). The notice can open over the wizard while
+	// its button is being clicked: a click that does not land is tried again,
+	// on whichever dialog is on top by then.
 	const notice = page.getByRole("button", { name: /^(I understand|J'ai compris)$/ });
 	const skip = page.getByRole("button", { name: /Skip Setup/ });
-	for (let dialog = 0; dialog < 2; dialog++) {
+	const deadline = Date.now() + 60_000;
+	for (let closed = 0; closed < 2 && Date.now() < deadline; ) {
 		const shown = await notice
 			.or(skip)
 			.first()
@@ -154,9 +157,14 @@ export async function signIn(page: Page, world: World, who: Account): Promise<vo
 			);
 		if (!shown) return;
 		const button = (await notice.isVisible()) ? notice : skip;
-		await button.click();
-		await expect(button).toBeHidden({ timeout: 15_000 });
+		const landed = await button.click({ timeout: 5_000 }).then(
+			() => true,
+			() => false,
+		);
+		if (landed) closed++;
 	}
+	await expect(notice).toBeHidden();
+	await expect(skip).toBeHidden();
 }
 
 /**
