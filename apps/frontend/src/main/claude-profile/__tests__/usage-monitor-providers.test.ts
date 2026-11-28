@@ -728,6 +728,49 @@ describe("Anthropic", () => {
 		expect(callsTo(OAUTH_USAGE)).toHaveLength(0);
 	});
 
+	it("offers to reconnect when the usage API refuses the active account's token", async () => {
+		// An expired token still in the keyring: the API answers 401
+		world.keychain.set(work.configDir, { token: "expired-test-token", email: null });
+		answer(OAUTH_USAGE, json({ error: { type: "authentication_error" } }, 401));
+
+		expect(await monitor.getUsageForProvider("anthropic")).toMatchObject({
+			profileId: "work",
+			profileEmail: "work@example.com",
+			needsReauthentication: true,
+		});
+	});
+
+	it("does not send the expired token again once its refresh was refused", async () => {
+		world.tokens.set(work.configDir, {
+			token: null,
+			wasRefreshed: false,
+			error: "Refresh token expired",
+			errorCode: "invalid_grant",
+		});
+		world.keychain.set(work.configDir, { token: "expired-test-token", email: null });
+
+		expect((await monitor.getUsageForProvider("anthropic"))?.needsReauthentication).toBe(true);
+		expect(callsTo(OAUTH_USAGE)).toHaveLength(0);
+	});
+
+	it("reads the CLI usage in the account's own folder, never a made-up 0 %", async () => {
+		world.keychain.set(work.configDir, { token: "oauth-test-token", email: null });
+		answer(OAUTH_USAGE, json({ error: "server overloaded" }, 529));
+		world.cli = { stdout: "Invalid API key · Please run /login", stderr: "", code: 0 };
+
+		expect(await monitor.getUsageForProvider("anthropic")).toMatchObject({
+			profileId: "anthropic",
+			usageUnmeasured: true,
+		});
+		expect(world.spawns.at(-1)).toMatchObject({ args: ["usage"], configDir: work.configDir });
+
+		world.claude.profiles = [{ ...work, configDir: "~/.claude-work" }];
+		world.keychain.set("~/.claude-work", { token: "oauth-test-token", email: null });
+		await monitor.getUsageForProvider("anthropic");
+		expect(world.spawns.at(-1)?.configDir).toMatch(/[\\/]\.claude-work$/);
+		expect(world.spawns.at(-1)?.configDir).not.toContain("~");
+	});
+
 	it("names the usage from the CLI when the API fails", async () => {
 		world.keychain.set(work.configDir, { token: "oauth-test-token", email: null });
 		answer(OAUTH_USAGE, json({ error: "server overloaded" }, 529));

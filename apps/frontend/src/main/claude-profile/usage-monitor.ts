@@ -20,7 +20,7 @@ import type {
 import type { APIProfile } from "@shared/types/profile";
 import { frontendDebugLog } from "../../shared/utils/debug-logger";
 import { localBackendUrl } from "../local-backend-port";
-import { reauthSnapshot, usageProfileOf } from "./usage-profile";
+import { isAuthFailure, readClaudeUsage, usageProfileOf } from "./usage-profile";
 import {
 	type ApiProvider,
 	getProviderLabel,
@@ -273,28 +273,6 @@ interface ActiveProfileResult {
 	profileEmail?: string;
 	isAPIProfile: boolean;
 	baseUrl: string;
-}
-
-/**
- * Type guard to check if an error has an HTTP status code
- * @param error - The error to check
- * @returns true if the error has a statusCode property
- */
-function isHttpError(error: unknown): error is Error & { statusCode?: number } {
-	return error instanceof Error && "statusCode" in error;
-}
-
-/**
- * An authentication failure of the usage API: a 401 or 403, or another status
- * whose body says the credentials were refused (fetchUsageViaAPI throws both).
- */
-function isAuthFailure(error: unknown): boolean {
-	return (
-		isHttpError(error) &&
-		(error.statusCode === 401 ||
-			error.statusCode === 403 ||
-			error.message.includes("Auth Failure"))
-	);
 }
 
 export class UsageMonitor extends EventEmitter {
@@ -1313,7 +1291,9 @@ export class UsageMonitor extends EventEmitter {
 					tokenResult.error,
 				);
 				if (tokenResult.errorCode === "invalid_grant") {
+					// Refresh refused: the stored token is the expired one, not a fallback
 					this.needsReauthProfiles.add(profile.id);
+					return undefined;
 				} else if (tokenResult.errorCode === "missing_credentials") {
 					this.flagMissingCredentials(profile);
 				}
@@ -3291,9 +3271,15 @@ export class UsageMonitor extends EventEmitter {
 				// Use helpers so shell:true is only set on Windows .cmd/.bat targets,
 				// avoiding Node DEP0190 (shell:true with array args).
 				const spawnCommand = getSpawnCommand(claudePath);
+				// The account's own folder: without it the CLI reads the default
+				// account's usage (~/.claude) and shows it under this one's name.
+				const configDir = getClaudeProfileManager().getProfile(profileId)?.configDir;
 				const spawnOptions = getSpawnOptions(claudePath, {
 					stdio: ["pipe", "pipe", "pipe"],
 					timeout: 15000,
+					...(configDir && {
+						env: { ...process.env, CLAUDE_CONFIG_DIR: configDir.replace(/^~(?=$|[\\/])/, homedir()) } as Record<string, string>,
+					}),
 				});
 				const child = spawn(spawnCommand, ["usage"], spawnOptions);
 
@@ -3385,16 +3371,16 @@ export class UsageMonitor extends EventEmitter {
 						allPercentages.push(match[1]);
 					}
 
-					if (allPercentages.length >= 1) {
-						sessionPercent = Number(allPercentages[0]);
-						if (allPercentages.length >= 2) {
-							weeklyPercent = Number(allPercentages[1]);
-						}
-						this.debugLog(
-							"[UsageMonitor:CLI] Generic parsing found percentages:",
-							{ sessionPercent, weeklyPercent },
-						);
+					// No usage line at all (an error, a prompt…): unread, not 0 %
+					if (allPercentages.length === 0) return null;
+					sessionPercent = Number(allPercentages[0]);
+					if (allPercentages.length >= 2) {
+						weeklyPercent = Number(allPercentages[1]);
 					}
+					this.debugLog(
+						"[UsageMonitor:CLI] Generic parsing found percentages:",
+						{ sessionPercent, weeklyPercent },
+					);
 				}
 			}
 
@@ -4306,50 +4292,26 @@ export class UsageMonitor extends EventEmitter {
 			try {
 				// The active account first: with several, the most available is not it
 				const oauthProfile = usageProfileOf(getClaudeProfileManager());
-
 				if (oauthProfile) {
-					this.debugLog(
-						"[UsageMonitor:getUsageForProvider] Step 2: Found OAuth profile, attempting fetch with fallback",
-					);
-
-					// Get credential for the OAuth profile
-					const credential = await this.getCredentialForProfile(oauthProfile);
-					if (!credential) {
-						// Expired or revoked sign-in: offer to reconnect. Otherwise (fresh
-						// install…) Step 4 returns a minimal snapshot so the UI stops loading.
-						if (this.needsReauthProfiles.has(oauthProfile.id)) return reauthSnapshot(oauthProfile);
-						console.warn(
-							"[UsageMonitor:getUsageForProvider] Step 2: No credential found for OAuth profile:",
-							oauthProfile.name,
-							"— falling through to minimal snapshot",
-						);
-					} else {
-						// Use the complete fetchUsage method which includes CLI fallback
-						const snapshot = await this.fetchUsage(
-							oauthProfile.id,
-							credential,
-							{
-								profileId: oauthProfile.id,
-								profileName: oauthProfile.name,
-								profileEmail: oauthProfile.email,
-								isAPIProfile: false,
-								baseUrl: "https://api.anthropic.com",
-							},
-							"anthropic", // providerName
-							true, // suppressErrors - Step 2 is also a best-effort attempt
-						);
-						if (snapshot) {
-							// CLI-fetched snapshots lack providerName — ensure it is always set before returning.
-							if (!snapshot.providerName) {
-								snapshot.providerName = "anthropic";
-							}
-							return snapshot;
-						}
-						console.warn(
-							"[UsageMonitor:getUsageForProvider] Step 2: fetchUsage returned null for OAuth profile:",
-							oauthProfile.name,
-						);
-					}
+					const snapshot = await readClaudeUsage(oauthProfile, {
+						credentialOf: (profile) => this.getCredentialForProfile(profile),
+						fetchWith: (profile, credential) =>
+							this.fetchUsage(
+								profile.id,
+								credential,
+								{
+									profileId: profile.id,
+									profileName: profile.name,
+									profileEmail: profile.email,
+									isAPIProfile: false,
+									baseUrl: "https://api.anthropic.com",
+								},
+								"anthropic",
+								true, // suppressErrors: a best-effort attempt
+							),
+						needsReauth: this.needsReauthProfiles,
+					});
+					if (snapshot) return snapshot;
 				} else {
 					console.warn(
 						"[UsageMonitor:getUsageForProvider] Step 2: No OAuth profiles found in ClaudeProfileManager",
