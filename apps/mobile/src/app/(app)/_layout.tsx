@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { LockGate } from "../../auth/LockGate";
 import { PushBridge } from "../../push/PushBridge";
 import { PageActivityBridge } from "../../usage/PageActivityBridge";
+import { UsageNoticeGate } from "../../usage/UsageNoticeGate";
 import { useTheme } from "../../ui/theme";
 
 export default function SignedInLayout() {
@@ -12,6 +13,7 @@ export default function SignedInLayout() {
 		<LockGate>
 			<PushBridge />
 			<PageActivityBridge />
+			<UsageNoticeGate />
 			<Stack
 				screenOptions={{
 					headerStyle: { backgroundColor: theme.surface },
@@ -43,6 +45,7 @@ export default function SignedInLayout() {
 				<Stack.Screen name="projects/[projectId]/chat" options={{ title: t("chat.title") }} />
 				<Stack.Screen name="projects/[projectId]/leaderboard" options={{ title: t("leaderboard.title") }} />
 				<Stack.Screen name="tokens" options={{ title: t("tokens.title") }} />
+				<Stack.Screen name="my-usage" options={{ title: t("myUsage.title") }} />
 				<Stack.Screen name="admin/index" options={{ title: t("admin.title") }} />
 				<Stack.Screen name="admin/overview" options={{ title: t("admin.overview.title") }} />
 				<Stack.Screen name="admin/members" options={{ title: t("admin.members.title") }} />

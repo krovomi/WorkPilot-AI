@@ -1113,6 +1113,51 @@
 		"revokeTitle": "End this link?",
 		"revokeBody": "“{{title}}” will no longer open for anyone who has the link."
 	},
+	"myUsage": {
+		"title": "My usage",
+		"summary": "What administrators see of you, and your data to download.",
+		"intro": "What this organization's administrators see of you over the last 30 days: totals, action names, runs and jobs. Never a prompt, code, typed text or file name.",
+		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators.",
+		"period": "Last 30 days",
+		"tokens_one": "{{value}} token",
+		"tokens_other": "{{value}} tokens",
+		"cost": "Cost: {{cost}}",
+		"costEstimated": "Cost: {{cost}} (partly estimated)",
+		"runs": "Runs: {{total}}, {{succeeded}} succeeded",
+		"jobs": "Jobs: {{total}}, {{succeeded}} succeeded",
+		"daily": "Tokens per day",
+		"timeline": "What you did",
+		"pages": "Pages opened",
+		"empty": "Nothing in this period.",
+		"event": "{{kind}}: {{what}}",
+		"kinds": {
+			"sign_in": "Sign-in",
+			"audit": "Action",
+			"run": "Run",
+			"job": "Job"
+		},
+		"export": "Share everything kept about me (JSON)",
+		"exportTitle": "My WorkPilot usage",
+		"notice": "Read again what is measured"
+	},
+	"usageNotice": {
+		"title": "What this server measures about you",
+		"intro": "This organization's server keeps a few figures about each member, to follow its use and costs.",
+		"bullet": "• {{text}}",
+		"measured": {
+			"tokens": "The tokens and cost of the agents you start, by provider and model",
+			"runs": "Your runs: phase, status, start and end",
+			"jobs": "Your project jobs: feature, status, start and end",
+			"sign_ins": "Your sign-ins: time, method, address and app",
+			"presence": "The days you were connected, and when you were last seen",
+			"pages": "How many times a day you open each screen of the app (its name only)"
+		},
+		"never": "Never a prompt, code, typed text or file name.",
+		"retention": "These figures are kept {{days}} days.",
+		"pageRetention": "Screen counts are kept {{days}} days.",
+		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators.",
+		"rights": "You can see them and share everything kept about you in Settings, My usage. To have your account erased, ask a platform administrator.",
+		"understood": "I understand"
 	"cardLog": {
 		"title": "Log of #{{id}}",
 		"open": "See the whole log",

@@ -21,6 +21,7 @@ export const MOBILE_PAGES = [
 	"admin/quotas",
 	"admin/roles",
 	"admin/roles/detail",
+	"my-usage",
 	"admin/sessions",
 	"projects",
 	"projects/analyses",

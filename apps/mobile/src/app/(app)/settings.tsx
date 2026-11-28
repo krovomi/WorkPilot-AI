@@ -81,6 +81,12 @@ export default function Settings() {
 					/>
 				) : null}
 				<ListRow icon="key" title={t("tokens.title")} subtitle={t("tokens.summary")} onPress={() => router.push("/tokens")} />
+				<ListRow
+					icon="bar-chart-2"
+					title={t("myUsage.title")}
+					subtitle={t("myUsage.summary")}
+					onPress={() => router.push("/my-usage")}
+				/>
 			</View>
 			<LockSection />
 			<SessionSection />
