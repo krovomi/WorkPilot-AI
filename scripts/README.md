@@ -17,6 +17,7 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `check_encoding.py` | Signale une ouverture de fichier sans `encoding="utf-8"`. | `tests/test_text_io_encoding.py`, à la main |
 | `validate-npm-scripts.js` | Vérifie que chaque script npm pointe vers un fichier qui existe. | `pnpm run validate:npm-scripts`, CI |
 | `fix-electron.js` | Répare le binaire Electron sous Windows. | `pnpm run fix:electron`, `beta-release.yml` |
+| `dev.mjs` | Choisit le port du backend (9000, `BACKEND_PORT`, ou le port libre suivant) puis lance le backend et l'app côte à côte. | `pnpm run dev` |
 | `sync-backend-port-to-frontend-env.cjs` | Recopie le port du backend dans le `.env` du frontend. | `dev:vite` et `build` du frontend |
 | `kill_port_8765.py`, `kill_port_8765.sh`, `kill_port_8765.bat` | Libèrent le port du WebSocket (8765) quand un ancien backend le tient. | à la main |
 

@@ -103,14 +103,22 @@ class SessionSandbox:
         return self.state == ISOLATED and self.policy is not None
 
     def wrap(
-        self, argv: list[str], env: dict[str, str], *, cwd: Path | str | None = None
+        self,
+        argv: list[str],
+        env: dict[str, str],
+        *,
+        cwd: Path | str | None = None,
+        stdin: bool = False,
     ) -> tuple[list[str], dict[str, str]]:
-        """`argv` and `env` as launched: under the sandbox when it is on."""
+        """`argv` and `env` as launched: under the sandbox when it is on.
+
+        `stdin`: the command reads its stdin (a microVM forwards it then).
+        """
         policy = self.policy
         if not self.isolated or policy is None:
             return list(argv), dict(env)
         if self.vm is not None:
-            return self.vm.exec_argv(list(argv), env, cwd), sbx_env(env)
+            return self.vm.exec_argv(list(argv), env, cwd, stdin=stdin), sbx_env(env)
         if cwd is not None:
             policy = replace(policy, cwd=Path(cwd).resolve())
         command = sandboxed(list(argv), policy, env)
@@ -257,6 +265,14 @@ _reported: set[tuple[str, str, str]] = set()
 _reported_lock = threading.Lock()
 
 
+def _report_reason(sandbox: SessionSandbox) -> str | None:
+    """Why commands are not isolated, cut to what the app keeps (500)."""
+    for reason in (sandbox.reason, getattr(sandbox, "fallback_reason", None)):
+        if isinstance(reason, str) and reason:
+            return reason[:500]
+    return None
+
+
 def first_report(
     spec_dir: Path | str | None, provider: str, sandbox: SessionSandbox
 ) -> dict | None:
@@ -278,7 +294,7 @@ def first_report(
         "state": sandbox.state,
         "backend": sandbox.backend,
         # The app keeps a reason of 500 characters at most (`main/task-sandbox.ts`).
-        "reason": (sandbox.reason or sandbox.fallback_reason or "")[:500] or None,
+        "reason": _report_reason(sandbox),
         "network": sandbox.policy.allowlist.describe() if sandbox.policy else [],
     }
 

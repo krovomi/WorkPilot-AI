@@ -342,7 +342,7 @@
 				"title": "Chaque appel d'un script est contrôlé comme un appel direct",
 				"description": "Le script lui-même ne lit aucun fichier, ne lance aucun processus et n'atteint aucun réseau. Chacun de ses appels passe par les droits de l'agent, les chemins protégés, les garde-fous, la liste des commandes permises et le bac à sable de l'OS, et la surveillance des anomalies note chacun d'eux."
 			},
-			"providers": "Marche avec tout fournisseur dont WorkPilot exécute les outils : OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio, les fournisseurs compatibles et les passerelles. Une tâche peut choisir son propre mode par phase."
+			"providers": "Marche avec tout fournisseur dont WorkPilot exécute les outils : OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio, les fournisseurs compatibles et les passerelles. Les tâches Claude prennent le mode code de Claude Code dans leur worktree, sur l'API Anthropic avec Opus ou Sonnet 5.5 et suivants, et les terminaux aussi. Une tâche peut choisir son propre mode par phase."
 		},
 		"anomaly-detection": {
 			"description": "Le score de confiance de chaque session d'agent, et ce qui la met en pause ou l'arrête",
@@ -507,6 +507,13 @@
 					"label": "Appliquer",
 					"description": "Une N0 verte, ou une N1 approuvée par la revue croisée, fusionne seule. N2 et N3 attendent une personne."
 				}
+			},
+			"express": {
+				"title": "Voie express des PR de dépendances",
+				"description": "Les pull requests Dependabot et Renovate de vos projets fusionnent seules quand leur niveau est N0 et que tous les checks sont passés. Seulement quand les niveaux sont appliqués.",
+				"toggle": "Fusionner les pull requests N0 vertes des bots",
+				"toggleDescription": "Environ toutes les demi-heures, pour chaque projet local sur GitHub. Une montée majeure, un changement de code ou de fichiers de CI, un check rouge ou en cours, un brouillon ou un fork reste à une personne.",
+				"needsEnforce": "Inactive tant que le mode n'est pas Appliquer."
 			},
 			"tiers": {
 				"title": "Les quatre niveaux",
@@ -3462,5 +3469,32 @@
 	"kanbanAbandonClosedPrs": {
 		"label": "Mettre de côté les cartes dont la PR est fermée",
 		"description": "Une carte dont la pull request a été fermée sans fusion passe dans « Abandonnée », avec la raison « PR fermée sans fusion ». La reprendre la remet au travail."
+	},
+	"myUsage": {
+		"navLabel": "Mon usage",
+		"title": "Mon usage",
+		"description": "Ce que les administrateurs de cette organisation voient de vous sur les 30 derniers jours : totaux, noms d'actions, runs et jobs. Jamais un prompt, du code, un texte saisi ou un nom de fichier.",
+		"export": "Télécharger tout ce qui est conservé sur moi (JSON)",
+		"notice": "Relire ce qui est mesuré",
+		"failed": "Le serveur a refusé : {{error}}",
+		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur."
+	},
+	"usageNotice": {
+		"title": "Ce que ce serveur mesure de vous",
+		"intro": "Le serveur de cette organisation conserve quelques chiffres sur chaque membre, pour suivre son usage et ses coûts.",
+		"measured": {
+			"tokens": "Les jetons et le coût des agents que vous lancez, par fournisseur et modèle",
+			"runs": "Vos runs : phase, statut, début et fin",
+			"jobs": "Vos jobs de projet : fonctionnalité, statut, début et fin",
+			"sign_ins": "Vos connexions : heure, méthode, adresse et application",
+			"presence": "Les jours où vous étiez connecté, et votre dernière présence",
+			"pages": "Combien de fois par jour vous ouvrez chaque page de l'app (son nom seulement)"
+		},
+		"never": "Jamais un prompt, du code, un texte saisi ou un nom de fichier.",
+		"retention": "Ces chiffres sont conservés {{days}} jours.",
+		"pageRetention": "Les comptes de pages sont conservés {{days}} jours.",
+		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur.",
+		"rights": "Vous pouvez les consulter et télécharger tout ce qui est conservé sur vous dans Paramètres, Mon usage. Pour faire effacer votre compte, demandez à un administrateur de la plateforme.",
+		"understood": "J'ai compris"
 	}
 }
