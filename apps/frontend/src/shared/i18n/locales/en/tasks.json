@@ -3105,7 +3105,9 @@
 			"seconds": "{{seconds}} s",
 			"minutes": "{{minutes}} min",
 			"hours": "{{hours}} h {{minutes}} min",
-			"days": "{{days}} d {{hours}} h"
+			"days": "{{days}} d {{hours}} h",
+			"hoursOnly": "{{hours}} h",
+			"daysOnly": "{{days}} d"
 		}
 	},
 	"approvalTier": {
