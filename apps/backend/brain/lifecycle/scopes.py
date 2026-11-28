@@ -73,7 +73,6 @@ MAX_SCOPE = 200
 PREFIXES = ("team", "branch")
 
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
-_PREFIXED = re.compile(r"^(team|branch)\s*:\s*(.*)$", re.IGNORECASE)
 _BAD_REF = re.compile(r"[\s~^:?*\[\\]|\.\.|@\{|//")
 
 
@@ -91,10 +90,11 @@ def normalise(value: str | None) -> str | None:
     text = str(value or "").strip()
     if len(text) > MAX_SCOPE or _CONTROL.search(text):
         return None
-    match = _PREFIXED.match(text)
-    if not match:
+    head, sep, rest = text.partition(":")
+    prefix = head.rstrip().lower()
+    if not sep or prefix not in PREFIXES:
         return text
-    prefix, name = match.group(1).lower(), match.group(2).strip()
+    name = rest.strip()
     if not name or (prefix == "branch" and not _valid_branch(name)):
         return None
     return f"{prefix}:{name}"

@@ -59,6 +59,7 @@ def gotcha(name: str) -> str:
         ("Team: Payments", "team:Payments"),
         ("BRANCH:release/2.0", "branch:release/2.0"),
         ("branch: main", "branch:main"),
+        ("team : Payments", "team:Payments"),
         ("docs:intro", "docs:intro"),
     ],
 )
