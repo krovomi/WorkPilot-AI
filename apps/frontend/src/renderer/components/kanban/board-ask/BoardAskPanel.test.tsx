@@ -79,7 +79,7 @@ describe("BoardAskPanel", () => {
 				data: { answer: "", matches: [{ taskId: "t1", title: "Admin", state: "in_progress" }], mode: "keywords", searched: 1 },
 			})
 			.mockResolvedValueOnce({ success: true, data: { answer: "", matches: [], mode: "keywords", searched: 3 } })
-			.mockResolvedValueOnce({ success: false, error: "server_project" })
+			.mockResolvedValueOnce({ success: false, error: "server_unreachable" })
 			.mockRejectedValueOnce(new Error("boom"));
 		useBoardAskStore.setState({ open: true });
 		render(<BoardAskButton projectId="p1" />);
@@ -90,7 +90,7 @@ describe("BoardAskPanel", () => {
 		await userEvent.type(box, "nothing{Enter}");
 		expect(await screen.findByText("No ticket relates to this question.")).toBeInTheDocument();
 		await userEvent.type(box, "server{Enter}");
-		expect(await screen.findByText("A server board cannot be asked yet.")).toBeInTheDocument();
+		expect(await screen.findByText(/The server's cards could not be read/)).toBeInTheDocument();
 		await userEvent.type(box, "boom{Enter}");
 		expect(await screen.findByText(/could not be answered/)).toBeInTheDocument();
 	});
@@ -183,6 +183,15 @@ describe("BoardAskPanel", () => {
 		await waitFor(() =>
 			expect(api.fn("saveSettings")).toHaveBeenLastCalledWith({ boardAskSources: ["roadmap", "ideas", "history"] }),
 		);
+	});
+
+	it("says on a server board that only its cards are read, with the person's rights", async () => {
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="s1" serverBoard />);
+		expect(screen.getByText("The server's cards, with your rights")).toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: /sources/ })).not.toBeInTheDocument();
+		await userEvent.click(screen.getByRole("tab", { name: "Check an idea" }));
+		expect(screen.getByText("The server's cards, with your rights")).toBeInTheDocument();
 	});
 
 	it("asks an example question from the empty state", async () => {

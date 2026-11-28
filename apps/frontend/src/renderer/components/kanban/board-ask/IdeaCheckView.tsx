@@ -26,7 +26,7 @@ import { createTask } from "../../../stores/task-store";
 import { Chip, type Tone } from "../../charter";
 import { Button } from "../../ui/button";
 import { Textarea } from "../../ui/textarea";
-import { MatchRow, ModeLine, SemanticModeSelect, SourcesMenu } from "./board-ask-parts";
+import { BoardSources, MatchRow, ModeLine, SemanticModeSelect } from "./board-ask-parts";
 import { hasWorkLeft, ideaCard } from "./idea-card";
 
 const VERDICT_TONE: Readonly<Record<BoardIdeaVerdict, Tone>> = {
@@ -209,9 +209,11 @@ function ResultView({
 export interface IdeaCheckViewProps {
 	readonly projectId: string;
 	readonly onOpenTask: (taskId: string) => (() => void) | undefined;
+	/** A board of the server: its cards only, read from the server. */
+	readonly serverBoard?: boolean;
 }
 
-export function IdeaCheckView({ projectId, onOpenTask }: IdeaCheckViewProps) {
+export function IdeaCheckView({ projectId, onOpenTask, serverBoard = false }: IdeaCheckViewProps) {
 	const { t } = useTranslation(["tasks"]);
 	const check = useBoardAskStore((s) => s.ideas[projectId]);
 	const checkIdea = useBoardAskStore((s) => s.checkIdea);
@@ -275,7 +277,7 @@ export function IdeaCheckView({ projectId, onOpenTask }: IdeaCheckViewProps) {
 				)}
 				{check?.status === "error" && (
 					<p className="text-sm text-destructive" role="alert">
-						{check.error === "server_project" ? t("kanban.ask.serverProject") : t("kanban.ask.idea.failed")}
+						{check.error === "server_unreachable" ? t("kanban.ask.serverUnreachable") : t("kanban.ask.idea.failed")}
 					</p>
 				)}
 				{check?.result && (
@@ -285,7 +287,7 @@ export function IdeaCheckView({ projectId, onOpenTask }: IdeaCheckViewProps) {
 
 			<div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pt-3">
 				<p className="min-w-0 flex-1 basis-64 text-2xs text-muted-foreground">{t("kanban.ask.privacy")}</p>
-				<SourcesMenu />
+				<BoardSources serverBoard={serverBoard} />
 						<SemanticModeSelect />
 				{check && (
 					<Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={restart} disabled={pending}>

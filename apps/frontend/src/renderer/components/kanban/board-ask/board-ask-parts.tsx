@@ -179,8 +179,20 @@ export function SemanticModeSelect() {
 	);
 }
 
+/** The sources menu, or on a server board, that only its cards are read. */
+export function BoardSources({ serverBoard }: { readonly serverBoard: boolean }) {
+	const { t } = useTranslation(["tasks"]);
+	if (!serverBoard) return <SourcesMenu />;
+	return (
+		<span className="flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground">
+			<Layers className="h-3.5 w-3.5" aria-hidden />
+			{t("kanban.ask.sources.serverBoard")}
+		</span>
+	);
+}
+
 /** What the board reads besides its cards, saved in the settings. */
-export function SourcesMenu() {
+function SourcesMenu() {
 	const { t } = useTranslation(["tasks"]);
 	const saved = useSettingsStore((s) => s.settings.boardAskSources);
 	const chosen: readonly BoardAskSource[] = saved ?? BOARD_ASK_SOURCES;

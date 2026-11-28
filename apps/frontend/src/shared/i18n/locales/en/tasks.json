@@ -602,7 +602,7 @@
 			"send": "Ask",
 			"searching": "Reading the tickets…",
 			"failed": "The question could not be answered. Try again in a moment.",
-			"serverProject": "A server board cannot be asked yet.",
+			"serverUnreachable": "The server's cards could not be read. Check the connection to the server and try again.",
 			"modeAi": "Answered by AI",
 			"modeKeywords": "Keyword search",
 			"keywordsHint": "No AI answer (no provider, or it did not reply): these tickets share words with the question.",
@@ -708,7 +708,8 @@
 				"cards": "Board cards",
 				"roadmap": "Roadmap features",
 				"ideas": "Ideation ideas",
-				"history": "Changes merged into the branch (git history)"
+				"history": "Changes merged into the branch (git history)",
+				"serverBoard": "The server's cards, with your rights"
 			}
 		},
 		"lanes": {
