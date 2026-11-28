@@ -207,23 +207,25 @@ async def set_quotas(
         quota = OrgQuota(org_id=org_id)
         db.add(quota)
 
+    sent = body.model_fields_set
+    # A limit sent as null is lifted (unlimited); one left out stays as it is.
     for field in (
         "max_users",
         "max_projects",
         "max_concurrent_runs",
         "monthly_token_budget",
-        "enforce_hard_stop",
     ):
-        value = getattr(body, field)
-        if value is not None:
-            setattr(quota, field, value)
+        if field in sent:
+            setattr(quota, field, getattr(body, field))
+    if body.enforce_hard_stop is not None:
+        quota.enforce_hard_stop = body.enforce_hard_stop
 
     await record(
         db,
         action="org.quota.updated",
         actor_id=actor.id,
         org_id=org_id,
-        payload=body.model_dump(exclude_none=True),
+        payload=body.model_dump(exclude_unset=True),
         request=request,
     )
     await db.commit()

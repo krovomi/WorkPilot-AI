@@ -185,6 +185,118 @@
 			"serverDefault": "Défaut du serveur : {{count}} jours",
 			"hint": "Vide garde le défaut du serveur. De {{min}} à {{max}} jours ; ce qui est plus vieux s'efface chaque heure.",
 			"invalid": "Saisissez un nombre entier de jours de {{min}} à {{max}}, ou laissez vide."
+		},
+		"panes": {
+			"dashboard": "Chiffres",
+			"settings": "Collecte et conservation"
+		},
+		"dashboard": {
+			"period": "Période",
+			"presets": {
+				"7d": "7 derniers jours",
+				"30d": "30 derniers jours",
+				"month": "Ce mois-ci",
+				"custom": "Jours choisis"
+			},
+			"start": "Du",
+			"end": "Au",
+			"all": "Tous",
+			"person": "Personne",
+			"group": "Groupe",
+			"project": "Projet",
+			"provider": "Fournisseur",
+			"model": "Modèle",
+			"platform": "Toute la plateforme",
+			"exportCsv": "Exporter en CSV",
+			"empty": "Rien sur cette période.",
+			"tokens": "Jetons",
+			"tokensHint": "{{input}} en entrée, {{output}} en sortie",
+			"cost": "Coût",
+			"estimated": "En partie estimé",
+			"budget": "Budget mensuel",
+			"budgetHint": "{{used}} sur {{limit}} ce mois-ci",
+			"noBudget": "Aucun budget fixé",
+			"active": "Actifs aujourd'hui",
+			"activeHint": "{{week}} cette semaine, {{month}} ce mois-ci",
+			"runs": "Runs",
+			"jobs": "Jobs",
+			"successRate": "{{rate}} réussis",
+			"sessions": "Sessions d'agent",
+			"dailyTitle": "Jetons par jour",
+			"dailyChart": "Jetons par jour, par fournisseur",
+			"unknownProvider": "Fournisseur inconnu",
+			"peopleTitle": "Par personne",
+			"engines": "Modèles",
+			"lastSeen": "Vu pour la dernière fois",
+			"erased": "Compte effacé",
+			"modelsTitle": "Par fournisseur et modèle",
+			"successRateShort": "Réussis",
+			"costPerRun": "Coût par run",
+			"byPhase": "Par phase",
+			"phase": "Phase",
+			"projectsTitle": "Par projet",
+			"phases": "Phases",
+			"noProject": "Sans projet",
+			"pagesTitle": "Pages ouvertes",
+			"pagesOff": "L'activité des pages est désactivée pour cette organisation : rien n'est compté.",
+			"app": "App",
+			"page": "Page",
+			"opens": "Ouvertures",
+			"people": "Personnes",
+			"apps": {
+				"desktop": "Bureau",
+				"mobile": "Téléphone"
+			},
+			"deliveryTitle": "Livraison",
+			"funnel": "De l'invitation au premier merge",
+			"funnelSteps": {
+				"invited": "Invités",
+				"accepted": "Acceptées",
+				"first_sign_in": "Première connexion",
+				"first_task": "Première tâche",
+				"first_merge": "Premier merge"
+			},
+			"delivered": "Livré",
+			"deliveredTasks_one": "{{count}} tâche fusionnée",
+			"deliveredTasks_other": "{{count}} tâches fusionnées",
+			"costPerTask": "Coût par tâche livrée : {{cost}}",
+			"timeToMerge": "Délai médian avant merge : {{hours}} h",
+			"failures": "Pourquoi des runs ont échoué",
+			"causes": {
+				"usage_limit": "Limite d'usage atteinte",
+				"provider_sign_in": "Connexion au fournisseur",
+				"timeout": "Délai dépassé",
+				"tests": "Tests en échec",
+				"other": "Autre"
+			},
+			"failureCounts": "{{runs}} runs, {{jobs}} jobs",
+			"presenceTitle": "En ce moment",
+			"online_one": "{{count}} personne en ligne",
+			"online_other": "{{count}} personnes en ligne",
+			"running_one": "{{count}} run en cours",
+			"running_other": "{{count}} runs en cours",
+			"runningRow": "{{what}} sur {{project}} depuis {{since}}, par",
+			"dormant": "Pas vus depuis {{days}} jours",
+			"neverSeen": "jamais connecté",
+			"deactivate": "Désactiver",
+			"nobody": "Compte effacé"
+		},
+		"person": {
+			"back": "Retour aux chiffres",
+			"timeline": "Ce que la personne a fait",
+			"kinds": {
+				"sign_in": "Connexion",
+				"audit": "Action",
+				"run": "Run",
+				"job": "Job"
+			},
+			"erase": {
+				"title": "Effacer ce compte",
+				"what": "Supprime le compte, ses traces de connexion et ses invitations partout. Les totaux de jetons restent, sans nom. C'est irréversible.",
+				"confirm": "Saisissez l'adresse e-mail du compte",
+				"button": "Effacer le compte",
+				"done": "Le compte a été effacé. Ses totaux comptent désormais pour un compte effacé."
+			}
 		}
 	}
 }

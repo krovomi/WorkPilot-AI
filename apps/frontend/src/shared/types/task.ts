@@ -683,6 +683,11 @@ export interface TaskMetadata {
 	 * (read by the backend from task_metadata.json). Absent: the project's.
 	 */
 	testPlacement?: TestPlacementMode;
+	/**
+	 * This task's code mode per phase, over Settings' (read by the backend from
+	 * task_metadata.json, `code_mode/settings.py`). A phase left out follows Settings.
+	 */
+	phaseCodeMode?: import("../utils/code-mode").PhaseCodeMode;
 	baseBranch?: string; // Override base branch for this task's worktree
 	prUrl?: string; // GitHub PR URL if task has been submitted as a PR
 	/**
