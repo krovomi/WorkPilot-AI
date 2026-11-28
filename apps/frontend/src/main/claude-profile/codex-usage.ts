@@ -23,6 +23,7 @@ import { existsSync, promises as fsp } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { UsageSnapshot } from "@shared/types";
+import { defaultLoginHome } from "../ai-accounts/login-accounts";
 
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 
@@ -59,9 +60,10 @@ const TOKEN_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const MAX_TOKEN_LENGTH = 16_384;
 
+/** The default Codex account's folder (Settings → AI accounts), else `CODEX_HOME`, else `~/.codex`. */
 export function resolveCodexHome(): string {
 	const fromEnv = process.env.CODEX_HOME?.trim();
-	return fromEnv ? fromEnv : path.join(homedir(), ".codex");
+	return defaultLoginHome("codex") ?? (fromEnv || path.join(homedir(), ".codex"));
 }
 
 /**

@@ -29,6 +29,7 @@ import {
 } from "./provider-settings-keys";
 import { loadBetterSqlite } from "./windsurf-sqlite";
 import { defaultAccountKey, settingsApiKey } from "../ai-accounts/ai-account-key";
+import { loginAccountEnv } from "../ai-accounts/login-accounts";
 
 const execFileAsync = promisify(execFile);
 
@@ -1392,12 +1393,11 @@ export class CredentialManager extends EventEmitter {
 	getEnvironmentVariables(providerOverride?: string): Record<string, string> {
 		// A blank choice is no choice: it must not hide settings.selectedProvider.
 		const requested = (providerOverride ?? "").trim().toLowerCase();
-		const env = this.buildEnvironmentVariables(requested || undefined);
+		// The CLIs' default accounts (Settings → AI accounts): each CLI's own folder.
+		const env = { ...this.buildEnvironmentVariables(requested || undefined), ...loginAccountEnv() };
 		if (!requested) return env;
 
-		// `anthropic` et `claude` sont le même fournisseur pour le backend.
-		const canonical = requested === "anthropic" ? "claude" : requested;
-
+		const canonical = requested === "anthropic" ? "claude" : requested; // même fournisseur
 		// Le choix de la page est la réponse. La construction ci-dessus a pu
 		// retomber sur le credential actif (un profil OpenAI, un SSO Windsurf…)
 		// dont le nom n'a rien à voir avec ce qui a été demandé.

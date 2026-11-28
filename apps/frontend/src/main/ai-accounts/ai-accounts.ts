@@ -11,10 +11,14 @@
  * `AiAccountView`, which says whether a key is set and nothing more (rule S6).
  * A key always goes to its provider's own endpoint, never to a URL the
  * renderer names.
+ *
+ * A coding-agent CLI's account (`login-specs.ts`) holds no key: it is a folder
+ * the main process creates under `<userData>/config/ai-account-homes/`, where
+ * the CLI keeps its own sign-in. Deleting the account deletes the folder.
  */
 
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import {
@@ -24,6 +28,7 @@ import {
 } from "../../shared/types/ai-accounts";
 import { decryptSecret, encryptSecret } from "../secret-storage";
 import { unmaskSecret } from "../utils/masked-secret";
+import { isLoginProvider, LOGIN_SPECS } from "./login-specs";
 
 export const MAX_AI_ACCOUNTS = 100;
 const MAX_NAME = 80;
@@ -35,6 +40,8 @@ interface StoredAccount {
 	name: string;
 	/** As written to disk: `enc:` ciphertext, or clear without a keyring. */
 	apiKey?: string;
+	/** A CLI sign-in account: its folder, created by the main process. */
+	home?: string;
 	createdAt: string;
 	keySetAt?: string;
 }
@@ -46,6 +53,11 @@ interface StoredFile {
 
 export function isAiAccountProvider(value: unknown): value is string {
 	return typeof value === "string" && AI_ACCOUNT_PROVIDERS.includes(value);
+}
+
+/** A provider with accounts: API keys, or a CLI's sign-ins. */
+function isAnyAccountProvider(value: unknown): value is string {
+	return isAiAccountProvider(value) || isLoginProvider(value);
 }
 
 /** Text without control characters, trimmed and bounded. */
@@ -64,20 +76,35 @@ function isStoredAccount(value: unknown): value is StoredAccount {
 	const account = value as Record<string, unknown>;
 	return (
 		typeof account.id === "string" &&
-		isAiAccountProvider(account.provider) &&
+		isAnyAccountProvider(account.provider) &&
 		typeof account.name === "string" &&
 		typeof account.createdAt === "string" &&
 		(account.apiKey === undefined || typeof account.apiKey === "string") &&
+		(account.home === undefined || typeof account.home === "string") &&
 		(account.keySetAt === undefined || typeof account.keySetAt === "string")
 	);
 }
 
-function viewOf({ apiKey, ...account }: StoredAccount): AiAccountView {
-	return { ...account, hasKey: Boolean(apiKey) };
+function viewOf({ apiKey, home, ...account }: StoredAccount): AiAccountView {
+	const spec = LOGIN_SPECS[account.provider];
+	if (!spec) return { ...account, hasKey: Boolean(apiKey), kind: "key" };
+	return { ...account, hasKey: false, kind: "login", signedIn: home ? spec.signedIn(home) : false };
 }
 
 export class AiAccountStore {
 	constructor(private readonly filePath: string) {}
+
+	/** Where the CLI accounts' folders live. */
+	private get homesRoot(): string {
+		return path.join(path.dirname(this.filePath), "ai-account-homes");
+	}
+
+	/** `home` when it is a folder of `homesRoot` (a file edited by hand may say otherwise). */
+	private ownHome(home: string | undefined): string | undefined {
+		if (!home) return undefined;
+		const relative = path.relative(this.homesRoot, path.resolve(home));
+		return relative && !relative.startsWith("..") && !path.isAbsolute(relative) ? home : undefined;
+	}
 
 	private read(): StoredFile {
 		if (!existsSync(this.filePath)) return { accounts: [], defaults: {} };
@@ -87,7 +114,9 @@ export class AiAccountStore {
 				defaults?: unknown;
 			};
 			const accounts = Array.isArray(parsed.accounts)
-				? parsed.accounts.filter(isStoredAccount)
+				? parsed.accounts
+						.filter(isStoredAccount)
+						.map((account) => ({ ...account, home: this.ownHome(account.home) }))
 				: [];
 			const defaults: Record<string, string> = {};
 			if (parsed.defaults && typeof parsed.defaults === "object") {
@@ -141,13 +170,21 @@ export class AiAccountStore {
 		return account && apiKey ? { account, apiKey } : undefined;
 	}
 
+	/** The folder of `provider`'s default CLI account, when it has signed in. */
+	defaultHomeOf(provider: string): string | undefined {
+		const id = this.read().defaults[provider];
+		const account = this.read().accounts.find((candidate) => candidate.id === id);
+		return account?.home && viewOf(account).signedIn ? account.home : undefined;
+	}
+
 	/** Creates (no id) or updates an account; throws a short reason when refused. */
 	save(input: AiAccountInput): AiAccountView {
-		if (!input || typeof input !== "object" || !isAiAccountProvider(input.provider)) {
+		if (!input || typeof input !== "object" || !isAnyAccountProvider(input.provider)) {
 			throw new Error("Invalid provider");
 		}
 		const name = clean(input.name, MAX_NAME);
 		if (!name) throw new Error("A name is required");
+		if (isLoginProvider(input.provider)) return this.saveLogin(input.provider, name, input.id);
 		const typed = unmaskSecret(typeof input.apiKey === "string" ? input.apiKey : undefined);
 		const apiKey = typed === undefined ? undefined : clean(typed, MAX_KEY + 1);
 		if (apiKey !== undefined && apiKey.length > MAX_KEY) throw new Error("Key too long");
@@ -184,29 +221,68 @@ export class AiAccountStore {
 		return viewOf(updated);
 	}
 
+	/** A CLI account: created with a folder of its own, then only renamed. */
+	private saveLogin(provider: string, name: string, id: string | undefined): AiAccountView {
+		const file = this.read();
+		if (id === undefined) {
+			if (file.accounts.length >= MAX_AI_ACCOUNTS) throw new Error("Too many accounts");
+			const newId = randomUUID();
+			const home = path.join(this.homesRoot, provider, newId);
+			mkdirSync(home, { recursive: true, mode: 0o700 });
+			const created: StoredAccount = { id: newId, provider, name, home, createdAt: new Date().toISOString() };
+			this.write({ ...file, accounts: [...file.accounts, created] });
+			return viewOf(created);
+		}
+		const existing = file.accounts.find((account) => account.id === id);
+		if (!existing) throw new Error("Account not found");
+		if (existing.provider !== provider) throw new Error("Invalid provider");
+		existing.name = name;
+		this.write(file);
+		return viewOf(existing);
+	}
+
+	/** The folder of a CLI account, for its sign-in terminal. */
+	homeOf(id: string): string | undefined {
+		return this.read().accounts.find((account) => account.id === id)?.home;
+	}
+
+	/** Whether `home` is the folder of one of `provider`'s CLI accounts. */
+	isLoginHome(provider: string, home: string): boolean {
+		return this.read().accounts.some((account) => account.provider === provider && account.home === home);
+	}
+
 	/**
 	 * Makes `id` the default account of `provider`; null goes back to the key
-	 * typed on the provider's own page.
+	 * typed on the provider's own page (a CLI: the sign-in of the system).
 	 */
 	setDefault(provider: string, id: string | null): void {
-		if (!isAiAccountProvider(provider)) throw new Error("Invalid provider");
+		if (!isAnyAccountProvider(provider)) throw new Error("Invalid provider");
 		const file = this.read();
 		if (id === null) {
 			delete file.defaults[provider];
 		} else {
 			const account = file.accounts.find((candidate) => candidate.id === id);
 			if (!account || account.provider !== provider) throw new Error("Account not found");
-			if (!account.apiKey) throw new Error("This account has no key");
+			if (isLoginProvider(provider)) {
+				if (!viewOf(account).signedIn) throw new Error("This account is not signed in");
+			} else if (!account.apiKey) {
+				throw new Error("This account has no key");
+			}
 			file.defaults[provider] = id;
 		}
 		this.write(file);
 	}
 
-	/** Deletes an account; a provider whose default it was goes back to its main key. */
+	/**
+	 * Deletes an account, and a CLI account's folder with the sign-in in it; a
+	 * provider whose default it was goes back to its main key.
+	 */
 	delete(id: string): boolean {
 		const file = this.read();
 		const accounts = file.accounts.filter((account) => account.id !== id);
 		if (accounts.length === file.accounts.length) return false;
+		const home = file.accounts.find((account) => account.id === id)?.home;
+		if (home) rmSync(home, { recursive: true, force: true });
 		const defaults = Object.fromEntries(
 			Object.entries(file.defaults).filter(([, account]) => account !== id),
 		);

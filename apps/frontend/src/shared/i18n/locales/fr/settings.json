@@ -3341,6 +3341,23 @@
 				"invalidName": "Mettez au moins une lettre ou un chiffre dans le nom.",
 				"addAndSignIn": "Ajouter et se connecter",
 				"deleteDescription": "Son dossier de connexion reste sur le disque ; WorkPilot cesse de l'utiliser."
+			},
+			"login": {
+				"title": "Connexions {{cli}}",
+				"intro": "Chaque compte {{cli}} se connecte dans un dossier à lui, pour que plusieurs abonnements cohabitent. Les tâches tournent sur le compte par défaut ; sans lui, {{cli}} garde la connexion de cet ordinateur.",
+				"system": "Connexion de cet ordinateur",
+				"systemHint": "Le compte avec lequel {{cli}} est connecté hors de WorkPilot.",
+				"signedIn": "Connecté",
+				"signedOut": "Non connecté",
+				"signIn": "Se connecter",
+				"reconnect": "Se reconnecter",
+				"signInFailed": "La connexion n'a pas pu démarrer.",
+				"addAndSignIn": "Ajouter et se connecter",
+				"deleteDescription": "Son dossier de connexion {{cli}} est effacé de cet ordinateur.",
+				"terminalTitle": "Se connecter à {{cli}} en tant que « {{name}} »",
+				"stepRun": "Appuyez sur Entrée pour lancer la commande affichée.",
+				"stepFollow": "Suivez les étapes qu'elle affiche (une page du navigateur peut s'ouvrir).",
+				"stepClose": "Fermez ce terminal quand il indique que vous êtes connecté."
 			}
 		}
 	},

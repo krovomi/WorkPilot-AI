@@ -6,12 +6,14 @@
  * forges. These channels take no project id first, so the checks read every
  * argument. Ids, names and paths are bounded text, sizes positive integers, a
  * date a day; a new terminal takes from the renderer no environment but a
- * profile's `CLAUDE_CONFIG_DIR` under the home folder, and auto-switch
+ * profile's `CLAUDE_CONFIG_DIR` under the home folder or a CLI account's own
+ * folder (`ai-accounts/login-accounts.ts`), and auto-switch
  * settings only their own fields. A refused `invoke` rejects; a refused
  * `send` is dropped.
  */
 
 import { IPC_CHANNELS } from "../../../shared/constants";
+import { isSignInEnv } from "../../ai-accounts/login-accounts";
 import { isValidConfigDir } from "../../utils/config-path-validator";
 import { type ArgChecks, argsAllowed, guardedIpcMain, isText, MAX_BATCH } from "../github/ipc-arg-guard";
 
@@ -42,11 +44,11 @@ const isShaped = (fields: Record<string, (value: unknown) => boolean>) => (value
 	Object.keys(value).every((key) => key in fields) &&
 	Object.entries(fields).every(([key, check]) => check(value[key]));
 
-/** The one variable a terminal may take from the renderer: a profile's folder. */
+/** What a terminal may take from the renderer: a profile's folder, or a CLI account's. */
 const isTerminalEnv = (value: unknown) =>
 	isObject(value) &&
-	Object.entries(value).every(
-		([key, dir]) => key === "CLAUDE_CONFIG_DIR" && isName(dir) && isValidConfigDir(dir as string),
+	Object.entries(value).every(([key, dir]) =>
+		key === "CLAUDE_CONFIG_DIR" ? isName(dir) && isValidConfigDir(dir as string) : isSignInEnv(key, dir),
 	);
 
 const isCreateOptions = isShaped({

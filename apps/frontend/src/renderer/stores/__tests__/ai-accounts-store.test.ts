@@ -15,6 +15,7 @@ const bridge = {
 	deleteAiAccount: vi.fn(),
 	testAiAccount: vi.fn(),
 	setDefaultAiAccount: vi.fn(),
+	signInAiAccount: vi.fn(),
 };
 
 beforeEach(() => {
@@ -75,6 +76,12 @@ describe("useAiAccountsStore", () => {
 		bridge.setDefaultAiAccount.mockResolvedValueOnce({ success: false });
 		expect(await store.setDefault("openai", null)).toBeNull();
 		expect(bridge.listAiAccounts).toHaveBeenCalledTimes(8);
+
+		const plan = { terminalId: "t", command: "codex login", env: { CODEX_HOME: "/h" } };
+		bridge.signInAiAccount.mockResolvedValueOnce({ success: true, data: plan });
+		expect(await store.signIn("a1")).toEqual({ plan });
+		bridge.signInAiAccount.mockResolvedValueOnce({ success: false, error: "Account not found" });
+		expect(await store.signIn("a1")).toEqual({ error: "Account not found" });
 	});
 
 	it("picks a provider's accounts and its default", () => {

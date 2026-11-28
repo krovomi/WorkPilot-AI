@@ -199,3 +199,61 @@ class TestBuiltPolicy:
         assert str(project.resolve()) in described["writable"]
         assert str((project / ".workpilot" / ".env").resolve()) in described["hidden"]
         assert described["network"] == ["a.org"]
+
+
+class TestStateInsideHiddenFolder:
+    def test_a_cli_account_under_the_app_settings_keeps_the_rest_hidden(
+        self, tmp_path, home, monkeypatch
+    ):
+        project = tmp_path / "project"
+        project.mkdir()
+        settings_dir = home / ".config" / "WorkPilot AI"
+        account = settings_dir / "config" / "ai-account-homes" / "gemini-cli" / "a1"
+        other = settings_dir / "config" / "ai-account-homes" / "codex" / "b2"
+        (account / ".gemini").mkdir(parents=True)
+        other.mkdir(parents=True)
+        (settings_dir / "settings.json").write_text("{}", encoding="utf-8")
+        (settings_dir / "config" / "ai-accounts.json").write_text(
+            "{}", encoding="utf-8"
+        )
+        monkeypatch.setenv("GEMINI_CLI_HOME", str(account))
+
+        policy = build_policy(project, state_dirs=["$GEMINI_CLI_HOME/.gemini"])
+
+        state = (account / ".gemini").resolve()
+        assert state in policy.writable
+        assert settings_dir.resolve() not in policy.hidden
+        assert (settings_dir / "settings.json").resolve() in policy.hidden_files
+        assert (
+            settings_dir / "config" / "ai-accounts.json"
+        ).resolve() in policy.hidden_files
+        assert (
+            settings_dir / "config" / "ai-account-homes" / "codex"
+        ).resolve() in policy.hidden
+        assert not any(state == h or state.is_relative_to(h) for h in policy.hidden)
+
+    def test_a_writable_folder_that_is_the_hidden_one_is_not_hidden(self, tmp_path):
+        hidden = tmp_path / "gh"
+        hidden.mkdir()
+
+        assert policy_module._hidden_around(hidden, [hidden]) == []
+        assert policy_module._hidden_around(hidden, [tmp_path / "other"]) == [hidden]
+
+    def test_a_hidden_folder_that_cannot_be_listed_hides_nothing_more(
+        self, tmp_path, monkeypatch
+    ):
+        hidden = tmp_path / "secret"
+        (hidden / "state").mkdir(parents=True)
+
+        def refuse(self):
+            raise OSError("denied")
+
+        monkeypatch.setattr(Path, "iterdir", refuse)
+
+        assert policy_module._hidden_around(hidden, [hidden / "state"]) == []
+
+    def test_a_hidden_file_on_the_way_is_not_walked(self, tmp_path):
+        hidden = tmp_path / "file"
+        hidden.write_text("", encoding="utf-8")
+
+        assert policy_module._hidden_around(hidden, [hidden / "x"]) == []

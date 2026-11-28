@@ -35,6 +35,7 @@ import {
 	registerAiAccountsHandlers,
 	saveAiAccount,
 	setDefaultAiAccount,
+	signInAiAccount,
 	testSavedAiAccount,
 } from "../ai-accounts-handlers";
 
@@ -62,6 +63,7 @@ describe("AI accounts IPC", () => {
 			IPC_CHANNELS.AI_ACCOUNTS_DELETE,
 			IPC_CHANNELS.AI_ACCOUNTS_TEST,
 			IPC_CHANNELS.AI_ACCOUNTS_SET_DEFAULT,
+			IPC_CHANNELS.AI_ACCOUNTS_SIGN_IN,
 		]);
 	});
 
@@ -93,7 +95,7 @@ describe("AI accounts IPC", () => {
 		});
 		expect(deleteAiAccount("x".repeat(65))).toEqual({ success: false, error: "Invalid account" });
 		expect(deleteAiAccount("missing")).toEqual({ success: false, error: "Account not found" });
-		expect(setDefaultAiAccount("copilot", null)).toEqual({ success: false, error: "Invalid provider" });
+		expect(setDefaultAiAccount("anthropic", null)).toEqual({ success: false, error: "Invalid provider" });
 		expect(setDefaultAiAccount("openai", 3)).toEqual({ success: false, error: "Invalid account" });
 		expect(setDefaultAiAccount("openai", "missing")).toEqual({
 			success: false,
@@ -138,5 +140,18 @@ describe("AI accounts IPC", () => {
 		const saved = await saveAiAccount({ provider: "grok", name: "A", apiKey: KEY });
 		expect(deleteAiAccount(saved.data?.id)).toEqual({ success: true });
 		expect(listAiAccounts().data?.accounts).toEqual([]);
+	});
+
+	it("hands a CLI account's sign-in terminal the command and folder chosen here", async () => {
+		const saved = await saveAiAccount({ provider: "codex", name: "Perso" });
+		const id = saved.data?.id as string;
+		const plan = signInAiAccount(id);
+		expect(plan.success).toBe(true);
+		expect(plan.data?.command).toBe("codex login");
+		expect(Object.keys(plan.data?.env ?? {})).toEqual(["CODEX_HOME"]);
+		expect(signInAiAccount(5)).toEqual({ success: false, error: "Invalid account" });
+		expect(signInAiAccount("missing")).toEqual({ success: false, error: "Account not found" });
+		expect(setDefaultAiAccount("codex", id)).toEqual({ success: false, error: "This account is not signed in" });
+		expect(setDefaultAiAccount("codex", null)).toEqual({ success: true });
 	});
 });

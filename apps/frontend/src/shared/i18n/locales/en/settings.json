@@ -3341,6 +3341,23 @@
 				"invalidName": "Use at least one letter or digit in the name.",
 				"addAndSignIn": "Add and sign in",
 				"deleteDescription": "Its sign-in folder stays on disk; WorkPilot stops using it."
+			},
+			"login": {
+				"title": "{{cli}} sign-ins",
+				"intro": "Each {{cli}} account signs in in a folder of its own, so several subscriptions can sit side by side. Tasks run on the default account; without one, {{cli}} uses the sign-in of this computer.",
+				"system": "Sign-in of this computer",
+				"systemHint": "The account {{cli}} is signed in with outside WorkPilot.",
+				"signedIn": "Signed in",
+				"signedOut": "Not signed in",
+				"signIn": "Sign in",
+				"reconnect": "Sign in again",
+				"signInFailed": "The sign-in could not start.",
+				"addAndSignIn": "Add and sign in",
+				"deleteDescription": "Its {{cli}} sign-in folder is erased from this computer.",
+				"terminalTitle": "Sign in to {{cli}} as \"{{name}}\"",
+				"stepRun": "Press Enter to run the command shown.",
+				"stepFollow": "Follow the steps it prints (a browser page may open).",
+				"stepClose": "Close this terminal once it says you are signed in."
 			}
 		}
 	},

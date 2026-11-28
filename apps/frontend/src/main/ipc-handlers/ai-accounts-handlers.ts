@@ -3,7 +3,8 @@
  * The renderer is not trusted (rule S6): it sends an account's fields, an id
  * or a provider, the store revalidates them, and a key only goes back as
  * `hasKey`. A connection test runs here, with the key read from the store,
- * against the provider's own endpoint.
+ * against the provider's own endpoint. A CLI account's sign-in terminal runs a
+ * command and a folder the main process chose.
  */
 
 import { ipcMain } from "electron";
@@ -12,12 +13,15 @@ import type { IPCResult } from "../../shared/types";
 import {
 	AI_ACCOUNT_PROVIDERS,
 	type AiAccountInput,
+	type AiAccountSignIn,
 	type AiAccountsSnapshot,
 	type AiAccountTestResult,
 	type AiAccountView,
 } from "../../shared/types/ai-accounts";
 import { hasMainKey } from "../ai-accounts/ai-account-key";
 import { aiAccountStore, isAiAccountProvider } from "../ai-accounts/ai-accounts";
+import { signInPlanOf } from "../ai-accounts/login-accounts";
+import { isLoginProvider } from "../ai-accounts/login-specs";
 import { appLog } from "../app-logger";
 import { prepareSecrets } from "../secret-storage";
 import { credentialManager } from "../services/credential-manager";
@@ -79,7 +83,9 @@ export function deleteAiAccount(id: unknown): IPCResult {
 }
 
 export function setDefaultAiAccount(provider: unknown, id: unknown): IPCResult {
-	if (!isAiAccountProvider(provider)) return { success: false, error: "Invalid provider" };
+	if (!isAiAccountProvider(provider) && !isLoginProvider(provider)) {
+		return { success: false, error: "Invalid provider" };
+	}
 	const checked = id === null ? null : accountId(id);
 	if (id !== null && checked === null) return { success: false, error: "Invalid account" };
 	try {
@@ -122,6 +128,14 @@ export async function testSavedAiAccount(
 	}
 }
 
+/** The sign-in terminal of a CLI account: its command and folder, chosen here. */
+export function signInAiAccount(id: unknown): IPCResult<AiAccountSignIn> {
+	const checked = accountId(id);
+	if (checked === null) return { success: false, error: "Invalid account" };
+	const plan = signInPlanOf(checked);
+	return plan ? { success: true, data: plan } : { success: false, error: "Account not found" };
+}
+
 export function registerAiAccountsHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.AI_ACCOUNTS_LIST, () => listAiAccounts());
 	ipcMain.handle(IPC_CHANNELS.AI_ACCOUNTS_SAVE, (_event, input: unknown) => saveAiAccount(input));
@@ -131,4 +145,5 @@ export function registerAiAccountsHandlers(): void {
 		IPC_CHANNELS.AI_ACCOUNTS_SET_DEFAULT,
 		(_event, provider: unknown, id: unknown) => setDefaultAiAccount(provider, id),
 	);
+	ipcMain.handle(IPC_CHANNELS.AI_ACCOUNTS_SIGN_IN, (_event, id: unknown) => signInAiAccount(id));
 }

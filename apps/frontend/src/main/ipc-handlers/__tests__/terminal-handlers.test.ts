@@ -89,6 +89,9 @@ vi.mock("../../claude-profile/session-utils", () => ({
 vi.mock("../../utils/config-path-validator", () => ({
 	isValidConfigDir: (dir: string) => dir.startsWith(state.home),
 }));
+vi.mock("../../ai-accounts/login-accounts", () => ({
+	isSignInEnv: (key: string, dir: unknown) => key === "CODEX_HOME" && dir === "/accounts/codex/a",
+}));
 vi.mock("../../project-store", () => ({ projectStore: { getProject: (id: string) => state.projects[id] } }));
 vi.mock("../../settings-utils", () => ({
 	readSettingsFileAsync: async () => {
@@ -198,6 +201,14 @@ describe("the arguments a terminal channel takes", () => {
 	it("takes a profile's folder under the home folder as the terminal's only variable", () => {
 		const env = { CLAUDE_CONFIG_DIR: path.join(state.home, ".claude-profiles", "work") };
 		expect(terminalArgsAllowed(IPC_CHANNELS.TERMINAL_CREATE, [{ id: "t-1", env }])).toBe(true);
+	});
+
+	it("takes a CLI account's folder only under that CLI's variable", () => {
+		const create = (env: Record<string, string>) => terminalArgsAllowed(IPC_CHANNELS.TERMINAL_CREATE, [{ id: "t-1", env }]);
+		expect(create({ CODEX_HOME: "/accounts/codex/a" })).toBe(true);
+		expect(create({ CODEX_HOME: "/elsewhere" })).toBe(false);
+		expect(create({ GH_CONFIG_DIR: "/accounts/codex/a" })).toBe(false);
+		expect(create({ CODEX_HOME: "/accounts/codex/a", NODE_OPTIONS: "--require x" })).toBe(false);
 	});
 
 	it("rejects a refused invoke before the handler runs, and drops a refused send", async () => {

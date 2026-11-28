@@ -3,8 +3,8 @@ feature: Plusieurs comptes par provider IA
 summary: >-
   Plusieurs comptes par provider à clé API (OpenAI, Google, Mistral, DeepSeek, Grok, Meta,
   OpenRouter, Hugging Face), clés chiffrées dans le main, un compte par défaut par provider que le
-  gestionnaire d'identifiants donne aux tâches, aux tests et aux vues ; les comptes Claude sont ses
-  profils OAuth ; bascule en un clic depuis la popin d'utilisation.
+  gestionnaire d'identifiants donne aux tâches et aux vues ; Claude : ses profils OAuth ; Copilot,
+  Codex CLI, Gemini CLI : un dossier de connexion par compte ; bascule depuis la popin.
 ---
 
 # Plusieurs comptes par provider IA
@@ -61,8 +61,9 @@ Les alias (`gemini` → `google`) passent par `accountProviderOf` (`shared/types
 ## IPC
 
 `aiAccounts:list`, `aiAccounts:save`, `aiAccounts:delete`, `aiAccounts:test`,
-`aiAccounts:setDefault` (`main/ipc-handlers/ai-accounts-handlers.ts`). Le handler revalide l'id
-(chaîne bornée), le provider (liste fermée `AI_ACCOUNT_PROVIDERS`) et le compte ; une clé arrive
+`aiAccounts:setDefault`, `aiAccounts:signIn` (`main/ipc-handlers/ai-accounts-handlers.ts`). Le
+handler revalide l'id (chaîne bornée), le provider (listes fermées `AI_ACCOUNT_PROVIDERS` et
+`LOGIN_SPECS`) et le compte ; une clé arrive
 une fois, masque compris (`unmaskSecret`), n'est jamais renvoyée ; le test répond `ok`, un nombre
 de modèles ou une raison courte (200 caractères), jamais le corps de la réponse.
 
@@ -76,17 +77,52 @@ dans le profil), `api` pour un compte à clé, `unknown` sinon ; plus `isDefault
 Enterprise : une feature réservée à ces plans s'allume d'elle-même dessus. Le renderer lit le même
 `subscriptionType` dans `getClaudeProfiles`.
 
+## Les comptes des outils CLI
+
+Copilot (GitHub CLI), Codex CLI (offre ChatGPT) et Gemini CLI gardent leur connexion dans un
+dossier qu'ils lisent dans une variable (`main/ai-accounts/login-specs.ts`). Un compte de ces outils
+ne contient donc aucune clé : c'est un dossier que le main crée sous
+`<userData>/config/ai-account-homes/<provider>/<id>` (`0700`), où l'outil écrit sa propre connexion.
+
+| Outil | Variable du terminal de connexion | Variable du backend | Commande | Connecté quand |
+|---|---|---|---|---|
+| GitHub CLI (Copilot) | `GH_CONFIG_DIR` | `COPILOT_GH_CONFIG_DIR` | `gh auth login --hostname github.com --web` | `hosts.yml` nomme `github.com` |
+| Codex CLI | `CODEX_HOME` | `CODEX_HOME` | `codex login` | `auth.json` existe |
+| Gemini CLI | `GEMINI_CLI_HOME` | `GEMINI_CLI_HOME` | `gemini` | `.gemini/oauth_creds.json` existe |
+
+- **Commande et dossier choisis par le main** (règle S6) : `aiAccounts:signIn` rend la commande et
+  le dossier du compte (`signInPlanOf`, `login-accounts.ts`) ; le terminal de connexion ne prend du
+  renderer que `CLAUDE_CONFIG_DIR` d'un profil ou la variable d'un outil qui nomme le dossier d'un
+  compte de cet outil (`isSignInEnv`, appelé par `terminal-ipc-guard.ts`). Un dossier lu sur disque
+  hors de la racine des comptes est ignoré, et n'est jamais supprimé.
+- **Compte par défaut** : seulement un compte connecté. `credential-manager.ts` ajoute à
+  l'environnement de chaque tâche la variable du backend de chaque outil qui a un défaut
+  (`loginAccountEnv`) ; sans défaut, l'outil lit son dossier habituel (« connexion de cet
+  ordinateur »). L'usage de Codex de la popin se lit dans le même dossier (`resolveCodexHome`).
+- **Copilot** : le backend ne lit `COPILOT_GH_CONFIG_DIR` que pour le jeton de Copilot
+  (`foundation/copilot_gh_env.py`, dans `core/agent_clients/copilot.py` et `copilot_models.py`) :
+  le `gh` qu'un agent lance pour une PR garde la connexion habituelle de la personne.
+- **Bac à sable** : Gemini CLI garde `$GEMINI_CLI_HOME/.gemini` en écriture
+  (`capabilities/providers.yaml`). Ce dossier est sous les réglages de WorkPilot, cachés à un
+  agent : `os_sandbox/policy.py` (`_hidden_around`) ne rend visible que le chemin jusqu'à lui, le
+  reste du dossier caché le reste (réglages, autres comptes).
+- **Limite** : `CODEX_HOME` et `GEMINI_CLI_HOME` déplacent aussi les réglages de l'outil
+  (`config.toml`, `settings.json`) ; un compte commence sans eux.
+- **Interface** : `LoginAccounts` dans le dialogue de la carte (OpenAI montre ses clés puis les
+  connexions de Codex CLI), une ligne « connexion de cet ordinateur » par défaut tant qu'aucun
+  compte ne l'est ; la popin liste les deux groupes séparément.
+
 ## Pas encore
 
-Les providers qui se connectent par leur propre outil gardent un compte : Copilot (`gh`), Codex
-(ChatGPT), Gemini CLI, Windsurf, Cursor, AWS (paire de clés et région), Ollama (local). Il leur faut
-un dossier de connexion par compte, comme Claude (`CLAUDE_CONFIG_DIR`).
+Windsurf, Cursor, AWS (paire de clés et région) et Ollama (local) gardent un compte.
 
 ## Fichiers
 
 - `apps/frontend/src/shared/types/ai-accounts.ts` : types et providers.
 - `apps/frontend/src/main/ai-accounts/ai-accounts.ts` : le stockage.
 - `apps/frontend/src/main/ai-accounts/ai-account-key.ts` : la clé que reçoit un provider.
+- `apps/frontend/src/main/ai-accounts/login-specs.ts`, `login-accounts.ts` : les comptes des outils CLI.
+- `apps/backend/foundation/copilot_gh_env.py` : le dossier GitHub CLI du jeton de Copilot.
 - `apps/frontend/src/main/ipc-handlers/ai-accounts-handlers.ts` : l'IPC.
 - `apps/frontend/src/renderer/stores/ai-accounts-store.ts` : le store du renderer.
 - `apps/frontend/src/renderer/components/settings/ai-accounts/` : le dialogue des comptes.
