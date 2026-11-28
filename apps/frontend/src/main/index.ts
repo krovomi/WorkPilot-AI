@@ -58,7 +58,7 @@ import {
 import type { AppSettings, AuthFailureInfo } from "../shared/types";
 import { AgentManager } from "./agent";
 import { getAppLanguage, initAppLanguage } from "./app-language";
-import { setupErrorLogging } from "./app-logger";
+import { appLog, setupErrorLogging } from "./app-logger";
 import { initializeAppUpdater, stopPeriodicUpdates } from "./app-updater";
 import { backendReloadArgs } from "./backend-reload-args";
 import { isProfileAuthenticated } from "./claude-profile/profile-utils";
@@ -71,10 +71,8 @@ import {
 	configureToolsFromSettings,
 	preWarmToolCache,
 } from "./cli-tool-manager";
-import {
-	pauseRunningTasksForShutdown,
-	resumeTasksInterruptedByAppExit,
-} from "./ipc-handlers/task/interrupted-runs";
+import { offerInterruptedTasksAtLaunch } from "./ipc-handlers/task/interrupted-prompt";
+import { pauseRunningTasksForShutdown } from "./ipc-handlers/task/interrupted-runs";
 import { getSourceEnvPath } from "./ipc-handlers/settings-handlers";
 import { stopAllPrFollowups } from "./ipc-handlers/task/pr-followup-handlers";
 import { stopSplitMergeWatch } from "./ipc-handlers/task/split-merge-watch";
@@ -1079,15 +1077,16 @@ function validateAndMigrateAutoBuildPath(
 // ... (rest of the code remains the same)
 
 /**
- * Resume, once, the Kanban builds that were running when WorkPilot last
- * stopped — closed, crashed or killed. See `interrupted-runs.ts`.
+ * Offer (or resume, or leave, per Settings › Agents) the Kanban builds that
+ * were running when WorkPilot last stopped — closed, crashed or killed. See
+ * `interrupted-prompt.ts`.
  */
 function resumeInterruptedTasksWhenReady(): void {
 	const manager = agentManager;
 	if (!manager) return;
 	const run = () => {
-		resumeTasksInterruptedByAppExit(manager).catch((error) => {
-			console.warn("[main] Could not resume interrupted tasks:", error);
+		offerInterruptedTasksAtLaunch(manager, () => mainWindow).catch((error) => {
+			appLog.warn("[main] Could not offer interrupted tasks:", error);
 		});
 	};
 	const webContents = mainWindow?.webContents;
@@ -1366,7 +1365,7 @@ async function main() {
 	// Initialize profile manager and handle migrated profiles
 	await initializeProfileManager();
 
-	// The builds the last exit interrupted continue where they stopped. After
+	// The builds the last exit interrupted are offered to resume. After
 	// the profile manager (Claude builds need their credentials) and once the
 	// window has loaded, so the resumed runs' events reach the Kanban.
 	resumeInterruptedTasksWhenReady();
@@ -1437,6 +1436,8 @@ app.on("before-quit", (event) => {
 		return;
 	}
 	isQuitting = true;
+	// Written to main.log: the next launch can then tell a close from a crash.
+	appLog.info("[main] Quitting: pausing running tasks and stopping agents");
 
 	// Pause quit to perform async cleanup
 	event.preventDefault();

@@ -27,6 +27,7 @@ import {
 import { Switch } from "../ui/switch";
 import { AgentProfileSettings } from "./AgentProfileSettings";
 import { CustomProviderConfig } from "./CustomProviderConfig";
+import { InterruptedTasksSetting } from "./InterruptedTasksSetting";
 import { SettingsSection } from "./SettingsSection";
 
 interface GeneralSettingsProps {
@@ -222,6 +223,11 @@ export function GeneralSettings({
 									}
 								/>
 							</div>
+						</div>
+
+						{/* What a launch does with the builds the last exit interrupted */}
+						<div className="pt-4 border-t border-border">
+							<InterruptedTasksSetting settings={settings} onSettingsChange={onSettingsChange} />
 						</div>
 
 						{/* Feature Model Configuration */}

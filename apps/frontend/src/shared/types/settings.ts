@@ -293,6 +293,8 @@ export interface AppSettings {
 	swarm?: import("./swarm").SwarmSettings;
 	/** Settings, Sandbox and Anomaly detection: sent to every agent process. */
 	agentSafety?: import("./agent-safety").AgentSafetySettings;
+	/** Settings, Agents: what a launch does with builds the last exit interrupted (ask when absent). */
+	interruptedTasksOnLaunch?: import("./interrupted-tasks").InterruptedLaunchPolicy;
 	/** Settings, Code mode: agents chain their tools in a script (off when absent). */
 	codeMode?: import("../utils/code-mode").CodeModeSetting;
 	/** Settings, Approval tiers: sent to the PR follow-through as WORKPILOT_APPROVALS. */

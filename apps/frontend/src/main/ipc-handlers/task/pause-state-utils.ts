@@ -39,6 +39,10 @@ export interface PauseStateRecord {
 	provider?: string | null;
 	model?: string | null;
 	reason?: string | null;
+	/** With `app_shutdown`: recorded at the next launch, the app had crashed (no close). */
+	crashed?: boolean;
+	/** The person answered « Plus tard » at a launch: not offered again (interrupted-prompt.ts). */
+	deferred_at?: string | null;
 }
 
 /**
@@ -87,6 +91,20 @@ export function writePauseState(
 		} catch (err) {
 			appLog.warn(`[pause-state] Could not write pause state in ${specDir}:`, err);
 		}
+	}
+	return written;
+}
+
+/**
+ * « Plus tard » on the launch dialog: the pause stays, with the time the
+ * person put it off, so the next launch does not ask about it again.
+ */
+export function markPauseDeferred(specDirs: string[], at: string): number {
+	let written = 0;
+	for (const specDir of specDirs) {
+		const state = readJson<PauseStateRecord>(path.join(specDir, AUTO_BUILD_PATHS.PAUSE_STATE));
+		if (!state?.enabled) continue;
+		written += writePauseState([specDir], { ...state, deferred_at: at });
 	}
 	return written;
 }

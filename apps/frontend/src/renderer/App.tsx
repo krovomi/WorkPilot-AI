@@ -403,6 +403,7 @@ import { ProjectTabBar } from "./components/ProjectTabBar";
 import { ProviderContextProvider } from "./components/ProviderContext";
 import { PageLlmSelector } from "./components/PageLlmSelector";
 import { RateLimitModal } from "./components/RateLimitModal";
+import { InterruptedTasksDialog } from "./components/interrupted-tasks/InterruptedTasksDialog";
 import { SDKRateLimitModal } from "./components/SDKRateLimitModal";
 import { VersionWarningModal } from "./components/VersionWarningModal";
 import { ViewStateProvider } from "./contexts/ViewStateContext";
@@ -2044,7 +2045,7 @@ export function App() {
 						}
 					/>
 
-					{/* Version warning modal - shown once for reauthentication notice */}
+					<InterruptedTasksDialog />
 					<VersionWarningModal
 						isOpen={isVersionWarningModalOpen}
 						onClose={handleVersionWarningClose}
@@ -2056,7 +2057,6 @@ export function App() {
 						onProjectAdded={handleProjectAdded}
 					/>
 
-					{/* Remove Project Confirmation Dialog */}
 					<Dialog
 						open={showRemoveProjectDialog}
 						onOpenChange={(open) => {

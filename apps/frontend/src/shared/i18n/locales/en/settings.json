@@ -743,6 +743,22 @@
 	"general": {
 		"providerSection": "Default provider",
 		"providerSectionDescription": "The provider new Kanban tasks start from, and the one used by features without a selector of their own (titles, auto-fix, test generation…). Each task keeps its own provider, model and effort: changing this never modifies an existing task.",
+		"interruptedTasks": {
+			"title": "Interrupted tasks at launch",
+			"description": "What WorkPilot does with the Kanban tasks that were running when it closed or crashed. A task you stopped with “Stop all agents” is never resumed on its own.",
+			"ask": {
+				"label": "Ask me",
+				"description": "A dialog lists them at launch, with the step each one resumes from. Recommended."
+			},
+			"always": {
+				"label": "Resume all",
+				"description": "Every task the app interrupted resumes within the “In progress” limit; a notification lists them."
+			},
+			"never": {
+				"label": "Resume none",
+				"description": "The cards stay paused, each with its Resume button."
+			}
+		},
 		"otherAgentSettings": "Other Agent Settings",
 		"otherAgentSettingsDescription": "Additional agent configuration options",
 		"agentFramework": "Agent Framework",

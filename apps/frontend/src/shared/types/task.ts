@@ -762,6 +762,10 @@ export interface TaskMetadata {
 		 * with `policy`.
 		 */
 		reason?: string | null;
+		/** With "app_shutdown": the app crashed rather than closed (settled at the next launch). */
+		crashed?: boolean;
+		/** « Plus tard » on the launch dialog: not offered again (interrupted-prompt.ts). */
+		deferred_at?: string | null;
 		budget?: BudgetPauseDetail;
 		breaker?: BreakerPauseDetail;
 		anomaly?: AnomalyPauseDetail;
