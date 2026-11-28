@@ -7,7 +7,9 @@
 import { describe, expect, it } from "vitest";
 import {
 	mergeAccountPins,
+	pinKeysOf,
 	pinnedAccountOf,
+	pinnedLoginOf,
 	pinProviderOf,
 	pinsForProviders,
 	sanitizeAccountPins,
@@ -25,7 +27,25 @@ describe("pinProviderOf", () => {
 	});
 });
 
+describe("pinKeysOf", () => {
+	it("lists a provider's key pin, then its CLI sign-in pin", () => {
+		expect(pinKeysOf("openai")).toEqual(["openai", "codex"]);
+		expect(pinKeysOf("Copilot")).toEqual(["copilot"]);
+		expect(pinKeysOf("gemini-cli")).toEqual(["gemini-cli"]);
+		expect(pinKeysOf("gemini")).toEqual(["google"]);
+		expect(pinKeysOf("ollama")).toEqual([]);
+	});
+});
+
 describe("sanitizeAccountPins", () => {
+	it("keeps the pins of the coding-agent CLIs' sign-ins", () => {
+		expect(sanitizeAccountPins({ codex: "c", copilot: "g", "gemini-cli": "x" })).toEqual({
+			codex: "c",
+			copilot: "g",
+			"gemini-cli": "x",
+		});
+	});
+
 	it("keeps the pins of providers with accounts, keyed by that provider", () => {
 		expect(
 			sanitizeAccountPins({ gemini: "a-1", anthropic: "work", mistral: "m-2" }),
@@ -60,6 +80,14 @@ describe("mergeAccountPins", () => {
 		).toEqual({ openai: "card", claude: "team" });
 	});
 
+	it("lets a card's Codex sign-in replace the project's OpenAI key, and the reverse", () => {
+		expect(mergeAccountPins({ codex: "plan" }, { openai: "key", copilot: "gh" })).toEqual({
+			codex: "plan",
+			copilot: "gh",
+		});
+		expect(mergeAccountPins({ openai: "key" }, { codex: "plan" })).toEqual({ openai: "key" });
+	});
+
 	it("is undefined when neither pins anything", () => {
 		expect(mergeAccountPins(undefined, { ollama: "x" })).toBeUndefined();
 	});
@@ -74,7 +102,29 @@ describe("pinnedAccountOf", () => {
 	});
 });
 
+describe("pinnedLoginOf", () => {
+	it("reads OpenAI's Codex sign-in and a CLI's own", () => {
+		expect(pinnedLoginOf({ codex: "c", openai: "o" }, "openai")).toBe("c");
+		expect(pinnedLoginOf({ copilot: "g" }, "copilot")).toBe("g");
+		expect(pinnedLoginOf({ google: "g" }, "google")).toBeUndefined();
+		expect(pinnedLoginOf(undefined, "copilot")).toBeUndefined();
+	});
+});
+
 describe("withAccountPin", () => {
+	it("keeps OpenAI on its key or on its Codex sign-in, never both", () => {
+		const key = withAccountPin({ codex: "plan", google: "g" }, "openai", "k");
+		expect(key).toEqual({ google: "g", openai: "k" });
+		expect(withAccountPin(key, "openai", "plan", "login")).toEqual({ google: "g", codex: "plan" });
+		expect(withAccountPin({ openai: "k" }, "codex", "plan", "login")).toEqual({ codex: "plan" });
+		expect(withAccountPin({ codex: "plan" }, "openai", null)).toBeUndefined();
+	});
+
+	it("pins a CLI provider's sign-in whatever the kind says", () => {
+		expect(withAccountPin(undefined, "copilot", "gh")).toEqual({ copilot: "gh" });
+		expect(withAccountPin({ google: "g" }, "google", "x", "login")).toBeUndefined();
+	});
+
 	it("sets, replaces and removes one pin, and is undefined once none is left", () => {
 		const one = withAccountPin(undefined, "gemini", "g");
 		expect(one).toEqual({ google: "g" });
@@ -94,6 +144,7 @@ describe("pinsForProviders", () => {
 			pinsForProviders({ openai: "o", claude: "c", google: "g" }, ["anthropic", "gemini", "ollama"]),
 		).toEqual({ claude: "c", google: "g" });
 		expect(pinsForProviders({ openai: "o" }, ["mistral"])).toBeUndefined();
+		expect(pinsForProviders({ codex: "c", copilot: "g" }, ["openai"])).toEqual({ codex: "c" });
 		expect(pinsForProviders(undefined, ["openai"])).toBeUndefined();
 	});
 });
