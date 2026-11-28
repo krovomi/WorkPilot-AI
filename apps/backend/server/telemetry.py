@@ -13,6 +13,7 @@ template and a status say how the server behaves without saying who used it.
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 from genai_trace.tracer import get_tracer
@@ -48,10 +49,12 @@ class RequestSpans:
             span.set_attribute("url.scheme", scope.get("scheme", "http"))
             try:
                 await self.app(scope, receive, sending)
-            except BaseException as error:
-                span.set_attribute("error.type", type(error).__name__)
-                raise
             finally:
+                # Raising, the error is the one propagating (the span also
+                # records it as an event and an error status).
+                error = sys.exc_info()[1]
+                if error is not None:
+                    span.set_attribute("error.type", type(error).__name__)
                 route = getattr(scope.get("route"), "path", None)
                 if route:
                     span.set_attribute("http.route", route)
