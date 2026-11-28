@@ -106,10 +106,12 @@ FORWARDED_ENV: tuple[str, ...] = (
 #: first argument, so `stop_run` can end the whole group.
 RUN_SCRIPT = 'echo $$ > "$0"; exec "$@"'
 _RUN_FILE = re.compile(r"^/tmp/workpilot-run-[0-9a-f]{16}\.pid$")
+#: The VM's /bin/sh is dash, whose `kill` refuses `--`: the group is given as
+#: its negative id alone.
 _STOP_SCRIPT = (
     'p=$(cat "$0" 2>/dev/null) || exit 0; '
-    'kill -TERM -- "-$p" 2>/dev/null; sleep 1; '
-    'kill -KILL -- "-$p" 2>/dev/null; rm -f "$0"; exit 0'
+    'kill -TERM "-$p" 2>/dev/null; sleep 1; '
+    'kill -0 "-$p" 2>/dev/null && kill -KILL "-$p" 2>/dev/null; rm -f "$0"; exit 0'
 )
 #: Every host. Created with a deny of it, a VM reaches nothing until its own
 #: rules are in place.
