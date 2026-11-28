@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installRendererApi, type RendererApi } from "../../../../__tests__/helpers/renderer-api";
 import type { BoardAskResult, Task } from "../../../../shared/types";
 import { turnAnswer, useBoardAskStore } from "../../../stores/board-ask-store";
+import { useSettingsStore } from "../../../stores/settings-store";
 import { useTaskStore } from "../../../stores/task-store";
 import { BoardAskButton } from "./BoardAskButton";
 
@@ -107,6 +108,46 @@ describe("BoardAskPanel", () => {
 		const rows = screen.getAllByRole("button", { name: /Rebuilt it/ });
 		expect(rows[0]).not.toHaveAttribute("aria-current");
 		expect(rows[1]).toHaveAttribute("aria-current", "true");
+	});
+
+	it("names the embeddings model that ranked the tickets, and how much of the board it read", async () => {
+		askBoard
+			.mockResolvedValueOnce({
+				success: true,
+				data: {
+					answer: "",
+					matches: [{ taskId: "t1", title: "Revisión del panel", state: "done" }],
+					mode: "semantic",
+					searched: 40,
+					semantic: { kind: "local", provider: "ollama", model: "bge-m3", indexed: 30, total: 40 },
+				},
+			})
+			.mockResolvedValueOnce({
+				success: true,
+				data: { ...aiResult, semantic: { kind: "cloud", provider: "openai", model: "text-embedding-3-small", indexed: 12, total: 12 } },
+			});
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="p1" />);
+		const box = screen.getByRole("textbox", { name: /Ask a question/ });
+		await userEvent.type(box, "admin{Enter}");
+		expect(await screen.findByText("Ranked by meaning")).toBeInTheDocument();
+		expect(screen.getByText("Meaning: bge-m3, on this computer")).toBeInTheDocument();
+		expect(screen.getByText(/30 of 40 tickets read by meaning so far/)).toBeInTheDocument();
+		expect(screen.getByText(/closest to the question in meaning/)).toBeInTheDocument();
+		await userEvent.type(box, "again{Enter}");
+		expect(await screen.findByText("Meaning: text-embedding-3-small (openai API)")).toBeInTheDocument();
+		expect(screen.queryAllByText(/tickets read by meaning so far/)).toHaveLength(1);
+	});
+
+	it("saves whether to rank by meaning", async () => {
+		useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, boardAskSemantic: undefined } });
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="p1" />);
+		const select = screen.getByRole("combobox", { name: /By meaning/ });
+		expect(select).toHaveValue("auto");
+		await userEvent.selectOptions(select, "local");
+		await waitFor(() => expect(api.fn("saveSettings")).toHaveBeenCalledWith({ boardAskSemantic: "local" }));
+		await waitFor(() => expect(select).toHaveValue("local"));
 	});
 
 	it("asks an example question from the empty state", async () => {
