@@ -37,6 +37,8 @@ const STATUS_WORDS: Readonly<Record<string, string>> = {
 	succeeded: "completed",
 	failed: "failed",
 	cancelled: "cancelled",
+	// Stopped by a server restart, waiting to be resumed: it did not fail.
+	interrupted: "cancelled",
 	running: "running",
 	queued: "queued",
 };
