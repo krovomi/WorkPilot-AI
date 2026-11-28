@@ -47,6 +47,7 @@ from .microvm import (
     ensure_vm,
     probe_microvm,
     sbx_env,
+    stop_run,
     task_vm,
 )
 from .policy import SandboxPolicy, build_policy
@@ -127,6 +128,16 @@ class SessionSandbox:
         command = sandboxed(list(argv), policy, env)
         self._proxy = command.proxy
         return command.argv, command.env
+
+    def stop(self, argv: list[str]) -> None:
+        """End inside the microVM what `argv` (from `wrap`) started there.
+
+        Call it after stopping the host process: in a VM, the command would
+        keep running. Nothing to do for the OS sandbox, where stopping the
+        process group is enough.
+        """
+        if self.vm is not None:
+            stop_run(self.vm, list(argv))
 
     def refused_hosts(self, since: float | None = None) -> list[str]:
         """Hosts the proxy refused for this session, oldest first, once each.

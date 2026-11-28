@@ -17,10 +17,16 @@ VM. A CLI that runs its own commands keeps the OS sandbox.
   read-only over themselves, and the hidden ones (``.workpilot/.env``) are
   covered by an empty file or folder. The home directory, its credentials and
   the host's package caches are never mounted: the VM has its own.
-- **Network**: created with ``--deny-network``, then the same allowlist as the
-  OS sandbox, as rules scoped to that VM (``sbx policy allow network
-  --sandbox``). A local endpoint (``127.0.0.1:11434``) is reached from inside
-  as ``host.docker.internal``.
+- **Network**: the same allowlist as the OS sandbox. sbx gives every VM its
+  global policy (a list of allowed hosts) and a deny rule always wins over an
+  allow, so the VM is created closed (``--deny-network "**"``), each global
+  host the task does not need is denied for that VM, the task's hosts are
+  allowed for it (``sbx policy allow network --sandbox``), and only then is
+  the ``**`` rule taken off (`_ensure_network`). A local endpoint
+  (``127.0.0.1:11434``) is reached from inside as ``host.docker.internal``.
+- **Stopping**: killing ``sbx exec`` on the host leaves the command running in
+  the VM, so each command records its process group in the VM
+  (`RUN_SCRIPT`) and `stop_run` ends that group.
 - **Resources**: ``--memory`` and ``--cpus`` from the settings, or sized from
   the machine (`vm_resources`): sbx would otherwise take half the RAM per VM.
 - **Privacy**: every ``sbx`` call runs with ``SBX_NO_TELEMETRY=1``.
@@ -38,6 +44,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import threading
@@ -47,6 +54,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from foundation.platform import find_executable, is_linux, is_macos, is_windows
+from security.child_env import env_without_credentials
 from security.path_guard import WRITE_ROOTS_ENV_VAR, workpilot_scratch_dir
 
 from .hosts import HostAllowlist, HostRule, _is_loopback
@@ -93,6 +101,20 @@ FORWARDED_ENV: tuple[str, ...] = (
     "FORCE_COLOR",
 )
 
+#: How a command starts in the VM: its own session (`setsid -w`, which waits
+#: and passes the exit code on), whose id it writes to the file named by its
+#: first argument, so `stop_run` can end the whole group.
+RUN_SCRIPT = 'echo $$ > "$0"; exec "$@"'
+_RUN_FILE = re.compile(r"^/tmp/workpilot-run-[0-9a-f]{16}\.pid$")
+_STOP_SCRIPT = (
+    'p=$(cat "$0" 2>/dev/null) || exit 0; '
+    'kill -TERM -- "-$p" 2>/dev/null; sleep 1; '
+    'kill -KILL -- "-$p" 2>/dev/null; rm -f "$0"; exit 0'
+)
+#: Every host. Created with a deny of it, a VM reaches nothing until its own
+#: rules are in place.
+ALL_HOSTS = "**"
+
 _QUICK_TIMEOUT = 60
 _CREATE_TIMEOUT = 900
 _GIB = 1024**3
@@ -120,10 +142,12 @@ def sbx_executable() -> str | None:
 
 
 def sbx_env(base: dict[str, str] | None = None) -> dict[str, str]:
-    """The environment of an ``sbx`` process on the host."""
-    env = dict(os.environ if base is None else base)
-    env.update(TELEMETRY_ENV)
-    return env
+    """The environment of an ``sbx`` process on the host: no credential.
+
+    sbx signs in on its own (``sbx login``, its keys in the OS keychain), and
+    what its environment holds may be passed into the VM.
+    """
+    return env_without_credentials(os.environ if base is None else base, TELEMETRY_ENV)
 
 
 def _install_hint() -> str:
@@ -466,7 +490,65 @@ class TaskVm:
             if not _ENV_NAME.match(name) or "\0" in value or "\n" in value:
                 raise MicrovmError(f"not a variable for the microVM: {name}")
             argv += ["-e", f"{name}={value}"]
-        return [*argv, self.name, *command]
+        run_file = f"/tmp/workpilot-run-{secrets.token_hex(8)}.pid"
+        return [
+            *argv,
+            self.name,
+            "setsid",
+            "-w",
+            "sh",
+            "-c",
+            RUN_SCRIPT,
+            run_file,
+            *command,
+        ]
+
+    def stop_argv(self, argv: list[str]) -> list[str] | None:
+        """The ``sbx exec`` that ends the command `argv` started, if it did."""
+        run_file = run_file_of(argv)
+        if run_file is None:
+            return None
+        return [
+            sbx_executable() or "sbx",
+            "--no-input",
+            "exec",
+            self.name,
+            "sh",
+            "-c",
+            _STOP_SCRIPT,
+            run_file,
+        ]
+
+
+def run_file_of(argv: list[str]) -> str | None:
+    """The run file of an `exec_argv` command line, None for any other."""
+    for index, part in enumerate(argv[:-1]):
+        if part == RUN_SCRIPT and _RUN_FILE.match(argv[index + 1]):
+            return argv[index + 1]
+    return None
+
+
+def stop_run(vm: TaskVm, argv: list[str]) -> None:
+    """End, inside the VM, what `argv` started there (and its children).
+
+    The host's ``sbx exec`` stopping does not stop it. Best effort: a VM
+    already gone or a command already done is not an error.
+    """
+    stop = vm.stop_argv(argv)
+    if stop is None:
+        return
+    try:
+        subprocess.run(
+            stop,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=sbx_env(),
+            timeout=_QUICK_TIMEOUT,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        logger.info("[microvm] stopping a command in %s: %s", vm.name, error)
 
 
 def _state_file(name: str) -> Path:
@@ -558,21 +640,121 @@ def _ensure_vm(vm: TaskVm) -> bool:
         _create(vm, present=present)
         state = {"fingerprint": fingerprint, "worktree": str(vm.worktree)}
         created = True
+    changed = _ensure_network(vm, state)
+    if created:
+        # Closed until here: its own rules are in place.
+        _check(run_sbx(_rm_rule(vm.name, ALL_HOSTS)), "`sbx policy rm network` of `**`")
+    if created or changed:
+        _write_state(vm.name, state)
+    return created
+
+
+def _rm_rule(name: str, resource: str) -> list[str]:
+    return [
+        "policy",
+        "rm",
+        "network",
+        "--force",
+        "--sandbox",
+        name,
+        "--resource",
+        resource,
+    ]
+
+
+def _ensure_network(vm: TaskVm, state: dict[str, Any]) -> bool:
+    """The VM's rules: sbx's global hosts denied, the task's allowed.
+
+    A global rule that covers one of the task's hosts (``**.docker.com`` for
+    ``registry-1.docker.io``) stays open: a deny would win over the allow.
+    Allow rules only grow (the VM never holds a key: the sbx proxy adds it);
+    a deny is lifted when the task comes to need what it covered.
+    """
+    wanted = [
+        resource
+        for resource in global_allowed()
+        if not any(_overlaps(resource, ours) for ours in vm.network)
+    ]
+    denied = [r for r in state.get("denied") or () if isinstance(r, str)]
+    add = [r for r in wanted if r not in denied]
+    if add:
+        _check(
+            run_sbx(["policy", "deny", "network", "--sandbox", vm.name, ",".join(add)]),
+            "`sbx policy deny network`",
+        )
+    lifted = [r for r in denied if r not in wanted]
+    for resource in lifted:
+        _check(run_sbx(_rm_rule(vm.name, resource)), "`sbx policy rm network`")
     applied = [r for r in state.get("network") or () if isinstance(r, str)]
     missing = [rule for rule in vm.network if rule not in applied]
     if missing:
-        # Rules only grow: a rule cannot be taken back from a running VM
-        # here, and the VM never holds a key (the sbx proxy adds it).
         _check(
             run_sbx(
                 ["policy", "allow", "network", "--sandbox", vm.name, ",".join(missing)]
             ),
             "`sbx policy allow network`",
         )
-        state["network"] = applied + missing
-    if created or missing:
-        _write_state(vm.name, state)
-    return created
+    state["denied"] = wanted
+    state["network"] = applied + missing
+    return bool(add or lifted or missing)
+
+
+def global_allowed() -> list[str]:
+    """The hosts sbx's global policy allows every VM (`sbx policy ls`).
+
+    Raises `MicrovmError` when they cannot be read, or when the policy allows
+    every host: the VM could not then be held to the task's allowlist.
+    """
+    result = run_sbx(
+        ["policy", "ls", "--json", "--type", "network", "--decision", "allow"]
+    )
+    _check(result, "`sbx policy ls`")
+    try:
+        data = json.loads(result.stdout or "")
+    except ValueError as error:
+        raise MicrovmError("`sbx policy ls` did not answer in JSON") from error
+    rules = data.get("rules", []) if isinstance(data, dict) else data
+    resources: list[str] = []
+    for rule in rules if isinstance(rules, list) else ():
+        if not isinstance(rule, dict) or rule.get("scope", "global") != "global":
+            continue
+        listed = rule.get("resources")
+        if not isinstance(listed, list):
+            listed = [rule.get("resource")]
+        resources += [r for r in listed if isinstance(r, str) and r]
+    if any(_split(r)[0] == ALL_HOSTS for r in resources):
+        raise MicrovmError(
+            "sbx's global policy allows every host: the microVM cannot hold "
+            "the task's allowlist (`sbx policy` sets it back to balanced)"
+        )
+    return list(dict.fromkeys(resources))
+
+
+def _split(resource: str) -> tuple[str, str | None]:
+    host, _, port = resource.lower().rpartition(":")
+    if not host or not port.isdigit():
+        return resource.lower(), None
+    return host, port
+
+
+def _covers(pattern: str, host: str) -> bool:
+    """sbx's patterns: ``**`` any host, ``**.x`` and ``*.x`` x and below."""
+    if pattern == ALL_HOSTS:
+        return True
+    for prefix in ("**.", "*."):
+        if pattern.startswith(prefix):
+            base = pattern[len(prefix) :]
+            bare = host.removeprefix("**.").removeprefix("*.")
+            return bare == base or bare.endswith("." + base)
+    return pattern == host
+
+
+def _overlaps(first: str, second: str) -> bool:
+    """Whether two rules can match the same host and port."""
+    (a, a_port), (b, b_port) = _split(first), _split(second)
+    if a_port and b_port and a_port != b_port:
+        return False
+    return _covers(a, b) or _covers(b, a)
 
 
 def _create(vm: TaskVm, *, present: bool) -> None:
@@ -592,6 +774,7 @@ def _create(vm: TaskVm, *, present: bool) -> None:
         "--cpus",
         str(vm.resources.cpus),
         "--deny-network",
+        ALL_HOSTS,
         "--no-progress",
     ]
     _check(run_sbx(args, timeout=_CREATE_TIMEOUT), "`sbx create`")
@@ -642,7 +825,7 @@ def secret_services() -> frozenset[str]:
     for entry in data if isinstance(data, list) else ():
         if isinstance(entry, str):
             names.add(entry.lower())
-        elif isinstance(entry, dict):
+        elif isinstance(entry, dict) and entry.get("type", "service") == "service":
             for key in ("service", "name", "id"):
                 value = entry.get(key)
                 if isinstance(value, str):

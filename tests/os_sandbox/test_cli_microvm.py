@@ -217,3 +217,39 @@ def test_opencode_starts_in_the_vm_without_a_host_key(tmp_path, monkeypatch):
     assert vm_env["PWD"].startswith("/vm")
     assert argv[3:] == ["opencode", "run", "--format", "json"]
     assert not any("sk-test-0000" in part for part in argv)
+
+
+def test_a_stopped_cli_is_ended_inside_the_vm(tmp_path):
+    class _Process:
+        returncode = None
+
+        def terminate(self):
+            self.returncode = -15
+
+        async def wait(self):
+            return self.returncode
+
+    class _Recorder:
+        def __init__(self):
+            self.stopped = []
+
+        def stop(self, argv):
+            self.stopped.append(argv)
+
+    client = OpenCodeCliAgentClient(
+        model="anthropic/claude",
+        system_prompt=None,
+        project_dir=str(tmp_path),
+        agent_type="coder",
+    )
+    sandbox = _Recorder()
+    client._sandbox = sandbox
+    client._cli_vm = cli_microvm.CliVm("opencode", "install", ())
+    client._argv = ["sbx", "exec", "vm", "opencode"]
+    client._process = _Process()
+    asyncio.run(client._stop_process())
+    assert sandbox.stopped == [["sbx", "exec", "vm", "opencode"]]
+    client._cli_vm = None
+    client._process = _Process()
+    asyncio.run(client._stop_process())
+    assert len(sandbox.stopped) == 1
