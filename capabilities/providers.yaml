@@ -287,7 +287,8 @@ opencode:
     # WorkPilot; the VM's variables hold a placeholder the sbx proxy replaces).
     microvm:
       command: opencode
-      install: npm install -g opencode-ai@latest
+      # The standalone binary from npm's registry: the VM's image has no Node.
+      install: 'A=$(uname -m | sed ''s/x86_64/x64/;s/aarch64/arm64/''); U=$(curl -fsS "https://registry.npmjs.org/opencode-linux-$A/latest" | python3 -c ''import json,sys;print(json.load(sys.stdin)["dist"]["tarball"])'') && rm -rf "$HOME/.local/opencode" && mkdir -p "$HOME/.local/opencode" "$HOME/.local/bin" && curl -fsSL "$U" | tar -xz -C "$HOME/.local/opencode" --strip-components=1 && ln -sf "$HOME/.local/opencode/bin/opencode" "$HOME/.local/bin/opencode" && "$HOME/.local/bin/opencode" --version'
       secrets:
         anthropic: [ANTHROPIC_API_KEY]
         openai: [OPENAI_API_KEY]

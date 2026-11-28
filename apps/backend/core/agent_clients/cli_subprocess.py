@@ -227,6 +227,7 @@ class CliSubprocessAgentClient(AgentClient):
         self._sandbox: Any = None
         #: How this CLI runs in the task's microVM, when it does (`cli_microvm`).
         self._cli_vm: Any = None
+        self._argv: list[str] = []
 
     def session_sandbox(self, spec_dir: Path | str | None = None) -> Any:
         """The OS sandbox this CLI's process runs in, decided once.
@@ -388,6 +389,7 @@ class CliSubprocessAgentClient(AgentClient):
 
     async def _spawn(self, command: list[str], stdin_data: bytes) -> Any:
         argv, env = self._launch(command)
+        self._argv = argv
         process = await self._process_factory(
             *argv,
             cwd=self._project_dir,
@@ -434,3 +436,6 @@ class CliSubprocessAgentClient(AgentClient):
             await process.wait()
         finally:
             self._process = None
+            if self._cli_vm is not None and self._sandbox is not None:
+                # In the microVM the CLI outlives `sbx exec` on the host.
+                await asyncio.to_thread(self._sandbox.stop, self._argv)
