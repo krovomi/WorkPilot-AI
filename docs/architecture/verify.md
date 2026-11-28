@@ -208,7 +208,11 @@ the same provider; the app is relaunched. Two rounds without fewer errors and
 the loop stops and says what blocks — the same rule as `archify.authoring`.
 `VERIFY_MAX_ROUNDS` is a ceiling on top of it. An environment error (database
 absent, variable missing, port taken) is classified as such: a lesson for the
-next run, not a defect of the code.
+next run, not a defect of the code. A port taken between its check and the
+app's bind (two tasks verified at once) never gets that far: when the port
+reaches the app (`{port}` or a port variable) the launch starts it again on
+another free port within the same deadline, and another app answering on that
+port while ours could not bind is not taken for ours.
 
 **Where it sits.** `verify` runs between `review` and `qa`, so QA judges code
 that was seen running and receives the record (`verify_section`, fenced as

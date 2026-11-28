@@ -9,11 +9,13 @@ the process is mocked.
 from __future__ import annotations
 
 import http.server
+import socket
 import sys
 import threading
 from pathlib import Path
 
 import pytest
+import verify.launch as launch_module
 from verify.detect import Target
 from verify.launch import _log_path, launch, probe, read_log
 from verify.state import live_process, load_state, stop_all, work_dir
@@ -289,3 +291,115 @@ def test_a_project_given_as_text_is_a_path(project):
     result = launch(_api(_python("quiet_exit.py")), str(root), base, timeout=20)
     assert result.status == "exited"
     assert Path(result.log_path).parent == base / "logs"
+
+
+# -- a port taken between the check and the bind ------------------------------
+
+FIXED = """import pathlib, socketserver, sys
+with pathlib.Path("starts.txt").open("a", encoding="utf-8") as starts:
+    starts.write("start\\n")
+socketserver.TCPServer(("127.0.0.1", int(sys.argv[1])), None).serve_forever()
+"""
+
+
+@pytest.fixture
+def held_port():
+    """A port another process listens on, as a second launch would."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        sock.listen()
+        yield sock.getsockname()[1]
+
+
+def test_a_port_taken_before_the_app_binds_gets_a_new_one(
+    project, held_port, monkeypatch
+):
+    root, base = project
+    picks = iter([held_port])
+    real = launch_module.free_port
+    # The race: the port looked free when chosen, then another launch took it.
+    monkeypatch.setattr(
+        launch_module, "free_port", lambda preferred=0: next(picks, None) or real()
+    )
+
+    result = launch(_api(_python("serve.py", "{port}")), root, base, timeout=30)
+
+    assert result.status == "ready", result.log_tail
+    assert result.url != f"http://127.0.0.1:{held_port}"
+    assert live_process(base, "api")["url"] == result.url
+
+
+def test_a_port_that_stays_taken_ends_at_the_deadline(project, held_port, monkeypatch):
+    root, base = project
+    (root / "fixed.py").write_text(FIXED, encoding="utf-8")
+    monkeypatch.setattr(launch_module, "free_port", lambda preferred=0: held_port)
+
+    result = launch(_api(_python("fixed.py", "{port}")), root, base, timeout=5)
+
+    # Started again on every refusal, then the deadline ends the last attempt.
+    assert result.status in ("exited", "timeout")
+    assert (root / "starts.txt").read_text(encoding="utf-8").count("start") >= 2
+    assert live_process(base, "api") is None
+
+
+def test_an_app_that_chooses_its_own_port_is_not_started_again(project, held_port):
+    root, base = project
+    (root / "fixed.py").write_text(FIXED, encoding="utf-8")
+
+    result = launch(_api(_python("fixed.py", str(held_port))), root, base, timeout=30)
+
+    assert result.status == "exited"
+    assert (root / "starts.txt").read_text(encoding="utf-8") == "start\n"
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        Target(kind="backend-api", name="api", command="serve {port}"),
+        Target(kind="backend-api", name="api", command="serve", port_env=["PORT"]),
+        Target(kind="backend-api", name="api", command="serve", env={"URL": ":{port}"}),
+    ],
+)
+def test_the_port_reaches_the_app_by_its_command_or_its_environment(target):
+    assert launch_module._takes_our_port(target, target.command)
+    assert not launch_module._takes_our_port(
+        Target(kind="backend-api", name="api"), "serve"
+    )
+
+
+LATE = """import runpy, sys, time
+time.sleep(0.5)  # another app answers on the port before this one tries it
+sys.argv = ["serve.py", *sys.argv[1:]]
+runpy.run_path("serve.py", run_name="__main__")
+"""
+
+
+class _Other(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, *a):
+        pass
+
+
+def test_another_app_answering_on_the_port_is_not_taken_for_ours(project, monkeypatch):
+    root, base = project
+    (root / "late.py").write_text(LATE, encoding="utf-8")
+    other = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Other)
+    threading.Thread(target=other.serve_forever, daemon=True).start()
+    taken = other.server_address[1]
+    picks = iter([taken])
+    real = launch_module.free_port
+    monkeypatch.setattr(
+        launch_module, "free_port", lambda preferred=0: next(picks, None) or real()
+    )
+    try:
+        result = launch(_api(_python("late.py", "{port}")), root, base, timeout=30)
+    finally:
+        other.shutdown()
+        other.server_close()
+
+    assert result.status == "ready", result.log_tail
+    assert result.url != f"http://127.0.0.1:{taken}"
+    assert result.pid
