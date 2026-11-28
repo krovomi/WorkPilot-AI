@@ -12,7 +12,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { AUTO_BUILD_PATHS } from "../../shared/constants/config";
 import type { AppSettings, BoardAskSource, BoardAskState, Task } from "../../shared/types";
@@ -70,11 +70,21 @@ export function readProjectJson(projectDir: string, ...segments: string[]): Reco
 	try {
 		const root = realpathSync(projectDir);
 		const file = realpathSync(path.join(root, ...segments));
-		if (!isPathWithinBase(file, root) || statSync(file).size > MAX_SOURCE_BYTES) return null;
-		const parsed: unknown = JSON.parse(readFileSync(file, "utf-8"));
-		return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-			? (parsed as Record<string, unknown>)
-			: null;
+		if (!isPathWithinBase(file, root)) return null;
+		// One descriptor: the file measured is the file read, up to that size.
+		const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+		try {
+			const stat = fstatSync(fd);
+			if (!stat.isFile() || stat.size > MAX_SOURCE_BYTES) return null;
+			const buffer = Buffer.alloc(stat.size);
+			const read = readSync(fd, buffer, 0, stat.size, 0);
+			const parsed: unknown = JSON.parse(buffer.toString("utf-8", 0, read));
+			return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+				? (parsed as Record<string, unknown>)
+				: null;
+		} finally {
+			closeSync(fd);
+		}
 	} catch {
 		return null;
 	}
