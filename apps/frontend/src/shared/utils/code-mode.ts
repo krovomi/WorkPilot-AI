@@ -16,3 +16,38 @@ export function normalizeCodeMode(value: unknown): CodeModeSetting {
 		? (value as CodeModeSetting)
 		: DEFAULT_CODE_MODE;
 }
+
+/** The phases a task can give a mode of its own (the backend's `PHASE_OF_AGENT`). */
+export const CODE_MODE_PHASES = ["spec", "planning", "coding", "qa"] as const;
+export type CodeModePhase = (typeof CODE_MODE_PHASES)[number];
+
+/**
+ * A task's own mode per phase, saved as `phaseCodeMode` in its metadata. A
+ * phase left out follows Settings; the Settings switch on `off` wins over all.
+ */
+export type PhaseCodeMode = Partial<Record<CodeModePhase, CodeModeSetting>>;
+
+/** The known phases with a known mode, nothing else. */
+export function normalizePhaseCodeMode(value: unknown): PhaseCodeMode {
+	const chosen: PhaseCodeMode = {};
+	if (!value || typeof value !== "object") return chosen;
+	for (const phase of CODE_MODE_PHASES) {
+		const mode = (value as Record<string, unknown>)[phase];
+		if (typeof mode === "string" && (CODE_MODES as readonly string[]).includes(mode)) {
+			chosen[phase] = mode as CodeModeSetting;
+		}
+	}
+	return chosen;
+}
+
+/** The same choice, `undefined` when no phase has one (nothing to save). */
+export function phaseCodeModeToSave(value: PhaseCodeMode): PhaseCodeMode | undefined {
+	const chosen = normalizePhaseCodeMode(value);
+	return Object.keys(chosen).length > 0 ? chosen : undefined;
+}
+
+/** What a new task's metadata gets: `{ phaseCodeMode }`, or nothing. */
+export function phaseCodeModeMetadata(value: PhaseCodeMode): { phaseCodeMode?: PhaseCodeMode } {
+	const chosen = phaseCodeModeToSave(value);
+	return chosen ? { phaseCodeMode: chosen } : {};
+}

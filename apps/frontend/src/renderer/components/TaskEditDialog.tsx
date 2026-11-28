@@ -82,6 +82,11 @@ import {
 } from "../../shared/utils/task-engine";
 import { BenchEngineHint } from "./bench/BenchRecommendation";
 import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
+import {
+	normalizePhaseCodeMode,
+	type PhaseCodeMode,
+	phaseCodeModeToSave,
+} from "../../shared/utils/code-mode";
 import { TaskFormFields } from "./task-form/TaskFormFields";
 import { TaskModalLayout } from "./task-form/TaskModalLayout";
 import type { FileReferenceData } from "./task-form/useImageUpload";
@@ -229,6 +234,9 @@ export function TaskEditDialog({
 	);
 	const [engine, setEngine] = useState<TaskEngine>(engineForTask);
 	const initialEngineRef = useRef<string>(JSON.stringify(engine));
+	const [phaseCodeMode, setPhaseCodeMode] = useState<PhaseCodeMode>(() =>
+		normalizePhaseCodeMode(task.metadata?.phaseCodeMode),
+	);
 
 	// Agent profile / model configuration
 	const [profileId, setProfileId] = useState<string>(() => {
@@ -380,6 +388,7 @@ export function TaskEditDialog({
 		const openedEngine = engineForTask();
 		setEngine(openedEngine);
 		initialEngineRef.current = JSON.stringify(openedEngine);
+		setPhaseCodeMode(normalizePhaseCodeMode(task.metadata?.phaseCodeMode));
 		setError(null);
 		setStep(1);
 
@@ -521,6 +530,12 @@ export function TaskEditDialog({
 		// writes it only when it was changed here.
 		if (isDuplicate || engineChanged) {
 			Object.assign(metadataUpdates, buildEngineMetadata(engine));
+		}
+		// Its code mode per phase too: written when changed, removed when back to Settings'.
+		const ownCodeMode = phaseCodeModeToSave(phaseCodeMode);
+		const savedCodeMode = phaseCodeModeToSave(normalizePhaseCodeMode(task.metadata?.phaseCodeMode));
+		if (isDuplicate || JSON.stringify(ownCodeMode) !== JSON.stringify(savedCodeMode)) {
+			metadataUpdates.phaseCodeMode = ownCodeMode;
 		}
 		// Always set attachedImages to persist removal when all images are deleted
 		metadataUpdates.attachedImages = images.length > 0 ? images : [];
@@ -766,6 +781,8 @@ export function TaskEditDialog({
 							onChange={setEngine}
 							idPrefix={`task-engine-${task.id}`}
 							disabled={isSaving}
+							phaseCodeMode={phaseCodeMode}
+							onPhaseCodeModeChange={setPhaseCodeMode}
 						/>
 					</div>
 				}

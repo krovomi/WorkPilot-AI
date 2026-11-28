@@ -257,6 +257,7 @@ except ImportError:
         return {}
 
 
+from code_mode.native import apply as native_code_mode
 from core.custom_mcp_validation import (
     validate_custom_mcp_server as _validate_custom_mcp_server,
 )
@@ -845,6 +846,7 @@ def create_client(
         options_kwargs["disallowed_tools"] = denied
 
     _add_effort(options_kwargs, model, max_thinking_tokens, agent_type)
+    native_code_mode(options_kwargs, settings_file, agent_type, spec_dir, project_dir)
 
     return ClaudeSDKClient(options=ClaudeAgentOptions(**options_kwargs))
 
@@ -1008,7 +1010,6 @@ def _write_security_settings(
     project_dir: Path, spec_dir: Path, required_servers
 ) -> tuple[Path, list[str]]:
     """Write `.claude_settings.json`; returns it and the worktree rules it holds."""
-    # Determine browser tools for permissions (already in allowed_tools_list)
     browser_tools_permissions = []
     if "electron" in required_servers:
         browser_tools_permissions = ELECTRON_TOOLS
@@ -1085,7 +1086,6 @@ def _write_security_settings(
         },
     }
 
-    # Write settings to a file in the project directory
     settings_file = project_dir / ".claude_settings.json"
     with open(settings_file, "w", encoding="utf-8") as f:
         json.dump(security_settings, f, indent=2)

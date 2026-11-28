@@ -444,7 +444,7 @@
 				"title": "Each call of a script is checked like a direct call",
 				"description": "The script itself reads no file, starts no process and reaches no network. Each of its calls goes through the agent's rights, the protected paths, the guardrails, the command allowlist and the OS sandbox, and the anomaly watch scores every one."
 			},
-			"providers": "Works with every provider whose tools WorkPilot runs: OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio and the compatible providers and gateways. A task can choose its own mode per phase."
+			"providers": "Works with every provider whose tools WorkPilot runs: OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio and the compatible providers and gateways. Claude tasks use Claude Code's own code mode in their worktree, on the Anthropic API with Opus or Sonnet 5.5 and later, and terminals get it too. A task can choose its own mode per phase."
 		},
 		"anomaly-detection": {
 			"title": "Anomaly Detection",
@@ -507,6 +507,13 @@
 					"label": "Enforce",
 					"description": "A green N0, or N1 agreed by the cross-review, merges by itself. N2 and N3 wait for a person."
 				}
+			},
+			"express": {
+				"title": "Express lane for dependency PRs",
+				"description": "The Dependabot and Renovate pull requests of your projects merge by themselves when their tier is N0 and every check passed. Only when the tiers enforce.",
+				"toggle": "Merge the bots' green N0 pull requests",
+				"toggleDescription": "About every half hour, for each local project on GitHub. A major bump, a change to code or CI files, a red or running check, a draft or a fork is left to a person.",
+				"needsEnforce": "Off while the mode is not Enforce."
 			},
 			"tiers": {
 				"title": "The four tiers",
@@ -3469,5 +3476,32 @@
 		"off": "Never",
 		"after_one": "After {{count}} day",
 		"after_other": "After {{count}} days"
+	},
+	"myUsage": {
+		"navLabel": "My usage",
+		"title": "My usage",
+		"description": "What this organization's administrators see of you over the last 30 days: totals, action names, runs and jobs. Never a prompt, code, typed text or file name.",
+		"export": "Download everything kept about me (JSON)",
+		"notice": "Read again what is measured",
+		"failed": "The server refused: {{error}}",
+		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators."
+	},
+	"usageNotice": {
+		"title": "What this server measures about you",
+		"intro": "This organization's server keeps a few figures about each member, to follow its use and costs.",
+		"measured": {
+			"tokens": "The tokens and cost of the agents you start, by provider and model",
+			"runs": "Your runs: phase, status, start and end",
+			"jobs": "Your project jobs: feature, status, start and end",
+			"sign_ins": "Your sign-ins: time, method, address and app",
+			"presence": "The days you were connected, and when you were last seen",
+			"pages": "How many times a day you open each page of the app (its name only)"
+		},
+		"never": "Never a prompt, code, typed text or file name.",
+		"retention": "These figures are kept {{days}} days.",
+		"pageRetention": "Page counts are kept {{days}} days.",
+		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators.",
+		"rights": "You can see them and download everything kept about you in Settings, My usage. To have your account erased, ask a platform administrator.",
+		"understood": "I understand"
 	}
 }

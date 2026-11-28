@@ -185,6 +185,118 @@
 			"serverDefault": "Server default: {{count}} days",
 			"hint": "Empty keeps the server's default. From {{min}} to {{max}} days; older data is erased every hour.",
 			"invalid": "Enter a whole number of days from {{min}} to {{max}}, or leave it empty."
+		},
+		"panes": {
+			"dashboard": "Figures",
+			"settings": "Collection and retention"
+		},
+		"dashboard": {
+			"period": "Period",
+			"presets": {
+				"7d": "Last 7 days",
+				"30d": "Last 30 days",
+				"month": "This month",
+				"custom": "Chosen days"
+			},
+			"start": "From",
+			"end": "To",
+			"all": "All",
+			"person": "Person",
+			"group": "Group",
+			"project": "Project",
+			"provider": "Provider",
+			"model": "Model",
+			"platform": "Whole platform",
+			"exportCsv": "Export CSV",
+			"empty": "Nothing in this period.",
+			"tokens": "Tokens",
+			"tokensHint": "{{input}} in, {{output}} out",
+			"cost": "Cost",
+			"estimated": "Partly estimated",
+			"budget": "Monthly budget",
+			"budgetHint": "{{used}} of {{limit}} this month",
+			"noBudget": "No budget set",
+			"active": "Active today",
+			"activeHint": "{{week}} this week, {{month}} this month",
+			"runs": "Runs",
+			"jobs": "Jobs",
+			"successRate": "{{rate}} succeeded",
+			"sessions": "Agent sessions",
+			"dailyTitle": "Tokens per day",
+			"dailyChart": "Tokens per day, by provider",
+			"unknownProvider": "Unknown provider",
+			"peopleTitle": "By person",
+			"engines": "Models",
+			"lastSeen": "Last seen",
+			"erased": "Erased account",
+			"modelsTitle": "By provider and model",
+			"successRateShort": "Succeeded",
+			"costPerRun": "Cost per run",
+			"byPhase": "By phase",
+			"phase": "Phase",
+			"projectsTitle": "By project",
+			"phases": "Phases",
+			"noProject": "No project",
+			"pagesTitle": "Pages opened",
+			"pagesOff": "Page activity is off for this organization: nothing is counted.",
+			"app": "App",
+			"page": "Page",
+			"opens": "Opens",
+			"people": "People",
+			"apps": {
+				"desktop": "Desktop",
+				"mobile": "Phone"
+			},
+			"deliveryTitle": "Delivery",
+			"funnel": "From invitation to first merge",
+			"funnelSteps": {
+				"invited": "Invited",
+				"accepted": "Accepted",
+				"first_sign_in": "First sign-in",
+				"first_task": "First task",
+				"first_merge": "First merge"
+			},
+			"delivered": "Delivered",
+			"deliveredTasks_one": "{{count}} task merged",
+			"deliveredTasks_other": "{{count}} tasks merged",
+			"costPerTask": "Cost per delivered task: {{cost}}",
+			"timeToMerge": "Median time to merge: {{hours}} h",
+			"failures": "Why runs failed",
+			"causes": {
+				"usage_limit": "Usage limit reached",
+				"provider_sign_in": "Provider sign-in",
+				"timeout": "Timed out",
+				"tests": "Tests failed",
+				"other": "Other"
+			},
+			"failureCounts": "{{runs}} runs, {{jobs}} jobs",
+			"presenceTitle": "Right now",
+			"online_one": "{{count}} person online",
+			"online_other": "{{count}} people online",
+			"running_one": "{{count}} run in progress",
+			"running_other": "{{count}} runs in progress",
+			"runningRow": "{{what}} on {{project}} since {{since}}, by",
+			"dormant": "Not seen for {{days}} days",
+			"neverSeen": "never signed in",
+			"deactivate": "Deactivate",
+			"nobody": "Erased account"
+		},
+		"person": {
+			"back": "Back to the figures",
+			"timeline": "What they did",
+			"kinds": {
+				"sign_in": "Sign-in",
+				"audit": "Action",
+				"run": "Run",
+				"job": "Job"
+			},
+			"erase": {
+				"title": "Erase this account",
+				"what": "Removes the account, its sign-in details and its invitations everywhere. Token totals stay, without a name. This cannot be undone.",
+				"confirm": "Type the account's email address",
+				"button": "Erase the account",
+				"done": "The account was erased. Its totals now count as an erased account."
+			}
 		}
 	}
 }

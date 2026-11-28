@@ -1,0 +1,50 @@
+From bdba5397b0d5e6422296b68ea44382ce3a162787 Mon Sep 17 00:00:00 2001
+From: WorkPilot Wiki Bot <noreply@workpilot.ai>
+Date: Fri, 27 Nov 2026 23:16:49 +0000
+Subject: [PATCH] docs(wiki): the usage figures and my usage
+
+---
+ Team-Server.fr.md | 8 ++++++++
+ Team-Server.md    | 7 +++++++
+ 2 files changed, 15 insertions(+)
+
+diff --git a/Team-Server.fr.md b/Team-Server.fr.md
+index 53fdfb9..f9ed716 100644
+--- a/Team-Server.fr.md
++++ b/Team-Server.fr.md
+@@ -104,6 +104,14 @@ comptes. Chaque organisation règle combien de temps elle garde la consommation
+ `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS`), de 30 à 3650 jours. La page pour votre registre
+ RGPD : [docs/server-usage-data.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/server-usage-data.md).
+ 
++**Administration → Usage → Chiffres** montre ces données sur une période et des filtres
++(personne, groupe, projet, provider, modèle) : tokens, coût, part du budget, personnes actives,
++tables par personne, modèle et projet, entonnoir d'adoption, causes d'échec, présence ; chaque
++table s'exporte en CSV, un nom ouvre la fiche de la personne. Chaque membre est informé une fois
++de ce qui est mesuré, et retrouve dans **Paramètres → Mon usage** ce que les administrateurs
++voient de lui, avec un export JSON de tout ce qui est gardé. Un administrateur de la plateforme
++peut effacer un compte : ses totaux restent, sans nom.
++
+ ## Dépannage rapide
+ 
+ | Symptôme | Que faire |
+diff --git a/Team-Server.md b/Team-Server.md
+index 5cc5fac..ac7b2ca 100644
+--- a/Team-Server.md
++++ b/Team-Server.md
+@@ -101,6 +101,13 @@ presence (365 days by default, `WORKPILOT_USAGE_RETENTION_DAYS`) and page activi
+ `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS`), from 30 to 3650 days. The page for your GDPR register:
+ [docs/server-usage-data.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/server-usage-data.md).
+ 
++**Administration → Usage → Figures** shows this data over a period and filters (person, group,
++project, provider, model): tokens, cost, share of the budget, active people, tables per person,
++model and project, the adoption funnel, failure causes and presence; each table exports as CSV,
++and a name opens that person's sheet. Each member is told once what is measured, and finds in
++**Settings → My usage** what administrators see of them, with a JSON export of everything kept.
++A platform administrator can erase an account: its totals stay, without a name.
++
+ ## Quick troubleshooting
+ 
+ | Symptom | What to do |
+-- 
+2.43.0
+
