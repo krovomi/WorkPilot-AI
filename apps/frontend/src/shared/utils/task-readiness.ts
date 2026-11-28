@@ -22,7 +22,11 @@ export function isFirstStart(task: Pick<Task, "status">): boolean {
  */
 export function isShortCard(task: Pick<Task, "title" | "description" | "subtasks">): boolean {
 	if (task.subtasks.length > 0) return false;
+	return cardBody(task).length < SHORT_CARD_CHARS;
+}
+
+/** What a card says besides its title: "" when its description only repeats it. */
+export function cardBody(task: Pick<Task, "title" | "description">): string {
 	const description = (task.description ?? "").trim();
-	const body = description === task.title.trim() ? "" : description;
-	return body.length < SHORT_CARD_CHARS;
+	return description === task.title.trim() ? "" : description;
 }

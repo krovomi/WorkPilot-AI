@@ -425,6 +425,22 @@ describe("TASK_UPDATE", () => {
 		expect(existsSync(f.meta)).toBe(false);
 	});
 
+	it("writes a description edited on its own where the spec pipeline reads it", async () => {
+		// The card's inline editor and the pre-start answers send the description
+		// alone: requirements.json kept the text of the card's creation, so the
+		// agent planned from the title and ignored what the person wrote.
+		addTask({ status: "human_review" });
+		const f = seed();
+		expect((await update({ description: "What I wrote on the card" })).success).toBe(true);
+		expect(read(f.req)).toEqual({ task_description: "What I wrote on the card", additional_context: "old" });
+		expect(read(f.plan).description).toBe("What I wrote on the card");
+
+		// A title alone leaves requirements.json as it is.
+		write(f.req, { task_description: "Kept" });
+		expect((await update({ title: "Renamed" })).success).toBe(true);
+		expect(read(f.req)).toEqual({ task_description: "Kept" });
+	});
+
 	it("keeps tracker HTML for display only, inlining Azure DevOps images", async () => {
 		addTask({ status: "human_review", metadata: { importSource: "azure-devops" } });
 		const f = seed();

@@ -1039,8 +1039,13 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					} catch (err) {
 						console.error("Failed to update task_metadata.json:", err);
 					}
+				}
 
-					// Update requirements.json if it exists
+				// Update requirements.json if it exists. The spec pipeline reads the
+				// description there, so a description edited on its own (the card's
+				// inline editor, the answers given before a start) goes there too.
+				const meta = updates.metadata;
+				if (descriptionProvided || meta) {
 					const requirementsPath = path.join(specDir, "requirements.json");
 					try {
 						const requirementsContent = readFileSync(requirementsPath, "utf-8");
@@ -1056,15 +1061,14 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 								delete requirements.display_description;
 							}
 						}
-						if (updates.metadata.category) {
-							requirements.workflow_type = updates.metadata.category;
+						if (meta?.category) {
+							requirements.workflow_type = meta.category;
 						}
-						if (updates.metadata.acceptanceCriteria !== undefined) {
-							requirements.acceptance_criteria =
-								updates.metadata.acceptanceCriteria;
+						if (meta?.acceptanceCriteria !== undefined) {
+							requirements.acceptance_criteria = meta.acceptanceCriteria;
 						}
-						if (updates.metadata.extraNote !== undefined) {
-							const trimmed = updates.metadata.extraNote.trim();
+						if (meta?.extraNote !== undefined) {
+							const trimmed = meta.extraNote.trim();
 							if (trimmed) {
 								requirements.additional_context = trimmed;
 							} else {

@@ -1,21 +1,26 @@
 {
 	"readiness": {
 		"checking": "Checking “{{title}}” before it starts…",
-		"title": "Before “{{title}}” starts",
-		"questionsIntro": "The card is short: the agent would have to guess. Answer in one line; the answer is added to the description.",
+		"questionsIntro": "The card is short: without more detail the agent will have to guess. Answer what you know, leave the rest blank.",
 		"problemIntro": "The start would fail:",
 		"problems": {
 			"no_git": "The project is not a git repository. WorkPilot builds each task in a worktree: run “git init” in the project folder.",
 			"no_commit": "The git repository has no commit yet. Make a first commit, then start the card again.",
 			"no_auth": "The Claude account is not signed in. Sign in under Settings, Claude Profiles, then start the card again."
 		},
-		"answerLabel": "Answer",
 		"sectionTitle": "Clarifications before the start",
 		"later": "Later",
 		"close": "Close",
-		"startAnyway": "Start anyway",
-		"saveAndStart": "Save and start",
-		"saveFailed": "The answers could not be saved. The card did not start."
+		"startAnyway": "Start without details",
+		"saveAndStart": "Add details and start",
+		"saveFailed": "The answers could not be saved. The card did not start.",
+		"kicker": "Pre-start check",
+		"kickerMany": "Pre-start check · {{count}} cards waiting",
+		"cardReads": "What the agent will read",
+		"titleOnly": "Nothing beyond the title.",
+		"answerPlaceholder": "Your answer, in one line",
+		"useSuggestion": "Suggestion: {{suggestion}}",
+		"footerHint": "Your answers are added at the end of the description · Ctrl+Enter"
 	},
 	"dictation": {
 		"pending": "Add or discard the voice draft before continuing.",

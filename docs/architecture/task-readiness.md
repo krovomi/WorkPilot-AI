@@ -56,12 +56,26 @@ aide, elle ne bloque jamais. « Pas prête » sans question compte comme prête.
 ## La fenêtre
 
 `components/task-readiness/ReadinessDialog.tsx`, rendue par `kanban/BoardKeyboard.tsx`, montre la
-première carte retenue (`stores/task-readiness-store.ts`). Les réponses sont préremplies avec la
-suggestion du modèle ; « Enregistrer et démarrer » les ajoute à la description (section
-« Précisions avant le démarrage ») puis démarre, « Démarrer quand même » démarre sans rien
-ajouter, « Plus tard » laisse la carte où elle était. Une carte démarrée depuis la fenêtre est
-`accepted` pour la session : la pré-analyse ne l'arrête plus. Elle respecte la limite d'En cours :
-sans place libre, elle attend dans File d'attente.
+première carte retenue (`stores/task-readiness-store.ts`) et, s'il y en a plusieurs, combien
+attendent. Elle commence par **ce que l'agent lira** (la description, ou « rien de plus que le
+titre » quand elle ne fait que le répéter, `cardBody`) : la personne voit que son texte est lu.
+
+Les questions sont numérotées, chacune avec un champ **vide**. La suggestion du modèle est une
+pastille « Suggestion : … » qui remplit le champ d'un clic ; elle n'est jamais écrite d'office.
+Avant le 28 novembre 2026, les champs étaient préremplis avec elle et le modèle y mettait souvent un
+indice (« Décrire le comportement attendu… ») : il ressemblait à un texte d'exemple et partait tel
+quel dans la description. Le prompt demande désormais une réponse probable, jamais une consigne.
+
+« Préciser et démarrer » (ou Ctrl+Entrée), actif dès une réponse, ajoute les réponses à la fin de
+la description (section « Précisions avant le démarrage ») puis démarre ; « Démarrer sans
+préciser » démarre sans rien ajouter ; « Plus tard » laisse la carte où elle était. Une carte
+démarrée depuis la fenêtre est `accepted` pour la session : la pré-analyse ne l'arrête plus. Elle
+respecte la limite d'En cours : sans place libre, elle attend dans File d'attente.
+
+La description complétée est écrite partout où elle se lit, `requirements.json` compris
+(`TASK_UPDATE`, `crud-handlers.ts`) : c'est là que le pipeline de spec relit la tâche. Une
+description modifiée seule, sans métadonnées (éditeur de la fiche, cette fenêtre), n'y était pas
+écrite, et l'agent planifiait sur le texte de création de la carte.
 
 Pendant la revue d'une carte courte, un toast dit « Pré-analyse de « … » ».
 
