@@ -1,0 +1,95 @@
+From ca721774735a4f95dd5e249e6f8f3123af85307e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 28 Nov 2026 15:22:22 +0000
+Subject: [PATCH] docs(wiki): release 1.6.1 (What's new, Roadmap: plan and
+ propose a sprint, dates in the app's language)
+
+---
+ Home.md       |  8 +++++---
+ Roadmap.fr.md | 27 ++++++++++++++++++++++++++-
+ Roadmap.md    | 10 +++++++++-
+ 3 files changed, 40 insertions(+), 5 deletions(-)
+
+diff --git a/Home.md b/Home.md
+index dd3cd0b..62fde60 100644
+--- a/Home.md
++++ b/Home.md
+@@ -6,11 +6,13 @@
+ 
+ ---
+ 
+-## 🆕 What's new in 1.6.0 / Nouveautés de la 1.6.0
++## 🆕 What's new in 1.6.1 / Nouveautés de la 1.6.1
+ 
+-The Kanban becomes an agile board: Failed and Abandoned columns, sprints, swimlanes, list and timeline views, reports, labels and quick filters, cards coloured by type, quick add, right-click menus and multi-select, and a board you can ask questions in any language. Each AI provider and each forge takes several accounts (a default, a monthly budget, one pinned per project or card, failover to the same provider's other accounts first); OpenRouter, Hugging Face and Bitbucket Cloud join the list. The app now decides where a task's long test suites run (here, on the forge's CI or on the server), pull requests get approval tiers N0 to N3, code mode lets agents run one script instead of many calls, and a task can run in its own microVM. The team server measures usage within the GDPR, sends a daily report and enforces monthly token budgets, and the mobile app is redesigned. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
++A sprint's **Plan** view shows its capacity against the velocity of the last sprints and moves tasks by drag and drop or the keyboard, with undo, quick backlog filters and « Estimate ». **Propose the sprint** fills it up to its capacity: rules rank the backlog and add what a task waits on first, the selected provider's model picks among the best and gives a reason per task (rules alone without a model), with variants, a suggested goal and one undoable « Add N tasks ». Dates, times and date pickers now follow the app's language on the desktop and the phone, a task's microVM stays closed to its allowlist, and the release builds run on a Node.js REA accepts. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
+ 
+-Un Kanban agile qu'on interroge, plusieurs comptes par IA et par forge, et des suites longues placées là où elles tiennent.
++Planifier et proposer un sprint avec l'IA, et des dates dans la langue de l'app.
++
++Before that, **1.6.0** made the Kanban an agile board you can ask questions, with several accounts per AI provider and per forge: see the [Roadmap](Roadmap).
+ 
+ ---
+ 
+diff --git a/Roadmap.fr.md b/Roadmap.fr.md
+index db52014..34f4f05 100644
+--- a/Roadmap.fr.md
++++ b/Roadmap.fr.md
+@@ -20,7 +20,32 @@ WorkPilot AI vise à devenir le **framework de référence pour le développemen
+ 
+ ## 🧭 Versions récentes
+ 
+-### v1.6.0 — Stable actuelle (28 novembre 2026)
++### v1.6.1 — Stable actuelle (28 novembre 2026)
++
++*Planifier et proposer un sprint avec l'IA, et des dates dans la langue de l'app.* Détail dans le
++[CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
++
++- **Planifier un sprint** : la vue Planifier montre une jauge de capacité en points face à la
++  vélocité des 3 derniers sprints (ou une cible pour un premier sprint) et la disponibilité de
++  l'équipe en % ; les tâches se glissent ou s'envoient au clavier, le dernier déplacement s'annule,
++  le backlog a des filtres rapides (urgentes, bugs, non estimées) et « Estimer », les tâches
++  reportées et en attente sont marquées, et un sprint planifié démarre depuis la vue
++- **Proposer le sprint** : depuis le bandeau du sprint, la vue Planifier ou un nouveau sprint, on
++  règle l'objectif, la capacité et l'intention (Équilibré, Plus prudent, Bugs d'abord, Autour du
++  but) ; des règles classent le backlog et ajoutent d'abord ce qu'une tâche attend, le modèle du
++  provider choisi compose le sprint avec une raison par tâche, les meilleures qui n'y tiennent pas
++  restent sous la ligne de capacité, avec des variantes et un objectif proposé, puis « Ajouter
++  N tâches », annulable ; sans modèle, les règles proposent seules
++- **Le sprint en cours au-dessus du Kanban** : dates, jours restants, avancement, ses tâches seules,
++  le planifier, le démarrer ou le terminer
++- **Des dates dans la langue de l'app** : 28/11/2026 et 14:30 en français, 11/28/2026 et 02:30 PM en
++  anglais, calendrier qui commence le lundi en français, sur le bureau et le mobile, plus aucune date
++  brute
++- **Corrections** : la microVM Docker d'une tâche n'atteint que l'allowlist de la tâche, une commande
++  arrêtée au délai s'arrête aussi dans la VM, sbx démarre sans les identifiants de l'hôte ; les builds
++  de release demandent un Node.js accepté par le REA épinglé
++
++### v1.6.0 — 28 novembre 2026
+ 
+ *Un Kanban agile qu'on interroge, plusieurs comptes par IA et par forge, et des suites longues placées là où elles tiennent.* Détail dans le
+ [CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
+diff --git a/Roadmap.md b/Roadmap.md
+index 4a13090..d17ca84 100644
+--- a/Roadmap.md
++++ b/Roadmap.md
+@@ -29,7 +29,15 @@ Together, these pieces mean the Roadmap isn't just a planning artifact — it's
+ 
+ ## Recent releases
+ 
+-### v1.6.0 — current stable (November 28, 2026)
++### v1.6.1 — current stable (November 28, 2026)
++
++- **Plan a sprint**: the Plan view shows a capacity gauge in points against the velocity of the last 3 sprints (or a target for a first sprint) and the team's availability in %; tasks move by drag and drop or the keyboard, the last move can be undone, the backlog has quick filters (urgent, bugs, not estimated) and « Estimate », carried-over and waiting tasks are marked, and a planned sprint starts from the view
++- **Propose the sprint**: from the sprint banner, the Plan view or a new sprint, set the goal, the capacity and the intent (Balanced, Safer, Bugs first, Around the goal); rules rank the backlog and add blockers first, the selected provider's model composes the sprint with a reason per task, the best that do not fit are shown under the capacity line, variants and a suggested goal, then one undoable « Add N tasks »; rules propose alone without a model, and the model only reads titles, the start of descriptions, priority, type, points, labels and dependencies
++- **The active sprint above the Kanban**: dates, days left, progress, its tasks only, plan, start or close it
++- **Dates in the app's language**: 28/11/2026 and 14:30 in French, 11/28/2026 and 02:30 PM in English, calendars starting on Monday in French, on the desktop and the phone, no raw dates left
++- **Fixes**: a task's Docker microVM reaches only the task's allowlist, a command stopped at its timeout stops inside the VM, sbx starts without the host's credentials; the release builds ask for a Node.js the pinned REA accepts
++
++### v1.6.0 — November 28, 2026
+ 
+ - **Agile Kanban, as in Jira**: Failed and Abandoned columns with the reason, the Blocked flag, sprints with points, swimlanes, Board / List / Timeline layouts, reports (burndown, velocity, cumulative flow, cycle time, throughput), labels, quick filters, saved views and auto-archive, in local and server mode
+ - **Ask the board** in any language: every related ticket, roadmap item, idea and merged change, ranked by meaning with a local embeddings model first, and « Check an idea » for a planned feature; on the desktop, a team server and the phone
+-- 
+2.43.0
+
