@@ -1657,9 +1657,9 @@ export function isDraftEmpty(draft: TaskDraft | null): boolean {
 // ============================================
 
 /**
- * Check if a task is in human_review but has no completed subtasks.
- * This indicates the task crashed/exited before implementation completed
- * and should be resumed rather than reviewed.
+ * Check if a task is in human_review but has no subtask done (completed or
+ * blocked). This indicates the build stopped before implementing anything and
+ * should be resumed rather than reviewed.
  */
 export function isIncompleteHumanReview(task: Task): boolean {
 	if (task.status !== "human_review") return false;
@@ -1676,13 +1676,15 @@ export function isIncompleteHumanReview(task: Task): boolean {
 	// If no subtasks defined, task hasn't been planned yet (shouldn't be in human_review)
 	if (!task.subtasks || task.subtasks.length === 0) return true;
 
-	// Check if any subtasks are completed
-	const completedSubtasks = task.subtasks.filter(
-		(s) => s.status === "completed",
+	// Done means completed OR blocked, as in getTaskProgress and the backend: a
+	// build whose only subtask the agent marked blocked (a question, a manual
+	// step) is fully handled and waits for review, it did not stop early.
+	const doneSubtasks = task.subtasks.filter((s) =>
+		isSubtaskDone(s.status),
 	).length;
 
-	// If 0 completed subtasks, this task crashed before implementation
-	return completedSubtasks === 0;
+	// No subtask done at all: the build stopped before implementing anything.
+	return doneSubtasks === 0;
 }
 
 /**

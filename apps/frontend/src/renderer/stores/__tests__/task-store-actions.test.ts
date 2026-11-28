@@ -687,6 +687,10 @@ describe("progress and review checks", () => {
 		expect(review({ subtasks: [] })).toBe(true);
 		expect(review({ subtasks: subtasks("pending") })).toBe(true);
 		expect(review({ subtasks: subtasks("pending", "completed") })).toBe(false);
+		// A subtask the agent marked blocked (a question, a manual step) is done:
+		// the build is handled and waits for review, it did not stop early.
+		expect(review({ subtasks: subtasks("blocked") })).toBe(false);
+		expect(review({ subtasks: subtasks("pending", "blocked") })).toBe(false);
 	});
 });
 
