@@ -2,7 +2,8 @@
  * The other accounts of the provider the usage popover shows (OpenAI,
  * Mistral, OpenRouter…), one click from becoming its default: the next task,
  * test or view of that provider runs on it. Claude's accounts keep their own
- * list in the popover (its OAuth profiles, with their usage).
+ * list in the popover (its OAuth profiles, with their usage). Each account
+ * shows what it spent this month (`main/ai-accounts/account-usage.ts`).
  */
 
 import { accountProviderOf } from "@shared/types/ai-accounts";
@@ -10,6 +11,8 @@ import { KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
+import { formatUsd } from "@/components/administration/usage/usage-format";
+import { useAiAccountUsageStore } from "@/stores/ai-account-usage-store";
 import { aiAccountsOf, useAiAccountsStore } from "@/stores/ai-accounts-store";
 
 interface ProviderAccountSwitcherProps {
@@ -29,8 +32,12 @@ export function ProviderAccountSwitcher({ provider }: ProviderAccountSwitcherPro
 	const [switching, setSwitching] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
+	const spend = useAiAccountUsageStore((s) => s.accounts);
+
 	useEffect(() => {
-		if (accountProvider) void useAiAccountsStore.getState().load();
+		if (!accountProvider) return;
+		void useAiAccountsStore.getState().load();
+		void useAiAccountUsageStore.getState().load();
 	}, [accountProvider]);
 
 	if (!accountProvider) return null;
@@ -78,6 +85,14 @@ export function ProviderAccountSwitcher({ provider }: ProviderAccountSwitcherPro
 					>
 						<KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
 						<span className="min-w-0 flex-1 truncate text-xs font-medium">{entry.name}</span>
+						{spend[entry.id] && spend[entry.id].costUsd > 0 && (
+							<span
+								className="text-3xs tabular-nums opacity-80"
+								title={t("settings:aiAccounts.spend.monthShort")}
+							>
+								{formatUsd(spend[entry.id].costUsd)}
+							</span>
+						)}
 						<span
 							className={`rounded-md px-2 py-0.5 text-3xs ${
 								isActive ? "bg-primary-foreground/20" : "bg-primary/10 text-primary"

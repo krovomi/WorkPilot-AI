@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../../shared/i18n";
 import type { AiAccountsSnapshot } from "../../../../shared/types/ai-accounts";
+import { useAiAccountUsageStore } from "../../../stores/ai-account-usage-store";
 import { useAiAccountsStore } from "../../../stores/ai-accounts-store";
 import { ProviderAccountSwitcher } from "../ProviderAccountSwitcher";
 
@@ -71,6 +72,30 @@ describe("ProviderAccountSwitcher", () => {
 		render(<ProviderAccountSwitcher provider="openai" />);
 		fireEvent.click(await screen.findByRole("button", { name: /Perso/ }));
 		expect(await screen.findByRole("alert")).toHaveTextContent("Account not found");
+	});
+
+	it("shows what each account spent this month", async () => {
+		const usage = (key: string, costUsd: number) => ({
+			key,
+			costUsd,
+			inputTokens: 0,
+			outputTokens: 0,
+			sessions: 1,
+			complete: true,
+			budgetUsd: 0,
+			level: "none",
+		});
+		Object.assign(bridge, {
+			getAiAccountUsage: vi.fn(async () => ({
+				success: true,
+				data: { month: "2026-11", accounts: { a1: usage("a1", 3.5), a2: usage("a2", 0) } },
+			})),
+		});
+		render(<ProviderAccountSwitcher provider="openai" />);
+		expect(await screen.findByText("$3.50")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /Client/ })).not.toHaveTextContent("$");
+		delete (bridge as { getAiAccountUsage?: unknown }).getAiAccountUsage;
+		useAiAccountUsageStore.setState({ accounts: {}, month: "", loaded: false });
 	});
 
 	it("shows nothing for Claude, an unknown provider or a single account", async () => {
