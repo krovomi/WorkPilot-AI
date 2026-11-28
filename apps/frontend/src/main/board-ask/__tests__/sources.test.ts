@@ -81,6 +81,8 @@ describe("readProjectJson", () => {
 		expect(readProjectJson(dir, "null.json")).toBeNull();
 		write("big.json", `{"x":"${"a".repeat(MAX_SOURCE_BYTES)}"}`);
 		expect(readProjectJson(dir, "big.json")).toBeNull();
+		mkdirSync(path.join(dir, "folder.json"));
+		expect(readProjectJson(dir, "folder.json")).toBeNull();
 		const outside = mkdtempSync(path.join(tmpdir(), "board-outside-"));
 		try {
 			writeFileSync(path.join(outside, "x.json"), "{}", "utf-8");
