@@ -19,12 +19,21 @@ const stopped = {
 		provider: string;
 		projectId: string;
 		specDirs: string[];
-		pinKey?: string;
-		pinnedAccount?: string;
+		pins?: Record<string, string>;
+		pinKeys: string[];
+		defaultKey?: string;
 	},
 };
 const excluded = { value: [] as string[] };
-type Account = { id: string; provider: string; name: string; hasKey: boolean; createdAt: string };
+type Account = {
+	id: string;
+	provider: string;
+	name: string;
+	hasKey: boolean;
+	createdAt: string;
+	kind?: "key" | "login";
+	signedIn?: boolean;
+};
 const aiAccounts = {
 	accounts: [] as Account[],
 	defaults: {} as Record<string, string>,
@@ -37,6 +46,12 @@ const account = (id: string, provider: string, hasKey = true): Account => ({
 	hasKey,
 	createdAt: "2026-11-28T00:00:00.000Z",
 });
+/** A CLI sign-in account (Copilot, Codex, Gemini CLI): no key, a sign-in folder. */
+const login = (id: string, provider: string, signedIn = true): Account => ({
+	...account(id, provider, false),
+	kind: "login",
+	signedIn,
+});
 
 vi.mock("../../claude-profile-manager", () => ({ getClaudeProfileManager: () => manager }));
 vi.mock("../../services/profile/profile-manager", () => ({
@@ -47,8 +62,6 @@ vi.mock("../../ipc-handlers/task/resume-with-provider", () => ({ resumeTaskWithP
 vi.mock("../../app-logger", () => ({ appLog: { info: vi.fn(), warn: vi.fn() } }));
 vi.mock("../task-phase-provider", () => ({
 	FAILOVER_REQUEST_EVENT: "provider-failover-request",
-	accountPinKey: (provider: string) =>
-		provider === "anthropic" ? "claude" : ["openai", "mistral", "google"].includes(provider) ? provider : undefined,
 	excludedEntries: () => excluded.value,
 	stoppedTask: () => stopped.value,
 }));
@@ -102,7 +115,7 @@ beforeEach(() => {
 	manager.isProfileRateLimited.mockReturnValue({ limited: false });
 	profilesFile.profiles = [{ id: "mistral", baseUrl: "https://api.mistral.ai/v1", apiKey: "k" }];
 	profilesFile.activeProfileId = null;
-	stopped.value = { provider: "anthropic", projectId: "p1", specDirs: [specDir] };
+	stopped.value = { provider: "anthropic", projectId: "p1", specDirs: [specDir], pinKeys: ["claude"] };
 	excluded.value = [];
 	aiAccounts.accounts = [];
 	aiAccounts.defaults = {};
@@ -156,27 +169,53 @@ describe("buildFailoverChain", () => {
 			["account-m1", "mistral"],
 		]);
 	});
+
+	it("runs a Codex sign-in on OpenAI and the other CLI accounts on their own provider", () => {
+		const chain = buildFailoverChain(
+			[],
+			[],
+			[],
+			[login("c1", "codex"), login("g1", "copilot"), login("gc", "gemini-cli")] as never,
+		);
+		expect(chain.map((c) => [c.id, c.provider])).toEqual([
+			["account-c1", "openai"],
+			["account-g1", "copilot"],
+			["account-gc", "gemini-cli"],
+		]);
+	});
 });
 
 describe("offClaudeEntry", () => {
-	const accounts = [account("o1", "openai"), account("o2", "openai"), account("m1", "mistral")] as never;
+	const accounts = [
+		account("o1", "openai"),
+		account("o2", "openai"),
+		account("m1", "mistral"),
+		login("c1", "codex"),
+		login("c2", "codex"),
+	] as never;
+	const openai = { provider: "openai", pinKeys: ["openai", "codex"], defaultKey: "openai" };
 
 	it("is the pinned account, else the provider's default, else the provider", () => {
-		expect(offClaudeEntry({ provider: "openai", pinKey: "openai", pinnedAccount: "o2" }, accounts, { openai: "o1" })).toBe(
-			"account-o2",
-		);
-		expect(offClaudeEntry({ provider: "openai", pinKey: "openai" }, accounts, { openai: "o1" })).toBe("account-o1");
-		expect(offClaudeEntry({ provider: "openai", pinKey: "openai" }, accounts, {})).toBe("provider-openai");
-		expect(offClaudeEntry({ provider: "copilot" }, accounts, {})).toBe("provider-copilot");
+		expect(offClaudeEntry({ ...openai, pins: { openai: "o2" } }, accounts, { openai: "o1" })).toBe("account-o2");
+		expect(offClaudeEntry(openai, accounts, { openai: "o1" })).toBe("account-o1");
+		expect(offClaudeEntry(openai, accounts, {})).toBe("provider-openai");
+		expect(offClaudeEntry({ provider: "ollama", pinKeys: [] }, accounts, {})).toBe("provider-ollama");
+	});
+
+	it("takes an API key pin before a CLI sign-in pin, as the task's environment does", () => {
+		expect(offClaudeEntry({ ...openai, pins: { openai: "o2", codex: "c1" } }, accounts, {})).toBe("account-o2");
+		expect(offClaudeEntry({ ...openai, pins: { codex: "c2" } }, accounts, { openai: "o1" })).toBe("account-c2");
+	});
+
+	it("is the Codex default for OpenAI in its Codex mode", () => {
+		const codexMode = { ...openai, defaultKey: "codex" };
+		expect(offClaudeEntry(codexMode, accounts, { openai: "o1", codex: "c1" })).toBe("account-c1");
 	});
 
 	it("ignores a pin or a default that names another provider's account, or none", () => {
-		expect(offClaudeEntry({ provider: "openai", pinKey: "openai", pinnedAccount: "m1" }, accounts, { openai: "m1" })).toBe(
-			"provider-openai",
-		);
-		expect(offClaudeEntry({ provider: "openai", pinKey: "openai", pinnedAccount: "gone" }, accounts, {})).toBe(
-			"provider-openai",
-		);
+		expect(offClaudeEntry({ ...openai, pins: { openai: "m1" } }, accounts, { openai: "m1" })).toBe("provider-openai");
+		expect(offClaudeEntry({ ...openai, pins: { openai: "gone" } }, accounts, {})).toBe("provider-openai");
+		expect(offClaudeEntry({ ...openai, pins: { codex: "o1" } }, accounts, {})).toBe("provider-openai");
 	});
 });
 
@@ -185,8 +224,9 @@ describe("failTaskOver across the accounts of one provider", () => {
 		provider: "openai",
 		projectId: "p1",
 		specDirs: [specDir],
-		pinKey: "openai",
-		pinnedAccount,
+		pins: pinnedAccount ? { openai: pinnedAccount } : undefined,
+		pinKeys: ["openai", "codex"],
+		defaultKey: "openai",
 	});
 
 	beforeEach(() => {
@@ -252,7 +292,13 @@ describe("failTaskOver across the accounts of one provider", () => {
 	});
 
 	it("starts from the Claude profile pinned on a Claude task", async () => {
-		stopped.value = { provider: "anthropic", projectId: "p1", specDirs: [], pinKey: "claude", pinnedAccount: "work" };
+		stopped.value = {
+			provider: "anthropic",
+			projectId: "p1",
+			specDirs: [],
+			pins: { claude: "work" },
+			pinKeys: ["claude"],
+		};
 		manager.getAccountPriorityOrder.mockReturnValue(["oauth-perso", "oauth-work"]);
 		expect((await failTaskOver(agent().emitter, "t1", "rate_limit", "p1", NOW))?.id).toBe("oauth-perso");
 	});
@@ -261,6 +307,63 @@ describe("failTaskOver across the accounts of one provider", () => {
 		aiAccounts.broken = true;
 		manager.getAccountPriorityOrder.mockReturnValue(["account-o2", "provider-mistral"]);
 		expect((await failTaskOver(agent().emitter, "t1", "rate_limit", "p1", NOW))?.id).toBe("provider-mistral");
+	});
+});
+
+describe("failTaskOver across CLI sign-in accounts", () => {
+	beforeEach(() => {
+		aiAccounts.accounts = [
+			login("g1", "copilot"),
+			login("g2", "copilot", false),
+			login("g3", "copilot"),
+			account("o1", "openai"),
+			login("c1", "codex"),
+		];
+		aiAccounts.defaults = { copilot: "g1", openai: "o1", codex: "c1" };
+	});
+
+	it("moves a Copilot task to the next signed-in GitHub account and pins it", async () => {
+		stopped.value = { provider: "copilot", projectId: "p1", specDirs: [], pinKeys: ["copilot"], defaultKey: "copilot" };
+		manager.getAccountPriorityOrder.mockReturnValue(["account-g1", "account-g2", "account-g3"]);
+		const { emitter, logs } = agent();
+		expect((await failTaskOver(emitter, "t1", "rate_limit", "p1", NOW))?.id).toBe("account-g3");
+		expect(resume).toHaveBeenCalledWith(emitter, "t1", "copilot", {
+			keepClaudeSession: false,
+			accountPin: { key: "copilot", id: "g3" },
+		});
+		expect(isCoolingDown("account-g1", NOW + 1000)).toBe(true);
+		expect(logs.join("")).toContain("copilot → copilot (G3)");
+	});
+
+	it("moves an OpenAI key task to a Codex sign-in, pinned under codex", async () => {
+		stopped.value = {
+			provider: "openai",
+			projectId: "p1",
+			specDirs: [],
+			pinKeys: ["openai", "codex"],
+			defaultKey: "openai",
+		};
+		manager.getAccountPriorityOrder.mockReturnValue(["account-o1", "account-c1"]);
+		expect((await failTaskOver(agent().emitter, "t1", "auth_failure", "p1", NOW))?.id).toBe("account-c1");
+		expect(resume).toHaveBeenCalledWith(expect.anything(), "t1", "openai", {
+			keepClaudeSession: false,
+			accountPin: { key: "codex", id: "c1" },
+		});
+	});
+
+	it("skips a CLI account that is not signed in", async () => {
+		stopped.value = {
+			provider: "copilot",
+			projectId: "p1",
+			specDirs: [],
+			pins: { copilot: "g3" },
+			pinKeys: ["copilot"],
+			defaultKey: "copilot",
+		};
+		manager.hasValidAuth.mockReturnValue(false);
+		manager.getAccountPriorityOrder.mockReturnValue(["account-g3", "account-g2"]);
+		aiAccounts.accounts = [login("g2", "copilot", false), login("g3", "copilot")];
+		expect(await failTaskOver(agent().emitter, "t1", "rate_limit", "p1", NOW)).toBeNull();
 	});
 });
 
@@ -296,7 +399,7 @@ describe("failTaskOver", () => {
 	});
 
 	it("moves a task off another provider, skipping unusable accounts", async () => {
-		stopped.value = { provider: "copilot", projectId: "p1", specDirs: [] };
+		stopped.value = { provider: "copilot", projectId: "p1", specDirs: [], pinKeys: ["copilot"] };
 		manager.hasValidAuth.mockImplementation((id: string) => id !== "perso");
 		manager.isProfileRateLimited.mockReturnValue({ limited: true });
 		profilesFile.profiles = [{ id: "mistral", baseUrl: "https://api.mistral.ai/v1" }];
@@ -328,7 +431,7 @@ describe("failTaskOver", () => {
 
 		stopped.value = null;
 		expect(await failTaskOver(agent().emitter, "t1", "rate_limit", undefined, NOW)).toBeNull();
-		stopped.value = { provider: "anthropic", projectId: "p1", specDirs: [] };
+		stopped.value = { provider: "anthropic", projectId: "p1", specDirs: [], pinKeys: ["claude"] };
 
 		expect((await failTaskOver(agent().emitter, "t1", "rate_limit", undefined, NOW))?.id).toBe("oauth-work");
 		expect(await failTaskOver(agent().emitter, "t1", "rate_limit", undefined, NOW + 1000)).toBeNull();

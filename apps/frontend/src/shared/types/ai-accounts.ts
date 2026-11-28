@@ -68,6 +68,14 @@ export function loginProviderOf(provider: string | undefined | null): string | u
 	return provider ? LOGIN_PROVIDER_OF_CARD[provider.trim().toLowerCase()] : undefined;
 }
 
+/** The task engine a sign-in account runs: Codex CLI's is OpenAI in its Codex mode. */
+const ENGINE_OF_LOGIN_PROVIDER: Readonly<Record<string, string>> = { codex: "openai" };
+
+/** The provider a task runs on with an account of `accountProvider`. */
+export function engineProviderOfAccount(accountProvider: string): string {
+	return ENGINE_OF_LOGIN_PROVIDER[accountProvider] ?? accountProvider;
+}
+
 /** Aliases a task or a page may name for a provider of `AI_ACCOUNT_PROVIDERS`. */
 const ACCOUNT_PROVIDER_ALIASES: Readonly<Record<string, string>> = {
 	gemini: "google",
@@ -110,6 +118,11 @@ export interface AiAccountView {
 	createdAt: string;
 	/** When the key got its current value. */
 	keySetAt?: string;
+}
+
+/** Whether a task can run on `account` now: a key to send, or a CLI signed in. */
+export function isAccountUsable(account: AiAccountView): boolean {
+	return account.kind === "login" ? account.signedIn === true : account.hasKey;
 }
 
 /** The accounts and, per provider, the id of its default account. */

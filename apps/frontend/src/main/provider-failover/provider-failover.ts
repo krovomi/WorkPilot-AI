@@ -24,7 +24,12 @@ import { rmSync } from "node:fs";
 import path from "node:path";
 import { getProvider as getRegistryProvider } from "../../shared/services/providerRegistry";
 import type { ClaudeProfile } from "../../shared/types/agent";
-import type { AiAccountView } from "../../shared/types/ai-accounts";
+import {
+	type AiAccountView,
+	CLAUDE_ACCOUNT_PROVIDER,
+	engineProviderOfAccount,
+	isAccountUsable,
+} from "../../shared/types/ai-accounts";
 import type { APIProfile } from "../../shared/types/profile";
 import {
 	apiProfileProvider,
@@ -34,9 +39,7 @@ import {
 	parseFailoverEntry,
 	pickNextFailover,
 } from "../../shared/utils/failover-chain";
-import {
-	isClaudeProvider,
-} from "../../shared/utils/task-engine";
+import { isClaudeProvider } from "../../shared/utils/task-engine";
 import type { AgentManager } from "../agent/agent-manager";
 import { aiAccountStore } from "../ai-accounts/ai-accounts";
 import type { ExecutionProgressData } from "../agent/types";
@@ -45,7 +48,6 @@ import { getClaudeProfileManager } from "../claude-profile-manager";
 import { resumeTaskWithProvider } from "../ipc-handlers/task/resume-with-provider";
 import { loadProfilesFile, setActiveAPIProfile } from "../services/profile/profile-manager";
 import {
-	accountPinKey,
 	excludedEntries,
 	FAILOVER_REQUEST_EVENT,
 	type FailoverReason,
@@ -140,7 +142,7 @@ export function buildFailoverChain(
 		if (!entry) continue;
 		if (entry.kind === "account") {
 			const account = aiAccounts.find((a) => a.id === entry.key);
-			if (account) chain.push({ ...entry, provider: account.provider });
+			if (account) chain.push({ ...entry, provider: engineProviderOfAccount(account.provider) });
 		} else if (entry.kind === "oauth") {
 			if (claudeProfiles.some((p) => p.id === entry.key)) {
 				chain.push({ ...entry, provider: "anthropic" });
@@ -171,19 +173,22 @@ function readAiAccounts(): { accounts: AiAccountView[]; defaults: Record<string,
 }
 
 /**
- * The entry a task off Claude ran on: its pinned account, else its
- * provider's default account, else the provider itself (its main key, a CLI).
+ * The entry a task off Claude ran on: its pinned account (an API key first,
+ * then a CLI sign-in, as its environment applies them), else the default
+ * account its provider runs on, else the provider itself (its main key, a CLI
+ * signed in outside WorkPilot).
  */
 export function offClaudeEntry(
-	stopped: Pick<StoppedTask, "provider" | "pinKey" | "pinnedAccount">,
+	stopped: Pick<StoppedTask, "provider" | "pins" | "pinKeys" | "defaultKey">,
 	accounts: readonly AiAccountView[],
 	defaults: Readonly<Record<string, string>>,
 ): string {
-	const own = (id: string | undefined) =>
-		id !== undefined && accounts.some((a) => a.id === id && a.provider === stopped.pinKey);
-	if (own(stopped.pinnedAccount)) return failoverEntryId("account", stopped.pinnedAccount as string);
-	const fallback = stopped.pinKey ? defaults[stopped.pinKey] : undefined;
-	if (own(fallback)) return failoverEntryId("account", fallback as string);
+	const owned = (key: string | undefined, id: string | undefined) =>
+		key !== undefined && id !== undefined && accounts.some((a) => a.id === id && a.provider === key);
+	const pinned = stopped.pinKeys.find((key) => owned(key, stopped.pins?.[key]));
+	if (pinned) return failoverEntryId("account", stopped.pins?.[pinned] as string);
+	const key = stopped.defaultKey;
+	if (key && owned(key, defaults[key])) return failoverEntryId("account", defaults[key]);
 	return failoverEntryId("provider", stopped.provider);
 }
 
@@ -232,10 +237,9 @@ export async function failTaskOver(
 			accounts,
 		);
 		const onClaude = isClaudeProvider(stopped.provider);
+		const claudePin = stopped.pins?.[CLAUDE_ACCOUNT_PROVIDER];
 		const pinnedClaude =
-			onClaude && claudeProfiles.some((p) => p.id === stopped.pinnedAccount)
-				? stopped.pinnedAccount
-				: undefined;
+			onClaude && claudeProfiles.some((p) => p.id === claudePin) ? claudePin : undefined;
 		const currentEntryId = !onClaude
 			? offClaudeEntry(stopped, accounts, defaults)
 			: profilesFile.activeProfileId
@@ -256,7 +260,8 @@ export async function failTaskOver(
 			isUsable: (candidate) => {
 				if (isCoolingDown(candidate.id, now)) return false;
 				if (candidate.kind === "account") {
-					return accounts.some((a) => a.id === candidate.key && a.hasKey);
+					const account = accounts.find((a) => a.id === candidate.key);
+					return account !== undefined && isAccountUsable(account);
 				}
 				if (candidate.kind === "oauth") {
 					return (
@@ -293,11 +298,15 @@ export async function failTaskOver(
 		state.moves += 1;
 		state.lastAt = now;
 		// The account this task, and only this task, runs on from now on.
-		const pinKey = accountPinKey(target.provider);
-		const accountPin =
-			pinKey && (target.kind === "account" || target.kind === "oauth")
-				? { key: pinKey, id: target.key }
-				: undefined;
+		// An account is pinned under its own provider (`codex` for a Codex
+		// sign-in running OpenAI), a Claude profile under `claude`.
+		const pinKey =
+			target.kind === "account"
+				? accounts.find((a) => a.id === target.key)?.provider
+				: target.kind === "oauth"
+					? CLAUDE_ACCOUNT_PROVIDER
+					: undefined;
+		const accountPin = pinKey ? { key: pinKey, id: target.key } : undefined;
 		const result = await resumeTaskWithProvider(agentManager, taskId, target.provider, {
 			keepClaudeSession: false,
 			accountPin,
