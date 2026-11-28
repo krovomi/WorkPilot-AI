@@ -39,7 +39,7 @@ async function open(user: ReturnType<typeof userEvent.setup>, trigger: HTMLEleme
 
 describe("SyncFromBranchDialog", () => {
 	it("says it is loading, then syncs from the remote branch picked", async () => {
-		let answer: (value: unknown) => void = () => {};
+		let answer: ((value: unknown) => void) | undefined;
 		api.getGitBranches.mockReturnValue(new Promise((resolve) => (answer = resolve)));
 		api.syncWorktreeFromBranch.mockResolvedValue({
 			success: true,
@@ -47,7 +47,7 @@ describe("SyncFromBranchDialog", () => {
 		});
 		const trigger = renderDialog();
 		expect(trigger).toHaveTextContent("Loading branches...");
-		answer({ success: true, data: ["main", "origin/main"] });
+		answer?.({ success: true, data: ["main", "origin/main"] });
 		await waitFor(() => expect(trigger).toHaveTextContent("Select a branch..."));
 
 		const user = userEvent.setup();
