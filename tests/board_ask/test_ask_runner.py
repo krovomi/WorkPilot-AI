@@ -100,3 +100,23 @@ def test_the_server_starts_it_as_a_script(tmp_path):
         "mode": "keywords",
         "searched": 0,
     }
+
+
+def test_a_provider_that_refuses_leaves_the_keyword_answer(
+    tmp_path, monkeypatch, capsys
+):
+    """No OAuth token on the server: the phone still gets the matching cards."""
+    clone = _clone(tmp_path / "clone")
+
+    async def refused(prompt, *, system_prompt, project_dir, max_turns):
+        raise ValueError("No OAuth token found.")
+
+    import core.oneshot
+
+    monkeypatch.setattr(core.oneshot, "oneshot_completion", refused)
+    assert runner.main(["--project-dir", str(clone), "--question=admin page"]) == 0
+    out = capsys.readouterr().out.strip().splitlines()
+    assert "no answer from the model (ValueError)" in out[0]
+    result = json.loads(out[-1][len(runner.MARKER) :])
+    assert result["mode"] == "keywords"
+    assert [m["taskId"] for m in result["matches"]] == ["001-admin"]

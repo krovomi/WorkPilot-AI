@@ -15,7 +15,9 @@ organizations: in the first, Alice (its administrator, who registers the
 projects) and Bob (a member of each); in the second, Carol. "Team Board" is
 cloned from a local repository; "Team Site" from GitHub and "Team Docs" from
 GitLab, both served by the fake forges of ``fake_forge.py``, whose address
-(``forgeUrl``) gives the spec what they were asked. Their
+(``forgeUrl``) gives the spec what they were asked. "Team App" is cloned from
+the local repository too, its board filled before anyone signs in
+(``world_cards.py``: a card whose captures wait for review, cards to ask about). Their
 passwords stay with the spec that drew them; the platform administrator's is
 drawn here, and neither is ever written out.
 
@@ -39,6 +41,7 @@ from cryptography.fernet import Fernet
 from tests.server_e2e import stack as e2e
 from tests.server_e2e.fake_backend.fake_agent import RELEASE_FILE, REPORT_FILE
 from tests.server_e2e.fake_forge import GITHUB_CLONE_URL, GITLAB_CLONE_URL, FakeForge
+from tests.server_e2e.world_cards import seed_app_cards
 
 PROJECT_NAME = "Team Board"
 #: The same team's projects on GitHub and on GitLab, served by the fake forges
@@ -46,6 +49,10 @@ PROJECT_NAME = "Team Board"
 #: server's relay with each person's own token.
 GITHUB_PROJECT = "Team Site"
 GITLAB_PROJECT = "Team Docs"
+#: A project whose board the world fills before the apps sign in
+#: (``world_cards.py``): a card whose pull request's captures wait for the
+#: team's review, and cards for « Interroger le tableau » to find.
+APP_PROJECT = "Team App"
 
 #: A guide that cites a function the code does not have: the documentation
 #: drift the team's analysis finds (``docs-drift`` scenario of the app's spec).
@@ -87,6 +94,7 @@ def _seed(
         (PROJECT_NAME, repo_url),
         (GITHUB_PROJECT, GITHUB_CLONE_URL),
         (GITLAB_PROJECT, GITLAB_CLONE_URL),
+        (APP_PROJECT, repo_url),
     ):
         project = st.ok(
             alice, "POST", "/projects", json={"name": name, "repo_url": url}
@@ -177,12 +185,18 @@ def main() -> int:
             st = e2e.Stack(env, root)
             try:
                 st.start()
-                _seed(st, people, run, origin)
+                projects = _seed(st, people, run, origin)
+                cards = seed_app_cards(
+                    st, people["alice"], projects[APP_PROJECT], root / "repos"
+                )
                 world = {
                     "serverUrl": st.base_url,
                     "project": PROJECT_NAME,
                     "githubProject": GITHUB_PROJECT,
                     "gitlabProject": GITLAB_PROJECT,
+                    "appProject": APP_PROJECT,
+                    # Titles of the cards seeded on its board (``world_cards``).
+                    "appCards": cards,
                     # What the fake forges were asked (``GET /calls``).
                     "forgeUrl": forges.url,
                     "emails": {key: people[key].email for key in PEOPLE},

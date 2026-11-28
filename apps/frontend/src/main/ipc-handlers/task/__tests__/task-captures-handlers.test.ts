@@ -5,7 +5,8 @@
  * folder, a published copy served only when the publication lists it, and
  * the runner (a stand-in Node script here) started with arguments main
  * builds itself; an action outside the closed list, a server card or a task
- * without captures never starts it.
+ * without captures never starts it. A server card's copy comes from the
+ * server, named by its place in the publication.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -18,6 +19,8 @@ const state = vi.hoisted(() => ({
 	root: "",
 	project: {} as Record<string, unknown>,
 	tasks: [] as Array<Record<string, unknown>>,
+	serverAnswer: { ok: false, error: "unset" } as { ok: boolean; data?: unknown; error?: string },
+	serverCalls: [] as string[],
 }));
 
 vi.mock("../../../cli-tool-manager", () => ({ getToolPath: (name: string) => name }));
@@ -35,6 +38,22 @@ vi.mock("../../../updater/path-resolver", () => ({
 	getEffectiveSourcePath: () => path.join(state.base, "backend"),
 }));
 vi.mock("../../../app-language", () => ({ getAppLanguage: () => "en" }));
+// A server card ("srv:<project>:<card>" here) and the server's answer.
+vi.mock("../../../server-board-actions", () => ({
+	findServerCard: (taskId: string) => {
+		const [, projectId, cardId] = taskId.split(":");
+		// Its mirror is the test's folder; the card's folder is named by its id.
+		return projectId
+			? { project: { id: projectId, path: state.root, autoBuildPath: ".workpilot" }, cardId }
+			: null;
+	},
+}));
+vi.mock("../../../server-connection", () => ({
+	authedFetch: async (url: string) => {
+		state.serverCalls.push(url);
+		return state.serverAnswer;
+	},
+}));
 
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../../shared/constants";
@@ -142,6 +161,51 @@ describe("TASK_CAPTURES_IMAGE", () => {
 				error: "not-listed",
 			});
 		}
+	});
+});
+
+describe("TASK_CAPTURES_IMAGE of a server card", () => {
+	// Not in the project store: the server card is found by its id alone.
+	const CARD = `srv:proj-9:${SPEC}`;
+	beforeEach(() => {
+		state.tasks = [];
+		state.serverCalls = [];
+	});
+
+	it("asks the server for the copy by its place, never by its file", async () => {
+		writePublication();
+		// The mirror has no image: only the server's answer is shown.
+		rmSync(path.join(specDir(), "captures", "published"), { recursive: true });
+		state.serverAnswer = { ok: true, data: { mimeType: "image/png", data: PNG.toString("base64") } };
+		const ok = await invoke(
+			IPC_CHANNELS.TASK_CAPTURES_IMAGE,
+			CARD,
+			"captures/published/task/web--orders.png",
+		);
+		expect(ok).toEqual({ success: true, data: { base64: PNG.toString("base64"), mimeType: "image/png" } });
+		expect(state.serverCalls).toEqual([`/api/board/cards/${SPEC}/captures/0/after?project_id=proj-9`]);
+	});
+
+	it("passes on the server's refusal, and asks nothing for a file the publication does not list", async () => {
+		writePublication();
+		state.serverAnswer = { ok: false, error: "Capture not found" };
+		expect(
+			await invoke(IPC_CHANNELS.TASK_CAPTURES_IMAGE, CARD, "captures/published/task/web--orders.png"),
+		).toEqual({ success: false, error: "Capture not found" });
+		expect(
+			await invoke(IPC_CHANNELS.TASK_CAPTURES_IMAGE, CARD, "captures/published/task/other.png"),
+		).toEqual({ success: false, error: "not-listed" });
+		expect(state.serverCalls).toHaveLength(1);
+	});
+
+	it("reads its summary from the mirror, and never runs the local runner for it", async () => {
+		writePublication();
+		expect((await invoke(IPC_CHANNELS.TASK_CAPTURES_GET, CARD)).data).toMatchObject({ publish: "review" });
+		expect(await invoke(IPC_CHANNELS.TASK_CAPTURES_ACTION, CARD, "approve")).toEqual({
+			success: false,
+			error: "server-project",
+		});
+		expect(() => call()).toThrow();
 	});
 });
 

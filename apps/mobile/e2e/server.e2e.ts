@@ -20,7 +20,11 @@
  * approved from the phone, built (the fake agent checks the approval as a
  * build does and commits in the card's workspace), reviewed with its changes
  * and sent back to a build that runs; a person shows their name on the
- * team's leaderboard, a choice the server keeps, and finds their replay links; a built card's changed file opens full screen, and the project memory's trash reads from the server; an admin reads the organization's overview, sets and lifts a quota (kept by the server and written to the audit log) and sees who is signed in. The browser cannot set headers on a WebSocket, so on the web the
+ * team's leaderboard, a choice the server keeps, and finds their replay links; a built card's changed file opens full screen, and the project memory's trash reads from the server; an admin reads the organization's overview, sets and lifts a quota (kept by the server and written to the audit log) and sees who is signed in; a
+ * question to the board is answered by a job on the server, by the cards'
+ * words when no model is set up there; a card's captures for its pull request
+ * are drawn from the published copies the server sends, then published and
+ * withdrawn by a reviewer, which the audit log records. The browser cannot set headers on a WebSocket, so on the web the
  * board follows by its periodic read; the header handshake is the native
  * app's (unit-tested in `src/__tests__`).
  *
@@ -49,6 +53,9 @@ interface World {
 	/** The team's projects on the fake GitHub and GitLab (`fake_forge.py`). */
 	githubProject: string;
 	gitlabProject: string;
+	/** A project whose board the world filled (`tests/server_e2e/world_cards.py`), its cards by purpose. */
+	appProject: string;
+	appCards: { captures: string; emails: string; invoice: string };
 	/** Where the fake forges say what they were asked (`GET /calls`). */
 	forgeUrl: string;
 	emails: Record<Who, string>;
@@ -719,4 +726,60 @@ test("Alice reads the organization's overview, lifts a quota she set, and finds 
 	await expect(alice.getByText(`${world.emails.alice} (you)`)).toBeVisible({ timeout: 30_000 });
 	await expect(alice.getByText(world.emails.bob, { exact: true })).toBeVisible();
 	await expect(alice.getByRole("button", { name: "Sign out everywhere" }).first()).toBeVisible();
+});
+
+test("Bob asks the board from the phone: the server answers by the cards' words, without a model", async () => {
+	const { emails, invoice } = world.appCards;
+	const bob = signedInPage("bob");
+	await openProject(bob, world.appProject);
+	await morePage(bob, "Ask the board");
+	await bob.getByLabel("Your question").fill("onboarding emails in French");
+	await bob.getByRole("button", { name: "Ask", exact: true }).click();
+	// A job on the server: the project has no model to ask, so the board answers by its words.
+	await expect(bob.getByText("No model answered: these tickets share words with the question.")).toBeVisible({
+		timeout: 90_000,
+	});
+	await expect(bob.getByText("3 tickets searched")).toBeVisible();
+	const match = bob.getByRole("button", { name: new RegExp(`^${emails}`) });
+	await expect(match).toBeVisible();
+	await expect(bob.getByRole("button", { name: new RegExp(`^${invoice}`) })).toHaveCount(0);
+	await shot(bob, "28-ask");
+	// A cited card opens.
+	await match.click();
+	await expect(bob.getByRole("heading", { name: emails })).toBeVisible({ timeout: 30_000 });
+});
+
+test("Alice reviews a card's captures from the phone, publishes then withdraws them, and the audit log has both", async () => {
+	const { captures } = world.appCards;
+	const alice = signedInPage("alice");
+	await openProject(alice, world.appProject);
+	await alice.getByRole("button", { name: captures }).first().click({ timeout: 30_000 });
+	await expect(alice.getByRole("heading", { name: captures })).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText("2 screens · 1 kept on the task")).toBeVisible({ timeout: 30_000 });
+	await alice.getByRole("button", { name: "See the captures" }).click();
+	await expect(alice.getByText("Waiting for a reviewer to publish them.").filter({ visible: true })).toBeVisible({ timeout: 30_000 });
+	// The two published copies of "Settings", each sent by the server; "Profile" is held back.
+	for (const side of ["Before", "After"]) {
+		await expect(alice.getByRole("img", { name: `Capture, ${side}`, exact: true }).first()).toBeVisible({
+			timeout: 30_000,
+		});
+	}
+	await expect(alice.getByRole("img", { name: /^Capture, / })).toHaveCount(2);
+	await shot(alice, "29-captures");
+
+	await alice.getByRole("button", { name: "Publish in the pull request" }).click();
+	// The card has no pull request yet: the run the server starts finds none to update.
+	await expect(alice.getByText("Ready, shown once the pull request exists.").filter({ visible: true })).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText("The server is updating the pull request.").filter({ visible: true })).toBeVisible();
+	const withdraw = alice.getByRole("button", { name: "Withdraw from the pull request" });
+	await expect(withdraw).toBeVisible();
+	await withdraw.click();
+	await expect(alice.getByText("Waiting for a reviewer to publish them.").filter({ visible: true })).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByRole("button", { name: "Publish in the pull request" })).toBeVisible();
+
+	await openSettings(alice, world.project);
+	await alice.getByRole("button", { name: "Administration", exact: true }).click();
+	await alice.getByRole("link", { name: /^Audit log/ }).click();
+	await expect(alice.getByText("task.captures.published").first()).toBeVisible({ timeout: 30_000 });
+	await expect(alice.getByText("task.captures.withdrawn").first()).toBeVisible();
 });

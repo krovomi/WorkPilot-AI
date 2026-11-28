@@ -59,12 +59,19 @@ def make_complete(project_dir: Path):
     async def complete(prompt: str, system_prompt: str) -> str:
         from core.oneshot import oneshot_completion
 
-        return await oneshot_completion(
-            prompt,
-            system_prompt=system_prompt,
-            project_dir=str(project_dir),
-            max_turns=1,
-        )
+        # A provider without credentials (no OAuth token on the server, no
+        # key) refuses before answering: the board still answers by its
+        # words, as the desktop app does without a model.
+        try:
+            return await oneshot_completion(
+                prompt,
+                system_prompt=system_prompt,
+                project_dir=str(project_dir),
+                max_turns=1,
+            )
+        except (ImportError, OSError, RuntimeError, TypeError, ValueError) as error:
+            print(f"board ask: no answer from the model ({type(error).__name__})")
+            return ""
 
     return complete
 

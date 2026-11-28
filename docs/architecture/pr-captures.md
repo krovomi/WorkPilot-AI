@@ -210,7 +210,9 @@ Sur la carte du Kanban, `Task.captures` (résumé joint par `project-store.ts`, 
 changement de fichier) donne la pastille appareil photo (`task-captures/TaskCapturesBadge.tsx`) :
 le nombre d'écrans et leur état (dans la PR, en attente de « Publier », prêtes, gardées sur la
 tâche, retenues). L'aperçu au survol montre le premier écran. Une carte d'un projet du serveur
-reçoit les deux fichiers JSON dans l'instantané du tableau (`remote-board.ts`), sans image.
+reçoit les deux fichiers JSON dans l'instantané du tableau (`remote-board.ts`), sans image :
+l'onglet demande chaque copie publiée au serveur (`task-captures/server-captures.ts`), par sa place
+dans la liste et son côté, jamais par le fichier que nomme le renderer.
 
 Le choix de la carte (« suivre le projet », « toujours », « jamais ») se règle dans l'onglet et
 part au build en `WORKPILOT_CAPTURES` (`agent/env-utils.ts`, `applyCapturesChoice`). Les clés
@@ -279,5 +281,7 @@ temps, pour le registre RGPD : [pr-captures-data.md](../pr-captures-data.md).
    et `apps/mobile/src/captures/`, le registre [pr-captures-data.md](../pr-captures-data.md), les README.
 
 Tests : `tests/backend/test_shared_board_captures.py` (routes du serveur, refus compris),
-`apps/mobile/src/__tests__/app/card-captures.test.tsx`, `tests/pr_captures/` (dont les scripts de page joués dans un vrai Chromium et la branche
+`apps/mobile/src/__tests__/app/card-captures.test.tsx`, de bout en bout sur un vrai serveur
+`apps/frontend/e2e/server-board.server-e2e.ts` (copies dessinées sur le bureau) et
+`apps/mobile/e2e/server.e2e.ts` (publier, retirer, audit), `tests/pr_captures/` (dont les scripts de page joués dans un vrai Chromium et la branche
 des captures poussée vers un vrai dépôt nu), `tests/test_verify_compare.py`.
