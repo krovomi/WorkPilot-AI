@@ -233,3 +233,5 @@ Tests : `shared/utils/__tests__/board-ask-search.test.ts`,
 `renderer/components/kanban/board-ask/BoardAskPanel.test.tsx`, `IdeaCheckView.test.tsx`,
 `idea-card.test.ts`, `tests/backend/test_shared_board_ask.py`,
 `apps/mobile/src/__tests__/app/board-ask.test.tsx`.
+De bout en bout, dans l'app construite contre un faux serveur Ollama : `apps/frontend/e2e/board-ai.e2e.ts`
+(question, suivi, repli par mots-clés et par le sens, « Vérifier une idée » jusqu'à la carte).
