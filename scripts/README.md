@@ -42,6 +42,7 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 |---|---|---|
 | `changelog.py` | Valide les fragments de `changelog.d/` (`check`), montre les notes de la prochaine version (`preview`), les verse dans `CHANGELOG.md` (`release X.Y.Z "Titre"`). | `pre-push.js`, `tests/test_changelog_fragments.py` ; `release` à la main avant la release |
 | `bump-version.js` | Change la version partout où elle est écrite. | `prepare-release.yml` |
+| `release_notes_cap.py` | Garde les notes d'une release sous la limite de GitHub (125 000 caractères) : une section plus longue garde des entrées entières et finit par un lien vers la section complète de `CHANGELOG.md`. | `release.yml` |
 | `update-readme.py` | Met à jour les badges et liens de téléchargement de `README.md` et `README.fr.md` (tableau dans la langue de chaque fichier). | `release.yml`, `beta-release.yml` |
 | `readme-screenshots/` | Régénère les captures des deux README dans `.github/assets/screenshots/` : `capture-desktop.cjs` (aperçu navigateur du renderer), `capture-mobile.cjs` (bundle web de l'app mobile), avec les données inventées de `demo-data.js` ; sans backend ni compte. Puis `render-showcase.cjs` met ces captures dans un cadre de fenêtre et dessine les deux schémas du README (fonctionnement, architecture), en anglais et en français, en thème clair et sombre, dans `.github/assets/showcase/`. | à la main |
 | `validate-release.js` | Vérifie qu'une release est cohérente avant publication. | `bump-version.js` |
