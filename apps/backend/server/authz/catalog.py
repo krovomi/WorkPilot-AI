@@ -176,6 +176,10 @@ _ALL: tuple[Permission, ...] = (
     _p("settings", "write"),
     _p("settings", "provider.read", privileged=True),
     _p("settings", "provider.write", privileged=True),
+    # A person's own AI accounts (``/users/me/ai-accounts``): their keys,
+    # used by their own runs only, never the deployment's.
+    _p("settings", "account.read"),
+    _p("settings", "account.write"),
     # -- marketplace -------------------------------------------------------
     _p("marketplace", "read"),
     # A review of a catalogue server shared within the organization (#369
