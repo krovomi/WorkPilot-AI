@@ -31,6 +31,7 @@ from server.authz.groups import project_group_names
 from server.config import get_settings
 from server.db.engine import get_session_factory
 from server.db.models import AgentRun, SpecIndex, User
+from server.services import ai_accounts
 from server.services.events import emit_board_event
 from server.services.needs_you import notify_needs_you
 from server.services.push import notify_run_finished
@@ -41,10 +42,11 @@ from server.services.run_isolation import (
     prepare_run,
     project_brain_env,
 )
-from server.services.secrets import get_user_secret
+from server.services.secrets import SecretsVaultError, get_user_secret
 from server.services.status_history import follow_status, stop_following
 from server.services.usage_records import finish_collecting, usage_channel
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +213,21 @@ USER_SECRET_ENV: dict[str, str] = {
 
 class RunManagerError(RuntimeError):
     pass
+
+
+async def _account_keys(db: AsyncSession, user_id: str) -> dict[str, str]:
+    """The keys of the starter's default AI accounts (``services/ai_accounts``).
+
+    They replace what the deployment set for the same provider: the run is
+    the starter's, so it spends on their account. A key the vault cannot
+    decrypt leaves every provider on the deployment's credentials, logged
+    without the key.
+    """
+    try:
+        return await ai_accounts.run_env(db, user_id)
+    except SecretsVaultError as e:
+        logger.warning("Could not read the AI accounts of a run: %s", type(e).__name__)
+        return {}
 
 
 #: How to read and keep a spec's approval around a build: installed by the
@@ -587,6 +604,7 @@ class RunManager:
                     continue
                 if value:
                     env[env_name] = value
+            env.update(await _account_keys(db, user_id))
         return env
 
     async def _execute(

@@ -85,6 +85,10 @@ l'erreur citerait le jeton. Un run reçoit les jetons de qui l'a lancé (`USER_S
 sien remplace celui que l'opérateur aurait posé pour le déploiement : ce qu'il fait sur une forge
 ou un outil de tickets est fait au nom de cette personne.
 
+**Ses comptes IA aussi** (`server/services/ai_accounts.py`, table `user_ai_accounts`, révision
+`0049`) : plusieurs clés par provider, une par défaut, que ses runs et ses jobs reçoivent à la
+place de celle du déploiement ; détail dans [ai-accounts.md](ai-accounts.md#en-mode-serveur).
+
 **Le thème de la personne la suit d'un appareil à l'autre** (`server/routers/preferences.py`,
 table `user_preferences`, révision `0009`). `GET /users/me/preferences` rend le mode (`light`,
 `dark`, `system`) et le thème de couleur (un des sept du bureau), `null` tant qu'elle n'a rien
