@@ -37,6 +37,7 @@ import { setupGitSurgeonListeners } from "./git-surgeon-store";
 import { setupIdeationListeners } from "./ideation-store";
 import { setupInjectionGuardListeners } from "./injection-guard-store";
 import { setupInsightsListeners } from "./insights-store";
+import { setupInterruptedTasksListeners } from "./interrupted-tasks-store";
 import { setupGitHubInvestigationListeners } from "./github";
 import { setupGitLabInvestigationListeners } from "./gitlab-store";
 import { setupLearningLoopListeners } from "./learning-loop-store";
@@ -128,6 +129,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["Ideation", setupIdeationListeners],
 	["InjectionGuard", setupInjectionGuardListeners],
 	["Insights", setupInsightsListeners],
+	// The launch offers the builds the last exit interrupted, before any page opens.
+	["InterruptedTasks", setupInterruptedTasksListeners],
 	["GitHubInvestigation", setupGitHubInvestigationListeners],
 	["GitLabInvestigation", setupGitLabInvestigationListeners],
 	["LearningLoop", setupLearningLoopListeners],

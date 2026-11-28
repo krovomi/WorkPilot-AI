@@ -52,7 +52,8 @@ un processus d'agent, comme le bouton Pause (`pauseTaskNow`, sorti de `TASK_PAUS
 partagé) : `pause_state.json` dans chaque copie, puis le processus arrêté tout de suite
 (`haltTask`), sans attendre le point de contrôle coopératif. Rien n'est perdu : chaque carte
 reprend sa phase et sa conversation. La raison `kill_switch` la distingue de la pause écrite à la
-fermeture de l'app (`app_shutdown`) : le prochain lancement ne la reprend pas.
+fermeture de l'app (`app_shutdown`) : le prochain lancement ne la reprend jamais de lui-même. Il la
+propose une fois, décochée, dans le dialogue des tâches interrompues ([pause-resume.md](pause-resume.md)).
 
 **Le reste s'arrête.** Un processus d'agent qui n'est pas une tâche (idéation, roadmap,
 insights…) n'a rien à reprendre : il est arrêté. Une tâche dont la pause ne s'écrit pas est

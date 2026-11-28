@@ -1253,6 +1253,22 @@
 		"gitlabCLIPathPlaceholder": "glab (par défaut)",
 		"model": "Modèle",
 		"notDetected": "Non détecté",
+		"interruptedTasks": {
+			"title": "Tâches interrompues à l'ouverture",
+			"description": "Ce que fait WorkPilot des tâches Kanban qui tournaient quand il s'est fermé ou a planté. Une tâche arrêtée par « Arrêter tous les agents » ne reprend jamais toute seule.",
+			"ask": {
+				"label": "Me demander",
+				"description": "Un dialogue les liste au démarrage, avec l'étape où chacune reprendra. Recommandé."
+			},
+			"always": {
+				"label": "Tout reprendre",
+				"description": "Chaque tâche interrompue par l'app reprend, dans la limite « En cours » ; une notification les liste."
+			},
+			"never": {
+				"label": "Ne rien reprendre",
+				"description": "Les cartes restent en pause, chacune avec son bouton Reprendre."
+			}
+		},
 		"otherAgentSettings": "Autres paramètres d'agent",
 		"otherAgentSettingsDescription": "Options de configuration supplémentaires des agents",
 		"paths": "Chemins",

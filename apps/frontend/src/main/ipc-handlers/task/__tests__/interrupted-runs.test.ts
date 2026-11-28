@@ -1,6 +1,6 @@
 /**
- * Closing WorkPilot while a Kanban build runs is a pause; opening it again is
- * the resume — from where the build stopped, not from the top of its phase.
+ * Closing WorkPilot while a Kanban build runs is a pause (what the next launch
+ * does with it: interrupted-prompt.test.ts).
  *
  * The spec directories are real (a temp dir), because what the backend reads
  * back is the file: `pause_state.json` and `.session.json`.
@@ -42,11 +42,7 @@ vi.mock("../../../app-logger", () => ({
 	appLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import {
-	pauseRunningTasksForShutdown,
-	resumeTasksInterruptedByAppExit,
-	wasInterruptedByAppExit,
-} from "../interrupted-runs";
+import { pauseRunningTasksForShutdown } from "../interrupted-runs";
 import { readPersistedSessionId } from "../resume-task";
 
 let root: string;
@@ -173,124 +169,6 @@ describe("closing the application", () => {
 			fakeAgentManager(["ideation:proj-1"]) as any,
 		);
 		expect(paused).toEqual([]);
-	});
-});
-
-describe("which tasks the last exit interrupted", () => {
-	const notRunning = () => false;
-
-	it("a shutdown pause, and a task persisted as running with no process", () => {
-		const shutdown = createTask({
-			status: "in_progress",
-			metadata: {
-				paused: {
-					enabled: true,
-					paused_at: null,
-					paused_subtask_id: null,
-					reason: "app_shutdown",
-				},
-			},
-		} as Partial<Task>);
-		expect(wasInterruptedByAppExit(shutdown, notRunning)).toBe(true);
-		// A crash or a forced kill leaves no pause, only the running status.
-		expect(wasInterruptedByAppExit(createTask({ status: "in_progress" }), notRunning)).toBe(true);
-		expect(wasInterruptedByAppExit(createTask({ status: "ai_review" }), notRunning)).toBe(true);
-	});
-
-	it("never the user's pause, a settled task, an archived one or one already running", () => {
-		const userPause = createTask({
-			metadata: {
-				paused: { enabled: true, paused_at: null, paused_subtask_id: null },
-			},
-		} as Partial<Task>);
-		expect(wasInterruptedByAppExit(userPause, notRunning)).toBe(false);
-		expect(wasInterruptedByAppExit(createTask({ status: "human_review" }), notRunning)).toBe(false);
-		expect(wasInterruptedByAppExit(createTask({ status: "backlog" }), notRunning)).toBe(false);
-		expect(
-			wasInterruptedByAppExit(
-				createTask({ metadata: { archivedAt: "2026-09-01" } } as Partial<Task>),
-				notRunning,
-			),
-		).toBe(false);
-		expect(wasInterruptedByAppExit(createTask(), () => true)).toBe(false);
-	});
-});
-
-describe("opening the application again", () => {
-	it("resumes the interrupted build with its interrupted Claude session", async () => {
-		const project = createProject();
-		const task = createTask({
-			metadata: {
-				tddMode: true,
-				paused: {
-					enabled: true,
-					paused_at: null,
-					paused_phase: "coding",
-					paused_subtask_id: "subtask-2-1",
-					reason: "app_shutdown",
-				},
-			},
-		} as Partial<Task>);
-		register(project, task);
-		const specDir = specDirOf(project, task);
-		writeFileSync(path.join(specDir, "spec.md"), "# Spec\n");
-		writeFileSync(
-			path.join(specDir, ".session.json"),
-			JSON.stringify({ session_id: "sess-interrupted", provider: "claude" }),
-		);
-		writeFileSync(
-			path.join(specDir, "pause_state.json"),
-			JSON.stringify(task.metadata?.paused),
-		);
-		const manager = fakeAgentManager();
-
-		// biome-ignore lint/suspicious/noExplicitAny: structural fake
-		const resumed = await resumeTasksInterruptedByAppExit(manager as any);
-
-		expect(resumed).toEqual([task.id]);
-		expect(manager.startTaskExecution).toHaveBeenCalledTimes(1);
-		const [, , specId, options] = manager.startTaskExecution.mock.calls[0] as unknown as [
-			string,
-			string,
-			string,
-			Record<string, unknown>,
-		];
-		expect(specId).toBe(task.specId);
-		expect(options.resumeSessionId).toBe("sess-interrupted");
-		expect(options.tddMode).toBe(true);
-		// The flag is lifted, or the backend would pause again at its first checkpoint.
-		expect(readPause(project, task).enabled).toBe(false);
-	});
-
-	it("sends a build stopped during spec creation back to the spec pipeline", async () => {
-		const project = createProject();
-		const task = createTask({ status: "in_progress" });
-		register(project, task); // no spec.md yet
-		const manager = fakeAgentManager();
-
-		// biome-ignore lint/suspicious/noExplicitAny: structural fake
-		await resumeTasksInterruptedByAppExit(manager as any);
-
-		expect(manager.startSpecCreation).toHaveBeenCalledTimes(1);
-		expect(manager.startTaskExecution).not.toHaveBeenCalled();
-	});
-
-	it("does not touch a task the user paused", async () => {
-		const project = createProject();
-		const task = createTask({
-			metadata: {
-				paused: { enabled: true, paused_at: null, paused_subtask_id: null },
-			},
-		} as Partial<Task>);
-		register(project, task);
-		const manager = fakeAgentManager();
-
-		// biome-ignore lint/suspicious/noExplicitAny: structural fake
-		const resumed = await resumeTasksInterruptedByAppExit(manager as any);
-
-		expect(resumed).toEqual([]);
-		expect(manager.startTaskExecution).not.toHaveBeenCalled();
-		expect(manager.startSpecCreation).not.toHaveBeenCalled();
 	});
 });
 

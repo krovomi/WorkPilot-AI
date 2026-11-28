@@ -175,6 +175,10 @@ import {
 import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
 import { createReaAPI, type ReaAPI } from "./modules/rea-api";
 import { createTaskSandboxAPI, type TaskSandboxAPI } from "./modules/task-sandbox-api";
+import {
+	createInterruptedTasksAPI,
+	type InterruptedTasksAPI,
+} from "./modules/interrupted-tasks-api";
 import { type StackAPI, createStackAPI } from "./modules/stack-api";
 import {
 	createTaskPermissionAPI,
@@ -325,6 +329,7 @@ export interface ElectronAPI
 		AgentCliAPI,
 		ReaAPI,
 		TaskSandboxAPI,
+		InterruptedTasksAPI,
 		StackAPI,
 		TaskPermissionAPI,
 		CopilotOAuthAPI,
@@ -577,6 +582,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createAutoRefactorAPI(),
 		...createGenericIpcAPI(),
 		...createTaskSandboxAPI(),
+		...createInterruptedTasksAPI(),
 		...createStackAPI(),
 		github: createGitHubAPI(),
 		swarm: createSwarmAPI(),
