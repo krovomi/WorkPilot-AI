@@ -104,6 +104,20 @@ describe("AutomationsIntegration", () => {
 		expect(screen.getByText("Each card starts its build as soon as it is created.")).toBeInTheDocument();
 	});
 
+	it("reads a scheduled rule's time the way the app's language writes it", async () => {
+		api.get.mockResolvedValue({ success: true, data: { rules: [], statuses: {}, activity: [] } });
+		render(<AutomationsIntegration projectId="p1" />);
+		fireEvent.click(await screen.findByRole("button", { name: "Add a rule" }));
+		fireEvent.change(screen.getByLabelText("When"), { target: { value: "schedule" } });
+		const time = screen.getByLabelText("Time");
+		// English keeps the 12-hour clock; a typed 24-hour time is read too.
+		expect(time).toHaveValue("09:00 AM");
+		fireEvent.focus(time);
+		fireEvent.change(time, { target: { value: "19h30" } });
+		fireEvent.blur(time);
+		expect(time).toHaveValue("07:30 PM");
+	});
+
 	it("sends a PR rule without card settings, and shows its reviews", async () => {
 		api.get.mockResolvedValue({ success: true, data: { rules: [], statuses: {}, activity: [] } });
 		render(<AutomationsIntegration projectId="p1" />);

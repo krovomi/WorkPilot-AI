@@ -2,7 +2,8 @@
  * @vitest-environment jsdom
  */
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import i18n from "../../../../shared/i18n";
 import type { CarbonReport } from "../../../../shared/types/carbon-profiler";
 import { useCarbonProfilerStore } from "../../../stores/carbon-profiler-store";
 import { CarbonReportView } from "../CarbonReportView";
@@ -70,6 +71,10 @@ beforeEach(() => {
 	useCarbonProfilerStore.setState({ phase: "idle", report: null, error: null, month: "2026-11", exported: null });
 });
 
+afterEach(() => {
+	vi.useRealTimers();
+});
+
 describe("CarbonReportView", () => {
 	it("reads the month's report, with the budget, the advice and the degraded mode", async () => {
 		render(<CarbonReportView projectPath="/p" />);
@@ -96,5 +101,16 @@ describe("CarbonReportView", () => {
 			cpuOnly: false,
 			factors: {},
 		});
+	});
+
+	it("names the months in the app's language, this month when all of them are shown", async () => {
+		vi.useFakeTimers({ toFake: ["Date"] });
+		vi.setSystemTime(new Date(2026, 11, 3));
+		await i18n.changeLanguage("en");
+		useCarbonProfilerStore.setState({ month: "" });
+		render(<CarbonReportView projectPath="/p" />);
+		await waitFor(() => expect(screen.getByText('carbonProfiler:export.title {"month":"December 2026"}')).toBeTruthy());
+		expect(screen.getByRole("option", { name: "October 2026" })).toBeTruthy();
+		expect(screen.getByText("Oct 2026")).toBeTruthy();
 	});
 });
