@@ -17,7 +17,12 @@ import type {
 	Project,
 	ProjectSettings as ProjectSettingsType,
 } from "../../../shared/types";
+import {
+	AI_ACCOUNT_PROVIDERS,
+	CLAUDE_ACCOUNT_PROVIDER,
+} from "../../../shared/types/ai-accounts";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
+import { AiAccountPinsEditor } from "../ai-account-pins/AiAccountPinsEditor";
 import { cn } from "../../lib/utils";
 import { useSettingsStore } from "../../stores/settings-store";
 import {
@@ -33,6 +38,9 @@ import { WorkflowSettings } from "./WorkflowSettings";
 import { WorktreeRecipeSection } from "./WorktreeRecipeSection";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
+
+/** Every provider a project can pin an account for: Claude, then the API-key ones. */
+const PROJECT_PIN_PROVIDERS = [CLAUDE_ACCOUNT_PROVIDER, ...AI_ACCOUNT_PROVIDERS];
 
 interface GeneralSettingsProps {
 	readonly project: Project;
@@ -330,6 +338,13 @@ export function GeneralSettings({
 							description={t("projectSections.general.useClaudeMdDescription")}
 							checked={settings.useClaudeMd ?? true}
 							onCheckedChange={(checked) => setProject({ useClaudeMd: checked })}
+						/>
+						<AiAccountPinsEditor
+							providers={PROJECT_PIN_PROVIDERS}
+							value={settings.aiAccounts}
+							onChange={(aiAccounts) => setProject({ aiAccounts })}
+							scope="project"
+							idPrefix="project"
 						/>
 					</SettingsGroup>
 

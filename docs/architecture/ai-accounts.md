@@ -44,6 +44,33 @@ déjà lancée garde le compte de son lancement.
 
 Les alias (`gemini` → `google`) passent par `accountProviderOf` (`shared/types/ai-accounts.ts`).
 
+## Un compte épinglé par projet ou par carte
+
+Un projet (`ProjectSettings.aiAccounts`) et une carte Kanban (`TaskMetadata.aiAccounts`, dans
+`task_metadata.json`) peuvent épingler un compte par provider : `{ provider: id }`, où le provider
+est celui des comptes (`google` pour `gemini`) ou `claude`, dont l'id est un profil OAuth. La carte
+prime, puis le projet, puis le compte par défaut (`shared/utils/ai-account-pins.ts`,
+`mergeAccountPins`). L'épingle n'est qu'un id : elle est nettoyée à la lecture (providers connus,
+id court et imprimable) et le main cherche le compte dans son propre magasin.
+
+- Clé API : `taskAccountPins` (`main/agent/task-provider-env.ts`) remplit
+  `TaskProviderPlan.accounts` ; `buildTaskProviderEnv` pose la clé du compte épinglé par-dessus ce
+  que le gestionnaire d'identifiants a choisi (`applyPinnedAccount`,
+  `main/ai-accounts/pinned-account-env.ts`), sur l'adresse officielle du provider (l'URL d'un profil
+  est retirée), seulement si le compte est bien de ce provider. OpenAI passe alors en clé API.
+- Claude : `pinnedClaudeProfileEnv` (`main/agent/pinned-claude-profile.ts`) remplace
+  `getBestAvailableProfileEnv` pour la tâche ; le jeton rafraîchi avant le lancement et le profil
+  marqué « en cours » sont ceux du profil épinglé. Le profil actif de l'app ne change pas.
+- Un compte supprimé ou illisible rend la tâche au compte par défaut, avec un avertissement dans
+  le journal.
+- Bascule automatique : une limite ou un refus de connexion dans la sortie d'une tâche épinglée est
+  compté à son profil ; quand l'auto-swap passe à un autre profil, le redémarrage suivant de la
+  tâche prend celui-ci une fois (`main/agent/claude-swap-pins.ts`), sans réécrire le fichier.
+- L'interface : `AiAccountPinsEditor` (`renderer/components/ai-account-pins/`), dans le groupe Agent
+  des paramètres du projet et sous le moteur de la carte (création et modification). Une ligne par
+  provider qui a un choix : un compte à clé, ou plus d'un profil Claude.
+
+
 ## L'interface
 
 - **Carte du provider** : « Compte : X » quand un compte est nommé, bouton « Comptes · n ».
@@ -198,6 +225,8 @@ Windsurf, Cursor, AWS (paire de clés et région) et Ollama (local) gardent un c
 - `apps/frontend/src/renderer/stores/ai-accounts-store.ts` : le store du renderer.
 - `apps/frontend/src/renderer/components/settings/ai-accounts/` : le dialogue des comptes.
 - `apps/frontend/src/renderer/components/usage/ProviderAccountSwitcher.tsx` : la bascule de la popin.
+- `apps/frontend/src/shared/utils/ai-account-pins.ts` : l'épingle d'un projet ou d'une carte.
+- `apps/frontend/src/main/ai-accounts/pinned-account-env.ts`, `apps/frontend/src/main/agent/pinned-claude-profile.ts` : le compte épinglé dans l'environnement d'une tâche.
 - `apps/frontend/src/main/ai-accounts/account-attribution.ts`, `account-usage.ts`,
   `account-budgets.ts` et `apps/backend/foundation/ai_account.py` : la dépense et le budget par compte.
 - `apps/backend/server/services/ai_accounts.py`, `apps/backend/server/routers/ai_accounts.py` : les

@@ -32,6 +32,7 @@ import type {
 } from "../../../shared/types";
 import {
 	planTaskProviders,
+	taskAccountPins,
 	readTaskMetadataFor,
 	taskEngineFromMetadata,
 } from "../../agent/task-provider-env";
@@ -175,12 +176,14 @@ export function registerPrFollowupHandlers(
 				getSpecsDir(project.autoBuildPath || undefined),
 				task.specId,
 			);
-			const engine = taskEngineFromMetadata(
-				readTaskMetadataFor({ projectPath: project.path, specDir }),
-			);
+			const metadata = readTaskMetadataFor({ projectPath: project.path, specDir });
+			const engine = taskEngineFromMetadata(metadata);
 			const backend = backendPath();
 			const env = await pythonRunnerEnv(backend, {
-				taskProviders: planTaskProviders(engine, "qa"),
+				taskProviders: {
+					...planTaskProviders(engine, "qa"),
+					accounts: taskAccountPins(metadata, project.settings),
+				},
 				// The approval tier of the green PR, and whether it merges by itself.
 				extra: approvalsEnv(),
 			});

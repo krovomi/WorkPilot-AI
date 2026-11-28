@@ -59,6 +59,17 @@ export function accountProviderOf(provider: string | undefined | null): string |
 	return AI_ACCOUNT_PROVIDERS.includes(resolved) ? resolved : undefined;
 }
 
+/** The key under which a pin names a Claude account (an OAuth profile id). */
+export const CLAUDE_ACCOUNT_PROVIDER = "claude";
+
+/**
+ * Provider → account id a project or a Kanban card pins
+ * (`shared/utils/ai-account-pins.ts`). The provider is one of
+ * `AI_ACCOUNT_PROVIDERS` or `claude` (a profile id). Absent means the
+ * provider's default account.
+ */
+export type AiAccountPins = Record<string, string>;
+
 /** An account as the renderer sees it. */
 export interface AiAccountView {
 	id: string;

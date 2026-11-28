@@ -12,6 +12,22 @@ import { useProjectStore } from "../../stores/project-store";
 import { clearDraft, loadDraft, useTaskStore } from "../../stores/task-store";
 import { TaskCreationWizard } from "../TaskCreationWizard";
 
+// The account pins have their own tests: here a button pins accounts, and the
+// project's pins it was given are shown.
+vi.mock("../ai-account-pins/AiAccountPinsEditor", () => ({
+	AiAccountPinsEditor: ({
+		onChange,
+		inherited,
+	}: {
+		onChange: (pins: Record<string, string>) => void;
+		inherited?: Record<string, string>;
+	}) => (
+		<button type="button" onClick={() => onChange({ claude: "team", mistral: "unused" })}>
+			{`pin accounts ${JSON.stringify(inherited ?? {})}`}
+		</button>
+	),
+}));
+
 const api = {
 	createTask: vi.fn(),
 	getGitBranchesWithInfo: vi.fn(),
@@ -93,6 +109,19 @@ describe("TaskCreationWizard create", () => {
 		expect(metadata.useLocalBranch).toBeUndefined();
 		expect(metadata.provider).toBeDefined();
 		expect(useTaskStore.getState().tasks[0].id).toBe("t-new");
+	});
+
+	it("saves the accounts the card pins, for the providers its engine uses", async () => {
+		useProjectStore.setState({
+			projects: [{ id: "p1", name: "Repo", path: "/repo", settings: { aiAccounts: { claude: "work" } } } as never],
+		});
+		renderWizard();
+		fireEvent.click(await screen.findByText('pin accounts {"claude":"work"}'));
+		fireEvent.change(description(), { target: { value: "Do it" } });
+		fireEvent.click(screen.getByRole("button", { name: "Create Task" }));
+		await waitFor(() => expect(api.createTask).toHaveBeenCalled());
+		expect(createdMetadata().provider).toBe("anthropic");
+		expect(createdMetadata().aiAccounts).toEqual({ claude: "team" });
 	});
 
 	it("detects the main branch when the project names no default", async () => {

@@ -38,6 +38,19 @@ vi.mock("../WorktreeRecipeSection", () => ({
 	),
 }));
 vi.mock("../CrossReviewSettings", () => ({ CrossReviewSettings: () => <div data-testid="cross-review" /> }));
+vi.mock("../../ai-account-pins/AiAccountPinsEditor", () => ({
+	AiAccountPinsEditor: ({
+		providers,
+		onChange,
+	}: {
+		providers: string[];
+		onChange: (pins: Record<string, string> | undefined) => void;
+	}) => (
+		<button type="button" onClick={() => onChange({ openai: "client" })}>
+			{`pin for ${providers.join(",")}`}
+		</button>
+	),
+}));
 
 const initialSettings = useSettingsStore.getState();
 
@@ -202,6 +215,14 @@ describe("GeneralSettings, agent and switches", () => {
 		});
 		render(<Host />);
 		expect(screen.getByText(/Profile: Auto \(Optimized\) · Flagship model: —/)).toBeTruthy();
+	});
+
+	it("saves the accounts the project pins, Claude's and every API-key provider's", async () => {
+		const user = userEvent.setup();
+		render(<Host />);
+		const pins = screen.getByRole("button", { name: /^pin for claude,openai,google,/ });
+		await user.click(pins);
+		expect(latest.aiAccounts).toEqual({ openai: "client" });
 	});
 
 	it("names every switch and saves it, with its default", async () => {
