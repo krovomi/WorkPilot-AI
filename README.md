@@ -337,7 +337,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - On a team server, a daily usage report by email at 9:00 by default (time to the minute, any time zone, the days and up to 20 addresses each organization picks, French or English, with or without names, weekly and monthly reports too): each figure beside the day before and the 7-day average, the top consumers, providers and models, why runs failed and the budget alerts at 80 % and 100 % (the organization's, and monthly budgets per person, group or project that can block their runs); sent once even across a restart, readable in the app without SMTP ([what it holds](docs/server-usage-data.md#le-rapport-par-e-mail)).
 
 **Look and feel**
-- One UI charter across every module that follows the active theme: 7 colour themes in light and dark plus a theme editor, full English and French interface.
+- One UI charter across every module that follows the active theme: 7 colour themes in light and dark plus a theme editor, full English and French interface; dates, times and date pickers follow the app's language (28/11/2026 and 14:30 in French, 11/28/2026 and 02:30 PM in English), not the system region.
 - A light menu: a rail of spaces with one panel at a time, arranged by each person (drag a page onto another space, reorder pins, or « Customize the menu » from the keyboard) and resizable with the mouse, « My menu » for pinned and recent pages, four Toolbox hubs, the beta pages in a **Labo**, an offer to hide pages unused for 30 days, the CLI tools in one chip; the command palette (Ctrl+K or `/`) finds every page by name, group or keyword.
 - A first-run wizard that sets up any AI provider and says honestly which ones are connected.
 
@@ -406,7 +406,7 @@ Full reference: [docs/CLI-USAGE.md](docs/CLI-USAGE.md).
 
 ## Security
 
-1. **OS sandbox**: agent commands run under bubblewrap (Linux) or Seatbelt (macOS), and the card says when a task runs without a sandbox. Optional, off by default (Settings > Sandbox): a **Docker Sandboxes microVM per task**, with its own kernel and Docker engine, only the worktree mounted and the network closed to the allowlist; it is also what isolates commands on Windows 11.
+1. **OS sandbox**: agent commands run under bubblewrap (Linux) or Seatbelt (macOS), and the card says when a task runs without a sandbox. Optional, off by default (Settings > Sandbox): a **Docker Sandboxes microVM per task**, with its own kernel and Docker engine, only the worktree mounted, the network closed to the task's allowlist, a command stopped at its timeout stopped inside the VM too, and sbx started without the host's credentials; it is also what isolates commands on Windows 11.
 2. **Filesystem restrictions**: operations stay inside the project directory.
 3. **Dynamic command allowlist**: only the commands of the detected stack are allowed.
 4. **Snapshots and trust score**: before each agent session the task's worktree is saved as a hidden git commit; each session starts with a trust score of 100 that anomalies lower, and below a threshold the task pauses, or the session stops and its snapshot is restored. Restricted mode and per-session limits are in Settings > Sandbox; restore a snapshot from the card.
