@@ -15,6 +15,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { AI_ACCOUNT_KEY_PATTERN } from "../shared/types/ai-account-usage";
 import type { DashboardSnapshot } from "../shared/types/workspace";
 
 export const COST_DATA_FILE = "cost_data.json";
@@ -41,6 +42,8 @@ export interface LedgerUsage {
 	agent_type: string;
 	spec_id: string;
 	timestamp: string;
+	/** The app's AI account the session ran on, when the app named one (`foundation/ai_account.py`). */
+	account_id?: string;
 }
 
 /** A task of the board, as far as the dashboard counts it. */
@@ -126,6 +129,9 @@ function toUsage(raw: unknown): LedgerUsage | null {
 		agent_type: label(u.agent_type),
 		spec_id: label(u.spec_id) || label(u.task_id),
 		timestamp,
+		...(typeof u.account_id === "string" && AI_ACCOUNT_KEY_PATTERN.test(u.account_id)
+			? { account_id: u.account_id }
+			: {}),
 	};
 }
 

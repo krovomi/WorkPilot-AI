@@ -9,6 +9,7 @@ import type { EventEmitter } from "node:events";
 import type { CompletablePhase } from "../../shared/constants/phase-protocol";
 import { isPausePhase } from "../../shared/constants/phase-protocol";
 import { stripAnsiCodes } from "../../shared/utils/ansi-sanitizer";
+import { processAccountsEnv } from "../ai-accounts/account-attribution";
 import { appLog } from "../app-logger";
 import { clearKeychainCache } from "../claude-profile/credential-utils";
 import { getProfileSelectionLock } from "../claude-profile/profile-selection-lock";
@@ -323,6 +324,8 @@ export class AgentProcessManager {
 			...profileEnv,
 			...claudeAuthClearVars,
 			...providerEnv,
+			// The AI accounts this process runs on, for the spend per account.
+			...processAccountsEnv(profileResult.profileId, !nonClaudeProvider),
 			PYTHONUNBUFFERED: "1",
 			PYTHONIOENCODING: "utf-8",
 			PYTHONUTF8: "1",
