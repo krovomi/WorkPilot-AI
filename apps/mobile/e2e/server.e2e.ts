@@ -143,7 +143,19 @@ async function signIn(browser: Browser, world: World, who: Who, password = world
 	await page.getByRole("textbox", { name: "Password" }).fill(password);
 	if (who === "alice") await shot(page, "1-sign-in");
 	await page.getByRole("button", { name: "Sign in", exact: true }).click();
-	if (password === world.passwords[who]) signedIn.set(who, page);
+	if (password !== world.passwords[who]) return page;
+	// What the server measures is shown once in each organization, right
+	// after the sign-in; a device signed in again later is not shown it.
+	const notice = page.getByRole("button", { name: "I understand", exact: true });
+	const shown = await notice.waitFor({ timeout: 15_000 }).then(
+		() => true,
+		() => false,
+	);
+	if (shown) {
+		await notice.click();
+		await expect(notice).toBeHidden();
+	}
+	signedIn.set(who, page);
 	return page;
 }
 
