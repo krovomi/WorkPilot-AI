@@ -11,9 +11,8 @@
 
 /** Control characters other than tab and line breaks, a lone carriage return, zero-width characters, the Unicode tag block. */
 const INVISIBLE = /(?![\t\n\r])\p{Cc}|\r(?!\n)|[\u200B-\u200D\u2060\uFEFF]|[\u{E0000}-\u{E007F}]/gu;
-const HTML_COMMENT = /<!--[\s\S]*?-->/g;
-const SCRIPT_TAG = /<script\b[\s\S]*?<\/script\b[^>]*>/gi;
-const STYLE_TAG = /<style\b[\s\S]*?<\/style\b[^>]*>/gi;
+/** An HTML comment, a `<script>` block or a `<style>` block, in one pattern so each pass removes all three. */
+const HIDDEN_BLOCK = /<!--[\s\S]*?-->|<script\b[\s\S]*?<\/script\b[^>]*>|<style\b[\s\S]*?<\/style\b[^>]*>/gi;
 const MARKER = /<<<+/g;
 
 /**
@@ -26,11 +25,7 @@ export function cleanUntrusted(text: string): string {
 	let previous: string;
 	do {
 		previous = cleaned;
-		cleaned = cleaned
-			.replace(INVISIBLE, "")
-			.replace(HTML_COMMENT, "")
-			.replace(SCRIPT_TAG, "")
-			.replace(STYLE_TAG, "");
+		cleaned = cleaned.replace(INVISIBLE, "").replace(HIDDEN_BLOCK, "");
 	} while (cleaned !== previous);
 	return cleaned.replace(MARKER, "<<");
 }

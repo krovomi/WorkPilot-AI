@@ -2183,6 +2183,7 @@ l'usage dans le cadre du RGPD, avec un rapport quotidien et des budgets de jeton
 
 ### 🛠️ Qualité
 
+- **Nettoyage du texte reçu et lecture des portées de mémoire réécrits plus simplement** : un seul motif retire commentaires HTML, blocs `<script>` et `<style>` à chaque passe, et une portée `team:` / `branch:` se lit sans expression régulière. Le comportement ne change pas.
 - **Toute PR verte vers `develop` est fusionnée seule** : le pilote de pile inscrit désormais d'office chaque PR non brouillon de ce dépôt vers `develop` (squash par défaut, dans l'ordre de sa pile), sans label ni auto-merge à poser. Celles de Dependabot comprises ; les PR vers `main`, les brouillons et les forks restent dehors, et le label `autopilot/off` retire une PR.
 - **Comparaison de builds : chaque indicateur d'un groupe compte ses propres projets** : la
   médiane d'un groupe pour la durée, le coût, les itérations de QA ou les agents n'est donnée que

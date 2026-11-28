@@ -191,7 +191,7 @@ def test_the_allowlist_becomes_rules_scoped_to_ports():
         "*.example.com:80",
         "localhost:11434",
     ]
-    assert "registry-1.docker.io:443" in rules
+    assert {"registry-1.docker.io:443"} <= set(rules)
     assert len(rules) == len(set(rules))
 
 
@@ -226,7 +226,7 @@ def test_a_missing_vm_is_created_closed_then_opened_to_the_allowlist(sbx, worktr
     assert "--deny-network" in create
     allow = next(c for c in sbx.calls if c[:3] == ["policy", "allow", "network"])
     assert allow[3:5] == ["--sandbox", vm.name]
-    assert "registry.npmjs.org:443" in allow[5].split(",")
+    assert {"registry.npmjs.org:443"} <= set(allow[5].split(","))
     assert any(c[:2] == ["exec", vm.name] and "safe.directory" in c for c in sbx.calls)
 
 
