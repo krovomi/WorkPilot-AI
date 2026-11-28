@@ -224,7 +224,8 @@ describe("the active Claude account", () => {
 		await check();
 
 		expect(callsTo(OAUTH_USAGE)).toHaveLength(0);
-		expect(world.spawns).toEqual([{ command: "claude", args: ["usage"] }]);
+		// In the account's own folder, not the default ~/.claude
+		expect(world.spawns).toEqual([{ command: "claude", args: ["usage"], configDir: "/home/tester/.claude-a" }]);
 		expect(lastUsage()).toMatchObject({
 			sessionPercent: 7,
 			weeklyPercent: 9,
