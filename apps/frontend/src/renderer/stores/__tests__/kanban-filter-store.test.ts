@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SORT, EMPTY_FILTERS } from "../../lib/kanban-filter";
 import { type SavedView, useKanbanFilterStore } from "../kanban-filter-store";
+import { DEFAULT_LANE_PREFERENCES, useKanbanLanesStore } from "../kanban-lanes-store";
 
 const api = { getKanbanBoardState: vi.fn(), saveKanbanBoardState: vi.fn() };
 const INITIAL = useKanbanFilterStore.getState();
@@ -29,6 +30,7 @@ async function open(projectId: string, data?: unknown) {
 
 beforeEach(() => {
 	useKanbanFilterStore.setState(INITIAL, true);
+	useKanbanLanesStore.setState({ ...DEFAULT_LANE_PREFERENCES, projectId: null });
 	localStorage.clear();
 	api.getKanbanBoardState.mockReset();
 	api.saveKanbanBoardState.mockReset().mockResolvedValue({ success: true });
@@ -165,6 +167,17 @@ describe("filters and sort", () => {
 		expect(store().filters).toEqual(EMPTY_FILTERS);
 	});
 
+	it("toggles labels without case, and the quick filters", () => {
+		store().toggleLabel("Front");
+		store().toggleLabel("api");
+		store().toggleQuick("flagged");
+		expect(store().filters).toMatchObject({ labels: ["Front", "api"], quick: ["flagged"] });
+		store().toggleLabel("FRONT");
+		store().toggleQuick("flagged");
+		expect(store().filters).toMatchObject({ labels: ["api"], quick: [] });
+		expect(cached("kanban-filters-p1").filters.labels).toEqual(["api"]);
+	});
+
 	it("shows one split group, then everything again", () => {
 		store().toggleGroup("001-split");
 		expect(store().filters.group).toBe("001-split");
@@ -235,6 +248,19 @@ describe("saved views", () => {
 		expect(store().savedViews[0].filters.sources).toEqual(["github"]);
 	});
 
+	it("keeps the labels and quick filters with a view, as copies", () => {
+		store().toggleLabel("api");
+		store().toggleQuick("recent");
+		store().saveCurrentView("Mine");
+		store().toggleLabel("front");
+		expect(store().savedViews[0].filters).toMatchObject({ labels: ["api"], quick: ["recent"] });
+		store().clearFilters();
+		store().applyView(store().savedViews[0].id);
+		store().toggleQuick("flagged");
+		expect(store().filters).toMatchObject({ labels: ["api"], quick: ["recent", "flagged"] });
+		expect(store().savedViews[0].filters.quick).toEqual(["recent"]);
+	});
+
 	it("names a view without crypto.randomUUID too", () => {
 		vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(undefined as never);
 		store().saveCurrentView("v");
@@ -260,6 +286,32 @@ describe("saved views", () => {
 
 		store().applyView("missing");
 		expect(store().filters.sources).toEqual(["jira", "github"]);
+	});
+
+	it("keeps the layout, the lanes and the list's sort with a view, and brings them back", () => {
+		const lanes = useKanbanLanesStore.getState();
+		lanes.setLayout("list");
+		lanes.setGrouping("priority");
+		lanes.setListSort({ field: "points", direction: "desc" });
+		store().saveCurrentView("Plan");
+		expect(store().savedViews[0]).toMatchObject({
+			layout: "list",
+			grouping: "priority",
+			listSort: { field: "points", direction: "desc" },
+		});
+
+		lanes.setLayout("board");
+		lanes.setGrouping("none");
+		lanes.setListSort(null);
+		store().saveCurrentView("Plain");
+		expect(store().savedViews[1].listSort).toBeNull();
+
+		store().applyView(store().savedViews[0].id);
+		expect(useKanbanLanesStore.getState()).toMatchObject({
+			layout: "list",
+			grouping: "priority",
+			listSort: { field: "points", direction: "desc" },
+		});
 	});
 
 	it("deletes a view everywhere", () => {

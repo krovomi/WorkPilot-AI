@@ -2431,7 +2431,7 @@ export function KanbanBoard({
 					items={columnOrder.map((s) => `col-${s}`)}
 					strategy={horizontalListSortingStrategy}
 				>
-					<BoardLanes projectId={projectId} columnOrder={columnOrder} tasksByStatus={tasksByStatus} renderColumn={(status, columnTasks, droppableId) => (
+					<BoardLanes projectId={projectId} columnOrder={columnOrder} tasksByStatus={tasksByStatus} onOpenTask={onTaskClick} renderColumn={(status, columnTasks, droppableId) => (
 							<SortableColumnWrapper
 								key={droppableId ?? status}
 								sortableId={`col-${status}`}

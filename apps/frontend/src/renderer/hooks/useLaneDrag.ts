@@ -6,7 +6,7 @@
  * - a lane's column is a drop target of its own (`laneDropId`); the board's
  *   handlers receive the plain column id, as without lanes;
  * - a card dropped in another lane first gets that lane's field written
- *   (priority, type, sub-project, `laneMetadata`), the whole selection when
+ *   (priority, type, sub-project, sprint, `laneMetadata`), the whole selection when
  *   the card is part of one, recorded for Ctrl+Z; a lane whose field the
  *   board does not own refuses the drop;
  * - the pinned « Bloquées » lane flags a card dropped in it (reason dialog)
@@ -23,6 +23,7 @@ import { applyCardChoice } from "../lib/card-edits";
 import { FLAGGED_LANE, laneKeyOf, laneMetadata, parseLaneDropId } from "../lib/kanban-lanes";
 import { useFlagRequestStore } from "../stores/flag-request-store";
 import { useKanbanLanesStore } from "../stores/kanban-lanes-store";
+import { useSprintStore } from "../stores/sprint-store";
 import { unflagTask } from "../stores/task-flag-actions";
 import { useTaskStore } from "../stores/task-store";
 import { toast } from "./use-toast";
@@ -82,7 +83,11 @@ export function useLaneDrag(
 			const flagged = cards.filter((card) => card.metadata?.flagged === true);
 			// Out of « Bloquées » into the card's own lane: only the flag goes.
 			const ownLane = cards.every((card) => laneKeyOf(card, { grouping, pinFlagged: false }) === target);
-			const change = ownLane ? null : laneMetadata(grouping, target);
+			const open = useSprintStore
+				.getState()
+				.sprints.filter((sprint) => sprint.state !== "closed")
+				.map((sprint) => sprint.id);
+			const change = ownLane ? null : laneMetadata(grouping, target, open);
 			if (!ownLane && !change) {
 				toast({ title: t("tasks:kanban.lanes.readOnlyDrop", { grouping: t(`tasks:kanban.lanes.groupings.${grouping}`) }) });
 				return false;
