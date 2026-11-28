@@ -7,10 +7,12 @@ import {
 	FlagOff,
 	Gauge,
 	GitMerge,
+	IterationCw,
 	Pause,
 	Pencil,
 	Play,
 	Shapes,
+	Tag,
 	Trash2,
 	Undo2,
 	X,
@@ -28,6 +30,7 @@ import {
 	DropdownMenuSubTrigger,
 } from "../ui/dropdown-menu";
 import { CardTypeMenuItems, PriorityMenuItems } from "./CardChoiceMenuItems";
+import { SprintChoiceMenuItems } from "./SprintChoiceMenuItems";
 
 export interface TaskCardMenuActions {
 	/** Opens the card's panel (right-click menu only: a click does it too). */
@@ -36,6 +39,10 @@ export interface TaskCardMenuActions {
 	onEdit?: () => void;
 	onSetType?: (type: CardType) => void;
 	onSetPriority?: (priority: TaskPriority) => void;
+	/** Puts the card in a sprint, or back in the backlog (null). */
+	onSetSprint?: (sprintId: string | null) => void;
+	/** Opens the labels dialog (the board's labels: an agent's run neither reads nor changes them). */
+	onEditLabels?: () => void;
 	/** The columns the card can be moved to by hand, and the move. */
 	moves?: {
 		targets: readonly TaskStatus[];
@@ -58,6 +65,7 @@ export interface TaskCardMenuActions {
 interface TaskCardMenuItemsProps extends TaskCardMenuActions {
 	currentType?: CardType | null;
 	currentPriority?: TaskPriority | null;
+	currentSprint?: string | null;
 	/** An agent is working on the card: what it reads is not edited under it. */
 	isLocked?: boolean;
 }
@@ -72,6 +80,8 @@ export function TaskCardMenuItems({
 	onEdit,
 	onSetType,
 	onSetPriority,
+	onSetSprint,
+	onEditLabels,
 	moves,
 	onEstimate,
 	onDuplicate,
@@ -85,11 +95,12 @@ export function TaskCardMenuItems({
 	onDelete,
 	currentType,
 	currentPriority,
+	currentSprint,
 	isLocked,
 }: TaskCardMenuItemsProps) {
 	const { t } = useTranslation(["tasks"]);
 	const hasMoves = !!moves && moves.targets.length > 0;
-	const hasEditGroup = !!(onOpen || onEdit || onSetType || onSetPriority || hasMoves);
+	const hasEditGroup = !!(onOpen || onEdit || onSetType || onSetPriority || onSetSprint || onEditLabels || hasMoves);
 	const hasWorkGroup = !!(
 		onEstimate || onDuplicate || onPause || onResume || onSyncFromBranch || onFlag || onUnflag || onAbandon || onUnabandon
 	);
@@ -138,6 +149,23 @@ export function TaskCardMenuItems({
 						/>
 					</DropdownMenuSubContent>
 				</DropdownMenuSub>
+			)}
+			{onSetSprint && (
+				<DropdownMenuSub>
+					<DropdownMenuSubTrigger>
+						<IterationCw className="mr-2 h-4 w-4" />
+						{t("tasks:kanban.sprints.cardMenu")}
+					</DropdownMenuSubTrigger>
+					<DropdownMenuSubContent className="w-56" onClick={(e) => e.stopPropagation()}>
+						<SprintChoiceMenuItems current={currentSprint} onSelect={onSetSprint} />
+					</DropdownMenuSubContent>
+				</DropdownMenuSub>
+			)}
+			{onEditLabels && (
+				<DropdownMenuItem onSelect={onEditLabels}>
+					<Tag className="mr-2 h-4 w-4" />
+					{t("tasks:cardLabels.cardMenu")}
+				</DropdownMenuItem>
 			)}
 			{moves && hasMoves && (
 				<DropdownMenuSub>

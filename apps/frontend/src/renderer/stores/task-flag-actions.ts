@@ -7,7 +7,8 @@ import type { TaskMetadata } from "../../shared/types";
 import { buildFlagMetadata, buildUnflagMetadata } from "../../shared/utils/task-flag";
 import { useTaskStore } from "./task-store";
 
-async function saveFlag(
+/** Save a part of a card's metadata, then show it on the board. */
+export async function saveCardMetadata(
 	taskId: string,
 	patch: Partial<TaskMetadata>,
 ): Promise<{ success: boolean; error?: string }> {
@@ -28,9 +29,9 @@ async function saveFlag(
 }
 
 export function flagTask(taskId: string, reason?: string) {
-	return saveFlag(taskId, buildFlagMetadata(reason));
+	return saveCardMetadata(taskId, buildFlagMetadata(reason));
 }
 
 export function unflagTask(taskId: string) {
-	return saveFlag(taskId, buildUnflagMetadata());
+	return saveCardMetadata(taskId, buildUnflagMetadata());
 }

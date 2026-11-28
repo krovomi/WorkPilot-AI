@@ -14,11 +14,14 @@ import {
 	buildJudgePrompt,
 	citeMatches,
 	type CompletionFn,
+	fuseRanks,
 	parseJudgement,
 	parseQueryPlan,
+	SEMANTIC_BAND,
 	SMALL_BOARD,
 } from "../board-ask-service";
-import { readSpecOpening, ticketDigest, ticketState, toTicket } from "../tickets";
+import type { SemanticFn } from "../semantic-search";
+import { type BoardTicket, readSpecOpening, ticketDigest, ticketMeaning, ticketState, toTicket } from "../tickets";
 
 function task(id: string, title: string, overrides: Partial<Task> = {}): Task {
 	return {
@@ -148,6 +151,96 @@ describe("askBoard", () => {
 	});
 });
 
+describe("askBoard, ranked by meaning", () => {
+	const many = Array.from({ length: SMALL_BOARD + 5 }, (_, i) => task(`n${i}`, `Unrelated chore ${i}`));
+	const spanish = task("es", "Revisión del panel de administración", { description: "Nuevo panel para gestores" });
+	const board = [...many, spanish, task("csv", "Export CSV des factures")];
+
+	/** An embeddings model that finds the Spanish ticket closest, then the given others. */
+	function meaning(extra: { id: string; score: number }[] = []) {
+		const calls: { query: string; ids: string[]; texts: string[] }[] = [];
+		const semantic: SemanticFn = vi.fn(async (query, documents) => {
+			calls.push({ query, ids: documents.map((d: { id: string }) => d.id), texts: documents.map((d: { text: string }) => d.text) });
+			return {
+				source: { kind: "local" as const, provider: "ollama", model: "bge-m3" },
+				scores: [{ id: "es", score: 0.82 }, ...extra],
+				indexed: documents.length,
+				total: documents.length,
+			};
+		});
+		return { semantic, calls };
+	}
+
+	it("lists, without a model to judge, a ticket in another language that shares no word", async () => {
+		const { semantic, calls } = meaning([
+			{ id: "n1", score: 0.82 - SEMANTIC_BAND / 2 },
+			{ id: "n2", score: 0.82 - SEMANTIC_BAND * 2 },
+		]);
+		const complete: CompletionFn = async () => null;
+		const result = await askBoard({ tasks: board, question: "admin page review", appLanguage: "en", complete, readSpec: noSpec, semantic });
+		expect(result.mode).toBe("semantic");
+		expect(result.matches[0]?.taskId).toBe("es");
+		expect(result.matches.map((m) => m.taskId)).toContain("n1");
+		expect(result.matches.map((m) => m.taskId)).not.toContain("n2");
+		expect(result.semantic).toEqual({ kind: "local", provider: "ollama", model: "bge-m3", indexed: board.length, total: board.length });
+		expect(calls[0]?.query).toBe("admin page review");
+		expect(calls[0]?.texts[calls[0].ids.indexOf("es")]).toContain("Nuevo panel para gestores");
+	});
+
+	it("hands the model the tickets found by meaning on a large board", async () => {
+		const { semantic } = meaning();
+		const { complete, prompts } = scripted(JSON.stringify({ question: "admin page", terms: ["admin"] }), () =>
+			JSON.stringify({ answer: "[T1]", matches: [{ ref: "T1", coverage: "full", reason: "Same page" }] }),
+		);
+		const result = await askBoard({ tasks: board, question: "admin page", appLanguage: "en", complete, readSpec: noSpec, semantic });
+		expect(prompts[1]).toContain("Revisión del panel");
+		expect(result.mode).toBe("ai");
+		expect(result.matches[0]?.taskId).toBe("es");
+		expect(result.semantic?.model).toBe("bge-m3");
+	});
+
+	it("reads a follow-up's meaning with the question before it", async () => {
+		const { semantic, calls } = meaning();
+		const complete: CompletionFn = async () => null;
+		await askBoard({
+			tasks: board,
+			question: "and the exports?",
+			history: [{ question: "invoices?", answer: "" }],
+			appLanguage: "en",
+			complete,
+			readSpec: noSpec,
+			semantic,
+		});
+		expect(calls[0]?.query).toBe("invoices?\nand the exports?");
+	});
+
+	it("falls back to keywords when the embeddings model fails or gives nothing", async () => {
+		const complete: CompletionFn = async () => null;
+		for (const semantic of [
+			vi.fn(async () => {
+				throw new Error("down");
+			}),
+			vi.fn(async () => null),
+		] as SemanticFn[]) {
+			const result = await askBoard({ tasks: board, question: "export csv", appLanguage: "fr", complete, readSpec: noSpec, semantic });
+			expect(result.mode).toBe("keywords");
+			expect(result.semantic).toBeUndefined();
+			expect(result.matches.map((m) => m.taskId)).toEqual(["csv"]);
+		}
+	});
+
+	it("fuses rankings: first in both comes first, any one's best comes up", () => {
+		expect(fuseRanks([["a", "b", "c"], ["b", "d"]])).toEqual(["b", "a", "d", "c"]);
+		expect(fuseRanks([])).toEqual([]);
+	});
+
+	it("gives the embeddings model a ticket's words, not its state", () => {
+		const ticket = toTicket(task("t", "Title", { description: "Some   text", subtasks: [{ title: "Step" } as never] }), noSpec);
+		expect(ticketMeaning(ticket)).toBe("Title\nSome text\nStep");
+		expect(ticketMeaning(ticket, 5)).toBe("Title");
+	});
+});
+
 describe("parsers", () => {
 	it("reads the query plan, bounded, or nothing", () => {
 		expect(parseQueryPlan(null)).toBeNull();
@@ -249,5 +342,48 @@ describe("tickets", () => {
 		const digest = ticketDigest(ticket, 60);
 		expect(digest.length).toBe(60);
 		expect(ticketDigest(ticket, 2000)).toContain("State: done (archived), last change 2026-11-01");
+	});
+});
+
+describe("askBoard, with the other sources", () => {
+	const change: BoardTicket = {
+		id: "change:abcdef12",
+		title: "feat: export users to CSV (#42)",
+		description: "",
+		spec: "",
+		subtasks: [],
+		files: [],
+		state: "done",
+		archived: false,
+		kind: "change",
+		ref: "#42",
+	};
+	const roadmap: BoardTicket = { ...change, id: "roadmap:f1", title: "Export the invoices", kind: "roadmap", state: "planned" };
+	delete roadmap.ref;
+
+	it("searches them with the cards, says what they are, and tells the model", async () => {
+		const prompts: string[] = [];
+		const result = await askBoard({
+			tasks: [task("csv", "Export CSV des factures")],
+			sources: [change, roadmap, { ...change, id: "change:empty", title: "", description: "" }],
+			question: "export",
+			appLanguage: "en",
+			complete: async (prompt) => {
+				prompts.push(prompt);
+				return null;
+			},
+			readSpec: noSpec,
+		});
+		expect(result.searched).toBe(3);
+		const byId = new Map(result.matches.map((m) => [m.taskId, m]));
+		expect(byId.get("change:abcdef12")).toMatchObject({ kind: "change", ref: "#42", state: "done" });
+		expect(byId.get("roadmap:f1")).toMatchObject({ kind: "roadmap" });
+		expect(byId.get("roadmap:f1")).not.toHaveProperty("ref");
+		expect(byId.get("csv")).not.toHaveProperty("kind");
+		expect(buildJudgePrompt("q", [{ ref: "T1", ticket: change }], "en", undefined)).toContain(
+			"Kind: change merged into the project's branch #42",
+		);
+		expect(ticketDigest(roadmap, 2000)).toContain("Kind: roadmap feature\n");
+		expect(ticketDigest({ ...roadmap, kind: "idea" }, 2000)).toContain("Kind: idea (Ideation)");
 	});
 });

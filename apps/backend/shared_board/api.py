@@ -358,7 +358,8 @@ async def update_card_settings(
     """Change the card's engine, priority, category or goal.
 
     Unlike its text, these may change once work has started, as on the
-    desktop; not while a run reads them.
+    desktop; not while a run reads them. The fields only the board reads
+    (sub-project, flag, sprint: ``BOARD_ONLY_KEYS``) change even then.
     """
     from server.services.run_manager import get_run_manager
 
@@ -366,7 +367,8 @@ async def update_card_settings(
     _require_writer(scope, principal)
     directory = _card_or_404(scope, card_id)
     row = await _index_row(db, scope, card_id)
-    if row is not None and get_run_manager().is_running(row.id):
+    board_only = body.model_fields_set <= card_settings.BOARD_ONLY_KEYS
+    if not board_only and row is not None and get_run_manager().is_running(row.id):
         raise HTTPException(status_code=409, detail="A run is active on this card")
     root = scope.path.resolve()
     card_settings.apply_settings(root, directory, body)

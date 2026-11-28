@@ -47,10 +47,14 @@ export interface ServerCardSettings {
 	flaggedAt?: string | null;
 	/** The card's sub-project (Kanban lanes, `renderer/lib/kanban-lanes.ts`). */
 	area?: string | null;
+	/** The sprint the card is planned in (`shared/types/sprint.ts`). */
+	sprintId?: string | null;
+	/** The card's labels (`shared/utils/task-labels.ts`). */
+	labels?: string[] | null;
 }
 
 /** Metadata fields the server stores as they are given (`shared_board/settings.py`). */
-const LIST_KEYS = ["mobileTargets", "blockedBy"] as const;
+const LIST_KEYS = ["mobileTargets", "blockedBy", "labels"] as const;
 /** The abandon and flag fields (`task-lifecycle.ts`, `task-flag.ts`), resuming or lifting clears them; the sub-project. */
 const OPTIONAL_TEXT_KEYS = [
 	"abandonedAt",
@@ -60,6 +64,7 @@ const OPTIONAL_TEXT_KEYS = [
 	"flaggedReason",
 	"flaggedAt",
 	"area",
+	"sprintId",
 ] as const;
 
 interface CardRef {

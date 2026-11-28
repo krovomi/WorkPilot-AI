@@ -11,6 +11,7 @@ import { toast } from "../../hooks/use-toast";
 import { canMoveTaskTo, manualMoveTargets } from "../../lib/kanban-columns";
 import { useAbandonRequestStore } from "../../stores/abandon-request-store";
 import { useFlagRequestStore } from "../../stores/flag-request-store";
+import { useLabelRequestStore } from "../../stores/label-request-store";
 import { unflagTask } from "../../stores/task-flag-actions";
 import { extractTextFromHtml } from "../../lib/utils";
 import { openSmartEstimation } from "../../stores/smart-estimation-store";
@@ -100,6 +101,10 @@ export function TaskCardMenus({
 			},
 			onSetPriority: (priority: TaskPriority) =>
 				void save({ priority }, t("tasks:kanban.undoLabels.priority")),
+			// The sprint is the board's, not the run's: it changes while an agent works.
+			onSetSprint: (sprintId: string | null) =>
+				void save({ sprintId: sprintId ?? undefined }, t("tasks:kanban.sprints.undoLabel")),
+			onEditLabels: () => useLabelRequestStore.getState().request(task.id),
 			moves: onStatusChange && {
 				targets: manualMoveTargets({
 					status: task.status,
@@ -145,7 +150,8 @@ export function TaskCardMenus({
 		t,
 	]);
 
-	const itemProps = { ...actions, currentType, currentPriority, isLocked };
+	const currentSprint = task.metadata?.sprintId ?? null;
+	const itemProps = { ...actions, currentType, currentPriority, currentSprint, isLocked };
 
 	return (
 		<>

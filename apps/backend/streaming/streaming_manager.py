@@ -48,6 +48,8 @@ class EventType(str, Enum):
     SPEC_UPDATED = "spec_updated"
     SPEC_DELETED = "spec_deleted"
     SPEC_APPROVED = "spec_approved"
+    # The project's sprints changed (``shared_board/sprints.py``).
+    SPRINTS_UPDATED = "sprints_updated"
     # A shared feature of the project (``shared_features``): a file a member
     # rewrote, and a job's status as it starts and ends.
     FEATURE_UPDATED = "feature_updated"
