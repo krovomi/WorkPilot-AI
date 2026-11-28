@@ -21,14 +21,15 @@ maintenant pour tous les providers, et les interrupteurs affichés sont ceux que
 |---|---|
 | `oauth-<id>` | un compte Claude connecté par OAuth (profil Claude) |
 | `api-<id>` | un profil API (une clé et une URL, `profiles.json`) ; son provider vient de l'URL |
-| `account-<id>` | un compte de Réglages → Comptes IA (`ai-accounts.json`, une clé sur l'adresse de son provider) ; plusieurs par provider |
+| `account-<id>` | un compte de Réglages → Comptes IA (`ai-accounts.json`) : une clé sur l'adresse de son provider, ou la connexion d'un outil CLI (Copilot, Codex CLI pour OpenAI, Gemini CLI) ; plusieurs par provider |
 | `provider-<nom>` | un provider sans compte à lui ici : Copilot par `gh`, une clé dans les réglages, Ollama, un CLI d'agent |
 
 Le renderer construit la chaîne affichée à partir de ce qui est connecté
 (`renderer/components/settings/failover-accounts.ts`) et enregistre l'ordre ; un ordre sauvé
 avant les types d'entrée (`copilot`) se lit comme `provider-copilot`. Un provider qui a des
-comptes n'y montre que ses comptes (avec une clé), son entrée générique ne ferait que répéter
-son compte par défaut. Un compte que l'ordre sauvé ne nomme pas encore suit, à la fin, chez le
+comptes n'y montre que ses comptes (avec une clé, ou connectés pour un outil CLI), son entrée
+générique ne ferait que répéter son compte par défaut. Un compte Codex CLI fait tourner OpenAI
+(`engineProviderOfAccount`) : l'entrée `provider-openai` reste, c'est la clé OpenAI. Un compte que l'ordre sauvé ne nomme pas encore suit, à la fin, chez le
 renderer comme dans le main (`buildFailoverChain`) : un compte ajouté sert sans qu'on réordonne. Une entrée retirée de la
 chaîne garde sa place (`disabledAutoSwitchProviders`, par id d'entrée).
 
@@ -57,8 +58,10 @@ provider » (`sameProviderFirst`, absent = oui), les comptes du provider arrêt�
 autres entrées, chacun groupe dans l'ordre de la chaîne. Éteint, la chaîne se lit de haut en bas.
 
 L'entrée en cours d'une tâche hors Claude est le compte épinglé sur la tâche (puis sur son
-projet, champ `aiAccounts` de `task_metadata.json` et des réglages du projet), sinon le compte
-par défaut de son provider, sinon l'entrée générique du provider (`offClaudeEntry`). Pour une
+projet, champ `aiAccounts` de `task_metadata.json` et des réglages du projet), dans l'ordre où
+l'environnement de la tâche les applique (clé API, puis connexion CLI : `openai`, puis `codex`),
+sinon le compte par défaut de son provider (celui de Codex CLI pour OpenAI en mode Codex), sinon
+l'entrée générique du provider (`offClaudeEntry`). Pour une
 tâche Claude, c'est le profil API actif, sinon le profil Claude épinglé, sinon le profil actif.
 
 L'entrée quittée est mise de côté pour **toutes** les tâches, pas seulement pour celle qui
@@ -73,7 +76,9 @@ partir de la phase arrêtée, et le journal de conversation porte le contexte. U
 compte Claude pose d'abord le profil actif ; la session Claude n'est pas reprise, puisqu'un autre
 compte ne l'a pas. Un passage vers un compte (`account-<id>`) ou un profil Claude (`oauth-<id>`)
 épingle aussi ce compte sur **la tâche seule** (`EngineChoice.accountPin`, écrit dans
-`aiAccounts` de chaque copie de `task_metadata.json` avec le moteur) : le compte par défaut du
+`aiAccounts` de chaque copie de `task_metadata.json` avec le moteur), sous le provider du compte
+(`codex` pour une connexion Codex CLI, dont l'épingle `openai` est retirée : une clé épinglée
+l'emporterait) : le compte par défaut du
 provider, donc celui des autres tâches, ne change pas. Le renderer ne peut pas demander cet
 épinglage : le « Reprendre avec… » de la tâche ne transmet que provider, modèle, effort et
 portée. Une ligne du journal de la tâche dit d'où vers où elle est passée, avec le nom du compte.

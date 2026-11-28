@@ -3,7 +3,11 @@ import path from "node:path";
 import { getSpecsDir } from "../../shared/constants";
 import type { ProjectSettings, TaskMetadata } from "../../shared/types";
 import type { AiAccountPins } from "../../shared/types/ai-accounts";
-import { mergeAccountPins, pinnedAccountOf } from "../../shared/utils/ai-account-pins";
+import {
+	mergeAccountPins,
+	pinnedAccountOf,
+	pinnedLoginAccountOf,
+} from "../../shared/utils/ai-account-pins";
 import {
 	defaultEngineProvider,
 	type EnginePhase,
@@ -15,7 +19,7 @@ import {
 	type EngineSeedSettings,
 	type TaskEngine,
 } from "../../shared/utils/task-engine";
-import { applyPinnedAccount } from "../ai-accounts/pinned-account-env";
+import { applyPinnedAccount, applyPinnedLoginAccount } from "../ai-accounts/pinned-account-env";
 import { appLog } from "../app-logger";
 import { projectStore } from "../project-store";
 import { credentialManager } from "../services/credential-manager";
@@ -39,7 +43,9 @@ import { readSettingsFile } from "../settings-utils";
  * `buildContestantEnv` already follows for the Bounty Board. A Claude account
  * pinned by the card or the project goes through that chain too
  * (`getPinnedOrBestProfileEnv`); the pin of an API-key provider is applied
- * here, on top of what the credential manager chose (`applyPinnedAccount`).
+ * here, on top of what the credential manager chose (`applyPinnedAccount`),
+ * and so is a CLI sign-in pin (Copilot, Codex, Gemini CLI) when no API-key
+ * pin applies (`applyPinnedLoginAccount`).
  */
 
 export interface TaskProviderPlan {
@@ -106,7 +112,10 @@ export function buildTaskProviderEnv(
 		if (isClaudeProvider(provider)) continue;
 		try {
 			const providerEnv = { ...getEnv(provider) };
-			applyPinnedAccount(providerEnv, provider, pinnedAccountOf(plan.accounts, provider));
+			// An API-key pin wins; otherwise a CLI sign-in pin (Copilot, Codex, Gemini CLI).
+			if (!applyPinnedAccount(providerEnv, provider, pinnedAccountOf(plan.accounts, provider))) {
+				applyPinnedLoginAccount(providerEnv, provider, pinnedLoginAccountOf(plan.accounts, provider));
+			}
 			Object.assign(env, providerEnv);
 		} catch (err) {
 			appLog.warn(

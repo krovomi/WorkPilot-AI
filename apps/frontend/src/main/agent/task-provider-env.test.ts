@@ -15,9 +15,18 @@ const applyPinnedAccount = vi.fn(
 		return true;
 	},
 );
+const applyPinnedLoginAccount = vi.fn(
+	(env: Record<string, string>, provider: string, accountId: string | undefined) => {
+		if (!accountId) return false;
+		env[`${provider.toUpperCase()}_HOME`] = `home:${accountId}`;
+		return true;
+	},
+);
 vi.mock("../ai-accounts/pinned-account-env", () => ({
 	applyPinnedAccount: (...args: Parameters<typeof applyPinnedAccount>) =>
 		applyPinnedAccount(...args),
+	applyPinnedLoginAccount: (...args: Parameters<typeof applyPinnedLoginAccount>) =>
+		applyPinnedLoginAccount(...args),
 }));
 
 import {
@@ -122,6 +131,22 @@ describe("pinned accounts", () => {
 		expect(env.OPENAI_KEY).toBe("pinned:client");
 		expect(env.GEMINI_KEY).toBe("pinned:work");
 		expect(env.MISTRAL_KEY).toBe("default");
+	});
+
+	it("runs a provider on its pinned CLI sign-in when no API-key pin applies", () => {
+		const env = buildTaskProviderEnv(
+			{
+				providers: ["openai", "copilot", "mistral"],
+				startProvider: "openai",
+				usesClaude: false,
+				accounts: { codex: "c1", copilot: "g1", mistral: "m1" },
+			},
+			() => ({}),
+		);
+		expect(env.OPENAI_HOME).toBe("home:c1");
+		expect(env.COPILOT_HOME).toBe("home:g1");
+		expect(env.MISTRAL_KEY).toBe("pinned:m1");
+		expect(env.MISTRAL_HOME).toBeUndefined();
 	});
 
 	it("takes the card's pin over the project's, the project's for the rest", () => {

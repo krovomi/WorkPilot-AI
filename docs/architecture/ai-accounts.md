@@ -48,9 +48,12 @@ Les alias (`gemini` → `google`) passent par `accountProviderOf` (`shared/types
 
 Un projet (`ProjectSettings.aiAccounts`) et une carte Kanban (`TaskMetadata.aiAccounts`, dans
 `task_metadata.json`) peuvent épingler un compte par provider : `{ provider: id }`, où le provider
-est celui des comptes (`google` pour `gemini`) ou `claude`, dont l'id est un profil OAuth. La carte
-prime, puis le projet, puis le compte par défaut (`shared/utils/ai-account-pins.ts`,
-`mergeAccountPins`). L'épingle n'est qu'un id : elle est nettoyée à la lecture (providers connus,
+est celui des comptes (`google` pour `gemini`), `claude`, dont l'id est un profil OAuth, ou un outil
+CLI (`copilot`, `codex`, `gemini-cli`), dont l'id est un compte connecté. La carte prime, puis le
+projet, puis le compte par défaut (`shared/utils/ai-account-pins.ts`, `mergeAccountPins`). Une
+épingle de la carte remplace aussi celle du projet pour le même moteur sous l'autre clé : une carte
+sur une connexion Codex CLI ne tourne pas sur la clé OpenAI que le projet épingle
+(`siblingPinKeys`). L'épingle n'est qu'un id : elle est nettoyée à la lecture (providers connus,
 id court et imprimable) et le main cherche le compte dans son propre magasin.
 
 - Clé API : `taskAccountPins` (`main/agent/task-provider-env.ts`) remplit
@@ -58,6 +61,9 @@ id court et imprimable) et le main cherche le compte dans son propre magasin.
   que le gestionnaire d'identifiants a choisi (`applyPinnedAccount`,
   `main/ai-accounts/pinned-account-env.ts`), sur l'adresse officielle du provider (l'URL d'un profil
   est retirée), seulement si le compte est bien de ce provider. OpenAI passe alors en clé API.
+- Outil CLI : sans épingle à clé qui s'applique, `buildTaskProviderEnv` pose le dossier du compte
+  CLI épinglé dans la variable du backend de l'outil (`applyPinnedLoginAccount`), seulement si le
+  compte est de cet outil et connecté. OpenAI passe alors en mode Codex (`OPENAI_AUTH_MODE`).
 - Claude : `pinnedClaudeProfileEnv` (`main/agent/pinned-claude-profile.ts`) remplace
   `getBestAvailableProfileEnv` pour la tâche ; le jeton rafraîchi avant le lancement et le profil
   marqué « en cours » sont ceux du profil épinglé. Le profil actif de l'app ne change pas.
@@ -234,9 +240,10 @@ Windsurf, Cursor, AWS (paire de clés et région) et Ollama (local) gardent un c
 
 ## Quand un compte s'arrête
 
-Chaque compte est une entrée `account-<id>` de la chaîne de basculement. Une tâche arrêtée par
-une limite, un quota épuisé ou une clé refusée passe au compte suivant de son provider, épinglé
-sur elle seule ; le compte par défaut ne bouge pas. Détail : [provider-failover.md](provider-failover.md).
+Chaque compte est une entrée `account-<id>` de la chaîne de basculement, ceux des outils CLI
+compris dès qu'ils sont connectés (un compte Codex CLI sert OpenAI). Une tâche arrêtée par une
+limite, un quota épuisé ou une clé refusée passe au compte suivant de son provider, épinglé sur
+elle seule ; le compte par défaut ne bouge pas. Détail : [provider-failover.md](provider-failover.md).
 
 Voir aussi [forge-accounts.md](forge-accounts.md) (même modèle pour les forges) et
 [provider-failover.md](provider-failover.md) (basculement auto entre comptes).

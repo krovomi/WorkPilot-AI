@@ -6,14 +6,19 @@
  * when the account is gone or has no key. Nothing here holds a key.
  *
  * The key of a pin is the provider of the account: one of
- * `AI_ACCOUNT_PROVIDERS` (`gemini` is written `google`) or `claude`, whose
- * accounts are its OAuth profiles (the value is then a profile id).
+ * `AI_ACCOUNT_PROVIDERS` (`gemini` is written `google`), `claude`, whose
+ * accounts are its OAuth profiles (the value is then a profile id), or a CLI
+ * of `AI_LOGIN_PROVIDERS` (`copilot`, `codex`, `gemini-cli`), whose accounts
+ * are sign-in folders (the automatic failover writes those).
  */
 
 import {
+	AI_LOGIN_PROVIDERS,
 	type AiAccountPins,
 	accountProviderOf,
 	CLAUDE_ACCOUNT_PROVIDER,
+	engineProviderOfAccount,
+	loginProviderOf,
 } from "../types/ai-accounts";
 import { isClaudeProvider } from "./task-engine";
 
@@ -46,19 +51,54 @@ export function sanitizeAccountPins(value: unknown): AiAccountPins | undefined {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
 	const pins: AiAccountPins = {};
 	for (const [provider, id] of Object.entries(value as Record<string, unknown>)) {
-		const key = pinProviderOf(provider);
+		const key = pinProviderOf(provider) ?? (AI_LOGIN_PROVIDERS.includes(provider) ? provider : undefined);
 		if (key && isPinId(id)) pins[key] = id;
 	}
 	return Object.keys(pins).length > 0 ? pins : undefined;
 }
 
-/** The pins a task runs with: the project's, each replaced by the card's own. */
+/**
+ * The pins a task runs with: the project's, each replaced by the card's own.
+ * A card pin also replaces the project's pins of the same engine: a card on a
+ * Codex sign-in does not run on the OpenAI key the project pins.
+ */
 export function mergeAccountPins(
 	taskPins: unknown,
 	projectPins: unknown,
 ): AiAccountPins | undefined {
-	const merged = { ...sanitizeAccountPins(projectPins), ...sanitizeAccountPins(taskPins) };
+	const project: AiAccountPins = { ...sanitizeAccountPins(projectPins) };
+	const task = sanitizeAccountPins(taskPins) ?? {};
+	for (const key of Object.keys(task)) {
+		for (const sibling of siblingPinKeys(key)) delete project[sibling];
+	}
+	const merged = { ...project, ...task };
 	return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+/**
+ * Every pin key whose accounts can run `provider`, API key first: OpenAI
+ * runs on an OpenAI key or a Codex CLI sign-in, Copilot on a GitHub CLI one.
+ */
+export function pinKeysOf(provider: string | undefined | null): string[] {
+	const keys = [pinProviderOf(provider), loginProviderOf(provider)];
+	return [...new Set(keys.filter((key): key is string => Boolean(key)))];
+}
+
+/**
+ * The other pin keys whose accounts run the same engine as an account of
+ * `key`: `codex` for `openai` and back, none for the others.
+ */
+export function siblingPinKeys(key: string): string[] {
+	return pinKeysOf(engineProviderOfAccount(key)).filter((other) => other !== key);
+}
+
+/** The sign-in account pinned for `provider` (`codex` for OpenAI), or undefined. */
+export function pinnedLoginAccountOf(
+	pins: AiAccountPins | undefined,
+	provider: string | undefined | null,
+): string | undefined {
+	const key = loginProviderOf(provider);
+	return key ? pins?.[key] : undefined;
 }
 
 /** The account pinned for `provider` (aliases included), or undefined. */
@@ -93,7 +133,7 @@ export function pinsForProviders(
 	providers: readonly string[],
 ): AiAccountPins | undefined {
 	if (!pins) return undefined;
-	const used = new Set(providers.map(pinProviderOf));
+	const used = new Set(providers.flatMap(pinKeysOf));
 	const kept = Object.fromEntries(Object.entries(pins).filter(([key]) => used.has(key)));
 	return Object.keys(kept).length > 0 ? kept : undefined;
 }

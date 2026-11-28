@@ -22,10 +22,9 @@ vi.mock("../../agent/task-provider-env", () => ({
 }));
 
 import {
-	accountPinKey,
 	chainHasOtherProvider,
+	defaultPinKey,
 	excludedEntries,
-	pinnedAccountOf,
 	stoppedTask,
 	taskPhaseProvider,
 } from "../task-phase-provider";
@@ -56,33 +55,50 @@ describe("stoppedTask", () => {
 	it("names the provider of the phase the task stopped in", () => {
 		found.task = { metadata: { engine: { coding: " Copilot " } } };
 		found.project = { id: "p1", settings: {} };
-		expect(stoppedTask("t1")).toEqual({ provider: "copilot", projectId: "p1", specDirs: ["/specs/main", "/specs/wt"] });
+		expect(stoppedTask("t1")).toEqual({
+			provider: "copilot",
+			projectId: "p1",
+			specDirs: ["/specs/main", "/specs/wt"],
+			pins: undefined,
+			pinKeys: ["copilot"],
+			defaultKey: "copilot",
+		});
 		found.task = { metadata: { engine: { qa: "openai" }, paused: { paused_phase: "qa_review" } } };
 		expect(taskPhaseProvider("t1", "p1")).toBe("openai");
 	});
 });
 
 describe("the account a stopped task is pinned to", () => {
-	it("reads the task's pin first, then its project's, under the provider's key", () => {
+	it("merges the task's pins over its project's, and names the keys of its provider", () => {
 		found.task = { metadata: { engine: { coding: "gemini" }, aiAccounts: { google: "g-task" } } };
 		found.project = { id: "p1", settings: { aiAccounts: { google: "g-project", claude: "work" } } };
-		expect(stoppedTask("t1")).toMatchObject({ provider: "gemini", pinKey: "google", pinnedAccount: "g-task" });
-		found.task = { metadata: { engine: { coding: "gemini" } } };
-		expect(stoppedTask("t1")).toMatchObject({ pinKey: "google", pinnedAccount: "g-project" });
+		expect(stoppedTask("t1")).toMatchObject({
+			provider: "gemini",
+			pins: { google: "g-task", claude: "work" },
+			pinKeys: ["google"],
+		});
 		found.task = { metadata: {} };
-		expect(stoppedTask("t1")).toMatchObject({ provider: "anthropic", pinKey: "claude", pinnedAccount: "work" });
+		expect(stoppedTask("t1")).toMatchObject({ provider: "anthropic", pinKeys: ["claude"], defaultKey: "claude" });
 	});
 
-	it("has no pin for a provider without accounts, nor for a pin that is not text", () => {
-		found.task = { metadata: { engine: { coding: "copilot" }, aiAccounts: { copilot: "x" } } };
+	it("keeps CLI sign-in pins, and a card's Codex pin replaces the project's OpenAI one", () => {
+		found.task = { metadata: { engine: { coding: "openai" }, aiAccounts: { codex: "c1" } } };
+		found.project = { id: "p1", settings: { aiAccounts: { openai: "o1", copilot: "g1" } } };
+		expect(stoppedTask("t1")).toMatchObject({
+			pins: { codex: "c1", copilot: "g1" },
+			pinKeys: ["openai", "codex"],
+			defaultKey: "openai",
+		});
+		settings.value = { globalOpenAIAuthMode: "codex-cli" };
+		expect(stoppedTask("t1")).toMatchObject({ defaultKey: "codex" });
+	});
+
+	it("has no keys for a provider without accounts", () => {
+		found.task = { metadata: { engine: { coding: "ollama" } } };
 		found.project = { id: "p1", settings: {} };
-		expect(stoppedTask("t1")).toMatchObject({ pinKey: undefined, pinnedAccount: undefined });
-		expect(accountPinKey("claude")).toBe("claude");
-		expect(accountPinKey("ollama")).toBeUndefined();
-		expect(pinnedAccountOf({ openai: 3 }, "openai")).toBeUndefined();
-		expect(pinnedAccountOf({ openai: "" }, "openai")).toBeUndefined();
-		expect(pinnedAccountOf(["openai"], "openai")).toBeUndefined();
-		expect(pinnedAccountOf(null, "openai")).toBeUndefined();
+		expect(stoppedTask("t1")).toMatchObject({ pins: undefined, pinKeys: [], defaultKey: undefined });
+		expect(defaultPinKey(["copilot"], { globalOpenAIAuthMode: "codex-cli" })).toBe("copilot");
+		expect(defaultPinKey(["openai", "codex"], undefined)).toBe("openai");
 	});
 });
 

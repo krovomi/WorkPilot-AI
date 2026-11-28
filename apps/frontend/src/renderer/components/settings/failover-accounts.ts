@@ -6,7 +6,11 @@
  * The ids are the ones the main reads (shared/utils/failover-chain.ts).
  */
 import type { ClaudeProfile } from "@shared/types/agent";
-import type { AiAccountView } from "@shared/types/ai-accounts";
+import {
+	type AiAccountView,
+	engineProviderOfAccount,
+	isAccountUsable,
+} from "@shared/types/ai-accounts";
 import type { APIProfile } from "@shared/types/profile";
 import {
 	apiProfileProvider,
@@ -84,17 +88,19 @@ export function buildFailoverAccounts(sources: FailoverSources): FailoverAccount
 		covered.add(provider);
 	}
 	// Several accounts of one provider: each is its own entry, and the
-	// provider's generic entry would only repeat its default account.
+	// provider's generic entry would only repeat its default account. A Codex
+	// sign-in runs OpenAI, whose generic entry stays: it is the OpenAI key.
 	for (const account of sources.aiAccounts ?? []) {
-		if (!account.hasKey) continue;
+		if (!isAccountUsable(account)) continue;
+		const provider = engineProviderOfAccount(account.provider);
 		accounts.push({
 			id: failoverEntryId("account", account.id),
 			kind: "account",
-			provider: account.provider,
+			provider,
 			label: account.name,
 			isActive: sources.aiAccountDefaults?.[account.provider] === account.id,
 		});
-		covered.add(account.provider);
+		if (provider === account.provider) covered.add(provider);
 	}
 	for (const { name, label } of sources.providers) {
 		if (!sources.connected[name] || covered.has(name)) continue;
