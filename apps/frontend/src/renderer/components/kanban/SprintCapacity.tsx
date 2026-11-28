@@ -158,7 +158,7 @@ export function SprintCapacity({ sprint, points, proposed = 0, canEdit }: Sprint
 					{proposed > 0 && (
 						<div
 							data-testid="sprint-capacity-proposed"
-							className="absolute inset-y-0 bg-[repeating-linear-gradient(135deg,var(--color-violet-500)_0_5px,transparent_5px_9px)] bg-violet-500/30"
+							className="absolute inset-y-0 bg-[repeating-linear-gradient(135deg,currentColor_0_5px,transparent_5px_9px)] bg-violet-500/30 text-violet-500"
 							style={{ left: width(points), width: width(proposed) }}
 						/>
 					)}
