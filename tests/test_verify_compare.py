@@ -272,3 +272,29 @@ class TestRoute:
         body = TestClient(app).post("/api/verify/compare", json={"spec_id": "x"}).json()
         assert body["success"] is False
         assert json.dumps(body).find("Traceback") == -1
+
+
+class TestCapturedPagesOnly:
+    def test_a_verification_with_pages_only_is_compared_for_its_captures(self, repo):
+        root, spec = repo
+        record = load_record(spec / "verify")
+        record["scenario"] = []
+        record["screenshots"] = [
+            {
+                "path": "a.png",
+                "label": "web final state",
+                "platform": "web",
+                "url": "http://127.0.0.1:5173/orders",
+            }
+        ]
+        save_record(spec / "verify", record)
+        seen: list = []
+        observe = _fake_observe([])
+
+        async def watching(code_dir, side_spec, context, shot):
+            seen.append((side_spec.name, context.get("_spec_dir")))
+            return await observe(code_dir, side_spec, context, shot)
+
+        entry = asyncio.run(run_base_comparison(root, spec, observe=watching))
+        assert entry["status"] == "done"
+        assert seen == [("base", str(spec.resolve())), ("task", str(spec.resolve()))]

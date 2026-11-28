@@ -140,6 +140,14 @@ async def run_verify_phase(resolved, ctx):
             phase.id, phase.impl, resolved.dispatch, None, detail=str(exc)[:200]
         )
 
+    from .captures_step import after_verify
+
+    # The captures the pull request will show: decided from the changed
+    # files, "before" from the base branch, personal data replaced by fakes.
+    await after_verify(
+        ctx.project_dir, ctx.spec_dir, record, ctx.changed_files, log=_log
+    )
+
     report = render_report(record)
     output = _write_output(ctx, phase.id, report)
     status = record.get("status")

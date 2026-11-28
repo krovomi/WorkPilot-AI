@@ -1,0 +1,6 @@
+---
+section: ✨ Nouveautés
+---
+
+- **Captures avant/après préparées pour la PR** : une tâche dont les fichiers changés touchent un écran (web, Electron, Razor et Blazor, XAML, Flutter, SwiftUI, Android, templates serveur, fenêtres et pages WinDev) prépare ses captures toute seule. La vérification prend l'« après », la comparaison avec la branche de base prend l'« avant » de chaque page capturée, et la vue téléphone d'une page ne remplace plus sa capture de bureau. Réglable par projet et par carte (`CAPTURES_MODE` : automatique, toujours, jamais).
+- **De fausses données à la place des vraies sur les captures** : avant qu'une capture puisse quitter la machine, chaque e-mail, téléphone, IBAN, numéro de carte, nom ou adresse d'un champ, et chaque secret, est remplacé par une fausse valeur du même type et du même format. Un e-mail garde son extension, un téléphone son indicatif, un IBAN son pays et une clé valide, une carte devient un numéro de test du même réseau. Une même valeur donne toujours le même faux sur toutes les captures de la tâche. Sur le web, le remplacement se fait dans la page juste avant la capture, puis la page est remise en état ; ailleurs, l'OCR local repère le texte et le faux est écrit à sa place. Une capture qu'aucune vérification n'a pu lire reste sur la tâche.
