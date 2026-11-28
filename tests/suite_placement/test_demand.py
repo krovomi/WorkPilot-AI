@@ -124,3 +124,14 @@ def test_gpu_memory_without_the_tool_is_empty(monkeypatch):
 
     monkeypatch.setattr(demand_module.subprocess, "run", boom)
     assert demand_module._gpu_memory_by_pid() == {}
+
+
+def test_a_block_shorter_than_a_coarse_clock_tick_still_lasts(monkeypatch):
+    # On Windows, Python 3.12's monotonic clock ticks every ~15 ms: a short
+    # session read 0 s with it and was never added to the history.
+    monkeypatch.setattr(demand_module.time, "monotonic", lambda: 1000.0)
+    monkeypatch.setattr(demand_module, "_gpu_memory_by_pid", lambda: {})
+    with Meter(interval=0.05) as meter:
+        pass
+    assert meter.usage is not None
+    assert meter.usage.seconds > 0
