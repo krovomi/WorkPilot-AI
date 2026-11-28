@@ -10,6 +10,7 @@ screenshots; the design of each feature is in [`architecture/`](architecture/).
 | Feature | Description |
 |---------|-------------|
 | **Kanban Board** | Visual task management from planning through completion with real-time agent progress |
+| **Agile board** | As in Jira: **Failed** and **Abandoned** columns (with the reason), the **Blocked** flag, **sprints** (start, close with carry-over, points from Smart Estimation, never a duration), **swimlanes** (sprint, sub-project, priority, type, source, parent), **Board / List / Timeline** layouts, **reports** (burndown, velocity, cumulative flow, cycle time, throughput, unsuccessful ends), **labels**, quick filters (Blocked, Changed this week, My tasks on a server), saved views and auto-archive of finished tasks. Local and server mode. See [docs/architecture/kanban-sprints.md](architecture/kanban-sprints.md), [kanban-reports.md](architecture/kanban-reports.md) |
 | **Multi-Agent Pipeline** | Planner → Coder → QA Reviewer → QA Fixer pipeline runs autonomously end-to-end |
 | **Parallel Execution** | Up to 12 simultaneous agent terminals for parallel builds |
 | **Isolated Workspaces** | Every task runs in a dedicated git worktree — your main branch stays safe |
