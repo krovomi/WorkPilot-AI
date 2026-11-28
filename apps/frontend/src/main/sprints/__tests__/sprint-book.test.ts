@@ -60,3 +60,19 @@ describe("sprint book", () => {
 		expect(deleteSprint([planned], "sp-0000ffff")).toEqual({ error: "not_found" });
 	});
 });
+
+describe("sprint capacity in the book", () => {
+	it("keeps the capacity through a rename and clears it with null", () => {
+		let list = sprints(saveSprint([], { name: "S1", capacity: 21 }, NOW, "sp-00000001"));
+		expect(list[0].capacity).toBe(21);
+		list = sprints(saveSprint(list, { id: "sp-00000001", name: "S1b" }, NOW));
+		expect(list[0].capacity).toBe(21);
+		list = sprints(saveSprint(list, { id: "sp-00000001", name: "S1b", capacity: 16 }, NOW));
+		expect(list[0].capacity).toBe(16);
+		list = sprints(saveSprint(list, { id: "sp-00000001", name: "S1b", capacity: null }, NOW));
+		expect(list[0]).not.toHaveProperty("capacity");
+		expect(saveSprint(list, { id: "sp-00000001", name: "S1b", capacity: 0 }, NOW)).toEqual({ error: "invalid" });
+		// A new sprint created with a null capacity simply has none.
+		expect(sprints(saveSprint([], { name: "S2", capacity: null }, NOW, "sp-00000002"))[0]).not.toHaveProperty("capacity");
+	});
+});

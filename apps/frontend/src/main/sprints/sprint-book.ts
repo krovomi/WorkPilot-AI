@@ -65,13 +65,18 @@ export function saveSprint(sprints: readonly Sprint[], raw: unknown, now: string
 	if (!draft) return { error: "invalid" };
 	if (!draft.id) {
 		if (sprints.length >= MAX_SPRINTS) return { error: "too_many" };
-		const sprint: Sprint = { ...draft, id, state: "planned", createdAt: now };
+		const { capacity, ...fields } = draft;
+		const sprint: Sprint = { ...fields, id, state: "planned", createdAt: now };
+		if (typeof capacity === "number") sprint.capacity = capacity;
 		return { sprints: [...sprints, sprint], sprint };
 	}
 	const current = sprints.find((s) => s.id === draft.id);
 	if (!current) return { error: "not_found" };
 	if (current.state === "closed") return { error: "closed" };
 	const sprint: Sprint = { ...current, name: draft.name, goal: draft.goal, startDate: draft.startDate, endDate: draft.endDate };
+	// Left out, the capacity is kept; null clears it (back to the velocity).
+	if (draft.capacity === null) delete sprint.capacity;
+	else if (typeof draft.capacity === "number") sprint.capacity = draft.capacity;
 	return { sprints: replace(sprints, sprint), sprint };
 }
 

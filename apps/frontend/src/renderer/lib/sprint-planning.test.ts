@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { Sprint, Task } from "../../shared/types";
 import { NO_SPRINT } from "./kanban-filter";
-import { byPlanningOrder, daysLeft, focusedSprint, isPlannable, matchesSearch, planningPools } from "./sprint-planning";
+import {
+	byPlanningOrder,
+	carriedFromSprint,
+	daysLeft,
+	focusedSprint,
+	isPlannable,
+	matchesQuick,
+	matchesSearch,
+	missingBlockers,
+	planningPools,
+	waitingOn,
+} from "./sprint-planning";
 
 const sprint = (id: string, state: Sprint["state"], endDate?: string): Sprint => ({
 	id,
@@ -90,5 +101,47 @@ describe("daysLeft", () => {
 
 	it("is unknown without an end day", () => {
 		expect(daysLeft({}, noon("2026-11-28"))).toBeNull();
+	});
+});
+
+describe("planning helps", () => {
+	const SP = "sp-0000000a";
+
+	it("filters the backlog by urgency, bugs and missing estimates", () => {
+		const urgent = card("u", { metadata: { priority: "urgent", smartEstimate: { complexityScore: 3 } } as Task["metadata"] });
+		const high = card("h", { metadata: { priority: "high" } as Task["metadata"] });
+		const bug = card("b", { metadata: { category: "bug_fix", smartEstimate: { complexityScore: 2 } } as Task["metadata"] });
+		expect([urgent, high, bug].filter((task) => matchesQuick(task, "urgent")).map((task) => task.id)).toEqual(["u", "h"]);
+		expect([urgent, high, bug].filter((task) => matchesQuick(task, "bugs")).map((task) => task.id)).toEqual(["b"]);
+		expect([urgent, high, bug].filter((task) => matchesQuick(task, "unestimated")).map((task) => task.id)).toEqual(["h"]);
+		expect([urgent, high, bug].every((task) => matchesQuick(task, "all"))).toBe(true);
+	});
+
+	it("names the closed sprint that carried a card only while the card is where it carried it", () => {
+		const closed: Sprint = {
+			...sprint("sp-0000000c", "closed"),
+			report: { done: 0, donePoints: 0, carried: 1, carriedPoints: 0, carriedTo: SP },
+		};
+		const carried = card("c", { metadata: { sprintId: SP, carriedFrom: closed.id } as Task["metadata"] });
+		expect(carriedFromSprint(carried, [closed])?.id).toBe(closed.id);
+		// Moved by a person to another sprint since: no longer « carried over ».
+		const moved = card("m", { metadata: { sprintId: "sp-0000000b", carriedFrom: closed.id } as Task["metadata"] });
+		expect(carriedFromSprint(moved, [closed])).toBeUndefined();
+		expect(carriedFromSprint(card("n"), [closed])).toBeUndefined();
+	});
+
+	it("lists what a card waits on outside its sprint, and what of it is still in the backlog", () => {
+		const blocker = card("a");
+		const inSprint = card("s", { metadata: { sprintId: SP } as Task["metadata"] });
+		const done = card("d", { status: "done" });
+		const elsewhere = card("e", { metadata: { sprintId: "sp-0000000b" } as Task["metadata"] });
+		const waiting = card("w", {
+			metadata: { sprintId: SP, blockedBy: ["00a", "s", "d", "e", "gone", "w"] } as Task["metadata"],
+		});
+		const all = [blocker, inSprint, done, elsewhere, waiting];
+		expect(waitingOn(waiting, all).map((task) => task.id)).toEqual(["a", "e"]);
+		// Only the backlog card can be added: « e » is planned in another sprint.
+		expect(missingBlockers([waiting, inSprint], all).map((task) => task.id)).toEqual(["a"]);
+		expect(missingBlockers([{ ...waiting, status: "done" } as Task], all)).toEqual([]);
 	});
 });
