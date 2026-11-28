@@ -56,6 +56,7 @@ import { setupPromptOptimizerListeners } from "./prompt-optimizer-store";
 import { setupRegressionGuardianListeners } from "./regression-guardian-store";
 import { setupReleaseCoordinatorListeners } from "./release-coordinator-store";
 import { setupSandboxListeners } from "./sandbox-store";
+import { setupTaskRunFactsListeners } from "./task-run-facts-refresh";
 import { setupTaskSandboxListeners } from "./task-sandbox-store";
 import { setupSecureStorageListeners } from "./secure-storage-store";
 import { setupSelfHealingListeners } from "./self-healing-store";
@@ -148,6 +149,9 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["Sandbox", setupSandboxListeners],
 	// Whether each task's commands run in the OS sandbox, for its card.
 	["TaskSandbox", setupTaskSandboxListeners],
+	// Not an IPC listener: a card's bilan (history, people, spend) read again
+	// when its status changes, so a card finished in this session shows it.
+	["TaskRunFacts", setupTaskRunFactsListeners],
 	// Not a page's feature: the sidebar's warning that stored API keys are
 	// not protected by the OS keyring.
 	["SecureStorage", setupSecureStorageListeners],
