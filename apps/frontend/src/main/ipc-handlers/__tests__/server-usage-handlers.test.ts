@@ -23,6 +23,15 @@ const mocks = vi.hoisted(() => ({
 		markUsageNoticeSeen: vi.fn(async () => ["seen"]),
 		eraseAccount: vi.fn(async (...args: unknown[]) => ["erase", ...args]),
 	},
+	report: {
+		getReportSettings: vi.fn(async () => ["reportSettings"]),
+		setReportSettings: vi.fn(async (...args: unknown[]) => ["setReportSettings", ...args]),
+		getReport: vi.fn(async (...args: unknown[]) => ["report", ...args]),
+		sendReportNow: vi.fn(async () => ["sendNow"]),
+		getBudgets: vi.fn(async () => ["budgets"]),
+		setBudget: vi.fn(async (...args: unknown[]) => ["setBudget", ...args]),
+		removeBudget: vi.fn(async (...args: unknown[]) => ["removeBudget", ...args]),
+	},
 }));
 
 vi.mock("electron", () => ({
@@ -35,6 +44,7 @@ vi.mock("electron", () => ({
 }));
 vi.mock("../../server-usage", () => mocks.usage);
 vi.mock("../../server-usage-views", () => mocks.views);
+vi.mock("../../server-usage-report", () => mocks.report);
 
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import { registerServerUsageHandlers } from "../server-usage-handlers";
@@ -71,5 +81,27 @@ describe("usage channels", () => {
 			"u1",
 			"a@b.c",
 		]);
+	});
+
+	it("pass the report's and the budgets' arguments, untouched, to the module that checks them", async () => {
+		registerServerUsageHandlers();
+		const call = (channel: string, ...args: unknown[]) => mocks.handlers.get(channel)?.({}, ...args);
+		expect(await call(IPC_CHANNELS.SERVER_USAGE_GET_REPORT_SETTINGS)).toEqual(["reportSettings"]);
+		expect(await call(IPC_CHANNELS.SERVER_USAGE_SET_REPORT_SETTINGS, { time: "09:00" })).toEqual([
+			"setReportSettings",
+			{ time: "09:00" },
+		]);
+		expect(await call(IPC_CHANNELS.SERVER_USAGE_REPORT, "weekly", "2026-11-20")).toEqual([
+			"report",
+			"weekly",
+			"2026-11-20",
+		]);
+		expect(await call(IPC_CHANNELS.SERVER_USAGE_SEND_REPORT)).toEqual(["sendNow"]);
+		expect(await call(IPC_CHANNELS.SERVER_USAGE_BUDGETS)).toEqual(["budgets"]);
+		expect(await call(IPC_CHANNELS.SERVER_USAGE_SET_BUDGET, { scope: "group" })).toEqual([
+			"setBudget",
+			{ scope: "group" },
+		]);
+		expect(await call(IPC_CHANNELS.SERVER_USAGE_REMOVE_BUDGET, "b1")).toEqual(["removeBudget", "b1"]);
 	});
 });

@@ -188,7 +188,9 @@
 		},
 		"panes": {
 			"dashboard": "Figures",
-			"settings": "Collection and retention"
+			"settings": "Collection and retention",
+			"report": "Report",
+			"budgets": "Budgets"
 		},
 		"dashboard": {
 			"period": "Period",
@@ -297,6 +299,130 @@
 				"button": "Erase the account",
 				"done": "The account was erased. Its totals now count as an erased account."
 			}
+		},
+		"report": {
+			"description": "A summary of the organization's usage, sent by email. It carries figures, never a prompt, code, typed text or file name.",
+			"noSmtp": "This server cannot send mail (SMTP is not configured): the report can only be read here.",
+			"enabled": "Send the daily report",
+			"when": "When",
+			"time": "Time",
+			"timezone": "Time zone",
+			"invalidTime": "A time as HH:MM and a time zone such as Europe/Paris.",
+			"days": "Days",
+			"weekdays": {
+				"0": "Mon",
+				"1": "Tue",
+				"2": "Wed",
+				"3": "Thu",
+				"4": "Fri",
+				"5": "Sat",
+				"6": "Sun"
+			},
+			"noDay": "Choose at least one day.",
+			"weekly": "Also the past week's report, each Monday",
+			"monthly": "Also the past month's report, on the first of the month",
+			"content": "Content",
+			"language": "Language",
+			"languages": {
+				"fr": "French",
+				"en": "English"
+			},
+			"names": "Name people in the report",
+			"namesHint": "Off, the report gives totals only and names nobody.",
+			"recipients": "Recipients",
+			"recipientsHint": "One address per line, up to {{max}}.",
+			"defaultRecipients": "Left empty, the report goes to the members whose role reads usage: {{list}}.",
+			"noReader": "nobody yet",
+			"invalidRecipients": "Check the addresses: one per line, up to {{max}}.",
+			"outside": "{{address}} is not a member of this organization: the report will leave it.",
+			"lastSends": "Last sends",
+			"noSends": "Nothing sent yet.",
+			"sentAt": "When",
+			"kind": "Report",
+			"status": "Outcome",
+			"recipientCount": "Recipients",
+			"kinds": {
+				"daily": "Daily",
+				"weekly": "Weekly",
+				"monthly": "Monthly"
+			},
+			"statuses": {
+				"sent": "Sent",
+				"failed": "Failed",
+				"no_smtp": "No SMTP",
+				"no_recipient": "No recipient"
+			},
+			"sendNow": "Send now",
+			"sendNowHint": "Sends the last daily report to its recipients now; the scheduled send still goes at its time.",
+			"sent_one": "Sent to {{count}} address.",
+			"sent_other": "Sent to {{count}} addresses.",
+			"notSent": "Not sent: {{status}}.",
+			"preview": {
+				"title": "Preview",
+				"hint": "The report as the email carries it.",
+				"day": "Period holding",
+				"show": "Show",
+				"period": "From {{start}} to {{end}}",
+				"figure": "Figure",
+				"value": "This period",
+				"previous": "Period before",
+				"average": "7-day mean",
+				"figures": {
+					"tokens": "Tokens",
+					"cost_usd": "Cost",
+					"active": "Active people",
+					"new_members": "New members",
+					"runs": "Runs",
+					"succeeded": "Succeeded",
+					"failed": "Failed",
+					"success_rate": "Success rate",
+					"merged": "Tasks merged",
+					"cost_per_task_usd": "Cost per delivered task"
+				},
+				"dormant_one": "{{count}} member not seen for a while.",
+				"dormant_other": "{{count}} members not seen for a while.",
+				"top": "Who used most",
+				"unnamed": "Not named",
+				"alerts": "Budget alerts",
+				"budgetAlert": "Organization budget: {{percent}} used (alert at {{threshold}} %).",
+				"scopeAlert": "{{scope}} {{name}}: {{percent}} used (alert at {{threshold}} %)."
+			}
+		},
+		"budgets": {
+			"description": "Monthly token budgets for a person, a group or a project. Those who read usage get an email at 80 % and at 100 %; a blocking budget refuses new runs once spent, until the next month.",
+			"organization": "Organization budget",
+			"organizationHint": "{{used}} of {{limit}} tokens this month ({{percent}}), set in Quotas.",
+			"noOrganization": "No organization budget: it is set in Quotas.",
+			"list": "Budgets",
+			"empty": "No budget yet.",
+			"scope": "For",
+			"name": "Name",
+			"limit": "Monthly tokens",
+			"used": "Used this month",
+			"block": "Blocks new runs",
+			"yes": "Yes",
+			"no": "No",
+			"unknown": "Unknown",
+			"scopes": {
+				"person": "Person",
+				"group": "Group",
+				"project": "Project"
+			},
+			"remove": "Remove",
+			"removeLabel": "Remove the budget of {{name}}",
+			"set": "Add or change a budget",
+			"setHint": "A budget set again for the same person, group or project replaces it.",
+			"target": "Who",
+			"choose": "Choose",
+			"tokens": "Monthly tokens",
+			"invalidTokens": "A whole number of tokens, from 1 to 1,000,000,000,000.",
+			"blockToggle": "Refuse new runs once it is spent",
+			"save": "Set the budget",
+			"alerts": "Last alerts",
+			"noAlerts": "No alert yet.",
+			"month": "Month",
+			"threshold": "Threshold",
+			"recipients": "Sent to"
 		}
 	}
 }
